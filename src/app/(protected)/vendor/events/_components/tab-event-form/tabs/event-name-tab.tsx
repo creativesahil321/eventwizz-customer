@@ -1,0 +1,1314 @@
+"use client";
+
+import React, { useState, useEffect, useCallback } from "react";
+import { useForm, useFieldArray } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { Button } from "@/components/ui/button";
+import {
+  Form,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormControl,
+  FormMessage,
+  FormDescription,
+} from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import { FileUploader } from "@/components/ui/file-uploader";
+import { TiptapEditor } from "@/components/ui/tiptap-editor";
+import { Plus, X } from "lucide-react";
+import { useEventCategories } from "@/services/vendor/events/query";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { toast } from "sonner";
+import { useEventFormContext } from "../../events-form-provider";
+import { StepOneType, stepOneSchema } from "../schema";
+import { eventsService } from "@/services/vendor/events/events.service";
+import { useRouter } from "next/navigation";
+import Image from "next/image";
+
+export default function EventNameTab() {
+  // No need to use session update as we get data from API
+  const router = useRouter();
+  // Access the GLOBAL form context
+  const {
+    form: globalForm,
+    save,
+    isLoading: globalLoading,
+    setActiveField,
+  } = useEventFormContext();
+
+  // Get event categories
+  const { data: eventCategories, isLoading: isEventCategoriesLoading } =
+    useEventCategories();
+
+  // State for banner files and uploads
+  const [bannerType, setBannerType] = useState<"image" | "video">("image");
+  const [bannerImageFile, setBannerImageFile] = useState<File[]>([]);
+  const [bannerVideoFile, setBannerVideoFile] = useState<File[]>([]);
+  const [bannerImageUploading, setBannerImageUploading] = useState(false);
+  const [bannerVideoUploading, setBannerVideoUploading] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [eventSchedularBackgroundImage, setEventSchedularBackgroundImage] =
+    useState<File[] | null>(null);
+
+  // URL strings from backend for existing videos/images
+  const [bannerImageUrl, setBannerImageUrl] = useState<string>("");
+  const [bannerVideoUrl, setBannerVideoUrl] = useState<string>("");
+
+  // Initialize form with combined step data
+  const stepOneDefaults = globalForm.getValues().stepOne;
+  const vendorLocationId = (() => {
+    const storedId = localStorage.getItem("vendor_location_id");
+    const parsedId = storedId ? parseInt(storedId, 10) : 0;
+    const globalFormId = globalForm.getValues("stepOne.vendor_location_id");
+    const validId =
+      !isNaN(parsedId) && parsedId > 0 ? parsedId : globalFormId || 0;
+    return Number(validId);
+  })();
+
+  // Setup form with the new schema structure
+  const form = useForm<StepOneType>({
+    resolver: zodResolver(stepOneSchema),
+    defaultValues: {
+      step: 1,
+      vendor_location_id: vendorLocationId,
+      event_category_id: stepOneDefaults?.event_category_id || undefined,
+      event_name: stepOneDefaults?.event_name || "",
+      event_banner_image: stepOneDefaults?.event_banner_image,
+      event_banner_video: stepOneDefaults?.event_banner_video,
+      event_banner_heading: stepOneDefaults?.event_banner_heading || "",
+      event_banner_sub_heading: stepOneDefaults?.event_banner_sub_heading || "",
+      about_event_heading: stepOneDefaults?.about_event_heading || "",
+      about_event_sub_heading: stepOneDefaults?.about_event_sub_heading || "",
+      about_event_description: stepOneDefaults?.about_event_description || "",
+      event_schedular_title: stepOneDefaults?.event_schedular_title || "",
+      event_schedular: stepOneDefaults?.event_schedular || [
+        { title: "", time: "" },
+      ],
+      event_schedular_background_image:
+        stepOneDefaults?.event_schedular_background_image,
+      remove_event_banner_image: false,
+      remove_event_banner_video: false,
+    } as StepOneType,
+    mode: "onChange",
+  });
+
+  // Update form when vendor_location_id changes
+  useEffect(() => {
+    form.setValue("vendor_location_id", vendorLocationId);
+  }, [vendorLocationId, form]);
+
+  // Initialize banner image and video from existing data
+  useEffect(() => {
+    const bannerImage = form.watch("event_banner_image");
+    const bannerVideo = form.watch("event_banner_video");
+
+    // Handle banner image
+    if (bannerImage) {
+      if (typeof bannerImage === "string" && bannerImage) {
+        // If it's a URL string, set the banner type to image
+        setBannerImageUrl(bannerImage);
+        setBannerType("image");
+        console.log("Existing image URL detected:", bannerImage);
+      } else if (bannerImage instanceof File) {
+        // If it's already a File object
+        setBannerImageFile([bannerImage]);
+        setBannerImageUrl(""); // Clear URL when using File
+        setBannerType("image");
+        console.log("Existing image File detected:", bannerImage);
+      }
+    } else {
+      setBannerImageUrl("");
+    }
+
+    // Handle banner video
+    if (bannerVideo) {
+      if (typeof bannerVideo === "string" && bannerVideo) {
+        // If it's a URL string
+        setBannerVideoUrl(bannerVideo);
+        setBannerType("video");
+        console.log("Existing video URL detected:", bannerVideo);
+      } else if (bannerVideo instanceof File) {
+        // If it's already a File object
+        setBannerVideoFile([bannerVideo]);
+        setBannerVideoUrl(""); // Clear URL when using File
+        setBannerType("video");
+        console.log("Existing video File detected:", bannerVideo);
+      }
+    } else {
+      setBannerVideoUrl("");
+    }
+
+    // Handle event scheduler background image
+    const eventSchedularBackgroundImage = form.watch(
+      "event_schedular_background_image"
+    );
+    if (eventSchedularBackgroundImage) {
+      if (typeof eventSchedularBackgroundImage === "string") {
+        // Don't set as File if it's a URL
+        setEventSchedularBackgroundImage(null);
+      } else {
+        setEventSchedularBackgroundImage([
+          eventSchedularBackgroundImage as unknown as File,
+        ]);
+      }
+    } else {
+      setEventSchedularBackgroundImage(null);
+    }
+  }, [form]);
+
+  // Cleanup object URLs to prevent memory leaks
+  useEffect(() => {
+    return () => {
+      bannerVideoFile.forEach((file) => {
+        if (file instanceof File) {
+          URL.revokeObjectURL(URL.createObjectURL(file));
+        }
+      });
+    };
+  }, [bannerVideoFile]);
+
+  // Field array for scheduler items
+  const {
+    fields: schedulerFields,
+    append,
+    remove,
+  } = useFieldArray({
+    control: form.control,
+    name: "event_schedular",
+  });
+
+  // Handle field focus for tracking active field
+  const handleFieldFocus = useCallback(
+    (fieldName: string) => {
+      setActiveField?.(fieldName);
+    },
+    [setActiveField]
+  );
+
+  // Handle banner image change
+  const handleBannerImageChange = useCallback(
+    (files: File[]) => {
+      if (files.length === 0) return;
+
+      setBannerImageFile(files);
+      setBannerImageUrl(""); // Clear URL when new file is uploaded
+      setBannerImageUploading(true);
+
+      try {
+        // Update local form
+        form.setValue("event_banner_image", files[0]);
+
+        // Sync to global form
+        const currentStepOne = globalForm.getValues().stepOne || {};
+        globalForm.setValue("stepOne", {
+          ...currentStepOne,
+          event_banner_image: files[0],
+          remove_event_banner_image: false,
+          remove_event_banner_video: false,
+        });
+
+        // Clear removal flags when new file is uploaded
+        form.setValue("remove_event_banner_image", false);
+        form.setValue("remove_event_banner_video", false);
+
+        // Switch to image mode
+        setBannerType("image");
+
+        // Clear video when image is uploaded
+        setBannerVideoFile([]);
+        setBannerVideoUrl(""); // Clear video URL too
+        form.setValue("event_banner_video", undefined);
+      } catch (error) {
+        console.error("Error handling banner image:", error);
+      } finally {
+        setBannerImageUploading(false);
+      }
+    },
+    [form, globalForm]
+  );
+
+  // Handle banner video change
+  const handleBannerVideoChange = useCallback(
+    (files: File[]) => {
+      if (files.length === 0) return;
+
+      setBannerVideoFile(files);
+      setBannerVideoUrl(""); // Clear URL when new file is uploaded
+      setBannerVideoUploading(true);
+
+      try {
+        // Update local form
+        form.setValue("event_banner_video", files[0]);
+        console.log("Video uploaded, form values:", form.getValues());
+
+        // Clear removal flags when new file is uploaded
+        form.setValue("remove_event_banner_image", false);
+        form.setValue("remove_event_banner_video", false);
+
+        // Update global form
+        const currentStepOne = globalForm.getValues().stepOne || {};
+        globalForm.setValue("stepOne", {
+          ...currentStepOne,
+          event_banner_video: files[0],
+          remove_event_banner_image: false,
+          remove_event_banner_video: false,
+        });
+
+        // Switch to video mode
+        setBannerType("video");
+
+        // Clear image when video is uploaded
+        setBannerImageFile([]);
+        setBannerImageUrl(""); // Clear image URL too
+        form.setValue("event_banner_image", undefined);
+        globalForm.setValue("stepOne.event_banner_image", undefined);
+
+        toast.success("Video uploaded successfully");
+      } catch (error) {
+        console.error("Error handling banner video:", error);
+      } finally {
+        setBannerVideoUploading(false);
+      }
+    },
+    [form, globalForm]
+  );
+
+  // Handle banner image removal
+  const handleRemoveBannerImage = useCallback(() => {
+    setBannerImageFile([]);
+    setBannerImageUrl(""); // Clear URL too
+    form.setValue("event_banner_image", undefined);
+    form.setValue("remove_event_banner_image", true);
+
+    // Update global form
+    const currentStepOne = globalForm.getValues().stepOne || {};
+    globalForm.setValue("stepOne", {
+      ...currentStepOne,
+      event_banner_image: undefined,
+      remove_event_banner_image: true,
+    });
+  }, [form, globalForm]);
+
+  // Handle banner video removal
+  const handleRemoveBannerVideo = useCallback(() => {
+    setBannerVideoFile([]);
+    setBannerVideoUrl(""); // Clear URL too
+    form.setValue("event_banner_video", undefined);
+    form.setValue("remove_event_banner_video", true);
+    setBannerType("image");
+
+    // Update global form
+    const currentStepOne = globalForm.getValues().stepOne || {};
+    globalForm.setValue("stepOne", {
+      ...currentStepOne,
+      event_banner_video: undefined,
+      remove_event_banner_video: true,
+    });
+  }, [form, globalForm]);
+
+  // Handle form submission
+  const handleSubmit = useCallback(
+    async (data: StepOneType) => {
+      setIsLoading(true);
+
+      try {
+        // Manually re-trigger validation on all fields to force error display
+        console.log("Form values before validation:", form.getValues());
+        const isValid = await form.trigger();
+
+        // If form is not valid, only highlight fields - no toast
+        if (!isValid) {
+          // Get all validation errors
+          const errors = form.formState.errors;
+          const errorFields = Object.keys(errors);
+
+          // Find the first error field and scroll to it
+          if (errorFields.length > 0) {
+            setActiveField(errorFields[0]);
+
+            // Try to find and focus the field with an error
+            const errorElement = document.querySelector(
+              `[name="${errorFields[0]}"]`
+            );
+            if (errorElement) {
+              (errorElement as HTMLElement).focus();
+              errorElement.scrollIntoView({
+                behavior: "smooth",
+                block: "center",
+              });
+            }
+          }
+
+          setIsLoading(false);
+          return;
+        }
+
+        // Validate event scheduler times
+        if (data.event_schedular && data.event_schedular.length > 0) {
+          // Check for sequence
+          const validSchedules = data.event_schedular.filter(
+            (schedule) => schedule.time && schedule.title
+          );
+          for (let i = 0; i < validSchedules.length - 1; i++) {
+            const currentTime = validSchedules[i].time;
+            const nextTime = validSchedules[i + 1].time;
+
+            if (!currentTime || !nextTime) continue;
+
+            const [currentHours, currentMinutes] = currentTime
+              .split(":")
+              .map(Number);
+            const [nextHours, nextMinutes] = nextTime.split(":").map(Number);
+
+            const currentTotalMinutes = currentHours * 60 + currentMinutes;
+            const nextTotalMinutes = nextHours * 60 + nextMinutes;
+
+            if (nextTotalMinutes <= currentTotalMinutes) {
+              toast.error("Event times must be in ascending order.", {
+                description:
+                  "Please arrange the times from earliest to latest.",
+                duration: 5000,
+              });
+              setIsLoading(false);
+              return;
+            }
+          }
+        }
+
+        // Continue with valid data - don't include vendor_location_id as it's sent in headers
+        const formData = {
+          ...data,
+          // Include video field if it exists
+          ...(form.getValues("event_banner_video") && {
+            event_banner_video: form.getValues("event_banner_video"),
+          }),
+        };
+
+        // SAFETY CHECK: Ensure banner image is included if we have it in state
+        if (bannerImageFile.length > 0 && !formData.event_banner_image) {
+          formData.event_banner_image = bannerImageFile[0];
+        }
+
+        // SAFETY CHECK: Ensure scheduler background image is included if we have it in state
+        if (
+          eventSchedularBackgroundImage &&
+          eventSchedularBackgroundImage.length > 0 &&
+          !formData.event_schedular_background_image
+        ) {
+          formData.event_schedular_background_image =
+            eventSchedularBackgroundImage[0];
+        }
+
+        // Update global form with all fields
+        globalForm.setValue("stepOne", {
+          ...globalForm.getValues().stepOne,
+          ...formData,
+        });
+
+        // Save data using the global save function
+        await save();
+
+        // Update global form
+        globalForm.setValue("stepOne", formData);
+
+        // Check if we already have an event_id from the URL route
+        const pathname = window.location.pathname;
+        let eventIdFromUrl;
+
+        // Handle both URL patterns: /vendor/events/{id} and /vendor/events/create/{id}
+        if (pathname.includes("/events/create/")) {
+          eventIdFromUrl = pathname.split("/events/create/")[1];
+        } else if (pathname.includes("/events/")) {
+          const segment = pathname.split("/events/")[1];
+          // Make sure we don't get "create" as an ID
+          eventIdFromUrl = segment !== "create" ? segment : undefined;
+        }
+
+        // Fallback to form data if URL doesn't contain event ID
+        const eventIdFromGlobalForm =
+          globalForm.getValues().stepOne &&
+          typeof (globalForm.getValues().stepOne as Record<string, unknown>)
+            .event_id === "number"
+            ? String(
+                (globalForm.getValues().stepOne as Record<string, unknown>)
+                  .event_id
+              )
+            : undefined;
+
+        const existingEventId = eventIdFromUrl || eventIdFromGlobalForm;
+        let response;
+
+        if (existingEventId) {
+          // We already have an event_id, so use update API
+          const formDataWithId = {
+            ...formData,
+            event_id: Number(existingEventId),
+          };
+
+          // Update the global form with the event_id too
+          globalForm.setValue("stepOne", {
+            ...(globalForm.getValues().stepOne as StepOneType),
+            event_id: Number(existingEventId),
+          } as StepOneType);
+
+          response = await eventsService.updateStepOneData(
+            formDataWithId,
+            existingEventId.toString()
+          );
+          console.log("Update response:", response);
+        } else {
+          // First time creating event, use create API
+          response = await eventsService.storeStepOneData(formData);
+          console.log("Create response:", response);
+        }
+
+        if (response && response.status) {
+          // Type assertion to handle the response data structure
+          // The API response can have different formats
+          let eventId;
+
+          // For update responses, we can use the existing event ID
+          if (existingEventId) {
+            eventId = Number(existingEventId);
+          }
+          // For create responses, extract from the response
+          else if (response.data) {
+            // Try to handle different response formats
+            if (Array.isArray(response.data)) {
+              // If it's an array, we can't extract an ID directly
+              console.log(
+                "Response data is an array, can't extract ID directly"
+              );
+
+              // Try to get event_id from URL
+              const pathname = window.location.pathname;
+              const matches = pathname.match(/\/events\/(\d+)/);
+              if (matches && matches[1]) {
+                eventId = Number(matches[1]);
+                console.log("Extracted event ID from URL:", eventId);
+              }
+            } else {
+              // Handle object response
+              const responseData = response.data as Record<string, unknown>;
+
+              // Check for common patterns
+              if ("id" in responseData && responseData.id) {
+                eventId = responseData.id as number;
+                console.log("Found ID directly in response.data:", eventId);
+              } else if ("event_id" in responseData && responseData.event_id) {
+                eventId = responseData.event_id as number;
+                console.log("Found event_id in response.data:", eventId);
+              } else if (
+                "data" in responseData &&
+                responseData.data &&
+                typeof responseData.data === "object" &&
+                responseData.data !== null
+              ) {
+                const nestedData = responseData.data as Record<string, unknown>;
+                if ("id" in nestedData && nestedData.id) {
+                  eventId = nestedData.id as number;
+                  console.log("Found ID in response.data.data:", eventId);
+                } else if ("event_id" in nestedData && nestedData.event_id) {
+                  eventId = nestedData.event_id as number;
+                  console.log("Found event_id in response.data.data:", eventId);
+                }
+              }
+            }
+          }
+
+          // Final fallback: try to get event ID from URL if we still don't have it
+          if (!eventId) {
+            // Try to extract from the current URL if we're already on an event page
+            const pathname = window.location.pathname;
+            const matches = pathname.match(/\/events\/(\d+)/);
+            if (matches && matches[1]) {
+              eventId = Number(matches[1]);
+              console.log(
+                "Last resort: Extracted event ID from current URL:",
+                eventId
+              );
+            }
+          }
+
+          if (eventId) {
+            // Show success message
+            toast.success(
+              existingEventId
+                ? "Event updated successfully!"
+                : "Event created successfully!",
+              {
+                description: existingEventId
+                  ? "Changes saved"
+                  : "Redirecting to next step...",
+                duration: 3000,
+              }
+            );
+
+            // Only redirect if this is a new event
+            if (!existingEventId) {
+              router.push(`/vendor/events/${eventId}`);
+            }
+          } else {
+            console.error("No event_id in response:", response);
+            // Don't show error toast if the message indicates success
+            if (
+              response.message &&
+              response.message.toLowerCase().includes("success")
+            ) {
+              toast.success("Event updated successfully!", {
+                description: "Changes saved",
+                duration: 3000,
+              });
+            } else {
+              toast.error("No event ID received from server");
+            }
+          }
+        } else {
+          // Handle API errors
+          const errorMessage =
+            response?.message || "Failed to create event. Please try again.";
+          toast.error("Error creating event", {
+            description: errorMessage,
+          });
+        }
+      } catch (error) {
+        console.error("Error saving event details:", error);
+        toast.error("Failed to save event details");
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [
+      globalForm,
+      save,
+      form,
+      setActiveField,
+      router,
+      bannerImageFile,
+      eventSchedularBackgroundImage,
+    ]
+  );
+
+  return (
+    <div className="space-y-4 sm:space-y-6 md:space-y-8">
+      <Form {...form}>
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            form.trigger().then((valid) => {
+              if (valid) {
+                form.handleSubmit(handleSubmit)(e);
+              }
+              // No toast error - let the form display validation errors natively
+            });
+          }}
+          className="space-y-4 sm:space-y-6"
+          noValidate
+          autoComplete="off"
+        >
+          <div className="space-y-4 sm:space-y-6">
+            {/* Event Details Section */}
+            <div className="space-y-4 sm:space-y-6">
+              <div className="flex items-center gap-3 title-header">
+                <h2 className="text-xl font-bold">Event Details</h2>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
+                <FormField
+                  control={form.control}
+                  name="event_name"
+                  render={({ field }) => (
+                    <FormItem className="w-full">
+                      <FormLabel className="text-sm font-medium">
+                        Event Name <span className="text-red-500">*</span>
+                      </FormLabel>
+                      <FormControl>
+                        <Input
+                          {...field}
+                          placeholder="Enter your event name"
+                          className="h-11 bg-[#F9FAFB] border-[#E5E7EB] w-full"
+                          onFocus={() => handleFieldFocus("event_name")}
+                          onChange={(e) => {
+                            field.onChange(e);
+                            globalForm.setValue(
+                              "stepOne.event_name",
+                              e.target.value
+                            );
+                          }}
+                          onBlur={field.onBlur} // Important for onBlur validation
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="event_category_id"
+                  render={({ field }) => (
+                    <FormItem className="w-full">
+                      <FormLabel className="text-sm font-medium">
+                        Event Category <span className="text-red-500">*</span>
+                      </FormLabel>
+                      <Select
+                        onValueChange={(value) => {
+                          field.onChange(Number(value));
+                          globalForm.setValue(
+                            "stepOne.event_category_id",
+                            Number(value)
+                          );
+                        }}
+                        value={field.value ? field.value.toString() : undefined}
+                        disabled={isEventCategoriesLoading}
+                        onOpenChange={() => field.onBlur()} // Trigger validation when dropdown closes
+                      >
+                        <FormControl>
+                          <SelectTrigger className="h-11 bg-[#F9FAFB] border-[#E5E7EB] w-full">
+                            <SelectValue placeholder="Select event category" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {eventCategories?.data?.map(
+                            (category: { id: number; name: string }) => (
+                              <SelectItem
+                                key={category.id}
+                                value={category.id.toString()}
+                              >
+                                {category.name}
+                              </SelectItem>
+                            )
+                          )}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              <div className="space-y-4">
+                <h3 className="text-lg font-semibold title-header">
+                  Add a Cover Photo or Video
+                </h3>
+
+                <Tabs
+                  value={bannerType}
+                  onValueChange={(v) => setBannerType(v as "image" | "video")}
+                >
+                  <TabsList className="grid w-full grid-cols-2">
+                    <TabsTrigger value="image">Image Banner</TabsTrigger>
+                    <TabsTrigger value="video">Video Banner</TabsTrigger>
+                  </TabsList>
+
+                  <TabsContent value="image">
+                    <FormField
+                      control={form.control}
+                      name="event_banner_image"
+                      render={() => (
+                        <FormItem>
+                          <FormLabel>Banner Image</FormLabel>
+                          <FormDescription>
+                            Upload a static image for your event banner
+                            (recommended size: 1200 x 600px)
+                          </FormDescription>
+                          <FormControl>
+                            <div>
+                              {bannerImageUrl ? (
+                                <div className="space-y-2">
+                                  <Image
+                                    src={bannerImageUrl}
+                                    alt="Banner"
+                                    width={400}
+                                    height={200}
+                                    className="max-h-60 object-contain mx-auto"
+                                    quality={100}
+                                  />
+                                  <Button
+                                    type="button"
+                                    variant="destructive"
+                                    size="sm"
+                                    onClick={handleRemoveBannerImage}
+                                    className="mt-2"
+                                  >
+                                    Remove
+                                  </Button>
+                                </div>
+                              ) : (
+                                <FileUploader
+                                  value={bannerImageFile}
+                                  onValueChange={handleBannerImageChange}
+                                  maxFileCount={1}
+                                  maxSize={2 * 1024 * 1024} // 2MB
+                                  disabled={bannerImageUploading}
+                                  onRemove={handleRemoveBannerImage}
+                                  accept={{
+                                    "image/png": [".png"],
+                                    "image/jpeg": [".jpg", ".jpeg"],
+                                    "image/webp": [".webp"],
+                                  }}
+                                  enableCropping={true}
+                                  aspectRatio={21 / 9}
+                                  cropConfig={{
+                                    maxSizeKB: 500,
+                                    quality: 0.9,
+                                    maxWidth: 1920,
+                                    maxHeight: 823,
+                                  }}
+                                />
+                              )}
+                            </div>
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </TabsContent>
+
+                  <TabsContent value="video">
+                    <FormField
+                      control={form.control}
+                      name="event_banner_video"
+                      render={() => (
+                        <FormItem>
+                          <FormLabel>Banner Video</FormLabel>
+                          <FormDescription>
+                            Upload a video for your event banner (MP4 format,
+                            max 10MB)
+                          </FormDescription>
+                          <FormControl>
+                            <div className="space-y-4">
+                              {bannerVideoUrl ? (
+                                <div className="space-y-2">
+                                  <video
+                                    controls
+                                    className="w-full h-auto max-h-[200px] object-contain bg-gray-100 rounded-lg"
+                                  >
+                                    <source
+                                      src={bannerVideoUrl}
+                                      type="video/mp4"
+                                    />
+                                    Your browser does not support the video tag.
+                                  </video>
+                                  <Button
+                                    type="button"
+                                    variant="destructive"
+                                    size="sm"
+                                    onClick={handleRemoveBannerVideo}
+                                    className="mt-2"
+                                  >
+                                    Remove Video
+                                  </Button>
+                                </div>
+                              ) : (
+                                <>
+                                  <FileUploader
+                                    value={bannerVideoFile}
+                                    onValueChange={handleBannerVideoChange}
+                                    maxFileCount={1}
+                                    maxSize={10 * 1024 * 1024} // 10MB
+                                    disabled={bannerVideoUploading}
+                                    onRemove={handleRemoveBannerVideo}
+                                    accept={{
+                                      "video/mp4": [".mp4"],
+                                      "video/webm": [".webm"],
+                                      "video/ogg": [".ogv"],
+                                      "video/quicktime": [".mov"],
+                                      "video/x-msvideo": [".avi"],
+                                      "video/x-matroska": [".mkv"],
+                                    }}
+                                  />
+                                  {/* Video Preview for uploaded files */}
+                                  {bannerVideoFile.length > 0 && (
+                                    <div className="relative mt-4 rounded-lg overflow-hidden border">
+                                      <video
+                                        controls
+                                        className="w-full h-auto max-h-[200px] object-contain bg-gray-100"
+                                      >
+                                        <source
+                                          src={URL.createObjectURL(
+                                            bannerVideoFile[0]
+                                          )}
+                                          type="video/mp4"
+                                        />
+                                        Your browser does not support the video
+                                        tag.
+                                      </video>
+                                    </div>
+                                  )}
+                                </>
+                              )}
+                            </div>
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </TabsContent>
+                </Tabs>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
+                <FormField
+                  control={form.control}
+                  name="event_banner_heading"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-sm font-medium">
+                        Banner Heading <span className="text-red-500">*</span>
+                      </FormLabel>
+                      <FormControl>
+                        <Input
+                          {...field}
+                          placeholder="Enter event title"
+                          className="h-11 bg-[#F9FAFB] border-[#E5E7EB]"
+                          onFocus={() =>
+                            handleFieldFocus("event_banner_heading")
+                          }
+                          onChange={(e) => {
+                            field.onChange(e);
+                            globalForm.setValue(
+                              "stepOne.event_banner_heading",
+                              e.target.value
+                            );
+                          }}
+                          onBlur={field.onBlur}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="event_banner_sub_heading"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-sm font-medium">
+                        Write banner Sub-heading{" "}
+                        <span className="text-red-500">*</span>
+                      </FormLabel>
+                      <FormControl>
+                        <Input
+                          {...field}
+                          placeholder="Enter event subtitle"
+                          className="h-11 bg-[#F9FAFB] border-[#E5E7EB]"
+                          onFocus={() =>
+                            handleFieldFocus("event_banner_sub_heading")
+                          }
+                          onChange={(e) => {
+                            field.onChange(e);
+                            globalForm.setValue(
+                              "stepOne.event_banner_sub_heading",
+                              e.target.value
+                            );
+                          }}
+                          onBlur={field.onBlur}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+            </div>
+
+            {/* Tell Guests What It's About Section */}
+            <div className="space-y-6">
+              <div className="flex items-center gap-3 title-header">
+                <h2 className="text-xl font-bold">
+                  Tell Guests What It&apos;s About
+                </h2>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
+                <FormField
+                  control={form.control}
+                  name="about_event_heading"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-sm font-medium">
+                        Title <span className="text-red-500">*</span>
+                      </FormLabel>
+                      <FormControl>
+                        <Input
+                          {...field}
+                          placeholder="Enter about event heading"
+                          className="h-11 bg-[#F9FAFB] border-[#E5E7EB]"
+                          onFocus={() =>
+                            handleFieldFocus("about_event_heading")
+                          }
+                          onChange={(e) => {
+                            field.onChange(e);
+                            globalForm.setValue(
+                              "stepOne.about_event_heading",
+                              e.target.value
+                            );
+                          }}
+                          onBlur={field.onBlur}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="about_event_sub_heading"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-sm font-medium">
+                        Sub Title
+                      </FormLabel>
+                      <FormControl>
+                        <Input
+                          {...field}
+                          placeholder="Enter about event sub-heading"
+                          className="h-11 bg-[#F9FAFB] border-[#E5E7EB]"
+                          onFocus={() =>
+                            handleFieldFocus("about_event_sub_heading")
+                          }
+                          onChange={(e) => {
+                            field.onChange(e);
+                            globalForm.setValue(
+                              "stepOne.about_event_sub_heading",
+                              e.target.value
+                            );
+                          }}
+                          onBlur={field.onBlur}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              <FormField
+                control={form.control}
+                name="about_event_description"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-sm font-medium">
+                      Description
+                    </FormLabel>
+                    <FormControl>
+                      <TiptapEditor
+                        value={field.value}
+                        onChange={(value) => {
+                          field.onChange(value);
+                          globalForm.setValue(
+                            "stepOne.about_event_description",
+                            value
+                          );
+                        }}
+                        placeholder="Write a compelling description..."
+                        className="bg-gray-100 p-2 rounded-md"
+                        maxLength={340}
+                        maxWords={50}
+                        showAIButton={true}
+                        wrapText={true}
+                        aiContext={{
+                          event_name: form.watch("event_name"),
+                          title: form.watch("about_event_heading"),
+                          sub_title: form.watch("about_event_sub_heading"),
+                          description: form.watch("about_event_description"),
+                          ctaText: form.watch("about_event_sub_heading"),
+                        }}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            {/* Event Scheduler Section */}
+            <div className="space-y-4 sm:space-y-6">
+              <div className="flex items-center gap-3 title-header">
+                <h2 className="text-xl font-bold">Event Schedule</h2>
+              </div>
+
+              <FormField
+                control={form.control}
+                name="event_schedular_title"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-sm font-medium">
+                      Event Scheduler Title
+                    </FormLabel>
+                    <FormControl>
+                      <Input
+                        {...field}
+                        placeholder="e.g. Event Schedule"
+                        className="h-11 bg-[#F9FAFB] border-[#E5E7EB]"
+                        onFocus={() =>
+                          handleFieldFocus("event_schedular_title")
+                        }
+                        onChange={(e) => {
+                          field.onChange(e);
+                          globalForm.setValue(
+                            "stepOne.event_schedular_title",
+                            e.target.value
+                          );
+                        }}
+                        onBlur={field.onBlur}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <div className="space-y-4">
+                <FormField
+                  control={form.control}
+                  name="event_schedular_background_image"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-base font-medium">
+                        Event Scheduler Background Image
+                      </FormLabel>
+                      <FormControl>
+                        {typeof field.value === "string" && field.value ? (
+                          <div className="relative w-full">
+                            <Image
+                              src={field.value}
+                              alt="Scheduler Background"
+                              width={400}
+                              height={200}
+                              className="max-h-60 object-contain mx-auto mb-2"
+                            />
+                            <Button
+                              type="button"
+                              variant="destructive"
+                              size="sm"
+                              onClick={() => {
+                                field.onChange(null); // instead of undefined
+                                setEventSchedularBackgroundImage(null);
+                                globalForm.setValue(
+                                  "stepOne.event_schedular_background_image",
+                                  null
+                                );
+                              }}
+                              className="mt-2"
+                            >
+                              Remove
+                            </Button>
+                          </div>
+                        ) : (
+                          <FileUploader
+                            value={eventSchedularBackgroundImage || []}
+                            onValueChange={(files) => {
+                              if (files.length > 0) {
+                                setEventSchedularBackgroundImage(files);
+                                field.onChange(files[0]);
+                                globalForm.setValue(
+                                  "stepOne.event_schedular_background_image",
+                                  files[0]
+                                );
+                              }
+                            }}
+                            maxFileCount={1}
+                            maxSize={2 * 1024 * 1024} // 2MB
+                            onRemove={() => {
+                              field.onChange(undefined);
+                              setEventSchedularBackgroundImage(null);
+                              globalForm.setValue(
+                                "stepOne.event_schedular_background_image",
+                                undefined
+                              );
+                            }}
+                            accept={{
+                              "image/png": [".png"],
+                              "image/jpeg": [".jpg", ".jpeg"],
+                              "image/webp": [".webp"],
+                            }}
+                            enableCropping={true}
+                            aspectRatio={undefined}
+                            cropConfig={{
+                              maxSizeKB: 400,
+                              quality: 0.9,
+                              maxWidth: 1920,
+                              maxHeight: 1920,
+                            }}
+                          />
+                        )}
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+              <div className="space-y-4">
+                {schedulerFields.map((field, index) => (
+                  <div
+                    key={field.id}
+                    className="flex items-center justify-between gap-4 p-4 border border-[#E5E7EB] rounded-md bg-white"
+                  >
+                    <div className="flex-1">
+                      <FormField
+                        control={form.control}
+                        name={`event_schedular.${index}.title`}
+                        render={({ field: itemField }) => (
+                          <FormItem>
+                            <FormControl>
+                              <Input
+                                {...itemField}
+                                placeholder="Event Title"
+                                className="h-11 bg-[#F9FAFB] border-[#E5E7EB]"
+                                onChange={(e) => {
+                                  itemField.onChange(e);
+                                  const currentSchedulers = [
+                                    ...form.getValues("event_schedular"),
+                                  ];
+                                  currentSchedulers[index].title =
+                                    e.target.value;
+                                  const currentStepOne =
+                                    globalForm.getValues().stepOne || {};
+                                  globalForm.setValue("stepOne", {
+                                    ...currentStepOne,
+                                    event_schedular: currentSchedulers,
+                                  });
+                                }}
+                                onBlur={itemField.onBlur}
+                              />
+                            </FormControl>
+                            <FormMessage className="text-red-500 font-semibold mt-1" />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                    <div className="flex-1">
+                      <FormField
+                        control={form.control}
+                        name={`event_schedular.${index}.time`}
+                        render={({ field: itemField }) => (
+                          <FormItem>
+                            <FormControl>
+                              <div className="relative">
+                                <Input
+                                  {...itemField}
+                                  type="time"
+                                  className="h-11 bg-[#F9FAFB] border-[#E5E7EB] pr-10"
+                                  onChange={(e) => {
+                                    itemField.onChange(e);
+                                    const currentSchedulers = [
+                                      ...form.getValues("event_schedular"),
+                                    ];
+                                    currentSchedulers[index].time =
+                                      e.target.value;
+                                    const currentStepOne =
+                                      globalForm.getValues().stepOne || {};
+                                    globalForm.setValue("stepOne", {
+                                      ...currentStepOne,
+                                      event_schedular: currentSchedulers,
+                                    });
+                                  }}
+                                  onBlur={itemField.onBlur}
+                                />
+                              </div>
+                            </FormControl>
+                            <FormMessage className="text-red-500 font-semibold mt-1" />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        remove(index);
+                        const updatedSchedulers = form
+                          .getValues("event_schedular")
+                          .filter((_, i) => i !== index);
+                        const currentStepOne =
+                          globalForm.getValues().stepOne || {};
+                        globalForm.setValue("stepOne", {
+                          ...currentStepOne,
+                          event_schedular: updatedSchedulers,
+                        });
+                      }}
+                      disabled={schedulerFields.length === 1}
+                      className="h-11 w-11 p-0 text-red-500 hover:bg-red-50"
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  const newItem = { title: "", time: "" };
+                  append(newItem);
+                  const updatedSchedulers = [
+                    ...form.getValues("event_schedular"),
+                    newItem,
+                  ];
+                  const currentStepOne = globalForm.getValues().stepOne || {};
+                  globalForm.setValue("stepOne", {
+                    ...currentStepOne,
+                    event_schedular: updatedSchedulers,
+                  });
+                }}
+                className="flex items-center gap-2"
+              >
+                <Plus className="h-4 w-4" />
+                Add Schedule
+              </Button>
+            </div>
+
+            {/* Submit Button */}
+            <div className="flex justify-end mt-6">
+              <Button
+                type="submit"
+                onClick={async () => {
+                  // First trigger validation on all fields to show errors
+                  const valid = await form.trigger();
+                  if (!valid) {
+                    const errors = form.formState.errors;
+                    const errorFields = Object.keys(errors);
+
+                    // Attempt to focus the first error field
+                    if (errorFields.length > 0) {
+                      const firstErrorElement = document.querySelector(
+                        `[name="${errorFields[0]}"]`
+                      );
+                      if (firstErrorElement) {
+                        (firstErrorElement as HTMLElement).focus();
+                        firstErrorElement.scrollIntoView({
+                          behavior: "smooth",
+                          block: "center",
+                        });
+                      }
+                    }
+                  } else {
+                    form.handleSubmit(handleSubmit)();
+                  }
+                }}
+                disabled={isLoading || globalLoading}
+                variant="event-primary"
+              >
+                {isLoading || globalLoading ? "Saving..." : "Save & Next"}
+              </Button>
+            </div>
+          </div>
+        </form>
+      </Form>
+    </div>
+  );
+}

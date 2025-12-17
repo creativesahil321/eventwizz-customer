@@ -1,0 +1,88 @@
+# ==========================
+# 🎯 CUSTOMER PROJECT Environment Variables
+# ==========================
+# 
+# Copy this to your customer project's .env file
+# Update the domain values to match your customer project domain
+#
+
+# ==========================
+# 🔗 API & App Configuration
+# ==========================
+
+# Base URL for your Laravel backend API (same as main project)
+NEXT_PUBLIC_API_URL="https://eventwizz-admin.socreativesupport.com/api/v1"
+
+# Base URL for your Customer Site (UPDATE THIS to customer project domain)
+NEXT_PUBLIC_APP_URL=https://eventwizz-customer.vercel.app
+
+# Enable developer mode
+NEXT_PUBLIC_DEV_MODE=true
+
+# Enable internationalization
+NEXT_PUBLIC_ENABLE_I18N=true
+
+# DISABLE subdomain routing (customer site is standalone)
+NEXT_PUBLIC_ENABLE_SUBDOMAIN_ROUTING=false
+
+# ==========================
+# 🔑 Security & Auth
+# ==========================
+
+# Use SAME secret as main project (for shared sessions if needed)
+# Or use different secret for complete separation
+NEXTAUTH_SECRET=your-nextauth-secret
+
+# Public URL of Customer Site (UPDATE THIS)
+NEXTAUTH_URL=https://eventwizz-customer.vercel.app
+
+# ==========================
+# 🌍 Third-Party Integrations
+# ==========================
+
+# Google Maps API Key (same as main project)
+NEXT_PUBLIC_GOOGLE_MAPS_API_KEY="your-google-maps-api-key"
+
+# Google OAuth (same as main project)
+GOOGLE_CLIENT_ID=your-google-client-id.apps.googleusercontent.com
+GOOGLE_CLIENT_SECRET=your-google-client-secret
+
+# Facebook OAuth (same as main project)
+FACEBOOK_CLIENT_ID=your-facebook-client-id
+FACEBOOK_CLIENT_SECRET=your-facebook-client-secret
+
+# ==========================
+# ⚡ Real-time & AI Services
+# ==========================
+
+# WebSocket server URL (same as main project)
+NEXT_PUBLIC_SOCKET_URL="wss://eventwizz-admin.socreativesupport.com"
+
+# GROQ AI API Key (same as main project)
+GROQ_API_KEY="your-groq-api-key"
+
+# ==========================
+# 🏷️ White-label Support
+# ==========================
+
+# Customer site domain (UPDATE THIS)
+NEXT_PUBLIC_WHITE_LABEL_URL=eventwizz-customer.vercel.app
+
+# ==========================
+# 📝 IMPORTANT NOTES
+# ==========================
+#
+# 1. UPDATE these values to match your customer project domain:
+#    - NEXT_PUBLIC_APP_URL
+#    - NEXTAUTH_URL
+#    - NEXT_PUBLIC_WHITE_LABEL_URL
+#
+# 2. Keep these the SAME as main project:
+#    - NEXT_PUBLIC_API_URL (same backend)
+#    - NEXTAUTH_SECRET (if you want shared sessions)
+#    - OAuth credentials (same providers)
+#
+# 3. Set NEXT_PUBLIC_ENABLE_SUBDOMAIN_ROUTING=false
+#    (customer site is standalone, no subdomains needed)
+#
+

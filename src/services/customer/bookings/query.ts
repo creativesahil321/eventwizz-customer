@@ -1,0 +1,240 @@
+/**
+ * Bookings Query Hooks
+ *
+ * TanStack Query hooks for customer bookings.
+ */
+
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { bookingsService } from "./bookings.service";
+import {
+  BookingsQueryParams,
+  BookingsResponse,
+  BookingItem,
+  BookingDetailsResponse,
+  MenuItemsResponse,
+  MenuSelectionPayload,
+  MenuSelectionResponse,
+  SaveMenuChoicePayload,
+  RescheduleDataResponse,
+  RescheduleBookingPayload,
+} from "./type";
+// Toast notifications are handled at root level by API client interceptor
+
+/**
+ * Query key factory for bookings
+ */
+export const bookingsKeys = {
+  all: ["customer", "bookings"] as const,
+  lists: () => [...bookingsKeys.all, "list"] as const,
+  list: (params?: BookingsQueryParams) =>
+    [...bookingsKeys.lists(), params] as const,
+  details: () => [...bookingsKeys.all, "detail"] as const,
+  detail: (id: number) => [...bookingsKeys.details(), id] as const,
+  bookingDetails: () => [...bookingsKeys.all, "booking-details"] as const,
+  bookingDetail: (id: number) =>
+    [...bookingsKeys.bookingDetails(), id] as const,
+  menuItems: () => [...bookingsKeys.all, "menu-items"] as const,
+  menuItem: (bookingId: number, date: string, tableId?: number) =>
+    [...bookingsKeys.menuItems(), bookingId, date, tableId] as const,
+  rescheduleDates: () => [...bookingsKeys.all, "reschedule-dates"] as const,
+  rescheduleDate: (bookingId: number, bookingDateId: number) =>
+    [...bookingsKeys.rescheduleDates(), bookingId, bookingDateId] as const,
+};
+
+/**
+ * Hook to fetch bookings list
+ */
+export const useBookings = (params?: BookingsQueryParams) => {
+  return useQuery<BookingsResponse>({
+    queryKey: bookingsKeys.list(params),
+    queryFn: () => bookingsService.getBookings(params),
+    staleTime: 5 * 60 * 1000, // 5 minutes
+    gcTime: 10 * 60 * 1000, // 10 minutes (formerly cacheTime)
+    placeholderData: (previousData) => previousData, // Keep previous data while fetching new data
+  });
+};
+
+/**
+ * Hook to fetch a single booking
+ */
+export const useBooking = (id: number, enabled = true) => {
+  return useQuery<BookingItem>({
+    queryKey: bookingsKeys.detail(id),
+    queryFn: () => bookingsService.getBooking(id),
+    enabled: enabled && !!id,
+    staleTime: 5 * 60 * 1000, // 5 minutes
+    gcTime: 10 * 60 * 1000, // 10 minutes
+  });
+};
+
+/**
+ * Hook to fetch booking details
+ */
+export const useBookingDetails = (id: number, enabled = true) => {
+  return useQuery<BookingDetailsResponse>({
+    queryKey: bookingsKeys.bookingDetail(id),
+    queryFn: () => bookingsService.getBookingDetails(id),
+    enabled: enabled && !!id,
+    staleTime: 0,
+    gcTime: 10 * 60 * 1000, // 10 minutes
+    refetchOnMount: true,
+    refetchOnReconnect: true,
+  });
+};
+
+/**
+ * Hook to fetch menu items for a booking, date, and table
+ * Query key includes tableId - switching tables triggers a fresh fetch automatically
+ * Cached data is reused when switching back to a previously viewed table
+ */
+export const useMenuItems = (
+  bookingId: number,
+  date: string,
+  tableId?: number,
+  enabled = true
+) => {
+  return useQuery<MenuItemsResponse>({
+    queryKey: bookingsKeys.menuItem(bookingId, date, tableId),
+    queryFn: () => {
+      if (!tableId) {
+        throw new Error("Table ID is required to fetch menu items");
+      }
+      return bookingsService.getMenuItems(bookingId, date, tableId);
+    },
+    enabled: enabled && !!bookingId && !!date && !!tableId,
+    staleTime: 2 * 60 * 1000, // 2 minutes - data stays fresh, prevents duplicate calls
+    gcTime: 10 * 60 * 1000, // 10 minutes - cache persists for switching back
+  });
+};
+
+/**
+ * Hook to submit menu selections (batch)
+ * Note: Toast notifications are handled at root level by API client interceptor
+ */
+export const useSubmitMenuSelections = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation<MenuSelectionResponse, Error, MenuSelectionPayload>({
+    mutationFn: (payload) => bookingsService.submitMenuSelections(payload),
+    onSuccess: (response, variables) => {
+      // Check if response has errors - let root level handle toast
+      if (response.errors && response.errors.length > 0) {
+        return;
+      }
+
+      // Invalidate menu items query to refetch updated data
+      queryClient.invalidateQueries({
+        queryKey: bookingsKeys.menuItem(variables.booking_id, variables.date),
+      });
+      // Also invalidate booking details
+      queryClient.invalidateQueries({
+        queryKey: bookingsKeys.bookingDetail(variables.booking_id),
+      });
+      // Toast notifications handled at root level by API client interceptor
+    },
+    onError: () => {
+      // Error toast notifications handled at root level by API client interceptor
+    },
+  });
+};
+
+/**
+ * Hook to save a single menu choice immediately
+ * Note: Toast notifications are handled at root level by TanStack Query
+ */
+export const useSaveMenuChoice = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation<MenuSelectionResponse, Error, SaveMenuChoicePayload>({
+    mutationFn: (payload) => bookingsService.saveMenuChoice(payload),
+    onSuccess: (response, variables) => {
+      // Check if response has errors - let root level handle toast
+      if (response.errors && response.errors.length > 0) {
+        return;
+      }
+
+      // Invalidate menu items query to refetch updated data with new menu_choices
+      // Invalidate all queries that start with menuItems for this booking_id
+      queryClient.invalidateQueries({
+        predicate: (query) => {
+          const key = query.queryKey;
+          // Match all menu item queries for this booking_id
+          // Key format: ["customer", "bookings", "menu-items", bookingId, date, tableId]
+          return (
+            Array.isArray(key) &&
+            key.length >= 4 &&
+            key[0] === "customer" &&
+            key[1] === "bookings" &&
+            key[2] === "menu-items" &&
+            key[3] === variables.booking_id
+          );
+        },
+      });
+      // Also invalidate booking details
+      queryClient.invalidateQueries({
+        queryKey: bookingsKeys.bookingDetail(variables.booking_id),
+      });
+      // Toast notifications handled at root level by TanStack Query
+    },
+    onError: () => {
+      // Error toast notifications handled at root level by TanStack Query
+    },
+  });
+};
+
+/**
+ * Hook to fetch reschedule data (current date, payment gateways, and available dates)
+ */
+export const useRescheduleData = (
+  bookingId: number,
+  bookingDateId: number,
+  enabled = true
+) => {
+  return useQuery<RescheduleDataResponse>({
+    queryKey: bookingsKeys.rescheduleDate(bookingId, bookingDateId),
+    queryFn: () => bookingsService.getRescheduleData(bookingId, bookingDateId),
+    enabled: enabled && !!bookingId && !!bookingDateId,
+    staleTime: 2 * 60 * 1000, // 2 minutes - data stays fresh
+    gcTime: 5 * 60 * 1000, // 5 minutes - cache persists
+    retry: 1, // Retry once on failure
+    refetchOnWindowFocus: false, // Don't refetch on window focus
+    refetchOnMount: false, // Don't refetch on mount if data exists
+    refetchOnReconnect: false, // Don't refetch on reconnect
+  });
+};
+
+/**
+ * Hook to reschedule a booking date
+ */
+export const useRescheduleBooking = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation<
+    { status: boolean; message: string; data?: unknown },
+    Error,
+    RescheduleBookingPayload
+  >({
+    mutationFn: (payload) => bookingsService.rescheduleBooking(payload),
+    onSuccess: (response, variables) => {
+      if (response.status) {
+        // Invalidate booking details to refetch updated data
+        queryClient.invalidateQueries({
+          queryKey: bookingsKeys.bookingDetail(variables.booking_id),
+        });
+        // Refetch active booking details immediately
+        queryClient.refetchQueries({
+          queryKey: bookingsKeys.bookingDetail(variables.booking_id),
+          type: "active",
+        });
+        // Invalidate reschedule dates cache for this booking
+        queryClient.invalidateQueries({
+          queryKey: bookingsKeys.rescheduleDates(),
+        });
+        // Invalidate bookings list to update status
+        queryClient.invalidateQueries({
+          queryKey: bookingsKeys.lists(),
+        });
+      }
+    },
+  });
+};

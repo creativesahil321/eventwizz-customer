@@ -1,0 +1,40 @@
+.title-header {
+    position: relative;
+    font-family: var(--font-heading);
+
+    &::before {
+        content: "";
+        position: absolute;
+        left: -24px;
+        height: 100%;
+        width: 5px;
+        background-color: var(--color-primary);
+        border-radius: 0px 5px 5px 0px;
+    }
+}
+
+/* Custom Scrollbar for Payment Options */
+.payment-options-scroll {
+    /* Firefox */
+    scrollbar-width: thin;
+    scrollbar-color: #cbd5e1 #f1f5f9;
+
+    /* Chrome, Safari, Edge */
+    &::-webkit-scrollbar {
+        width: 8px;
+    }
+
+    &::-webkit-scrollbar-track {
+        background: #f1f5f9;
+        border-radius: 4px;
+    }
+
+    &::-webkit-scrollbar-thumb {
+        background: #cbd5e1;
+        border-radius: 4px;
+
+        &:hover {
+            background: #94a3b8;
+        }
+    }
+}

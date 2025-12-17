@@ -1,0 +1,270 @@
+/**
+ * Enhanced Cart Type Definitions
+ * Centralized type definitions to improve type safety
+ * Updated for new date-based API structure
+ */
+
+import {
+  EventCartData,
+  DateData,
+  DrinkData,
+  TableData,
+  TicketData,
+} from "@/services/customer/cart/type";
+
+// Payment System Types
+export interface PaymentInfo {
+  type: "full" | "deposit";
+  is_deposit_enabled: boolean;
+  deposit_type: "amount" | "percentage";
+  deposit_value: number;
+  balance_due_date: string | null;
+}
+
+export interface SelectedDrink {
+  id: number;
+  vendor_event_id: number;
+  title: string;
+  price: string;
+  quantity?: number;
+}
+
+// Professional API Response Types (Date-based structure)
+export interface ApiEventCartData extends EventCartData {
+  drinks: SelectedDrink[];
+  [dateKey: string]:
+    | {
+        payment: PaymentInfo;
+        tables: ApiTableData[];
+        tickets: ApiTicketData[];
+        selected_drinks: SelectedDrink[];
+      }
+    | SelectedDrink[];
+}
+
+export interface ApiDateData extends DateData {
+  payment: PaymentInfo;
+  selected_drinks: SelectedDrink[];
+}
+
+export interface ApiDrinkData extends DrinkData {}
+
+export interface ApiTableData extends TableData {
+  min_persons: number;
+  max_persons: number;
+  total_tables: number;
+}
+
+export interface ApiTicketData extends TicketData {}
+
+// Professional UI Types (replacing cart store types)
+export interface DrinkPackage {
+  id: number;
+  title: string;
+  price: number;
+  quantity: number;
+}
+
+export interface Table {
+  id: number;
+  title: string;
+  description: string;
+  price: number;
+  capacity: number;
+  quantity: number;
+}
+
+export interface Ticket {
+  id: number;
+  title: string;
+  description: string;
+  price: number;
+  total_capacity: number;
+  event_date: string;
+  quantity: number;
+}
+
+// Legacy API Response Types (for backward compatibility)
+export interface LegacyApiCartItem {
+  event_name: string;
+  event_slug: string;
+  event_image: string;
+  event_date: string;
+  tables: ApiTableData[];
+  tickets: ApiTicketData[];
+  packages: ApiPackageData[];
+}
+
+export interface ApiPackageData {
+  title: string;
+  price: string;
+  quantity: string;
+}
+
+// Normalized types for internal processing
+export interface NormalizedCartData {
+  event_name: string;
+  event_slug: string;
+  event_image: string;
+  dates: Record<
+    string,
+    {
+      tables: Table[];
+      tickets: Ticket[];
+      drinks: DrinkPackage[];
+    }
+  >;
+}
+
+// UI Component Types
+export interface CartItemProps {
+  item: DrinkPackage | Table | Ticket;
+  quantity: number;
+  availableQuantity: number;
+  onQuantityChange: (quantity: number) => void;
+  onRemove: () => void;
+  type: "drink" | "table" | "ticket";
+}
+
+export interface QuantityControlsProps {
+  quantity: number;
+  availableQuantity: number;
+  onIncrement: () => void;
+  onDecrement: () => void;
+  onRemove: () => void;
+  disabled?: boolean;
+}
+
+export interface StockStatusProps {
+  availableQuantity: number;
+  currentQuantity?: number;
+  type: "ticket" | "table" | "drink";
+}
+
+// Date Accordion Props
+export interface DateAccordionProps {
+  date: string;
+  availableTickets: Ticket[];
+  availableTables: Table[];
+  availableDrinks: DrinkPackage[];
+  onAddTicket: (date: string, ticket: Ticket) => void;
+  onUpdateTicketQuantity: (
+    date: string,
+    ticketId: number,
+    quantity: number
+  ) => void;
+  onRemoveTicket: (date: string, ticketId: number) => void;
+  onAddTable: (date: string, table: Table) => void;
+  onUpdateTableQuantity: (
+    date: string,
+    tableId: number,
+    quantity: number
+  ) => void;
+  onRemoveTable: (date: string, tableId: number) => void;
+  onAddDrink: (date: string, drink: DrinkPackage) => void;
+  onUpdateDrinkQuantity: (
+    date: string,
+    drinkTitle: string,
+    quantity: number
+  ) => void;
+  onRemoveDrink: (date: string, drinkTitle: string) => void;
+}
+
+// Security and Validation Types
+export interface PriceValidationResult {
+  isValid: boolean;
+  expectedPrice: number;
+  providedPrice: number;
+  itemType: CartItemType;
+  itemId: string | number;
+  errorMessage?: string;
+}
+
+export interface SecurityValidation {
+  validatePrices: (
+    cartData: NormalizedCartData,
+    apiData: ApiEventCartData
+  ) => PriceValidationResult[];
+  isCartTampered: (
+    cartData: NormalizedCartData,
+    apiData: ApiEventCartData
+  ) => boolean;
+  sanitizeCartData: (
+    cartData: NormalizedCartData,
+    apiData: ApiEventCartData
+  ) => NormalizedCartData;
+}
+
+// Error Types
+export interface CartError {
+  message: string;
+  code?: string;
+  details?: Record<string, unknown>;
+}
+
+export interface ApiErrorResponse {
+  status: boolean;
+  message: string;
+  data: unknown[];
+  errors: Record<string, string[]>;
+}
+
+// Utility Types
+export type CartItemType = "drink" | "table" | "ticket";
+export type StockStatus = "in-stock" | "low-stock" | "out-of-stock";
+
+// Event Handlers
+export type CartItemHandler<T = unknown> = (item: T, date: string) => void;
+export type QuantityHandler = (
+  date: string,
+  id: number | string,
+  quantity: number
+) => void;
+export type RemoveHandler = (date: string, id: number | string) => void;
+
+// API Data Transformation Types
+export interface ApiDataTransformer {
+  transformEventData: (apiData: ApiEventCartData) => NormalizedCartData;
+  extractDateKeys: (apiData: ApiEventCartData) => string[];
+  getDateData: (apiData: ApiEventCartData, date: string) => DateData | null;
+  mergeCartData: (
+    existingData: NormalizedCartData,
+    newData: ApiEventCartData
+  ) => NormalizedCartData;
+}
+
+// Hook Return Types
+export interface UseCartDataReturn {
+  cartData: { data: { data: ApiEventCartData[] } } | undefined;
+  isLoadingCartData: boolean;
+  cartError: Error | null;
+  currentEvent: any; // Keep as any for now to avoid conversion issues
+  normalizedData: NormalizedCartData[];
+}
+
+export interface UseCartActionsReturn {
+  handleAddDrink: (date: string, drink: DrinkPackage) => void;
+  handleUpdateDrinkQuantity: (
+    date: string,
+    drinkTitle: string,
+    quantity: number
+  ) => void;
+  handleRemoveDrink: (date: string, drinkTitle: string) => void;
+  handleAddTable: (date: string, table: Table) => void;
+  handleUpdateTableQuantity: (
+    date: string,
+    tableId: number,
+    quantity: number
+  ) => void;
+  handleRemoveTable: (date: string, tableId: number) => void;
+  handleAddTicket: (date: string, ticket: Ticket) => void;
+  handleUpdateTicketQuantity: (
+    date: string,
+    ticketId: number,
+    quantity: number
+  ) => void;
+  handleRemoveTicket: (date: string, ticketId: number) => void;
+  handleProceedToPayment: (eventSlug: string, eventDate: string) => void;
+  isPending: boolean;
+  isProcessing: boolean;
+}

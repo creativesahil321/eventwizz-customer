@@ -1,0 +1,480 @@
+"use client";
+
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useState, useEffect } from "react";
+import { useRouter, usePathname } from "next/navigation";
+import { Button } from "@/components/ui/button";
+import {
+  Form,
+  FormControl,
+  FormDescription,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Switch } from "@/components/ui/switch";
+import { AlertCircle, UserCog, Save, X } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import {
+  PermissionGroup,
+  Permission,
+} from "@/services/common/manage-roles/type";
+import { useCreateRole } from "../_lib/queries";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Separator } from "@/components/ui/separator";
+import { createRoleSchema, CreateRoleFormValues } from "../_lib/schemas";
+
+// Custom type for processed permission groups
+interface ProcessedPermission {
+  id?: number;
+  slug: string;
+  label: string;
+}
+
+interface ProcessedPermissionGroup {
+  title: string;
+  slug: string;
+  permissions: ProcessedPermission[];
+}
+
+export default function CreateRoleForm({
+  permissions,
+}: {
+  permissions: PermissionGroup[];
+}) {
+  const [isPermissionsEmpty, setIsPermissionsEmpty] = useState(false);
+  const [isAllChecked, setIsAllChecked] = useState(false);
+  const router = useRouter();
+  const pathname = usePathname() || "";
+
+  // Get the return path (parent directory)
+  const returnPath = pathname.split("/").slice(0, -1).join("/");
+
+  // Use the mutation hook for creating roles
+  const createRoleMutation = useCreateRole();
+
+  // Transform permissions data for display
+  const [displayPermissions, setDisplayPermissions] = useState<
+    ProcessedPermissionGroup[]
+  >([]);
+
+  // Process permissions data for display
+  useEffect(() => {
+    if (!permissions || permissions.length === 0) {
+      setIsPermissionsEmpty(true);
+      return;
+    }
+
+    setIsPermissionsEmpty(false);
+
+    // Transform the API permissions data into the format we need
+    const transformedGroups: ProcessedPermissionGroup[] = [];
+
+    // Process all permissions from API
+    permissions.forEach((group) => {
+      const permissionItems = group.permission
+        .filter((perm: Permission) => perm.id) // Ensure we only include permissions with IDs
+        .map((perm: Permission) => ({
+          id: perm.id,
+          slug: perm.key || perm.slug,
+          label: perm.title || perm.label,
+        }));
+
+      if (permissionItems.length > 0) {
+        transformedGroups.push({
+          title: group.title,
+          slug: group.title.toLowerCase().replace(/\s+/g, "-"),
+          permissions: permissionItems,
+        });
+      }
+    });
+
+    setDisplayPermissions(transformedGroups);
+  }, [permissions]);
+
+  const form = useForm<CreateRoleFormValues>({
+    resolver: zodResolver(createRoleSchema),
+    defaultValues: {
+      slug: "",
+      label: "",
+      permissions: [],
+    },
+  });
+
+  const [formError, setFormError] = useState<string | null>(null);
+  // Track if slug was manually edited
+  const [slugManuallyEdited, setSlugManuallyEdited] = useState(false);
+
+  async function onSubmit(values: CreateRoleFormValues) {
+    try {
+      if (isPermissionsEmpty) {
+        setFormError("No permissions available to select");
+        return;
+      }
+
+      createRoleMutation.mutate(values, {
+        onSuccess: (result) => {
+          if (result.status) {
+            router.push(returnPath);
+            router.refresh();
+          } else {
+            setFormError(result.message || "Failed to create role");
+          }
+        },
+        onError: (error: Error) => {
+          setFormError(error?.message || "Failed to create role");
+        },
+      });
+    } catch (error) {
+      setFormError("An error occurred while creating the role");
+      console.error(error);
+    }
+  }
+
+  // Watch permissions for UI updates
+  const selectedPermissions = form.watch("permissions");
+
+  // Collect all valid permission IDs from all permission groups
+  const getAllPermissionIds = () => {
+    if (displayPermissions.length === 0) return [];
+    return displayPermissions.flatMap((group) =>
+      group.permissions
+        .filter((perm) => perm.id !== undefined)
+        .map((perm) => perm.id!)
+    );
+  };
+
+  const allPermissionIds = getAllPermissionIds();
+
+  // Update the "all checked" state
+  useEffect(() => {
+    const allEnabled =
+      allPermissionIds.length > 0 &&
+      allPermissionIds.every((id) => selectedPermissions.includes(id));
+    setIsAllChecked(allEnabled);
+  }, [selectedPermissions, allPermissionIds]);
+
+  const updatePermissionSelections = (
+    permissionId: number,
+    isChecked: boolean
+  ) => {
+    const currentPermissions = form.getValues("permissions");
+    let updatedPermissions: number[];
+
+    if (isChecked) {
+      // Add the permission ID if it's checked
+      updatedPermissions = [...currentPermissions, permissionId];
+    } else {
+      // Remove the permission ID if it's unchecked
+      updatedPermissions = currentPermissions.filter(
+        (id) => id !== permissionId
+      );
+    }
+
+    form.setValue("permissions", updatedPermissions, {
+      shouldValidate: true,
+      shouldDirty: true,
+    });
+  };
+
+  const toggleAllPermissions = (checked: boolean) => {
+    const allPermissionIds: number[] = [];
+
+    if (checked) {
+      // Add all permission IDs when "Toggle All" is checked
+      displayPermissions.forEach((group) => {
+        group.permissions.forEach((perm) => {
+          if (perm.id) {
+            allPermissionIds.push(perm.id);
+          }
+        });
+      });
+    }
+
+    form.setValue("permissions", allPermissionIds, {
+      shouldValidate: true,
+      shouldDirty: true,
+    });
+    setIsAllChecked(checked);
+  };
+
+  // Count selected permissions
+  const getSelectionCount = () => {
+    return form.getValues("permissions").length;
+  };
+
+  // Check if everything is loaded properly
+  const isLoading = createRoleMutation.isPending;
+
+  if (isPermissionsEmpty) {
+    return (
+      <div className="bg-red-50 p-6 rounded-lg border border-red-200">
+        <div className="flex items-center gap-2 text-red-600 mb-2">
+          <AlertCircle className="h-5 w-5" />
+          <h3 className="font-semibold">Unable to load permissions</h3>
+        </div>
+        <p className="text-red-700 mb-4">
+          We couldn&apos;t retrieve the permission data needed to create a role.
+          This might be a temporary issue.
+        </p>
+        <div className="flex justify-end">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => router.push(returnPath)}
+            className="border-red-200 text-red-700 hover:bg-red-50 hover:text-red-800"
+          >
+            Go Back
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  if (isLoading) {
+    return (
+      <div className="space-y-8 animate-pulse">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+          <div className="h-24 bg-gray-100 rounded-md"></div>
+          <div className="h-24 bg-gray-100 rounded-md"></div>
+        </div>
+        <div className="space-y-4">
+          <div className="h-6 bg-gray-100 rounded w-1/4"></div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {[...Array(6)].map((_, i) => (
+              <div key={i} className="h-32 bg-gray-100 rounded-md"></div>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Create New Role</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
+            {/* Display form error if there is one */}
+            {formError && (
+              <div className="p-3 bg-red-50 border border-red-200 rounded-md text-red-600 text-sm">
+                <AlertCircle className="h-4 w-4 inline-block mr-1" />
+                {formError}
+              </div>
+            )}
+
+            {/* Role Information Fields */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+              <div className="space-y-2">
+                <FormField
+                  control={form.control}
+                  name="label"
+                  render={({ field }) => (
+                    <FormItem className="space-y-1">
+                      <FormLabel className="text-sm font-semibold">
+                        Role Name
+                      </FormLabel>
+                      <FormControl>
+                        <Input
+                          placeholder="E.g., Marketing Manager"
+                          {...field}
+                          maxLength={50}
+                          onChange={(e) => {
+                            // Limit to 50 characters
+                            const value = e.target.value.slice(0, 50);
+                            e.target.value = value;
+
+                            // Call the original onChange handler
+                            field.onChange(e);
+
+                            // Get label value
+                            const labelValue = value;
+
+                            // Generate slug from label
+                            const generatedSlug = labelValue
+                              .toLowerCase()
+                              .replace(/\s+/g, "-")
+                              .replace(/[^a-z0-9-]/g, "");
+
+                            // Update slug if it hasn't been manually edited
+                            if (!slugManuallyEdited) {
+                              form.setValue("slug", generatedSlug, {
+                                shouldValidate: true,
+                              });
+                            }
+                          }}
+                          className="h-10"
+                        />
+                      </FormControl>
+                      <div className="flex items-center justify-between">
+                        <FormDescription className="text-xs text-black/50">
+                          A descriptive name for this role.
+                        </FormDescription>
+                        <span className="text-xs text-muted-foreground">
+                          {field.value?.length || 0}/50
+                        </span>
+                      </div>
+                      <FormMessage className="text-xs" />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <FormField
+                  control={form.control}
+                  name="slug"
+                  render={({ field }) => (
+                    <FormItem className="space-y-1">
+                      <FormLabel className="text-sm font-semibold">
+                        Role Slug
+                      </FormLabel>
+                      <FormControl>
+                        <Input
+                          placeholder="E.g., marketing-manager"
+                          {...field}
+                          maxLength={50}
+                          onChange={(e) => {
+                            // Limit to 50 characters
+                            const value = e.target.value.slice(0, 50);
+                            e.target.value = value;
+                            field.onChange(e);
+                            // Mark slug as manually edited if user types in it
+                            if (value !== "") {
+                              setSlugManuallyEdited(true);
+                            }
+                          }}
+                          className="h-10"
+                        />
+                      </FormControl>
+                      <div className="flex items-center justify-between">
+                        <FormDescription className="text-xs text-black/50">
+                          A unique identifier (lowercase letters, numbers,
+                          hyphens only).
+                        </FormDescription>
+                        <span className="text-xs text-muted-foreground">
+                          {field.value?.length || 0}/50
+                        </span>
+                      </div>
+                      <FormMessage className="text-xs" />
+                    </FormItem>
+                  )}
+                />
+              </div>
+            </div>
+
+            {/* Permissions Section */}
+            <div className="space-y-4">
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2">
+                  <h3 className="text-base font-semibold">Permissions</h3>
+                  {getSelectionCount() > 0 && (
+                    <Badge className="bg-[var(--color-primary)] text-white">
+                      {getSelectionCount()} enabled
+                    </Badge>
+                  )}
+                </div>
+
+                {/* Global toggle all switch */}
+                <div className="flex items-center">
+                  <FormLabel htmlFor="toggle-all" className="mr-2 text-sm">
+                    Toggle All Permissions
+                  </FormLabel>
+                  <Switch
+                    id="toggle-all"
+                    checked={isAllChecked}
+                    onCheckedChange={toggleAllPermissions}
+                  />
+                </div>
+              </div>
+
+              <ScrollArea className="h-[500px] rounded-md border p-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {displayPermissions.map((group) => (
+                    <div
+                      key={group.slug}
+                      className="border border-[var(--color-border)] p-4 rounded-lg shadow-sm bg-background"
+                    >
+                      <div className="flex items-center mb-2">
+                        <UserCog className="h-5 w-5 text-[var(--color-primary)] mr-2" />
+                        <h3 className="font-semibold text-lg">{group.title}</h3>
+                      </div>
+                      <Separator className="mb-3" />
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 py-2">
+                        {group.permissions.map(
+                          (perm) =>
+                            perm.id !== undefined && (
+                              <div
+                                key={perm.id}
+                                className="flex items-center space-x-2 p-1 rounded hover:bg-[var(--color-background-hover)]"
+                              >
+                                <Switch
+                                  id={`perm-${perm.id}`}
+                                  checked={selectedPermissions.includes(
+                                    perm.id
+                                  )}
+                                  onCheckedChange={(checked) =>
+                                    updatePermissionSelections(
+                                      perm.id!,
+                                      checked
+                                    )
+                                  }
+                                />
+                                <FormLabel
+                                  htmlFor={`perm-${perm.id}`}
+                                  className="capitalize cursor-pointer flex-1"
+                                >
+                                  {perm.label}
+                                </FormLabel>
+                              </div>
+                            )
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </ScrollArea>
+
+              <FormField
+                control={form.control}
+                name="permissions"
+                render={() => (
+                  <FormMessage className="mt-2 text-red-500 font-medium" />
+                )}
+              />
+            </div>
+
+            <div className="flex justify-end gap-4 pt-4 border-t border-[var(--color-border)]">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => router.push(returnPath)}
+                disabled={isLoading}
+                className="flex items-center gap-2"
+              >
+                <X className="h-4 w-4" />
+                Cancel
+              </Button>
+              <Button
+                variant="event-primary"
+                type="submit"
+                disabled={isLoading}
+                className="flex items-center gap-2"
+              >
+                <Save className="h-4 w-4" />
+                {isLoading ? "Creating..." : "Create Role"}
+              </Button>
+            </div>
+          </form>
+        </Form>
+      </CardContent>
+    </Card>
+  );
+}

@@ -1,0 +1,208 @@
+/**
+ * Bookings Service
+ *
+ * Handles all API calls related to customer bookings.
+ */
+
+import { api } from "../../core/api-client";
+import { API_ENDPOINTS } from "../../core/endpoints";
+import {
+  BookingsQueryParams,
+  BookingsResponse,
+  BookingItem,
+  BookingDetailsResponse,
+  AddOnsResponse,
+  SaveAddOnsPayload,
+  SaveAddOnsResponse,
+  MenuItemsResponse,
+  MenuSelectionPayload,
+  MenuSelectionResponse,
+  SaveMenuChoicePayload,
+  RescheduleDataResponse,
+  RescheduleBookingPayload,
+} from "./type";
+
+export const bookingsService = {
+  /**
+   * Get a list of bookings for the customer
+   */
+  getBookings: async (
+    params?: BookingsQueryParams
+  ): Promise<BookingsResponse> => {
+    return api.get<BookingsResponse>(API_ENDPOINTS.CUSTOMER.BOOKINGS.BOOKINGS, {
+      params,
+      returnFullResponse: true,
+    });
+  },
+
+  /**
+   * Get a single booking by ID
+   */
+  getBooking: async (id: number): Promise<BookingItem> => {
+    return api.get<BookingItem>(
+      `${API_ENDPOINTS.CUSTOMER.BOOKINGS.BOOKINGS}/${id}`,
+      {
+        returnFullResponse: true,
+      }
+    );
+  },
+
+  /**
+   * Get booking details by ID
+   */
+  getBookingDetails: async (id: number): Promise<BookingDetailsResponse> => {
+    const endpoint = API_ENDPOINTS.CUSTOMER.BOOKINGS.BOOKING_DETAILS.replace(
+      "{id}",
+      id.toString()
+    );
+    return api.get<BookingDetailsResponse>(endpoint, {
+      returnFullResponse: true,
+    });
+  },
+
+  /**
+   * Get add-ons details for a specific booking and date
+   */
+  getAddOnsDetails: async (
+    bookingId: number,
+    date: string
+  ): Promise<AddOnsResponse> => {
+    const endpoint = API_ENDPOINTS.CUSTOMER.BOOKINGS.ADD_ONS_DETAILS.replace(
+      "{id}",
+      bookingId.toString()
+    ).replace("{date}", date);
+    return api.get<AddOnsResponse>(endpoint, {
+      returnFullResponse: true,
+    });
+  },
+
+  /**
+   * Save add-ons for a booking
+   */
+  saveAddOns: async (
+    payload: SaveAddOnsPayload | FormData
+  ): Promise<SaveAddOnsResponse> => {
+    return api.post<SaveAddOnsResponse>(
+      API_ENDPOINTS.CUSTOMER.BOOKINGS.SAVE_ADDONS,
+      payload,
+      {
+        returnFullResponse: true,
+        headers:
+          payload instanceof FormData
+            ? {
+                "Content-Type": "multipart/form-data",
+              }
+            : undefined,
+      }
+    );
+  },
+
+  /**
+   * Get menu items for a specific booking, date, and table
+   */
+  getMenuItems: async (
+    bookingId: number,
+    date: string,
+    tableId: number
+  ): Promise<MenuItemsResponse> => {
+    const endpoint = API_ENDPOINTS.CUSTOMER.MENU_CHOICES.ADD_MENU.replace(
+      "{id}",
+      bookingId.toString()
+    )
+      .replace("{date}", date)
+      .replace("{table_id}", tableId.toString());
+    return api.get<MenuItemsResponse>(endpoint, {
+      returnFullResponse: true,
+    });
+  },
+
+  /**
+   * Submit menu selections for a booking (batch)
+   */
+  submitMenuSelections: async (
+    payload: MenuSelectionPayload
+  ): Promise<MenuSelectionResponse> => {
+    const endpoint = API_ENDPOINTS.CUSTOMER.MENU_CHOICES.ADD_MENU.replace(
+      "{id}",
+      payload.booking_id.toString()
+    ).replace("{date}", payload.date);
+    return api.post<MenuSelectionResponse>(endpoint, payload, {
+      returnFullResponse: true,
+    });
+  },
+
+  /**
+   * Save a single menu choice immediately
+   */
+  saveMenuChoice: async (
+    payload: SaveMenuChoicePayload
+  ): Promise<MenuSelectionResponse> => {
+    return api.post<MenuSelectionResponse>(
+      API_ENDPOINTS.CUSTOMER.MENU_CHOICES.SAVE_MENU_CHOICES,
+      payload,
+      {
+        returnFullResponse: true,
+      }
+    );
+  },
+
+  /**
+   * Delete add-ons for a booking
+   * @param bookingId - The booking ID
+   * @param date - The date key (e.g., "2025-09-20")
+   * @param keyword - For TABLES: table size, For DRINKS/TICKETS: item ID
+   * @param type - "tables", "drinks", or "tickets"
+   */
+  deleteAddOns: async (
+    bookingId: number,
+    date: string,
+    keyword: string | number,
+    type: "tables" | "drinks" | "tickets"
+  ): Promise<{ status: boolean; message: string }> => {
+    const endpoint = API_ENDPOINTS.CUSTOMER.BOOKINGS.DELETE_ADD_ONS.replace(
+      "{id}",
+      bookingId.toString()
+    )
+      .replace("{date}", date)
+      .replace("{keyword}", keyword.toString())
+      .replace("{type}", type);
+    return api.delete<{ status: boolean; message: string }>(endpoint, {
+      returnFullResponse: true,
+    });
+  },
+
+  /**
+   * Get reschedule data (current date, payment gateways, and available dates)
+   * @param bookingId - The booking ID
+   * @param bookingDateId - The booking date ID (from event_dates array)
+   */
+  getRescheduleData: async (
+    bookingId: number,
+    bookingDateId: number
+  ): Promise<RescheduleDataResponse> => {
+    const endpoint = API_ENDPOINTS.CUSTOMER.BOOKINGS.RESCHEDULE_BOOKING.replace(
+      "{booking_id}",
+      bookingId.toString()
+    ).replace("{date_id}", bookingDateId.toString());
+    return api.get<RescheduleDataResponse>(endpoint, {
+      returnFullResponse: true,
+    });
+  },
+
+  /**
+   * Reschedule a booking date
+   * @param payload - The reschedule booking payload with all required data
+   */
+  rescheduleBooking: async (
+    payload: RescheduleBookingPayload
+  ): Promise<{ status: boolean; message: string; data?: unknown }> => {
+    const endpoint = API_ENDPOINTS.CUSTOMER.BOOKINGS.SAVE_RESCHEDULE_BOOKING;
+    return api.post<{ status: boolean; message: string; data?: unknown }>(
+      endpoint,
+      payload,
+      {
+        returnFullResponse: true,
+      }
+    );
+  },
+};

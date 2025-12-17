@@ -1,0 +1,20 @@
+[33m3878197[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m, [m[1;31morigin/main[m[33m, [m[1;31morigin/HEAD[m[33m)[m Implement per-date payment selection and enhance cart calculations
+[33md58d1c8[m Refactor AddToCartButton and remove unused cart integration example
+[33mbca2f05[m Remove unused fields and components related to frontend display options in onboarding and event forms
+[33mcf94a55[m Integrate preview context and refactor header components for onboarding and event previews
+[33m3ff9444[m Refactor onboarding steps and layout for improved user experience
+[33m101d569[m Refactor onboarding components for improved layout and header integration
+[33m87357b3[m Enhance onboarding and date management components with validation and UI improvements
+[33mee75a4d[m Refactor error handling in DatesSection component
+[33m672d926[m Implement cart conflict resolution system with professional UI components
+[33me5660d4[m Remove outdated documentation files for the EventWizz cart system
+[33mb582ad3[m Refactor onboarding process to utilize session management for state persistence
+[33m0fb0182[m Enhance DrinkSection and FaqSection with toggle functionality
+[33ma66ae17[m Update OrderSummary component to handle empty cart state
+[33m2fe7c5b[m Update form validation and default values in onboarding and event components
+[33m636433c[m Enhance StepFive component with accordion functionality for date management
+[33m4dcd4e4[m Enhance FormPreview and DatesSection components for improved date handling
+[33mbda1f03[m Remove CartConflictModal and replace with CartSkeletonLoader in CartManager for improved loading state management
+[33m78d2b72[m Enhance drink selection and event management in onboarding and checkout components
+[33m52937f8[m Refactor DateAccordion and TableRecommendations components for improved state management
+[33m543ae46[m Implement cart date deletion and clearing functionality in CartManager

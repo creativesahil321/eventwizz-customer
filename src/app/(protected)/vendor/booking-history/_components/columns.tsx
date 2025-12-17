@@ -1,0 +1,331 @@
+import { ColumnDef } from "@tanstack/react-table";
+import { DataTableColumnHeader } from "@/components/data-table/data-table-column-header";
+import { Button } from "@/components/ui/button";
+import {
+  HardDriveDownload,
+  Mail,
+  Settings2,
+  Eye,
+  CalendarDays,
+} from "lucide-react";
+import React from "react";
+import Link from "next/link";
+import { DataTableRowAction, History } from "../_lib/types";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+
+// Color configurations for order status
+const ORDER_STATUS_COLORS = {
+  confirmed: {
+    bg: "#10b981", // green
+    text: "#ffffff",
+  },
+  completed: {
+    bg: "#10b981", // green
+    text: "#ffffff",
+  },
+  processing: {
+    bg: "#3b82f6", // blue
+    text: "#ffffff",
+  },
+  cancelled: {
+    bg: "#ef4444", // red
+    text: "#ffffff",
+  },
+};
+
+interface GetHistoryColumnsProps {
+  setRowAction: React.Dispatch<
+    React.SetStateAction<DataTableRowAction<History> | null>
+  >;
+}
+export function getHistoryColumns({
+  setRowAction,
+}: GetHistoryColumnsProps): ColumnDef<History>[] {
+  return [
+    {
+      accessorKey: "id",
+      header: ({ column }) => (
+        <DataTableColumnHeader
+          className="text-foreground"
+          column={column}
+          title="Booking ID"
+        />
+      ),
+      cell: ({ row }) => (
+        <span className="font-mono text-sm font-semibold text-blue-600">
+          #{row.getValue("id")}
+        </span>
+      ),
+      enableSorting: false,
+      enableHiding: false,
+    },
+    {
+      accessorKey: "event_name",
+      header: ({ column }) => (
+        <DataTableColumnHeader
+          className="text-foreground"
+          column={column}
+          title="Event Name"
+        />
+      ),
+      cell: ({ row }) => {
+        const booking = row.original as History;
+        const eventName = row.getValue("event_name") as string;
+        const eventId = booking.event_id;
+
+        // If event_id exists, make it clickable with Link
+        if (eventId) {
+          return (
+            <Link
+              href={`/vendor/events/${eventId}`}
+              className="font-semibold text-sm text-[var(--color-primary)] hover:text-[var(--color-primary-hover)] hover:underline transition-colors cursor-pointer inline-block"
+              title={`View event: ${eventName}`}
+            >
+              {eventName}
+            </Link>
+          );
+        }
+
+        // Fallback if no event_id
+        return <span className="font-semibold text-sm">{eventName}</span>;
+      },
+      enableSorting: false,
+      enableHiding: false,
+    },
+    {
+      accessorKey: "user_name",
+      header: ({ column }) => (
+        <DataTableColumnHeader
+          className="text-foreground"
+          column={column}
+          title="Customer Name"
+        />
+      ),
+      cell: ({ row }) => (
+        <span className="font-medium text-sm">{row.getValue("user_name")}</span>
+      ),
+      enableSorting: false,
+      enableHiding: false,
+    },
+    {
+      accessorKey: "booking_date",
+      header: ({ column }) => (
+        <DataTableColumnHeader
+          className="text-foreground"
+          column={column}
+          title="Booking Date"
+        />
+      ),
+      cell: ({ row }) => {
+        const dateValue = row.getValue("booking_date");
+        const date = new Date(dateValue as string);
+        if (isNaN(date.getTime()))
+          return <span className="text-foreground text-sm">Invalid Date</span>;
+        const day = String(date.getDate()).padStart(2, "0");
+        const month = String(date.getMonth() + 1).padStart(2, "0");
+        const year = date.getFullYear();
+        return (
+          <span className="text-foreground text-sm">{`${day}-${month}-${year}`}</span>
+        );
+      },
+      enableSorting: false,
+      enableHiding: false,
+    },
+    {
+      accessorKey: "date",
+      header: ({ column }) => (
+        <DataTableColumnHeader
+          className="text-foreground"
+          column={column}
+          title="Event Date"
+        />
+      ),
+      cell: ({ row }) => {
+        const booking = row.original as History;
+        const eventDates = booking.event_dates || [];
+        const dateValue = row.getValue("date") as string;
+
+        // Use first date from event_dates if available, otherwise use primary date
+        const primaryDateValue =
+          eventDates.length > 0 ? eventDates[0] : dateValue;
+        const primaryDate = new Date(primaryDateValue);
+
+        // Format date helper
+        const formatDate = (dateStr: string) => {
+          const date = new Date(dateStr);
+          if (isNaN(date.getTime())) return "Invalid Date";
+          const day = String(date.getDate()).padStart(2, "0");
+          const month = String(date.getMonth() + 1).padStart(2, "0");
+          const year = date.getFullYear();
+          return `${day}-${month}-${year}`;
+        };
+
+        if (isNaN(primaryDate.getTime())) {
+          return <span className="text-foreground text-sm">Invalid Date</span>;
+        }
+
+        const formattedPrimaryDate = formatDate(primaryDateValue);
+
+        // If multiple dates, show tooltip
+        if (eventDates.length > 1) {
+          return (
+            <TooltipProvider>
+              <Tooltip delayDuration={300}>
+                <TooltipTrigger asChild>
+                  <div className="flex items-center gap-2 cursor-pointer group">
+                    <span className="text-foreground text-sm font-medium">
+                      {formattedPrimaryDate}
+                    </span>
+                    <span className="inline-flex items-center justify-center px-2 py-0.5 rounded-full text-xs font-semibold bg-blue-100 text-blue-700 group-hover:bg-blue-200 transition-colors">
+                      <CalendarDays className="h-3 w-3 mr-1" />+
+                      {eventDates.length - 1}
+                    </span>
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent
+                  side="top"
+                  className="max-w-xs p-3 bg-popover border shadow-lg"
+                >
+                  <div className="space-y-2">
+                    <p className="font-semibold text-sm mb-2 text-black">
+                      All Event Dates ({eventDates.length}):
+                    </p>
+                    <div className="space-y-1.5">
+                      {eventDates.map((dateStr, index) => (
+                        <div
+                          key={index}
+                          className="flex items-center gap-2 text-xs text-muted-foreground"
+                        >
+                          <span className="font-medium text-black">
+                            {index + 1}.
+                          </span>
+                          <span>{formatDate(dateStr)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          );
+        }
+
+        // Single date - no tooltip needed
+        return (
+          <span className="text-black text-sm font-medium">
+            {formattedPrimaryDate}
+          </span>
+        );
+      },
+      enableSorting: false,
+      enableHiding: false,
+    },
+    {
+      accessorKey: "amount",
+      header: ({ column }) => (
+        <DataTableColumnHeader
+          className="text-foreground"
+          column={column}
+          title="Amount"
+        />
+      ),
+      cell: ({ row }) => (
+        <span className="font-bold text-sm text-primary">
+          £{row.getValue("amount")}
+        </span>
+      ),
+      enableSorting: false,
+      enableHiding: false,
+    },
+    {
+      accessorKey: "status",
+      header: ({ column }) => (
+        <DataTableColumnHeader
+          className="text-foreground"
+          column={column}
+          title="Status"
+        />
+      ),
+      cell: ({ row }) => {
+        const status = row.getValue("status") as string;
+        if (!status) return null;
+
+        // Get color configuration for this order status or use default
+        const colorConfig = ORDER_STATUS_COLORS[
+          status.toLowerCase() as keyof typeof ORDER_STATUS_COLORS
+        ] || {
+          bg: "#6b7280", // gray
+          text: "#ffffff",
+        };
+
+        return (
+          <div
+            className="inline-flex items-center justify-center px-3 py-1.5 rounded-full text-xs font-semibold capitalize"
+            style={{
+              backgroundColor: colorConfig.bg,
+              color: colorConfig.text,
+            }}
+          >
+            {status}
+          </div>
+        );
+      },
+      enableSorting: false,
+      enableHiding: false,
+    },
+    {
+      accessorKey: "action",
+      header: ({ column }) => (
+        <DataTableColumnHeader
+          className="text-foreground"
+          column={column}
+          title="Action"
+        />
+      ),
+      cell: ({ row }) => (
+        <nav className="flex space-x-2">
+          <Button
+            onClick={() => setRowAction({ row, type: "view" })}
+            variant={"event-outline"}
+            size="sm"
+            title="View Details"
+          >
+            <Eye size={14} />
+          </Button>
+          <Button
+            onClick={() => setRowAction({ row, type: "adjust" })}
+            variant={"event-primary"}
+            size="sm"
+            title="Adjust Booking"
+            className="text-white"
+          >
+            <Settings2 size={14} />
+          </Button>
+          <Button
+            onClick={() => setRowAction({ row, type: "download" })}
+            variant={"event-outline"}
+            size="sm"
+            title="Download"
+          >
+            <HardDriveDownload size={14} />
+          </Button>
+          <Button
+            onClick={() => setRowAction({ row, type: "mail" })}
+            variant={"event-outline"}
+            size="sm"
+            title="Send Mail"
+          >
+            <Mail size={14} />
+          </Button>
+        </nav>
+      ),
+      enableSorting: false,
+      enableHiding: false,
+    },
+  ];
+}
