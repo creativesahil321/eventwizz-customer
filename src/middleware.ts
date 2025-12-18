@@ -62,6 +62,14 @@ export async function middleware(req: NextRequest) {
       return NextResponse.next();
     }
 
+    // ⚡ Allow /vendor/checkout on customer site (it's actually customer checkout)
+    if (
+      pathname === "/vendor/checkout" ||
+      pathname.startsWith("/vendor/checkout/")
+    ) {
+      return NextResponse.next();
+    }
+
     // Redirect vendor/admin routes to main domain
     if (pathname.startsWith("/vendor") || pathname.startsWith("/admin")) {
       return NextResponse.redirect(
