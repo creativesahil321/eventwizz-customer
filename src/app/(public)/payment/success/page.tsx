@@ -403,7 +403,7 @@ function PaymentSuccessContent() {
         >
           <Button
             onClick={handleDownloadReceipt}
-            variant="outline"
+            variant="event-outline"
             className="w-full"
           >
             <Download className="h-4 w-4 mr-2" />
@@ -412,7 +412,7 @@ function PaymentSuccessContent() {
 
           <Button
             onClick={handleEmailReceipt}
-            variant="outline"
+            variant="event-outline"
             className="w-full"
           >
             <Mail className="h-4 w-4 mr-2" />

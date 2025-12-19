@@ -31,6 +31,7 @@ import { TiptapEditor } from "@/components/ui/tiptap-editor";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import Image from "next/image";
 import { setEventIdInForm } from "../../../_lib/hooks/useEventId";
+import { VideoFormatInfo } from "@/components/shared/video-format-info";
 
 export default function StepThree() {
   const {
@@ -221,14 +222,38 @@ export default function StepThree() {
 
   // Handle banner video change
   const handleBannerVideoChange = useCallback(
-    (files: File[], onChange: (value: File | undefined) => void) => {
+    async (files: File[], onChange: (value: File | undefined) => void) => {
       if (!files || files.length === 0) return;
 
+      // Prevent duplicate validation calls
+      if (bannerVideoUploading) return;
+
       const file = files[0];
-      setBannerVideoFile(files);
       setBannerVideoUploading(true);
 
       try {
+        // Validate video compatibility
+        const { validateVideo } = await import("@/utils/video-validator");
+        const validation = await validateVideo(file, 10);
+
+        if (!validation.isValid) {
+          toast.error(validation.errors.join(". ") || "Invalid video file", {
+            description:
+              "Please upload an MP4 video with H.264 codec for best compatibility.",
+          });
+          setBannerVideoUploading(false);
+          return;
+        }
+
+        // Show warnings if any (e.g., HEVC detected)
+        if (validation.warnings.length > 0) {
+          toast.warning("Video compatibility warning", {
+            description: validation.warnings[0],
+          });
+        }
+
+        setBannerVideoFile(files);
+
         // Update local form
         onChange(file);
         globalForm.setValue("stepThree.event_banner_video", file);
@@ -250,6 +275,10 @@ export default function StepThree() {
         // Success toast will be shown by axios interceptor when form is submitted
       } catch (error) {
         console.error("Error handling banner video:", error);
+        toast.error("Failed to process video", {
+          description:
+            "Please ensure the video is in MP4 format with H.264 codec.",
+        });
       } finally {
         setBannerVideoUploading(false);
       }
@@ -782,7 +811,7 @@ export default function StepThree() {
                                     )
                                   }
                                   maxFileCount={1}
-                                  maxSize={10 * 1024 * 1024} // 10MB
+                                  maxSize={100 * 1024 * 1024} // 100MB - Custom validation in handler
                                   onRemove={() =>
                                     handleRemoveBannerVideo(field.onChange)
                                   }
@@ -800,10 +829,15 @@ export default function StepThree() {
                               )}
                             {bannerVideoFile.length === 0 &&
                               !bannerVideoUrl && (
-                                <p className="text-sm text-gray-500 mt-2">
-                                  Upload a banner video for your event header
-                                  (MP4, WebM, or OGG format, max 10MB)
-                                </p>
+                                <>
+                                  <p className="text-sm text-gray-500 mt-2">
+                                    Upload a banner video for your event header
+                                    (MP4, WebM, or OGG format, max 10MB)
+                                  </p>
+                                  <div className="w-full mt-3">
+                                    <VideoFormatInfo variant="compact" />
+                                  </div>
+                                </>
                               )}
                           </div>
                         </FormControl>

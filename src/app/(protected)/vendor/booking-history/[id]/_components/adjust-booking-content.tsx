@@ -64,6 +64,14 @@ export default function AdjustBookingContent({
 
   const bookingData = bookingResponse?.data;
 
+  // Helper function to safely format amounts (handles null/undefined)
+  const formatAmount = (value: number | null | undefined): string => {
+    if (value === null || value === undefined) {
+      return "£0.00";
+    }
+    return `£${Number(value).toFixed(2)}`;
+  };
+
   const handleDownload = () => {
     toast.success("Downloading booking receipt...");
     // TODO: Implement download logic
@@ -104,12 +112,14 @@ export default function AdjustBookingContent({
   };
 
   const getPendingAmount = (
-    totalAmount: number,
-    paidAmount: number
+    totalAmount: number | null | undefined,
+    paidAmount: number | null | undefined
   ): string | null => {
-    const pending = totalAmount - paidAmount;
+    const total = totalAmount ?? 0;
+    const paid = paidAmount ?? 0;
+    const pending = total - paid;
     if (pending <= 0) return null;
-    return `£${pending.toFixed(2)}`;
+    return formatAmount(pending);
   };
 
   const toggleAllocationExpansion = (dateId: string, itemIdx: number) => {
@@ -212,24 +222,34 @@ export default function AdjustBookingContent({
     );
   }
 
-  // Calculate totals
+  // Calculate totals with null safety
   const totalTables = bookingData.event_dates.reduce(
     (sum, date) =>
-      sum + date.tables.reduce((tSum, table) => tSum + table.no_tables, 0),
+      sum +
+      (date.tables?.reduce((tSum, table) => tSum + (table.no_tables ?? 0), 0) ??
+        0),
     0
   );
 
   const totalTickets = bookingData.event_dates.reduce(
     (sum, date) =>
-      sum + date.tickets.reduce((tSum, ticket) => tSum + ticket.quantity, 0),
+      sum +
+      (date.tickets?.reduce(
+        (tSum, ticket) => tSum + (ticket.quantity ?? 0),
+        0
+      ) ?? 0),
     0
   );
 
   const totalPeople = bookingData.event_dates.reduce(
     (sum, date) =>
       sum +
-      date.tables.reduce((tSum, table) => tSum + table.people, 0) +
-      date.tickets.reduce((tSum, ticket) => tSum + ticket.quantity, 0),
+      (date.tables?.reduce((tSum, table) => tSum + (table.people ?? 0), 0) ??
+        0) +
+      (date.tickets?.reduce(
+        (tSum, ticket) => tSum + (ticket.quantity ?? 0),
+        0
+      ) ?? 0),
     0
   );
 
@@ -412,22 +432,26 @@ export default function AdjustBookingContent({
                         dateInfo.total_amount,
                         dateInfo.paid_amount
                       );
-                      const totalDateTables = dateInfo.tables.reduce(
-                        (sum, table) => sum + table.no_tables,
-                        0
-                      );
-                      const totalDateGuests = dateInfo.tables.reduce(
-                        (sum, table) => sum + table.people,
-                        0
-                      );
-                      const totalDateTickets = dateInfo.tickets.reduce(
-                        (sum, ticket) => sum + ticket.quantity,
-                        0
-                      );
-                      const totalDateDrinks = dateInfo.drinks.reduce(
-                        (sum, drink) => sum + drink.quantity,
-                        0
-                      );
+                      const totalDateTables =
+                        dateInfo.tables?.reduce(
+                          (sum, table) => sum + (table.no_tables ?? 0),
+                          0
+                        ) ?? 0;
+                      const totalDateGuests =
+                        dateInfo.tables?.reduce(
+                          (sum, table) => sum + (table.people ?? 0),
+                          0
+                        ) ?? 0;
+                      const totalDateTickets =
+                        dateInfo.tickets?.reduce(
+                          (sum, ticket) => sum + (ticket.quantity ?? 0),
+                          0
+                        ) ?? 0;
+                      const totalDateDrinks =
+                        dateInfo.drinks?.reduce(
+                          (sum, drink) => sum + (drink.quantity ?? 0),
+                          0
+                        ) ?? 0;
 
                       const hasAddons =
                         (dateInfo.addons?.tables &&
@@ -521,7 +545,7 @@ export default function AdjustBookingContent({
                                   )}
                                   <span>•</span>
                                   <span className="font-semibold text-foreground">
-                                    £{dateInfo.total_amount.toFixed(2)}
+                                    {formatAmount(dateInfo.total_amount)}
                                   </span>
                                 </div>
                               </div>
@@ -543,7 +567,7 @@ export default function AdjustBookingContent({
                                           Total Amount
                                         </p>
                                         <p className="text-sm font-semibold text-foreground">
-                                          £{dateInfo.total_amount.toFixed(2)}
+                                          {formatAmount(dateInfo.total_amount)}
                                         </p>
                                       </div>
                                     </div>
@@ -556,7 +580,7 @@ export default function AdjustBookingContent({
                                           Paid Amount
                                         </p>
                                         <p className="text-sm font-semibold text-green-600">
-                                          £{dateInfo.paid_amount.toFixed(2)}
+                                          {formatAmount(dateInfo.paid_amount)}
                                         </p>
                                       </div>
                                     </div>
@@ -578,142 +602,146 @@ export default function AdjustBookingContent({
                                   </div>
 
                                   {/* Tables Section */}
-                                  {dateInfo.tables.length > 0 && (
-                                    <div className="mt-4">
-                                      <div className="flex items-center justify-between px-3 py-2 rounded-md bg-blue-50 border border-blue-100 mb-3">
-                                        <div className="flex items-center gap-2">
-                                          <UtensilsCrossed className="h-4 w-4 text-blue-600" />
+                                  {dateInfo.tables &&
+                                    dateInfo.tables.length > 0 && (
+                                      <div className="mt-4">
+                                        <div className="flex items-center justify-between px-3 py-2 rounded-md bg-blue-50 border border-blue-100 mb-3">
+                                          <div className="flex items-center gap-2">
+                                            <UtensilsCrossed className="h-4 w-4 text-blue-600" />
+                                            <span className="text-xs font-semibold text-blue-900">
+                                              Tables ({totalDateTables})
+                                            </span>
+                                          </div>
                                           <span className="text-xs font-semibold text-blue-900">
-                                            Tables ({totalDateTables})
+                                            {totalDateGuests} Guests
                                           </span>
                                         </div>
-                                        <span className="text-xs font-semibold text-blue-900">
-                                          {totalDateGuests} Guests
-                                        </span>
-                                      </div>
 
-                                      <div className="space-y-3">
-                                        {dateInfo.tables.map((table, idx) => (
-                                          <div
-                                            key={idx}
-                                            className="flex items-start justify-between py-2 border-b border-gray-100 last:border-0 gap-4"
-                                          >
-                                            <div className="flex-1 min-w-0">
-                                              <div className="flex items-center gap-2 mb-1">
-                                                <span className="text-sm font-medium text-foreground">
-                                                  Table of {table.table_size}
-                                                </span>
-                                                <span className="text-xs text-muted-foreground bg-gray-100 px-2 py-0.5 rounded">
-                                                  {table.no_tables}{" "}
-                                                  {table.no_tables === 1
-                                                    ? "Table"
-                                                    : "Tables"}
-                                                </span>
-                                              </div>
-                                              {/* Table Allocation */}
-                                              {table.allocation &&
-                                                table.allocation.length > 0 && (
-                                                  <div className="mt-1.5 space-y-1">
-                                                    <p className="text-xs text-muted-foreground mb-1">
-                                                      Seating Arrangement:
-                                                    </p>
-                                                    <div className="flex flex-wrap gap-2">
-                                                      {(() => {
-                                                        const MAX_VISIBLE = 6;
-                                                        const key = `${dateInfo.booking_date_id}-${idx}`;
-                                                        const isExpanded =
-                                                          expandedAllocations[
-                                                            key
-                                                          ] || false;
-                                                        const visible =
-                                                          isExpanded
-                                                            ? table.allocation
-                                                            : table.allocation?.slice(
-                                                                0,
-                                                                MAX_VISIBLE
-                                                              ) || [];
-                                                        const hasMore =
-                                                          (table.allocation
-                                                            ?.length || 0) >
-                                                          MAX_VISIBLE;
+                                        <div className="space-y-3">
+                                          {dateInfo.tables.map((table, idx) => (
+                                            <div
+                                              key={idx}
+                                              className="flex items-start justify-between py-2 border-b border-gray-100 last:border-0 gap-4"
+                                            >
+                                              <div className="flex-1 min-w-0">
+                                                <div className="flex items-center gap-2 mb-1">
+                                                  <span className="text-sm font-medium text-foreground">
+                                                    Table of {table.table_size}
+                                                  </span>
+                                                  <span className="text-xs text-muted-foreground bg-gray-100 px-2 py-0.5 rounded">
+                                                    {table.no_tables}{" "}
+                                                    {table.no_tables === 1
+                                                      ? "Table"
+                                                      : "Tables"}
+                                                  </span>
+                                                </div>
+                                                {/* Table Allocation */}
+                                                {table.allocation &&
+                                                  table.allocation.length >
+                                                    0 && (
+                                                    <div className="mt-1.5 space-y-1">
+                                                      <p className="text-xs text-muted-foreground mb-1">
+                                                        Seating Arrangement:
+                                                      </p>
+                                                      <div className="flex flex-wrap gap-2">
+                                                        {(() => {
+                                                          const MAX_VISIBLE = 6;
+                                                          const key = `${dateInfo.booking_date_id}-${idx}`;
+                                                          const isExpanded =
+                                                            expandedAllocations[
+                                                              key
+                                                            ] || false;
+                                                          const visible =
+                                                            isExpanded
+                                                              ? table.allocation
+                                                              : table.allocation?.slice(
+                                                                  0,
+                                                                  MAX_VISIBLE
+                                                                ) || [];
+                                                          const hasMore =
+                                                            (table.allocation
+                                                              ?.length || 0) >
+                                                            MAX_VISIBLE;
 
-                                                        return (
-                                                          <>
-                                                            {visible.map(
-                                                              (
-                                                                people,
-                                                                tableIdx
-                                                              ) => (
-                                                                <div
-                                                                  key={tableIdx}
-                                                                  className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-blue-50 border border-blue-100"
+                                                          return (
+                                                            <>
+                                                              {visible.map(
+                                                                (
+                                                                  people,
+                                                                  tableIdx
+                                                                ) => (
+                                                                  <div
+                                                                    key={
+                                                                      tableIdx
+                                                                    }
+                                                                    className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-blue-50 border border-blue-100"
+                                                                  >
+                                                                    <span className="text-xs font-medium text-blue-700">
+                                                                      Table{" "}
+                                                                      {tableIdx +
+                                                                        1}
+                                                                      :
+                                                                    </span>
+                                                                    <span className="text-xs font-semibold text-blue-900">
+                                                                      {people}{" "}
+                                                                      {people ===
+                                                                      1
+                                                                        ? "Person"
+                                                                        : "People"}
+                                                                    </span>
+                                                                  </div>
+                                                                )
+                                                              )}
+                                                              {hasMore && (
+                                                                <Button
+                                                                  variant="ghost"
+                                                                  size="sm"
+                                                                  className="h-7 px-2 text-xs text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                                                                  onClick={() =>
+                                                                    toggleAllocationExpansion(
+                                                                      dateInfo.booking_date_id.toString(),
+                                                                      idx
+                                                                    )
+                                                                  }
                                                                 >
-                                                                  <span className="text-xs font-medium text-blue-700">
-                                                                    Table{" "}
-                                                                    {tableIdx +
-                                                                      1}
-                                                                    :
-                                                                  </span>
-                                                                  <span className="text-xs font-semibold text-blue-900">
-                                                                    {people}{" "}
-                                                                    {people ===
-                                                                    1
-                                                                      ? "Person"
-                                                                      : "People"}
-                                                                  </span>
-                                                                </div>
-                                                              )
-                                                            )}
-                                                            {hasMore && (
-                                                              <Button
-                                                                variant="ghost"
-                                                                size="sm"
-                                                                className="h-7 px-2 text-xs text-blue-600 hover:text-blue-700 hover:bg-blue-50"
-                                                                onClick={() =>
-                                                                  toggleAllocationExpansion(
-                                                                    dateInfo.booking_date_id.toString(),
-                                                                    idx
-                                                                  )
-                                                                }
-                                                              >
-                                                                {isExpanded ? (
-                                                                  <>
-                                                                    <ChevronUp className="h-3 w-3 mr-1" />
-                                                                    Show Less
-                                                                  </>
-                                                                ) : (
-                                                                  <>
-                                                                    <ChevronDown className="h-3 w-3 mr-1" />
-                                                                    Show{" "}
-                                                                    {(table
-                                                                      .allocation
-                                                                      ?.length ||
-                                                                      0) -
-                                                                      MAX_VISIBLE}{" "}
-                                                                    More
-                                                                  </>
-                                                                )}
-                                                              </Button>
-                                                            )}
-                                                          </>
-                                                        );
-                                                      })()}
+                                                                  {isExpanded ? (
+                                                                    <>
+                                                                      <ChevronUp className="h-3 w-3 mr-1" />
+                                                                      Show Less
+                                                                    </>
+                                                                  ) : (
+                                                                    <>
+                                                                      <ChevronDown className="h-3 w-3 mr-1" />
+                                                                      Show{" "}
+                                                                      {(table
+                                                                        .allocation
+                                                                        ?.length ||
+                                                                        0) -
+                                                                        MAX_VISIBLE}{" "}
+                                                                      More
+                                                                    </>
+                                                                  )}
+                                                                </Button>
+                                                              )}
+                                                            </>
+                                                          );
+                                                        })()}
+                                                      </div>
                                                     </div>
-                                                  </div>
-                                                )}
-                                              <p className="text-xs text-muted-foreground mt-1.5">
-                                                £{table.price_per_person} ×{" "}
-                                                {table.people}
+                                                  )}
+                                                <p className="text-xs text-muted-foreground mt-1.5">
+                                                  £{table.price_per_person ?? 0}{" "}
+                                                  × {table.people ?? 0}
+                                                </p>
+                                              </div>
+                                              <p className="text-sm font-semibold text-foreground shrink-0">
+                                                {formatAmount(table.total)}
                                               </p>
                                             </div>
-                                            <p className="text-sm font-semibold text-foreground shrink-0">
-                                              £{table.total.toFixed(2)}
-                                            </p>
-                                          </div>
-                                        ))}
+                                          ))}
+                                        </div>
                                       </div>
-                                    </div>
-                                  )}
+                                    )}
 
                                   {/* Tickets Section */}
                                   {dateInfo.tickets.length > 0 && (
@@ -746,10 +774,8 @@ export default function AdjustBookingContent({
                                             </div>
                                             <p className="text-sm font-semibold text-foreground shrink-0">
                                               £
-                                              {(
-                                                ticket.price_per_ticket *
-                                                ticket.quantity
-                                              ).toFixed(2)}
+                                              {ticket.price_per_ticket *
+                                                ticket.quantity}
                                             </p>
                                           </div>
                                         ))}
@@ -783,7 +809,7 @@ export default function AdjustBookingContent({
                                               </p>
                                             </div>
                                             <p className="text-sm font-semibold text-foreground shrink-0">
-                                              £{drink.total.toFixed(2)}
+                                              {formatAmount(drink.total)}
                                             </p>
                                           </div>
                                         ))}
@@ -810,9 +836,9 @@ export default function AdjustBookingContent({
                                           </span>
                                           <Badge className="text-xs bg-purple-100 text-purple-700">
                                             £
-                                            {dateInfo.addons.total_amount.toFixed(
+                                            {dateInfo.addons.total_amount?.toFixed(
                                               2
-                                            )}
+                                            ) ?? "0.00"}
                                           </Badge>
                                         </div>
                                         {expandedAddOns[
@@ -845,7 +871,9 @@ export default function AdjustBookingContent({
                                                       Table of{" "}
                                                       {table.table_size} ×{" "}
                                                       {table.no_tables} - £
-                                                      {table.total.toFixed(2)}
+                                                      {table.total
+                                                        ? table.total.toFixed(2)
+                                                        : "0.00"}
                                                     </div>
                                                   )
                                                 )}
@@ -890,7 +918,9 @@ export default function AdjustBookingContent({
                                                     >
                                                       {drink.title} ×{" "}
                                                       {drink.quantity} - £
-                                                      {drink.total.toFixed(2)}
+                                                      {drink.total
+                                                        ? drink.total.toFixed(2)
+                                                        : "0.00"}
                                                     </div>
                                                   )
                                                 )}
@@ -920,9 +950,9 @@ export default function AdjustBookingContent({
                                               Total
                                             </p>
                                             <p className="font-semibold text-amber-900">
-                                              £
-                                              {dateInfo.parent_booking_date.total_amount.toFixed(
-                                                2
+                                              {formatAmount(
+                                                dateInfo.parent_booking_date
+                                                  .total_amount
                                               )}
                                             </p>
                                           </div>
@@ -931,9 +961,9 @@ export default function AdjustBookingContent({
                                               Paid
                                             </p>
                                             <p className="font-semibold text-green-600">
-                                              £
-                                              {dateInfo.parent_booking_date.paid_amount.toFixed(
-                                                2
+                                              {formatAmount(
+                                                dateInfo.parent_booking_date
+                                                  .paid_amount
                                               )}
                                             </p>
                                           </div>
@@ -942,9 +972,9 @@ export default function AdjustBookingContent({
                                               Pending
                                             </p>
                                             <p className="font-semibold text-red-600">
-                                              £
-                                              {dateInfo.parent_booking_date.pending_payment.toFixed(
-                                                2
+                                              {formatAmount(
+                                                dateInfo.parent_booking_date
+                                                  .pending_payment
                                               )}
                                             </p>
                                           </div>
@@ -983,7 +1013,7 @@ export default function AdjustBookingContent({
                           Package Sub-total
                         </span>
                         <span className="text-sm font-semibold text-foreground">
-                          £{bookingData.sub_total.toFixed(2)}
+                          {formatAmount(bookingData.sub_total)}
                         </span>
                       </div>
 
@@ -994,7 +1024,7 @@ export default function AdjustBookingContent({
                               Add-ons Total
                             </span>
                             <span className="text-sm font-semibold text-purple-600">
-                              £{bookingData.addons_amount.toFixed(2)}
+                              {formatAmount(bookingData.addons_amount)}
                             </span>
                           </div>
                         )}
@@ -1006,7 +1036,7 @@ export default function AdjustBookingContent({
                               Deposit
                             </span>
                             <span className="text-sm font-semibold text-blue-600">
-                              £{bookingData.deposit_paid.toFixed(2)}
+                              {formatAmount(bookingData.deposit_paid)}
                             </span>
                           </div>
                         )}
@@ -1016,7 +1046,7 @@ export default function AdjustBookingContent({
                           Paid Amount
                         </span>
                         <span className="text-sm font-semibold text-green-600">
-                          £{bookingData.paid_amount.toFixed(2)}
+                          {formatAmount(bookingData.paid_amount)}
                         </span>
                       </div>
 
@@ -1026,7 +1056,7 @@ export default function AdjustBookingContent({
                             Pending Payment
                           </span>
                           <span className="text-sm font-semibold text-red-600">
-                            £{bookingData.pending_payment.toFixed(2)}
+                            {formatAmount(bookingData.pending_payment)}
                           </span>
                         </div>
                       )}
@@ -1038,7 +1068,7 @@ export default function AdjustBookingContent({
                           Total Amount
                         </span>
                         <span className="text-xl font-bold text-primary">
-                          £{bookingData.total.toFixed(2)}
+                          {formatAmount(bookingData.total)}
                         </span>
                       </div>
 

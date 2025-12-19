@@ -54,39 +54,39 @@ export default function PopularEvents({
   }
 
   // Calculate responsive layout based on event count
-  const { itemsPerView, itemWidth, showNavigation } = useMemo(() => {
+  const { itemsPerView, itemWidth, showNavigationDesktop } = useMemo(() => {
     const count = events.length;
 
     // Default configuration for 5+ events
     let config = {
       itemsPerView: "md:basis-1/2 lg:basis-1/4",
       itemWidth: "w-full",
-      showNavigation: true,
+      showNavigationDesktop: true,
     };
 
     if (count === 1) {
       config = {
         itemsPerView: "basis-full",
         itemWidth: "max-w-md mx-auto w-full",
-        showNavigation: false,
+        showNavigationDesktop: false,
       };
     } else if (count === 2) {
       config = {
         itemsPerView: "md:basis-1/2",
         itemWidth: "w-full max-w-md mx-auto",
-        showNavigation: false, // Hide navigation for 2 events
+        showNavigationDesktop: false, // Hide navigation for 2 events on desktop
       };
     } else if (count === 3) {
       config = {
         itemsPerView: "md:basis-1/3",
         itemWidth: "w-full max-w-sm mx-auto",
-        showNavigation: false, // Hide navigation for 3 events
+        showNavigationDesktop: false, // Hide navigation for 3 events on desktop
       };
     } else if (count === 4) {
       config = {
         itemsPerView: "md:basis-1/2 lg:basis-1/4",
         itemWidth: "w-full",
-        showNavigation: false, // Hide navigation for 4 events
+        showNavigationDesktop: false, // Hide navigation for 4 events on desktop
       };
     }
 
@@ -259,16 +259,16 @@ export default function PopularEvents({
           )}
         >
           <Carousel className="relative">
-            {showNavigation && (
-              <CarouselPrevious
-                className={cn(
-                  "absolute top-1/2 transform -translate-y-1/2 z-10 bg-white shadow-lg rounded-full border-2 border-gray-300 flex items-center justify-center",
-                  events.length === 2 ? "-left-3 md:-left-6" : "",
-                  events.length === 3 ? "-left-3 md:-left-5" : "",
-                  events.length >= 4 && "-left-5 md:-left-10"
-                )}
-              />
-            )}
+            <CarouselPrevious
+              className={cn(
+                "absolute top-1/2 transform -translate-y-1/2 z-10 bg-white shadow-lg rounded-full border-2 border-gray-300 flex items-center justify-center",
+                events.length === 2 ? "-left-3 md:-left-6" : "",
+                events.length === 3 ? "-left-3 md:-left-5" : "",
+                events.length >= 4 && "-left-5 md:-left-10",
+                // Always show on mobile, conditionally hide on desktop based on event count
+                !showNavigationDesktop && "md:hidden"
+              )}
+            />
             <CarouselContent
               className={cn(
                 "-ml-4",
@@ -323,16 +323,16 @@ export default function PopularEvents({
                 </CarouselItem>
               ))}
             </CarouselContent>
-            {showNavigation && (
-              <CarouselNext
-                className={cn(
-                  "absolute top-1/2 transform -translate-y-1/2 z-10 bg-white shadow-lg rounded-full border-2 border-gray-300 flex items-center justify-center",
-                  events.length === 2 ? "-right-3 md:-right-6" : "",
-                  events.length === 3 ? "-right-3 md:-right-5" : "",
-                  events.length >= 4 && "-right-5 md:-right-10"
-                )}
-              />
-            )}
+            <CarouselNext
+              className={cn(
+                "absolute top-1/2 transform -translate-y-1/2 z-10 bg-white shadow-lg rounded-full border-2 border-gray-300 flex items-center justify-center",
+                events.length === 2 ? "-right-3 md:-right-6" : "",
+                events.length === 3 ? "-right-3 md:-right-5" : "",
+                events.length >= 4 && "-right-5 md:-right-10",
+                // Always show on mobile, conditionally hide on desktop based on event count
+                !showNavigationDesktop && "md:hidden"
+              )}
+            />
           </Carousel>
         </div>
       </div>

@@ -446,12 +446,30 @@ export default function DateAccordion({
       {isExpanded && (
         <CardContent className="pt-0">
           <Tabs
-            defaultValue={dateData.tables.length > 0 ? "tables" : "tickets"}
+            defaultValue={
+              dateData.tables.length > 0
+                ? "tables"
+                : dateData.tickets.length > 0
+                ? "tickets"
+                : "drinks"
+            }
             className="w-full overflow-hidden"
           >
             <TabsList
               className={`grid w-full gap-1 ${
-                dateData.tables.length > 0 ? "grid-cols-3" : "grid-cols-2"
+                [
+                  dateData.tables.length > 0,
+                  dateData.tickets.length > 0,
+                  dateData.drinks.length > 0,
+                ].filter(Boolean).length === 3
+                  ? "grid-cols-3"
+                  : [
+                      dateData.tables.length > 0,
+                      dateData.tickets.length > 0,
+                      dateData.drinks.length > 0,
+                    ].filter(Boolean).length === 2
+                  ? "grid-cols-2"
+                  : "grid-cols-1"
               }`}
             >
               {dateData.tables.length > 0 && (
@@ -468,111 +486,67 @@ export default function DateAccordion({
                   </span>
                 </TabsTrigger>
               )}
-              <TabsTrigger
-                value="tickets"
-                className="flex items-center justify-center gap-1 sm:gap-2 text-xs sm:text-sm px-1 sm:px-2 min-w-0"
-              >
-                <Ticket className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
-                <span className="truncate">
-                  <span>Tickets </span>
-                  <span className="font-semibold">
-                    ({dateData.tickets.length})
+              {dateData.tickets.length > 0 && (
+                <TabsTrigger
+                  value="tickets"
+                  className="flex items-center justify-center gap-1 sm:gap-2 text-xs sm:text-sm px-1 sm:px-2 min-w-0"
+                >
+                  <Ticket className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
+                  <span className="truncate">
+                    <span>Tickets </span>
+                    <span className="font-semibold">
+                      ({dateData.tickets.length})
+                    </span>
                   </span>
-                </span>
-              </TabsTrigger>
-              <TabsTrigger
-                value="drinks"
-                className="flex items-center justify-center gap-1 sm:gap-2 text-xs sm:text-sm px-1 sm:px-2 min-w-0"
-              >
-                <Wine className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
-                <span className="truncate">
-                  <span className="hidden sm:inline">{drinkTitle} </span>
-                  <span className="sm:hidden">
-                    {drinkTitle.length > 8
-                      ? drinkTitle.substring(0, 6) + ".."
-                      : drinkTitle}
+                </TabsTrigger>
+              )}
+              {dateData.drinks.length > 0 && (
+                <TabsTrigger
+                  value="drinks"
+                  className="flex items-center justify-center gap-1 sm:gap-2 text-xs sm:text-sm px-1 sm:px-2 min-w-0"
+                >
+                  <Wine className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
+                  <span className="truncate">
+                    <span className="hidden sm:inline">{drinkTitle} </span>
+                    <span className="sm:hidden">
+                      {drinkTitle.length > 8
+                        ? drinkTitle.substring(0, 6) + ".."
+                        : drinkTitle}
+                    </span>
+                    <span className="font-semibold">
+                      ({dateData.drinks.length})
+                    </span>
                   </span>
-                  <span className="font-semibold">
-                    ({dateData.drinks.length})
-                  </span>
-                </span>
-              </TabsTrigger>
+                </TabsTrigger>
+              )}
             </TabsList>
 
-            {/* Drinks Tab */}
-            <TabsContent value="drinks" className="mt-4 space-y-3 sm:space-y-4">
-              {dateData.drinks.length > 0 ? (
-                <div className="grid grid-cols-1 gap-3 sm:gap-4">
-                  {dateData.drinks.map((drink, index) => (
-                    <div
-                      key={index}
-                      className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 p-3 sm:p-4 border rounded-lg hover:bg-gray-50"
-                    >
-                      <div className="flex-1 min-w-0">
-                        <h4 className="font-medium text-sm sm:text-base mb-1">
-                          {drink.title}
-                        </h4>
-                        <p className="text-xs sm:text-sm text-gray-600 break-words">
-                          £{drink.price} • Quantity in cart: {drink.quantity}
-                        </p>
-                      </div>
-                      <div className="flex-shrink-0">
-                        <QuantityControls
-                          quantity={drink.quantity}
-                          onIncrease={() =>
-                            handleQuantityChange("drink", drink.id, 1)
-                          }
-                          onDecrease={() =>
-                            handleQuantityChange("drink", drink.id, -1)
-                          }
-                          onRemove={() =>
-                            updateQuantity(
-                              eventSlug,
-                              date,
-                              "drink",
-                              drink.id,
-                              0
-                            )
-                          }
-                          size="sm"
-                        />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="text-center py-8">
-                  <p className="text-gray-500 text-sm sm:text-base">
-                    No drinks available for this date
-                  </p>
-                </div>
-              )}
-            </TabsContent>
-
             {/* Tables Tab - Now with Professional Recommendations */}
-            <TabsContent value="tables" className="mt-4">
-              <TableRecommendations
-                eventSlug={eventSlug}
-                date={date}
-                tables={dateData.tables}
-                onQuantityChange={(tableId, change) =>
-                  handleQuantityChange("table", tableId, change)
-                }
-                onUpdateQuantity={(tableId, quantity) =>
-                  updateQuantity(eventSlug, date, "table", tableId, quantity)
-                }
-                getTotalQuantity={(tableId) =>
-                  getTotalQuantity(eventSlug, date, "table", tableId)
-                }
-              />
-            </TabsContent>
+            {dateData.tables.length > 0 && (
+              <TabsContent value="tables" className="mt-4">
+                <TableRecommendations
+                  eventSlug={eventSlug}
+                  date={date}
+                  tables={dateData.tables}
+                  onQuantityChange={(tableId, change) =>
+                    handleQuantityChange("table", tableId, change)
+                  }
+                  onUpdateQuantity={(tableId, quantity) =>
+                    updateQuantity(eventSlug, date, "table", tableId, quantity)
+                  }
+                  getTotalQuantity={(tableId) =>
+                    getTotalQuantity(eventSlug, date, "table", tableId)
+                  }
+                />
+              </TabsContent>
+            )}
 
             {/* Tickets Tab */}
-            <TabsContent
-              value="tickets"
-              className="mt-4 space-y-3 sm:space-y-4"
-            >
-              {dateData.tickets.length > 0 ? (
+            {dateData.tickets.length > 0 && (
+              <TabsContent
+                value="tickets"
+                className="mt-4 space-y-3 sm:space-y-4"
+              >
                 <div className="grid grid-cols-1 gap-3 sm:gap-4">
                   {dateData.tickets.map((ticket) => (
                     <div
@@ -615,14 +589,55 @@ export default function DateAccordion({
                     </div>
                   ))}
                 </div>
-              ) : (
-                <div className="text-center py-8">
-                  <p className="text-gray-500 text-sm sm:text-base">
-                    No tickets available for this date
-                  </p>
+              </TabsContent>
+            )}
+
+            {/* Drinks Tab */}
+            {dateData.drinks.length > 0 && (
+              <TabsContent
+                value="drinks"
+                className="mt-4 space-y-3 sm:space-y-4"
+              >
+                <div className="grid grid-cols-1 gap-3 sm:gap-4">
+                  {dateData.drinks.map((drink, index) => (
+                    <div
+                      key={index}
+                      className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 p-3 sm:p-4 border rounded-lg hover:bg-gray-50"
+                    >
+                      <div className="flex-1 min-w-0">
+                        <h4 className="font-medium text-sm sm:text-base mb-1">
+                          {drink.title}
+                        </h4>
+                        <p className="text-xs sm:text-sm text-gray-600 break-words">
+                          £{drink.price} • Quantity in cart: {drink.quantity}
+                        </p>
+                      </div>
+                      <div className="flex-shrink-0">
+                        <QuantityControls
+                          quantity={drink.quantity}
+                          onIncrease={() =>
+                            handleQuantityChange("drink", drink.id, 1)
+                          }
+                          onDecrease={() =>
+                            handleQuantityChange("drink", drink.id, -1)
+                          }
+                          onRemove={() =>
+                            updateQuantity(
+                              eventSlug,
+                              date,
+                              "drink",
+                              drink.id,
+                              0
+                            )
+                          }
+                          size="sm"
+                        />
+                      </div>
+                    </div>
+                  ))}
                 </div>
-              )}
-            </TabsContent>
+              </TabsContent>
+            )}
           </Tabs>
 
           {/* Special Request Section - Common for all tabs */}

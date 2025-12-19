@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from "react";
-import { useForm, useFieldArray } from "react-hook-form";
+import { useForm, useFieldArray, Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { eventsService } from "@/services/vendor/events/events.service";
 import { Button } from "@/components/ui/button";
@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { X, PlusCircle } from "lucide-react";
+import { TiptapEditor } from "@/components/ui/tiptap-editor";
 
 export default function DrinksTab() {
   const [isLoading, setIsLoading] = useState(false);
@@ -33,7 +34,7 @@ export default function DrinksTab() {
 
   // Create local form instance
   const form = useForm<StepFiveType>({
-    resolver: zodResolver(stepFiveSchema),
+    resolver: zodResolver(stepFiveSchema) as Resolver<StepFiveType>,
     mode: "onChange",
     reValidateMode: "onChange",
     defaultValues: {
@@ -45,8 +46,13 @@ export default function DrinksTab() {
       // Ensure at least one default package renders when API/global returns an empty array
       packages:
         (globalForm.getValues().stepFive?.packages || []).length > 0
-          ? (globalForm.getValues().stepFive
-              ?.packages as StepFiveType["packages"])!
+          ? globalForm.getValues().stepFive?.packages.map((pkg) => ({
+              ...pkg,
+              available_quantity:
+                typeof pkg.available_quantity === "number"
+                  ? pkg.available_quantity
+                  : 100,
+            }))
           : [
               {
                 title: "Premium Package",
@@ -55,7 +61,7 @@ export default function DrinksTab() {
                 available_quantity: 100,
               },
             ],
-    } as StepFiveType,
+    },
   });
 
   const { control } = form;
@@ -296,13 +302,17 @@ export default function DrinksTab() {
                           Package Description
                         </FormLabel>
                         <FormControl>
-                          <Input
-                            {...field}
+                          <TiptapEditor
+                            value={field.value || ""}
+                            onChange={(value) => {
+                              field.onChange(value);
+                            }}
                             placeholder="e.g. Includes premium access, special amenities..."
-                            className="h-10 bg-[#F9FAFB] border-[#E5E7EB]"
-                            onFocus={() =>
-                              handleFieldFocus(`packages.${index}.description`)
-                            }
+                            className="bg-gray-100 p-2 rounded-md"
+                            maxLength={160}
+                            maxWords={50}
+                            showAIButton={false}
+                            wrapText={true}
                           />
                         </FormControl>
                         <FormMessage />
@@ -316,8 +326,7 @@ export default function DrinksTab() {
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel className="text-sm font-medium">
-                          Package Price{" "}
-                          <span className="text-red-500">*</span>
+                          Package Price <span className="text-red-500">*</span>
                         </FormLabel>
                         <FormControl>
                           <Input
@@ -335,7 +344,7 @@ export default function DrinksTab() {
                                 field.onChange("");
                                 return;
                               }
-                              
+
                               const numValue = Number.parseFloat(value);
                               if (!Number.isNaN(numValue) && numValue > 0) {
                                 field.onChange(numValue);

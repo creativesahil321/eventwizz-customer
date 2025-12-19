@@ -10,6 +10,7 @@ import {
 
 import Image from "next/image";
 import { useContext, useMemo } from "react";
+import { cn } from "@/lib/utils";
 import { ServerContext } from "@/lib/server-context";
 import { ThemeSchema } from "@/types/theme.types";
 import { GalleryComponentProps } from "../event-types";
@@ -44,9 +45,10 @@ export default function RecentEventsGlimpse({
   // Check if we only have one image
   const isSingleImage = images.length === 1;
 
-  // Determine if navigation arrows should be shown
-  const showNavigation = useMemo(() => {
-    return images.length !== 3; // Hide navigation when exactly 3 events
+  // Determine if navigation arrows should be shown on desktop
+  // On mobile, arrows always show (when there are multiple images)
+  const showNavigationDesktop = useMemo(() => {
+    return images.length !== 3; // Hide navigation when exactly 3 events on desktop
   }, [images.length]);
 
   return (
@@ -139,9 +141,13 @@ export default function RecentEventsGlimpse({
           </div>
 
           <Carousel className="relative">
-            {showNavigation && (
-              <CarouselPrevious className="absolute left-8 top-1/2 transform -translate-y-1/2 z-20 bg-white shadow-lg rounded-full border-2 border-gray-300 flex items-center justify-center" />
-            )}
+            <CarouselPrevious
+              className={cn(
+                "absolute left-8 top-1/2 transform -translate-y-1/2 z-20 bg-white shadow-lg rounded-full border-2 border-gray-300 flex items-center justify-center",
+                // Always show on mobile, conditionally hide on desktop based on image count
+                !showNavigationDesktop && "md:hidden"
+              )}
+            />
 
             <CarouselContent className="-ml-4">
               {images.map((src, index) => (
@@ -162,9 +168,13 @@ export default function RecentEventsGlimpse({
               ))}
             </CarouselContent>
 
-            {showNavigation && (
-              <CarouselNext className="absolute right-8 top-1/2 transform -translate-y-1/2 z-20 bg-white shadow-lg rounded-full border-2 border-gray-300 flex items-center justify-center" />
-            )}
+            <CarouselNext
+              className={cn(
+                "absolute right-8 top-1/2 transform -translate-y-1/2 z-20 bg-white shadow-lg rounded-full border-2 border-gray-300 flex items-center justify-center",
+                // Always show on mobile, conditionally hide on desktop based on image count
+                !showNavigationDesktop && "md:hidden"
+              )}
+            />
           </Carousel>
         </div>
       )}

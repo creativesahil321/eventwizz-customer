@@ -25,6 +25,7 @@ import { EventMenuCategory } from "@/services/vendor/events/type";
 import MenuCategoryDropdown from "@/app/(on-boarding)/on-boarding/_components/steps/step-6/menu-category-dropdown";
 import Image from "next/image";
 import { FileUploader } from "@/components/ui/file-uploader";
+import { TiptapEditor } from "@/components/ui/tiptap-editor";
 
 export default function CateringTab() {
   const [isLoading, setIsLoading] = useState(false);
@@ -493,8 +494,25 @@ export default function CateringTab() {
                             (item: unknown, itemIndex: number) => (
                               <div
                                 key={itemIndex}
-                                className="grid grid-cols-[1fr_1fr_auto] gap-4 items-center"
+                                className="grid grid-cols-1 gap-4 p-4 border border-gray-200 rounded-lg"
                               >
+                                <div className="flex justify-end">
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() =>
+                                      handleRemoveItem(menuIndex, itemIndex)
+                                    }
+                                    className="h-8 w-8 p-0 rounded-full border-red-400 text-red-500"
+                                    disabled={
+                                      watch(`menus.${menuIndex}.items`)
+                                        ?.length === 1
+                                    }
+                                  >
+                                    <X size={16} />
+                                  </Button>
+                                </div>
                                 <FormField
                                   control={control}
                                   name={`menus.${menuIndex}.items.${itemIndex}.title`}
@@ -523,33 +541,23 @@ export default function CateringTab() {
                                         Description
                                       </FormLabel>
                                       <FormControl>
-                                        <Input
-                                          {...field}
+                                        <TiptapEditor
+                                          value={field.value || ""}
+                                          onChange={(value) => {
+                                            field.onChange(value);
+                                          }}
                                           placeholder="e.g., Spicy, with rice"
-                                          className="h-10 bg-[#F9FAFB] border-[#E5E7EB]"
+                                          className="bg-gray-100 p-2 rounded-md"
+                                          maxLength={160}
+                                          maxWords={50}
+                                          showAIButton={false}
+                                          wrapText={true}
                                         />
                                       </FormControl>
                                       <FormMessage />
                                     </FormItem>
                                   )}
                                 />
-                                <div className="pt-6">
-                                  <Button
-                                    type="button"
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() =>
-                                      handleRemoveItem(menuIndex, itemIndex)
-                                    }
-                                    className="h-8 w-8 p-0 rounded-full border-red-400 text-red-500"
-                                    disabled={
-                                      watch(`menus.${menuIndex}.items`)
-                                        ?.length === 1
-                                    }
-                                  >
-                                    <X size={16} />
-                                  </Button>
-                                </div>
                               </div>
                             )
                           )}

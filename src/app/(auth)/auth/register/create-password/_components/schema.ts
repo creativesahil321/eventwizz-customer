@@ -5,12 +5,18 @@ export const registerSchema = z
   .object({
     firstName: z
       .string()
-      .min(2, "First name must be at least 2 characters")
-      .regex(/^[a-zA-Z\s'-]+$/, "First name must contain only letters, spaces, hyphens, or apostrophes"),
+      .min(1, "First name is required")
+      .regex(
+        /^[a-zA-Z\s'-]+$/,
+        "First name must contain only letters, spaces, hyphens, or apostrophes"
+      ),
     lastName: z
       .string()
-      .min(2, "Last name must be at least 2 characters")
-      .regex(/^[a-zA-Z\s'-]+$/, "Last name must contain only letters, spaces, hyphens, or apostrophes"),
+      .min(1, "Last name is required")
+      .regex(
+        /^[a-zA-Z\s'-]+$/,
+        "Last name must contain only letters, spaces, hyphens, or apostrophes"
+      ),
     email: z
       .string()
       .email("Please enter a valid email address")

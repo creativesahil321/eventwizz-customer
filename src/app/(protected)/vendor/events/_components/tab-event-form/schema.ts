@@ -627,56 +627,21 @@ export const stepFiveSchema = z.object({
               "Package price is required and must be between 1 and 999999",
           }
         ),
-        available_quantity: z.preprocess(
-          (val) => {
-            // Convert undefined, null, NaN, or empty string to undefined
-            if (
-              val === undefined ||
-              val === null ||
-              val === "" ||
-              (typeof val === "number" && Number.isNaN(val))
-            ) {
-              return undefined;
-            }
-            // Convert string to number
+        available_quantity: z
+          .union([z.number(), z.string()])
+          .transform((val) => {
             if (typeof val === "string") {
               const num = Number.parseFloat(val);
-              return Number.isNaN(num) ? undefined : num;
+              return Number.isNaN(num) ? 0 : num;
             }
             return val;
-          },
-          z.union([z.number(), z.undefined()]).superRefine((val, ctx) => {
-            if (val === undefined || val === null) {
-              ctx.addIssue({
-                code: z.ZodIssueCode.custom,
-                message: "Available quantity is required",
-              });
-              return;
-            }
-            const num =
-              typeof val === "number" ? val : Number.parseFloat(String(val));
-            if (Number.isNaN(num)) {
-              ctx.addIssue({
-                code: z.ZodIssueCode.custom,
-                message: "Available quantity must be a number",
-              });
-              return;
-            }
-            if (num < 1) {
-              ctx.addIssue({
-                code: z.ZodIssueCode.custom,
-                message: "Available quantity must be at least 1",
-              });
-              return;
-            }
-            if (num > 500) {
-              ctx.addIssue({
-                code: z.ZodIssueCode.custom,
-                message: "Available quantity cannot exceed 500",
-              });
-            }
           })
-        ) as z.ZodType<number, z.ZodTypeDef, unknown>,
+          .refine((val) => val >= 1, {
+            message: "Available quantity must be at least 1",
+          })
+          .refine((val) => val <= 500, {
+            message: "Available quantity cannot exceed 500",
+          }),
       })
     )
     .min(1, "At least one package is required"),

@@ -121,16 +121,6 @@ const EventScheduler: React.FC<EventSchedulerProps> = ({
     <div className="space-y-4">
       <OnboardingSectionTitle>Event Scheduler</OnboardingSectionTitle>
 
-      {/* Validation error for sequence */}
-      {validationErrors.sequence && (
-        <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-md">
-          <AlertCircle className="h-4 w-4 text-red-500" />
-          <span className="text-sm text-red-600">
-            {validationErrors.sequence}
-          </span>
-        </div>
-      )}
-
       {fields.map((fieldItem, index) => (
         <div
           key={fieldItem.id}
@@ -229,6 +219,15 @@ const EventScheduler: React.FC<EventSchedulerProps> = ({
           </Button>
         </div>
       ))}
+      {/* Validation error for sequence */}
+      {validationErrors.sequence && (
+        <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-md">
+          <AlertCircle className="h-4 w-4 text-red-500" />
+          <span className="text-sm text-red-600">
+            {validationErrors.sequence}
+          </span>
+        </div>
+      )}
       <Button
         variant="event-secondary"
         type="button"

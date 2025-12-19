@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Button } from "@/components/ui/button";
@@ -16,7 +16,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { FileUploader } from "@/components/ui/file-uploader";
 import { TiptapEditor } from "@/components/ui/tiptap-editor";
-import { Plus, X } from "lucide-react";
+import { Plus, X, AlertCircle } from "lucide-react";
 import { useEventCategories } from "@/services/vendor/events/query";
 import {
   Select,
@@ -57,6 +57,9 @@ export default function EventNameTab() {
   const [isLoading, setIsLoading] = useState(false);
   const [eventSchedularBackgroundImage, setEventSchedularBackgroundImage] =
     useState<File[] | null>(null);
+  const [schedulerValidationErrors, setSchedulerValidationErrors] = useState<{
+    [key: string]: string;
+  }>({});
 
   // URL strings from backend for existing videos/images
   const [bannerImageUrl, setBannerImageUrl] = useState<string>("");
@@ -175,6 +178,76 @@ export default function EventNameTab() {
     };
   }, [bannerVideoFile]);
 
+  // Validation helper function for time sequence
+  const validateTimeSequence = useCallback(
+    (schedules: Array<{ title: string; time: string }>): boolean => {
+      if (schedules.length <= 1) return true;
+
+      const validSchedules = schedules.filter(
+        (schedule) => schedule.time && schedule.title
+      );
+      if (validSchedules.length <= 1) return true;
+
+      for (let i = 0; i < validSchedules.length - 1; i++) {
+        const currentTime = validSchedules[i].time;
+        const nextTime = validSchedules[i + 1].time;
+
+        if (!currentTime || !nextTime) continue;
+
+        const [currentHours, currentMinutes] = currentTime
+          .split(":")
+          .map(Number);
+        const [nextHours, nextMinutes] = nextTime.split(":").map(Number);
+
+        const currentTotalMinutes = currentHours * 60 + currentMinutes;
+        const nextTotalMinutes = nextHours * 60 + nextMinutes;
+
+        if (nextTotalMinutes <= currentTotalMinutes) {
+          return false;
+        }
+      }
+
+      return true;
+    },
+    []
+  );
+
+  // Debounced validation and global form update
+  const validateAndUpdateScheduler = useCallback(
+    (schedulers: Array<{ title: string; time: string }>) => {
+      // Validate the scheduler
+      const errors: { [key: string]: string } = {};
+      if (!validateTimeSequence(schedulers)) {
+        errors.sequence = "Times must be in ascending order";
+      }
+      setSchedulerValidationErrors(errors);
+
+      // Update global form (debounced)
+      const currentStepOne = globalForm.getValues().stepOne || {};
+      globalForm.setValue("stepOne", {
+        ...currentStepOne,
+        event_schedular: schedulers,
+      });
+    },
+    [globalForm, validateTimeSequence]
+  );
+
+  // Debounce timer ref
+  const validationTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Debounced validation function
+  const debouncedValidate = useCallback(
+    (schedulers: Array<{ title: string; time: string }>) => {
+      if (validationTimerRef.current) {
+        clearTimeout(validationTimerRef.current);
+      }
+      validationTimerRef.current = setTimeout(() => {
+        validateAndUpdateScheduler(schedulers);
+      }, 300); // 300ms debounce
+    },
+    [validateAndUpdateScheduler]
+  );
+
   // Field array for scheduler items
   const {
     fields: schedulerFields,
@@ -184,6 +257,23 @@ export default function EventNameTab() {
     control: form.control,
     name: "event_schedular",
   });
+
+  // Validate scheduler on mount and when scheduler changes
+  useEffect(() => {
+    const currentSchedulers = form.getValues("event_schedular") || [];
+    if (currentSchedulers.length > 0) {
+      validateAndUpdateScheduler(currentSchedulers);
+    }
+  }, [form, validateAndUpdateScheduler, schedulerFields.length]);
+
+  // Cleanup debounce timer on unmount
+  useEffect(() => {
+    return () => {
+      if (validationTimerRef.current) {
+        clearTimeout(validationTimerRef.current);
+      }
+    };
+  }, []);
 
   // Handle field focus for tracking active field
   const handleFieldFocus = useCallback(
@@ -237,16 +327,42 @@ export default function EventNameTab() {
 
   // Handle banner video change
   const handleBannerVideoChange = useCallback(
-    (files: File[]) => {
+    async (files: File[]) => {
       if (files.length === 0) return;
 
-      setBannerVideoFile(files);
-      setBannerVideoUrl(""); // Clear URL when new file is uploaded
+      // Prevent duplicate validation calls
+      if (bannerVideoUploading) return;
+
       setBannerVideoUploading(true);
 
       try {
+        const file = files[0];
+
+        // Validate video compatibility
+        const { validateVideo } = await import("@/utils/video-validator");
+        const validation = await validateVideo(file, 10);
+
+        if (!validation.isValid) {
+          toast.error(validation.errors.join(". ") || "Invalid video file", {
+            description:
+              "Please upload an MP4 video with H.264 codec for best compatibility.",
+          });
+          setBannerVideoUploading(false);
+          return;
+        }
+
+        // Show warnings if any (e.g., HEVC detected)
+        if (validation.warnings.length > 0) {
+          toast.warning("Video compatibility warning", {
+            description: validation.warnings[0],
+          });
+        }
+
+        setBannerVideoFile(files);
+        setBannerVideoUrl(""); // Clear URL when new file is uploaded
+
         // Update local form
-        form.setValue("event_banner_video", files[0]);
+        form.setValue("event_banner_video", file);
         console.log("Video uploaded, form values:", form.getValues());
 
         // Clear removal flags when new file is uploaded
@@ -257,7 +373,7 @@ export default function EventNameTab() {
         const currentStepOne = globalForm.getValues().stepOne || {};
         globalForm.setValue("stepOne", {
           ...currentStepOne,
-          event_banner_video: files[0],
+          event_banner_video: file,
           remove_event_banner_image: false,
           remove_event_banner_video: false,
         });
@@ -274,6 +390,10 @@ export default function EventNameTab() {
         toast.success("Video uploaded successfully");
       } catch (error) {
         console.error("Error handling banner video:", error);
+        toast.error("Failed to process video", {
+          description:
+            "Please ensure the video is in MP4 format with H.264 codec.",
+        });
       } finally {
         setBannerVideoUploading(false);
       }
@@ -814,7 +934,7 @@ export default function EventNameTab() {
                                     value={bannerVideoFile}
                                     onValueChange={handleBannerVideoChange}
                                     maxFileCount={1}
-                                    maxSize={10 * 1024 * 1024} // 10MB
+                                    maxSize={100 * 1024 * 1024} // 100MB - Custom validation in handler
                                     disabled={bannerVideoUploading}
                                     onRemove={handleRemoveBannerVideo}
                                     accept={{
@@ -1151,6 +1271,16 @@ export default function EventNameTab() {
                 />
               </div>
               <div className="space-y-4">
+                {/* Validation error for sequence */}
+                {schedulerValidationErrors.sequence && (
+                  <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-md">
+                    <AlertCircle className="h-4 w-4 text-red-500" />
+                    <span className="text-sm text-red-600">
+                      {schedulerValidationErrors.sequence}
+                    </span>
+                  </div>
+                )}
+
                 {schedulerFields.map((field, index) => (
                   <div
                     key={field.id}
@@ -1167,19 +1297,20 @@ export default function EventNameTab() {
                                 {...itemField}
                                 placeholder="Event Title"
                                 className="h-11 bg-[#F9FAFB] border-[#E5E7EB]"
+                                onFocus={() =>
+                                  handleFieldFocus("event_schedular")
+                                }
                                 onChange={(e) => {
+                                  // Update form immediately for responsive typing
                                   itemField.onChange(e);
-                                  const currentSchedulers = [
-                                    ...form.getValues("event_schedular"),
-                                  ];
-                                  currentSchedulers[index].title =
-                                    e.target.value;
-                                  const currentStepOne =
-                                    globalForm.getValues().stepOne || {};
-                                  globalForm.setValue("stepOne", {
-                                    ...currentStepOne,
-                                    event_schedular: currentSchedulers,
-                                  });
+
+                                  // Debounce validation and global form update
+                                  // Use setTimeout to ensure form state is updated first
+                                  setTimeout(() => {
+                                    const currentSchedulers =
+                                      form.getValues("event_schedular") || [];
+                                    debouncedValidate(currentSchedulers);
+                                  }, 0);
                                 }}
                                 onBlur={itemField.onBlur}
                               />
@@ -1201,19 +1332,21 @@ export default function EventNameTab() {
                                   {...itemField}
                                   type="time"
                                   className="h-11 bg-[#F9FAFB] border-[#E5E7EB] pr-10"
+                                  onFocus={() =>
+                                    handleFieldFocus("event_schedular")
+                                  }
                                   onChange={(e) => {
-                                    itemField.onChange(e);
-                                    const currentSchedulers = [
-                                      ...form.getValues("event_schedular"),
-                                    ];
-                                    currentSchedulers[index].time =
-                                      e.target.value;
-                                    const currentStepOne =
-                                      globalForm.getValues().stepOne || {};
-                                    globalForm.setValue("stepOne", {
-                                      ...currentStepOne,
-                                      event_schedular: currentSchedulers,
-                                    });
+                                    // Update form immediately for responsive typing
+                                    itemField.onChange(e.target.value);
+
+                                    // Validate immediately for time fields (no debounce, but defer to ensure form state is updated)
+                                    setTimeout(() => {
+                                      const currentSchedulers =
+                                        form.getValues("event_schedular") || [];
+                                      validateAndUpdateScheduler(
+                                        currentSchedulers
+                                      );
+                                    }, 0);
                                   }}
                                   onBlur={itemField.onBlur}
                                 />
@@ -1239,6 +1372,13 @@ export default function EventNameTab() {
                           ...currentStepOne,
                           event_schedular: updatedSchedulers,
                         });
+
+                        // Re-validate after removal
+                        const errors: { [key: string]: string } = {};
+                        if (!validateTimeSequence(updatedSchedulers)) {
+                          errors.sequence = "Times must be in ascending order";
+                        }
+                        setSchedulerValidationErrors(errors);
                       }}
                       disabled={schedulerFields.length === 1}
                       className="h-11 w-11 p-0 text-red-500 hover:bg-red-50"
@@ -1264,6 +1404,7 @@ export default function EventNameTab() {
                     ...currentStepOne,
                     event_schedular: updatedSchedulers,
                   });
+                  handleFieldFocus("event_schedular");
                 }}
                 className="flex items-center gap-2"
               >

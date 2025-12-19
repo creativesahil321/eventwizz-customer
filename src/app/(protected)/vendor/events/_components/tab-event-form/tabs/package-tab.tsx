@@ -22,6 +22,7 @@ import Image from "next/image";
 import { useEventFormContext } from "../../events-form-provider";
 import { StepTwoType, stepTwoSchema } from "../schema";
 import { eventsService } from "@/services/vendor/events/events.service";
+import { TiptapEditor } from "@/components/ui/tiptap-editor";
 
 // Define interfaces for gallery items and files with preview
 interface FileWithPreview extends File {
@@ -372,22 +373,21 @@ export default function PackageTab() {
                       Sub Heading <span className="text-red-500">*</span>
                     </FormLabel>
                     <FormControl>
-                      <Input
-                        {...field}
-                        placeholder="e.g., Prices From £65 Plus VAT Include:"
-                        className="h-11 bg-[#F9FAFB] border-[#E5E7EB]"
-                        onFocus={() => handleFieldFocus("package_description")}
-                        onChange={(e) => {
-                          field.onChange(e);
+                      <TiptapEditor
+                        value={field.value}
+                        onChange={(value) => {
+                          field.onChange(value);
                           globalForm.setValue(
                             "stepTwo.package_description",
-                            e.target.value
+                            value
                           );
                         }}
-                        onBlur={field.onBlur}
-                        value={
-                          typeof field.value === "string" ? field.value : ""
-                        }
+                        placeholder="e.g., Prices From £65 Plus VAT Include:"
+                        className="bg-gray-100 p-2 rounded-md"
+                        maxLength={160}
+                        maxWords={50}
+                        showAIButton={true}
+                        wrapText={true}
                       />
                     </FormControl>
                     <FormMessage className="text-red-500 font-semibold mt-1" />

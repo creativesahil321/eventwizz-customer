@@ -324,29 +324,84 @@ export default function EventLocationMap({
 
   // Initialize map when component mounts
   useEffect(() => {
+    let isMounted = true;
+    let timeoutId: NodeJS.Timeout | null = null;
+
+    // Check if script is already being loaded or exists
+    const existingScript = document.querySelector(
+      `script[src*="maps.googleapis.com/maps/api/js"]`
+    );
+
     const initializeMapCallback = () => {
-      initializeMap();
+      if (!isMounted) return;
+
+      // Wait for mapRef to be ready with retries
+      const tryInitialize = (attempts = 0) => {
+        if (!isMounted) return;
+
+        if (mapRef.current && window.google && window.google.maps) {
+          initializeMap();
+        } else if (attempts < 10) {
+          // Retry up to 10 times (2 seconds total)
+          timeoutId = setTimeout(() => tryInitialize(attempts + 1), 200);
+        } else {
+          setError("Map container not ready. Please refresh the page.");
+          setIsLoading(false);
+        }
+      };
+
+      tryInitialize();
     };
 
-    if (!mapRef.current || !window.google) {
-      // Load Google Maps API if not already loaded
-      if (!window.google) {
-        const script = document.createElement("script");
-        script.src = `https://maps.googleapis.com/maps/api/js?key=${env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}&libraries=places`;
-        script.async = true;
-        script.defer = true;
-        script.onload = initializeMapCallback;
-        document.head.appendChild(script);
-      } else {
+    // If Google Maps API is already loaded, initialize immediately
+    if (window.google && window.google.maps && window.google.maps.places) {
+      initializeMapCallback();
+    } else if (existingScript) {
+      // Script is already being loaded, wait for it
+      const handleLoad = () => {
+        if (isMounted) {
+          initializeMapCallback();
+        }
+      };
+
+      if (existingScript.getAttribute("data-loaded") === "true") {
+        // Script already loaded
         initializeMapCallback();
+      } else {
+        existingScript.addEventListener("load", handleLoad);
+        return () => {
+          isMounted = false;
+          if (timeoutId) clearTimeout(timeoutId);
+          existingScript.removeEventListener("load", handleLoad);
+        };
       }
+    } else {
+      // Load Google Maps API script
+      const script = document.createElement("script");
+      script.src = `https://maps.googleapis.com/maps/api/js?key=${env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}&libraries=places`;
+      script.async = true;
+      script.defer = true;
+      script.onload = () => {
+        script.setAttribute("data-loaded", "true");
+        if (isMounted) {
+          initializeMapCallback();
+        }
+      };
+      script.onerror = () => {
+        if (isMounted) {
+          setError("Failed to load Google Maps. Please refresh the page.");
+          setIsLoading(false);
+        }
+      };
+      document.head.appendChild(script);
     }
 
-    // Only cleanup on unmount, not on every render
     return () => {
-      // Cleanup will be handled by component unmount
+      isMounted = false;
+      if (timeoutId) clearTimeout(timeoutId);
     };
-  }, [initializeMap]); // Removed marker from dependencies
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Empty dependency array - only run once on mount
 
   // Cleanup marker only on component unmount
   useEffect(() => {

@@ -7,7 +7,6 @@ import { Button } from "@/components/ui/button";
 import BookingSummarySkeleton from "./booking-summary-skeleton-loader";
 import {
   Calendar,
-  MapPin,
   CreditCard,
   Shield,
   Clock,
@@ -312,17 +311,17 @@ export default function BookingSummary({}: BookingSummaryProps) {
   return (
     <motion.div {...ANIMATION_VARIANTS.FADE_IN_UP}>
       <Card className="h-fit lg:sticky lg:top-4">
-        <CardHeader className="pb-3 sm:pb-4">
-          <CardTitle className="flex items-center gap-2 text-base sm:text-lg text-gray-900">
-            <CreditCard className="h-4 w-4 sm:h-5 sm:w-5 text-gray-600" />
+        <CardHeader className="pb-2">
+          <CardTitle className="flex items-center gap-2 text-base text-gray-900">
+            <CreditCard className="h-4 w-4 text-gray-600" />
             Your Booking
           </CardTitle>
         </CardHeader>
 
-        <CardContent className="space-y-3">
-          {/* Event Details - Extra Compact */}
-          <div className="flex gap-2">
-            <div className="relative w-10 h-10 rounded overflow-hidden bg-gray-100 flex-shrink-0">
+        <CardContent className="space-y-2.5">
+          {/* Event Details - Minimal Compact */}
+          <div className="flex items-center gap-2 pb-2 border-b">
+            <div className="relative w-8 h-8 rounded overflow-hidden bg-gray-100 flex-shrink-0">
               <Image
                 src={currentEventApiData?.event_image || ""}
                 alt={currentEventApiData?.event_name || "Event"}
@@ -336,20 +335,11 @@ export default function BookingSummary({}: BookingSummaryProps) {
               />
             </div>
             <div className="flex-1 min-w-0">
-              <h3 className="font-semibold text-sm truncate text-gray-900">
+              <h3 className="font-semibold text-xs truncate text-gray-900">
                 {currentEventApiData?.event_name}
               </h3>
-              <div className="flex items-center gap-3 mt-0.5">
-                <div className="flex items-center gap-1 text-xs text-gray-600">
-                  <Calendar className="h-3 w-3" />
-                  <span>
-                    {totalItems} date{totalItems !== 1 ? "s" : ""}
-                  </span>
-                </div>
-                <div className="flex items-center gap-1 text-xs text-gray-600">
-                  <MapPin className="h-3 w-3" />
-                  <span>Location</span>
-                </div>
+              <div className="text-xs text-gray-500">
+                {totalItems} date{totalItems !== 1 ? "s" : ""}
               </div>
             </div>
           </div>
@@ -367,13 +357,13 @@ export default function BookingSummary({}: BookingSummaryProps) {
               dateData.isDepositEnabled
             );
           }) && (
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <h4 className="font-medium text-gray-900">Payment Options</h4>
-              </div>
+            <div className="space-y-2">
+              <h4 className="text-sm font-semibold text-gray-900">
+                Payment Options
+              </h4>
 
               {/* Scrollable Payment Options List */}
-              <div className="max-h-[200px] overflow-y-auto space-y-3 payment-options-scroll">
+              <div className="max-h-[180px] overflow-y-auto space-y-2 payment-options-scroll">
                 {availableDates.map((date) => {
                   const dateData = currentEventSlug
                     ? getDateData(currentEventSlug, date)
@@ -591,21 +581,23 @@ export default function BookingSummary({}: BookingSummaryProps) {
 
           <Separator />
 
-          {/* Items Summary - Compact */}
-          <div className="space-y-1.5">
-            <div className="flex justify-between items-center text-sm">
-              <span className="text-gray-600">
-                {totalItems} date{totalItems !== 1 ? "s" : ""}
+          {/* Booking Summary - No Duplication */}
+          <div className="space-y-2">
+            {/* Total Booking Amount - Simple Display */}
+            <div className="flex justify-between items-center py-1.5">
+              <span className="text-sm font-medium text-gray-700">
+                Booking Total
               </span>
-              <span className="font-semibold">£{totalToday.toFixed(2)}</span>
+              <span className="text-lg font-bold text-gray-900">
+                £{(totalToday + totalLater).toFixed(2)}
+              </span>
             </div>
 
+            {/* Show payment split info only if deposit selected */}
             {totalLater > 0 && (
-              <div className="flex justify-between items-center text-xs">
-                <span className="text-gray-500">Balance due later</span>
-                <span className="font-medium text-orange-600">
-                  £{totalLater.toFixed(2)}
-                </span>
+              <div className="text-xs text-gray-500">
+                Split payment: £{totalToday.toFixed(2)} today + £
+                {totalLater.toFixed(2)} later
               </div>
             )}
           </div>
@@ -636,21 +628,23 @@ export default function BookingSummary({}: BookingSummaryProps) {
 
           <Separator />
 
-          {/* Pay Today Section - Compact */}
+          {/* Amount to Pay Today - Clear and Actionable */}
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
             <div className="flex justify-between items-center">
-              <span className="text-sm font-medium text-gray-700">
-                Total Due Now
+              <span className="text-sm font-semibold text-gray-900">
+                Amount to Pay Today
               </span>
-              <span className="text-lg font-bold text-blue-600">
+              <span className="text-2xl font-bold text-blue-600">
                 £{finalTotal.toFixed(2)}
               </span>
             </div>
+
             {totalLater > 0 && (
-              <p className="text-xs text-gray-600 mt-1">
-                +£{totalLater.toFixed(2)} due later
-              </p>
+              <div className="text-xs text-gray-600 mt-2 pt-2 border-t border-blue-200">
+                Balance of £{totalLater.toFixed(2)} due before event date
+              </div>
             )}
+
             <div className="flex items-center gap-1.5 text-xs text-green-700 mt-2">
               <Shield className="h-3 w-3" />
               <span>Secure SSL encrypted</span>

@@ -18,6 +18,8 @@ import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { TiptapEditor } from "@/components/ui/tiptap-editor";
 import Image from "next/image";
+import { VideoFormatInfo } from "@/components/shared/video-format-info";
+
 interface BrandingTabProps {
   shouldResetImages?: boolean;
 }
@@ -42,6 +44,7 @@ export function BrandingTab({ shouldResetImages = false }: BrandingTabProps) {
   const [landingPageVideoUrl, setLandingPageVideoUrl] = useState<string>("");
 
   const [bannerType, setBannerType] = useState<"image" | "video">("image");
+  const [isValidatingVideo, setIsValidatingVideo] = useState(false);
 
   // Initialize URL states from form values if they exist
   useEffect(() => {
@@ -90,15 +93,56 @@ export function BrandingTab({ shouldResetImages = false }: BrandingTabProps) {
     form.setValue("cover_video", null); // Clear video
   };
 
-  const handleLandingPageVideoChange = (files: File[]) => {
-    setLandingPageVideoFiles(files);
-    setLandingPageVideoUrl(""); // Clear URL when new file is uploaded
-    setLandingPageImageFiles([]); // Clear image files
-    setLandingPageImageUrl(""); // Clear image URL
-    setBannerType("video");
+  const handleLandingPageVideoChange = async (files: File[]) => {
+    if (files.length === 0) return;
 
-    form.setValue("cover_video", files.length > 0 ? files[0] : null);
-    form.setValue("cover_image", null); // Clear image
+    // Prevent duplicate validation calls
+    if (isValidatingVideo) return;
+    setIsValidatingVideo(true);
+
+    const file = files[0];
+
+    try {
+      // Validate video compatibility
+      const { validateVideo } = await import("@/utils/video-validator");
+      const validation = await validateVideo(file, 10);
+
+      if (!validation.isValid) {
+        const toast = (await import("sonner")).toast;
+        toast.error(validation.errors.join(". ") || "Invalid video file", {
+          description:
+            "Please upload an MP4 video with H.264 codec for best compatibility.",
+        });
+        setIsValidatingVideo(false);
+        return;
+      }
+
+      // Show warnings if any (e.g., HEVC detected)
+      if (validation.warnings.length > 0) {
+        const toast = (await import("sonner")).toast;
+        toast.warning("Video compatibility warning", {
+          description: validation.warnings[0],
+        });
+      }
+
+      setLandingPageVideoFiles(files);
+      setLandingPageVideoUrl(""); // Clear URL when new file is uploaded
+      setLandingPageImageFiles([]); // Clear image files
+      setLandingPageImageUrl(""); // Clear image URL
+      setBannerType("video");
+
+      form.setValue("cover_video", file);
+      form.setValue("cover_image", null); // Clear image
+    } catch (error) {
+      console.error("Error validating video:", error);
+      const toast = (await import("sonner")).toast;
+      toast.error("Failed to process video", {
+        description:
+          "Please ensure the video is in MP4 format with H.264 codec.",
+      });
+    } finally {
+      setIsValidatingVideo(false);
+    }
   };
 
   const handleRemoveLogo = () => {
@@ -515,12 +559,21 @@ export function BrandingTab({ shouldResetImages = false }: BrandingTabProps) {
                             value={landingPageVideoFiles}
                             onValueChange={handleLandingPageVideoChange}
                             maxFileCount={1}
-                            maxSize={10 * 1024 * 1024} // 10MB
+                            maxSize={100 * 1024 * 1024} // 100MB - Custom validation in handler
                             onRemove={handleRemoveLandingPageVideo}
                             accept={{
                               "video/mp4": [],
                             }}
                           />
+
+                          {/* Format Guide - Show when no video uploaded */}
+                          {landingPageVideoFiles.length === 0 &&
+                            !landingPageVideoUrl && (
+                              <div className="mt-3">
+                                <VideoFormatInfo variant="compact" />
+                              </div>
+                            )}
+
                           {/* Video Preview for uploaded files */}
                           {landingPageVideoFiles.length > 0 &&
                             landingPageVideoFiles[0] instanceof File && (
