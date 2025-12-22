@@ -26,7 +26,6 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { LocationFormValues, locationSchema } from "../_lib/validations";
 import { useCreateLocation } from "../_lib/queries";
 import { slugify } from "@/lib/utils";
-import { useSession } from "next-auth/react";
 import { useLocationStore } from "@/store/location.store";
 import GoogleLocationSearch from "@/app/(on-boarding)/on-boarding/_components/steps/step-11/google-location-search";
 import { env } from "@/env";
@@ -35,7 +34,6 @@ import { fetchLocationDetails } from "@/app/(on-boarding)/on-boarding/_component
 export default function CreateLocationDialog() {
   const [open, setOpen] = React.useState(false);
   const { mutate: createLocation, isPending } = useCreateLocation();
-  const { data: session } = useSession();
   const { selectedLocation } = useLocationStore();
 
   // Get the venue name from the selected location or session
@@ -158,9 +156,16 @@ export default function CreateLocationDialog() {
                   <FormLabel>Contact Number</FormLabel>
                   <FormControl>
                     <Input
+                      type="tel"
                       placeholder="e.g. +44 123 456 7890"
                       {...field}
                       autoComplete="off"
+                      onChange={(e) => {
+                        // Only allow numbers, spaces, dashes, plus signs, and parentheses
+                        const value = e.target.value.replace(/[^\d\s\-+()]/g, "");
+                        e.target.value = value;
+                        field.onChange(value);
+                      }}
                     />
                   </FormControl>
                   <FormMessage />

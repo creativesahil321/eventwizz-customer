@@ -38,7 +38,7 @@ export default function ViewLocationDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[550px] text-black">
+      <DialogContent className="sm:max-w-[550px] max-w-[90vw] text-black">
         <DialogHeader>
           <DialogTitle>Location Details</DialogTitle>
           <DialogDescription>
@@ -60,7 +60,9 @@ export default function ViewLocationDialog({
           )}
 
           <div className="flex items-center justify-between">
-            <h3 className="text-lg font-semibold">{location.name}</h3>
+            <h3 className="text-lg font-semibold break-words">
+              {location.name}
+            </h3>
             {isDefault ? (
               <Badge
                 variant="outline"
@@ -78,34 +80,34 @@ export default function ViewLocationDialog({
 
           <div className="space-y-3">
             <div className="flex items-start gap-3">
-              <MapPin className="h-4 w-4 text-muted-foreground mt-1" />
-              <div>
+              <MapPin className="h-4 w-4 text-muted-foreground mt-1 shrink-0" />
+              <div className="min-w-0 flex-1">
                 <p className="text-sm font-medium">Address</p>
-                <p className="text-sm text-muted-foreground">
+                <p className="text-sm text-muted-foreground break-words">
                   {location.address || "No address provided"}
                 </p>
                 <p className="text-sm font-medium mt-1">City</p>
-                <p className="text-sm text-muted-foreground">
+                <p className="text-sm text-muted-foreground break-words">
                   {location.city || "No city provided"}
                 </p>
               </div>
             </div>
 
             <div className="flex items-start gap-3">
-              <Mail className="h-4 w-4 text-muted-foreground mt-1" />
-              <div>
+              <Mail className="h-4 w-4 text-muted-foreground mt-1 shrink-0" />
+              <div className="min-w-0 flex-1">
                 <p className="text-sm font-medium">Email</p>
-                <p className="text-sm text-muted-foreground">
+                <p className="text-sm text-muted-foreground break-words">
                   {location.email || "No email provided"}
                 </p>
               </div>
             </div>
 
             <div className="flex items-start gap-3">
-              <Phone className="h-4 w-4 text-muted-foreground mt-1" />
-              <div>
+              <Phone className="h-4 w-4 text-muted-foreground mt-1 shrink-0" />
+              <div className="min-w-0 flex-1">
                 <p className="text-sm font-medium">Contact Number</p>
-                <p className="text-sm text-muted-foreground">
+                <p className="text-sm text-muted-foreground break-words">
                   {location.contact_number || "No contact number provided"}
                 </p>
               </div>

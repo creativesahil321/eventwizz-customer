@@ -6,7 +6,6 @@ import {
 import {
   vendorBookingsService,
   VendorBookingHistoryResponse,
-  VendorBookingDetailResponse,
 } from "@/services/vendor/bookings/bookings.service";
 import { AdminHistoryParams, History } from "./types";
 
@@ -57,6 +56,7 @@ const transformBookingItem = (
   return {
     id: item.booking_id.toString(), // Use booking_id as id
     booking_id: item.booking_id,
+    booking_number: item.booking_number, // Add booking_number from API
     event_id: item.event_id,
     event_name: item.event_name,
     user_name: item.user_name,

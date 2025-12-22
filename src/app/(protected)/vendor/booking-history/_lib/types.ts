@@ -10,6 +10,7 @@ export interface Transaction {
 export interface History {
   id: string; // Maps to booking_id from API
   booking_id?: number; // Original booking_id from API
+  booking_number?: string; // Booking number from API (e.g., "EV-007")
   event_id?: string | number; // Event ID for navigation to event page
   event_name: string;
   user_name: string;

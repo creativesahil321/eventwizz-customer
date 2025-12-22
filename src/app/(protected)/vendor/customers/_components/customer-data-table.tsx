@@ -72,6 +72,7 @@ export default function CustomerDataTable({
     pageCount: customers?.meta?.last_page || 1,
     filterFields: filterFields,
     enableAdvancedFilter: false,
+    enableClientSideSorting: true,
     initialState: {
       sorting: [{ id: "created_at", desc: true }],
     },

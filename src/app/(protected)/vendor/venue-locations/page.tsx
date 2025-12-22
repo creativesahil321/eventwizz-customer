@@ -30,7 +30,7 @@ export default function VenueLocationsPage() {
   // Default search params
   const searchParams: SearchParams = {
     page: "1",
-    per_page: "10",
+    per_page: "30",
     search: globalFilterValue,
   };
 
@@ -52,9 +52,9 @@ export default function VenueLocationsPage() {
 
   return (
     <section className="page text-black min-w-0">
-      <Shell className="gap-0">
+      <Shell className="gap-2">
         <div className="flex flex-col gap-4 min-w-0">
-          <div className="bg-white rounded-lg border border-[var(--color-border)] shadow-md p-6 mb-0 min-w-0">
+          <div className="bg-white rounded-lg border border-[var(--color-border)] shadow-md p-6 mb-4 min-w-0">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center flex-wrap gap-4 min-w-0">
               <div className="min-w-0">
                 <h1 className="text-2xl title-header font-bold">

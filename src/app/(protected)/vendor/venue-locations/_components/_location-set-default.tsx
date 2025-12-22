@@ -39,22 +39,30 @@ export default function SetDefaultLocationDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[425px]">
+      <DialogContent className="sm:max-w-[500px] max-w-[90vw]">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-black">
             Set Default Location
           </DialogTitle>
-          <DialogDescription>
-            Are you sure you want to set <strong>{location.name}</strong> (
-            {location.city}) as your default location?
+          <DialogDescription className="break-words">
+            Are you sure you want to set <strong>{location.name}</strong>
+            {location.city && (
+              <>
+                {" "}
+                (<span className="break-words">{location.city}</span>)
+              </>
+            )}{" "}
+            as your default location?
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-4 text-black">
           <div className="flex items-start gap-2">
-            <MapPin className="h-5 w-5 text-muted-foreground mt-0.5" />
-            <div>
-              <p className="font-medium">{location.name}</p>
-              <p className="text-sm text-muted-foreground">{location.city}</p>
+            <MapPin className="h-5 w-5 text-muted-foreground mt-0.5 shrink-0" />
+            <div className="min-w-0 flex-1">
+              <p className="font-medium break-words">{location.name}</p>
+              <p className="text-sm text-muted-foreground break-words">
+                {location.city}
+              </p>
             </div>
           </div>
           <p className="text-sm text-muted-foreground">

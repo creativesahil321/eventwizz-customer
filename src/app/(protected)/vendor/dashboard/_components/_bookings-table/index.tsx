@@ -72,6 +72,7 @@ export default function DashboardBookingsTable({
     pageCount: search.per_page ? Number(search.per_page) : 30,
     filterFields,
     enableAdvancedFilter: false,
+    enableClientSideSorting: true,
     initialState: {
       sorting: [{ id: "created_at", desc: true }],
       columnPinning: { right: ["actions"] },

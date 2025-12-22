@@ -179,6 +179,12 @@ export function CreateUserForm({
                   placeholder="+1234567890"
                   {...field}
                   className={apiErrors.phone ? "border-red-500" : ""}
+                  onChange={(e) => {
+                    // Only allow numbers, spaces, dashes, plus signs, and parentheses
+                    const value = e.target.value.replace(/[^\d\s\-+()]/g, "");
+                    e.target.value = value;
+                    field.onChange(value);
+                  }}
                 />
               </FormControl>
               <FormMessage />

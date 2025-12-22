@@ -94,6 +94,7 @@ function MenuChoicesDataTable({
     pageCount,
     filterFields,
     enableAdvancedFilter: false,
+    enableClientSideSorting: true,
     initialState: {
       sorting: [{ id: "created_at", desc: true }],
       columnPinning: { right: ["actions"] },
@@ -123,10 +124,7 @@ function MenuChoicesDataTable({
           className="min-w-0"
           emptyStateRenderer={() => (
             <TableRow>
-              <TableCell
-                colSpan={columns.length}
-                className="h-24 text-center"
-              >
+              <TableCell colSpan={columns.length} className="h-24 text-center">
                 No menu choices found. Try adjusting your filters.
               </TableCell>
             </TableRow>

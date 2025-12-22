@@ -42,7 +42,7 @@ export function getColumns({
       cell: ({ row }) => (
         <span className="font-medium">{row.getValue("event_name")}</span>
       ),
-      enableSorting: false,
+      enableSorting: true,
       enableHiding: false,
     },
     {
@@ -57,7 +57,7 @@ export function getColumns({
       cell: ({ row }) => (
         <span className="font-medium">{row.getValue("menu_name")}</span>
       ),
-      enableSorting: false,
+      enableSorting: true,
       enableHiding: false,
     },
     {
@@ -72,7 +72,7 @@ export function getColumns({
       cell: ({ row }) => (
         <span className="font-medium">{row.getValue("category")}</span>
       ),
-      enableSorting: false,
+      enableSorting: true,
       enableHiding: false,
     },
     {
@@ -129,8 +129,13 @@ export function getColumns({
         const formattedDate = `${day}-${month}-${year}`;
         return <span className="text-foreground">{formattedDate}</span>;
       },
-      enableSorting: false,
+      enableSorting: true,
       enableHiding: false,
+      sortingFn: (rowA, rowB) => {
+        const dateA = new Date(rowA.getValue("created_at") as string).getTime();
+        const dateB = new Date(rowB.getValue("created_at") as string).getTime();
+        return dateA - dateB;
+      },
     },
     {
       id: "actions",

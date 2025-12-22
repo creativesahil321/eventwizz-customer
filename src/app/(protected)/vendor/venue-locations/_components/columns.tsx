@@ -19,6 +19,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { DataTableColumnHeader } from "@/components/data-table/data-table-column-header";
 
 interface GetColumnsOptions {
   setRowAction: React.Dispatch<React.SetStateAction<LocationRowAction | null>>;
@@ -28,14 +29,39 @@ export const getColumns = ({
   setRowAction,
 }: GetColumnsOptions): ColumnDef<Location>[] => [
   {
-    accessorKey: "id",
-    header: "ID",
-    cell: ({ row }) => <span className="font-medium">#{row.original.id}</span>,
+    id: "sno",
+    header: "S.No",
+    cell: ({ row }) => <span className="font-medium">{row.index + 1}</span>,
+    enableSorting: false,
+    enableHiding: false,
   },
   {
     accessorKey: "city",
-    header: "Location City",
-    cell: ({ row }) => row.original.city,
+    header: ({ column }) => (
+      <DataTableColumnHeader
+        className="text-foreground"
+        column={column}
+        title="Location City"
+      />
+    ),
+    cell: ({ row }) => {
+      const city = row.original.city || "-";
+      return (
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <div className="max-w-[200px] truncate" title={city}>
+                {city}
+              </div>
+            </TooltipTrigger>
+            <TooltipContent className="max-w-md break-words">
+              <p className="break-words whitespace-normal">{city}</p>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      );
+    },
+    enableSorting: true,
   },
   {
     accessorKey: "address",
@@ -50,8 +76,8 @@ export const getColumns = ({
                 {address}
               </div>
             </TooltipTrigger>
-            <TooltipContent>
-              <p className="max-w-xs">{address}</p>
+            <TooltipContent className="max-w-md break-words">
+              <p className="break-words whitespace-normal">{address}</p>
             </TooltipContent>
           </Tooltip>
         </TooltipProvider>
@@ -60,12 +86,25 @@ export const getColumns = ({
   },
   {
     accessorKey: "contact_number",
-    header: "Contact",
+    header: ({ column }) => (
+      <DataTableColumnHeader
+        className="text-foreground"
+        column={column}
+        title="Contact"
+      />
+    ),
     cell: ({ row }) => row.original.contact_number || "-",
+    enableSorting: true,
   },
   {
     accessorKey: "email",
-    header: "Email",
+    header: ({ column }) => (
+      <DataTableColumnHeader
+        className="text-foreground"
+        column={column}
+        title="Email"
+      />
+    ),
     cell: ({ row }) => {
       const email = row.original.email || "-";
       return (
@@ -74,6 +113,7 @@ export const getColumns = ({
         </div>
       );
     },
+    enableSorting: true,
   },
   {
     accessorKey: "is_default",
@@ -97,21 +137,45 @@ export const getColumns = ({
   },
   {
     accessorKey: "created_at",
-    header: "Created At",
+    header: ({ column }) => (
+      <DataTableColumnHeader
+        className="text-foreground"
+        column={column}
+        title="Created At"
+      />
+    ),
     cell: ({ row }) => (
       <span className="text-sm text-muted-foreground">
         {formatDate(row.original.created_at)}
       </span>
     ),
+    enableSorting: true,
+    sortingFn: (rowA, rowB) => {
+      const dateA = new Date(rowA.getValue("created_at") as string).getTime();
+      const dateB = new Date(rowB.getValue("created_at") as string).getTime();
+      return dateA - dateB;
+    },
   },
   {
     accessorKey: "updated_at",
-    header: "Updated At",
+    header: ({ column }) => (
+      <DataTableColumnHeader
+        className="text-foreground"
+        column={column}
+        title="Updated At"
+      />
+    ),
     cell: ({ row }) => (
       <span className="text-sm text-muted-foreground">
         {formatDate(row.original.updated_at)}
       </span>
     ),
+    enableSorting: true,
+    sortingFn: (rowA, rowB) => {
+      const dateA = new Date(rowA.getValue("updated_at") as string).getTime();
+      const dateB = new Date(rowB.getValue("updated_at") as string).getTime();
+      return dateA - dateB;
+    },
   },
   {
     id: "actions",
@@ -120,10 +184,7 @@ export const getColumns = ({
       return (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button
-              variant="event-primary"
-              size="sm"
-            >
+            <Button variant="event-primary" size="sm">
               <span className="sr-only">Open menu</span>
               <Settings className="h-3.5 w-3.5 text-gray-600" />
               <span className="hidden sm:inline-block text-xs font-medium">

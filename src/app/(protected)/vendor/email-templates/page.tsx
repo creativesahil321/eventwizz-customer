@@ -14,14 +14,17 @@ export default function Page() {
   const parsedSearch = React.useMemo(() => {
     return {
       page: Number(searchParams?.get("page") || 1),
-      per_page: Number(searchParams?.get("per_page") || 10),
+      per_page: Number(searchParams?.get("per_page") || 30),
       search: searchParams?.get("search") || "",
       options: {},
     };
   }, [searchParams]);
 
   return (
-    <PermissionRoute permissionKey="read-email-template" fallbackPath="/unauthorized">
+    <PermissionRoute
+      permissionKey="read-email-template"
+      fallbackPath="/unauthorized"
+    >
       <section className="page">
         <Shell className="gap-2">
           <React.Suspense

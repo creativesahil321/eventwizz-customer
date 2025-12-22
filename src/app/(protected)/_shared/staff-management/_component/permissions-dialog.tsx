@@ -187,117 +187,112 @@ const StaffPermissionsDialog = ({
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>{triggerComponent}</DialogTrigger>
-      <DialogContent className="!max-w-[calc(100%-0.5rem)] sm:!max-w-[90vw] md:!max-w-[480px] lg:!max-w-[500px] !h-[calc(100vh-1rem)] sm:!h-auto !max-h-[calc(100vh-2rem)] sm:!max-h-[82vh] md:!max-h-[78vh] overflow-hidden !flex !flex-col !gap-0 !p-3 sm:!p-3 md:!p-4 text-black !top-2 sm:!top-3 md:!top-[50%] !left-1/2 !-translate-x-1/2 !-translate-y-0 sm:!-translate-y-0 md:!-translate-y-1/2 [&>button]:!top-2 [&>button]:!right-2">
-        <DialogHeader className="flex-shrink-0 pb-2">
-          <DialogTitle className="flex items-center gap-2 text-sm sm:text-base pr-6">
-            <ShieldAlert className="h-4 w-4 text-[var(--color-primary)] shrink-0" />
+      <DialogContent className="max-w-[calc(100%-1rem)] sm:max-w-[95vw] md:max-w-[600px] text-black">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2 text-base sm:text-lg">
+            <ShieldAlert className="h-4 w-4 sm:h-5 sm:w-5 text-[var(--color-primary)] shrink-0" />
             <span className="truncate">
               Active Permissions{" "}
               {role && `for ${role.label || role.title} Role`}
             </span>
           </DialogTitle>
-          <DialogDescription className="text-xs"></DialogDescription>
-          Customize which actions this staff member can perform
+          <DialogDescription className="text-xs sm:text-sm">
+            Customize which actions this staff member can perform
+          </DialogDescription>
         </DialogHeader>
 
-        <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
-          {isLoading ? (
-            <div className="flex items-center justify-center py-4 flex-shrink-0">
-              <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-            </div>
-          ) : role === null ? (
-            <div className="flex flex-col items-center justify-center py-4 text-center flex-shrink-0">
-              <AlertCircle className="h-6 w-6 text-[var(--color-error)] mb-2" />
-              <h3 className="font-medium text-base">No role selected</h3>
-              <p className="text-muted-foreground text-sm">
-                Select a role to view and customize permissions
-              </p>
-            </div>
-          ) : (
-            <>
-              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 mb-2 flex-shrink-0">
-                <div className="text-xs text-muted-foreground">
-                  <span
-                    className={`font-medium ${
-                      showValidationError ? "text-red-500" : "text-foreground"
-                    }`}
-                  >
-                    {enabledCount}
-                  </span>{" "}
-                  of{" "}
-                  <span className="font-medium text-foreground">
-                    {totalCount}
-                  </span>{" "}
-                  enabled
-                  {showValidationError && (
-                    <span className="block sm:inline sm:ml-2 text-red-500 text-xs mt-0.5 sm:mt-0">
-                      At least one required
-                    </span>
-                  )}
-                </div>
-                <Button
-                  variant="event-outline"
-                  size="sm"
-                  className="h-7 text-xs w-full sm:w-auto px-3"
-                  onClick={toggleAllPermissions}
+        {isLoading ? (
+          <div className="flex items-center justify-center py-6">
+            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+          </div>
+        ) : role === null ? (
+          <div className="flex flex-col items-center justify-center py-6 text-center">
+            <AlertCircle className="h-8 w-8 text-[var(--color-error)] mb-2" />
+            <h3 className="font-medium text-lg">No role selected</h3>
+            <p className="text-muted-foreground">
+              Select a role to view and customize permissions
+            </p>
+          </div>
+        ) : (
+          <>
+            <div className="flex items-center justify-between mb-2">
+              <div className="text-sm text-muted-foreground">
+                <span
+                  className={`font-medium ${
+                    showValidationError ? "text-red-500" : "text-foreground"
+                  }`}
                 >
-                  {allToggled ? "Disable All" : "Enable All"}
-                </Button>
+                  {enabledCount}
+                </span>{" "}
+                of{" "}
+                <span className="font-medium text-foreground">
+                  {totalCount}
+                </span>{" "}
+                permissions enabled
+                {showValidationError && (
+                  <span className="ml-2 text-red-500">
+                    At least one permission is required
+                  </span>
+                )}
               </div>
+              <Button
+                variant="event-outline"
+                size="sm"
+                className="h-7 text-xs"
+                onClick={toggleAllPermissions}
+              >
+                {allToggled ? "Disable All" : "Enable All"}
+              </Button>
+            </div>
 
-              <ScrollArea className="flex-1 min-h-0 pr-2">
-                <div className="space-y-3">
-                  {permissionGroups.map((group) => (
-                    <div key={group.title} className="space-y-1.5">
-                      <h3 className="text-xs font-medium border-b pb-0.5">
-                        {group.title}
-                      </h3>
-                      <div className="grid grid-cols-1 gap-1">
-                        {group.permissions.map((permission) => {
-                          // Ensure we have a valid key for permission
-                          const permKey =
-                            permission.key || permission.slug || "";
+            <ScrollArea className="h-[300px] pr-4">
+              <div className="space-y-6">
+                {permissionGroups.map((group) => (
+                  <div key={group.title} className="space-y-2">
+                    <h3 className="text-sm font-medium border-b pb-1">
+                      {group.title}
+                    </h3>
+                    <div className="grid grid-cols-1 gap-2">
+                      {group.permissions.map((permission) => {
+                        // Ensure we have a valid key for permission
+                        const permKey = permission.key || permission.slug || "";
 
-                          return (
-                            <div
-                              key={permKey}
-                              className="flex items-center space-x-2 py-0.5"
-                            >
-                              <Checkbox
-                                id={`permission-${permKey}`}
-                                checked={permissions[permKey] || false}
-                                onCheckedChange={() =>
-                                  togglePermission(permKey)
-                                }
-                                className="shrink-0 h-4 w-4"
-                              />
-                              <div className="grid gap-0 min-w-0 flex-1">
-                                <label
-                                  htmlFor={`permission-${permKey}`}
-                                  className="text-xs font-medium leading-tight cursor-pointer break-words"
-                                >
-                                  {permission.label ||
-                                    permission.title ||
-                                    permKey}
-                                </label>
-                              </div>
+                        return (
+                          <div
+                            key={permKey}
+                            className="flex items-center space-x-2 py-1"
+                          >
+                            <Checkbox
+                              id={`permission-${permKey}`}
+                              checked={permissions[permKey] || false}
+                              onCheckedChange={() => togglePermission(permKey)}
+                            />
+                            <div className="grid gap-0">
+                              <label
+                                htmlFor={`permission-${permKey}`}
+                                className="text-sm font-medium leading-none cursor-pointer"
+                              >
+                                {permission.label ||
+                                  permission.title ||
+                                  permKey}
+                              </label>
                             </div>
-                          );
-                        })}
-                      </div>
+                          </div>
+                        );
+                      })}
                     </div>
-                  ))}
-                </div>
-              </ScrollArea>
-            </>
-          )}
-        </div>
+                  </div>
+                ))}
+              </div>
+            </ScrollArea>
+          </>
+        )}
 
-        <DialogFooter className="flex-shrink-0 mt-2 pt-2 border-t gap-2">
+        <DialogFooter className="mt-4">
           <Button
             variant="event-outline"
             onClick={() => setOpen(false)}
-            className="w-full sm:w-auto text-xs h-8 px-3"
+            className="mr-2"
           >
             Cancel
           </Button>
@@ -305,11 +300,11 @@ const StaffPermissionsDialog = ({
             variant="event-primary"
             type="button"
             onClick={handleSave}
-            className="gap-1 w-full sm:w-auto text-xs h-8 px-3"
+            className="gap-1"
             disabled={!role || enabledCount === 0}
           >
-            <Lock className="h-3 w-3" />
-            Save
+            <Lock className="h-4 w-4" />
+            Save Permissions
           </Button>
         </DialogFooter>
       </DialogContent>

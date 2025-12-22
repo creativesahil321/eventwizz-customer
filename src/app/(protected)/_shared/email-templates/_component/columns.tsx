@@ -29,14 +29,14 @@ export function getColumns({
           {row.getValue("title")}
         </span>
       ),
-      enableSorting: false,
+      enableSorting: true,
       enableHiding: false,
     },
     {
       accessorKey: "who_received",
       header: ({ column }) => (
         <DataTableColumnHeader
-          className="text-foreground hidden sm:table-cell"
+          className="text-foreground"
           column={column}
           title="Who Received"
         />
@@ -46,14 +46,17 @@ export function getColumns({
           {String(row.getValue("who_received"))}
         </span>
       ),
-      enableSorting: false,
+      enableSorting: true,
       enableHiding: false,
+      meta: {
+        className: "hidden sm:table-cell",
+      },
     },
     {
       accessorKey: "when_received",
       header: ({ column }) => (
         <DataTableColumnHeader
-          className="text-foreground hidden md:table-cell"
+          className="text-foreground"
           column={column}
           title="When Do They Received"
         />
@@ -65,14 +68,17 @@ export function getColumns({
           </span>
         );
       },
-      enableSorting: false,
+      enableSorting: true,
       enableHiding: false,
+      meta: {
+        className: "hidden md:table-cell",
+      },
     },
     {
       accessorKey: "status",
       header: ({ column }) => (
         <DataTableColumnHeader
-          className="text-foreground hidden sm:table-cell"
+          className="text-foreground"
           column={column}
           title="Status"
         />
@@ -91,8 +97,11 @@ export function getColumns({
           </span>
         );
       },
-      enableSorting: false,
+      enableSorting: true,
       enableHiding: false,
+      meta: {
+        className: "hidden sm:table-cell",
+      },
     },
     {
       id: "actions",

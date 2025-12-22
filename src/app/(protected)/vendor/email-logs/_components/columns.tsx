@@ -23,7 +23,7 @@ export function getColumns({
       cell: ({ row }) => (
         <span className="font-medium">{row.getValue("emailTo")}</span>
       ),
-      enableSorting: false,
+      enableSorting: true,
       enableHiding: false,
     },
     {
@@ -34,7 +34,7 @@ export function getColumns({
       cell: ({ row }) => (
         <span className="font-medium">{row.getValue("subject")}</span>
       ),
-      enableSorting: false,
+      enableSorting: true,
       enableHiding: false,
     },
     {
@@ -45,7 +45,7 @@ export function getColumns({
       cell: ({ row }) => (
         <span className="font-medium capitalize">{row.getValue("role")}</span>
       ),
-      enableSorting: false,
+      enableSorting: true,
       enableHiding: false,
     },
     {
@@ -70,8 +70,13 @@ export function getColumns({
           <span className="text-foreground">{`${day}-${month}-${year}`}</span>
         );
       },
-      enableSorting: false,
+      enableSorting: true,
       enableHiding: false,
+      sortingFn: (rowA, rowB) => {
+        const dateA = new Date(rowA.getValue("created_at") as string).getTime();
+        const dateB = new Date(rowB.getValue("created_at") as string).getTime();
+        return dateA - dateB;
+      },
     },
     {
       id: "actions",

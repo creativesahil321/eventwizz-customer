@@ -16,7 +16,7 @@ export const generateEmailLogs = (count: number): EmailLog[] => {
 export const fetchEmailLogs = async ({
   search = "",
   page = 1,
-  per_page = 10,
+  per_page = 30,
   status = "",
 }: AdminEmailLogsParams = {}) => {
   // Simulate network delay.

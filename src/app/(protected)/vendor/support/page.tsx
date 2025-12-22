@@ -18,7 +18,7 @@ export default async function Page({
   searchParams: searchParamsPromise,
 }: PageProps) {
   const searchParams = await searchParamsPromise;
-  const perPage = Number(searchParams.per_page) || 10;
+  const perPage = Number(searchParams.per_page) || 30;
   let tickets;
   try {
     tickets = await getTickets(perPage);

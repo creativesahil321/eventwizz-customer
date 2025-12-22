@@ -157,7 +157,7 @@ export default function ShowBookingDialog({
               {booking.transaction_history &&
                 booking.transaction_history.length > 0 && (
                   <div className="space-y-2">
-                    <Label className="font-medium">Transaction History</Label>
+                    <Label className="font-medium">Transaction</Label>
                     <div className="space-y-2">
                       {booking.transaction_history.map((tx) => (
                         <div

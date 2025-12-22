@@ -48,19 +48,23 @@ export function getHistoryColumns({
 }: GetHistoryColumnsProps): ColumnDef<History>[] {
   return [
     {
-      accessorKey: "id",
+      accessorKey: "booking_number",
       header: ({ column }) => (
         <DataTableColumnHeader
           className="text-foreground"
           column={column}
-          title="Booking ID"
+          title="Booking Number"
         />
       ),
-      cell: ({ row }) => (
-        <span className="font-mono text-sm font-semibold text-blue-600">
-          #{row.getValue("id")}
-        </span>
-      ),
+      cell: ({ row }) => {
+        const bookingNumber = row.getValue("booking_number") as string;
+        const fallbackId = row.original.booking_id || row.original.id;
+        return (
+          <span className="font-mono text-sm font-semibold text-blue-600">
+            {bookingNumber || `#${fallbackId}`}
+          </span>
+        );
+      },
       enableSorting: false,
       enableHiding: false,
     },
@@ -109,7 +113,7 @@ export function getHistoryColumns({
       cell: ({ row }) => (
         <span className="font-medium text-sm">{row.getValue("user_name")}</span>
       ),
-      enableSorting: false,
+      enableSorting: true,
       enableHiding: false,
     },
     {
@@ -133,8 +137,17 @@ export function getHistoryColumns({
           <span className="text-foreground text-sm">{`${day}-${month}-${year}`}</span>
         );
       },
-      enableSorting: false,
+      enableSorting: true,
       enableHiding: false,
+      sortingFn: (rowA, rowB) => {
+        const dateA = new Date(
+          rowA.getValue("booking_date") as string
+        ).getTime();
+        const dateB = new Date(
+          rowB.getValue("booking_date") as string
+        ).getTime();
+        return dateA - dateB;
+      },
     },
     {
       accessorKey: "date",
@@ -222,8 +235,13 @@ export function getHistoryColumns({
           </span>
         );
       },
-      enableSorting: false,
+      enableSorting: true,
       enableHiding: false,
+      sortingFn: (rowA, rowB) => {
+        const dateA = new Date(rowA.getValue("date") as string).getTime();
+        const dateB = new Date(rowB.getValue("date") as string).getTime();
+        return dateA - dateB;
+      },
     },
     {
       accessorKey: "amount",
@@ -239,8 +257,13 @@ export function getHistoryColumns({
           £{row.getValue("amount")}
         </span>
       ),
-      enableSorting: false,
+      enableSorting: true,
       enableHiding: false,
+      sortingFn: (rowA, rowB) => {
+        const amountA = Number(rowA.getValue("amount"));
+        const amountB = Number(rowB.getValue("amount"));
+        return amountA - amountB;
+      },
     },
     {
       accessorKey: "status",

@@ -24,7 +24,7 @@ export const useAdminMenuChoices = (params: UseMenuChoicesQueryParams = {}) => {
   const {
     search = "",
     page = 1,
-    per_page = 10,
+    per_page = 30,
     event_type = "",
     menu = "",
     status = "",

@@ -272,7 +272,18 @@ export default function ProfilePage() {
                   </FormLabel>
                   <Input
                     id="phone"
-                    {...profileForm.register("phone")}
+                    type="tel"
+                    {...profileForm.register("phone", {
+                      onChange: (e) => {
+                        // Only allow numbers, spaces, dashes, plus signs, and parentheses
+                        const value = e.target.value.replace(
+                          /[^\d\s\-+()]/g,
+                          ""
+                        );
+                        e.target.value = value;
+                        profileForm.setValue("phone", value);
+                      },
+                    })}
                     className={`bg-gray-50 h-11 w-full ${
                       profileForm.formState.errors.phone ? "border-red-500" : ""
                     }`}

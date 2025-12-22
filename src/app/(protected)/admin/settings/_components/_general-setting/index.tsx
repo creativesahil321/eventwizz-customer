@@ -69,7 +69,21 @@ const InputField = memo(
         <FormItem>
           <FormLabel>{label}</FormLabel>
           <FormControl>
-            <Input type={type} placeholder={placeholder} {...field} />
+            <Input
+              type={name === "phoneNumber" ? "tel" : type}
+              placeholder={placeholder}
+              {...field}
+              onChange={(e) => {
+                if (name === "phoneNumber") {
+                  // Only allow numbers, spaces, dashes, plus signs, and parentheses
+                  const value = e.target.value.replace(/[^\d\s\-+()]/g, "");
+                  e.target.value = value;
+                  field.onChange(value);
+                } else {
+                  field.onChange(e);
+                }
+              }}
+            />
           </FormControl>
           <FormMessage />
         </FormItem>

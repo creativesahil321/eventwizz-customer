@@ -77,7 +77,7 @@ export const fetchDashboardData = async ({ status }: { status: string }) => {
 export const fetchAdminDashboardOrders = async ({
   search = "",
   page = 1,
-  per_page = 10,
+  per_page = 30,
   status = "",
 }): Promise<OrdersResponse> => {
   // Simulate network delay.

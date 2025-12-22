@@ -121,7 +121,7 @@ export default function UpdateLocationDialog({
                       value={field.value || ""}
                       onChange={(value) => field.onChange(value)}
                       onSelect={(placeId) =>
-                        fetchLocationDetails(form , placeId)
+                        fetchLocationDetails(form, placeId)
                       }
                       placeholder="Search for a location..."
                     />
@@ -176,10 +176,20 @@ export default function UpdateLocationDialog({
                   <FormLabel>Contact Number</FormLabel>
                   <FormControl>
                     <Input
+                      type="tel"
                       placeholder="e.g. +44 123 456 7890"
                       {...field}
                       autoComplete="off"
                       disabled={isSettingDefault}
+                      onChange={(e) => {
+                        // Only allow numbers, spaces, dashes, plus signs, and parentheses
+                        const value = e.target.value.replace(
+                          /[^\d\s\-+()]/g,
+                          ""
+                        );
+                        e.target.value = value;
+                        field.onChange(value);
+                      }}
                     />
                   </FormControl>
                   <FormMessage />

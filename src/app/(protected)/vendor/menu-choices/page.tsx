@@ -20,7 +20,7 @@ export default function Page() {
   const menuSearch = {
     ...parsedSearch,
     page: String(parsedSearch.page || 1),
-    per_page: String(parsedSearch.per_page || 10),
+    per_page: String(parsedSearch.per_page || 30),
   };
 
   return (

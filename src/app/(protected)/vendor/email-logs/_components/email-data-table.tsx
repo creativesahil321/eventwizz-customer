@@ -39,6 +39,7 @@ function EmailLogsDataTable({ initialData, search }: EmailLogDataTableProps) {
     pageCount,
     filterFields: [],
     enableAdvancedFilter: false,
+    enableClientSideSorting: true,
     initialState: {
       sorting: [{ id: "created_at", desc: true }],
     },

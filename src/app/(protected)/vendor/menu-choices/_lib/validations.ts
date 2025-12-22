@@ -6,7 +6,7 @@ import {
 
 export const searchParamsCache = createSearchParamsCache({
   page: parseAsInteger.withDefault(1),
-  per_page: parseAsInteger.withDefault(10),
+  per_page: parseAsInteger.withDefault(30),
   event_type: parseAsString.withDefault(""),
   menu_name: parseAsString.withDefault(""),
   status: parseAsString.withDefault(""),

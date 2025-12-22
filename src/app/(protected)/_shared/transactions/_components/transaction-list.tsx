@@ -1,14 +1,23 @@
 "use client";
 
 import { Transaction } from "../_lib/types";
-
-interface TransactionMeta {
-  total: number;
-  current_page: number;
-  per_page: number;
-  last_page: number;
-}
-import { TransactionItemComponent } from "./transaction-item";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  useReactTable,
+  getCoreRowModel,
+  getSortedRowModel,
+  flexRender,
+  SortingState,
+} from "@tanstack/react-table";
+import { useMemo, useState } from "react";
+import { getTransactionColumns } from "./columns";
 import {
   Pagination,
   PaginationContent,
@@ -20,6 +29,13 @@ import {
 import { EmptyPlaceholder } from "@/components/empty-placeholder";
 import { Receipt } from "lucide-react";
 import { TransactionsListSkeleton } from "./skeleton-loader";
+
+interface TransactionMeta {
+  total: number;
+  current_page: number;
+  per_page: number;
+  last_page: number;
+}
 
 interface TransactionListProps {
   transactions: Transaction[];
@@ -36,6 +52,24 @@ export function TransactionListComponent({
   onPageChange,
   isLoading,
 }: TransactionListProps) {
+  const [sorting, setSorting] = useState<SortingState>([]);
+
+  const columns = useMemo(
+    () => getTransactionColumns({ onViewDetails }),
+    [onViewDetails]
+  );
+
+  const table = useReactTable({
+    data: transactions || [],
+    columns,
+    getCoreRowModel: getCoreRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+    onSortingChange: setSorting,
+    state: {
+      sorting,
+    },
+  });
+
   // If loading, show a skeleton
   if (isLoading) {
     return <TransactionsListSkeleton />;
@@ -58,14 +92,45 @@ export function TransactionListComponent({
 
   return (
     <div className="space-y-4">
-      <div className="border rounded-md overflow-hidden">
-        {transactions.map((transaction) => (
-          <TransactionItemComponent
-            key={transaction.id}
-            transaction={transaction}
-            onViewDetails={onViewDetails}
-          />
-        ))}
+      {/* Table */}
+      <div className="border rounded-md overflow-hidden bg-white">
+        <div className="overflow-x-auto">
+          <Table>
+            <TableHeader>
+              {table.getHeaderGroups().map((headerGroup) => (
+                <TableRow key={headerGroup.id} className="bg-gray-50">
+                  {headerGroup.headers.map((header) => (
+                    <TableHead key={header.id} className="font-semibold">
+                      {header.isPlaceholder
+                        ? null
+                        : flexRender(
+                            header.column.columnDef.header,
+                            header.getContext()
+                          )}
+                    </TableHead>
+                  ))}
+                </TableRow>
+              ))}
+            </TableHeader>
+            <TableBody>
+              {table.getRowModel().rows.map((row) => (
+                <TableRow
+                  key={row.id}
+                  className="hover:bg-gray-50 transition-colors"
+                >
+                  {row.getVisibleCells().map((cell) => (
+                    <TableCell key={cell.id}>
+                      {flexRender(
+                        cell.column.columnDef.cell,
+                        cell.getContext()
+                      )}
+                    </TableCell>
+                  ))}
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
       </div>
 
       {/* Pagination */}

@@ -79,7 +79,7 @@ export function getColumns({
           </div>
         );
       },
-      enableSorting: false,
+      enableSorting: true,
       enableHiding: false,
     },
     {
@@ -94,7 +94,7 @@ export function getColumns({
       cell: ({ row }) => (
         <span className="font-medium">{row.getValue("event_name")}</span>
       ),
-      enableSorting: false,
+      enableSorting: true,
       enableHiding: false,
     },
     {
@@ -119,8 +119,13 @@ export function getColumns({
         return <span className="text-foreground">{formattedTimeAgo}</span>;
       },
 
-      enableSorting: false,
+      enableSorting: true,
       enableHiding: false,
+      sortingFn: (rowA, rowB) => {
+        const dateA = new Date(rowA.getValue("created_at") as string).getTime();
+        const dateB = new Date(rowB.getValue("created_at") as string).getTime();
+        return dateA - dateB;
+      },
     },
     {
       accessorKey: "total_amount",
@@ -134,8 +139,13 @@ export function getColumns({
       cell: ({ row }) => (
         <span className="font-medium">{row.getValue("total_amount")}</span>
       ),
-      enableSorting: false,
+      enableSorting: true,
       enableHiding: false,
+      sortingFn: (rowA, rowB) => {
+        const amountA = Number(rowA.getValue("total_amount"));
+        const amountB = Number(rowB.getValue("total_amount"));
+        return amountA - amountB;
+      },
     },
     {
       accessorKey: "balance_amount",
@@ -149,8 +159,13 @@ export function getColumns({
       cell: ({ row }) => (
         <span className="font-medium">{row.getValue("balance_amount")}</span>
       ),
-      enableSorting: false,
+      enableSorting: true,
       enableHiding: false,
+      sortingFn: (rowA, rowB) => {
+        const amountA = Number(rowA.getValue("balance_amount"));
+        const amountB = Number(rowB.getValue("balance_amount"));
+        return amountA - amountB;
+      },
     },
     {
       accessorKey: "status",

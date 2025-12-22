@@ -115,7 +115,7 @@ function VenueLocationsDataTable({
 
   // Configure data table
   const pageCount = useMemo(
-    () => Number(search?.per_page) || 10,
+    () => Number(search?.per_page) || 30,
     [search?.per_page]
   );
 
@@ -130,6 +130,7 @@ function VenueLocationsDataTable({
     pageCount,
     filterFields,
     enableAdvancedFilter: false,
+    enableClientSideSorting: true,
     initialState: {
       sorting: [{ id: "created_at", desc: true }],
       columnPinning: { right: ["actions"] },

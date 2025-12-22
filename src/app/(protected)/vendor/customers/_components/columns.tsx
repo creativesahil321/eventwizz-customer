@@ -57,7 +57,7 @@ export function getColumns({
           <span className="font-medium">{row.getValue("first_name")}</span>
         </>
       ),
-      enableSorting: false,
+      enableSorting: true,
       enableHiding: false,
     },
     {
@@ -74,7 +74,7 @@ export function getColumns({
           <span className="font-medium">{row.getValue("last_name")}</span>
         </>
       ),
-      enableSorting: false,
+      enableSorting: true,
       enableHiding: false,
     },
     {

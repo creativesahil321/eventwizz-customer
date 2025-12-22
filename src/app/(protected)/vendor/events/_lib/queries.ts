@@ -99,7 +99,7 @@ export const useEvents = (
               last_page: 1,
               links: [],
               path: "",
-              per_page: 10,
+              per_page: 30,
               to: initialData.length,
               total: initialData.length,
             },

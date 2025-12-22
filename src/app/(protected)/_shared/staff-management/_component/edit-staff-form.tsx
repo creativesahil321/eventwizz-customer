@@ -368,10 +368,15 @@ export default function EditStaffForm({ staffId }: EditStaffFormProps) {
                         {...field}
                         maxLength={20}
                         onChange={(e) => {
+                          // Only allow numbers, spaces, dashes, plus signs, and parentheses
+                          const value = e.target.value.replace(
+                            /[^\d\s\-+()]/g,
+                            ""
+                          );
                           // Limit to 20 characters
-                          const value = e.target.value.slice(0, 20);
-                          e.target.value = value;
-                          field.onChange(e);
+                          const limitedValue = value.slice(0, 20);
+                          e.target.value = limitedValue;
+                          field.onChange(limitedValue);
                         }}
                       />
                     </FormControl>

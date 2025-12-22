@@ -21,7 +21,7 @@ export const generateFakePayments = (count: number): Payment[] => {
 };
 export const fetchPayments = async ({
   page = 1,
-  per_page = 10,
+  per_page = 30,
 }: PaymentsParams = {}) => {
   // Simulate network delay.
   await new Promise((resolve) => setTimeout(resolve, 100));
