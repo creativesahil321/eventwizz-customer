@@ -133,10 +133,7 @@ export const stepTwoSchema = z
       .string()
       .min(1, "Event main heading is required")
       .max(40, "Event main heading must not exceed 40 characters"),
-    package_description: z
-      .string()
-      .min(1, "Event sub-heading is required")
-      .max(160, "Event sub-heading must not exceed 160 characters"),
+    package_description: z.string().min(1, "Event sub-heading is required"),
     package_button_name: z
       .string()
       .min(1, "Button name is required")
@@ -252,47 +249,97 @@ const dateSchema = baseDateSchema
   .extend({
     tickets: z
       .array(
-        z.object({
-          title: z
-            .string()
-            .min(1, "Title is required")
-            .max(25, "Ticket title must not exceed 25 characters"),
-          description: z
-            .string()
-            .min(1, "Description is required")
-            .max(160, "Ticket description must not exceed 160 characters"),
-          total_capacity: z.union([z.string(), z.number()]).refine((val) => {
-            const num = typeof val === "string" ? parseInt(val, 10) : val;
-            return !isNaN(num) && num >= 1 && num <= 100000;
-          }, "Total capacity must be between 1 and 100,000"),
-          price: z.union([z.string(), z.number()]).refine((val) => {
-            const num = typeof val === "string" ? parseInt(val, 10) : val;
-            return !isNaN(num) && num >= 1 && num <= 9999;
-          }, "Price must be between 1 and 9,999 (4 digits max)"),
-        })
+        z
+          .object({
+            id: z.number().optional(), // From API when editing
+            event_date_id: z.number().optional(), // From API when editing
+            title: z
+              .string()
+              .min(1, "Title is required")
+              .max(25, "Ticket title must not exceed 25 characters"),
+            description: z
+              .string()
+              .min(1, "Description is required")
+              .max(160, "Ticket description must not exceed 160 characters"),
+            total_capacity: z.union([z.string(), z.number()]).refine((val) => {
+              const num = typeof val === "string" ? parseInt(val, 10) : val;
+              return !isNaN(num) && num >= 1 && num <= 100000;
+            }, "Total capacity must be between 1 and 100,000"),
+            price: z.union([z.string(), z.number()]).refine((val) => {
+              const num = typeof val === "string" ? parseInt(val, 10) : val;
+              return !isNaN(num) && num >= 1 && num <= 9999;
+            }, "Price must be between 1 and 9,999 (4 digits max)"),
+            sold_tickets: z.number().optional(), // Read-only from API
+            status: z.boolean().optional(), // Read-only from API
+          })
+          .superRefine((ticket, ctx) => {
+            // Validate that total_capacity is not less than sold_tickets
+            if (
+              ticket.sold_tickets !== undefined &&
+              ticket.sold_tickets !== null
+            ) {
+              const totalCapacity =
+                typeof ticket.total_capacity === "string"
+                  ? parseInt(ticket.total_capacity, 10)
+                  : ticket.total_capacity;
+
+              if (
+                !isNaN(totalCapacity) &&
+                totalCapacity < ticket.sold_tickets
+              ) {
+                ctx.addIssue({
+                  code: z.ZodIssueCode.custom,
+                  message: `Total capacity cannot be less than sold tickets (${ticket.sold_tickets})`,
+                  path: ["total_capacity"],
+                });
+              }
+            }
+          })
       )
       .optional(),
     total_ticket_types: z.number().optional(),
     tables: z
       .array(
-        z.object({
-          min_persons: z.union([z.string(), z.number()]).refine((val) => {
-            const num = typeof val === "string" ? parseInt(val, 10) : val;
-            return !isNaN(num) && num >= 1;
-          }, "Minimum persons must be at least 1"),
-          max_persons: z.union([z.string(), z.number()]).refine((val) => {
-            const num = typeof val === "string" ? parseInt(val, 10) : val;
-            return !isNaN(num) && num >= 1;
-          }, "Maximum persons must be at least 1"),
-          price: z.union([z.string(), z.number()]).refine((val) => {
-            const num = typeof val === "string" ? parseInt(val, 10) : val;
-            return !isNaN(num) && num >= 0 && num <= 9999;
-          }, "Price must be between 0 and 9,999 (4 digits max)"),
-          total_tables: z.union([z.string(), z.number()]).refine((val) => {
-            const num = typeof val === "string" ? parseInt(val, 10) : val;
-            return !isNaN(num) && num >= 1 && num <= 5000;
-          }, "Total tables must be between 1 and 5,000"),
-        })
+        z
+          .object({
+            id: z.number().optional(), // From API when editing
+            event_date_id: z.number().optional(), // From API when editing
+            min_persons: z.union([z.string(), z.number()]).refine((val) => {
+              const num = typeof val === "string" ? parseInt(val, 10) : val;
+              return !isNaN(num) && num >= 1;
+            }, "Minimum persons must be at least 1"),
+            max_persons: z.union([z.string(), z.number()]).refine((val) => {
+              const num = typeof val === "string" ? parseInt(val, 10) : val;
+              return !isNaN(num) && num >= 1;
+            }, "Maximum persons must be at least 1"),
+            price: z.union([z.string(), z.number()]).refine((val) => {
+              const num = typeof val === "string" ? parseInt(val, 10) : val;
+              return !isNaN(num) && num >= 0 && num <= 9999;
+            }, "Price must be between 0 and 9,999 (4 digits max)"),
+            total_tables: z.union([z.string(), z.number()]).refine((val) => {
+              const num = typeof val === "string" ? parseInt(val, 10) : val;
+              return !isNaN(num) && num >= 1 && num <= 5000;
+            }, "Total tables must be between 1 and 5,000"),
+            sold_tables: z.number().optional(), // Read-only from API
+            status: z.boolean().optional(), // Read-only from API
+          })
+          .superRefine((table, ctx) => {
+            // Validate that total_tables is not less than sold_tables
+            if (table.sold_tables !== undefined && table.sold_tables !== null) {
+              const totalTables =
+                typeof table.total_tables === "string"
+                  ? parseInt(table.total_tables, 10)
+                  : table.total_tables;
+
+              if (!isNaN(totalTables) && totalTables < table.sold_tables) {
+                ctx.addIssue({
+                  code: z.ZodIssueCode.custom,
+                  message: `Total tables cannot be less than sold tables (${table.sold_tables})`,
+                  path: ["total_tables"],
+                });
+              }
+            }
+          })
       )
       .optional(),
     total_table_types: z.number().optional(),
@@ -631,10 +678,14 @@ export const stepFiveSchema = z.object({
           .union([z.number(), z.string()])
           .transform((val) => {
             if (typeof val === "string") {
+              // Handle empty string from API - default to 100
+              if (val.trim() === "") {
+                return 100;
+              }
               const num = Number.parseFloat(val);
-              return Number.isNaN(num) ? 0 : num;
+              return Number.isNaN(num) ? 100 : num;
             }
-            return val;
+            return val || 100;
           })
           .refine((val) => val >= 1, {
             message: "Available quantity must be at least 1",
@@ -642,6 +693,7 @@ export const stepFiveSchema = z.object({
           .refine((val) => val <= 500, {
             message: "Available quantity cannot exceed 500",
           }),
+        sold_quantity: z.number().optional(), // Read-only from API
       })
     )
     .min(1, "At least one package is required"),

@@ -11,6 +11,7 @@ import {
   RotateCcw,
   Trash2,
 } from "lucide-react";
+import { formatDate } from "@/lib/utils";
 
 // Map of status to CSS color variables
 const STATUS_COLORS = {
@@ -151,6 +152,27 @@ export function getColumns({
       },
       enableSorting: false,
       enableHiding: false,
+    },
+    {
+      accessorKey: "created_at",
+      header: ({ column }) => (
+        <DataTableColumnHeader
+          className="text-foreground"
+          column={column}
+          title="Created At"
+        />
+      ),
+      cell: ({ row }) => (
+        <span className="text-sm text-muted-foreground">
+          {formatDate(row.original.created_at)}
+        </span>
+      ),
+      enableSorting: true,
+      sortingFn: (rowA, rowB) => {
+        const dateA = new Date(rowA.getValue("created_at") as string).getTime();
+        const dateB = new Date(rowB.getValue("created_at") as string).getTime();
+        return dateA - dateB;
+      },
     },
     {
       id: "actions",

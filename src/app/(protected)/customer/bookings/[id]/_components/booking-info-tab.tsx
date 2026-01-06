@@ -347,11 +347,6 @@ export default function BookingInfoTab({ bookingData }: BookingInfoTabProps) {
     });
   };
 
-  const handlePayNow = (dateId: string) => {
-    // TODO: Navigate to payment page for specific date
-    console.log("Pay now for date:", dateId);
-  };
-
   const handlePayAll = () => {
     // TODO: Navigate to payment page for all dates
     console.log("Pay all dates");
@@ -480,7 +475,12 @@ export default function BookingInfoTab({ bookingData }: BookingInfoTabProps) {
             )}
           </div>
 
-          <Accordion type="single" collapsible className="w-full space-y-3">
+          <Accordion
+            type="single"
+            collapsible
+            className="w-full space-y-3"
+            defaultValue={bookingData.dates.length === 1 ? "date-0" : undefined}
+          >
             {bookingData.dates.map((dateInfo, index) => {
               const tableItems = dateInfo.items.filter(
                 (item) => item.type === "table"
@@ -611,7 +611,10 @@ export default function BookingInfoTab({ bookingData }: BookingInfoTabProps) {
                             ) : null;
                           })()}
                           <Button
-                            onClick={() => handlePayNow(dateInfo.id)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleSingleDatePaymentClick(dateInfo);
+                            }}
                             size="sm"
                             className="gap-1.5 cursor-pointer h-8 px-3"
                             style={{
@@ -1427,30 +1430,8 @@ export default function BookingInfoTab({ bookingData }: BookingInfoTabProps) {
                       </Card>
 
                       {/* Action Buttons - Hidden at bottom */}
-                      <div className="mt-3 pt-3 border-t border-gray-200 flex flex-wrap items-center gap-3">
-                        {/* Pay for this date button - Only show if there's pending payment */}
-                        {(() => {
-                          const pendingAmount = getPendingAmount(dateInfo);
-                          return pendingAmount &&
-                            dateInfo.paymentStatus !== "paid" ? (
-                            <Button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleSingleDatePaymentClick(dateInfo);
-                              }}
-                              size="sm"
-                              className="gap-1.5 h-8 px-3 text-xs"
-                              style={{
-                                backgroundColor: "var(--color-primary)",
-                                color: "white",
-                              }}
-                            >
-                              <CreditCard className="h-3.5 w-3.5" />
-                              <span>Pay for this date</span>
-                            </Button>
-                          ) : null;
-                        })()}
-                        {dateInfo.hasUnbookedEventDates && (
+                      {dateInfo.hasUnbookedEventDates && (
+                        <div className="mt-3 pt-3 border-t border-gray-200 flex flex-wrap items-center gap-3">
                           <Button
                             onClick={(e) => {
                               e.stopPropagation();
@@ -1463,8 +1444,8 @@ export default function BookingInfoTab({ bookingData }: BookingInfoTabProps) {
                             <RotateCcw className="h-3 w-3" />
                             <span className="text-xs">Need to reschedule?</span>
                           </Button>
-                        )}
-                      </div>
+                        </div>
+                      )}
                     </div>
                   </AccordionContent>
                 </AccordionItem>

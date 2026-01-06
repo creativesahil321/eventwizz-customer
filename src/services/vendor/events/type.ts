@@ -263,3 +263,85 @@ export interface EventsResponse {
   };
   errors: string[];
 }
+
+/**
+ * Event Overview Types
+ */
+export interface EventOverviewQueryParams {
+  date_status?: "all" | "available" | "sold_out";
+  date_per_page?: number;
+  date_page?: number;
+}
+
+export interface EventOverviewTableConfig {
+  size: number;
+  count: number;
+  price: string;
+  sold: number;
+  total: number;
+}
+
+export interface EventOverviewTicket {
+  id: number;
+  name: string;
+  sold: number;
+  total: number;
+}
+
+export interface EventOverviewDrink {
+  id: number;
+  name: string;
+  quantity: number;
+}
+
+export interface EventOverviewDateEntry {
+  id: number;
+  eventDate: string;
+  category: string;
+  submittedOn: string;
+  soldOut: boolean;
+  tables: EventOverviewTableConfig[];
+  totalTables: number;
+  tablesBooked: number;
+  tablesLeft: number;
+  totalPeople: number;
+  tickets: EventOverviewTicket[];
+  drinks: EventOverviewDrink[];
+}
+
+export interface EventOverviewInfo {
+  id: number;
+  name: string;
+  date: string;
+  status: string;
+  totalRevenue: string;
+  totalBookings: number;
+  totalGuests: number;
+}
+
+export interface EventOverviewResponse {
+  success: boolean;
+  event: EventOverviewInfo;
+  data: EventOverviewDateEntry[];
+  links: {
+    first: string | null;
+    last: string | null;
+    prev: string | null;
+    next: string | null;
+  };
+  meta: {
+    current_page: number;
+    from: number;
+    last_page: number;
+    per_page: number;
+    to: number;
+    total: number;
+    links: Array<{
+      url: string | null;
+      label: string;
+      page: number | null;
+      active: boolean;
+    }>;
+    path: string;
+  };
+}

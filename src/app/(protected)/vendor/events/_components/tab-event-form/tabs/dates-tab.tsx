@@ -75,7 +75,13 @@ const getDefaultDate = (
         ...baseDate,
         total_ticket_types: 1,
         tickets: [
-          { title: "", description: "", total_capacity: "", price: "" },
+          {
+            title: "",
+            description: "",
+            total_capacity: "",
+            price: "",
+            status: true,
+          },
         ],
         total_table_types: 0,
         tables: [],
@@ -90,7 +96,13 @@ const getDefaultDate = (
         deposit_due_date: "",
         total_table_types: 1,
         tables: [
-          { min_persons: 1, max_persons: 1, price: 10, total_tables: 1 },
+          {
+            min_persons: 1,
+            max_persons: 1,
+            price: 10,
+            total_tables: 1,
+            status: true,
+          },
         ],
         total_ticket_types: 0,
         tickets: [],
@@ -105,10 +117,24 @@ const getDefaultDate = (
         deposit_due_date: "",
         total_table_types: 1,
         tables: [
-          { min_persons: 1, max_persons: 1, price: 10, total_tables: 1 },
+          {
+            min_persons: 1,
+            max_persons: 1,
+            price: 10,
+            total_tables: 1,
+            status: true,
+          },
         ],
         total_ticket_types: 1,
-        tickets: [{ title: "", description: "", total_capacity: 1, price: 10 }],
+        tickets: [
+          {
+            title: "",
+            description: "",
+            total_capacity: 1,
+            price: 10,
+            status: true,
+          },
+        ],
       };
   }
 };
@@ -325,8 +351,8 @@ export default function DatesTab() {
       return (
         <>
           <div className="text-lg font-semibold mb-4">Ticket Information</div>
-          <div className="mt-6 bg-gray-50 rounded-lg p-5">
-            <div className="flex justify-between items-center">
+          <div className="mt-6 bg-gray-50 rounded-lg p-4 sm:p-5">
+            <div className="flex justify-end items-center">
               <Button
                 type="button"
                 variant="outline"
@@ -340,10 +366,11 @@ export default function DatesTab() {
                       description: "",
                       total_capacity: "",
                       price: "",
+                      status: true,
                     },
                   ]);
                 }}
-                className="bg-white hover:bg-gray-100"
+                className="bg-white hover:bg-gray-100 w-full sm:w-auto"
               >
                 <PlusCircle className="h-4 w-4 mr-2" />
                 Add Ticket
@@ -352,11 +379,67 @@ export default function DatesTab() {
 
             <div className="mt-4 space-y-4">
               {watch(`dates.${dateIndex}.tickets`)?.map(
-                (_: unknown, ticketIndex: number) => (
+                (ticket, ticketIndex: number) => (
                   <div
                     key={`ticket-${dateIndex}-${ticketIndex}`}
-                    className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4 bg-white p-4 rounded-lg border border-gray-200 shadow-sm"
+                    className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4 bg-white p-4 sm:p-5 rounded-lg border border-gray-200 shadow-sm relative"
                   >
+                    <div className="md:col-span-2 flex justify-between items-center mb-2">
+                      <div className="flex items-center gap-4">
+                        {ticket && "id" in ticket && (
+                          <div className="px-3 py-1 bg-blue-50 text-blue-700 text-xs font-semibold rounded-full border border-blue-100">
+                            Sold:{" "}
+                            {(ticket as { sold_tickets?: number })
+                              .sold_tickets || 0}
+                          </div>
+                        )}
+                        <FormField
+                          control={control}
+                          name={`dates.${dateIndex}.tickets.${ticketIndex}.status`}
+                          render={({ field }) => (
+                            <FormItem className="flex items-center space-x-2 space-y-0">
+                              <FormLabel className="text-sm font-medium text-gray-600">
+                                Active
+                              </FormLabel>
+                              <FormControl>
+                                <Switch
+                                  checked={field.value ?? true}
+                                  onCheckedChange={field.onChange}
+                                  className="data-[state=checked]:bg-green-500"
+                                />
+                              </FormControl>
+                            </FormItem>
+                          )}
+                        />
+                      </div>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="text-red-500 hover:text-red-700 hover:bg-red-50"
+                        onClick={() => {
+                          const tickets =
+                            watch(`dates.${dateIndex}.tickets`) || [];
+                          if (tickets.length > 1) {
+                            const updatedTickets = tickets.filter(
+                              (_: unknown, i: number) => i !== ticketIndex
+                            );
+                            setValue(
+                              `dates.${dateIndex}.tickets`,
+                              updatedTickets
+                            );
+                            setValue(
+                              `dates.${dateIndex}.total_ticket_types`,
+                              updatedTickets.length
+                            );
+                          }
+                        }}
+                      >
+                        <Trash2 className="h-4 w-4 mr-2" />
+                        <span className="hidden sm:inline">Remove</span>
+                      </Button>
+                    </div>
+
                     <FormField
                       control={control}
                       name={`dates.${dateIndex}.tickets.${ticketIndex}.title`}
@@ -398,42 +481,83 @@ export default function DatesTab() {
                     <FormField
                       control={control}
                       name={`dates.${dateIndex}.tickets.${ticketIndex}.total_capacity`}
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel className="text-md font-medium">
-                            Total Tickets
-                          </FormLabel>
-                          <FormControl>
-                            <Input
-                              type="number"
-                              min="1"
-                              max="100000"
-                              step="1"
-                              {...field}
-                              placeholder="Enter number of tickets (max 100,000)"
-                              value={field.value ?? ""}
-                              className="w-full h-11 bg-[#F9FAFB] border-[#E5E7EB] [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                              onChange={(e) => {
-                                const value = e.target.value;
-                                if (value === "") {
-                                  field.onChange("");
-                                } else {
-                                  const numValue = parseInt(value, 10);
-                                  if (!isNaN(numValue) && numValue >= 1) {
-                                    // Cap at 100000
-                                    if (numValue > 100000) {
-                                      field.onChange(100000);
-                                    } else {
-                                      field.onChange(numValue);
+                      render={({ field }) => {
+                        const currentTicket = watch(
+                          `dates.${dateIndex}.tickets.${ticketIndex}`
+                        );
+                        const soldTickets =
+                          currentTicket && "sold_tickets" in currentTicket
+                            ? (currentTicket as { sold_tickets?: number })
+                                .sold_tickets || 0
+                            : 0;
+                        const minValue = soldTickets > 0 ? soldTickets : 1;
+
+                        return (
+                          <FormItem>
+                            <FormLabel className="text-md font-medium">
+                              Total Tickets
+                              {soldTickets > 0 && (
+                                <span className="text-xs text-gray-500 ml-2">
+                                  (Min: {soldTickets} sold)
+                                </span>
+                              )}
+                            </FormLabel>
+                            <FormControl>
+                              <Input
+                                type="number"
+                                min={minValue}
+                                max="100000"
+                                step="1"
+                                {...field}
+                                placeholder="Enter number of tickets (max 100,000)"
+                                value={field.value ?? ""}
+                                className="w-full h-11 bg-[#F9FAFB] border-[#E5E7EB] [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                onChange={(e) => {
+                                  const value = e.target.value;
+                                  if (value === "") {
+                                    field.onChange("");
+                                  } else {
+                                    const numValue = parseInt(value, 10);
+                                    if (!isNaN(numValue) && numValue >= 1) {
+                                      // Validate against sold tickets
+                                      if (
+                                        soldTickets > 0 &&
+                                        numValue < soldTickets
+                                      ) {
+                                        setError(
+                                          `dates.${dateIndex}.tickets.${ticketIndex}.total_capacity`,
+                                          {
+                                            type: "manual",
+                                            message: `Total capacity cannot be less than sold tickets (${soldTickets})`,
+                                          }
+                                        );
+                                      } else {
+                                        // Clear error if valid
+                                        trigger(
+                                          `dates.${dateIndex}.tickets.${ticketIndex}.total_capacity`
+                                        );
+                                      }
+                                      // Cap at 100000
+                                      if (numValue > 100000) {
+                                        field.onChange(100000);
+                                      } else {
+                                        field.onChange(numValue);
+                                      }
                                     }
                                   }
-                                }
-                              }}
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
+                                }}
+                                onBlur={async () => {
+                                  field.onBlur();
+                                  await trigger(
+                                    `dates.${dateIndex}.tickets.${ticketIndex}.total_capacity`
+                                  );
+                                }}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        );
+                      }}
                     />
                     <FormField
                       control={control}
@@ -475,35 +599,6 @@ export default function DatesTab() {
                         </FormItem>
                       )}
                     />
-                    {/* Remove ticket button */}
-                    <div className="col-span-1 md:col-span-2 flex justify-end">
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        className="text-red-500 hover:text-red-700 hover:bg-red-50"
-                        onClick={() => {
-                          const tickets =
-                            watch(`dates.${dateIndex}.tickets`) || [];
-                          if (tickets.length > 1) {
-                            const updatedTickets = tickets.filter(
-                              (_: unknown, i: number) => i !== ticketIndex
-                            );
-                            setValue(
-                              `dates.${dateIndex}.tickets`,
-                              updatedTickets
-                            );
-                            setValue(
-                              `dates.${dateIndex}.total_ticket_types`,
-                              updatedTickets.length
-                            );
-                          }
-                        }}
-                      >
-                        <Trash2 className="h-4 w-4 mr-2" />
-                        Remove Ticket
-                      </Button>
-                    </div>
                   </div>
                 )
               )}
@@ -512,7 +607,7 @@ export default function DatesTab() {
         </>
       );
     },
-    [control, watch, setValue]
+    [control, watch, setValue, setError, trigger]
   );
 
   // Create custom field arrays for tables - now checks individual date's booking type
@@ -525,12 +620,13 @@ export default function DatesTab() {
 
       return (
         <div className="mt-4">
-          <div className="flex justify-between items-center">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-0">
             <div className="text-lg font-semibold">Table Information</div>
             <Button
               type="button"
               variant="outline"
               size="sm"
+              className="w-full sm:w-auto"
               onClick={() => {
                 const tables = watch(`dates.${dateIndex}.tables`) || [];
                 setValue(`dates.${dateIndex}.tables`, [
@@ -540,6 +636,7 @@ export default function DatesTab() {
                     max_persons: "",
                     price: "",
                     total_tables: "",
+                    status: true,
                   },
                 ]);
               }}
@@ -551,17 +648,68 @@ export default function DatesTab() {
 
           <div className="mt-4">
             {watch(`dates.${dateIndex}.tables`)?.map(
-              (_: unknown, tableIndex: number) => (
+              (table, tableIndex: number) => (
                 <div
                   key={`table-${dateIndex}-${tableIndex}`}
-                  className="grid grid-cols-4 gap-4 mt-4 bg-gray-50 dark:bg-gray-800 p-4 rounded-lg"
+                  className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-4 bg-gray-50 dark:bg-gray-800 p-4 rounded-lg relative"
                 >
+                  <div className="sm:col-span-2 lg:col-span-4 flex justify-between items-center mb-2">
+                    <div className="flex items-center gap-4">
+                      {table && "id" in table && (
+                        <div className="px-3 py-1 bg-blue-50 text-blue-700 text-xs font-semibold rounded-full border border-blue-100">
+                          Sold:{" "}
+                          {(table as { sold_tables?: number }).sold_tables || 0}
+                        </div>
+                      )}
+                      <FormField
+                        control={control}
+                        name={`dates.${dateIndex}.tables.${tableIndex}.status`}
+                        render={({ field }) => (
+                          <FormItem className="flex items-center space-x-2 space-y-0">
+                            <FormLabel className="text-sm font-medium text-gray-600">
+                              Active
+                            </FormLabel>
+                            <FormControl>
+                              <Switch
+                                checked={field.value ?? true}
+                                onCheckedChange={field.onChange}
+                                className="data-[state=checked]:bg-green-500"
+                              />
+                            </FormControl>
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                      onClick={() => {
+                        const tables = watch(`dates.${dateIndex}.tables`) || [];
+                        if (tables.length > 1) {
+                          const updatedTables = tables.filter(
+                            (_: unknown, i: number) => i !== tableIndex
+                          );
+                          setValue(`dates.${dateIndex}.tables`, updatedTables);
+                          setValue(
+                            `dates.${dateIndex}.total_table_types`,
+                            updatedTables.length
+                          );
+                        }
+                      }}
+                    >
+                      <Trash2 className="h-4 w-4 mr-2" />
+                      <span className="hidden sm:inline">Remove</span>
+                    </Button>
+                  </div>
+
                   <FormField
                     control={control}
                     name={`dates.${dateIndex}.tables.${tableIndex}.min_persons`}
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Minimum No. of People/Table</FormLabel>
+                        <FormLabel>Min People/Table</FormLabel>
                         <FormControl>
                           <Input
                             type="number"
@@ -635,7 +783,7 @@ export default function DatesTab() {
                     name={`dates.${dateIndex}.tables.${tableIndex}.max_persons`}
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Maximum No. of People/Table</FormLabel>
+                        <FormLabel>Max People/Table</FormLabel>
                         <FormControl>
                           <Input
                             type="number"
@@ -745,67 +893,84 @@ export default function DatesTab() {
                   <FormField
                     control={control}
                     name={`dates.${dateIndex}.tables.${tableIndex}.total_tables`}
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Total Tables</FormLabel>
-                        <FormControl>
-                          <Input
-                            type="number"
-                            min="1"
-                            max="5000"
-                            step="1"
-                            {...field}
-                            placeholder="Enter number of tables (max 5,000)"
-                            value={field.value ?? ""}
-                            className="w-full [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                            onChange={(e) => {
-                              const value = e.target.value;
-                              if (value === "") {
-                                field.onChange("");
-                              } else {
-                                const numValue = parseInt(value, 10);
-                                if (!isNaN(numValue) && numValue >= 1) {
-                                  // Cap at 5000
-                                  if (numValue > 5000) {
-                                    field.onChange(5000);
-                                  } else {
-                                    field.onChange(numValue);
+                    render={({ field }) => {
+                      const currentTable = watch(
+                        `dates.${dateIndex}.tables.${tableIndex}`
+                      );
+                      const soldTables =
+                        currentTable && "sold_tables" in currentTable
+                          ? (currentTable as { sold_tables?: number })
+                              .sold_tables || 0
+                          : 0;
+                      const minValue = soldTables > 0 ? soldTables : 1;
+
+                      return (
+                        <FormItem>
+                          <FormLabel>
+                            Total Tables
+                            {soldTables > 0 && (
+                              <span className="text-xs text-gray-500 ml-2">
+                                (Min: {soldTables} sold)
+                              </span>
+                            )}
+                          </FormLabel>
+                          <FormControl>
+                            <Input
+                              type="number"
+                              min={minValue}
+                              max="5000"
+                              step="1"
+                              {...field}
+                              placeholder="Enter number of tables (max 5,000)"
+                              value={field.value ?? ""}
+                              className="w-full [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                              onChange={(e) => {
+                                const value = e.target.value;
+                                if (value === "") {
+                                  field.onChange("");
+                                } else {
+                                  const numValue = parseInt(value, 10);
+                                  if (!isNaN(numValue) && numValue >= 1) {
+                                    // Validate against sold tables
+                                    if (
+                                      soldTables > 0 &&
+                                      numValue < soldTables
+                                    ) {
+                                      setError(
+                                        `dates.${dateIndex}.tables.${tableIndex}.total_tables`,
+                                        {
+                                          type: "manual",
+                                          message: `Total tables cannot be less than sold tables (${soldTables})`,
+                                        }
+                                      );
+                                    } else {
+                                      // Clear error if valid
+                                      trigger(
+                                        `dates.${dateIndex}.tables.${tableIndex}.total_tables`
+                                      );
+                                    }
+                                    // Cap at 5000
+                                    if (numValue > 5000) {
+                                      field.onChange(5000);
+                                    } else {
+                                      field.onChange(numValue);
+                                    }
                                   }
                                 }
-                              }
-                            }}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
+                              }}
+                              onBlur={async () => {
+                                field.onBlur();
+                                await trigger(
+                                  `dates.${dateIndex}.tables.${tableIndex}.total_tables`
+                                );
+                              }}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      );
+                    }}
                   />
-
-                  {/* Remove table button */}
-                  <div className="col-span-4 flex justify-end">
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                      onClick={() => {
-                        const tables = watch(`dates.${dateIndex}.tables`) || [];
-                        if (tables.length > 1) {
-                          const updatedTables = tables.filter(
-                            (_: unknown, i: number) => i !== tableIndex
-                          );
-                          setValue(`dates.${dateIndex}.tables`, updatedTables);
-                          setValue(
-                            `dates.${dateIndex}.total_table_types`,
-                            updatedTables.length
-                          );
-                        }
-                      }}
-                    >
-                      <Trash2 className="h-4 w-4 mr-2" />
-                      Remove Table
-                    </Button>
-                  </div>
                 </div>
               )
             )}
@@ -813,7 +978,7 @@ export default function DatesTab() {
         </div>
       );
     },
-    [control, watch, setValue]
+    [control, watch, setValue, setError, trigger]
   );
 
   const renderDateFields = useCallback(
@@ -821,33 +986,34 @@ export default function DatesTab() {
       return (
         <div
           key={`date-${dateIndex}`}
-          className="border-2 border-gray-200 rounded-lg p-5 mb-6 bg-white shadow-sm hover:shadow-md transition-all"
+          className="border-2 border-gray-200 rounded-lg p-4 sm:p-5 mb-6 bg-white shadow-sm hover:shadow-md transition-all"
         >
-          <div className="flex justify-between items-center mb-4">
-            <h3 className="text-lg font-semibold">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-0 mb-4">
+            <h3 className="text-lg font-semibold truncate flex-1 min-w-0">
               {formatDateDisplay(watch(`dates.${dateIndex}.event_date`))}
             </h3>
             {dateFields.length > 1 && (
               <Button
                 type="button"
                 variant="destructive"
-                className="text-destructive hover:text-white bg-destructive/10"
+                className="text-destructive hover:text-white bg-destructive/10 w-full sm:w-auto"
                 size="sm"
                 onClick={() => remove(dateIndex)}
               >
                 <Trash2 className="h-4 w-4 mr-2" />
-                Remove Date
+                <span className="hidden sm:inline">Remove Date</span>
+                <span className="sm:hidden">Remove</span>
               </Button>
             )}
           </div>
 
-          <div className="grid grid-cols-1 gap-5 mb-4">
+          <div className="grid grid-cols-1 gap-4 sm:gap-5 mb-4">
             <FormField
               control={control}
               name={`dates.${dateIndex}.event_date`}
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel className="text-md font-medium">
+                  <FormLabel className="text-sm sm:text-md font-medium">
                     Event Date
                   </FormLabel>
                   <FormControl>
@@ -856,7 +1022,7 @@ export default function DatesTab() {
                       placeholder="Select date"
                       {...field}
                       min={getTodayDateString()} // Add min attribute to prevent past dates
-                      className="w-full h-11 bg-[#F9FAFB] border-[#E5E7EB] focus:ring-2 focus:ring-blue-500"
+                      className="w-full h-10 sm:h-11 bg-[#F9FAFB] border-[#E5E7EB] focus:ring-2 focus:ring-blue-500 text-sm sm:text-base"
                       onChange={(e) => {
                         const newDate = e.target.value;
                         if (
@@ -880,7 +1046,7 @@ export default function DatesTab() {
               name={`dates.${dateIndex}.booking_type`}
               render={({ field }) => (
                 <FormItem className="w-full">
-                  <FormLabel className="text-md font-medium">
+                  <FormLabel className="text-sm sm:text-md font-medium">
                     Is it a ticketed or seated event?
                   </FormLabel>
                   <FormControl>
@@ -892,7 +1058,7 @@ export default function DatesTab() {
                         updateDate(dateIndex, value);
                       }}
                     >
-                      <SelectTrigger className="w-full h-12 bg-[#F9FAFB] border-[#E5E7EB]">
+                      <SelectTrigger className="w-full h-10 sm:h-12 bg-[#F9FAFB] border-[#E5E7EB] text-sm sm:text-base">
                         <SelectValue placeholder="Select booking type" />
                       </SelectTrigger>
                       <SelectContent className="w-full">
@@ -916,15 +1082,15 @@ export default function DatesTab() {
           {(watch(`dates.${dateIndex}.booking_type`) === "tables" ||
             watch(`dates.${dateIndex}.booking_type`) === "both") && (
             <>
-              <div className="text-lg font-semibold mt-6 mb-2">
+              <div className="text-base sm:text-lg font-semibold mt-6 mb-2">
                 Table Payment Settings
               </div>
-              <p className="text-sm text-gray-600 mb-4">
+              <p className="text-xs sm:text-sm text-gray-600 mb-4">
                 Configure payment options for table bookings (deposit or full
                 payment)
               </p>
-              <div className="mt-6 bg-gray-50 rounded-lg p-5">
-                <div className="bg-gray-50 rounded-lg p-5">
+              <div className="mt-6 bg-gray-50 rounded-lg p-4 sm:p-5">
+                <div className="bg-gray-50 rounded-lg p-4 sm:p-5">
                   {/* Payment Type */}
                   <div className="mb-5">
                     <FormField
@@ -932,7 +1098,7 @@ export default function DatesTab() {
                       name={`dates.${dateIndex}.payment_type`}
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel className="text-md font-medium text-gray-700">
+                          <FormLabel className="text-sm sm:text-md font-medium text-gray-700">
                             Payment Type
                           </FormLabel>
                           <FormControl>
@@ -953,7 +1119,7 @@ export default function DatesTab() {
                                   );
                                 }
                               }}
-                              className="flex space-x-4 pt-2"
+                              className="flex flex-col sm:flex-row gap-3 sm:gap-4 sm:space-x-4 pt-2"
                             >
                               <FormItem className="flex items-center space-x-2 space-y-0">
                                 <FormControl>
@@ -981,16 +1147,18 @@ export default function DatesTab() {
 
                   {/* Conditional deposit fields */}
                   {watch(`dates.${dateIndex}.payment_type`) === "deposit" && (
-                    <div className="space-y-4 mb-5 p-4 bg-white rounded-md border border-gray-100">
+                    <div className="space-y-4 mb-5 p-3 sm:p-4 bg-white rounded-md border border-gray-100">
                       {/* Enable/Disable Deposit Toggle */}
                       <FormField
                         control={control}
                         name={`dates.${dateIndex}.is_deposit_enabled`}
                         render={({ field }) => (
-                          <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm">
-                            <div className="space-y-0.5">
-                              <FormLabel>Enable Deposit</FormLabel>
-                              <div className="text-sm text-gray-500">
+                          <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 sm:p-4 shadow-sm gap-3">
+                            <div className="space-y-0.5 flex-1 min-w-0">
+                              <FormLabel className="text-sm sm:text-base">
+                                Enable Deposit
+                              </FormLabel>
+                              <div className="text-xs sm:text-sm text-gray-500">
                                 Allow customers to pay deposit for this date
                               </div>
                             </div>
@@ -998,6 +1166,7 @@ export default function DatesTab() {
                               <Switch
                                 checked={field.value ?? true}
                                 onCheckedChange={field.onChange}
+                                className="flex-shrink-0"
                               />
                             </FormControl>
                           </FormItem>
@@ -1013,7 +1182,7 @@ export default function DatesTab() {
                             name={`dates.${dateIndex}.deposit_type`}
                             render={({ field }) => (
                               <FormItem>
-                                <FormLabel className="text-md font-medium">
+                                <FormLabel className="text-sm sm:text-md font-medium">
                                   Deposit Type
                                 </FormLabel>
                                 <FormControl>
@@ -1031,7 +1200,7 @@ export default function DatesTab() {
                                         );
                                       }
                                     }}
-                                    className="flex space-x-4 pt-2"
+                                    className="flex flex-col sm:flex-row gap-3 sm:gap-4 sm:space-x-4 pt-2"
                                   >
                                     <FormItem className="flex items-center space-x-2 space-y-0">
                                       <FormControl>
@@ -1111,14 +1280,20 @@ export default function DatesTab() {
                                         }
 
                                         // Remove any decimal points and non-numeric characters except digits
-                                        const cleanedValue = value.replace(/[^\d]/g, "");
+                                        const cleanedValue = value.replace(
+                                          /[^\d]/g,
+                                          ""
+                                        );
 
                                         if (cleanedValue === "") {
                                           field.onChange("");
                                           return;
                                         }
 
-                                        const numValue = parseInt(cleanedValue, 10);
+                                        const numValue = parseInt(
+                                          cleanedValue,
+                                          10
+                                        );
 
                                         if (!isNaN(numValue) && numValue >= 0) {
                                           // For percentage: limit to 100
@@ -1177,7 +1352,7 @@ export default function DatesTab() {
               type="button"
               variant="outline"
               size="sm"
-              className="text-blue-600 border-blue-600 hover:bg-blue-50"
+              className="text-blue-600 border-blue-600 hover:bg-blue-50 w-full sm:w-auto"
               onClick={() => {
                 const currentDate = watch(`dates.${dateIndex}`);
                 const newDate = {
@@ -1205,6 +1380,7 @@ export default function DatesTab() {
       watch,
       updateDate,
       validateDateUniqueness,
+      setValue,
     ]
   );
 
@@ -1333,14 +1509,14 @@ export default function DatesTab() {
           className="space-y-8"
         >
           {/* Event Dates & Pricing Section */}
-          <div className="mt-8">
-            <h2 className="text-xl font-bold title-header">
+          <div className="mt-6 sm:mt-8">
+            <h2 className="text-lg sm:text-xl font-bold title-header">
               Event Dates & Pricing
             </h2>
-            <p className="text-sm text-gray-500 mt-1 mb-2">
+            <p className="text-xs sm:text-sm text-gray-500 mt-1 mb-2">
               Set your event dates, payment options, and pricing details
             </p>
-            <p className="text-xs text-blue-600 mb-4 flex items-center gap-1">
+            <p className="text-xs text-blue-600 mb-4 flex items-center gap-1 flex-wrap">
               <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
                 <path
                   fillRule="evenodd"
@@ -1365,8 +1541,13 @@ export default function DatesTab() {
             Add Another Date
           </Button>
 
-          <div className="flex justify-end gap-4 pt-4">
-            <Button type="submit" disabled={isLoading} variant="event-primary">
+          <div className="flex flex-col sm:flex-row justify-end gap-3 sm:gap-4 pt-4">
+            <Button
+              type="submit"
+              disabled={isLoading}
+              variant="event-primary"
+              className="w-full sm:w-auto"
+            >
               {isLoading ? "Saving..." : "Save & Next"}
             </Button>
           </div>

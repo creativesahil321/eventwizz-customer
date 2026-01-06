@@ -1,8 +1,12 @@
+"use client";
+
 import Link from "next/link";
-import { Clock, Dot } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { Clock, Dot, Eye } from "lucide-react";
 import Image from "next/image";
 import { Event } from "../../_lib/types";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Button } from "@/components/ui/button";
 
 type EventCardProps = {
   event: Event;
@@ -27,6 +31,8 @@ export default function EventCard({
   onSelect,
   selectionMode = false,
 }: EventCardProps) {
+  const router = useRouter();
+
   // Format the event name with first letter capitalized
   const formattedName = event.name
     ? event.name.charAt(0).toUpperCase() + event.name.slice(1)
@@ -44,6 +50,12 @@ export default function EventCard({
       e.stopPropagation();
       onSelect();
     }
+  };
+
+  const handleOverviewClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    router.push(`/vendor/events/${event?.id}/overview`);
   };
 
   return (
@@ -97,7 +109,7 @@ export default function EventCard({
         >
           <div className="p-2 sm:p-3 bg-background rounded-md shadow-2xl w-full">
             {event.image ? (
-              <div className="relative w-full aspect-[4/3] overflow-hidden rounded-md rounded-bl-none rounded-br-none">
+              <div className="relative w-full aspect-[4/3] overflow-hidden rounded-md rounded-bl-none rounded-br-none group">
                 <Image
                   fill
                   src={event.image}
@@ -105,6 +117,18 @@ export default function EventCard({
                   className="object-cover"
                   sizes="(max-width: 640px) 100vw, (max-width: 768px) 50vw, (max-width: 1024px) 33vw, (max-width: 1280px) 25vw, 20vw"
                 />
+                {/* Overview Button - Top Right */}
+                {!selectionMode && (
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    onClick={handleOverviewClick}
+                    className="absolute top-2 right-2 z-10 bg-white/90 hover:bg-white text-black shadow-lg backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-opacity duration-200 h-8 px-3 text-xs font-medium"
+                  >
+                    <Eye className="w-3.5 h-3.5 mr-1.5" />
+                    View Stats
+                  </Button>
+                )}
               </div>
             ) : (
               <div className="flex items-center justify-center w-full aspect-[4/3] bg-gray-300 rounded-sm dark:bg-gray-700">

@@ -93,6 +93,25 @@ export function FormProvider({
 
         // Map the event data to our form structure
         const eventDataAny = eventData as unknown as EventSchemaType; // Type cast to handle dynamic properties
+        
+        // Transform Step 6 location data (lat/long → latitude/longitude)
+        type StepSixWithLegacy = typeof eventDataAny.stepSix & { lat?: string | number; long?: string | number };
+        const stepSixData = eventDataAny.stepSix as StepSixWithLegacy;
+        
+        const transformedStepSix = stepSixData
+          ? {
+              ...stepSixData,
+              latitude: stepSixData.latitude || 
+                        (typeof stepSixData.lat === 'string' 
+                          ? parseFloat(stepSixData.lat) 
+                          : stepSixData.lat),
+              longitude: stepSixData.longitude || 
+                         (typeof stepSixData.long === 'string' 
+                           ? parseFloat(stepSixData.long) 
+                           : stepSixData.long),
+            }
+          : initialData.stepSix;
+        
         const mappedData: Partial<EventSchemaType> = {
           // Map all steps from the server data
           stepOne: eventDataAny.stepOne || initialData.stepOne,
@@ -100,7 +119,7 @@ export function FormProvider({
           stepThree: eventDataAny.stepThree || initialData.stepThree,
           stepFour: eventDataAny.stepFour || initialData.stepFour,
           stepFive: eventDataAny.stepFive || initialData.stepFive,
-          stepSix: eventDataAny.stepSix || initialData.stepSix,
+          stepSix: transformedStepSix,
           stepSeven: eventDataAny.stepSeven || initialData.stepSeven,
           stepEight: eventDataAny.stepEight || initialData.stepEight,
         };

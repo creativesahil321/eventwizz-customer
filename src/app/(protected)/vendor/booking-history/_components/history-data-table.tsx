@@ -1,9 +1,8 @@
 "use client";
 
 import { useDataTable } from "@/hooks/data-table/use-data-table";
-import React, { useMemo, useCallback, useRef, useEffect } from "react";
+import React, { useMemo, useCallback, useEffect } from "react";
 import { DataTable } from "@/components/data-table/data-table";
-import { Button } from "@/components/ui/button";
 import { DataTableRowAction, History, SearchParams } from "../_lib/types";
 import { useHistory } from "../_lib/queries";
 import { getHistoryColumns } from "./columns";
@@ -11,7 +10,6 @@ import { DataTableSkeleton } from "@/components/data-table/data-table-skeleton";
 import { DataTableFilterField } from "@/hooks/data-table/use-data-table";
 import { toSentenceCase } from "@/lib/utils";
 import UpdateHistoryDialog from "./_history-update";
-import { exportTableToCSV } from "@/lib/export";
 import MailHistoryDialog from "./_history-mail";
 import { useRouter } from "next/navigation";
 
@@ -35,19 +33,10 @@ function HistoryDataTable({ search, tableRef }: HistoryDataTableProps) {
     () => getHistoryColumns({ setRowAction }),
     [setRowAction]
   );
-  const buttonRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
-    if (rowAction?.type === "download" && buttonRef.current) {
-      buttonRef.current.click();
-    }
-    // Handle adjust button click
-    if (rowAction?.type === "adjust" && rowAction.row.original.id) {
-      router.push(`/vendor/booking-history/${rowAction.row.original.id}`);
-    }
     // Handle view button click
     if (rowAction?.type === "view" && rowAction.row.original.id) {
-      // For now, same as adjust - you can create a separate view-only modal later
       router.push(`/vendor/booking-history/${rowAction.row.original.id}`);
     }
   }, [rowAction, router]);
@@ -98,7 +87,7 @@ function HistoryDataTable({ search, tableRef }: HistoryDataTableProps) {
     enableAdvancedFilter: false,
     enableClientSideSorting: true,
     initialState: {
-      sorting: [{ id: "created_at", desc: true }],
+      sorting: [{ id: "booking_date", desc: true }],
       columnPinning: { right: ["actions"] },
     },
     getRowId,
@@ -116,8 +105,17 @@ function HistoryDataTable({ search, tableRef }: HistoryDataTableProps) {
   if (isLoading) {
     return (
       <DataTableSkeleton
-        columnCount={6}
-        cellWidths={["10rem", "40rem", "12rem", "12rem", "8rem", "8rem"]}
+        columnCount={8}
+        cellWidths={[
+          "10rem",
+          "40rem",
+          "12rem",
+          "12rem",
+          "8rem",
+          "8rem",
+          "8rem",
+          "8rem",
+        ]}
         shrinkZero
       />
     );
@@ -146,20 +144,6 @@ function HistoryDataTable({ search, tableRef }: HistoryDataTableProps) {
           showTrigger={false}
           onSuccess={() => rowAction?.row?.toggleSelected(false)}
         />
-      )}
-      {rowAction?.type === "download" && (
-        <Button
-          variant="event-outline"
-          ref={buttonRef}
-          onClick={() =>
-            exportTableToCSV(table, {
-              filename: "orders-history",
-              excludeColumns: ["select", "actions"],
-            })
-          }
-        >
-          CSV
-        </Button>
       )}
       {rowAction?.type === "mail" && (
         <MailHistoryDialog

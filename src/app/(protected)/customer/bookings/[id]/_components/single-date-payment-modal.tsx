@@ -142,12 +142,14 @@ export function SingleDatePaymentModal({
                 </span>
               </div>
             </div>
-            <button
+            <Button
+              variant="event-ghost"
+              size="icon"
               onClick={handleClose}
               className="rounded-full p-2 hover:bg-gray-100 transition-colors"
             >
               <X className="h-5 w-5 text-gray-500" />
-            </button>
+            </Button>
           </div>
         </DialogHeader>
 
@@ -437,13 +439,14 @@ export function SingleDatePaymentModal({
         {/* Footer Actions */}
         <div className="sticky bottom-0 bg-white border-t px-6 py-4 flex items-center justify-between gap-4">
           <Button
-            variant="outline"
+            variant="event-outline"
             onClick={handleClose}
             className="flex-1 sm:flex-none"
           >
             Cancel
           </Button>
           <Button
+            variant="event-primary"
             onClick={handleConfirm}
             disabled={isConfirmDisabled}
             className="flex-1 sm:flex-none"
@@ -463,4 +466,3 @@ export function SingleDatePaymentModal({
     </Dialog>
   );
 }
-

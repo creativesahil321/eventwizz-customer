@@ -2,7 +2,7 @@
 
 import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Search, Mail } from "lucide-react";
+import { Search, Mail, Loader2 } from "lucide-react";
 import Link from "next/link";
 import CustomerDataTable from "./_components/customer-data-table";
 import dynamic from "next/dynamic";
@@ -19,6 +19,8 @@ import {
 } from "@/components/ui/select";
 import { CustomersPageSkeleton } from "./_components/skeleton-loader";
 import { Suspense } from "react";
+import { useCustomers } from "./_lib/queries";
+import { useDebounce } from "@/hooks/data-table/use-debounce";
 
 // Dynamic import of the customer create dialog
 const CreateCustomerDialog = dynamic(
@@ -41,13 +43,22 @@ export default function CustomersPage() {
   const [statusFilter, setStatusFilter] = useState("all");
   const tableRef = React.useRef<unknown>(null);
 
+  // Debounce search input using existing hook
+  const debouncedSearch = useDebounce(globalFilterValue, 500);
+
   // Default search params
   const searchParams: SearchParams = {
     page: 1,
     per_page: 30,
-    search: globalFilterValue,
+    search: debouncedSearch,
     status: statusFilter === "all" ? "" : statusFilter,
   };
+
+  // Fetch data to track loading state
+  const {
+    isLoading,
+    isFetching,
+  } = useCustomers(searchParams, undefined);
 
   // Handle CSV export
   const handleCSVExport = () => {
@@ -67,7 +78,12 @@ export default function CustomersPage() {
           <div className="bg-white rounded-lg border border-[var(--color-border)] shadow-md p-6 mb-0">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center flex-wrap gap-4">
               <div>
-                <h1 className="text-2xl title-header font-bold">Customers</h1>
+                <h1 className="text-2xl title-header font-bold flex items-center gap-2">
+                  Customers
+                  {isFetching && (
+                    <Loader2 className="h-5 w-5 animate-spin text-primary" />
+                  )}
+                </h1>
                 <p className="text-muted-foreground mt-2">
                   Manage your customers. View, edit, and communicate with your
                   customer base.
@@ -84,7 +100,11 @@ export default function CustomersPage() {
                       className="pl-8 w-full"
                     />
                   </div>
-                  <Select value={statusFilter} onValueChange={setStatusFilter}>
+                  <Select
+                    value={statusFilter}
+                    onValueChange={setStatusFilter}
+                    disabled={isFetching}
+                  >
                     <SelectTrigger className="w-[180px]">
                       <SelectValue placeholder="Filter by status" />
                     </SelectTrigger>
@@ -97,7 +117,11 @@ export default function CustomersPage() {
                   </Select>
                 </div>
                 <div className="flex items-center gap-2">
-                  <Button variant="event-primary" onClick={handleCSVExport}>
+                  <Button
+                    variant="event-primary"
+                    onClick={handleCSVExport}
+                    disabled={isFetching}
+                  >
                     CSV
                   </Button>
                   <Link href="/vendor/send-email-to-all">
@@ -112,13 +136,28 @@ export default function CustomersPage() {
             </div>
           </div>
 
-          <Suspense fallback={<CustomersPageSkeleton />}>
-            <CustomerDataTable
-              search={searchParams}
-              tableRef={tableRef}
-              currentFilter={statusFilter}
-            />
-          </Suspense>
+          {isLoading ? (
+            <CustomersPageSkeleton />
+          ) : (
+            <div className="relative">
+              {/* Subtle loading overlay for refetch */}
+              {isFetching && (
+                <div className="absolute inset-0 bg-background/80 backdrop-blur-[1px] z-10 flex items-center justify-center rounded-lg">
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    <span>Updating...</span>
+                  </div>
+                </div>
+              )}
+              <Suspense fallback={<CustomersPageSkeleton />}>
+                <CustomerDataTable
+                  search={searchParams}
+                  tableRef={tableRef}
+                  currentFilter={statusFilter}
+                />
+              </Suspense>
+            </div>
+          )}
         </div>
       </Shell>
     </section>

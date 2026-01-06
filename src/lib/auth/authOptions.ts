@@ -14,6 +14,7 @@ import {
   buildOAuthErrorRedirectUrl,
   extractErrorMessage,
 } from "./oauth-utils";
+import { VenueLocation } from "@/types/api.types";
 
 // Extend global to include our OAuth tenant info
 declare global {
@@ -120,6 +121,8 @@ declare module "next-auth" {
 
   interface Session {
     user: {
+      venue_locations: VenueLocation[];
+      default_venue_location: VenueLocation;
       name: string | null;
       email: string | null;
       account_type: string;

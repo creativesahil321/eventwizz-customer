@@ -1,13 +1,7 @@
 import { ColumnDef } from "@tanstack/react-table";
 import { DataTableColumnHeader } from "@/components/data-table/data-table-column-header";
 import { Button } from "@/components/ui/button";
-import {
-  HardDriveDownload,
-  Mail,
-  Settings2,
-  Eye,
-  CalendarDays,
-} from "lucide-react";
+import { Mail, Eye, CalendarDays } from "lucide-react";
 import React from "react";
 import Link from "next/link";
 import { DataTableRowAction, History } from "../_lib/types";
@@ -24,16 +18,20 @@ const ORDER_STATUS_COLORS = {
     bg: "#10b981", // green
     text: "#ffffff",
   },
-  completed: {
-    bg: "#10b981", // green
-    text: "#ffffff",
-  },
-  processing: {
-    bg: "#3b82f6", // blue
-    text: "#ffffff",
-  },
   cancelled: {
     bg: "#ef4444", // red
+    text: "#ffffff",
+  },
+  pending: {
+    bg: "#f59e0b", // amber/orange
+    text: "#ffffff",
+  },
+  draft: {
+    bg: "#f59e0b", // amber/orange (same as pending)
+    text: "#ffffff",
+  },
+  partially_paid: {
+    bg: "#3b82f6", // blue
     text: "#ffffff",
   },
 };
@@ -266,6 +264,98 @@ export function getHistoryColumns({
       },
     },
     {
+      accessorKey: "deposit_amount",
+      header: ({ column }) => (
+        <DataTableColumnHeader
+          className="text-foreground"
+          column={column}
+          title="Deposit Amount"
+        />
+      ),
+      cell: ({ row }) => {
+        const depositAmount = row.getValue("deposit_amount") as
+          | number
+          | string
+          | undefined;
+        const value = depositAmount
+          ? typeof depositAmount === "string"
+            ? parseFloat(depositAmount)
+            : depositAmount
+          : 0;
+        
+        if (value === 0 || isNaN(value)) {
+          return (
+            <span className="text-sm text-muted-foreground">—</span>
+          );
+        }
+        
+        return (
+          <span className="font-semibold text-sm text-green-600">
+            £{value.toFixed(2)}
+          </span>
+        );
+      },
+      enableSorting: true,
+      enableHiding: false,
+      sortingFn: (rowA, rowB) => {
+        const amountA =
+          typeof rowA.getValue("deposit_amount") === "string"
+            ? parseFloat(rowA.getValue("deposit_amount") as string) || 0
+            : (rowA.getValue("deposit_amount") as number) || 0;
+        const amountB =
+          typeof rowB.getValue("deposit_amount") === "string"
+            ? parseFloat(rowB.getValue("deposit_amount") as string) || 0
+            : (rowB.getValue("deposit_amount") as number) || 0;
+        return amountA - amountB;
+      },
+    },
+    {
+      accessorKey: "pending_amount",
+      header: ({ column }) => (
+        <DataTableColumnHeader
+          className="text-foreground"
+          column={column}
+          title="Pending Amount"
+        />
+      ),
+      cell: ({ row }) => {
+        const pendingAmount = row.getValue("pending_amount") as
+          | number
+          | string
+          | undefined;
+        const value = pendingAmount
+          ? typeof pendingAmount === "string"
+            ? parseFloat(pendingAmount)
+            : pendingAmount
+          : 0;
+        
+        if (value === 0 || isNaN(value)) {
+          return (
+            <span className="text-sm text-muted-foreground">—</span>
+          );
+        }
+        
+        return (
+          <span className="font-semibold text-sm text-orange-600">
+            £{value.toFixed(2)}
+          </span>
+        );
+      },
+      enableSorting: true,
+      enableHiding: false,
+      sortingFn: (rowA, rowB) => {
+        const amountA =
+          typeof rowA.getValue("pending_amount") === "string"
+            ? parseFloat(rowA.getValue("pending_amount") as string) || 0
+            : (rowA.getValue("pending_amount") as number) || 0;
+        const amountB =
+          typeof rowB.getValue("pending_amount") === "string"
+            ? parseFloat(rowB.getValue("pending_amount") as string) || 0
+            : (rowB.getValue("pending_amount") as number) || 0;
+        return amountA - amountB;
+      },
+    },
+    {
       accessorKey: "status",
       header: ({ column }) => (
         <DataTableColumnHeader
@@ -319,23 +409,6 @@ export function getHistoryColumns({
             title="View Details"
           >
             <Eye size={14} />
-          </Button>
-          <Button
-            onClick={() => setRowAction({ row, type: "adjust" })}
-            variant={"event-primary"}
-            size="sm"
-            title="Adjust Booking"
-            className="text-white"
-          >
-            <Settings2 size={14} />
-          </Button>
-          <Button
-            onClick={() => setRowAction({ row, type: "download" })}
-            variant={"event-outline"}
-            size="sm"
-            title="Download"
-          >
-            <HardDriveDownload size={14} />
           </Button>
           <Button
             onClick={() => setRowAction({ row, type: "mail" })}

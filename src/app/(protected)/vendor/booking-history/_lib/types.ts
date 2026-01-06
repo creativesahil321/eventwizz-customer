@@ -31,6 +31,8 @@ export interface History {
   status: string; // "Pending", "Confirmed", "Processing", "Cancelled"
   created_at?: string;
   action?: string;
+  deposit_amount?: number | string; // Deposit amount from API
+  pending_amount?: number | string; // Pending amount from API
 }
 export interface AdminHistoryParams {
   search?: string;

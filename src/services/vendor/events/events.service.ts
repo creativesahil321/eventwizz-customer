@@ -19,6 +19,8 @@ import {
   EventCategoryPayload,
   EventMenuCategoryPayload,
   EventMenuCategory,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  EventOverviewResponse,
 } from "./type";
 
 export const eventsService = {
@@ -44,6 +46,35 @@ export const eventsService = {
         returnFullResponse: true,
       }
     );
+  },
+
+  /**
+   * Get event overview with booking details
+   */
+  getEventOverview: async (
+    eventId: string,
+    params: {
+      date_status?: "all" | "available" | "sold_out";
+      date_per_page?: number;
+      date_page?: number;
+      date_filter?: string; // Date filter in YYYY-MM-DD format
+    }
+  ) => {
+    let endpoint = API_ENDPOINTS.VENDOR.EVENT.GET_EVENT_OVERVIEW.replace(
+      "{eventId}",
+      eventId
+    ).replace("{date_status}", params.date_status || "all");
+
+    // Replace date_filter - use empty string if not provided (backend will ignore it)
+    endpoint = endpoint.replace("{date_filter}", params.date_filter || "");
+
+    return api.get(endpoint, {
+      params: {
+        date_per_page: params.date_per_page || 10,
+        date_page: params.date_page || 1,
+      },
+      returnFullResponse: true,
+    });
   },
 
   /**

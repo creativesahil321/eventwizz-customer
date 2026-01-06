@@ -28,6 +28,10 @@ import {
   ChevronUp,
   AlertCircle,
   RotateCcw,
+  Trash2,
+  FileDown,
+  Eye,
+  Loader2,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -38,6 +42,12 @@ import {
 } from "@/components/ui/accordion";
 import { useVendorBookingDetails } from "../../_lib/queries";
 import { Skeleton } from "@/components/ui/skeleton";
+import AddOnsTab from "./add-ons-tab";
+import { useDeleteVendorAddOns } from "@/services/vendor/bookings/hooks/useDeleteVendorAddOns";
+import { vendorBookingsService } from "@/services/vendor/bookings/bookings.service";
+import { VendorRescheduleDateModal } from "./vendor-reschedule-modal";
+import { useVendorRescheduleBooking } from "@/services/vendor/bookings/query";
+import type { VendorRescheduleBookingPayload } from "@/services/vendor/bookings/type";
 
 interface AdjustBookingContentProps {
   bookingId: string;
@@ -54,6 +64,21 @@ export default function AdjustBookingContent({
   const [expandedAddOns, setExpandedAddOns] = useState<Record<string, boolean>>(
     {}
   );
+  const [downloadingMenuChoices, setDownloadingMenuChoices] = useState<
+    Record<string, boolean>
+  >({});
+  const [rescheduleModalOpen, setRescheduleModalOpen] = useState(false);
+  const [selectedDateForReschedule, setSelectedDateForReschedule] = useState<{
+    date: string;
+    people: number;
+    tables: number;
+    tickets: number;
+    drinks: number;
+    price: number;
+    booking_date_id: number;
+    date_key: string;
+    hasAddons: boolean;
+  } | null>(null);
 
   // Fetch booking details from API
   const {
@@ -64,12 +89,115 @@ export default function AdjustBookingContent({
 
   const bookingData = bookingResponse?.data;
 
+  // Delete add-ons mutation
+  const deleteAddOnsMutation = useDeleteVendorAddOns();
+
+  // Reschedule mutation
+  const rescheduleMutation = useVendorRescheduleBooking();
+
   // Helper function to safely format amounts (handles null/undefined)
   const formatAmount = (value: number | null | undefined): string => {
     if (value === null || value === undefined) {
       return "£0.00";
     }
     return `£${Number(value).toFixed(2)}`;
+  };
+
+  // Handler for deleting add-ons
+  const handleDeleteAddOn = (
+    dateId: string,
+    keyword: string | number,
+    type: "table" | "drink" | "ticket"
+  ) => {
+    const apiType =
+      type === "table" ? "tables" : type === "drink" ? "drinks" : "tickets";
+
+    deleteAddOnsMutation.mutate({
+      bookingId: parseInt(bookingId),
+      date: dateId,
+      keyword,
+      type: apiType,
+    });
+  };
+
+  // Handler for reschedule button click
+  const handleRescheduleClick = (
+    dateInfo: NonNullable<typeof bookingData>["event_dates"][0]
+  ) => {
+    const totalPeople =
+      (dateInfo.tables?.reduce((sum, table) => sum + (table.people ?? 0), 0) ??
+        0) +
+      (dateInfo.tickets?.reduce(
+        (sum, ticket) => sum + (ticket.quantity ?? 0),
+        0
+      ) ?? 0);
+
+    const totalTables =
+      dateInfo.tables?.reduce(
+        (sum, table) => sum + (table.no_tables ?? 0),
+        0
+      ) ?? 0;
+
+    const totalTickets =
+      dateInfo.tickets?.reduce(
+        (sum, ticket) => sum + (ticket.quantity ?? 0),
+        0
+      ) ?? 0;
+
+    const totalDrinks =
+      dateInfo.drinks?.reduce((sum, drink) => sum + (drink.quantity ?? 0), 0) ??
+      0;
+
+    const hasAddons =
+      (dateInfo.addons?.tables && dateInfo.addons.tables.length > 0) ||
+      (dateInfo.addons?.tickets && dateInfo.addons.tickets.length > 0) ||
+      (dateInfo.addons?.drinks && dateInfo.addons.drinks.length > 0);
+
+    setSelectedDateForReschedule({
+      date: dateInfo.date,
+      people: totalPeople,
+      tables: totalTables,
+      tickets: totalTickets,
+      drinks: totalDrinks,
+      price: dateInfo.total_amount,
+      booking_date_id: dateInfo.booking_date_id,
+      date_key: dateInfo.date_key,
+      hasAddons,
+    });
+    setRescheduleModalOpen(true);
+  };
+
+  // Handler for reschedule confirm
+  const handleRescheduleConfirm = (payload: VendorRescheduleBookingPayload) => {
+    rescheduleMutation.mutate(payload, {
+      onSuccess: () => {
+        setRescheduleModalOpen(false);
+        setSelectedDateForReschedule(null);
+        toast.success("Booking date rescheduled successfully");
+      },
+      onError: (error) => {
+        toast.error(error.message || "Failed to reschedule booking date");
+      },
+    });
+  };
+
+  // Handler for downloading menu choices
+  const handleDownloadMenuChoices = async (dateKey: string) => {
+    const downloadKey = `${bookingId}-${dateKey}`;
+    setDownloadingMenuChoices((prev) => ({ ...prev, [downloadKey]: true }));
+
+    try {
+      await vendorBookingsService.exportMenuChoices(
+        parseInt(bookingId),
+        dateKey
+      );
+      toast.success("Menu choices downloaded successfully");
+    } catch (error) {
+      console.error("Error downloading menu choices:", error);
+      toast.error("Failed to download menu choices");
+    } finally {
+      setDownloadingMenuChoices((prev) => ({ ...prev, [downloadKey]: false }));
+    }
   };
 
   const handleDownload = () => {
@@ -222,37 +350,6 @@ export default function AdjustBookingContent({
     );
   }
 
-  // Calculate totals with null safety
-  const totalTables = bookingData.event_dates.reduce(
-    (sum, date) =>
-      sum +
-      (date.tables?.reduce((tSum, table) => tSum + (table.no_tables ?? 0), 0) ??
-        0),
-    0
-  );
-
-  const totalTickets = bookingData.event_dates.reduce(
-    (sum, date) =>
-      sum +
-      (date.tickets?.reduce(
-        (tSum, ticket) => tSum + (ticket.quantity ?? 0),
-        0
-      ) ?? 0),
-    0
-  );
-
-  const totalPeople = bookingData.event_dates.reduce(
-    (sum, date) =>
-      sum +
-      (date.tables?.reduce((tSum, table) => tSum + (table.people ?? 0), 0) ??
-        0) +
-      (date.tickets?.reduce(
-        (tSum, ticket) => tSum + (ticket.quantity ?? 0),
-        0
-      ) ?? 0),
-    0
-  );
-
   return (
     <section className="w-full relative flex flex-col space-y-6">
       {/* Header Section */}
@@ -344,19 +441,21 @@ export default function AdjustBookingContent({
                 </div>
 
                 {/* Customer Phone */}
-                <div className="flex items-start gap-3">
-                  <div className="p-1.5 rounded-md bg-purple-50 shrink-0">
-                    <Phone className="h-4 w-4 text-purple-600" />
+                {bookingData.user.phone && (
+                  <div className="flex items-start gap-3">
+                    <div className="p-1.5 rounded-md bg-purple-50 shrink-0">
+                      <Phone className="h-4 w-4 text-purple-600" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">
+                        Phone
+                      </p>
+                      <p className="text-sm font-semibold text-foreground">
+                        {bookingData.user.phone}
+                      </p>
+                    </div>
                   </div>
-                  <div className="min-w-0">
-                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">
-                      Phone
-                    </p>
-                    <p className="text-sm font-semibold text-foreground">
-                      {bookingData.user.phone}
-                    </p>
-                  </div>
-                </div>
+                )}
 
                 {/* Location */}
                 {bookingData.location && (
@@ -403,9 +502,9 @@ export default function AdjustBookingContent({
             <Receipt className="h-4 w-4" />
             Booking Details
           </TabsTrigger>
-          <TabsTrigger value="payment-info" className="gap-2">
-            <CreditCard className="h-4 w-4" />
-            Payment Summary
+          <TabsTrigger value="add-ons" className="gap-2">
+            <Plus className="h-4 w-4" />
+            Add-ons & Services
           </TabsTrigger>
         </TabsList>
 
@@ -426,6 +525,11 @@ export default function AdjustBookingContent({
                     type="single"
                     collapsible
                     className="w-full space-y-3"
+                    defaultValue={
+                      bookingData.event_dates.length === 1
+                        ? "date-0"
+                        : undefined
+                    }
                   >
                     {bookingData.event_dates.map((dateInfo, index) => {
                       const pendingAmount = getPendingAmount(
@@ -469,7 +573,7 @@ export default function AdjustBookingContent({
                         >
                           <AccordionTrigger className="px-4 py-3 hover:bg-gray-50 hover:no-underline">
                             <div className="flex items-center gap-3 text-left w-full">
-                              <div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center text-sm font-bold text-white shrink-0">
+                              <div className="w-10 h-10 rounded-full bg-[var(--color-primary)] flex items-center justify-center text-sm font-bold text-white shrink-0">
                                 {index + 1}
                               </div>
                               <div className="flex-1 min-w-0">
@@ -620,7 +724,7 @@ export default function AdjustBookingContent({
                                         <div className="space-y-3">
                                           {dateInfo.tables.map((table, idx) => (
                                             <div
-                                              key={idx}
+                                              key={`table-${idx}-${table.table_size}-${table.no_tables}`}
                                               className="flex items-start justify-between py-2 border-b border-gray-100 last:border-0 gap-4"
                                             >
                                               <div className="flex-1 min-w-0">
@@ -637,8 +741,8 @@ export default function AdjustBookingContent({
                                                 </div>
                                                 {/* Table Allocation */}
                                                 {table.allocation &&
-                                                  table.allocation.length >
-                                                    0 && (
+                                                  Object.keys(table.allocation)
+                                                    .length > 0 && (
                                                     <div className="mt-1.5 space-y-1">
                                                       <p className="text-xs text-muted-foreground mb-1">
                                                         Seating Arrangement:
@@ -651,36 +755,40 @@ export default function AdjustBookingContent({
                                                             expandedAllocations[
                                                               key
                                                             ] || false;
+
+                                                          // Convert allocation object to array of entries
+                                                          const allocationEntries =
+                                                            Object.entries(
+                                                              table.allocation
+                                                            );
+
                                                           const visible =
                                                             isExpanded
-                                                              ? table.allocation
-                                                              : table.allocation?.slice(
+                                                              ? allocationEntries
+                                                              : allocationEntries.slice(
                                                                   0,
                                                                   MAX_VISIBLE
-                                                                ) || [];
+                                                                );
+
                                                           const hasMore =
-                                                            (table.allocation
-                                                              ?.length || 0) >
+                                                            allocationEntries.length >
                                                             MAX_VISIBLE;
 
                                                           return (
                                                             <>
                                                               {visible.map(
-                                                                (
+                                                                ([
+                                                                  tableId,
                                                                   people,
-                                                                  tableIdx
-                                                                ) => (
+                                                                ]) => (
                                                                   <div
                                                                     key={
-                                                                      tableIdx
+                                                                      tableId
                                                                     }
                                                                     className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-blue-50 border border-blue-100"
                                                                   >
                                                                     <span className="text-xs font-medium text-blue-700">
-                                                                      Table{" "}
-                                                                      {tableIdx +
-                                                                        1}
-                                                                      :
+                                                                      Table:
                                                                     </span>
                                                                     <span className="text-xs font-semibold text-blue-900">
                                                                       {people}{" "}
@@ -713,10 +821,7 @@ export default function AdjustBookingContent({
                                                                     <>
                                                                       <ChevronDown className="h-3 w-3 mr-1" />
                                                                       Show{" "}
-                                                                      {(table
-                                                                        .allocation
-                                                                        ?.length ||
-                                                                        0) -
+                                                                      {allocationEntries.length -
                                                                         MAX_VISIBLE}{" "}
                                                                       More
                                                                     </>
@@ -740,6 +845,78 @@ export default function AdjustBookingContent({
                                             </div>
                                           ))}
                                         </div>
+
+                                        {/* Menu Choices Actions */}
+                                        {bookingData.is_menu_choice && (
+                                          <div className="mt-3 pt-3 border-t border-gray-100">
+                                            <div className="flex flex-col sm:flex-row gap-2">
+                                              <Button
+                                                onClick={() =>
+                                                  router.push(
+                                                    `/vendor/menu-choices/${bookingId}`
+                                                  )
+                                                }
+                                                size="sm"
+                                                className="flex-1 h-9 gap-2"
+                                                style={{
+                                                  backgroundColor:
+                                                    "var(--color-primary)",
+                                                  color:
+                                                    "var(--color-primary-foreground)",
+                                                }}
+                                              >
+                                                <Eye className="h-4 w-4" />
+                                                View Menu Choices
+                                              </Button>
+                                              <Button
+                                                onClick={() =>
+                                                  handleDownloadMenuChoices(
+                                                    dateInfo.date_key
+                                                  )
+                                                }
+                                                size="sm"
+                                                variant="outline"
+                                                className="flex-1 h-9 gap-2 border-2 hover:bg-gray-50"
+                                                disabled={
+                                                  downloadingMenuChoices[
+                                                    `${bookingId}-${dateInfo.date_key}`
+                                                  ]
+                                                }
+                                              >
+                                                {downloadingMenuChoices[
+                                                  `${bookingId}-${dateInfo.date_key}`
+                                                ] ? (
+                                                  <>
+                                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                                    Downloading...
+                                                  </>
+                                                ) : (
+                                                  <>
+                                                    <FileDown className="h-4 w-4" />
+                                                    Download CSV
+                                                  </>
+                                                )}
+                                              </Button>
+                                            </div>
+                                          </div>
+                                        )}
+
+                                        {/* Reschedule Button */}
+                                        {dateInfo.has_unbooked_event_dates && (
+                                          <div className="mt-3 pt-3 border-t border-gray-100">
+                                            <Button
+                                              onClick={() =>
+                                                handleRescheduleClick(dateInfo)
+                                              }
+                                              size="sm"
+                                              variant="outline"
+                                              className="w-full h-9 gap-2 border-2 border-blue-300 text-blue-700 hover:bg-blue-50 hover:border-blue-400"
+                                            >
+                                              <RotateCcw className="h-4 w-4" />
+                                              Reschedule Date
+                                            </Button>
+                                          </div>
+                                        )}
                                       </div>
                                     )}
 
@@ -753,9 +930,9 @@ export default function AdjustBookingContent({
                                         </span>
                                       </div>
                                       <div className="space-y-2">
-                                        {dateInfo.tickets.map((ticket, idx) => (
+                                        {dateInfo.tickets.map((ticket) => (
                                           <div
-                                            key={idx}
+                                            key={ticket.id}
                                             className="flex items-start justify-between py-2 border-b border-gray-100 last:border-0 gap-4"
                                           >
                                             <div className="flex-1 min-w-0">
@@ -773,9 +950,7 @@ export default function AdjustBookingContent({
                                               </p>
                                             </div>
                                             <p className="text-sm font-semibold text-foreground shrink-0">
-                                              £
-                                              {ticket.price_per_ticket *
-                                                ticket.quantity}
+                                              {formatAmount(ticket.total)}
                                             </p>
                                           </div>
                                         ))}
@@ -819,68 +994,328 @@ export default function AdjustBookingContent({
 
                                   {/* Add-ons Section */}
                                   {hasAddons && (
-                                    <div className="mt-4 pt-4 border-t">
+                                    <div className="mt-3 pt-3 border-t border-gray-200">
                                       <button
                                         type="button"
+                                        id={`addons-trigger-${dateInfo.booking_date_id}`}
                                         onClick={() =>
                                           toggleAddOnsExpansion(
                                             dateInfo.booking_date_id.toString()
                                           )
                                         }
-                                        className="flex items-center justify-between w-full py-2 px-3 border border-primary rounded-md hover:bg-primary/10 transition-colors"
+                                        aria-expanded={
+                                          expandedAddOns[
+                                            dateInfo.booking_date_id.toString()
+                                          ] === true
+                                        }
+                                        aria-controls={`addons-content-${dateInfo.booking_date_id}`}
+                                        className="flex items-center justify-between w-full py-2 px-3 border border-[var(--color-primary)] rounded-md transition-all duration-200 group cursor-pointer hover:text-[var(--color-primary)] hover:bg-[var(--color-primary)]/25 hover:-translate-y-0.5 hover:shadow-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)]/300 focus-visible:ring-offset-1"
                                       >
                                         <div className="flex items-center gap-2">
-                                          <Plus className="h-4 w-4" />
-                                          <span className="text-xs font-semibold">
+                                          <span className="text-xs font-semibold text-foreground">
                                             Add-ons Included
                                           </span>
-                                          <Badge className="text-xs bg-purple-100 text-purple-700">
-                                            £
-                                            {dateInfo.addons.total_amount?.toFixed(
-                                              2
-                                            ) ?? "0.00"}
-                                          </Badge>
+                                          <div className="flex items-center gap-2">
+                                            {(() => {
+                                              const tablesCount =
+                                                dateInfo.addons.tables?.reduce(
+                                                  (sum, table) =>
+                                                    sum +
+                                                    (table.no_tables || 0),
+                                                  0
+                                                ) || 0;
+                                              const ticketsCount =
+                                                dateInfo.addons.tickets?.reduce(
+                                                  (sum, ticket) =>
+                                                    sum + ticket.quantity,
+                                                  0
+                                                ) || 0;
+                                              const drinksCount =
+                                                dateInfo.addons.drinks?.reduce(
+                                                  (sum, drink) =>
+                                                    sum + drink.quantity,
+                                                  0
+                                                ) || 0;
+
+                                              return (
+                                                <>
+                                                  {tablesCount > 0 && (
+                                                    <div className="flex items-center gap-1">
+                                                      <UtensilsCrossed className="h-3.5 w-3.5 text-muted-foreground" />
+                                                      <span className="text-xs text-muted-foreground">
+                                                        {tablesCount}{" "}
+                                                        {tablesCount === 1
+                                                          ? "Table"
+                                                          : "Tables"}
+                                                      </span>
+                                                    </div>
+                                                  )}
+                                                  {ticketsCount > 0 && (
+                                                    <div className="flex items-center gap-1">
+                                                      <Ticket className="h-3.5 w-3.5 text-muted-foreground" />
+                                                      <span className="text-xs text-muted-foreground">
+                                                        {ticketsCount}{" "}
+                                                        {ticketsCount === 1
+                                                          ? "Ticket"
+                                                          : "Tickets"}
+                                                      </span>
+                                                    </div>
+                                                  )}
+                                                  {drinksCount > 0 && (
+                                                    <div className="flex items-center gap-1">
+                                                      <Wine className="h-3.5 w-3.5 text-muted-foreground" />
+                                                      <span className="text-xs text-muted-foreground">
+                                                        {drinksCount}{" "}
+                                                        {drinksCount === 1
+                                                          ? "Drink"
+                                                          : "Drinks"}
+                                                      </span>
+                                                    </div>
+                                                  )}
+                                                </>
+                                              );
+                                            })()}
+                                          </div>
                                         </div>
                                         {expandedAddOns[
                                           dateInfo.booking_date_id.toString()
-                                        ] ? (
-                                          <ChevronUp className="h-4 w-4" />
+                                        ] === true ? (
+                                          <ChevronUp className="h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors" />
                                         ) : (
-                                          <ChevronDown className="h-4 w-4" />
+                                          <ChevronDown className="h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors" />
                                         )}
                                       </button>
 
+                                      {/* Add-ons Content */}
                                       {expandedAddOns[
                                         dateInfo.booking_date_id.toString()
-                                      ] && (
-                                        <div className="mt-2 space-y-3 pl-4">
-                                          {/* Add-on Tables */}
+                                      ] === true && (
+                                        <div
+                                          id={`addons-content-${dateInfo.booking_date_id}`}
+                                          aria-labelledby={`addons-trigger-${dateInfo.booking_date_id}`}
+                                          className="mt-2 space-y-3 transition-opacity duration-200 ease-out"
+                                        >
+                                          {/* Tables Add-ons */}
                                           {dateInfo.addons.tables &&
                                             dateInfo.addons.tables.length >
                                               0 && (
-                                              <div>
-                                                <p className="text-xs font-medium text-muted-foreground mb-2">
-                                                  Additional Tables
-                                                </p>
+                                              <div className="space-y-3">
                                                 {dateInfo.addons.tables.map(
                                                   (table, idx) => (
                                                     <div
                                                       key={idx}
-                                                      className="text-sm py-1"
+                                                      className="flex items-start justify-between py-2 border-b border-gray-100 last:border-0 gap-4"
                                                     >
-                                                      Table of{" "}
-                                                      {table.table_size} ×{" "}
-                                                      {table.no_tables} - £
-                                                      {table.total
-                                                        ? table.total.toFixed(2)
-                                                        : "0.00"}
+                                                      <div className="flex-1 min-w-0">
+                                                        <div className="flex items-center gap-2 mb-1">
+                                                          <span className="text-sm font-medium text-foreground">
+                                                            {`Table of ${table.table_size}`}
+                                                          </span>
+                                                          {table.no_tables &&
+                                                            table.no_tables >
+                                                              0 && (
+                                                              <span className="text-xs text-muted-foreground bg-gray-100 px-2 py-0.5 rounded">
+                                                                {
+                                                                  table.no_tables
+                                                                }{" "}
+                                                                {table.no_tables ===
+                                                                1
+                                                                  ? "Table"
+                                                                  : "Tables"}
+                                                              </span>
+                                                            )}
+                                                        </div>
+                                                        {/* Table Allocation Breakdown */}
+                                                        {table.allocation &&
+                                                          Object.keys(
+                                                            table.allocation
+                                                          ).length > 0 && (
+                                                            <div className="mt-1.5 space-y-1">
+                                                              <p className="text-xs text-muted-foreground mb-1">
+                                                                Seating
+                                                                Arrangement:
+                                                              </p>
+                                                              <div className="flex flex-wrap gap-2">
+                                                                {Object.entries(
+                                                                  table.allocation
+                                                                ).map(
+                                                                  (
+                                                                    [
+                                                                      tableId,
+                                                                      people,
+                                                                    ],
+                                                                    tableIdx
+                                                                  ) => {
+                                                                    // Check if this is an addition to existing table (starts with "+")
+                                                                    const isAddition =
+                                                                      String(
+                                                                        people
+                                                                      ).startsWith(
+                                                                        "+"
+                                                                      );
+                                                                    const displayPeople =
+                                                                      String(
+                                                                        people
+                                                                      );
+
+                                                                    return (
+                                                                      <div
+                                                                        key={
+                                                                          tableId
+                                                                        }
+                                                                        className={`flex items-center gap-1.5 px-2 py-1 rounded-md border ${
+                                                                          isAddition
+                                                                            ? "bg-purple-50 border-purple-200"
+                                                                            : "bg-blue-50 border-blue-100"
+                                                                        }`}
+                                                                      >
+                                                                        <span
+                                                                          className={`text-xs font-medium ${
+                                                                            isAddition
+                                                                              ? "text-purple-700"
+                                                                              : "text-blue-700"
+                                                                          }`}
+                                                                        >
+                                                                          Table{" "}
+                                                                          {tableIdx +
+                                                                            1}
+                                                                          :
+                                                                        </span>
+                                                                        <span
+                                                                          className={`text-xs font-semibold ${
+                                                                            isAddition
+                                                                              ? "text-purple-900"
+                                                                              : "text-blue-900"
+                                                                          }`}
+                                                                        >
+                                                                          {
+                                                                            displayPeople
+                                                                          }{" "}
+                                                                          {String(
+                                                                            people
+                                                                          ).replace(
+                                                                            /[^0-9]/g,
+                                                                            ""
+                                                                          ) ===
+                                                                          "1"
+                                                                            ? "Person"
+                                                                            : "People"}
+                                                                        </span>
+                                                                      </div>
+                                                                    );
+                                                                  }
+                                                                )}
+                                                              </div>
+                                                            </div>
+                                                          )}
+                                                        {/* Price Breakdown */}
+                                                        {table.price_per_person && (
+                                                          <p className="text-xs text-muted-foreground mt-1.5">
+                                                            £
+                                                            {
+                                                              table.price_per_person
+                                                            }{" "}
+                                                            × {table.people}
+                                                          </p>
+                                                        )}
+                                                      </div>
+                                                      <div className="flex items-center gap-3 shrink-0">
+                                                        <p className="text-sm font-semibold text-foreground shrink-0">
+                                                          £
+                                                          {table.total.toFixed(
+                                                            2
+                                                          )}
+                                                        </p>
+                                                        <Button
+                                                          variant="ghost"
+                                                          size="sm"
+                                                          onClick={() =>
+                                                            handleDeleteAddOn(
+                                                              dateInfo.date_key,
+                                                              table.table_size,
+                                                              "table"
+                                                            )
+                                                          }
+                                                          disabled={
+                                                            deleteAddOnsMutation.isPending
+                                                          }
+                                                          className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
+                                                          title="Delete table"
+                                                        >
+                                                          <Trash2 className="h-4 w-4" />
+                                                        </Button>
+                                                      </div>
                                                     </div>
                                                   )
                                                 )}
                                               </div>
                                             )}
 
-                                          {/* Add-on Tickets */}
+                                          {/* Drinks Add-ons */}
+                                          {dateInfo.addons.drinks &&
+                                            dateInfo.addons.drinks.length >
+                                              0 && (
+                                              <div>
+                                                <p className="text-xs font-medium text-muted-foreground mb-2">
+                                                  Drinks Package
+                                                </p>
+                                                <div className="space-y-2">
+                                                  {dateInfo.addons.drinks.map(
+                                                    (drink, idx) => (
+                                                      <div
+                                                        key={idx}
+                                                        className="flex items-start justify-between py-2 border-b border-gray-100 last:border-0 gap-4"
+                                                      >
+                                                        <div className="flex-1 min-w-0">
+                                                          <p className="text-sm font-medium text-foreground">
+                                                            {drink.title}
+                                                          </p>
+                                                          <p className="text-xs text-muted-foreground mt-0.5">
+                                                            £{drink.price} ×{" "}
+                                                            {drink.quantity}
+                                                          </p>
+                                                        </div>
+                                                        <div className="flex items-center gap-3 shrink-0">
+                                                          <p className="text-sm font-semibold text-foreground shrink-0">
+                                                            £
+                                                            {(
+                                                              drink.price *
+                                                              drink.quantity
+                                                            ).toFixed(2)}
+                                                          </p>
+                                                          <Button
+                                                            variant="ghost"
+                                                            size="sm"
+                                                            onClick={() => {
+                                                              if (!drink.id) {
+                                                                toast.error(
+                                                                  "Unable to delete: Drink ID not available. Please refresh the page."
+                                                                );
+                                                                return;
+                                                              }
+                                                              handleDeleteAddOn(
+                                                                dateInfo.date_key,
+                                                                drink.id,
+                                                                "drink"
+                                                              );
+                                                            }}
+                                                            disabled={
+                                                              deleteAddOnsMutation.isPending
+                                                            }
+                                                            className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
+                                                            title="Delete drink"
+                                                          >
+                                                            <Trash2 className="h-4 w-4" />
+                                                          </Button>
+                                                        </div>
+                                                      </div>
+                                                    )
+                                                  )}
+                                                </div>
+                                              </div>
+                                            )}
+
+                                          {/* Tickets Add-ons */}
                                           {dateInfo.addons.tickets &&
                                             dateInfo.addons.tickets.length >
                                               0 && (
@@ -888,42 +1323,69 @@ export default function AdjustBookingContent({
                                                 <p className="text-xs font-medium text-muted-foreground mb-2">
                                                   Additional Tickets
                                                 </p>
-                                                {dateInfo.addons.tickets.map(
-                                                  (ticket, idx) => (
-                                                    <div
-                                                      key={idx}
-                                                      className="text-sm py-1"
-                                                    >
-                                                      {ticket.title} ×{" "}
-                                                      {ticket.quantity}
-                                                    </div>
-                                                  )
-                                                )}
-                                              </div>
-                                            )}
-
-                                          {/* Add-on Drinks */}
-                                          {dateInfo.addons.drinks &&
-                                            dateInfo.addons.drinks.length >
-                                              0 && (
-                                              <div>
-                                                <p className="text-xs font-medium text-muted-foreground mb-2">
-                                                  Additional Drinks
-                                                </p>
-                                                {dateInfo.addons.drinks.map(
-                                                  (drink, idx) => (
-                                                    <div
-                                                      key={idx}
-                                                      className="text-sm py-1"
-                                                    >
-                                                      {drink.title} ×{" "}
-                                                      {drink.quantity} - £
-                                                      {drink.total
-                                                        ? drink.total.toFixed(2)
-                                                        : "0.00"}
-                                                    </div>
-                                                  )
-                                                )}
+                                                <div className="space-y-2">
+                                                  {dateInfo.addons.tickets.map(
+                                                    (ticket, idx) => (
+                                                      <div
+                                                        key={idx}
+                                                        className="flex items-start justify-between py-2 border-b border-gray-100 last:border-0 gap-4"
+                                                      >
+                                                        <div className="flex-1 min-w-0">
+                                                          <p className="text-sm font-medium text-foreground">
+                                                            {ticket.title}
+                                                          </p>
+                                                          {ticket.description && (
+                                                            <p className="text-xs text-muted-foreground mt-0.5">
+                                                              {
+                                                                ticket.description
+                                                              }
+                                                            </p>
+                                                          )}
+                                                          <p className="text-xs text-muted-foreground mt-0.5">
+                                                            £
+                                                            {
+                                                              ticket.price_per_ticket
+                                                            }{" "}
+                                                            × {ticket.quantity}
+                                                          </p>
+                                                        </div>
+                                                        <div className="flex items-center gap-3 shrink-0">
+                                                          <p className="text-sm font-semibold text-foreground shrink-0">
+                                                            £
+                                                            {(
+                                                              ticket.price_per_ticket *
+                                                              ticket.quantity
+                                                            ).toFixed(2)}
+                                                          </p>
+                                                          <Button
+                                                            variant="ghost"
+                                                            size="sm"
+                                                            onClick={() => {
+                                                              if (!ticket.id) {
+                                                                toast.error(
+                                                                  "Unable to delete: Ticket ID not available. Please refresh the page."
+                                                                );
+                                                                return;
+                                                              }
+                                                              handleDeleteAddOn(
+                                                                dateInfo.date_key,
+                                                                ticket.id,
+                                                                "ticket"
+                                                              );
+                                                            }}
+                                                            disabled={
+                                                              deleteAddOnsMutation.isPending
+                                                            }
+                                                            className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
+                                                            title="Delete ticket"
+                                                          >
+                                                            <Trash2 className="h-4 w-4" />
+                                                          </Button>
+                                                        </div>
+                                                      </div>
+                                                    )
+                                                  )}
+                                                </div>
                                               </div>
                                             )}
                                         </div>
@@ -995,129 +1457,60 @@ export default function AdjustBookingContent({
             </CardContent>
           </TabsContent>
 
-          <TabsContent value="payment-info" className="mt-0">
+          <TabsContent value="add-ons" className="mt-0">
             <CardContent className="p-6">
-              <Card className="border-2 bg-gradient-to-br from-blue-50/50 via-white to-indigo-50/30">
-                <CardContent className="p-6">
-                  <div className="space-y-4">
-                    <div className="flex items-center gap-2 mb-4">
-                      <CreditCard className="h-5 w-5 text-primary" />
-                      <h3 className="text-lg font-semibold text-foreground">
-                        Payment Summary
-                      </h3>
-                    </div>
+              <AddOnsTab
+                bookingId={bookingId}
+                onSaveSuccess={() => setActiveTab("booking-info")}
+                dates={bookingData.event_dates.map((date) => {
+                  // Calculate total people from tables and tickets
+                  const tablePeople =
+                    date.tables?.reduce(
+                      (sum, table) => sum + (table.people ?? 0),
+                      0
+                    ) ?? 0;
+                  const ticketPeople =
+                    date.tickets?.reduce(
+                      (sum, ticket) => sum + (ticket.quantity ?? 0),
+                      0
+                    ) ?? 0;
+                  const totalPeople = tablePeople + ticketPeople;
 
-                    <div className="space-y-3">
-                      <div className="flex justify-between items-center py-2">
-                        <span className="text-sm text-muted-foreground">
-                          Package Sub-total
-                        </span>
-                        <span className="text-sm font-semibold text-foreground">
-                          {formatAmount(bookingData.sub_total)}
-                        </span>
-                      </div>
-
-                      {bookingData.addons_amount !== null &&
-                        bookingData.addons_amount > 0 && (
-                          <div className="flex justify-between items-center py-2">
-                            <span className="text-sm text-muted-foreground">
-                              Add-ons Total
-                            </span>
-                            <span className="text-sm font-semibold text-purple-600">
-                              {formatAmount(bookingData.addons_amount)}
-                            </span>
-                          </div>
-                        )}
-
-                      {bookingData.deposit_paid !== null &&
-                        bookingData.deposit_paid > 0 && (
-                          <div className="flex justify-between items-center py-2">
-                            <span className="text-sm text-muted-foreground">
-                              Deposit
-                            </span>
-                            <span className="text-sm font-semibold text-blue-600">
-                              {formatAmount(bookingData.deposit_paid)}
-                            </span>
-                          </div>
-                        )}
-
-                      <div className="flex justify-between items-center py-2">
-                        <span className="text-sm text-muted-foreground">
-                          Paid Amount
-                        </span>
-                        <span className="text-sm font-semibold text-green-600">
-                          {formatAmount(bookingData.paid_amount)}
-                        </span>
-                      </div>
-
-                      {bookingData.pending_payment > 0 && (
-                        <div className="flex justify-between items-center py-2">
-                          <span className="text-sm text-muted-foreground">
-                            Pending Payment
-                          </span>
-                          <span className="text-sm font-semibold text-red-600">
-                            {formatAmount(bookingData.pending_payment)}
-                          </span>
-                        </div>
-                      )}
-
-                      <Separator className="my-3" />
-
-                      <div className="flex justify-between items-center py-3 px-4 rounded-lg bg-white border-2 border-dashed border-primary">
-                        <span className="text-base font-semibold text-foreground">
-                          Total Amount
-                        </span>
-                        <span className="text-xl font-bold text-primary">
-                          {formatAmount(bookingData.total)}
-                        </span>
-                      </div>
-
-                      <div className="flex items-center justify-between pt-2">
-                        <span className="text-sm text-muted-foreground">
-                          Payment Status
-                        </span>
-                        {getPaymentStatusBadge(bookingData.payment_status)}
-                      </div>
-                    </div>
-
-                    {/* Quick Stats */}
-                    <Separator className="my-4" />
-                    <div className="grid grid-cols-3 gap-4 pt-2">
-                      <div className="text-center p-3 bg-white rounded-lg border">
-                        <UtensilsCrossed className="h-5 w-5 mx-auto mb-1 text-primary" />
-                        <p className="text-xs text-muted-foreground mb-1">
-                          Tables
-                        </p>
-                        <p className="text-lg font-bold text-foreground">
-                          {totalTables}
-                        </p>
-                      </div>
-                      <div className="text-center p-3 bg-white rounded-lg border">
-                        <Ticket className="h-5 w-5 mx-auto mb-1 text-primary" />
-                        <p className="text-xs text-muted-foreground mb-1">
-                          Tickets
-                        </p>
-                        <p className="text-lg font-bold text-foreground">
-                          {totalTickets}
-                        </p>
-                      </div>
-                      <div className="text-center p-3 bg-white rounded-lg border">
-                        <User className="h-5 w-5 mx-auto mb-1 text-primary" />
-                        <p className="text-xs text-muted-foreground mb-1">
-                          People
-                        </p>
-                        <p className="text-lg font-bold text-foreground">
-                          {totalPeople}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
+                  return {
+                    id: date.date_key, // Use date_key as id for API calls
+                    date: date.date,
+                    people: totalPeople,
+                  };
+                })}
+              />
             </CardContent>
           </TabsContent>
         </Card>
       </Tabs>
+
+      {/* Vendor Reschedule Date Modal */}
+      {selectedDateForReschedule && (
+        <VendorRescheduleDateModal
+          isOpen={rescheduleModalOpen}
+          onClose={() => {
+            setRescheduleModalOpen(false);
+            setSelectedDateForReschedule(null);
+          }}
+          currentDate={{
+            date: selectedDateForReschedule.date,
+            people: selectedDateForReschedule.people,
+            tables: selectedDateForReschedule.tables,
+            tickets: selectedDateForReschedule.tickets,
+            drinks: selectedDateForReschedule.drinks,
+            price: selectedDateForReschedule.price,
+          }}
+          bookingId={parseInt(bookingId)}
+          bookingDateId={selectedDateForReschedule.booking_date_id}
+          hasAddons={selectedDateForReschedule.hasAddons}
+          isProcessing={rescheduleMutation.isPending}
+          onConfirm={handleRescheduleConfirm}
+        />
+      )}
     </section>
   );
 }

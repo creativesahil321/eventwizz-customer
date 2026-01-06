@@ -109,8 +109,8 @@ export function TiptapEditor({
     editorProps: {
       attributes: {
         class: cn(
-          "min-h-[120px] w-full rounded-none bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50",
-          wrapText && "whitespace-normal break-words",
+          "min-h-[120px] w-full rounded-none bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50 overflow-x-hidden max-w-full",
+          wrapText && "whitespace-normal break-all",
           className
         ),
       },
@@ -300,7 +300,10 @@ export function TiptapEditor({
             </Button>
           )}
         </div>
-        <EditorContent editor={editor} className="px-3 py-2" />
+        <EditorContent
+          editor={editor}
+          className="px-3 py-2 overflow-x-hidden max-w-full"
+        />
       </div>
       <div className="text-xs text-muted-foreground mt-2 flex justify-between">
         <span className={characterCount > maxLength ? "text-destructive" : ""}>

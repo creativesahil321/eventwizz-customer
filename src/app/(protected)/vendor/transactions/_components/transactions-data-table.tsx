@@ -25,6 +25,7 @@ import { getTransactionColumns } from "./columns";
 import { useVendorTransactions } from "../_lib/queries";
 import { toast } from "sonner";
 import { DataTablePagination } from "@/components/data-table/data-table-pagination";
+import { TransactionsTableSkeleton } from "./skeleton-loader";
 
 type TransactionsDataTableProps = {
   search: SearchParams;
@@ -99,16 +100,7 @@ export function TransactionsDataTable({
   }, [rowAction]);
 
   if (isLoading) {
-    return (
-      <div className="bg-white rounded-lg border border-[var(--color-border)] shadow-sm p-8">
-        <div className="flex items-center justify-center min-h-[400px]">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-          <span className="ml-3 text-muted-foreground">
-            Loading transactions...
-          </span>
-        </div>
-      </div>
-    );
+    return <TransactionsTableSkeleton className="animate-pulse" />;
   }
 
   if (isError) {

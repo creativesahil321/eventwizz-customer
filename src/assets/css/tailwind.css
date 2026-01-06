@@ -265,6 +265,15 @@
 /* Tiptap Editor Styles */
 .ProseMirror {
   @apply min-h-[120px] w-full outline-none;
+  word-break: break-word;
+  overflow-wrap: break-word;
+  overflow-x: hidden;
+  max-width: 100%;
+}
+
+.ProseMirror * {
+  word-break: break-word;
+  overflow-wrap: break-word;
 }
 
 .ProseMirror p.is-editor-empty:first-child::before {

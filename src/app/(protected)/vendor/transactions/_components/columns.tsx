@@ -27,6 +27,10 @@ const PAYMENT_STATUS_COLORS: Record<string, { bg: string; text: string }> = {
     bg: "#ef4444", // red
     text: "#ffffff",
   },
+  Failed: {
+    bg: "#ef4444", // red
+    text: "#ffffff",
+  },
   refunded: {
     bg: "#6b7280", // gray
     text: "#ffffff",
@@ -94,10 +98,10 @@ export function getTransactionColumns({
       enableSorting: true,
       enableHiding: false,
       sortingFn: (rowA, rowB) => {
-        // Parse date format: "12-18-2025 05:55PM"
+        // Parse date format: "DD-MM-YYYY HH:MMAM/PM" (e.g., "23-12-2025 11:58AM")
         const parseDate = (dateStr: string) => {
           const [datePart] = dateStr.split(" ");
-          const [month, day, year] = datePart.split("-");
+          const [day, month, year] = datePart.split("-");
           return new Date(`${year}-${month}-${day}`).getTime();
         };
         const dateA = parseDate(rowA.getValue("booking_date") as string);
@@ -126,9 +130,9 @@ export function getTransactionColumns({
       enableSorting: true,
       enableHiding: false,
       sortingFn: (rowA, rowB) => {
-        // Parse date format: "02-14-2026"
+        // Parse date format: "DD-MM-YYYY" (e.g., "24-07-2026")
         const parseDate = (dateStr: string) => {
-          const [month, day, year] = dateStr.split("-");
+          const [day, month, year] = dateStr.split("-");
           return new Date(`${year}-${month}-${day}`).getTime();
         };
         const dateA = parseDate(rowA.getValue("event_date") as string);
@@ -202,10 +206,13 @@ export function getTransactionColumns({
         const status = row.getValue("status") as string;
         if (!status) return null;
 
-        const colorConfig = PAYMENT_STATUS_COLORS[status] || {
-          bg: "#6b7280",
-          text: "#ffffff",
-        };
+        // Normalize status to lowercase for lookup, but keep original for display
+        const statusKey = status.toLowerCase();
+        const colorConfig = PAYMENT_STATUS_COLORS[status] ||
+          PAYMENT_STATUS_COLORS[statusKey] || {
+            bg: "#6b7280",
+            text: "#ffffff",
+          };
 
         return (
           <div
@@ -243,6 +250,11 @@ export function getTransactionColumns({
       },
       enableSorting: true,
       enableHiding: false,
+      sortingFn: (rowA, rowB) => {
+        const amountA = parseFloat(rowA.getValue("amount") as string);
+        const amountB = parseFloat(rowB.getValue("amount") as string);
+        return amountA - amountB;
+      },
     },
     {
       accessorKey: "platform_fee",
@@ -267,6 +279,11 @@ export function getTransactionColumns({
       },
       enableSorting: true,
       enableHiding: false,
+      sortingFn: (rowA, rowB) => {
+        const feeA = parseFloat(rowA.getValue("platform_fee") as string);
+        const feeB = parseFloat(rowB.getValue("platform_fee") as string);
+        return feeA - feeB;
+      },
     },
     {
       id: "receipt",

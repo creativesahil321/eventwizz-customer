@@ -52,6 +52,8 @@ export const API_ENDPOINTS = {
       GET_MENU_CATEGORIES: "/vendor/event-menus",
       CREATE_MENU_CATEGORY: "/vendor/event-menus/store",
       BULK_UPDATE_STATUS: "/vendor/events/bulk-update-status",
+      GET_EVENT_OVERVIEW:
+        "/vendor/events/{eventId}/overview?date_status={date_status}&date_filter={date_filter}",
     },
 
     EMAIL_TEMPLATES: {
@@ -102,13 +104,10 @@ export const API_ENDPOINTS = {
       MARK_AS_READ: "/vendor/notifications/mark-as-read/{id}",
       STATS: "/vendor/notifications/stats",
     },
+
     MENU_CHOICES: {
-      GET_ALL: "/vendor/menu-choices",
-      SHOW: "/vendor/menu-choices/find/{id}",
-      CREATE: "/vendor/menu-choices/store",
-      UPDATE: "/vendor/menu-choices/update/{id}?_method=patch",
-      DELETE: "/vendor/menu-choices/delete/{id}?_method=delete",
-      UPDATE_STATUS: "/vendor/menu-choices/status/{id}?_method=patch",
+      ADD_MENU: "/vendor/bookings/menu-items/{id}/{date}/{table_id}",
+      SAVE_MENU_CHOICES: "/vendor/bookings/menu-items/store",
     },
     CUSTOMERS: {
       GET_ALL: "/vendor/customers",
@@ -128,10 +127,33 @@ export const API_ENDPOINTS = {
       CREATE: "/vendor/bookings/store",
       UPDATE: "/vendor/bookings/update/{id}",
       DELETE: "/vendor/bookings/delete/{id}",
+      ADD_ONS: {
+        GET_ALL: "/vendor/bookings/add-ons/{id}/{date}",
+        SAVE: "/vendor/bookings/add-ons/store",
+        DELETE_ADD_ONS:
+          "/vendor/bookings/delete-add-ons/{id}/{date}/{keyword}/{type}", // TABLES case = keyword will be tables size and type will be tables , DRINKS case = keyword will be id and type will be drinks , TICKETS case = keyword will be id and type will be tickets
+      },
+      MENU_CHOICES: {
+        GET_ALL: "/vendor/bookings/menu-items/{id}",
+        ADD_MENU: "/vendor/bookings/menu-items/{id}/{table_id}",
+        SAVE_MENU_CHOICES: "/vendor/bookings/menu-items/store",
+        EXPORT_MENU_CHOICES:
+          "/vendor/bookings/exports/menu-choices/{id}/{date}",
+      },
+      RESCHEDULE_BOOKING: {
+        GET_DATA: "/vendor/bookings/reschedule/{booking_id}/{date_id}",
+        WITH_DATE:
+          "/vendor/bookings/reschedule/{booking_id}/{date_id}/{new_date_id}",
+        SAVE: "/vendor/bookings/reschedule/store",
+      },
+    },
+    TRANSACTIONS: {
+      GET_ALL:
+        "/vendor/transactions?page={page}&per_page={per_page}&search={search}&status={status}&booking_date={booking_date}",
     },
   },
 
-  // Customer Endpoints
+  // Customer EndpointsD
   CUSTOMER: {
     DASHBOARD: {
       PAGINATE: "",

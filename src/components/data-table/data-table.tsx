@@ -57,6 +57,9 @@ export function DataTable<TData>({
                   <TableHead
                     key={header.id}
                     colSpan={header.colSpan}
+                    className={cn(
+                      header.column.columnDef.meta?.className
+                    )}
                     style={{
                       ...getCommonPinningStyles({ column: header.column }),
                     }}
@@ -83,7 +86,10 @@ export function DataTable<TData>({
                     {row.getVisibleCells().map((cell) => (
                       <TableCell
                         key={cell.id}
-                        className="py-4 px-4"
+                        className={cn(
+                          "py-4 px-4",
+                          cell.column.columnDef.meta?.className
+                        )}
                         style={{
                           ...getCommonPinningStyles({ column: cell.column }),
                         }}

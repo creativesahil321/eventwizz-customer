@@ -337,7 +337,7 @@ export default function PackageTab() {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel className="text-sm font-medium">
-                      Event Main Heading <span className="text-red-500">*</span>
+                      Event Package Heading <span className="text-red-500">*</span>
                     </FormLabel>
                     <FormControl>
                       <Input
@@ -374,19 +374,15 @@ export default function PackageTab() {
                     </FormLabel>
                     <FormControl>
                       <TiptapEditor
-                        value={field.value}
+                        value={field.value || ""}
                         onChange={(value) => {
                           field.onChange(value);
-                          globalForm.setValue(
-                            "stepTwo.package_description",
-                            value
-                          );
                         }}
                         placeholder="e.g., Prices From £65 Plus VAT Include:"
                         className="bg-gray-100 p-2 rounded-md"
                         maxLength={160}
                         maxWords={50}
-                        showAIButton={true}
+                        showAIButton={false}
                         wrapText={true}
                       />
                     </FormControl>

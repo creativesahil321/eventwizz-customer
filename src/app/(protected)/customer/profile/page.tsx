@@ -36,9 +36,6 @@ export default function ProfilePage() {
       firstName: "",
       lastName: "",
       phone: "",
-      address: "",
-      city: "",
-      postcode: "",
       avatar: undefined,
     },
   });
@@ -70,9 +67,6 @@ export default function ProfilePage() {
         firstName: profileData.first_name || "",
         lastName: profileData.last_name || "",
         phone: profileData.phone || "",
-        address: profileData.address || "",
-        city: profileData.city || "",
-        postcode: profileData.post_code || "",
       });
 
       // Set username in password form from profile data _key
@@ -305,45 +299,6 @@ export default function ProfilePage() {
                       {profileForm.formState.errors.phone.message}
                     </p>
                   )}
-                </div>
-
-                <div>
-                  <FormLabel
-                    htmlFor="address"
-                    className="block mb-2 text-black"
-                  >
-                    Address
-                  </FormLabel>
-                  <Input
-                    id="address"
-                    {...profileForm.register("address")}
-                    className="bg-gray-50 h-11 w-full"
-                  />
-                </div>
-
-                <div>
-                  <FormLabel htmlFor="city" className="block mb-2 text-black">
-                    City
-                  </FormLabel>
-                  <Input
-                    id="city"
-                    {...profileForm.register("city")}
-                    className="bg-gray-50 h-11 w-full"
-                  />
-                </div>
-
-                <div>
-                  <FormLabel
-                    htmlFor="postcode"
-                    className="block mb-2 text-black"
-                  >
-                    Postcode
-                  </FormLabel>
-                  <Input
-                    id="postcode"
-                    {...profileForm.register("postcode")}
-                    className="bg-gray-50 h-11 w-full"
-                  />
                 </div>
               </div>
 

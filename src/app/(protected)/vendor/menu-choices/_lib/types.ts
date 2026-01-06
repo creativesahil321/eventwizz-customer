@@ -1,41 +1,57 @@
-import { QueryOptions } from "@tanstack/react-query";
-import { Row } from "@tanstack/react-table";
+/**
+ * Menu Choices Types
+ * Types for booking menu selection system with multi-date and multi-table support
+ */
 
-export type AdminMenuChoicesParams = {
-  search?: string;
-  page?: number | string;
-  per_page?: number | string;
-  event_type?: string;
-  menu?: string;
-  status?: string;
-};
+export interface MenuBookingDate {
+  date_key: string;
+  date: string;
+  tables: TableInfo[];
+  tickets: number;
+  drinks: number;
+  status: string;
+}
 
-export type UseMenuChoicesQueryParams = AdminMenuChoicesParams & {
-  options?: QueryOptions<unknown, unknown>;
-};
+export interface TableInfo {
+  table_id: string;
+  table_name: string;
+  seats: number;
+  guests: number;
+}
 
-export type MenuChoice = {
-  id?: string | number;
+export interface MenuBooking {
+  booking_id: number;
+  booking_number?: string;
   event_name: string;
-  menu_name: string;
-  category: string | number;
-  event_type?: string;
-  status: string | number;
-  created_at: string | Date;
-};
-export type SearchParams = {
-  page?: string;
-  per_page?: string;
-  sort?: string;
-  menu_name?: string;
-  status?: string;
-  from?: string;
-  to?: string;
-  filters?: string;
-  [key: string]: string | string[] | undefined;
-};
+  event_image: string;
+  dates: MenuBookingDate[];
+  total_guests: number;
+}
 
-export interface DataTableRowAction<TData> {
-  row: Row<TData>;
-  type: "update" | "delete";
+export interface AttendeeMenuSelection {
+  id: string;
+  booking_id: number;
+  date_key: string;
+  table_id: string;
+  title: string;
+  fullName: string;
+  // Dynamic menu selections: key is category title, value is item ID
+  menuSelections: Record<string, string>;
+  // Legacy fields for backward compatibility (will be populated from menuSelections)
+  starter: string;
+  mainCourse: string;
+  dessert: string;
+  sides?: string;
+  allergens?: string[];
+  dietaryRequirements?: string[];
+  additionalNotes?: string;
+  status: "completed" | "pending";
+}
+
+export interface MenuSelectionState {
+  [bookingId: number]: {
+    [dateKey: string]: {
+      [tableId: string]: AttendeeMenuSelection[];
+    };
+  };
 }

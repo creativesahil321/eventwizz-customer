@@ -32,22 +32,24 @@ export function LocationSelector() {
       <DropdownMenuTrigger asChild>
         <Button
           variant="outline"
-          className="flex items-center gap-2 border-[var(--color-secondary,#009ead)] text-black"
+          className="flex items-center gap-2 border-[var(--color-secondary,#009ead)] text-black max-w-[200px]"
           disabled={isPending}
         >
-          <MapPin className="h-4 w-4 text-black" />
-          <div className="flex flex-col items-start">
-            <span className="text-sm font-medium">{selectedLocation.name}</span>
+          <MapPin className="h-4 w-4 text-black flex-shrink-0" />
+          <div className="flex flex-col items-start min-w-0 flex-1">
+            <span className="text-sm font-medium truncate w-full">
+              {selectedLocation.name}
+            </span>
             {selectedLocation.city && (
-              <span className="text-xs text-muted-foreground leading-tight">
+              <span className="text-xs text-muted-foreground leading-tight truncate w-full">
                 {selectedLocation.city}
               </span>
             )}
           </div>
-          <ChevronDown className="h-4 w-4 ml-1" />
+          <ChevronDown className="h-4 w-4 ml-1 flex-shrink-0" />
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-[220px]">
+      <DropdownMenuContent align="end" className="w-[220px] max-w-[220px]">
         <div className="py-2 px-3 border-b">
           <span className="text-xs text-muted-foreground">Select location</span>
         </div>
@@ -61,23 +63,23 @@ export function LocationSelector() {
             )}
             disabled={isPending || selectedLocation.id === location.id}
           >
-            <div className="flex items-center justify-between w-full">
-              <div className="flex flex-col">
-                <div className="flex items-center gap-2">
-                  <MapPin className="h-3 w-3 text-[var(--color-secondary,#009ead)]" />
-                  <span className="font-medium">
+            <div className="flex items-center justify-between w-full gap-2 min-w-0">
+              <div className="flex flex-col min-w-0 flex-1">
+                <div className="flex items-center gap-2 min-w-0">
+                  <MapPin className="h-3 w-3 text-[var(--color-secondary,#009ead)] flex-shrink-0" />
+                  <span className="font-medium truncate">
                     {location.city && location.city}
                   </span>
                 </div>
 
                 {location.is_default && (
-                  <span className="text-xs text-[var(--color-secondary,#009ead)] pl-5">
+                  <span className="text-xs text-[var(--color-secondary,#009ead)] pl-5 truncate">
                     (Default)
                   </span>
                 )}
               </div>
               {selectedLocation.id === location.id && (
-                <Check className="h-4 w-4 text-[var(--color-secondary,#009ead)]" />
+                <Check className="h-4 w-4 text-[var(--color-secondary,#009ead)] flex-shrink-0" />
               )}
             </div>
           </DropdownMenuItem>

@@ -992,151 +992,161 @@ export default function AddOnsTab({
         onDateChange={setSelectedDate}
       />
 
-      {/* Tables & Seating Section */}
-      <Accordion type="single" collapsible className="w-full">
-        <AccordionItem value="tables" className="border rounded-lg px-4">
-          <AccordionTrigger className="hover:no-underline">
-            <div className="flex items-center gap-3 flex-1">
-              <div
-                className="p-2 rounded-lg"
-                style={{
-                  backgroundColor: "var(--color-primary-light, #f0f0f0)",
-                }}
-              >
-                <UtensilsCrossed
-                  className="h-5 w-5"
-                  style={{ color: "var(--color-primary)" }}
-                />
-              </div>
-              <div className="text-left flex-1">
-                <h3 className="font-semibold">Tables & Seating</h3>
-                <p className="text-sm text-muted-foreground">
-                  Add more people or tables to your booking
-                </p>
-              </div>
-            </div>
-          </AccordionTrigger>
-          <AccordionContent>
-            <div className="space-y-4 pt-4">
-              {/* People Count Selector */}
-              <PeopleCountSelector
-                count={additionalPeopleCount}
-                inputValue={inputValue}
-                onCountChange={handlePeopleCountChange}
-                onInputChange={handleInputChange}
-                onInputBlur={handleInputBlur}
-                onInputKeyDown={handleInputKeyDown}
-              />
-
-              {/* Guest Allocation Card - Show when multiple new tables selected */}
-              {needsAllocation && (
+      {/* Tables & Seating Section - Only show if tables are available or existing */}
+      {(availableTableSizes.length > 0 || existingTables.length > 0) && (
+        <Accordion type="single" collapsible className="w-full">
+          <AccordionItem value="tables" className="border rounded-lg px-4">
+            <AccordionTrigger className="hover:no-underline">
+              <div className="flex items-center gap-3 flex-1">
                 <div
-                  className={`border rounded-lg p-3 ${
-                    allocationValid
-                      ? "bg-green-50 border-green-200"
-                      : "bg-amber-50 border-amber-200"
-                  }`}
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <Settings
-                        className={`h-4 w-4 ${
-                          allocationValid ? "text-green-600" : "text-amber-600"
-                        }`}
-                      />
-                      <div>
-                        <h4
-                          className={`text-sm font-medium ${
-                            allocationValid
-                              ? "text-green-900"
-                              : "text-amber-900"
-                          }`}
-                        >
-                          {allocationValid
-                            ? "New Tables Allocated ✓"
-                            : "New Tables Need Allocation"}
-                        </h4>
-                        <p
-                          className={`text-xs ${
-                            allocationValid
-                              ? "text-green-700"
-                              : "text-amber-700"
-                          }`}
-                        >
-                          {allocationValid
-                            ? `${peopleForNewTables} guests distributed across new tables`
-                            : `Click to distribute ${peopleForNewTables} guests across new tables`}
-                        </p>
-                      </div>
-                    </div>
-                    <Button
-                      onClick={() => setShowAllocationModal(true)}
-                      size="sm"
-                      variant="outline"
-                      className={
-                        allocationValid
-                          ? "text-green-700 border-green-300 hover:bg-green-100"
-                          : "text-amber-700 border-amber-300 hover:bg-amber-100"
-                      }
-                    >
-                      <Settings className="h-3 w-3 mr-1" />
-                      {allocationValid ? "Adjust" : "Allocate Now"}
-                    </Button>
-                  </div>
-                </div>
-              )}
-
-              {/* Existing Tables Section */}
-              {additionalPeopleCount > 0 && existingTables.length > 0 && (
-                <ExistingTablesSection
-                  tables={existingTables}
-                  additionalPeopleCount={additionalPeopleCount}
-                  totalAvailableSeats={totalAvailableSeats}
-                  tablePeopleAdditions={tablePeopleAdditions}
-                  onAddPeopleToTable={handleAddPeopleToTable}
-                  getAvailableSeats={getAvailableSeats}
-                  onManageSeating={(tableId) => {
-                    // Find the table and open modal for it
-                    const table = existingTables.find((t) => t.id === tableId);
-                    if (table && table.table_count > 1) {
-                      setSelectedExistingTableId(tableId);
-                      setShowExistingAllocationModal(true);
-                    }
+                  className="p-2 rounded-lg"
+                  style={{
+                    backgroundColor: "var(--color-primary-light, #f0f0f0)",
                   }}
-                  totalPeopleInExisting={totalPeopleInExisting}
+                >
+                  <UtensilsCrossed
+                    className="h-5 w-5"
+                    style={{ color: "var(--color-primary)" }}
+                  />
+                </div>
+                <div className="text-left flex-1">
+                  <h3 className="font-semibold">Tables & Seating</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Add more people or tables to your booking
+                  </p>
+                </div>
+              </div>
+            </AccordionTrigger>
+            <AccordionContent>
+              <div className="space-y-4 pt-4">
+                {/* People Count Selector */}
+                <PeopleCountSelector
+                  count={additionalPeopleCount}
+                  inputValue={inputValue}
+                  onCountChange={handlePeopleCountChange}
+                  onInputChange={handleInputChange}
+                  onInputBlur={handleInputBlur}
+                  onInputKeyDown={handleInputKeyDown}
                 />
-              )}
 
-              {/* New Tables Section */}
-              {additionalPeopleCount > 0 && shouldShowNewTables && (
-                <NewTablesSection
-                  peopleForNewTables={peopleForNewTables}
-                  availableTableSizes={availableTableSizes}
-                  newTables={newTables}
-                  totalAvailableSeats={totalAvailableSeats}
-                  allocationValid={allocationValid}
-                  onAddNewTable={handleAddNewTable}
-                  setNewTables={setNewTables}
-                />
-              )}
-            </div>
-          </AccordionContent>
-        </AccordionItem>
-      </Accordion>
+                {/* Guest Allocation Card - Show when multiple new tables selected */}
+                {needsAllocation && (
+                  <div
+                    className={`border rounded-lg p-3 ${
+                      allocationValid
+                        ? "bg-green-50 border-green-200"
+                        : "bg-amber-50 border-amber-200"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Settings
+                          className={`h-4 w-4 ${
+                            allocationValid
+                              ? "text-green-600"
+                              : "text-amber-600"
+                          }`}
+                        />
+                        <div>
+                          <h4
+                            className={`text-sm font-medium ${
+                              allocationValid
+                                ? "text-green-900"
+                                : "text-amber-900"
+                            }`}
+                          >
+                            {allocationValid
+                              ? "New Tables Allocated ✓"
+                              : "New Tables Need Allocation"}
+                          </h4>
+                          <p
+                            className={`text-xs ${
+                              allocationValid
+                                ? "text-green-700"
+                                : "text-amber-700"
+                            }`}
+                          >
+                            {allocationValid
+                              ? `${peopleForNewTables} guests distributed across new tables`
+                              : `Click to distribute ${peopleForNewTables} guests across new tables`}
+                          </p>
+                        </div>
+                      </div>
+                      <Button
+                        onClick={() => setShowAllocationModal(true)}
+                        size="sm"
+                        variant="outline"
+                        className={
+                          allocationValid
+                            ? "text-green-700 border-green-300 hover:bg-green-100"
+                            : "text-amber-700 border-amber-300 hover:bg-amber-100"
+                        }
+                      >
+                        <Settings className="h-3 w-3 mr-1" />
+                        {allocationValid ? "Adjust" : "Allocate Now"}
+                      </Button>
+                    </div>
+                  </div>
+                )}
 
-      {/* Drinks Section */}
-      <DrinksSection
-        drinks={drinks}
-        onQuantityChange={handleDrinkQuantityChange}
-        onRemove={handleDrinkRemove}
-      />
+                {/* Existing Tables Section */}
+                {additionalPeopleCount > 0 && existingTables.length > 0 && (
+                  <ExistingTablesSection
+                    tables={existingTables}
+                    additionalPeopleCount={additionalPeopleCount}
+                    totalAvailableSeats={totalAvailableSeats}
+                    tablePeopleAdditions={tablePeopleAdditions}
+                    onAddPeopleToTable={handleAddPeopleToTable}
+                    getAvailableSeats={getAvailableSeats}
+                    onManageSeating={(tableId) => {
+                      // Find the table and open modal for it
+                      const table = existingTables.find(
+                        (t) => t.id === tableId
+                      );
+                      if (table && table.table_count > 1) {
+                        setSelectedExistingTableId(tableId);
+                        setShowExistingAllocationModal(true);
+                      }
+                    }}
+                    totalPeopleInExisting={totalPeopleInExisting}
+                  />
+                )}
 
-      {/* Tickets Section */}
-      <TicketsSection
-        tickets={tickets}
-        onQuantityChange={handleTicketQuantityChange}
-        onRemove={handleTicketRemove}
-      />
+                {/* New Tables Section */}
+                {additionalPeopleCount > 0 && shouldShowNewTables && (
+                  <NewTablesSection
+                    peopleForNewTables={peopleForNewTables}
+                    availableTableSizes={availableTableSizes}
+                    newTables={newTables}
+                    totalAvailableSeats={totalAvailableSeats}
+                    allocationValid={allocationValid}
+                    onAddNewTable={handleAddNewTable}
+                    setNewTables={setNewTables}
+                  />
+                )}
+              </div>
+            </AccordionContent>
+          </AccordionItem>
+        </Accordion>
+      )}
+
+      {/* Drinks Section - Only show if drinks are available */}
+      {drinks.length > 0 && (
+        <DrinksSection
+          drinks={drinks}
+          onQuantityChange={handleDrinkQuantityChange}
+          onRemove={handleDrinkRemove}
+        />
+      )}
+
+      {/* Tickets Section - Only show if tickets are available */}
+      {tickets.length > 0 && (
+        <TicketsSection
+          tickets={tickets}
+          onQuantityChange={handleTicketQuantityChange}
+          onRemove={handleTicketRemove}
+        />
+      )}
 
       {/* Save Button */}
       <div className="flex flex-col items-end pt-4 border-t gap-2">

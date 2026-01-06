@@ -78,6 +78,12 @@ const transformBookingItem = (
     discount: 0,
     total_amount: parseFloat(item.amount) || 0,
     payment_status: item.status, // Use status as payment_status for now
+    deposit_amount: item.deposit_amount
+      ? parseFloat(item.deposit_amount)
+      : undefined,
+    pending_amount: item.pending_amount
+      ? parseFloat(item.pending_amount)
+      : undefined,
   };
 };
 
@@ -88,6 +94,11 @@ export interface BookingHistoryResponse {
   status: boolean;
   message: string;
   data: History[];
+  summary?: {
+    total_amount: string;
+    deposit_amount: string;
+    pending_amount: string;
+  };
   links: VendorBookingHistoryResponse["links"];
   meta: VendorBookingHistoryResponse["meta"];
   errors: string[];
@@ -138,6 +149,7 @@ export const useHistory = (
         status: response.status,
         message: response.message,
         data: transformedData,
+        summary: response.summary,
         links: response.links,
         meta: response.meta,
         errors: [],

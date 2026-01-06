@@ -1,13 +1,7 @@
 "use client";
 
 import type { Column } from "@tanstack/react-table";
-import {
-  ChevronDown,
-  ChevronUp,
-  ChevronsUpDown,
-  EyeOff,
-  X,
-} from "lucide-react";
+import { ChevronDown, ChevronUp, ChevronsUpDown, X } from "lucide-react";
 
 import {
   DropdownMenu,
@@ -30,7 +24,7 @@ export function DataTableColumnHeader<TData, TValue>({
   className,
   ...props
 }: DataTableColumnHeaderProps<TData, TValue>) {
-  if (!column.getCanSort() && !column.getCanHide()) {
+  if (!column.getCanSort()) {
     return <div className={cn(className)}>{title}</div>;
   }
 
@@ -82,16 +76,6 @@ export function DataTableColumnHeader<TData, TValue>({
               </DropdownMenuItem>
             )}
           </>
-        )}
-        {column.getCanHide() && (
-          <DropdownMenuCheckboxItem
-            className="relative pr-8 pl-2 [&>span:first-child]:right-2 [&>span:first-child]:left-auto [&_svg]:text-muted-foreground"
-            checked={!column.getIsVisible()}
-            onClick={() => column.toggleVisibility(false)}
-          >
-            <EyeOff />
-            Hide
-          </DropdownMenuCheckboxItem>
         )}
       </DropdownMenuContent>
     </DropdownMenu>
