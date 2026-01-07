@@ -6,6 +6,47 @@ import React from "react";
 import { Transaction, TransactionStatus } from "../_lib/types";
 import { formatDistanceToNow } from "date-fns";
 
+/**
+ * Normalize currency code - converts currency symbols to ISO 4217 codes
+ */
+const normalizeCurrencyCode = (currency: string | undefined | null): string => {
+  if (!currency) return "GBP";
+
+  const currencyUpper = currency.trim().toUpperCase();
+
+  // Map currency symbols to ISO codes
+  const currencyMap: Record<string, string> = {
+    "£": "GBP",
+    $: "USD",
+    "€": "EUR",
+    "¥": "JPY",
+    "₹": "INR",
+    A$: "AUD",
+    C$: "CAD",
+    CHF: "CHF",
+    GBP: "GBP",
+    USD: "USD",
+    EUR: "EUR",
+    JPY: "JPY",
+    INR: "INR",
+    AUD: "AUD",
+    CAD: "CAD",
+  };
+
+  // Check if it's a known symbol or code
+  if (currencyMap[currencyUpper]) {
+    return currencyMap[currencyUpper];
+  }
+
+  // If it's already a valid ISO code (3 letters), return it
+  if (/^[A-Z]{3}$/.test(currencyUpper)) {
+    return currencyUpper;
+  }
+
+  // Default to GBP if unknown
+  return "GBP";
+};
+
 // Color configurations for transaction status
 const TRANSACTION_STATUS_COLORS: Record<
   TransactionStatus,
@@ -98,13 +139,25 @@ export function getTransactionColumns({
       cell: ({ row }) => {
         const transaction = row.original;
         const amount = parseFloat(transaction.amount);
-        const formatted = new Intl.NumberFormat("en-GB", {
-          style: "currency",
-          currency: transaction.currency || "GBP",
-        }).format(amount);
-        return (
-          <span className="font-bold text-sm text-primary">{formatted}</span>
-        );
+        const currencyCode = normalizeCurrencyCode(transaction.currency);
+
+        try {
+          const formatted = new Intl.NumberFormat("en-GB", {
+            style: "currency",
+            currency: currencyCode,
+          }).format(amount);
+          return (
+            <span className="font-bold text-sm text-primary">{formatted}</span>
+          );
+        } catch (error) {
+          console.error("Error formatting currency:", error);
+          return (
+            <span className="font-bold text-sm text-primary">
+              {transaction.currency || "£"}
+              {amount.toFixed(2)}
+            </span>
+          );
+        }
       },
       enableSorting: true,
       enableHiding: false,

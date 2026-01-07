@@ -61,34 +61,40 @@ export default function FooterSection() {
   ];
 
   // Prepare contact sections
+  const contactDetails = (
+    vendorTheme as ThemeSchema & {
+      contactDetails?: {
+        phoneNumber?: string;
+        email?: string;
+        address?: string;
+        alternativeAddress?: string;
+      };
+    }
+  )?.contactDetails;
+
   const contactSections = [
     {
       icon: Phone,
       heading: "Phone Number:",
-      link: `tel:${
-        vendorTheme?.contactDetails?.phoneNumber || "+1 (123) 456-7890"
-      }`,
-      linkText: vendorTheme?.contactDetails?.phoneNumber || "+1 (123) 456-7890",
+      link: `tel:${contactDetails?.phoneNumber || "+1 (123) 456-7890"}`,
+      linkText: contactDetails?.phoneNumber || "+1 (123) 456-7890",
     },
     {
       icon: MapPin,
       heading: "Get Directions:",
-      textOne: vendorTheme?.contactDetails?.address || "123 Main St",
-      textTwo:
-        vendorTheme?.contactDetails?.alternativeAddress || "City, Country",
+      textOne: contactDetails?.address || "123 Main St",
+      textTwo: contactDetails?.alternativeAddress || "City, Country",
     },
     {
       icon: Send,
       heading: "Email Address:",
-      link: `mailto:${
-        vendorTheme?.contactDetails?.email || "info@eventwizz.com"
-      }`,
-      linkText: vendorTheme?.contactDetails?.email || "info@eventwizz.com",
+      link: `mailto:${contactDetails?.email || "info@eventwizz.com"}`,
+      linkText: contactDetails?.email || "info@eventwizz.com",
     },
   ];
 
   return (
-    <section className="p-10 bg-[color:var(--color-footer)]">
+    <section className="px-4 sm:px-6 md:p-10 py-8 md:py-10 bg-[color:var(--color-footer)]">
       <div className="container mx-auto border-b border-white/20 text-center pb-6">
         <Link href="/">
           <div className="h-20 flex items-center justify-center">
@@ -115,7 +121,7 @@ export default function FooterSection() {
           ))}
         </div>
       </div>
-      <div className="container mx-auto py-8 grid grid-cols-1 md:grid-cols-3 gap-8">
+      <div className="container mx-auto py-8 grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-8">
         {contactSections.map(
           (
             { icon: Icon, heading, link, linkText, textOne, textTwo },
@@ -123,26 +129,32 @@ export default function FooterSection() {
           ) => (
             <div
               key={index}
-              className="flex gap-4 justify-center md:justify-start"
+              className="flex gap-3 md:gap-4 justify-start items-start px-4 md:px-0"
             >
               <Icon
-                className="mt-1 text-[color:var(--color-primary)]"
-                size={22}
+                className="mt-0.5 flex-shrink-0 text-[color:var(--color-primary)]"
+                size={20}
               />
-              <div>
-                <h6 className="font-bold">{heading}</h6>
+              <div className="flex-1 min-w-0">
+                <h6 className="font-bold text-sm md:text-base mb-1">
+                  {heading}
+                </h6>
                 {link ? (
                   <Link
                     href={link}
-                    className="hover:text-[color:var(--color-primary)] transition-colors"
+                    className="text-sm md:text-base break-words hover:text-[color:var(--color-primary)] transition-colors block"
                   >
                     {linkText}
                   </Link>
                 ) : (
-                  <p>
+                  <p className="text-sm md:text-base break-words">
                     {textOne}
-                    <br />
-                    {textTwo}
+                    {textTwo && (
+                      <>
+                        <br />
+                        {textTwo}
+                      </>
+                    )}
                   </p>
                 )}
               </div>
@@ -150,8 +162,8 @@ export default function FooterSection() {
           )
         )}
       </div>
-      <div className="container mx-auto pt-6 text-center text-[color:var(--color-text-dimmed)]">
-        <p>
+      <div className="container mx-auto pt-6 px-4 md:px-0 text-center text-[color:var(--color-text-dimmed)]">
+        <p className="text-sm md:text-base">
           {vendorTheme?.copyright ||
             `© ${currentYear} ${
               vendorTheme?.name || "EventWizz"

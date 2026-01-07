@@ -65,7 +65,8 @@ export default function HeadersSec({
   // Extract phone number from props, theme, or use default
   const phoneNumber =
     contact_number ||
-    vendorTheme?.contactDetails?.phoneNumber ||
+    (vendorTheme as ThemeSchema & { contactDetails?: { phoneNumber?: string } })
+      ?.contactDetails?.phoneNumber ||
     "+1 (123) 456-7890";
 
   // Define header data using theme
@@ -186,21 +187,6 @@ export default function HeadersSec({
               </div>
             </Link>
           </div>
-          {isAuthenticated ? (
-            <Link
-              href={`/${session?.user?.account_type}/dashboard`}
-              className="p-2 hover:text-[color:var(--color-primary)] transition-colors"
-            >
-              <Bookmark className="h-5 w-5" />
-            </Link>
-          ) : (
-            <Link
-              href="/auth/login"
-              className="p-2 hover:text-[color:var(--color-primary)] transition-colors"
-            >
-              <Bookmark className="h-5 w-5" />
-            </Link>
-          )}
         </div>
 
         {/* Mobile Menu Overlay */}
@@ -213,7 +199,7 @@ export default function HeadersSec({
 
         {/* Mobile Menu Panel */}
         <div
-          className={`md:hidden fixed top-0 left-0 w-[70%] max-w-xs h-screen bg-[color:var(--color-surface)] z-50 transform transition-transform duration-300 ease-in-out ${
+          className={`md:hidden fixed top-0 left-0 w-[70%] max-w-xs h-screen bg-white dark:bg-gray-900 bg-[color:var(--color-surface)] z-50 transform transition-transform duration-300 ease-in-out ${
             mobileMenuOpen ? "translate-x-0" : "-translate-x-full"
           }`}
         >
@@ -232,10 +218,6 @@ export default function HeadersSec({
             >
               {headerData.browseEvent.linkText}
             </Link>
-
-            <button className="flex items-center gap-2 py-2 hover:text-[color:var(--color-primary)]">
-              <Search size={18} /> Search
-            </button>
 
             <hr className="border-gray-200" />
 
