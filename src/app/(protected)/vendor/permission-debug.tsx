@@ -6,6 +6,7 @@ import { vendorMenus } from "@/config/menus/vendor-menus";
 import { useMenuPermission } from "@/components/permission/use-menu-permission";
 import { mapMenuPermissionToAPI } from "@/services/common/permissions/utils";
 import { MenuItemProps } from "@/config/menus/types";
+import { env } from "@/env";
 
 interface PermissionItem {
   title: string;
@@ -21,6 +22,11 @@ export default function PermissionDebug() {
 
   // When permissions change, update menu permission checks
   useEffect(() => {
+    // Skip work in non-development environments
+    if (env.NEXT_PUBLIC_NODE_ENV !== "development") {
+      return;
+    }
+
     // Extract all menu permissions
     const extractPermissions = (menus: MenuItemProps[]): PermissionItem[] => {
       return menus.flatMap((menu) => {
@@ -53,6 +59,11 @@ export default function PermissionDebug() {
 
     setMenuPermissions(permissionChecks);
   }, [permissions, checkMenuPermission]);
+
+  // Only render in development mode
+  if (env.NEXT_PUBLIC_NODE_ENV !== "development") {
+    return null;
+  }
 
   return (
     <div className="fixed bottom-4 right-4 z-50 z-100">
