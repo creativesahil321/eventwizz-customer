@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   ArrowLeft,
   Calendar,
@@ -21,20 +21,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import {
-  Pagination,
-  PaginationContent,
-  PaginationItem,
-  PaginationLink,
-  PaginationNext,
-  PaginationPrevious,
-  PaginationEllipsis,
-} from "@/components/ui/pagination";
-import {
-  useEventOverview,
+  useEventOverviewInfinite,
   type EventOverviewResponse,
-} from "./_hooks/useEventOverview";
+} from "./_hooks/useEventOverviewInfinite";
+import { useEventOverview } from "./_hooks/useEventOverview";
 import { EmptyPlaceholder } from "@/components/empty-placeholder";
 import EventOverviewSkeleton from "./_components/overview-skeleton";
+import { BookingItemSkeleton } from "./_components/booking-item-skeleton";
 
 interface EventOverviewClientProps {
   eventId: string;
@@ -47,18 +40,23 @@ export default function EventOverviewClient({
   const [selectedTab, setSelectedTab] = useState<
     "all" | "available" | "sold_out"
   >("all");
-  const [currentPage, setCurrentPage] = useState(1);
 
-  // Fetch event overview data for the selected tab
+  // Intersection observer ref for infinite scroll
+  const loadMoreRef = useRef<HTMLDivElement>(null);
+
+  // Fetch event overview data with infinite scroll
   const {
-    data: apiResponse,
+    data: infiniteData,
     isLoading,
     isFetching,
     isError,
-  } = useEventOverview({
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+  } = useEventOverviewInfinite({
     eventId,
     dateStatus: selectedTab,
-    page: currentPage,
+    perPage: 10,
     dateFilter: dateFilter || undefined,
   });
 
@@ -72,9 +70,35 @@ export default function EventOverviewClient({
     perPage: 1000, // High limit to get all records for accurate tab counts
   });
 
+  // Setup intersection observer for infinite scroll
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        // When the load more element is visible and there's more data to load
+        if (entries[0].isIntersecting && hasNextPage && !isFetchingNextPage) {
+          fetchNextPage();
+        }
+      },
+      {
+        threshold: 0.1, // Trigger when 10% of the element is visible
+        rootMargin: "100px", // Start loading 100px before reaching the element
+      }
+    );
+
+    const currentRef = loadMoreRef.current;
+    if (currentRef) {
+      observer.observe(currentRef);
+    }
+
+    return () => {
+      if (currentRef) {
+        observer.unobserve(currentRef);
+      }
+    };
+  }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
+
   // Show skeleton only on initial load (when no data exists yet)
-  // On tab/page changes, keep content visible with a subtle loading indicator
-  const showSkeleton = isLoading && !apiResponse;
+  const showSkeleton = isLoading && !infiniteData;
 
   // Loading state - only show skeleton on initial load
   if (showSkeleton) {
@@ -82,7 +106,7 @@ export default function EventOverviewClient({
   }
 
   // Error state
-  if (isError || !apiResponse?.success) {
+  if (isError || !infiniteData?.pages[0]?.success) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
         <EmptyPlaceholder
@@ -94,10 +118,14 @@ export default function EventOverviewClient({
     );
   }
 
-  // Extract data from API response
-  const eventData = apiResponse?.event;
-  const tableData = apiResponse?.data || [];
-  const paginationMeta = apiResponse?.meta;
+  // Extract data from infinite query response
+  const firstPage = infiniteData?.pages[0];
+  const eventData = firstPage?.event;
+  const paginationMeta = firstPage?.meta;
+
+  // Flatten all pages into a single array
+  const tableData =
+    infiniteData?.pages.flatMap((page) => page.data || []) || [];
 
   // If no data available after loading, show skeleton
   if (!eventData || !paginationMeta) {
@@ -110,24 +138,18 @@ export default function EventOverviewClient({
   type TicketInfo = NonNullable<TableEntry["tickets"]>[0];
   type DrinkInfo = NonNullable<TableEntry["drinks"]>[0];
 
-  // Handler for page changes
-  const handlePageChange = (page: number) => {
-    setCurrentPage(page);
-    // When API is connected, the query key dependency will automatically refetch
-    // Scroll to top for better UX
-    window.scrollTo({ top: 0, behavior: "smooth" });
-  };
-
   // Handler for tab changes
   const handleTabChange = (value: string) => {
     setSelectedTab(value as "all" | "available" | "sold_out");
-    setCurrentPage(1); // Reset to first page on tab change
+    // Scroll to top for better UX
+    window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
   // Handler for date filter changes
   const handleDateFilterChange = (value: string) => {
     setDateFilter(value);
-    setCurrentPage(1); // Reset to first page on date filter change
+    // Scroll to top for better UX
+    window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
   // Server handles both status filtering and date filtering, so we just sort the data
@@ -181,12 +203,12 @@ export default function EventOverviewClient({
 
   return (
     <div className="space-y-6 relative">
-      {/* Subtle loading overlay for tab/page changes (not initial load) */}
-      {isFetching && !isLoading && (
-        <div className="absolute inset-0 bg-background/60 backdrop-blur-[1px] z-50 flex items-center justify-center rounded-lg pointer-events-none">
-          <div className="flex items-center gap-2 text-sm text-muted-foreground bg-background px-4 py-2 rounded-md shadow-sm border">
-            <Loader2 className="h-4 w-4 animate-spin" />
-            <span>Updating...</span>
+      {/* Subtle loading overlay for tab/filter changes (not initial load) */}
+      {isFetching && !isLoading && !isFetchingNextPage && (
+        <div className="absolute inset-0 bg-background/50 backdrop-blur-sm z-50 flex items-center justify-center rounded-lg pointer-events-none opacity-0 animate-[fadeIn_0.2s_ease-out_forwards]">
+          <div className="flex items-center gap-2.5 text-sm text-foreground bg-background/95 px-5 py-2.5 rounded-lg shadow-lg border border-border">
+            <Loader2 className="h-4 w-4 animate-spin text-primary" />
+            <span className="font-medium">Refreshing data...</span>
           </div>
         </div>
       )}
@@ -322,13 +344,19 @@ export default function EventOverviewClient({
                   />
                 </div>
               ) : (
-                <div className="space-y-3 max-h-[600px] overflow-y-auto pr-2">
-                  {sortedTables.map((table) => (
+                <div className="space-y-3">
+                  {sortedTables.map((table, index) => (
                     <Card
                       key={table.id}
-                      className={`overflow-hidden transition-all hover:shadow-md ${
+                      className={`overflow-hidden transition-all duration-300 ease-in-out hover:shadow-md ${
                         table.soldOut ? "border-red-200 bg-red-50/30" : ""
                       }`}
+                      style={{
+                        animation: `fadeInUp 0.4s ease-out ${Math.min(
+                          index * 50,
+                          300
+                        )}ms both`,
+                      }}
                     >
                       <CardContent className="p-4">
                         <div
@@ -346,23 +374,9 @@ export default function EventOverviewClient({
                             <p className="font-bold text-base">
                               {table.eventDate}
                             </p>
-                            {table.soldOut ? (
+                            {table.soldOut && (
                               <Badge variant="destructive" className="text-xs">
                                 Sold Out
-                              </Badge>
-                            ) : table.tablesLeft < 5 ? (
-                              <Badge
-                                variant="outline"
-                                className="text-xs bg-amber-50 text-amber-700 border-amber-200"
-                              >
-                                Low Availability
-                              </Badge>
-                            ) : (
-                              <Badge
-                                variant="outline"
-                                className="text-xs bg-green-50 text-green-700 border-green-200"
-                              >
-                                Available
                               </Badge>
                             )}
                           </div>
@@ -689,117 +703,52 @@ export default function EventOverviewClient({
                       </CardContent>
                     </Card>
                   ))}
+
+                  {/* Infinite Scroll Loading Skeleton */}
+                  {isFetchingNextPage && (
+                    <div className="space-y-3 opacity-0 animate-[fadeIn_0.3s_ease-out_0.1s_forwards]">
+                      <BookingItemSkeleton />
+                      <BookingItemSkeleton />
+                    </div>
+                  )}
+
+                  {/* Infinite Scroll Trigger */}
+                  <div ref={loadMoreRef} className="py-6">
+                    {isFetchingNextPage && (
+                      <div className="flex flex-col items-center justify-center gap-3 py-4">
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                          <Loader2 className="h-5 w-5 animate-spin text-primary" />
+                          <span className="font-medium">
+                            Loading more booking dates...
+                          </span>
+                        </div>
+                        <div className="flex gap-1">
+                          <div className="h-1.5 w-1.5 rounded-full bg-primary animate-bounce [animation-delay:-0.3s]"></div>
+                          <div className="h-1.5 w-1.5 rounded-full bg-primary animate-bounce [animation-delay:-0.15s]"></div>
+                          <div className="h-1.5 w-1.5 rounded-full bg-primary animate-bounce"></div>
+                        </div>
+                      </div>
+                    )}
+                    {!hasNextPage && sortedTables.length > 0 && (
+                      <div className="text-center py-6 border-t opacity-0 animate-[fadeIn_0.4s_ease-out_0.2s_forwards]">
+                        <div className="flex flex-col items-center gap-2">
+                          <div className="flex items-center gap-2 text-muted-foreground">
+                            <CheckCircle2 className="h-5 w-5 text-green-500 animate-[scaleIn_0.3s_ease-out]" />
+                            <p className="font-semibold text-base">
+                              All booking dates loaded
+                            </p>
+                          </div>
+                          <p className="text-sm text-muted-foreground">
+                            Showing all {paginationMeta.total} booking date
+                            {paginationMeta.total !== 1 ? "s" : ""}
+                          </p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </div>
               )}
             </TabsContent>
-
-            {/* Pagination */}
-            {paginationMeta && paginationMeta.last_page > 1 && (
-              <div className="mt-6">
-                <Pagination>
-                  <PaginationContent>
-                    {/* Previous Button */}
-                    {paginationMeta.current_page > 1 && (
-                      <PaginationItem>
-                        <PaginationPrevious
-                          onClick={() =>
-                            handlePageChange(paginationMeta.current_page - 1)
-                          }
-                          aria-label="Go to previous page"
-                          className="cursor-pointer"
-                        />
-                      </PaginationItem>
-                    )}
-
-                    {/* First Page */}
-                    <PaginationItem>
-                      <PaginationLink
-                        onClick={() => handlePageChange(1)}
-                        isActive={paginationMeta.current_page === 1}
-                        className="cursor-pointer"
-                      >
-                        1
-                      </PaginationLink>
-                    </PaginationItem>
-
-                    {/* Left Ellipsis */}
-                    {paginationMeta.current_page > 3 && (
-                      <PaginationItem>
-                        <PaginationEllipsis />
-                      </PaginationItem>
-                    )}
-
-                    {/* Current Page and Neighbors */}
-                    {Array.from(
-                      { length: paginationMeta.last_page },
-                      (_, i) => i + 1
-                    )
-                      .filter(
-                        (page) =>
-                          page > 1 &&
-                          page < paginationMeta.last_page &&
-                          Math.abs(page - paginationMeta.current_page) <= 1
-                      )
-                      .map((page) => (
-                        <PaginationItem key={page}>
-                          <PaginationLink
-                            onClick={() => handlePageChange(page)}
-                            isActive={page === paginationMeta.current_page}
-                            className="cursor-pointer"
-                          >
-                            {page}
-                          </PaginationLink>
-                        </PaginationItem>
-                      ))}
-
-                    {/* Right Ellipsis */}
-                    {paginationMeta.current_page <
-                      paginationMeta.last_page - 2 && (
-                      <PaginationItem>
-                        <PaginationEllipsis />
-                      </PaginationItem>
-                    )}
-
-                    {/* Last Page */}
-                    {paginationMeta.last_page > 1 && (
-                      <PaginationItem>
-                        <PaginationLink
-                          onClick={() =>
-                            handlePageChange(paginationMeta.last_page)
-                          }
-                          isActive={
-                            paginationMeta.current_page ===
-                            paginationMeta.last_page
-                          }
-                          className="cursor-pointer"
-                        >
-                          {paginationMeta.last_page}
-                        </PaginationLink>
-                      </PaginationItem>
-                    )}
-
-                    {/* Next Button */}
-                    {paginationMeta.current_page < paginationMeta.last_page && (
-                      <PaginationItem>
-                        <PaginationNext
-                          onClick={() =>
-                            handlePageChange(paginationMeta.current_page + 1)
-                          }
-                          aria-label="Go to next page"
-                          className="cursor-pointer"
-                        />
-                      </PaginationItem>
-                    )}
-                  </PaginationContent>
-                </Pagination>
-
-                {/* Pagination Info */}
-                <div className="mt-2 text-center text-sm text-muted-foreground">
-                  Showing {paginationMeta.from} to {paginationMeta.to} of{" "}
-                  {paginationMeta.total} booking dates
-                </div>
-              </div>
-            )}
           </Tabs>
         </CardContent>
       </Card>

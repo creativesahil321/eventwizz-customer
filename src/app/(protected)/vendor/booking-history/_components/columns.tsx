@@ -310,6 +310,52 @@ export function getHistoryColumns({
       },
     },
     {
+      accessorKey: "platform_fee",
+      header: ({ column }) => (
+        <DataTableColumnHeader
+          className="text-foreground"
+          column={column}
+          title="Platform Fee"
+        />
+      ),
+      cell: ({ row }) => {
+        const platformFee = row.getValue("platform_fee") as
+          | number
+          | string
+          | undefined;
+        const value = platformFee
+          ? typeof platformFee === "string"
+            ? parseFloat(platformFee)
+            : platformFee
+          : 0;
+        
+        if (value === 0 || isNaN(value)) {
+          return (
+            <span className="text-sm text-muted-foreground">—</span>
+          );
+        }
+        
+        return (
+          <span className="font-semibold text-sm text-purple-600">
+            £{value.toFixed(2)}
+          </span>
+        );
+      },
+      enableSorting: true,
+      enableHiding: false,
+      sortingFn: (rowA, rowB) => {
+        const amountA =
+          typeof rowA.getValue("platform_fee") === "string"
+            ? parseFloat(rowA.getValue("platform_fee") as string) || 0
+            : (rowA.getValue("platform_fee") as number) || 0;
+        const amountB =
+          typeof rowB.getValue("platform_fee") === "string"
+            ? parseFloat(rowB.getValue("platform_fee") as string) || 0
+            : (rowB.getValue("platform_fee") as number) || 0;
+        return amountA - amountB;
+      },
+    },
+    {
       accessorKey: "pending_amount",
       header: ({ column }) => (
         <DataTableColumnHeader

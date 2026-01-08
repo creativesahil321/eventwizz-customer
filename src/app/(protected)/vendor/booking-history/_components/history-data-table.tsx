@@ -47,6 +47,7 @@ function HistoryDataTable({ search, tableRef }: HistoryDataTableProps) {
     page: Number(search.page) || 1,
     per_page: Number(search.per_page) || 30,
     status: typeof search.status === "string" ? search.status : "",
+    event_date: typeof search.event_date === "string" ? search.event_date : "",
   };
 
   const { data: history, isError, isLoading } = useHistory(queryParams);

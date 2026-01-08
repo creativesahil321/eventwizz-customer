@@ -458,21 +458,22 @@ export default function BookingInfoTab({ bookingData }: BookingInfoTabProps) {
               </h3>
             </div>
 
-            {/* Pay All Button - Only show if there are pending payments */}
-            {bookingData.dates.some((d) => d.paymentStatus !== "paid") && (
-              <Button
-                onClick={handlePayAll}
-                size="sm"
-                className="gap-2 cursor-pointer"
-                style={{
-                  backgroundColor: "var(--color-primary)",
-                  color: "var(--color-primary-foreground)",
-                }}
-              >
-                <Banknote className="h-4 w-4" />
-                Pay All Dates
-              </Button>
-            )}
+            {/* Pay All Button - Only show if there are multiple dates with pending payments */}
+            {bookingData.dates.length > 1 &&
+              bookingData.dates.some((d) => d.paymentStatus !== "paid") && (
+                <Button
+                  onClick={handlePayAll}
+                  size="sm"
+                  className="gap-2 cursor-pointer"
+                  style={{
+                    backgroundColor: "var(--color-primary)",
+                    color: "var(--color-primary-foreground)",
+                  }}
+                >
+                  <Banknote className="h-4 w-4" />
+                  Pay All Dates
+                </Button>
+              )}
           </div>
 
           <Accordion

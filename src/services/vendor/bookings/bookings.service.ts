@@ -28,6 +28,7 @@ export interface VendorBookingHistoryResponse {
     total_amount: string;
     deposit_amount: string;
     pending_amount: string;
+    total_platform_fee?: string;
   };
   links: {
     first: string | null;
@@ -63,6 +64,7 @@ export interface VendorBookingItem {
   event_date: string[]; // Format: ["20-09-2025", "21-09-2025"]
   amount: string; // Format: "5800.00"
   status: string; // "Pending", "Confirmed", etc.
+  platform_fee?: string; // Format: "15.00"
   deposit_amount?: string; // Format: "400.00"
   pending_amount?: string; // Format: "4070.00"
 }
@@ -168,6 +170,7 @@ export interface VendorBookingsQueryParams {
   per_page?: number | string;
   status?: string;
   search?: string;
+  event_date?: string;
 }
 
 /**

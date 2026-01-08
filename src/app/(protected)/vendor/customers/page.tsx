@@ -55,10 +55,7 @@ export default function CustomersPage() {
   };
 
   // Fetch data to track loading state
-  const {
-    isLoading,
-    isFetching,
-  } = useCustomers(searchParams, undefined);
+  const { isLoading, isFetching } = useCustomers(searchParams, undefined);
 
   // Handle CSV export
   const handleCSVExport = () => {
@@ -72,10 +69,10 @@ export default function CustomersPage() {
   };
 
   return (
-    <section className="page text-black">
-      <Shell className="gap-0">
+    <section className="page text-black overflow-x-auto">
+      <Shell className="gap-0 overflow-visible">
         <div className="flex flex-col gap-4">
-          <div className="bg-white rounded-lg border border-[var(--color-border)] shadow-md p-6 mb-0">
+          <div className="bg-white rounded-lg border border-[var(--color-border)] shadow-md p-6 mb-0 min-w-fit">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center flex-wrap gap-4">
               <div>
                 <h1 className="text-2xl title-header font-bold flex items-center gap-2">

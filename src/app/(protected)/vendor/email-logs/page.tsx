@@ -21,8 +21,8 @@ export default async function Page(props: PageProps) {
     per_page: String(parsedSearch.per_page),
   };
   return (
-    <section className="page min-w-0">
-      <Shell className="gap-2">
+    <section className="page overflow-x-auto">
+      <Shell className="gap-2 overflow-visible">
         <Suspense
           fallback={
             <DataTableSkeleton

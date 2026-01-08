@@ -170,14 +170,14 @@ function PaymentCancelledContent() {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Button
               onClick={handleViewBookings}
-              variant="outline"
+              variant="event-outline"
               className="w-full"
             >
               <ArrowLeft className="h-4 w-4 mr-2" />
               View My Bookings
             </Button>
 
-            <Button onClick={handleGoHome} variant="outline" className="w-full">
+            <Button onClick={handleGoHome} variant="event-outline" className="w-full">
               <Home className="h-4 w-4 mr-2" />
               Go to Homepage
             </Button>

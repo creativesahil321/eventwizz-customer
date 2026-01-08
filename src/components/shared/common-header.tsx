@@ -288,6 +288,22 @@ export default function CommonHeader({
               size="icon"
               className={`p-2 ${styles.hoverColor} transition-colors`}
             />
+
+            {isAuthenticated ? (
+              <Link
+                href={`/${session?.user?.account_type}/dashboard`}
+                className={`p-2 ${styles.hoverColor} transition-colors`}
+              >
+                <Bookmark className="h-5 w-5" />
+              </Link>
+            ) : (
+              <Link
+                href="/auth/login"
+                className={`p-2 ${styles.hoverColor} transition-colors`}
+              >
+                <Bookmark className="h-5 w-5" />
+              </Link>
+            )}
           </div>
         </div>
 
@@ -320,6 +336,12 @@ export default function CommonHeader({
             >
               {headerData.browseEvent.linkText}
             </Link>
+
+            <button
+              className={`flex items-center gap-2 py-2 ${styles.hoverColor}`}
+            >
+              <Search size={18} /> Search
+            </button>
 
             {/* Mobile Cart Button */}
             <div className="py-2" onClick={toggleMobileMenu}>

@@ -128,6 +128,15 @@ interface UseDataTableProps<TData>
    */
   enableAdvancedFilter?: boolean;
 
+  /**
+   * Enable client-side sorting instead of server-side sorting.
+   * When true, sorting happens in the browser without API calls.
+   * Perfect for small datasets (< 100 records).
+   * @default false
+   * @type boolean
+   */
+  enableClientSideSorting?: boolean;
+
   // initialState?: Omit<Partial<TableState>, "sorting"> & {
   //   // Extend to make the sorting id typesafe
   //   sorting?: ExtendedSortingState<TData>;
@@ -150,6 +159,7 @@ export function useDataTable<TData>({
   pageCount = -1,
   filterFields = [],
   enableAdvancedFilter = false,
+  enableClientSideSorting = false,
   history = "replace",
   scroll = false,
   shallow = true,
@@ -187,6 +197,9 @@ export function useDataTable<TData>({
   );
   const [columnVisibility, setColumnVisibility] =
     React.useState<VisibilityState>(initialState?.columnVisibility ?? {});
+  const [sorting, setSorting] = React.useState<ExtendedColumnSort<TData>[]>(
+    initialState?.sorting ?? []
+  );
 
   const [page, setPage] = useQueryState(
     "page",
@@ -196,7 +209,7 @@ export function useDataTable<TData>({
     "per_page",
     parseAsInteger
       .withOptions(queryStateOptions)
-      .withDefault(initialState?.pagination?.pageSize ?? 10)
+      .withDefault(initialState?.pagination?.pageSize ?? 30)
   );
   // Create parsers for each filter field
   const filterParsers = React.useMemo(() => {
@@ -322,7 +335,7 @@ export function useDataTable<TData>({
     pageCount,
     state: {
       pagination,
-      // sorting,
+      sorting: enableClientSideSorting ? sorting : undefined,
       columnVisibility,
       rowSelection,
       columnFilters: enableAdvancedFilter ? [] : columnFilters,
@@ -330,7 +343,7 @@ export function useDataTable<TData>({
     enableRowSelection: true,
     onRowSelectionChange: setRowSelection,
     onPaginationChange,
-    // onSortingChange,
+    onSortingChange: enableClientSideSorting ? setSorting : undefined,
     onColumnFiltersChange,
     onColumnVisibilityChange: setColumnVisibility,
     getCoreRowModel: getCoreRowModel(),
@@ -338,13 +351,15 @@ export function useDataTable<TData>({
       ? undefined
       : getFilteredRowModel(),
     getPaginationRowModel: getPaginationRowModel(),
-    getSortedRowModel: getSortedRowModel(),
+    getSortedRowModel: enableClientSideSorting
+      ? getSortedRowModel()
+      : undefined,
     getFacetedRowModel: enableAdvancedFilter ? undefined : getFacetedRowModel(),
     getFacetedUniqueValues: enableAdvancedFilter
       ? undefined
       : getFacetedUniqueValues(),
     manualPagination: true,
-    manualSorting: true,
+    manualSorting: !enableClientSideSorting,
     manualFiltering: true,
   });
 

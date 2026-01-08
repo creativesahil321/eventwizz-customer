@@ -10,10 +10,10 @@ interface PageProps {
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 export default async function Page(props: PageProps) {
   await delay(4000);
-  const searchParams = await props.searchParams;
+  await props.searchParams; // Wait for searchParams
   return (
-    <section className="page">
-      <Shell className="gap-2">
+    <section className="page overflow-x-auto">
+      <Shell className="gap-2 overflow-visible">
         <React.Suspense fallback={<PageLoader />}>
           <section className="w-full">
             <Transactions />

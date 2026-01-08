@@ -49,7 +49,7 @@ export function DataTable<TData>({
     >
       {children}
       <section className="overflow-x-auto rounded-md border text-black">
-        <Table className="min-w-0">
+        <Table className="min-w-full w-max">
           <TableHeader>
             {table.getHeaderGroups().map((headerGroup) => (
               <TableRow key={headerGroup.id}>
@@ -57,9 +57,7 @@ export function DataTable<TData>({
                   <TableHead
                     key={header.id}
                     colSpan={header.colSpan}
-                    className={cn(
-                      header.column.columnDef.meta?.className
-                    )}
+                    className={cn(header.column.columnDef.meta?.className)}
                     style={{
                       ...getCommonPinningStyles({ column: header.column }),
                     }}

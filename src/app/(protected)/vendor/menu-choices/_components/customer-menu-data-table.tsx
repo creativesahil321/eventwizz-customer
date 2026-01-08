@@ -1,11 +1,18 @@
 "use client";
 
-import { useMemo, useState, useCallback } from "react";
+import {
+  useMemo,
+  useState,
+  useCallback,
+  useImperativeHandle,
+  forwardRef,
+} from "react";
 import { DataTable } from "@/components/data-table/data-table";
 import { useDataTable } from "@/hooks/data-table/use-data-table";
 import { getCustomerMenuColumns } from "./customer-menu-columns";
 import { CustomerMenuChoice } from "../_lib/customer-menu-types";
 import { dummyCustomerMenuChoices } from "../_lib/dummy-data";
+import type { Table } from "@tanstack/react-table";
 
 interface CustomerMenuDataTableProps {
   search?: {
@@ -15,9 +22,14 @@ interface CustomerMenuDataTableProps {
   };
 }
 
-export default function CustomerMenuDataTable({
-  search = {},
-}: CustomerMenuDataTableProps) {
+export interface CustomerMenuDataTableRef {
+  table: Table<CustomerMenuChoice> | null;
+}
+
+const CustomerMenuDataTable = forwardRef<
+  CustomerMenuDataTableRef,
+  CustomerMenuDataTableProps
+>(({ search = {} }, ref) => {
   const [data, setData] = useState<CustomerMenuChoice[]>(
     dummyCustomerMenuChoices
   );
@@ -56,7 +68,7 @@ export default function CustomerMenuDataTable({
         item.customer_email.toLowerCase().includes(searchTerm) ||
         item.customer_phone.toLowerCase().includes(searchTerm) ||
         item.event_date.toLowerCase().includes(searchTerm) ||
-        item.submitted_on.toLowerCase().includes(searchTerm)
+        item.status.toLowerCase().includes(searchTerm)
       );
     });
   }, [data, search?.search]);
@@ -78,11 +90,20 @@ export default function CustomerMenuDataTable({
     enableAdvancedFilter: false,
     enableClientSideSorting: true,
     initialState: {
-      sorting: [{ id: "submitted_on", desc: true }],
+      sorting: [{ id: "event_date", desc: false }],
       columnPinning: { right: ["actions"] },
     },
     getRowId,
   });
 
+  // Expose table via ref
+  useImperativeHandle(ref, () => ({
+    table,
+  }));
+
   return <DataTable table={table} />;
-}
+});
+
+CustomerMenuDataTable.displayName = "CustomerMenuDataTable";
+
+export default CustomerMenuDataTable;

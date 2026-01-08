@@ -59,10 +59,10 @@ export default function TransactionsPage() {
   };
 
   return (
-    <section className="page">
-      <Shell className="gap-2">
+    <section className="page overflow-x-auto">
+      <Shell className="gap-2 overflow-visible">
         {/* Header Section */}
-        <div className="bg-white rounded-lg border border-[var(--color-border)] shadow-md p-6 mb-4">
+        <div className="bg-white rounded-lg border border-[var(--color-border)] shadow-md p-6 mb-4 min-w-fit">
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center flex-wrap gap-4">
             {/* Title and Earnings */}
             <div>

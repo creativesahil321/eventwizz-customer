@@ -2,7 +2,7 @@
 
 import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Search, DollarSign, Clock, Receipt, Loader2 } from "lucide-react";
+import { Search, DollarSign, Clock, Receipt, Loader2, Tag } from "lucide-react";
 import HistoryDataTable from "./_components/history-data-table";
 import { Shell } from "@/components/shell";
 import { SearchParams } from "./_lib/types";
@@ -24,6 +24,7 @@ import { useDebounce } from "@/hooks/data-table/use-debounce";
 export default function BookingHistoryPage() {
   const [globalFilterValue, setGlobalFilterValue] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [eventDate, setEventDate] = useState("");
   const tableRef = React.useRef<unknown>(null);
 
   // Debounce search input using existing hook
@@ -35,6 +36,7 @@ export default function BookingHistoryPage() {
     per_page: "30",
     search: debouncedSearch,
     status: statusFilter === "all" ? "" : statusFilter,
+    event_date: eventDate,
   };
 
   // Fetch data for summary (use the same query as the table)
@@ -47,6 +49,7 @@ export default function BookingHistoryPage() {
     page: 1,
     per_page: 30,
     status: statusFilter === "all" ? "" : statusFilter,
+    event_date: eventDate,
   });
 
   // Get summary from API response
@@ -56,6 +59,8 @@ export default function BookingHistoryPage() {
         totalAmount: parseFloat(historyData.summary.total_amount) || 0,
         totalDeposit: parseFloat(historyData.summary.deposit_amount) || 0,
         totalPending: parseFloat(historyData.summary.pending_amount) || 0,
+        totalPlatformFee:
+          parseFloat(historyData.summary.total_platform_fee || "0") || 0,
       };
     }
     // Fallback: calculate from data if summary not available
@@ -81,7 +86,14 @@ export default function BookingHistoryPage() {
           : booking.pending_amount || 0;
       return sum + pending;
     }, 0);
-    return { totalAmount, totalDeposit, totalPending };
+    const totalPlatformFee = bookings.reduce((sum, booking) => {
+      const platformFee =
+        typeof booking.platform_fee === "string"
+          ? parseFloat(booking.platform_fee) || 0
+          : booking.platform_fee || 0;
+      return sum + platformFee;
+    }, 0);
+    return { totalAmount, totalDeposit, totalPending, totalPlatformFee };
   }, [historyData?.summary, historyData?.data]);
 
   // Handle CSV export
@@ -96,9 +108,9 @@ export default function BookingHistoryPage() {
   };
 
   return (
-    <section className="page">
-      <Shell className="gap-2">
-        <div className="bg-white rounded-lg border border-[var(--color-border)] shadow-md p-6 mb-4">
+    <section className="page overflow-x-auto">
+      <Shell className="gap-2 overflow-visible">
+        <div className="bg-white rounded-lg border border-[var(--color-border)] shadow-md p-6 mb-4 min-w-fit">
           <div className="flex flex-col gap-4">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center flex-wrap gap-4">
               <div>
@@ -115,6 +127,17 @@ export default function BookingHistoryPage() {
               </div>
               <div className="flex flex-col sm:flex-row gap-3 items-center w-full sm:w-auto">
                 <div className="flex flex-1 gap-3 items-center w-full sm:w-auto">
+                  {/* Event Date Filter */}
+                  <div className="flex flex-col gap-1.5">
+                    <Input
+                      type="date"
+                      value={eventDate}
+                      onChange={(e) => setEventDate(e.target.value)}
+                      className="w-full sm:w-[180px]"
+                      disabled={isFetching}
+                    />
+                  </div>
+                  {/* Search */}
                   <div className="relative flex-1 sm:min-w-[240px]">
                     <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
                     <Input
@@ -122,8 +145,10 @@ export default function BookingHistoryPage() {
                       value={globalFilterValue}
                       onChange={(e) => setGlobalFilterValue(e.target.value)}
                       className="pl-8 w-full"
+                      disabled={isFetching}
                     />
                   </div>
+                  {/* Status Filter */}
                   <Select
                     value={statusFilter}
                     onValueChange={setStatusFilter}
@@ -158,7 +183,7 @@ export default function BookingHistoryPage() {
             {/* Summary Section */}
             <div
               className={cn(
-                "grid grid-cols-1 sm:grid-cols-3 gap-4 pt-4 border-t border-[var(--color-border)] transition-opacity duration-200",
+                "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 pt-4 border-t border-[var(--color-border)] transition-opacity duration-200",
                 isFetching && "opacity-50"
               )}
             >
@@ -185,6 +210,19 @@ export default function BookingHistoryPage() {
                   </p>
                   <p className="text-lg font-bold text-green-600">
                     £{summaryTotals.totalDeposit.toFixed(2)}
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-purple-100 rounded-lg flex-shrink-0">
+                  <Tag className="h-5 w-5 text-purple-600" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-xs font-medium text-muted-foreground">
+                    Total Platform Fee
+                  </p>
+                  <p className="text-lg font-bold text-purple-600">
+                    £{summaryTotals.totalPlatformFee.toFixed(2)}
                   </p>
                 </div>
               </div>

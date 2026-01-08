@@ -31,6 +31,7 @@ export interface History {
   status: string; // "Pending", "Confirmed", "Processing", "Cancelled"
   created_at?: string;
   action?: string;
+  platform_fee?: number | string; // Platform fee from API
   deposit_amount?: number | string; // Deposit amount from API
   pending_amount?: number | string; // Pending amount from API
 }
@@ -39,6 +40,7 @@ export interface AdminHistoryParams {
   page?: number | string;
   per_page?: number | string;
   status?: string;
+  event_date?: string;
 }
 
 export interface DataTableRowAction<TData> {
@@ -50,6 +52,8 @@ export type SearchParams = {
   page?: string;
   per_page?: string;
   status?: string;
+  search?: string;
+  event_date?: string;
   from?: string;
   to?: string;
   filters?: string | unknown;

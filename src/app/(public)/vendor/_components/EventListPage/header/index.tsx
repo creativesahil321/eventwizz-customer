@@ -187,6 +187,21 @@ export default function HeadersSec({
               </div>
             </Link>
           </div>
+          {isAuthenticated ? (
+            <Link
+              href={`/${session?.user?.account_type}/dashboard`}
+              className="p-2 hover:text-[color:var(--color-primary)] transition-colors"
+            >
+              <Bookmark className="h-5 w-5" />
+            </Link>
+          ) : (
+            <Link
+              href="/auth/login"
+              className="p-2 hover:text-[color:var(--color-primary)] transition-colors"
+            >
+              <Bookmark className="h-5 w-5" />
+            </Link>
+          )}
         </div>
 
         {/* Mobile Menu Overlay */}
@@ -218,6 +233,10 @@ export default function HeadersSec({
             >
               {headerData.browseEvent.linkText}
             </Link>
+
+            <button className="flex items-center gap-2 py-2 hover:text-[color:var(--color-primary)]">
+              <Search size={18} /> Search
+            </button>
 
             <hr className="border-gray-200" />
 

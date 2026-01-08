@@ -10,12 +10,47 @@ import {
 import { Calendar, CheckCircle2, Clock } from "lucide-react";
 import { MenuBookingDate } from "../_lib/types";
 import { Badge } from "@/components/ui/badge";
+import { cn } from "@/lib/utils";
 
 interface DateSwitcherProps {
   readonly dates: MenuBookingDate[];
   readonly selectedDateKey: string;
   readonly onDateChange: (dateKey: string) => void;
 }
+
+const getStatusBadgeProps = (status: string) => {
+  const statusLower = status.toLowerCase();
+
+  if (
+    statusLower === "confirmed" ||
+    statusLower === "paid" ||
+    statusLower.includes("paid")
+  ) {
+    return {
+      className: "bg-green-100 text-green-700 hover:bg-green-100",
+      icon: CheckCircle2,
+    };
+  }
+
+  if (statusLower.includes("partial")) {
+    return {
+      className: "bg-amber-100 text-amber-700 hover:bg-amber-100",
+      icon: Clock,
+    };
+  }
+
+  if (statusLower.includes("pending")) {
+    return {
+      className: "bg-orange-100 text-orange-700 hover:bg-orange-100",
+      icon: Clock,
+    };
+  }
+
+  return {
+    className: "bg-gray-100 text-gray-700 hover:bg-gray-100",
+    icon: Clock,
+  };
+};
 
 export default function DateSwitcher({
   dates,
@@ -44,23 +79,22 @@ export default function DateSwitcher({
               <span className="font-medium text-sm truncate">
                 {selectedDate?.date || "Select a date"}
               </span>
-              {selectedDate && (
-                <Badge
-                  variant={
-                    selectedDate.status === "confirmed"
-                      ? "default"
-                      : "secondary"
-                  }
-                  className="text-[10px] px-1.5 py-0 h-4 flex-shrink-0"
-                >
-                  {selectedDate.status === "confirmed" ? (
-                    <CheckCircle2 className="h-2.5 w-2.5 mr-0.5" />
-                  ) : (
-                    <Clock className="h-2.5 w-2.5 mr-0.5" />
-                  )}
-                  {selectedDate.status}
-                </Badge>
-              )}
+              {selectedDate &&
+                (() => {
+                  const badgeProps = getStatusBadgeProps(selectedDate.status);
+                  const Icon = badgeProps.icon;
+                  return (
+                    <Badge
+                      className={cn(
+                        "text-[10px] px-1.5 py-0 h-4 flex-shrink-0",
+                        badgeProps.className
+                      )}
+                    >
+                      <Icon className="h-2.5 w-2.5 mr-0.5" />
+                      {selectedDate.status}
+                    </Badge>
+                  );
+                })()}
             </div>
           </SelectValue>
         </SelectTrigger>
@@ -81,19 +115,21 @@ export default function DateSwitcher({
                       {date.tables.length} Table
                       {date.tables.length > 1 ? "s" : ""}
                     </span>
-                    <Badge
-                      variant={
-                        date.status === "confirmed" ? "default" : "secondary"
-                      }
-                      className="text-[10px] px-1.5 py-0 h-4"
-                    >
-                      {date.status === "confirmed" ? (
-                        <CheckCircle2 className="h-2.5 w-2.5 mr-0.5" />
-                      ) : (
-                        <Clock className="h-2.5 w-2.5 mr-0.5" />
-                      )}
-                      {date.status}
-                    </Badge>
+                    {(() => {
+                      const badgeProps = getStatusBadgeProps(date.status);
+                      const Icon = badgeProps.icon;
+                      return (
+                        <Badge
+                          className={cn(
+                            "text-[10px] px-1.5 py-0 h-4",
+                            badgeProps.className
+                          )}
+                        >
+                          <Icon className="h-2.5 w-2.5 mr-0.5" />
+                          {date.status}
+                        </Badge>
+                      );
+                    })()}
                   </div>
                 </div>
               </div>

@@ -95,7 +95,7 @@ export default function DateAccordion({
   })();
 
   const hasChanges = hasUnsavedChanges(eventSlug, date);
-  
+
   // Check validation status
   const validation = validateDateRequirements(eventSlug, date);
   const hasValidationError = !validation.isValid && validation.errorMessage;

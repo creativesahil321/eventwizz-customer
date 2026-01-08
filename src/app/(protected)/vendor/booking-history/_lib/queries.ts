@@ -78,6 +78,7 @@ const transformBookingItem = (
     discount: 0,
     total_amount: parseFloat(item.amount) || 0,
     payment_status: item.status, // Use status as payment_status for now
+    platform_fee: item.platform_fee ? parseFloat(item.platform_fee) : undefined,
     deposit_amount: item.deposit_amount
       ? parseFloat(item.deposit_amount)
       : undefined,
@@ -98,6 +99,7 @@ export interface BookingHistoryResponse {
     total_amount: string;
     deposit_amount: string;
     pending_amount: string;
+    total_platform_fee?: string;
   };
   links: VendorBookingHistoryResponse["links"];
   meta: VendorBookingHistoryResponse["meta"];
@@ -125,7 +127,13 @@ export const useHistory = (
     ReturnType<typeof bookingHistoryKeys.list>
   >
 ) => {
-  const { search = "", page = 1, per_page = 30, status = "" } = params;
+  const {
+    search = "",
+    page = 1,
+    per_page = 30,
+    status = "",
+    event_date = "",
+  } = params;
 
   return useQuery({
     queryKey: bookingHistoryKeys.list({
@@ -133,6 +141,7 @@ export const useHistory = (
       page,
       per_page,
       status,
+      event_date,
     }),
     queryFn: async () => {
       const response = await vendorBookingsService.getBookings({
@@ -140,6 +149,7 @@ export const useHistory = (
         per_page: Number(per_page),
         status: status || undefined,
         search: search || undefined,
+        event_date: event_date || undefined,
       });
 
       // Transform API response to History format
