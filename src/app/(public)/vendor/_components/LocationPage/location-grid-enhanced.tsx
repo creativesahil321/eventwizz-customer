@@ -7,7 +7,6 @@ import {
   MapPin,
   ArrowRight,
   Calendar,
-  Users,
   TrendingUp,
   Sparkles,
   Clock,
@@ -196,7 +195,10 @@ export default function LocationGridEnhanced({
                 onClick={() => onSelect(locationSlug)}
               >
                 {/* Background Image Section */}
-                <div className="relative h-48 overflow-hidden bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500">
+                <div
+                  className="relative h-48 overflow-hidden"
+                  style={{ background: "var(--color-background)" }}
+                >
                   {coverImage && typeof coverImage === "string" ? (
                     <Image
                       src={coverImage}
@@ -209,7 +211,10 @@ export default function LocationGridEnhanced({
                       }}
                     />
                   ) : (
-                    <div className="absolute inset-0 bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500" />
+                    <div
+                      className="absolute inset-0 opacity-80"
+                      style={{ background: "var(--color-background)" }}
+                    />
                   )}
 
                   {/* Gradient Overlay for readability */}
@@ -315,28 +320,21 @@ export default function LocationGridEnhanced({
                 <div className="p-4 space-y-3">
                   {/* Stats Row */}
                   <div className="flex items-center justify-between text-sm">
-                    <div className="flex items-center gap-3">
-                      <div className="flex items-center gap-1.5 text-gray-700">
-                        <Calendar size={16} className="text-indigo-600" />
-                        <span className="font-semibold">
-                          {stats.eventsCount || 0}
-                        </span>
-                        <span className="text-gray-500">Events</span>
-                      </div>
-                      <div className="w-1 h-1 rounded-full bg-gray-300" />
-                      <div className="flex items-center gap-1.5 text-gray-700">
-                        <Users size={16} className="text-purple-600" />
-                        <span className="font-semibold">
-                          {stats.venuesCount || 0}
-                        </span>
-                        <span className="text-gray-500">Venues</span>
-                      </div>
+                    <div className="flex items-center gap-2">
+                      <Calendar
+                        size={16}
+                        className="text-[color:var(--color-primary)]"
+                      />
+                      <span className="font-semibold text-gray-900">
+                        {stats.eventsCount || 0}
+                      </span>
+                      <span className="text-gray-500">Events</span>
                     </div>
 
                     {/* Starting Price */}
                     {stats.startingPrice && (
                       <motion.div
-                        className="text-xs font-medium text-green-600 bg-green-50 px-2 py-1 rounded"
+                        className="text-xs font-semibold text-white bg-[color:var(--color-secondary)] px-3 py-1.5 rounded-lg shadow-sm"
                         initial={{ opacity: 0, scale: 0.8 }}
                         animate={{ opacity: 1, scale: 1 }}
                         transition={{ delay: idx * 0.1 + 0.4 }}
@@ -349,7 +347,7 @@ export default function LocationGridEnhanced({
                   {/* Upcoming Event Preview */}
                   {stats.upcomingEvent && (
                     <motion.div
-                      className="flex items-center gap-2 text-xs text-gray-600 bg-gray-50 p-2 rounded-lg"
+                      className="flex items-center gap-2 text-xs bg-gray-50 p-2.5 rounded-lg border border-gray-200"
                       initial={{ opacity: 0, y: 5 }}
                       animate={{
                         opacity: isHovered ? 1 : 0,
@@ -359,13 +357,13 @@ export default function LocationGridEnhanced({
                     >
                       <Clock
                         size={14}
-                        className="text-indigo-600 flex-shrink-0"
+                        className="flex-shrink-0 text-[color:var(--color-primary)]"
                       />
                       <div className="flex-1 min-w-0">
-                        <div className="font-medium truncate">
+                        <div className="font-medium text-gray-900 truncate text-xs">
                           Next: {stats.upcomingEvent.name}
                         </div>
-                        <div className="text-gray-500">
+                        <div className="text-gray-500 text-xs">
                           {new Date(
                             stats.upcomingEvent.date
                           ).toLocaleDateString("en-US", {
@@ -380,8 +378,7 @@ export default function LocationGridEnhanced({
                   {/* Explore Button */}
                   <motion.button
                     className="
-                      w-full bg-gradient-to-r from-indigo-600 to-purple-600 
-                      hover:from-indigo-700 hover:to-purple-700 
+                      w-full bg-[color:var(--color-primary)] hover:opacity-90
                       text-white py-2.5 px-4 rounded-lg text-sm font-semibold
                       flex items-center justify-center gap-2 
                       transition-all duration-200 shadow-md hover:shadow-lg
@@ -401,9 +398,9 @@ export default function LocationGridEnhanced({
 
                 {/* Hover Effect Glow */}
                 <motion.div
-                  className="absolute inset-0 bg-gradient-to-t from-indigo-500/10 to-transparent pointer-events-none"
+                  className="absolute inset-0 pointer-events-none bg-gradient-to-t from-[color:var(--color-primary)] to-transparent opacity-5"
                   initial={{ opacity: 0 }}
-                  animate={{ opacity: isHovered ? 1 : 0 }}
+                  animate={{ opacity: isHovered ? 0.1 : 0 }}
                   transition={{ duration: 0.3 }}
                 />
               </Card>
