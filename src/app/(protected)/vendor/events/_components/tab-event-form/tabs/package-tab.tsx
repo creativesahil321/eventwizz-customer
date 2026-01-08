@@ -22,7 +22,6 @@ import Image from "next/image";
 import { useEventFormContext } from "../../events-form-provider";
 import { StepTwoType, stepTwoSchema } from "../schema";
 import { eventsService } from "@/services/vendor/events/events.service";
-import { TiptapEditor } from "@/components/ui/tiptap-editor";
 
 // Define interfaces for gallery items and files with preview
 interface FileWithPreview extends File {
@@ -337,7 +336,8 @@ export default function PackageTab() {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel className="text-sm font-medium">
-                      Event Package Heading <span className="text-red-500">*</span>
+                      Event Package Heading{" "}
+                      <span className="text-red-500">*</span>
                     </FormLabel>
                     <FormControl>
                       <Input
@@ -373,17 +373,11 @@ export default function PackageTab() {
                       Sub Heading <span className="text-red-500">*</span>
                     </FormLabel>
                     <FormControl>
-                      <TiptapEditor
-                        value={field.value || ""}
-                        onChange={(value) => {
-                          field.onChange(value);
-                        }}
+                      <Input
+                        {...field}
                         placeholder="e.g., Prices From £65 Plus VAT Include:"
-                        className="bg-gray-100 p-2 rounded-md"
+                        className="h-10 bg-[#F9FAFB] border-[#E5E7EB]"
                         maxLength={160}
-                        maxWords={50}
-                        showAIButton={false}
-                        wrapText={true}
                       />
                     </FormControl>
                     <FormMessage className="text-red-500 font-semibold mt-1" />

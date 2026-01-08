@@ -303,12 +303,39 @@ export function validateCheckoutRequirements(
         );
       }
 
-      // Validate guest allocation for multiple tables
+      // Validate table capacity and guest allocation
       const selectedTables = dateData.tables.filter((t) => t.quantity > 0);
       const totalTablesSelected = selectedTables.reduce(
         (sum, table) => sum + table.quantity,
         0
       );
+
+      // Calculate total table capacity
+      if (selectedTables.length > 0 && dateData.peopleCount) {
+        let totalMinCapacity = 0;
+        let totalMaxCapacity = 0;
+
+        selectedTables.forEach((table) => {
+          const minPersons = table.minPersons || 1;
+          const maxPersons = table.maxPersons || 999;
+          totalMinCapacity += minPersons * table.quantity;
+          totalMaxCapacity += maxPersons * table.quantity;
+        });
+
+        // Critical validation: Check if selected tables can accommodate the group
+        if (dateData.peopleCount > totalMaxCapacity) {
+          errors.push(
+            `${date}: Insufficient table capacity! You have ${dateData.peopleCount} guests but selected tables can only accommodate ${totalMaxCapacity} guests maximum. Please add more tables.`
+          );
+        }
+
+        // Warning if capacity is too low (below minimum)
+        if (dateData.peopleCount < totalMinCapacity) {
+          errors.push(
+            `${date}: Selected tables require at least ${totalMinCapacity} guests, but you have ${dateData.peopleCount} guests. Please select smaller tables or reduce table quantity.`
+          );
+        }
+      }
 
       if (totalTablesSelected > 1) {
         // Check guest allocation for each table with multiple instances
@@ -353,6 +380,25 @@ export function validateCheckoutRequirements(
           if (totalAllocated !== dateData.peopleCount) {
             errors.push(
               `${date}: Total allocated guests (${totalAllocated}) must equal group size (${dateData.peopleCount})`
+            );
+          }
+        }
+      } else if (totalTablesSelected === 1) {
+        // Single table validation - check if it can accommodate all guests
+        const singleTable = selectedTables[0];
+        if (dateData.peopleCount && singleTable) {
+          const maxCapacity = singleTable.maxPersons || 999;
+          const minCapacity = singleTable.minPersons || 1;
+
+          if (dateData.peopleCount > maxCapacity) {
+            errors.push(
+              `${date}: ${singleTable.title} can only accommodate ${maxCapacity} guests maximum, but you have ${dateData.peopleCount} guests. Please select additional tables or a larger table option.`
+            );
+          }
+
+          if (dateData.peopleCount < minCapacity) {
+            errors.push(
+              `${date}: ${singleTable.title} requires at least ${minCapacity} guests, but you have ${dateData.peopleCount} guests. Please select a smaller table option.`
             );
           }
         }

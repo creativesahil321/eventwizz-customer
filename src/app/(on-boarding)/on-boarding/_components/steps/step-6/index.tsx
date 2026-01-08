@@ -30,7 +30,6 @@ import { useEventId } from "../../../_lib/hooks/useEventId";
 import MenuCategoryDropdown from "./menu-category-dropdown";
 import { useEventMenuCategories } from "@/services/vendor/events/query";
 import { EventMenuCategory } from "@/services/vendor/events/type";
-import { TiptapEditor } from "@/components/ui/tiptap-editor";
 
 // Define a type for the menu structure based on the schema
 type MenuType = {
@@ -172,13 +171,13 @@ export default function StepSix() {
 
   const appendItem = (menuIndex: number) => {
     const currentItems = form.getValues(`menus.${menuIndex}.items`) || [];
-    
+
     // Check if we've reached the maximum limit of 10 items per category
     if (currentItems.length >= 10) {
       toast.error("Maximum of 10 items allowed per category");
       return;
     }
-    
+
     const newItems = [...currentItems, { title: "", description: "" }];
 
     form.setValue(`menus.${menuIndex}.items`, newItems);
@@ -243,7 +242,7 @@ export default function StepSix() {
   useEffect(() => {
     const categoryId = form.getValues("event_menu_category_id");
     const hasMenus = menuFields.length > 0;
-    
+
     // Only create menu entry if:
     // 1. Category is selected
     // 2. Menu categories are loaded
@@ -788,10 +787,13 @@ export default function StepSix() {
                                             Description
                                           </FormLabel>
                                           <FormControl>
-                                            <TiptapEditor
-                                              value={field.value || ""}
-                                              onChange={(value) => {
-                                                field.onChange(value);
+                                            <Input
+                                              {...field}
+                                              placeholder="e.g., Spicy chicken with basmati rice"
+                                              className="h-10 bg-[#F9FAFB] border-[#E5E7EB]"
+                                              maxLength={160}
+                                              onChange={(e) => {
+                                                field.onChange(e);
                                                 // Update global form immediately
                                                 const currentMenus =
                                                   form.getValues("menus");
@@ -805,18 +807,14 @@ export default function StepSix() {
                                                   ];
                                                   updatedMenus[menuIndex].items[
                                                     itemIndex
-                                                  ].description = value;
+                                                  ].description =
+                                                    e.target.value;
                                                   globalForm.setValue(
                                                     "stepSix.menus",
                                                     updatedMenus
                                                   );
                                                 }
                                               }}
-                                              placeholder="e.g., Spicy chicken with basmati rice"
-                                              className="min-h-[80px] w-full overflow-hidden max-w-[200px]"
-                                              maxLength={160}
-                                              wrapText={true}
-                                              showAIButton={false}
                                             />
                                           </FormControl>
                                           <FormMessage />

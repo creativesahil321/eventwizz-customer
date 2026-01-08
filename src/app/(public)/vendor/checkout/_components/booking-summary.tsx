@@ -116,38 +116,52 @@ export default function BookingSummary({}: BookingSummaryProps) {
   }, [currentEventApiData]);
 
   // Calculate payment blocking state
-  const { isPaymentBlocked, hasValidationErrors } = useMemo(() => {
-    if (!currentEventSlug) {
-      return { isPaymentBlocked: false, hasValidationErrors: false };
-    }
-
-    let hasUnsaved = false;
-    let hasValidationErrors = false;
-
-    availableDates.forEach((date) => {
-      const dateData = getDateData(currentEventSlug, date);
-      if (dateData) {
-        if (hasUnsavedChanges(currentEventSlug, date) || dateData.hasChanges) {
-          hasUnsaved = true;
-        }
-        const validation = validateDateRequirements(currentEventSlug, date);
-        if (!validation.isValid) {
-          hasValidationErrors = true;
-        }
+  const { isPaymentBlocked, hasValidationErrors, validationErrorMessage } =
+    useMemo(() => {
+      if (!currentEventSlug) {
+        return {
+          isPaymentBlocked: false,
+          hasValidationErrors: false,
+          validationErrorMessage: undefined,
+        };
       }
-    });
 
-    return {
-      isPaymentBlocked: hasUnsaved || hasValidationErrors,
-      hasValidationErrors,
-    };
-  }, [
-    currentEventSlug,
-    availableDates,
-    getDateData,
-    hasUnsavedChanges,
-    validateDateRequirements,
-  ]);
+      let hasUnsaved = false;
+      let hasValidationErrors = false;
+      let validationErrorMessage: string | undefined;
+
+      availableDates.forEach((date) => {
+        const dateData = getDateData(currentEventSlug, date);
+        if (dateData) {
+          if (
+            hasUnsavedChanges(currentEventSlug, date) ||
+            dateData.hasChanges
+          ) {
+            hasUnsaved = true;
+          }
+          const validation = validateDateRequirements(currentEventSlug, date);
+          if (!validation.isValid) {
+            hasValidationErrors = true;
+            // Store the first error message we encounter
+            if (!validationErrorMessage && validation.errorMessage) {
+              validationErrorMessage = validation.errorMessage;
+            }
+          }
+        }
+      });
+
+      return {
+        isPaymentBlocked: hasUnsaved || hasValidationErrors,
+        hasValidationErrors,
+        validationErrorMessage,
+      };
+    }, [
+      currentEventSlug,
+      availableDates,
+      getDateData,
+      hasUnsavedChanges,
+      validateDateRequirements,
+    ]);
 
   // Checkout handler
   const handleProceedToPayment = async () => {
@@ -678,7 +692,8 @@ export default function BookingSummary({}: BookingSummaryProps) {
                     e.preventDefault();
                     if (hasValidationErrors) {
                       toast.error(
-                        "Please select at least one table or ticket for each date"
+                        validationErrorMessage ||
+                          "Please select at least one table or ticket for each date"
                       );
                     } else {
                       toast.error("Please save all changes first");
@@ -709,7 +724,7 @@ export default function BookingSummary({}: BookingSummaryProps) {
                   <>
                     <Clock className="w-4 h-4 mr-2 animate-spin" />
                     {hasValidationErrors
-                      ? "Select Tables/Tickets Required"
+                      ? "Validation Required"
                       : "Auto-saving... Please wait"}
                   </>
                 ) : !selectedGateway ? (

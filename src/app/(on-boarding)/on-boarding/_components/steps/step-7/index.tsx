@@ -25,7 +25,7 @@ import { onboardingService } from "@/services/vendor/onboarding/onboarding.servi
 import { useSession } from "next-auth/react";
 import { useFieldFocusHandler } from "../../form-preview/field-focus-handler";
 import { useEventId } from "../../../_lib/hooks/useEventId";
-import { TiptapEditor } from "@/components/ui/tiptap-editor";
+
 export default function StepSeven() {
   const { form: globalForm, save, setActiveStep } = useFormContext();
   const { handleFieldFocus } = useFieldFocusHandler();
@@ -351,10 +351,13 @@ export default function StepSeven() {
                                   Package Description
                                 </FormLabel>
                                 <FormControl>
-                                  <TiptapEditor
-                                    value={field.value || ""}
-                                    onChange={(value) => {
-                                      field.onChange(value);
+                                  <Input
+                                    {...field}
+                                    placeholder="e.g. Includes premium access, special amenities..."
+                                    className="h-10 bg-[#F9FAFB] border-[#E5E7EB]"
+                                    maxLength={160}
+                                    onChange={(e) => {
+                                      field.onChange(e);
                                       // Update global form immediately
                                       const currentPackages =
                                         form.getValues("packages");
@@ -362,17 +365,12 @@ export default function StepSeven() {
                                         ...currentPackages,
                                       ];
                                       updatedPackages[index].description =
-                                        value;
+                                        e.target.value;
                                       globalForm.setValue(
                                         "stepSeven.packages",
                                         updatedPackages as StepSevenType["packages"]
                                       );
                                     }}
-                                    placeholder="e.g. Includes premium access, special amenities..."
-                                    className="min-h-[80px] w-full overflow-hidden max-w-[200px]"
-                                    maxLength={160}
-                                    wrapText={true}
-                                    showAIButton={false}
                                   />
                                 </FormControl>
                                 <FormMessage />

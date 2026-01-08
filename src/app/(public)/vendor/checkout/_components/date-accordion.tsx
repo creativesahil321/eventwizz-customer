@@ -95,6 +95,10 @@ export default function DateAccordion({
   })();
 
   const hasChanges = hasUnsavedChanges(eventSlug, date);
+  
+  // Check validation status
+  const validation = validateDateRequirements(eventSlug, date);
+  const hasValidationError = !validation.isValid && validation.errorMessage;
 
   // AUTO-SAVE: Automatically save changes after 2 seconds of inactivity
   useEffect(() => {
@@ -358,6 +362,16 @@ export default function DateAccordion({
             </CardTitle>
           </div>
           <div className="flex items-center space-x-3">
+            {/* Validation Error Badge */}
+            {hasValidationError && (
+              <Badge
+                variant="destructive"
+                className="text-xs bg-red-50 text-red-700 border-red-200"
+              >
+                <span>⚠️ Validation Required</span>
+              </Badge>
+            )}
+
             {/* Unsaved Changes Indicator */}
             {/* Auto-Saving Status Badge */}
             {isAutoSaving && (
@@ -370,8 +384,8 @@ export default function DateAccordion({
               </Badge>
             )}
 
-            {/* Unsaved Badge - Only show if not auto-saving */}
-            {hasChanges && !isAutoSaving && (
+            {/* Unsaved Badge - Only show if not auto-saving and no validation errors */}
+            {hasChanges && !isAutoSaving && !hasValidationError && (
               <Badge
                 variant="secondary"
                 className="text-xs bg-blue-50 text-blue-700 border-blue-200"

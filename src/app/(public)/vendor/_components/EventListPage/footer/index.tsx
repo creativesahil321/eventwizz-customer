@@ -31,34 +31,31 @@ export default function FooterSection() {
   // Current year for copyright
   const currentYear = new Date().getFullYear();
 
-  // Prepare social links
-  const socialLinks = [
-    {
-      icon: Facebook,
-      href: "/#",
-      id: "facebook",
-    },
-    {
-      icon: Twitter,
-      href: "/#",
-      id: "twitter",
-    },
-    {
-      icon: Instagram,
-      href: "/#",
-      id: "instagram",
-    },
-    {
-      icon: Linkedin,
-      href: "/#",
-      id: "linkedin",
-    },
-    {
-      icon: Youtube,
-      href: "/#",
-      id: "youtube",
-    },
-  ];
+  // Social media icon mapping
+  const socialIcons = {
+    facebook: Facebook,
+    twitter: Twitter,
+    instagram: Instagram,
+    linkedin: Linkedin,
+    youtube: Youtube,
+  } as const;
+
+  // Prepare social links from theme data
+  const socialLinks = Object.entries(vendorTheme?.socialLinks || {})
+    .filter(([, url]) => url && url.trim() !== "")
+    .map(([platform, url]) => {
+      const IconComponent = socialIcons[platform as keyof typeof socialIcons];
+      if (!IconComponent) return null;
+      return {
+        icon: IconComponent,
+        href: url,
+        id: platform,
+      };
+    })
+    .filter(
+      (link): link is { icon: typeof Facebook; href: string; id: string } =>
+        link !== null
+    );
 
   // Prepare contact sections
   const contactDetails = (
@@ -108,18 +105,21 @@ export default function FooterSection() {
             />
           </div>
         </Link>
-        <div className="flex justify-center gap-4 my-5">
-          {socialLinks.map(({ icon: Icon, href }, index) => (
-            <Link
-              key={index}
-              href={href}
-              target="_blank"
-              className="hover:text-[color:var(--color-primary)] transition-colors"
-            >
-              <Icon size={20} />
-            </Link>
-          ))}
-        </div>
+        {socialLinks.length > 0 && (
+          <div className="flex justify-center gap-4 my-5">
+            {socialLinks.map(({ icon: Icon, href, id }) => (
+              <Link
+                key={id}
+                href={href}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="hover:text-[color:var(--color-primary)] transition-colors"
+              >
+                <Icon size={20} />
+              </Link>
+            ))}
+          </div>
+        )}
       </div>
       <div className="container mx-auto py-8 grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-8">
         {contactSections.map(

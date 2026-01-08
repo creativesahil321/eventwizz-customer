@@ -417,13 +417,7 @@ export default function GuestAllocationModal({
                       currentValue <= (table.maxPersons || 999);
 
                     return (
-                      <div key={index} className="space-y-2">
-                        <Label
-                          htmlFor={`table-${table.id}-${index}`}
-                          className="text-xs font-medium text-gray-700 block"
-                        >
-                          Table {index + 1}
-                        </Label>
+                      <div key={index} className="space-y-1.5 pb-6">
                         <div className="relative">
                           <Input
                             id={`table-${table.id}-${index}`}
@@ -438,17 +432,25 @@ export default function GuestAllocationModal({
                                 e.target.value
                               )
                             }
-                            className={`text-center text-base font-semibold py-2 ${
+                            className={`text-center text-lg font-semibold py-3 ${
                               isValid
                                 ? "border-gray-300 focus:border-blue-500 focus:ring-blue-500"
                                 : "border-red-300 focus:border-red-500 focus:ring-red-500"
                             }`}
                           />
-                          <div className="absolute -bottom-5 left-0 right-0 text-center">
-                            <span className="text-xs text-gray-400 bg-white px-1 py-0.5 rounded text-xs">
-                              {table.minPersons}-{table.maxPersons}
-                            </span>
-                          </div>
+                        </div>
+                        <div className="text-center">
+                          <span className="text-xs text-gray-500">
+                            {table.minPersons}-{table.maxPersons}
+                          </span>
+                        </div>
+                        <div className="text-center">
+                          <Label
+                            htmlFor={`table-${table.id}-${index}`}
+                            className="text-xs font-medium text-gray-600 cursor-pointer"
+                          >
+                            Table {index + 1}
+                          </Label>
                         </div>
                       </div>
                     );

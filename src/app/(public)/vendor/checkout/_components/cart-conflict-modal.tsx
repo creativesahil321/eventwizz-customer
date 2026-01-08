@@ -161,7 +161,7 @@ export default function CartConflictModal({
             </Button>
 
             <Button
-              variant="outline"
+              variant="event-outline"
               onClick={handleContinueWithCurrent}
               disabled={isProcessing}
               className="w-full"

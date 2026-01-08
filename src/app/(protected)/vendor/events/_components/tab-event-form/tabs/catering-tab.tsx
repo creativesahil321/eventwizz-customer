@@ -25,7 +25,6 @@ import { EventMenuCategory } from "@/services/vendor/events/type";
 import MenuCategoryDropdown from "@/app/(on-boarding)/on-boarding/_components/steps/step-6/menu-category-dropdown";
 import Image from "next/image";
 import { FileUploader } from "@/components/ui/file-uploader";
-import { TiptapEditor } from "@/components/ui/tiptap-editor";
 
 export default function CateringTab() {
   const [isLoading, setIsLoading] = useState(false);
@@ -541,17 +540,11 @@ export default function CateringTab() {
                                         Description
                                       </FormLabel>
                                       <FormControl>
-                                        <TiptapEditor
-                                          value={field.value || ""}
-                                          onChange={(value) => {
-                                            field.onChange(value);
-                                          }}
+                                        <Input
+                                          {...field}
                                           placeholder="e.g., Spicy, with rice"
-                                          className="bg-gray-100 p-2 rounded-md"
+                                          className="h-10 bg-[#F9FAFB] border-[#E5E7EB]"
                                           maxLength={160}
-                                          maxWords={50}
-                                          showAIButton={false}
-                                          wrapText={true}
                                         />
                                       </FormControl>
                                       <FormMessage />

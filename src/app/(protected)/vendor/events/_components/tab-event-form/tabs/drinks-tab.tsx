@@ -18,7 +18,6 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { X, PlusCircle } from "lucide-react";
-import { TiptapEditor } from "@/components/ui/tiptap-editor";
 
 export default function DrinksTab() {
   const [isLoading, setIsLoading] = useState(false);
@@ -302,17 +301,11 @@ export default function DrinksTab() {
                           Package Description
                         </FormLabel>
                         <FormControl>
-                          <TiptapEditor
-                            value={field.value || ""}
-                            onChange={(value) => {
-                              field.onChange(value);
-                            }}
+                          <Input
+                            {...field}
                             placeholder="e.g. Includes premium access, special amenities..."
-                            className="bg-gray-100 p-2 rounded-md"
+                            className="h-10 bg-[#F9FAFB] border-[#E5E7EB]"
                             maxLength={160}
-                            maxWords={50}
-                            showAIButton={false}
-                            wrapText={true}
                           />
                         </FormControl>
                         <FormMessage />
