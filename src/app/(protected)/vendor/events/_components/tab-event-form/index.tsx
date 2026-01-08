@@ -114,8 +114,8 @@ export default function TabEventForm() {
             className="w-full"
           >
             <div className="flex justify-between items-center mb-4">
-              <div className="w-full overflow-x-auto pb-2 no-scrollbar">
-                <TabsList className="flex w-max min-w-full bg-background p-1 h-auto rounded-lg gap-1 overflow-x-auto no-scrollbar">
+              <div className="w-full overflow-x-auto pb-2 scrollbar-thin scrollbar-thumb-gray-400 scrollbar-track-gray-100 hover:scrollbar-thumb-gray-500 -mx-1 px-1">
+                <TabsList className="inline-flex w-max bg-background p-1 h-auto rounded-lg gap-1.5">
                   {steps.map((step) => {
                     // Disable tabs that are beyond the current step
                     const isDisabled = currentStep
@@ -127,7 +127,7 @@ export default function TabEventForm() {
                         key={step.id}
                         value={step.value}
                         disabled={isDisabled}
-                        className={`px-2 sm:px-3 md:px-4 py-1 h-8 text-xs sm:text-sm font-medium whitespace-nowrap relative rounded-md data-[state=active]:bg-[var(--color-primary)] data-[state=active]:text-white data-[state=active]:shadow-sm mx-0.5 flex items-center gap-1 sm:gap-1.5 min-w-0 ${
+                        className={`px-2 sm:px-3 md:px-4 py-1.5 h-auto text-xs sm:text-sm font-medium whitespace-nowrap rounded-md data-[state=active]:bg-[var(--color-primary)] data-[state=active]:text-white data-[state=active]:shadow-sm flex items-center gap-1 sm:gap-1.5 flex-shrink-0 ${
                           isDisabled ? "opacity-50 cursor-not-allowed" : ""
                         } ${
                           currentStep && step.id === currentStep
@@ -136,9 +136,9 @@ export default function TabEventForm() {
                         }`}
                       >
                         {step.icon}
-                        {step.label}
+                        <span className="whitespace-nowrap">{step.label}</span>
                         {currentStep && step.id === currentStep && (
-                          <span className="ml-1 text-xs bg-blue-100 text-blue-800 px-1 sm:px-1.5 py-0.5 rounded-full hidden sm:inline">
+                          <span className="ml-1 text-xs bg-blue-100 text-blue-800 px-1 sm:px-1.5 py-0.5 rounded-full hidden sm:inline whitespace-nowrap">
                             Current
                           </span>
                         )}

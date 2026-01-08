@@ -994,7 +994,7 @@ export default function AdjustBookingContent({
 
                                   {/* Add-ons Section */}
                                   {hasAddons && (
-                                    <div className="mt-3 pt-3 border-t border-gray-200">
+                                    <div className="mt-4 p-3 border-2 border-purple-300 rounded-lg bg-gradient-to-br from-purple-50/80 via-purple-50/50 to-transparent shadow-sm">
                                       <button
                                         type="button"
                                         id={`addons-trigger-${dateInfo.booking_date_id}`}
@@ -1009,10 +1009,15 @@ export default function AdjustBookingContent({
                                           ] === true
                                         }
                                         aria-controls={`addons-content-${dateInfo.booking_date_id}`}
-                                        className="flex items-center justify-between w-full py-2 px-3 border border-[var(--color-primary)] rounded-md transition-all duration-200 group cursor-pointer hover:text-[var(--color-primary)] hover:bg-[var(--color-primary)]/25 hover:-translate-y-0.5 hover:shadow-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)]/300 focus-visible:ring-offset-1"
+                                        className="flex items-center justify-between w-full py-2.5 px-3 border-2 border-purple-400 rounded-md transition-all duration-200 group cursor-pointer bg-white hover:bg-purple-50 hover:-translate-y-0.5 hover:shadow-md hover:border-purple-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-400 focus-visible:ring-offset-2"
                                       >
                                         <div className="flex items-center gap-2">
-                                          <span className="text-xs font-semibold text-foreground">
+                                          <div className="p-1 rounded bg-purple-100">
+                                            <svg className="h-3.5 w-3.5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                                            </svg>
+                                          </div>
+                                          <span className="text-sm font-bold text-purple-900">
                                             Add-ons Included
                                           </span>
                                           <div className="flex items-center gap-2">
@@ -1080,9 +1085,9 @@ export default function AdjustBookingContent({
                                         {expandedAddOns[
                                           dateInfo.booking_date_id.toString()
                                         ] === true ? (
-                                          <ChevronUp className="h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors" />
+                                          <ChevronUp className="h-4 w-4 text-purple-600 group-hover:text-purple-700 transition-colors" />
                                         ) : (
-                                          <ChevronDown className="h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors" />
+                                          <ChevronDown className="h-4 w-4 text-purple-600 group-hover:text-purple-700 transition-colors" />
                                         )}
                                       </button>
 
@@ -1093,7 +1098,7 @@ export default function AdjustBookingContent({
                                         <div
                                           id={`addons-content-${dateInfo.booking_date_id}`}
                                           aria-labelledby={`addons-trigger-${dateInfo.booking_date_id}`}
-                                          className="mt-2 space-y-3 transition-opacity duration-200 ease-out"
+                                          className="mt-3 space-y-3 p-3 bg-white rounded-lg border border-purple-200 transition-opacity duration-200 ease-out"
                                         >
                                           {/* Tables Add-ons */}
                                           {dateInfo.addons.tables &&

@@ -5,7 +5,8 @@ import { useRouter } from "next/navigation";
 import { useLocationStore } from "@/store/location.store";
 import { useDomain } from "@/providers/domain-provider/domain-provider";
 import LocationSelectionHeader from "./_components/LocationPage/location-selection-header";
-import LocationGrid from "./_components/LocationPage/location-grid";
+import LocationGridEnhanced from "./_components/LocationPage/location-grid-enhanced";
+import { useLocationStats } from "@/services/common/locations/hooks/useLocationStats";
 import GoogleLocationMap from "./_components/LocationPage/location-map-google";
 import Image from "next/image";
 import { motion } from "framer-motion";
@@ -20,6 +21,11 @@ export default function VendorSiteHomePage() {
   const [viewMode, setViewMode] = useState<"map" | "grid">("grid");
   const [isMobile, setIsMobile] = useState(false);
   const { settings, isLoading: isDomainLoading } = useDomain();
+
+  // Fetch location statistics for enhanced cards
+  const { locationStats, isLoadingStats } = useLocationStats(
+    allLocations.map((loc) => ({ slug: loc.slug }))
+  );
 
   // Detect mobile devices
   useEffect(() => {
@@ -172,10 +178,11 @@ export default function VendorSiteHomePage() {
             />
           ) : (
             <div className="max-w-6xl mx-auto">
-              <LocationGrid
+              <LocationGridEnhanced
                 locations={allLocations}
-                isLoading={isLoading || isDomainLoading}
+                isLoading={isLoading || isDomainLoading || isLoadingStats}
                 onSelect={handleLocationSelect}
+                locationStats={locationStats}
               />
             </div>
           )}

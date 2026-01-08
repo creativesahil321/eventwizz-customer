@@ -270,7 +270,12 @@ export interface CartEditState {
       price_per_ticket: number;
       quantity: number;
     }>;
-    drink_package: Array<{ id: number; title: string; price: number; quantity: number }>;
+    drink_package: Array<{
+      id: number;
+      title: string;
+      price: number;
+      quantity: number;
+    }>;
     people_quantity?: number;
     special_request?: string;
   };
@@ -919,12 +924,50 @@ export const useCartEditStore = create<CartEditState>()(
         const hasTicket = dateData.tickets.some((t) => t.quantity > 0);
         const hasTableOrTicket = hasTable || hasTicket;
 
+        if (!hasTableOrTicket) {
+          return {
+            isValid: false,
+            hasTableOrTicket: false,
+            errorMessage:
+              "Please select at least one table or ticket for this date",
+          };
+        }
+
+        // Validate table capacity if tables are selected
+        const selectedTables = dateData.tables.filter((t) => t.quantity > 0);
+        if (selectedTables.length > 0 && dateData.peopleCount) {
+          let totalMinCapacity = 0;
+          let totalMaxCapacity = 0;
+
+          selectedTables.forEach((table) => {
+            const minPersons = table.minPersons || 1;
+            const maxPersons = table.maxPersons || 999;
+            totalMinCapacity += minPersons * table.quantity;
+            totalMaxCapacity += maxPersons * table.quantity;
+          });
+
+          // Check if selected tables can accommodate the group
+          if (dateData.peopleCount > totalMaxCapacity) {
+            return {
+              isValid: false,
+              hasTableOrTicket: true,
+              errorMessage: `Insufficient table capacity! You have ${dateData.peopleCount} guests but selected tables can only accommodate ${totalMaxCapacity} guests maximum. Please add more tables.`,
+            };
+          }
+
+          // Check if group size is too small for selected tables
+          if (dateData.peopleCount < totalMinCapacity) {
+            return {
+              isValid: false,
+              hasTableOrTicket: true,
+              errorMessage: `Selected tables require at least ${totalMinCapacity} guests, but you have ${dateData.peopleCount} guests. Please select smaller tables or reduce table quantity.`,
+            };
+          }
+        }
+
         return {
-          isValid: hasTableOrTicket,
-          hasTableOrTicket,
-          errorMessage: hasTableOrTicket
-            ? undefined
-            : "Please select at least one table or ticket for this date",
+          isValid: true,
+          hasTableOrTicket: true,
         };
       },
 

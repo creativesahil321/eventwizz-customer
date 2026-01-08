@@ -135,35 +135,35 @@ export default function AdminHeader() {
 
       {/* Mobile menu */}
       {mobileMenuOpen && (
-        <div className="md:hidden bg-[color:var(--color-surface)] border-t">
+        <div className="md:hidden bg-[color:var(--color-header)] border-t">
           <div className="container mx-auto px-4 py-4 flex flex-col space-y-4">
             <Link
               href="/admin/features"
-              className="text-sm font-medium hover:text-[color:var(--color-primary)] transition-colors py-2 border-b"
+              className="text-sm font-medium hover:text-[color:var(--color-primary)] transition-colors py-2 border-b text-[color:var(--color-text)]"
             >
               Features
             </Link>
             <Link
               href="/admin/uses"
-              className="text-sm font-medium hover:text-[color:var(--color-primary)] transition-colors py-2 border-b"
+              className="text-sm font-medium hover:text-[color:var(--color-primary)] transition-colors py-2 border-b text-[color:var(--color-text)]"
             >
               Uses
             </Link>
             <Link
               href="/admin/pricing"
-              className="text-sm font-medium hover:text-[color:var(--color-primary)] transition-colors py-2 border-b"
+              className="text-sm font-medium hover:text-[color:var(--color-primary)] transition-colors py-2 border-b text-[color:var(--color-text)]"
             >
               Pricing
             </Link>
             <Link
               href="/admin/faqs"
-              className="text-sm font-medium hover:text-[color:var(--color-primary)] transition-colors py-2 border-b"
+              className="text-sm font-medium hover:text-[color:var(--color-primary)] transition-colors py-2 border-b text-[color:var(--color-text)]"
             >
               FAQs
             </Link>
             <Link
               href="/admin/venues"
-              className="text-sm font-medium hover:text-[color:var(--color-primary)] transition-colors py-2 border-b"
+              className="text-sm font-medium hover:text-[color:var(--color-primary)] transition-colors py-2 border-b text-[color:var(--color-text)]"
             >
               Find Venues
             </Link>
@@ -176,24 +176,17 @@ export default function AdminHeader() {
 
               {isAuthenticated ? (
                 <Link href={`/${session?.user?.account_type}/dashboard`}>
-                  <Button variant="outline" className="w-full">
+                  <Button variant="event-primary" className="w-full">
                     Dashboard
                   </Button>
                 </Link>
               ) : (
                 <Link href="/auth/login">
-                  <Button variant="outline" className="w-full">
+                  <Button variant="event-primary" className="w-full">
                     Log in
                   </Button>
                 </Link>
               )}
-
-              <Button
-                variant="outline"
-                className="w-full flex items-center justify-center"
-              >
-                <Search className="mr-2 h-4 w-4" /> Search
-              </Button>
             </div>
           </div>
         </div>

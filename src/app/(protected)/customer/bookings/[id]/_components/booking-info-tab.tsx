@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
@@ -26,7 +26,6 @@ import {
   RotateCcw,
   Trash2,
 } from "lucide-react";
-import type { LucideIcon } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { RescheduleDateModal } from "./reschedule-date-modal";
 import { SingleDatePaymentModal } from "./single-date-payment-modal";
@@ -34,9 +33,6 @@ import { toast } from "sonner";
 import { useDeleteAddOns } from "@/services/customer/bookings/hooks/useDeleteAddOns";
 import { useRescheduleBooking } from "@/services/customer/bookings/query";
 import type { RescheduleBookingPayload } from "@/services/customer/bookings/type";
-import { motion } from "framer-motion";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Label } from "@/components/ui/label";
 
 interface BookingItem {
   type: "table" | "ticket";
@@ -186,83 +182,6 @@ export default function BookingInfoTab({ bookingData }: BookingInfoTabProps) {
       outstanding: "£0.00",
       depositSelected: "£0.00",
     };
-
-  const hasDepositSelection = summary.depositSelected > 0;
-  const depositOutstanding = hasDepositSelection
-    ? Math.max(summary.depositSelected - summary.paid, 0)
-    : 0;
-  const depositOptionAvailable =
-    hasDepositSelection && depositOutstanding > 0 && summary.outstanding > 0;
-  const depositAlreadySettled =
-    hasDepositSelection &&
-    !depositOptionAvailable &&
-    summary.depositSelected > 0;
-
-  const [selectedPaymentPlan, setSelectedPaymentPlan] = useState<
-    "full" | "deposit" | null
-  >(null);
-
-  useEffect(() => {
-    if (!depositOptionAvailable && selectedPaymentPlan === "deposit") {
-      setSelectedPaymentPlan(null);
-      setSelectedPaymentMethod(null);
-    }
-  }, [depositOptionAvailable, selectedPaymentPlan]);
-
-  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<
-    "card" | "bank-transfer" | null
-  >(null);
-
-  const handlePaymentPlanChange = (value: "full" | "deposit") => {
-    if (value === "deposit" && !depositOptionAvailable) {
-      return;
-    }
-    setSelectedPaymentPlan(value);
-    setSelectedPaymentMethod(null);
-  };
-
-  const payTodayAmount =
-    selectedPaymentPlan === "full"
-      ? summary.outstanding
-      : selectedPaymentPlan === "deposit"
-      ? Math.min(depositOutstanding, summary.outstanding)
-      : 0;
-
-  const balanceAfterPayment =
-    selectedPaymentPlan === null
-      ? summary.outstanding
-      : Math.max(summary.outstanding - payTodayAmount, 0);
-  const formatDisplayAmount = (value: number) => `£${value.toFixed(2)}`;
-  const depositBalanceAfterPayment = Math.max(
-    summary.outstanding - depositOutstanding,
-    0
-  );
-
-  const paymentMethods: Array<{
-    id: "card" | "bank-transfer";
-    label: string;
-    description: string;
-    icon: LucideIcon;
-  }> = [
-    {
-      id: "card",
-      label: "Card payment",
-      description:
-        "Pay securely with Visa, Mastercard, Amex or other major cards.",
-      icon: CreditCard,
-    },
-    {
-      id: "bank-transfer",
-      label: "Bank transfer",
-      description:
-        "Receive our bank details instantly and complete the transfer.",
-      icon: Banknote,
-    },
-  ];
-
-  const selectedMethodMeta = selectedPaymentMethod
-    ? paymentMethods.find((method) => method.id === selectedPaymentMethod)
-    : undefined;
 
   // Get table count for a date
   const getTableCount = (items: BookingItem[]) => {
@@ -1037,7 +956,7 @@ export default function BookingInfoTab({ bookingData }: BookingInfoTabProps) {
                                     dateInfo.addons.tickets.length > 0) ||
                                   (dateInfo.addons.drinks &&
                                     dateInfo.addons.drinks.length > 0)) && (
-                                  <div className="mt-3 pt-3 border-t border-gray-200">
+                                  <div className="mt-4 p-3 border-2 border-purple-300 rounded-lg bg-gradient-to-br from-purple-50/80 via-purple-50/50 to-transparent shadow-sm">
                                     <button
                                       type="button"
                                       id={`addons-trigger-${dateInfo.id}`}
@@ -1048,10 +967,25 @@ export default function BookingInfoTab({ bookingData }: BookingInfoTabProps) {
                                         expandedAddOns[dateInfo.id] === true
                                       }
                                       aria-controls={`addons-content-${dateInfo.id}`}
-                                      className="flex items-center justify-between w-full py-2 px-3 border border-[var(--color-primary)] rounded-md transition-all duration-200 group cursor-pointer hover:text-[var(--color-primary)] hover:bg-[var(--color-primary)]/25 hover:-translate-y-0.5 hover:shadow-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)]/300 focus-visible:ring-offset-1"
+                                      className="flex items-center justify-between w-full py-2.5 px-3 border-2 border-purple-400 rounded-md transition-all duration-200 group cursor-pointer bg-white hover:bg-purple-50 hover:-translate-y-0.5 hover:shadow-md hover:border-purple-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-400 focus-visible:ring-offset-2"
                                     >
                                       <div className="flex items-center gap-2">
-                                        <span className="text-xs font-semibold text-foreground">
+                                        <div className="p-1 rounded bg-purple-100">
+                                          <svg
+                                            className="h-3.5 w-3.5 text-purple-600"
+                                            fill="none"
+                                            stroke="currentColor"
+                                            viewBox="0 0 24 24"
+                                          >
+                                            <path
+                                              strokeLinecap="round"
+                                              strokeLinejoin="round"
+                                              strokeWidth={2}
+                                              d="M12 6v6m0 0v6m0-6h6m-6 0H6"
+                                            />
+                                          </svg>
+                                        </div>
+                                        <span className="text-sm font-bold text-purple-900">
                                           Add-ons Included
                                         </span>
                                         <div className="flex items-center gap-2">
@@ -1124,9 +1058,9 @@ export default function BookingInfoTab({ bookingData }: BookingInfoTabProps) {
                                         </div>
                                       </div>
                                       {expandedAddOns[dateInfo.id] === true ? (
-                                        <ChevronUp className="h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors" />
+                                        <ChevronUp className="h-4 w-4 text-purple-600 group-hover:text-purple-700 transition-colors" />
                                       ) : (
-                                        <ChevronDown className="h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors" />
+                                        <ChevronDown className="h-4 w-4 text-purple-600 group-hover:text-purple-700 transition-colors" />
                                       )}
                                     </button>
 
@@ -1135,7 +1069,7 @@ export default function BookingInfoTab({ bookingData }: BookingInfoTabProps) {
                                       <div
                                         id={`addons-content-${dateInfo.id}`}
                                         aria-labelledby={`addons-trigger-${dateInfo.id}`}
-                                        className="mt-2 space-y-3 transition-opacity duration-200 ease-out"
+                                        className="mt-3 space-y-3 p-3 bg-white rounded-lg border border-purple-200 transition-opacity duration-200 ease-out"
                                       >
                                         {/* Tables Add-ons */}
                                         {dateInfo.addons.tables &&
@@ -1458,7 +1392,7 @@ export default function BookingInfoTab({ bookingData }: BookingInfoTabProps) {
 
       <Separator className="my-4" />
 
-      {/* Payment Summary - Professional */}
+      {/* Payment Summary - Display Only */}
       <Card className="border-2 bg-gradient-to-br from-blue-50/50 via-white to-indigo-50/30 shadow-md">
         <CardContent className="p-4 sm:p-5">
           <div className="space-y-4">
@@ -1510,326 +1444,113 @@ export default function BookingInfoTab({ bookingData }: BookingInfoTabProps) {
               </div>
             </div>
 
-            {depositOptionAvailable && (
-              <div className="rounded-lg border border-blue-100 bg-blue-50/60 px-3 py-2 text-xs text-blue-700">
-                Secure this booking with a deposit of{" "}
-                <span className="font-semibold">
-                  {formatDisplayAmount(depositOutstanding)}
-                </span>{" "}
-                or settle the full balance today.
+            {/* Grand Total */}
+            <div
+              className="flex items-center justify-between px-4 py-3 rounded-xl bg-white border-2 border-dashed shadow-sm"
+              style={{ borderColor: "var(--color-primary)" }}
+            >
+              <div>
+                <p className="text-xs uppercase tracking-wide text-muted-foreground font-semibold">
+                  Grand Total
+                </p>
+                <p className="text-sm font-medium text-foreground">
+                  Includes all selected add-ons
+                </p>
               </div>
-            )}
-
-            {depositAlreadySettled && (
-              <div className="rounded-lg border border-green-100 bg-green-50/60 px-3 py-2 text-xs text-green-700">
-                The deposit of{" "}
-                <span className="font-semibold">
-                  {summaryFormatted.depositSelected}
-                </span>{" "}
-                has already been collected. Choose how you would like to clear
-                the remaining balance.
-              </div>
-            )}
-
-            <div className="space-y-3">
-              <p className="text-xs uppercase tracking-wide text-muted-foreground font-semibold">
-                Step 1 · Choose how much to pay today
-              </p>
-              <RadioGroup
-                value={selectedPaymentPlan ?? ""}
-                onValueChange={(value) =>
-                  handlePaymentPlanChange(value as "full" | "deposit")
-                }
-                className="space-y-3"
+              <span
+                className="text-2xl font-bold"
+                style={{ color: "var(--color-primary)" }}
               >
-                <Label
-                  htmlFor="plan-full"
-                  className={`flex items-start gap-3 rounded-xl border px-4 py-4 transition-all duration-200 ${
-                    selectedPaymentPlan === "full"
-                      ? "border-[var(--color-primary)] bg-blue-50/70 shadow-sm"
-                      : "border-slate-200 bg-white hover:border-[var(--color-primary)]/60 hover:bg-blue-50/40 cursor-pointer"
-                  }`}
-                >
-                  <RadioGroupItem
-                    value="full"
-                    id="plan-full"
-                    className="mt-1"
-                  />
-                  <div className="flex-1 space-y-1">
-                    <div className="flex items-center gap-2">
-                      <CheckCircle2
-                        className="h-4 w-4 text-green-600"
-                        aria-hidden="true"
-                      />
-                      <span className="font-semibold text-foreground text-sm">
-                        Pay full balance
-                      </span>
-                      <Badge className="text-xs bg-green-100 text-green-700">
-                        Recommended
-                      </Badge>
-                    </div>
-                    <p className="text-xs text-muted-foreground">
-                      Settle everything today and keep your booking fully
-                      confirmed.
-                    </p>
-                    <div className="flex items-center gap-3 text-sm pt-2">
-                      <span className="font-semibold text-green-700">
-                        {formatDisplayAmount(summary.outstanding)}
-                      </span>
-                      <span className="text-muted-foreground">due now</span>
-                    </div>
-                  </div>
-                </Label>
-
-                {hasDepositSelection && (
-                  <Label
-                    htmlFor="plan-deposit"
-                    aria-disabled={!depositOptionAvailable}
-                    className={`flex items-start gap-3 rounded-xl border px-4 py-4 transition-all duration-200 ${
-                      selectedPaymentPlan === "deposit"
-                        ? "border-[var(--color-primary)] bg-purple-50/70 shadow-sm"
-                        : "border-slate-200 bg-white"
-                    } ${
-                      depositOptionAvailable
-                        ? "cursor-pointer hover:border-[var(--color-primary)]/60 hover:bg-purple-50/40"
-                        : "cursor-not-allowed opacity-60"
-                    }`}
-                  >
-                    <RadioGroupItem
-                      value="deposit"
-                      id="plan-deposit"
-                      className="mt-1"
-                      disabled={!depositOptionAvailable}
-                    />
-                    <div className="flex-1 space-y-1">
-                      <div className="flex items-center gap-2">
-                        <Clock className="h-4 w-4 text-purple-600" />
-                        <span className="font-semibold text-foreground text-sm">
-                          Pay deposit now
-                        </span>
-                        <Badge className="text-xs bg-purple-100 text-purple-700">
-                          {depositOptionAvailable
-                            ? `Pay ${formatDisplayAmount(
-                                depositOutstanding
-                              )} today`
-                            : "Already collected"}
-                        </Badge>
-                      </div>
-                      <p className="text-xs text-muted-foreground">
-                        {depositOptionAvailable
-                          ? `Secure your booking now and pay the remaining ${formatDisplayAmount(
-                              depositBalanceAfterPayment
-                            )} later.`
-                          : "Deposit payment is complete. Proceed with the remaining balance below."}
-                      </p>
-                    </div>
-                  </Label>
-                )}
-              </RadioGroup>
+                {summaryFormatted.total}
+              </span>
             </div>
 
-            {selectedPaymentPlan === null && (
-              <div className="rounded-lg border border-dashed border-slate-200 bg-white px-4 py-3 text-xs text-muted-foreground">
-                Select how much you want to pay today to continue.
-              </div>
-            )}
-
-            {/* Step 2: Payment Method - Only show after plan selection */}
-            {selectedPaymentPlan !== null && (
-              <motion.div
-                initial={{ opacity: 0, y: -10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.3 }}
-                className="space-y-3"
-              >
-                <p className="text-xs uppercase tracking-wide text-muted-foreground font-semibold">
-                  Step 2 · Select payment method
-                </p>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {paymentMethods.map((method) => {
-                    const Icon = method.icon;
-                    const isSelected = selectedPaymentMethod === method.id;
-                    return (
-                      <button
-                        key={method.id}
-                        type="button"
-                        onClick={() => setSelectedPaymentMethod(method.id)}
-                        className={`flex items-start gap-3 rounded-xl border px-4 py-4 text-left transition-all duration-200 ${
-                          isSelected
-                            ? "border-[var(--color-primary)] bg-blue-50/70 shadow-md"
-                            : "border-slate-200 bg-white hover:border-[var(--color-primary)]/60 hover:bg-blue-50/40"
-                        }`}
-                      >
-                        <div
-                          className={`p-2 rounded-md ${
-                            isSelected
-                              ? "bg-[var(--color-primary)] text-white"
-                              : "bg-blue-100 text-blue-700"
-                          }`}
-                        >
-                          <Icon className="h-4 w-4" aria-hidden="true" />
-                        </div>
-                        <div className="flex-1">
-                          <p className="text-sm font-semibold text-foreground">
-                            {method.label}
-                          </p>
-                          <p className="text-xs text-muted-foreground mt-1">
-                            {method.description}
-                          </p>
-                        </div>
-                        {isSelected && (
-                          <CheckCircle2
-                            className="h-5 w-5 text-[var(--color-primary)]"
-                            aria-hidden="true"
-                          />
-                        )}
-                      </button>
-                    );
-                  })}
-                </div>
-
-                {selectedPaymentMethod === null && (
-                  <div className="rounded-lg border border-dashed border-slate-200 bg-white px-4 py-3 text-xs text-muted-foreground">
-                    Select a payment method to review your payment summary.
+            {/* Payment Details */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+              {summary.paid > 0 && (
+                <div className="flex items-center justify-between px-3 py-2 rounded-lg bg-slate-50 border border-slate-200">
+                  <div>
+                    <p className="text-[11px] uppercase tracking-wide text-muted-foreground font-semibold">
+                      Paid Amount
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      Already collected
+                    </p>
                   </div>
-                )}
+                  <span className="text-base font-semibold text-foreground">
+                    {summaryFormatted.paid}
+                  </span>
+                </div>
+              )}
 
-                {/* Summary boxes - Only show when payment method is also selected */}
-                {selectedPaymentMethod !== null && (
-                  <motion.div
-                    initial={{ opacity: 0, y: -10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.3, delay: 0.1 }}
-                    className="space-y-3 pt-2"
+              {summary.outstanding > 0 && (
+                <div
+                  className={`flex items-center justify-between px-3 py-2 rounded-lg border ${
+                    summary.outstanding > 0
+                      ? "bg-amber-50/70 border-amber-100"
+                      : "bg-green-50/70 border-green-100"
+                  }`}
+                >
+                  <div>
+                    <p className="text-[11px] uppercase tracking-wide text-muted-foreground font-semibold">
+                      Outstanding Balance
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {summary.outstanding > 0
+                        ? "Remaining to be paid"
+                        : "All paid"}
+                    </p>
+                  </div>
+                  <span
+                    className={`text-base font-semibold ${
+                      summary.outstanding > 0
+                        ? "text-amber-700"
+                        : "text-green-700"
+                    }`}
                   >
-                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm">
-                      <div>
-                        <p className="text-[11px] uppercase tracking-wide text-muted-foreground font-semibold">
-                          Paying with
-                        </p>
-                        <p className="text-sm font-semibold text-foreground">
-                          {selectedMethodMeta?.label ??
-                            "Select a payment method"}
-                        </p>
-                      </div>
-                      <p className="text-xs text-muted-foreground sm:text-right">
-                        {selectedMethodMeta?.description ??
-                          "Choose how you would like to complete this payment."}
-                      </p>
-                    </div>
+                    {summaryFormatted.outstanding}
+                  </span>
+                </div>
+              )}
+            </div>
 
-                    <div
-                      className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 py-3 px-4 rounded-xl bg-white border-2 border-dashed shadow-sm"
-                      style={{ borderColor: "var(--color-primary)" }}
-                    >
-                      <div>
-                        <p className="text-xs uppercase tracking-wide text-muted-foreground">
-                          Grand Total
-                        </p>
-                        <p className="text-sm font-medium text-foreground">
-                          Includes all selected add-ons
-                        </p>
-                      </div>
-                      <span
-                        className="text-2xl font-bold"
-                        style={{ color: "var(--color-primary)" }}
-                      >
-                        {summaryFormatted.total}
-                      </span>
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
-                      <div className="flex items-center justify-between px-3 py-2 rounded-lg bg-green-50/70 border border-green-100">
-                        <div>
-                          <p className="text-[11px] uppercase tracking-wide text-green-700 font-semibold">
-                            You&apos;ll pay today
-                          </p>
-                          <p className="text-xs text-muted-foreground">
-                            {selectedPaymentPlan === "full"
-                              ? "Full balance taken immediately."
-                              : depositOptionAvailable
-                              ? "Deposit to secure your booking."
-                              : "Remaining balance due now."}
-                          </p>
-                        </div>
-                        <span className="text-base font-semibold text-green-700">
-                          {formatDisplayAmount(payTodayAmount)}
-                        </span>
-                      </div>
-                      <div
-                        className={`flex items-center justify-between px-3 py-2 rounded-lg border ${
-                          balanceAfterPayment > 0
-                            ? "bg-amber-50/70 border-amber-100"
-                            : "bg-green-50/70 border-green-100"
-                        }`}
-                      >
-                        <div>
-                          <p className="text-[11px] uppercase tracking-wide text-muted-foreground font-semibold">
-                            Balance after this payment
-                          </p>
-                          <p className="text-xs text-muted-foreground">
-                            {balanceAfterPayment > 0
-                              ? "To be settled later."
-                              : "All balances cleared."}
-                          </p>
-                        </div>
-                        <span
-                          className={`text-base font-semibold ${
-                            balanceAfterPayment > 0
-                              ? "text-amber-700"
-                              : "text-green-700"
-                          }`}
-                        >
-                          {formatDisplayAmount(balanceAfterPayment)}
-                        </span>
-                      </div>
-                    </div>
-
-                    {summary.paid > 0 && (
-                      <div className="flex items-center justify-between px-3 py-2 rounded-lg bg-slate-50 border border-slate-200 text-sm">
-                        <span className="text-muted-foreground">
-                          Already collected previously
-                        </span>
-                        <span className="font-semibold text-foreground">
-                          {summaryFormatted.paid}
-                        </span>
-                      </div>
-                    )}
-
-                    <div className="flex items-center justify-between text-xs pt-2">
-                      <span className="text-muted-foreground">Status</span>
-                      <span
-                        className={`font-semibold flex items-center gap-1 ${
-                          bookingData.payment_status?.toLowerCase() === "paid"
-                            ? "text-green-600"
-                            : bookingData.payment_status?.toLowerCase() ===
-                              "pending"
-                            ? "text-yellow-600"
-                            : "text-red-600"
-                        }`}
-                      >
-                        <div
-                          className={`w-1.5 h-1.5 rounded-full ${
-                            bookingData.payment_status?.toLowerCase() === "paid"
-                              ? "bg-green-500"
-                              : bookingData.payment_status?.toLowerCase() ===
-                                "pending"
-                              ? "bg-yellow-500"
-                              : "bg-red-500"
-                          } ${
-                            bookingData.payment_status?.toLowerCase() ===
-                            "pending"
-                              ? "animate-pulse"
-                              : ""
-                          }`}
-                        />
-                        {bookingData.payment_status || "Pending"}
-                      </span>
-                    </div>
-                  </motion.div>
-                )}
-              </motion.div>
-            )}
+            {/* Payment Status */}
+            <div className="flex items-center justify-between px-3 py-2 rounded-lg bg-white border border-gray-200 text-sm">
+              <span className="text-muted-foreground font-medium">
+                Payment Status
+              </span>
+              <span
+                className={`font-semibold flex items-center gap-1.5 ${
+                  bookingData.payment_status?.toLowerCase() === "paid"
+                    ? "text-green-600"
+                    : bookingData.payment_status?.toLowerCase() === "pending" ||
+                      bookingData.payment_status?.toLowerCase() ===
+                        "partial payment"
+                    ? "text-yellow-600"
+                    : "text-red-600"
+                }`}
+              >
+                <div
+                  className={`w-2 h-2 rounded-full ${
+                    bookingData.payment_status?.toLowerCase() === "paid"
+                      ? "bg-green-500"
+                      : bookingData.payment_status?.toLowerCase() ===
+                          "pending" ||
+                        bookingData.payment_status?.toLowerCase() ===
+                          "partial payment"
+                      ? "bg-yellow-500"
+                      : "bg-red-500"
+                  } ${
+                    bookingData.payment_status?.toLowerCase() === "pending" ||
+                    bookingData.payment_status?.toLowerCase() ===
+                      "partial payment"
+                      ? "animate-pulse"
+                      : ""
+                  }`}
+                />
+                {bookingData.payment_status || "Pending"}
+              </span>
+            </div>
           </div>
         </CardContent>
       </Card>

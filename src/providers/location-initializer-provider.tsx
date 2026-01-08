@@ -93,7 +93,7 @@ export function LocationInitializerProvider({
           // We have locations in the session, use them instead of fetching again
           if (sessionLocations && sessionLocations.length > 0) {
             // Normalize locations to ensure is_default is boolean and preserve all fields
-            const normalizedLocations = sessionLocations.map((loc) => ({
+            const normalizedLocations = sessionLocations.map((loc: VenueLocation) => ({
               ...loc,
               is_default: Boolean(loc.is_default),
             }));
@@ -102,7 +102,7 @@ export function LocationInitializerProvider({
 
             // Set selected location from session
             const defaultLocation = normalizedLocations.find(
-              (loc) => loc.is_default === true
+              (loc: VenueLocation) => loc.is_default === true
             );
             if (defaultLocation) {
               setSelectedLocation(defaultLocation);
@@ -206,8 +206,17 @@ export function LocationInitializerProvider({
               }
             }
           } catch (timeoutError) {
-            console.error("Location API timed out:", timeoutError);
+            // Check if it's a timeout error (expected) or an actual API error
+            const isTimeoutError =
+              timeoutError instanceof Error &&
+              timeoutError.message === "Location fetch timed out";
+
+            // Only log unexpected errors, silently handle expected timeouts
+            if (!isTimeoutError) {
+              console.error("Error fetching locations:", timeoutError);
+            }
             // Continue the flow with any cached data we might have
+            // The app will work with existing location data if available
           }
         }
 
@@ -216,8 +225,26 @@ export function LocationInitializerProvider({
         // Check if we need to redirect
         checkAndHandleRedirect();
       } catch (error) {
-        console.error("Error initializing locations:", error);
+        // Only log unexpected errors (not timeouts or network errors)
+        const isExpectedError =
+          (error instanceof Error &&
+            (error.message === "Location fetch timed out" ||
+              error.message.includes("503") ||
+              error.message.includes("Service Unavailable") ||
+              error.message.includes("Network Error"))) ||
+          (error &&
+            typeof error === "object" &&
+            "response" in error &&
+            error.response &&
+            typeof error.response === "object" &&
+            "status" in error.response &&
+            error.response.status === 503);
+
+        if (!isExpectedError) {
+          console.error("Error initializing locations:", error);
+        }
         setIsLoading(false);
+        // Continue execution - app will work with cached data if available
       }
     };
 
