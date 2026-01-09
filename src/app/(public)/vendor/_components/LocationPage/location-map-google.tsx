@@ -94,15 +94,7 @@ export default function GoogleLocationMap({
         center: mapCenter,
         zoom: zoom,
         mapId: "DEMO_MAP_ID", // Required for Advanced Markers
-        restriction: {
-          latLngBounds: {
-            north: 60.9,
-            south: 49.8,
-            east: 2.0,
-            west: -8.5,
-          },
-          strictBounds: true,
-        },
+        // Removed strict bounds restriction to allow viewing all locations
         styles: [
           {
             featureType: "poi",
@@ -274,6 +266,9 @@ export default function GoogleLocationMap({
       // Geocode ALL locations (API doesn't provide lat/lng)
       if (markersToGeocode.length > 0) {
         let geocodedCount = 0;
+        const bounds = new google.maps.LatLngBounds();
+        let hasValidLocation = false;
+
         markersToGeocode.forEach((location, index) => {
           // Add delay to avoid rate limiting
           setTimeout(() => {
@@ -302,6 +297,9 @@ export default function GoogleLocationMap({
                       lat: newLat,
                       lng: newLng,
                     };
+                    // Extend bounds to include this marker
+                    bounds.extend(newPosition);
+                    hasValidLocation = true;
                   }
                 } else {
                   // If geocoding fails, log but don't show error
@@ -312,9 +310,32 @@ export default function GoogleLocationMap({
                 }
 
                 geocodedCount++;
-                // Hide loading when all geocoding is done
+                // Hide loading when all geocoding is done and fit bounds to show all locations
                 if (geocodedCount === markersToGeocode.length) {
                   setIsLoading(false);
+
+                  // Auto-fit map to show all markers with proper padding
+                  if (hasValidLocation && mapInstance) {
+                    mapInstance.fitBounds(bounds, {
+                      top: 100,
+                      bottom: 100,
+                      left: 100,
+                      right: 100,
+                    });
+
+                    // Add a listener to limit max zoom after fitBounds
+                    google.maps.event.addListenerOnce(
+                      mapInstance,
+                      "bounds_changed",
+                      () => {
+                        const currentZoom = mapInstance.getZoom();
+                        // Prevent zooming in too close for single location
+                        if (currentZoom && currentZoom > 12) {
+                          mapInstance.setZoom(12);
+                        }
+                      }
+                    );
+                  }
                 }
               }
             );

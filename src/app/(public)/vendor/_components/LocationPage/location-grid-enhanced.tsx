@@ -7,7 +7,6 @@ import {
   MapPin,
   ArrowRight,
   Calendar,
-  TrendingUp,
   Sparkles,
   Clock,
   Music,
@@ -36,7 +35,6 @@ interface LocationGridProps {
       upcomingEvent?: { date: string; name: string };
       categories?: string[];
       startingPrice?: number;
-      isHot?: boolean;
       isNew?: boolean;
     }
   >;
@@ -187,16 +185,17 @@ export default function LocationGridEnhanced({
             >
               <Card
                 className={`
-                  h-80 overflow-hidden rounded-xl cursor-pointer group relative
+                  min-h-[360px] overflow-hidden rounded-xl cursor-pointer group relative
                   bg-white border border-gray-200
-                  hover:shadow-2xl hover:border-gray-300
-                  transition-all duration-300
+                  shadow-sm hover:shadow-xl hover:border-gray-300
+                  transition-all duration-300 ease-out
+                  flex flex-col
                 `}
                 onClick={() => onSelect(locationSlug)}
               >
                 {/* Background Image Section */}
                 <div
-                  className="relative h-48 overflow-hidden"
+                  className="relative h-44 overflow-hidden flex-shrink-0"
                   style={{ background: "var(--color-background)" }}
                 >
                   {coverImage && typeof coverImage === "string" ? (
@@ -221,95 +220,52 @@ export default function LocationGridEnhanced({
                   <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent" />
 
                   {/* Top Badges Row */}
-                  <div className="absolute top-3 left-3 right-3 flex items-start justify-between gap-2 z-10">
-                    <div className="flex flex-wrap gap-2">
-                      {/* LIVE Badge */}
-                      {stats.liveEventsCount > 0 && (
-                        <motion.div
-                          initial={{ scale: 0 }}
-                          animate={{ scale: 1 }}
-                          transition={{ delay: idx * 0.1 + 0.2 }}
-                        >
-                          <Badge className="bg-red-500/90 text-white border-0 backdrop-blur-sm px-2 py-0.5 text-xs font-semibold shadow-lg">
-                            <motion.div
-                              className="w-1.5 h-1.5 bg-white rounded-full mr-1.5"
-                              animate={{
-                                opacity: [1, 0.3, 1],
-                              }}
-                              transition={{
-                                duration: 1.5,
-                                repeat: Infinity,
-                                ease: "easeInOut",
-                              }}
-                            />
-                            LIVE NOW
-                          </Badge>
-                        </motion.div>
-                      )}
+                  <div className="absolute top-3 left-3 right-3 z-10">
+                    <div className="flex items-center justify-between gap-2">
+                      {/* Left Side: Status Badges */}
+                      <div className="flex items-center gap-1.5">
+                        {/* New Badge */}
+                        {stats.isNew && (
+                          <motion.div
+                            initial={{ scale: 0 }}
+                            animate={{ scale: 1 }}
+                            transition={{ delay: idx * 0.1 + 0.3 }}
+                          >
+                            <Badge className="bg-green-500/95 text-white border-0 backdrop-blur-sm px-2.5 py-1 text-xs font-semibold shadow-lg whitespace-nowrap">
+                              <Sparkles className="w-3 h-3 mr-1 inline-block" />
+                              NEW
+                            </Badge>
+                          </motion.div>
+                        )}
+                      </div>
 
-                      {/* Hot Badge */}
-                      {stats.isHot && (
-                        <motion.div
-                          initial={{ scale: 0 }}
-                          animate={{ scale: 1 }}
-                          transition={{ delay: idx * 0.1 + 0.25 }}
-                        >
-                          <Badge className="bg-orange-500/90 text-white border-0 backdrop-blur-sm px-2 py-0.5 text-xs font-semibold shadow-lg">
-                            <TrendingUp className="w-3 h-3 mr-1" />
-                            HOT
-                          </Badge>
-                        </motion.div>
-                      )}
-
-                      {/* New Badge */}
-                      {stats.isNew && (
-                        <motion.div
-                          initial={{ scale: 0 }}
-                          animate={{ scale: 1 }}
-                          transition={{ delay: idx * 0.1 + 0.3 }}
-                        >
-                          <Badge className="bg-green-500/90 text-white border-0 backdrop-blur-sm px-2 py-0.5 text-xs font-semibold shadow-lg">
-                            <Sparkles className="w-3 h-3 mr-1" />
-                            NEW
-                          </Badge>
-                        </motion.div>
+                      {/* Right Side: Event Categories - Always Visible */}
+                      {stats.categories && stats.categories.length > 0 && (
+                        <div className="flex items-center gap-1.5">
+                          {stats.categories
+                            .slice(0, 3)
+                            .map((category, catIdx) => (
+                              <div
+                                key={catIdx}
+                                className="bg-white/20 backdrop-blur-md text-white p-1.5 rounded-lg shadow-lg"
+                                title={category}
+                              >
+                                {categoryIcons[category.toLowerCase()] ||
+                                  categoryIcons.default}
+                              </div>
+                            ))}
+                        </div>
                       )}
                     </div>
-
-                    {/* Event Categories */}
-                    {stats.categories && stats.categories.length > 0 && (
-                      <motion.div
-                        className="flex gap-1.5"
-                        initial={{ opacity: 0, x: 10 }}
-                        animate={{
-                          opacity: isHovered ? 1 : 0,
-                          x: isHovered ? 0 : 10,
-                        }}
-                        transition={{ duration: 0.2 }}
-                      >
-                        {stats.categories
-                          .slice(0, 3)
-                          .map((category, catIdx) => (
-                            <div
-                              key={catIdx}
-                              className="bg-white/20 backdrop-blur-md text-white p-1.5 rounded-lg shadow-lg"
-                              title={category}
-                            >
-                              {categoryIcons[category.toLowerCase()] ||
-                                categoryIcons.default}
-                            </div>
-                          ))}
-                      </motion.div>
-                    )}
                   </div>
 
                   {/* Location Name Overlay */}
-                  <div className="absolute bottom-3 left-3 right-3 z-10">
-                    <div className="flex items-center gap-2 mb-1">
-                      <div className="bg-white/20 backdrop-blur-md p-1.5 rounded-lg">
+                  <div className="absolute bottom-2 left-3 right-3 z-10">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <div className="bg-white/20 backdrop-blur-md p-1.5 rounded-lg flex-shrink-0">
                         <MapPin size={16} className="text-white" />
                       </div>
-                      <h3 className="text-2xl font-bold text-white drop-shadow-lg">
+                      <h3 className="text-xl font-bold text-white drop-shadow-lg truncate">
                         {locationName}
                       </h3>
                     </div>
@@ -317,10 +273,10 @@ export default function LocationGridEnhanced({
                 </div>
 
                 {/* Content Section */}
-                <div className="p-4 space-y-3">
-                  {/* Stats Row */}
-                  <div className="flex items-center justify-between text-sm">
-                    <div className="flex items-center gap-2">
+                <div className="p-4 flex-1 flex flex-col">
+                  <div className="space-y-2.5 flex-1">
+                    {/* Stats Row */}
+                    <div className="flex items-center gap-2 text-sm">
                       <Calendar
                         size={16}
                         className="text-[color:var(--color-primary)]"
@@ -329,67 +285,65 @@ export default function LocationGridEnhanced({
                         {stats.eventsCount || 0}
                       </span>
                       <span className="text-gray-500">Events</span>
+                      {/* Venues count if available */}
+                      {stats.venuesCount > 0 && (
+                        <>
+                          <span className="text-gray-300">•</span>
+                          <span className="text-xs text-gray-500">
+                            {stats.venuesCount} Venue
+                            {stats.venuesCount !== 1 ? "s" : ""}
+                          </span>
+                        </>
+                      )}
                     </div>
 
-                    {/* Starting Price */}
-                    {stats.startingPrice && (
-                      <motion.div
-                        className="text-xs font-semibold text-white bg-[color:var(--color-secondary)] px-3 py-1.5 rounded-lg shadow-sm"
-                        initial={{ opacity: 0, scale: 0.8 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        transition={{ delay: idx * 0.1 + 0.4 }}
-                      >
-                        From £{stats.startingPrice}
-                      </motion.div>
+                    {/* Upcoming Event Preview - Always Visible */}
+                    {stats.upcomingEvent ? (
+                      <div className="flex items-start gap-2.5 text-xs bg-gradient-to-br from-gray-50 to-gray-100/50 p-3 rounded-lg border border-gray-200/80 hover:border-gray-300 transition-colors">
+                        <Clock
+                          size={14}
+                          className="flex-shrink-0 text-[color:var(--color-primary)] mt-0.5"
+                        />
+                        <div className="flex-1 min-w-0">
+                          <div className="font-semibold text-gray-900 truncate mb-1">
+                            Next: {stats.upcomingEvent.name}
+                          </div>
+                          <div className="text-gray-600 text-[11px]">
+                            {new Date(
+                              stats.upcomingEvent.date
+                            ).toLocaleDateString("en-US", {
+                              month: "short",
+                              day: "numeric",
+                            })}
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="bg-gray-50 p-3 rounded-lg border border-gray-200/80">
+                        <span className="text-xs text-gray-400 italic">
+                          Check back soon for new events
+                        </span>
+                      </div>
                     )}
                   </div>
 
-                  {/* Upcoming Event Preview */}
-                  {stats.upcomingEvent && (
-                    <motion.div
-                      className="flex items-center gap-2 text-xs bg-gray-50 p-2.5 rounded-lg border border-gray-200"
-                      initial={{ opacity: 0, y: 5 }}
-                      animate={{
-                        opacity: isHovered ? 1 : 0,
-                        y: isHovered ? 0 : 5,
-                      }}
-                      transition={{ duration: 0.2 }}
-                    >
-                      <Clock
-                        size={14}
-                        className="flex-shrink-0 text-[color:var(--color-primary)]"
-                      />
-                      <div className="flex-1 min-w-0">
-                        <div className="font-medium text-gray-900 truncate text-xs">
-                          Next: {stats.upcomingEvent.name}
-                        </div>
-                        <div className="text-gray-500 text-xs">
-                          {new Date(
-                            stats.upcomingEvent.date
-                          ).toLocaleDateString("en-US", {
-                            month: "short",
-                            day: "numeric",
-                          })}
-                        </div>
-                      </div>
-                    </motion.div>
-                  )}
-
-                  {/* Explore Button */}
+                  {/* Explore Button - Always at bottom */}
                   <motion.button
                     className="
-                      w-full bg-[color:var(--color-primary)] hover:opacity-90
+                      w-full bg-[color:var(--color-primary)] hover:bg-[color:var(--color-primary)]/90
                       text-white py-2.5 px-4 rounded-lg text-sm font-semibold
                       flex items-center justify-center gap-2 
-                      transition-all duration-200 shadow-md hover:shadow-lg
+                      transition-all duration-200 
+                      shadow-sm hover:shadow-md
+                      mt-3 group-hover:shadow-lg
                     "
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
+                    whileHover={{ scale: 1.01 }}
+                    whileTap={{ scale: 0.99 }}
                   >
                     <span>Explore Events</span>
                     <motion.div
-                      animate={{ x: isHovered ? 3 : 0 }}
-                      transition={{ duration: 0.2 }}
+                      animate={{ x: isHovered ? 4 : 0 }}
+                      transition={{ duration: 0.2, ease: "easeOut" }}
                     >
                       <ArrowRight size={16} />
                     </motion.div>
