@@ -378,7 +378,7 @@ export default function DatesSection({
                     <div
                       className={`border rounded-sm overflow-hidden text-center w-[85px] sm:w-[100px] md:w-[120px] flex-shrink-0 transition-all duration-300 ${
                         isSoldOut
-                          ? "border-slate-500/50 cursor-not-allowed bg-slate-900/40 backdrop-blur-sm opacity-75"
+                          ? "border-red-500/60 cursor-not-allowed bg-slate-900/40 backdrop-blur-sm opacity-80 shadow-[0_0_25px_rgba(239,68,68,0.45)]"
                           : isInCart
                           ? "border-[var(--color-primary)] bg-black/20 backdrop-blur-sm opacity-95 cursor-pointer shadow-[0_0_20px_var(--color-primary)]/30"
                           : isPending
@@ -407,7 +407,7 @@ export default function DatesSection({
                       <div
                         className={`text-white text-sm sm:text-base tracking-wider py-1 sm:py-1.5 transition-all duration-300 ${
                           isSoldOut
-                            ? "bg-gradient-to-b from-slate-600/90 to-slate-700/90 text-white font-semibold border-t border-slate-500/30"
+                            ? "bg-gradient-to-b from-red-600 to-red-800 text-white font-semibold border-t border-red-500/40 tracking-wide"
                             : isInCart
                             ? "bg-gradient-to-b from-green-500 to-green-700"
                             : "bg-gradient-to-b from-[var(--color-primary)] to-[#232a61] hover:from-[var(--color-primary)]/90 hover:to-[#232a61]/90 hover:shadow-lg"
@@ -444,7 +444,7 @@ export default function DatesSection({
                     <div
                       className={`border rounded-sm overflow-hidden text-center w-[85px] sm:w-[100px] md:w-[120px] flex-shrink-0 transition-all duration-300 ${
                         isSoldOut
-                          ? "border-slate-500/50 cursor-not-allowed bg-slate-900/40 backdrop-blur-sm opacity-75"
+                          ? "border-red-500/60 cursor-not-allowed bg-slate-900/40 backdrop-blur-sm opacity-80 shadow-[0_0_25px_rgba(239,68,68,0.45)]"
                           : isInCart
                           ? "border-[var(--color-primary)] bg-black/20 backdrop-blur-sm opacity-95 cursor-pointer shadow-[0_0_20px_var(--color-primary)]/30"
                           : isPending
@@ -473,7 +473,7 @@ export default function DatesSection({
                       <div
                         className={`text-white text-sm sm:text-base tracking-wider py-1 sm:py-1.5 transition-all duration-300 ${
                           isSoldOut
-                            ? "bg-gradient-to-b from-slate-600/90 to-slate-700/90 text-white font-semibold border-t border-slate-500/30"
+                            ? "bg-gradient-to-b from-red-600 to-red-800 text-white font-semibold border-t border-red-500/40 tracking-wide"
                             : isInCart
                             ? "bg-gradient-to-b from-green-500 to-green-700"
                             : "bg-gradient-to-b from-[var(--color-primary)] to-[#232a61] hover:from-[var(--color-primary)]/90 hover:to-[#232a61]/90 hover:shadow-lg"
@@ -593,7 +593,7 @@ export default function DatesSection({
                   <motion.div
                     className={`border rounded-sm overflow-hidden text-center w-[85px] sm:w-[100px] md:w-[120px] flex-shrink-0 transition-all duration-300 ${
                       isSoldOut
-                        ? "border-slate-500/50 cursor-not-allowed bg-slate-900/40 backdrop-blur-sm opacity-75"
+                        ? "border-red-500/60 cursor-not-allowed bg-slate-900/40 backdrop-blur-sm opacity-80 shadow-[0_0_25px_rgba(239,68,68,0.45)]"
                         : isInCart
                         ? "border-[var(--color-primary)] bg-black/20 backdrop-blur-sm opacity-95 cursor-pointer shadow-[0_0_20px_var(--color-primary)]/30"
                         : isPending
@@ -639,7 +639,7 @@ export default function DatesSection({
                     <div
                       className={`text-white text-sm sm:text-base tracking-wider py-1 sm:py-1.5 transition-all duration-300 ${
                         isSoldOut
-                          ? "bg-gradient-to-b from-slate-600/90 to-slate-700/90 text-white font-semibold border-t border-slate-500/30"
+                          ? "bg-gradient-to-b from-red-600 to-red-800 text-white font-semibold border-t border-red-500/40 tracking-wide"
                           : isInCart
                           ? "bg-gradient-to-b from-[var(--color-primary)] to-[var(--color-primary)]/80 text-white font-semibold shadow-lg"
                           : "bg-gradient-to-b from-[var(--color-primary)] to-[#232a61] hover:from-[var(--color-primary)]/90 hover:to-[#232a61]/90 hover:shadow-lg"
@@ -676,7 +676,7 @@ export default function DatesSection({
                   <motion.div
                     className={`border rounded-sm overflow-hidden text-center w-[85px] sm:w-[100px] md:w-[120px] flex-shrink-0 transition-all duration-300 ${
                       isSoldOut
-                        ? "border-slate-500/50 cursor-not-allowed bg-slate-900/40 backdrop-blur-sm opacity-75"
+                        ? "border-red-500/60 cursor-not-allowed bg-slate-900/40 backdrop-blur-sm opacity-80 shadow-[0_0_25px_rgba(239,68,68,0.45)]"
                         : isInCart
                         ? "border-[var(--color-primary)] bg-black/20 backdrop-blur-sm opacity-95 cursor-pointer shadow-[0_0_20px_var(--color-primary)]/30"
                         : isPending
@@ -686,7 +686,7 @@ export default function DatesSection({
                     key={`second-${index}`}
                     initial={{ opacity: 1, y: 0 }}
                     animate={{
-                      opacity: isPending ? 0.5 : isSoldOut ? 0.75 : 1,
+                      opacity: isPending ? 0.5 : 1,
                       y: 0,
                     }}
                     transition={{
@@ -725,7 +725,7 @@ export default function DatesSection({
                     <div
                       className={`text-white text-sm sm:text-base tracking-wider py-1 sm:py-1.5 transition-all duration-300 ${
                         isSoldOut
-                          ? "bg-gradient-to-b from-slate-600/90 to-slate-700/90 text-white font-semibold border-t border-slate-500/30"
+                          ? "bg-gradient-to-b from-red-600 to-red-800 text-white font-semibold border-t border-red-500/40 tracking-wide"
                           : isInCart
                           ? "bg-gradient-to-b from-[var(--color-primary)] to-[var(--color-primary)]/80 text-white font-semibold shadow-lg"
                           : "bg-gradient-to-b from-[var(--color-primary)] to-[#232a61] hover:from-[var(--color-primary)]/90 hover:to-[#232a61]/90 hover:shadow-lg"

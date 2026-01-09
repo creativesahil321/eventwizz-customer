@@ -75,12 +75,17 @@ export default function AllergenModal({
     initialData?.additionalNotes || ""
   );
 
-  // Update state when initialData changes
+  // Update state when initialData changes (reset if null/undefined)
   useEffect(() => {
     if (initialData) {
       setSelectedAllergens(initialData.allergens || []);
       setSelectedDietary(initialData.dietaryRequirements || []);
       setAdditionalNotes(initialData.additionalNotes || "");
+    } else {
+      // Reset form when initialData is cleared
+      setSelectedAllergens([]);
+      setSelectedDietary([]);
+      setAdditionalNotes("");
     }
   }, [initialData]);
 

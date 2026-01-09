@@ -109,6 +109,7 @@ export default function MenuSelectionForm({
 
   const [allergenModalOpen, setAllergenModalOpen] = useState(false);
   const [allergenData, setAllergenData] = useState<AllergenData | null>(null);
+  const [formResetKey, setFormResetKey] = useState(0); // Key to force Select remount
 
   // Populate form when editing (similar to onboarding's form.reset pattern)
   useEffect(() => {
@@ -148,6 +149,7 @@ export default function MenuSelectionForm({
         menuSelections: {},
       });
       setAllergenData(null);
+      setFormResetKey((prev) => prev + 1); // Force Select reset when form clears
     }
   }, [editingAttendee, menuItems]);
 
@@ -273,17 +275,19 @@ export default function MenuSelectionForm({
       status: "completed",
     };
 
+    // Save attendee data
     onSaveAttendee(attendeeData);
 
-    // Reset form if not editing
-    if (!editingAttendee) {
-      setFormData({
-        title: "",
-        fullName: "",
-        menuSelections: {},
-      });
-      setAllergenData(null);
-    }
+    // Always clear form after successful submission (for both new and edit)
+    // Clear with explicit empty values to ensure Select components reset properly
+    setFormData({
+      title: "",
+      fullName: "",
+      menuSelections: {},
+    });
+    setAllergenData(null);
+    // Increment reset key to force Select components to remount and reset
+    setFormResetKey((prev) => prev + 1);
   };
 
   const handleCancel = () => {
@@ -293,6 +297,7 @@ export default function MenuSelectionForm({
       menuSelections: {},
     });
     setAllergenData(null);
+    setFormResetKey((prev) => prev + 1); // Force Select reset
     onCancelEdit?.();
   };
 
@@ -360,6 +365,7 @@ export default function MenuSelectionForm({
                   Title
                 </Label>
                 <Select
+                  key={`title-${formResetKey}`}
                   value={formData.title}
                   onValueChange={(value) =>
                     setFormData({ ...formData, title: value })
@@ -437,6 +443,7 @@ export default function MenuSelectionForm({
                     </div>
                   </div>
                   <Select
+                    key={`${category.title}-${formResetKey}`}
                     value={categoryValue || undefined}
                     onValueChange={(value) =>
                       setFormData({

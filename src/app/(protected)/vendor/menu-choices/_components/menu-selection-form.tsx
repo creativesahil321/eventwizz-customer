@@ -109,6 +109,7 @@ export default function MenuSelectionForm({
 
   const [allergenModalOpen, setAllergenModalOpen] = useState(false);
   const [allergenData, setAllergenData] = useState<AllergenData | null>(null);
+  const [formResetKey, setFormResetKey] = useState(0); // Key to force Select remount
 
   // Populate form when editing (similar to onboarding's form.reset pattern)
   useEffect(() => {
@@ -154,6 +155,7 @@ export default function MenuSelectionForm({
         menuSelections: initialMenuSelections,
       });
       setAllergenData(null);
+      setFormResetKey((prev) => prev + 1); // Force Select reset when form clears
     }
   }, [editingAttendee, menuItems]);
 
@@ -281,21 +283,20 @@ export default function MenuSelectionForm({
 
     onSaveAttendee(attendeeData);
 
-    // Reset form if not editing
-    if (!editingAttendee) {
-      // Initialize menuSelections with empty strings for all categories
-      const initialMenuSelections: Record<string, string> = {};
-      menuItems.forEach((category) => {
-        initialMenuSelections[category.title] = "";
-      });
+    // Always clear form after successful submission (for both new and edit)
+    // Initialize menuSelections with empty strings for all categories
+    const initialMenuSelections: Record<string, string> = {};
+    menuItems.forEach((category) => {
+      initialMenuSelections[category.title] = "";
+    });
 
-      setFormData({
-        title: "",
-        fullName: "",
-        menuSelections: initialMenuSelections,
-      });
-      setAllergenData(null);
-    }
+    setFormData({
+      title: "",
+      fullName: "",
+      menuSelections: initialMenuSelections,
+    });
+    setAllergenData(null);
+    setFormResetKey((prev) => prev + 1); // Force Select reset
   };
 
   const handleCancel = () => {
@@ -311,6 +312,7 @@ export default function MenuSelectionForm({
       menuSelections: initialMenuSelections,
     });
     setAllergenData(null);
+    setFormResetKey((prev) => prev + 1); // Force Select reset
     onCancelEdit?.();
   };
 
@@ -378,6 +380,7 @@ export default function MenuSelectionForm({
                   Title
                 </Label>
                 <Select
+                  key={`title-${formResetKey}`}
                   value={formData.title}
                   onValueChange={(value) =>
                     setFormData({ ...formData, title: value })
@@ -456,6 +459,7 @@ export default function MenuSelectionForm({
                     </div>
                   </div>
                   <Select
+                    key={`${category.title}-${formResetKey}`}
                     value={categoryValue}
                     onValueChange={(value) =>
                       setFormData({
