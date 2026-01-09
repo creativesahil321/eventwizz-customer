@@ -32,6 +32,7 @@ interface SessionUser {
 export type DatesSectionType = {
   event_date: string;
   price: number;
+  sold_out?: boolean;
 }[];
 
 type DatesSectionProps = {
@@ -98,6 +99,7 @@ export default function DatesSection({
   const [currentPage, setCurrentPage] = useState(0);
   // Professional API-only approach - no conflict modal needed
   const itemsPerRow = 5; // Number of items to display per row
+  const datesPerPage = itemsPerRow * 2; // Total dates visible per page (2 rows)
 
   // Setup client-side detection and window measurements
   useEffect(() => {
@@ -291,7 +293,14 @@ export default function DatesSection({
             .toISOString()
             .split("T")[0],
           price: 65,
+          sold_out: false,
         }));
+
+  // Check if pagination is needed
+  const needsPagination = displayDates.length > datesPerPage;
+  const maxPages = Math.ceil(displayDates.length / datesPerPage) - 1;
+  const canGoLeft = needsPagination && currentPage > 0;
+  const canGoRight = needsPagination && currentPage < maxPages;
 
   // Floating particles animation - only rendered client-side
   const particles = isClient
@@ -334,12 +343,20 @@ export default function DatesSection({
         </div>
 
         <div className="w-full max-w-5xl mx-auto relative z-10 px-2 sm:px-8 md:px-12">
-          {/* Left arrow */}
-          <div className="absolute left-0 sm:left-2 top-1/2 transform -translate-y-1/2 z-20">
-            <div className="bg-[#21223a] rounded-full p-1 sm:p-2 shadow-[0_0_10px_rgba(33,34,58,0.7)]">
-              <CircleChevronLeft className="h-7 w-7 sm:h-10 sm:w-10 text-[#8f96c3]" />
+          {/* Left arrow - Only show if pagination is needed and not on first page */}
+          {needsPagination && (
+            <div className="absolute left-0 sm:left-2 top-1/2 transform -translate-y-1/2 z-20">
+              <div
+                className={`bg-[#21223a] rounded-full p-1 sm:p-2 shadow-[0_0_10px_rgba(33,34,58,0.7)] ${
+                  canGoLeft
+                    ? "cursor-pointer hover:bg-[#2a2b4a]"
+                    : "opacity-30 cursor-not-allowed"
+                }`}
+              >
+                <CircleChevronLeft className="h-7 w-7 sm:h-10 sm:w-10 text-[#8f96c3]" />
+              </div>
             </div>
-          </div>
+          )}
 
           {/* Date cards container - matching client layout */}
           <div className="overflow-hidden">
@@ -355,11 +372,14 @@ export default function DatesSection({
                   const dateItem = displayDates[index];
                   const dateInfo = getDateInfo(dateItem);
                   const isInCart = isDateInCart(dateItem.event_date);
+                  const isSoldOut = dateItem.sold_out === true;
 
                   return (
                     <div
                       className={`border rounded-sm overflow-hidden text-center w-[85px] sm:w-[100px] md:w-[120px] flex-shrink-0 transition-all duration-300 ${
-                        isInCart
+                        isSoldOut
+                          ? "border-slate-500/50 cursor-not-allowed bg-slate-900/40 backdrop-blur-sm opacity-75"
+                          : isInCart
                           ? "border-[var(--color-primary)] bg-black/20 backdrop-blur-sm opacity-95 cursor-pointer shadow-[0_0_20px_var(--color-primary)]/30"
                           : isPending
                           ? "border-[var(--color-primary)] opacity-50 cursor-not-allowed shadow-[0_0_15px_rgba(60,70,147,0.25)] bg-transparent"
@@ -367,6 +387,7 @@ export default function DatesSection({
                       }`}
                       key={`first-${index}`}
                       onClick={() => {
+                        if (isSoldOut) return; // Don't allow clicks on sold out dates
                         if (!isPending && !isInCart) {
                           handleDateClick(dateItem);
                         } else if (isInCart) {
@@ -385,11 +406,19 @@ export default function DatesSection({
                       </div>
                       <div
                         className={`text-white text-sm sm:text-base tracking-wider py-1 sm:py-1.5 transition-all duration-300 ${
-                          isInCart
+                          isSoldOut
+                            ? "bg-gradient-to-b from-slate-600/90 to-slate-700/90 text-white font-semibold border-t border-slate-500/30"
+                            : isInCart
                             ? "bg-gradient-to-b from-green-500 to-green-700"
                             : "bg-gradient-to-b from-[var(--color-primary)] to-[#232a61] hover:from-[var(--color-primary)]/90 hover:to-[#232a61]/90 hover:shadow-lg"
                         }`}
-                      ></div>
+                      >
+                        {isSoldOut
+                          ? "SOLD OUT"
+                          : isInCart
+                          ? "VIEW CART"
+                          : `£${dateInfo.price}`}
+                      </div>
                     </div>
                   );
                 })}
@@ -409,11 +438,14 @@ export default function DatesSection({
                   const dateItem = displayDates[index];
                   const dateInfo = getDateInfo(dateItem);
                   const isInCart = isDateInCart(dateItem.event_date);
+                  const isSoldOut = dateItem.sold_out === true;
 
                   return (
                     <div
                       className={`border rounded-sm overflow-hidden text-center w-[85px] sm:w-[100px] md:w-[120px] flex-shrink-0 transition-all duration-300 ${
-                        isInCart
+                        isSoldOut
+                          ? "border-slate-500/50 cursor-not-allowed bg-slate-900/40 backdrop-blur-sm opacity-75"
+                          : isInCart
                           ? "border-[var(--color-primary)] bg-black/20 backdrop-blur-sm opacity-95 cursor-pointer shadow-[0_0_20px_var(--color-primary)]/30"
                           : isPending
                           ? "border-[var(--color-primary)] opacity-50 cursor-not-allowed shadow-[0_0_15px_rgba(60,70,147,0.25)] bg-transparent"
@@ -421,6 +453,7 @@ export default function DatesSection({
                       }`}
                       key={`second-${index}`}
                       onClick={() => {
+                        if (isSoldOut) return; // Don't allow clicks on sold out dates
                         if (!isPending && !isInCart) {
                           handleDateClick(dateItem);
                         } else if (isInCart) {
@@ -439,11 +472,19 @@ export default function DatesSection({
                       </div>
                       <div
                         className={`text-white text-sm sm:text-base tracking-wider py-1 sm:py-1.5 transition-all duration-300 ${
-                          isInCart
+                          isSoldOut
+                            ? "bg-gradient-to-b from-slate-600/90 to-slate-700/90 text-white font-semibold border-t border-slate-500/30"
+                            : isInCart
                             ? "bg-gradient-to-b from-green-500 to-green-700"
                             : "bg-gradient-to-b from-[var(--color-primary)] to-[#232a61] hover:from-[var(--color-primary)]/90 hover:to-[#232a61]/90 hover:shadow-lg"
                         }`}
-                      ></div>
+                      >
+                        {isSoldOut
+                          ? "SOLD OUT"
+                          : isInCart
+                          ? "VIEW CART"
+                          : `£${dateInfo.price}`}
+                      </div>
                     </div>
                   );
                 })}
@@ -451,12 +492,20 @@ export default function DatesSection({
             </div>
           </div>
 
-          {/* Right arrow */}
-          <div className="absolute right-0 sm:right-2 top-1/2 transform -translate-y-1/2 z-20">
-            <div className="bg-[#21223a] rounded-full p-1 sm:p-2 shadow-[0_0_10px_rgba(33,34,58,0.7)]">
-              <CircleChevronRight className="h-7 w-7 sm:h-10 sm:w-10 text-[#8f96c3]" />
+          {/* Right arrow - Only show if pagination is needed */}
+          {needsPagination && (
+            <div className="absolute right-0 sm:right-2 top-1/2 transform -translate-y-1/2 z-20">
+              <div
+                className={`bg-[#21223a] rounded-full p-1 sm:p-2 shadow-[0_0_10px_rgba(33,34,58,0.7)] ${
+                  canGoRight
+                    ? "cursor-pointer hover:bg-[#2a2b4a]"
+                    : "opacity-30 cursor-not-allowed"
+                }`}
+              >
+                <CircleChevronRight className="h-7 w-7 sm:h-10 sm:w-10 text-[#8f96c3]" />
+              </div>
             </div>
-          </div>
+          )}
         </div>
       </section>
     );
@@ -504,15 +553,25 @@ export default function DatesSection({
       </div>
 
       <div className="w-full max-w-5xl mx-auto relative z-10 px-2 sm:px-8 md:px-12">
-        {/* Left arrow */}
-        <div
-          className="absolute left-0 sm:left-2 top-1/2 transform -translate-y-1/2 z-20"
-          onClick={() => setCurrentPage((prev) => Math.max(0, prev - 1))}
-        >
-          <div className="bg-[#21223a] rounded-full p-1 sm:p-2 shadow-[0_0_10px_rgba(33,34,58,0.7)] cursor-pointer hover:bg-[#2a2b4a]">
-            <CircleChevronLeft className="h-7 w-7 sm:h-10 sm:w-10 text-[#8f96c3]" />
+        {/* Left arrow - Only show if pagination is needed and can go left */}
+        {needsPagination && (
+          <div
+            className="absolute left-0 sm:left-2 top-1/2 transform -translate-y-1/2 z-20"
+            onClick={() =>
+              canGoLeft && setCurrentPage((prev) => Math.max(0, prev - 1))
+            }
+          >
+            <div
+              className={`bg-[#21223a] rounded-full p-1 sm:p-2 shadow-[0_0_10px_rgba(33,34,58,0.7)] ${
+                canGoLeft
+                  ? "cursor-pointer hover:bg-[#2a2b4a]"
+                  : "opacity-30 cursor-not-allowed"
+              }`}
+            >
+              <CircleChevronLeft className="h-7 w-7 sm:h-10 sm:w-10 text-[#8f96c3]" />
+            </div>
           </div>
-        </div>
+        )}
 
         {/* Date cards container with transition */}
         <div className="overflow-hidden">
@@ -528,11 +587,14 @@ export default function DatesSection({
                 const dateItem = displayDates[index];
                 const dateInfo = getDateInfo(dateItem);
                 const isInCart = isDateInCart(dateItem.event_date);
+                const isSoldOut = dateItem.sold_out === true;
 
                 return (
                   <motion.div
                     className={`border rounded-sm overflow-hidden text-center w-[85px] sm:w-[100px] md:w-[120px] flex-shrink-0 transition-all duration-300 ${
-                      isInCart
+                      isSoldOut
+                        ? "border-slate-500/50 cursor-not-allowed bg-slate-900/40 backdrop-blur-sm opacity-75"
+                        : isInCart
                         ? "border-[var(--color-primary)] bg-black/20 backdrop-blur-sm opacity-95 cursor-pointer shadow-[0_0_20px_var(--color-primary)]/30"
                         : isPending
                         ? "border-[var(--color-primary)] opacity-50 cursor-not-allowed shadow-[0_0_15px_rgba(60,70,147,0.25)] bg-transparent"
@@ -540,18 +602,24 @@ export default function DatesSection({
                     }`}
                     key={`first-${index}`}
                     initial={{ opacity: 1, y: 0 }}
-                    animate={{ opacity: isPending ? 0.5 : 1, y: 0 }}
+                    animate={{
+                      opacity: isPending ? 0.5 : isSoldOut ? 0.75 : 1,
+                      y: 0,
+                    }}
                     transition={{ duration: 0.1, delay: i * 0.02 }}
                     whileHover={{
-                      scale: isPending || isInCart ? 1 : 1.02,
+                      scale: isPending || isInCart || isSoldOut ? 1 : 1.02,
                       boxShadow:
-                        isPending || isInCart
+                        isPending || isInCart || isSoldOut
                           ? "none"
                           : "0 0 25px rgba(60,70,147,0.5)",
                       transition: { duration: 0.2 },
                     }}
-                    whileTap={{ scale: isPending || isInCart ? 1 : 0.98 }}
+                    whileTap={{
+                      scale: isPending || isInCart || isSoldOut ? 1 : 0.98,
+                    }}
                     onClick={() => {
+                      if (isSoldOut) return; // Don't allow clicks on sold out dates
                       if (!isPending && !isInCart) {
                         handleDateClick(dateItem);
                       } else if (isInCart) {
@@ -570,12 +638,18 @@ export default function DatesSection({
                     </div>
                     <div
                       className={`text-white text-sm sm:text-base tracking-wider py-1 sm:py-1.5 transition-all duration-300 ${
-                        isInCart
+                        isSoldOut
+                          ? "bg-gradient-to-b from-slate-600/90 to-slate-700/90 text-white font-semibold border-t border-slate-500/30"
+                          : isInCart
                           ? "bg-gradient-to-b from-[var(--color-primary)] to-[var(--color-primary)]/80 text-white font-semibold shadow-lg"
                           : "bg-gradient-to-b from-[var(--color-primary)] to-[#232a61] hover:from-[var(--color-primary)]/90 hover:to-[#232a61]/90 hover:shadow-lg"
                       }`}
                     >
-                      {isInCart ? "VIEW CART" : `£${dateInfo.price}`}
+                      {isSoldOut
+                        ? "SOLD OUT"
+                        : isInCart
+                        ? "VIEW CART"
+                        : `£${dateInfo.price}`}
                     </div>
                   </motion.div>
                 );
@@ -596,11 +670,14 @@ export default function DatesSection({
                 const dateItem = displayDates[index];
                 const dateInfo = getDateInfo(dateItem);
                 const isInCart = isDateInCart(dateItem.event_date);
+                const isSoldOut = dateItem.sold_out === true;
 
                 return (
                   <motion.div
                     className={`border rounded-sm overflow-hidden text-center w-[85px] sm:w-[100px] md:w-[120px] flex-shrink-0 transition-all duration-300 ${
-                      isInCart
+                      isSoldOut
+                        ? "border-slate-500/50 cursor-not-allowed bg-slate-900/40 backdrop-blur-sm opacity-75"
+                        : isInCart
                         ? "border-[var(--color-primary)] bg-black/20 backdrop-blur-sm opacity-95 cursor-pointer shadow-[0_0_20px_var(--color-primary)]/30"
                         : isPending
                         ? "border-[var(--color-primary)] opacity-50 cursor-not-allowed shadow-[0_0_15px_rgba(60,70,147,0.25)] bg-transparent"
@@ -608,21 +685,27 @@ export default function DatesSection({
                     }`}
                     key={`second-${index}`}
                     initial={{ opacity: 1, y: 0 }}
-                    animate={{ opacity: isPending ? 0.5 : 1, y: 0 }}
+                    animate={{
+                      opacity: isPending ? 0.5 : isSoldOut ? 0.75 : 1,
+                      y: 0,
+                    }}
                     transition={{
                       duration: 0.1,
                       delay: i * 0.02,
                     }}
                     whileHover={{
-                      scale: isPending || isInCart ? 1 : 1.02,
+                      scale: isPending || isInCart || isSoldOut ? 1 : 1.02,
                       boxShadow:
-                        isPending || isInCart
+                        isPending || isInCart || isSoldOut
                           ? "none"
                           : "0 0 25px rgba(60,70,147,0.5)",
                       transition: { duration: 0.2 },
                     }}
-                    whileTap={{ scale: isPending || isInCart ? 1 : 0.98 }}
+                    whileTap={{
+                      scale: isPending || isInCart || isSoldOut ? 1 : 0.98,
+                    }}
                     onClick={() => {
+                      if (isSoldOut) return; // Don't allow clicks on sold out dates
                       if (!isPending && !isInCart) {
                         handleDateClick(dateItem);
                       } else if (isInCart) {
@@ -641,12 +724,18 @@ export default function DatesSection({
                     </div>
                     <div
                       className={`text-white text-sm sm:text-base tracking-wider py-1 sm:py-1.5 transition-all duration-300 ${
-                        isInCart
+                        isSoldOut
+                          ? "bg-gradient-to-b from-slate-600/90 to-slate-700/90 text-white font-semibold border-t border-slate-500/30"
+                          : isInCart
                           ? "bg-gradient-to-b from-[var(--color-primary)] to-[var(--color-primary)]/80 text-white font-semibold shadow-lg"
                           : "bg-gradient-to-b from-[var(--color-primary)] to-[#232a61] hover:from-[var(--color-primary)]/90 hover:to-[#232a61]/90 hover:shadow-lg"
                       }`}
                     >
-                      {isInCart ? "VIEW CART" : `£${dateInfo.price}`}
+                      {isSoldOut
+                        ? "SOLD OUT"
+                        : isInCart
+                        ? "VIEW CART"
+                        : `£${dateInfo.price}`}
                     </div>
                   </motion.div>
                 );
@@ -655,19 +744,27 @@ export default function DatesSection({
           </div>
         </div>
 
-        {/* Right arrow */}
-        <div
-          className="absolute right-0 sm:right-2 top-1/2 transform -translate-y-1/2 z-20"
-          onClick={() => {
-            const maxPages =
-              Math.ceil(displayDates.length / (itemsPerRow * 2)) - 1;
-            setCurrentPage((prev) => Math.min(maxPages, prev + 1));
-          }}
-        >
-          <div className="bg-[#21223a] rounded-full p-1 sm:p-2 shadow-[0_0_10px_rgba(33,34,58,0.7)] cursor-pointer hover:bg-[#2a2b4a]">
-            <CircleChevronRight className="h-7 w-7 sm:h-10 sm:w-10 text-[#8f96c3]" />
+        {/* Right arrow - Only show if pagination is needed and can go right */}
+        {needsPagination && (
+          <div
+            className="absolute right-0 sm:right-2 top-1/2 transform -translate-y-1/2 z-20"
+            onClick={() => {
+              if (canGoRight) {
+                setCurrentPage((prev) => Math.min(maxPages, prev + 1));
+              }
+            }}
+          >
+            <div
+              className={`bg-[#21223a] rounded-full p-1 sm:p-2 shadow-[0_0_10px_rgba(33,34,58,0.7)] ${
+                canGoRight
+                  ? "cursor-pointer hover:bg-[#2a2b4a]"
+                  : "opacity-30 cursor-not-allowed"
+              }`}
+            >
+              <CircleChevronRight className="h-7 w-7 sm:h-10 sm:w-10 text-[#8f96c3]" />
+            </div>
           </div>
-        </div>
+        )}
       </div>
 
       {/* Professional API-only approach - no conflict modal needed */}
