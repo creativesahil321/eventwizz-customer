@@ -418,14 +418,12 @@ export default function AddOnsTab({
   const shouldShowNewTables = additionalPeopleCount > 0;
 
   // Calculate how many people need new tables
-  // If user hasn't allocated to existing tables yet, account for available seats
-  // Otherwise use remaining people after allocation
+  // ALWAYS show new tables for the full additional count - users can choose existing OR new tables
+  // Only deduct from display count what's ALREADY allocated to existing tables
   const peopleForNewTables =
-    totalPeopleInExisting === 0 && totalAvailableSeats > 0
-      ? Math.max(0, additionalPeopleCount - totalAvailableSeats)
-      : remainingPeople > 0
-      ? remainingPeople
-      : additionalPeopleCount;
+    remainingPeople > 0
+      ? remainingPeople // If user allocated to existing, show remaining
+      : additionalPeopleCount; // Otherwise show all (don't force them to use existing)
 
   // Check if multiple new tables are selected (need allocation)
   const totalNewTablesCount = Object.values(newTables).reduce(

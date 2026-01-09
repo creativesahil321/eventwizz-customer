@@ -151,8 +151,12 @@ export default function GuestAllocationModal({
         }
       );
 
-      // Auto-fill if allocation is incomplete or all at minimum
-      const needsAutoFill = totalAllocated !== targetTotal && allAtMinimum;
+      // Auto-fill if allocation is incomplete (same as checkout)
+      // For existing tables: always auto-fill when there are people to add
+      // For new tables: auto-fill only when all at minimum and incomplete
+      const needsAutoFill = hasExistingAllocation
+        ? totalAllocated !== targetTotal // Existing tables: always auto-fill if incomplete
+        : totalAllocated !== targetTotal && allAtMinimum; // New tables: only if at minimum
 
       if (needsAutoFill) {
         // Auto-arrange guests automatically on first open
