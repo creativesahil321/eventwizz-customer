@@ -126,6 +126,7 @@ export const API_ENDPOINTS = {
       GET_BY_ID: "/vendor/bookings/show/{id}",
       CREATE: "/vendor/bookings/store",
       UPDATE: "/vendor/bookings/update/{id}",
+      UPDATE_STATUS: "/vendor/bookings/update-status",
       DELETE: "/vendor/bookings/delete/{id}",
       ADD_ONS: {
         GET_ALL: "/vendor/bookings/add-ons/{id}/{date}",
@@ -190,6 +191,11 @@ export const API_ENDPOINTS = {
       GET_CART_DATA: "/customer/event", // This is for to get the cart data from database and show in the cart page
       DELETE_CART_DATA: "/customer/event/delete/{date}", // This is for to delete the cart data from database and zustand store if date not send delete all the cart data from database also from zustand store
       CHECKOUT: "/customer/event/checkout", // This is for to checkout the cart data and event booking data in database
+    },
+
+    TRANSACTIONS: {
+      GET_ALL:
+        "/customer/transactions?page={page}&per_page={per_page}&search={search}&status={status}&payment_date={payment_date}&method={method}",
     },
   },
   // Admin Endpoints

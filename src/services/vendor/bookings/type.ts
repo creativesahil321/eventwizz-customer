@@ -128,3 +128,25 @@ export interface VendorRescheduleBookingPayload {
   payment_method: "online" | "offline"; // Payment method: online or offline
   table_details: VendorRescheduleTableDetailPayload[];
 }
+
+/**
+ * Payload for updating booking status
+ */
+export interface VendorUpdateBookingStatusPayload {
+  booking_id: number;
+  booking_date_id: number;
+  payment_status: number;
+}
+
+/**
+ * Response for updating booking status
+ */
+export interface VendorUpdateBookingStatusResponse {
+  status: boolean;
+  message: string;
+  data: {
+    booking_date_id: number;
+    payment_status: number;
+  };
+  errors: string[];
+}

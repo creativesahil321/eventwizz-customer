@@ -107,13 +107,18 @@ export interface BookingsResponse {
 
 /**
  * Table allocation details
+ * Allocation format: Record<table_id, seat_count>
+ * - Integer values (e.g., 8) represent NEW tables
+ * - String values with "+" (e.g., "+4") represent additions to EXISTING tables
  */
 export interface TableAllocation {
-  price_per_person: number;
+  price_per_person: number | string;
   table_size: number;
   no_tables: number;
-  allocation: number[];
+  allocation: Record<string, number | string>; // key = table_id, value = seat count or "+X"
   people: number;
+  total?: number;
+  deposit_per_person?: number | string | null;
 }
 
 /**
@@ -192,13 +197,20 @@ export interface BookingDetailsData {
   event_name: string;
   slug: string;
   location: string;
+  drink_title?: string;
   payment_status: string;
-  sub_total: string;
-  partial_payment: string;
+  payment_gateways?: Array<{
+    id: number;
+    slug: string;
+  }>;
+  sub_total: string | number;
+  partial_payment?: string | number;
+  deposit_paid?: number | null;
   paid_amount: number | null;
   pending_payment: number;
   addons_amount: number;
   total: number;
+  reschedule_status?: boolean;
   event_dates: BookingEventDate[];
 }
 
@@ -245,7 +257,8 @@ export interface AddOnsDrink {
 }
 
 /**
- * Allocation entry for selected tables
+ * Allocation entry for selected tables (DEPRECATED - kept for backward compatibility)
+ * New API format uses Record<string, number | string> directly
  */
 export interface AllocationEntry {
   parent_id: number;
@@ -257,7 +270,7 @@ export interface SelectedTable {
   price: string;
   table_size: number;
   no_tables: number;
-  allocation: AllocationEntry[];
+  allocation: Record<string, number | string>; // key = table_id, value = seat count or "+X"
 }
 
 export interface AddOnsData {
@@ -292,7 +305,7 @@ export interface SaveTable {
   table_size: number;
   price_per_person: number;
   no_tables: number;
-  allocation: number[];
+  allocation: Record<string, number | string>; // key = table_id, value = seat count or "+X"
   type?: "existing" | "new";
   table_id?: number;
 }

@@ -18,6 +18,8 @@ import type {
 import type {
   VendorRescheduleDataResponse,
   VendorRescheduleBookingPayload,
+  VendorUpdateBookingStatusPayload,
+  VendorUpdateBookingStatusResponse,
 } from "./type";
 
 export interface VendorBookingHistoryResponse {
@@ -379,5 +381,22 @@ export const vendorBookingsService = {
     link.click();
     document.body.removeChild(link);
     window.URL.revokeObjectURL(url);
+  },
+
+  /**
+   * Update booking status (payment status)
+   * @param payload Booking status update payload
+   * @returns Promise with updated booking status
+   */
+  updateBookingStatus: async (
+    payload: VendorUpdateBookingStatusPayload
+  ): Promise<VendorUpdateBookingStatusResponse> => {
+    return api.put<VendorUpdateBookingStatusResponse>(
+      API_ENDPOINTS.VENDOR.BOOKING_HISTORY.UPDATE_STATUS,
+      payload,
+      {
+        returnFullResponse: true,
+      }
+    );
   },
 };

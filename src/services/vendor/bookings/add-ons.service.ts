@@ -14,8 +14,8 @@ export interface VendorAddOnsTable {
   price: number;
   total_tables: number;
   sold_tables: number;
-  available_tables: number;
-  status: number;
+  available_tables?: number; // Optional - can be calculated from total_tables - sold_tables
+  status?: number;
 }
 
 export interface VendorAddOnsTicket {

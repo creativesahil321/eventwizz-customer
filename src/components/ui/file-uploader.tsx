@@ -169,6 +169,13 @@ export function FileUploader(props: FileUploaderProps) {
     ...dropzoneProps
   } = props;
 
+  // Detect if video types are in the accept prop
+  const isVideoUploader = React.useMemo(() => {
+    if (!accept) return false;
+    const acceptKeys = Object.keys(accept);
+    return acceptKeys.some((key) => key.startsWith("video/"));
+  }, [accept]);
+
   const [files, setFiles] = useControllableState({
     prop: valueProp,
     onChange: onValueChange,
@@ -473,98 +480,98 @@ export function FileUploader(props: FileUploaderProps) {
 
   return (
     <>
-    <div className="relative flex flex-col gap-6 overflow-hidden">
-      <Dropzone
-        onDrop={onDrop}
-        accept={accept}
+      <div className="relative flex flex-col gap-6 overflow-hidden">
+        <Dropzone
+          onDrop={onDrop}
+          accept={accept}
           // When autoCompress is enabled, allow very large files to pass validation
           // We'll compress image files automatically in onDrop
           // 100MB limit allows most images to pass, then we compress them
           maxSize={autoCompress ? 100 * 1024 * 1024 : maxSize}
-        maxFiles={maxFileCount}
-        multiple={maxFileCount > 1 || multiple}
-        disabled={isDisabled}
-      >
-        {({ getRootProps, getInputProps, isDragActive }) => (
-          <div
-            {...getRootProps()}
-            className={cn(
-              "group relative grid h-52 w-full cursor-pointer place-items-center rounded-lg border-2 border-dashed border-muted-foreground/25 px-5 py-2.5 text-center transition hover:bg-muted/25",
-              "ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
-              isDragActive && "border-muted-foreground/50",
-              isDisabled && "pointer-events-none opacity-60",
-              className
-            )}
-            {...dropzoneProps}
-          >
-            <input {...getInputProps()} />
-            {isDragActive ? (
-              <div className="flex flex-col items-center justify-center gap-4 sm:px-5">
-                <div className="rounded-full border border-dashed p-3">
-                  <Upload
-                    className="size-7 text-muted-foreground"
-                    aria-hidden="true"
-                  />
-                </div>
-                <p className="font-medium text-muted-foreground">
-                  Drop the files here
-                </p>
-              </div>
-            ) : (
-              <div className="flex flex-col items-center justify-center gap-4 sm:px-5">
-                <div className="rounded-full border border-dashed p-3">
-                  <Upload
-                    className="size-7 text-muted-foreground"
-                    aria-hidden="true"
-                  />
-                </div>
-                <div className="flex flex-col gap-px">
+          maxFiles={maxFileCount}
+          multiple={maxFileCount > 1 || multiple}
+          disabled={isDisabled}
+        >
+          {({ getRootProps, getInputProps, isDragActive }) => (
+            <div
+              {...getRootProps()}
+              className={cn(
+                "group relative grid h-52 w-full cursor-pointer place-items-center rounded-lg border-2 border-dashed border-muted-foreground/25 px-5 py-2.5 text-center transition hover:bg-muted/25",
+                "ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+                isDragActive && "border-muted-foreground/50",
+                isDisabled && "pointer-events-none opacity-60",
+                className
+              )}
+              {...dropzoneProps}
+            >
+              <input {...getInputProps()} />
+              {isDragActive ? (
+                <div className="flex flex-col items-center justify-center gap-4 sm:px-5">
+                  <div className="rounded-full border border-dashed p-3">
+                    <Upload
+                      className="size-7 text-muted-foreground"
+                      aria-hidden="true"
+                    />
+                  </div>
                   <p className="font-medium text-muted-foreground">
-                    Drag {`'n'`} drop files here, or click to select files
+                    Drop the files here
                   </p>
-                  <p className="text-sm text-muted-foreground/70">
-                    You can upload
-                    {maxFileCount > 1
-                      ? ` ${
+                </div>
+              ) : (
+                <div className="flex flex-col items-center justify-center gap-4 sm:px-5">
+                  <div className="rounded-full border border-dashed p-3">
+                    <Upload
+                      className="size-7 text-muted-foreground"
+                      aria-hidden="true"
+                    />
+                  </div>
+                  <div className="flex flex-col gap-px">
+                    <p className="font-medium text-muted-foreground">
+                      Drag {`'n'`} drop files here, or click to select files
+                    </p>
+                    <p className="text-sm text-muted-foreground/70">
+                      You can upload
+                      {maxFileCount > 1
+                        ? ` ${
                             maxFileCount === Infinity
                               ? "multiple"
                               : maxFileCount
                           } files`
                         : ` a file`}
-                      {autoCompress
+                      {!isVideoUploader && autoCompress
                         ? ` (images will be automatically optimized)`
                         : ` (up to ${formatBytes(maxSize)} each)`}
                     </p>
-                    {(enableCropping || autoCompress) && (
+                    {!isVideoUploader && (enableCropping || autoCompress) && (
                       <p className="text-xs text-blue-600 font-medium mt-1">
                         {enableCropping && autoCompress
                           ? "✂️ Images will be cropped & optimized automatically"
                           : enableCropping
                           ? "✂️ Images will be cropped automatically"
                           : "🔄 Images will be optimized automatically"}
-                  </p>
+                      </p>
                     )}
+                  </div>
                 </div>
-              </div>
-            )}
-          </div>
-        )}
-      </Dropzone>
-      {files?.length ? (
-        <ScrollArea className="h-fit w-full">
-          <div className="flex max-h-48 flex-col gap-4">
-            {files?.map((file, index) => (
-              <FileCard
-                key={index}
-                file={file}
-                onRemove={() => onRemove(index)}
-                progress={progresses?.[file.name]}
-              />
-            ))}
-          </div>
-        </ScrollArea>
-      ) : null}
-    </div>
+              )}
+            </div>
+          )}
+        </Dropzone>
+        {files?.length ? (
+          <ScrollArea className="h-fit w-full">
+            <div className="flex max-h-48 flex-col gap-4">
+              {files?.map((file, index) => (
+                <FileCard
+                  key={index}
+                  file={file}
+                  onRemove={() => onRemove(index)}
+                  progress={progresses?.[file.name]}
+                />
+              ))}
+            </div>
+          </ScrollArea>
+        ) : null}
+      </div>
 
       {/* Crop Dialog */}
       {cropDialogOpen && fileToCrop && (

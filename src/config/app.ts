@@ -12,6 +12,8 @@ export const appConfig = {
     name: "event-wizz",
     url: "https://event-wizz.com",
   },
+  logo: "/assets/images/logos/eventwizz-logo.png",
+  mini_logo: "/assets/images/logos/eventwizz-mini-logo.png",
   seo: {
     title: "Event Wizz - Plan the event of Your Dreams", // Will be overridden by theme API data
     description:
@@ -46,7 +48,7 @@ export const appConfig = {
       description:
         "Your ultimate companion for planning the wedding of your dreams. Discover venues, dresses, planning tools, and expert ideas to make your day unforgettable.",
       images: ["/images/twitter-image.jpg"],
-      creator: "@eventwizz", 
+      creator: "@eventwizz",
     },
   },
 };

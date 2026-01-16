@@ -1,6 +1,10 @@
+"use client";
+
 import { Skeleton } from "@/components/ui/skeleton";
+import { ServerContext } from "@/lib/server-context";
 import { cn } from "@/lib/utils";
 import Image from "next/image";
+import { useContext } from "react";
 
 interface OnboardingSkeletonProps {
   className?: string;
@@ -11,78 +15,86 @@ export function OnboardingFormSkeleton({
   className,
   layout = "split",
 }: Readonly<OnboardingSkeletonProps>) {
-  // Premium stepper that matches actual onboarding stepper
+  const { theme } = useContext(ServerContext);
+  const logoPath =
+    theme?.logo?.startsWith("/") ||
+    theme?.logo?.startsWith("data:") ||
+    theme?.logo?.startsWith("http") ||
+    theme?.logo?.startsWith("https") ||
+    theme?.logo?.startsWith("blob")
+      ? theme.logo
+      : "/assets/images/logos/eventwizz-logo.png";
+
   const ProgressSkeleton = () => (
     <div className="bg-[#12023e] backdrop-blur-md bg-opacity-90 border-b border-white/10 py-5">
       <div className="relative">
-        {/* Logo - matches actual position */}
-        <div className="absolute left-0 top-1/2 transform -translate-y-1/2 pl-6 z-10">
+        {/* Logo - Responsive sizing for all screens */}
+        <div className="absolute left-0 top-1/2 transform -translate-y-1/2 pl-4 md:pl-6 z-10 pr-4 md:pr-6">
           <Image
-            src="/assets/images/logos/eventwizz-mini-logo.png"
-            alt="EventWizz Logo"
-            width={120}
-            height={32}
-            className="h-8 w-auto object-contain animate-pulse"
+            src={logoPath}
+            alt={theme?.name || "EventWizz"}
+            width={110}
+            height={30}
+            className="h-5 md:h-6 lg:h-11 xl:h-13 w-auto object-contain max-w-[85px] md:max-w-[95px] lg:max-w-[130px] animate-pulse"
             priority
           />
         </div>
 
         {/* Main container for stepper */}
-        <div className="flex items-center justify-between max-w-7xl mx-auto">
-          {/* Stepper - Center */}
-          <div className="relative flex items-center justify-center gap-8 mx-auto px-32">
-            {/* Background line */}
-            <div className="absolute top-1/2 left-0 right-0 h-[3px] bg-gray-600 -translate-y-1/2 z-0" />
-            
-            {/* Animated progress line */}
-            <div 
-              className="absolute top-1/2 left-0 h-[3px] bg-green-500 -translate-y-1/2 z-10 transition-all duration-1000 animate-pulse"
-              style={{ width: '25%' }}
-            />
+        <div className="flex items-center justify-between max-w-7xl mx-auto pl-28 md:pl-32 lg:pl-36 xl:pl-40 pr-4">
+          {/* Stepper - Scrollable on medium screens, centered on large */}
+          <div className="relative flex-1 overflow-x-auto overflow-y-visible no-scrollbar">
+            <div className="relative flex justify-center items-start space-x-2 md:space-x-3 lg:space-x-4 min-w-max px-4 md:px-6">
+              {/* Background line */}
+              <div className="absolute top-1/2 left-4 md:left-6 right-4 md:right-6 h-[3px] bg-gray-600 -translate-y-1/2 z-0" />
 
-            {/* Step circles */}
-            {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((step, index) => {
-              const getStepClass = () => {
-                if (index === 0) {
-                  return "bg-green-500 text-white border-green-500 shadow-lg shadow-green-500/50 scale-110";
-                }
-                if (index < 2) {
-                  return "bg-white/20 text-white border-white/30";
-                }
-                return "bg-[#1c1c4d] text-gray-400 border-gray-600";
-              };
+              {/* Animated progress line */}
+              <div
+                className="absolute top-1/2 left-4 md:left-6 h-[3px] bg-green-500 -translate-y-1/2 z-10 transition-all duration-1000 animate-pulse"
+                style={{ width: "25%" }}
+              />
 
-              return (
-                <div
-                  key={step}
-                  className="flex flex-col items-center relative z-20 min-w-[80px]"
-                >
+              {/* Step circles */}
+              {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((step, index) => {
+                const getStepClass = () => {
+                  if (index === 0) {
+                    return "bg-green-500 text-white border-green-500 shadow-lg shadow-green-500/50 scale-110";
+                  }
+                  if (index < 2) {
+                    return "bg-white/20 text-white border-white/30";
+                  }
+                  return "bg-[#1c1c4d] text-gray-400 border-gray-600";
+                };
+
+                return (
                   <div
-                    className={cn(
-                      "flex items-center justify-center w-10 h-10 rounded-full border-2 transition-all duration-500",
-                      getStepClass()
-                    )}
-                    style={{
-                      animationDelay: `${index * 100}ms`,
-                    }}
+                    key={step}
+                    className="flex flex-col items-center relative z-20 min-w-[70px] md:min-w-[80px] flex-shrink-0"
                   >
-                    {index === 0 && (
-                      <div className="absolute inset-0 rounded-full bg-green-400 animate-ping opacity-75" />
-                    )}
-                    <span className="relative text-xs font-semibold z-10">
-                      {step}
-                    </span>
+                    <div
+                      className={cn(
+                        "flex items-center justify-center w-10 h-10 rounded-full border-2 transition-all duration-500",
+                        getStepClass()
+                      )}
+                      style={{
+                        animationDelay: `${index * 100}ms`,
+                      }}
+                    >
+                      {index === 0 && (
+                        <div className="absolute inset-0 rounded-full bg-green-400 animate-ping opacity-75" />
+                      )}
+                      <span className="relative text-xs font-semibold z-10">
+                        {step}
+                      </span>
+                    </div>
+                    <div className="text-center mt-2 w-20">
+                      <Skeleton className="h-3 w-16 mx-auto bg-white/20 rounded" />
+                    </div>
                   </div>
-                  <div className="text-center mt-2 w-20">
-                    <Skeleton className="h-3 w-16 mx-auto bg-white/20 rounded" />
-                  </div>
-                </div>
-              );
-            })}
+                );
+              })}
+            </div>
           </div>
-
-          {/* Right side empty space */}
-          <div className="flex-shrink-0 w-32 pr-6" />
         </div>
       </div>
     </div>

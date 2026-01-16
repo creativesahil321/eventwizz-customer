@@ -159,6 +159,7 @@ export function MenuBar({
         <>
           <div className="w-px h-full bg-border mx-1" />
           <Button
+            type="button"
             size="sm"
             variant="outline"
             onClick={onAIGenerate}

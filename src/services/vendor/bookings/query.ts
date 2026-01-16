@@ -13,6 +13,8 @@ import type {
 import type {
   VendorRescheduleDataResponse,
   VendorRescheduleBookingPayload,
+  VendorUpdateBookingStatusPayload,
+  VendorUpdateBookingStatusResponse,
 } from "./type";
 
 /**
@@ -157,6 +159,45 @@ export const useVendorRescheduleBooking = () => {
         // Invalidate reschedule dates cache for this booking
         queryClient.invalidateQueries({
           queryKey: vendorBookingsKeys.rescheduleDates(),
+        });
+        // Invalidate bookings list to update status
+        queryClient.invalidateQueries({
+          queryKey: ["vendor-booking-history", "list"],
+        });
+      }
+      // Toast notifications handled at root level by API client interceptor
+    },
+    onError: () => {
+      // Error toast notifications handled at root level by API client interceptor
+    },
+  });
+};
+
+/**
+ * Hook to update booking status (payment status)
+ * Note: Toast notifications are handled at root level by API client interceptor
+ */
+export const useUpdateVendorBookingStatus = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation<
+    VendorUpdateBookingStatusResponse,
+    Error,
+    VendorUpdateBookingStatusPayload
+  >({
+    mutationFn: (payload) =>
+      vendorBookingsService.updateBookingStatus(payload),
+    onSuccess: (response, variables) => {
+      if (response.status) {
+        // Invalidate booking details using the correct query key
+        // The actual query key is: ["vendor-booking-history", "detail", bookingId]
+        queryClient.invalidateQueries({
+          queryKey: ["vendor-booking-history", "detail", variables.booking_id],
+        });
+        // Refetch active booking details immediately
+        queryClient.refetchQueries({
+          queryKey: ["vendor-booking-history", "detail", variables.booking_id],
+          type: "active",
         });
         // Invalidate bookings list to update status
         queryClient.invalidateQueries({

@@ -1,6 +1,13 @@
 "use client";
 
-import { Bookmark, Menu, Phone, Search, X, ImageIcon } from "lucide-react";
+import {
+  Bookmark,
+  Menu,
+  Phone,
+  X,
+  ImageIcon,
+  ShoppingCart,
+} from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { useContext, useState, useEffect } from "react";
@@ -105,7 +112,6 @@ export default function CommonHeader({
         ? []
         : [
             {
-              icon: "bookmarks" as IconKey,
               link: "/auth/login",
               linkText: "Log In",
             },
@@ -164,6 +170,15 @@ export default function CommonHeader({
   };
 
   const styles = getVariantStyles();
+  const isOnboardingMode = variant === "onboarding";
+
+  // Prevent navigation during onboarding
+  const handleLinkClick = (e: React.MouseEvent) => {
+    if (isOnboardingMode) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+  };
 
   return (
     <section
@@ -173,21 +188,24 @@ export default function CommonHeader({
         {/* Desktop Header */}
         <div className="hidden md:flex justify-between items-center py-3">
           <div className="flex items-center gap-3 w-1/3">
-            <Link
-              href={headerData.browseEvent.link}
-              className={`text-sm ${styles.hoverColor} transition-colors border-2 ${styles.borderColor} rounded-lg px-2 py-1`}
-            >
-              {headerData.browseEvent.linkText}
-            </Link>
-            <button
-              className={`flex items-center gap-2 text-sm ${styles.hoverColor} transition-colors border-2 ${styles.borderColor} rounded-lg px-2 py-1`}
-            >
-              <Search size={16} /> Search
-            </button>
+            {isOnboardingMode ? (
+              <div
+                className={`text-sm ${styles.textColor} opacity-60 border-2 ${styles.borderColor} rounded-lg px-2 py-1 cursor-not-allowed`}
+              >
+                {headerData.browseEvent.linkText}
+              </div>
+            ) : (
+              <Link
+                href={headerData.browseEvent.link}
+                className={`text-sm ${styles.hoverColor} transition-colors border-2 ${styles.borderColor} rounded-lg px-2 py-1`}
+              >
+                {headerData.browseEvent.linkText}
+              </Link>
+            )}
           </div>
           <div className="w-1/3 text-center">
-            <Link href="/" aria-label="Home">
-              <div className="h-14 flex items-center justify-center">
+            {isOnboardingMode ? (
+              <div className="h-14 flex items-center justify-center cursor-default">
                 {logoPath ? (
                   <Image
                     src={logoPath as string}
@@ -206,24 +224,89 @@ export default function CommonHeader({
                   </div>
                 )}
               </div>
-            </Link>
+            ) : (
+              <Link href="/" aria-label="Home">
+                <div className="h-14 flex items-center justify-center">
+                  {logoPath ? (
+                    <Image
+                      src={logoPath as string}
+                      width={120}
+                      height={40}
+                      className="max-h-12 w-auto object-contain"
+                      alt={vendorTheme?.name || "EventWizz"}
+                      priority
+                    />
+                  ) : (
+                    <div
+                      className={`flex items-center gap-2 text-lg font-bold ${styles.textColor}`}
+                    >
+                      <ImageIcon size={24} />
+                      EventWizz
+                    </div>
+                  )}
+                </div>
+              </Link>
+            )}
           </div>
           <div
             className={`flex items-center gap-2 sm:gap-3 w-1/3 justify-end text-xs sm:text-sm`}
           >
             {/* Cart Button */}
-            <CartButton
-              size="sm"
-              className={`flex items-center gap-1 ${styles.hoverColor} transition-colors border-2 ${styles.borderColor} rounded-lg px-2 py-1`}
-            />
+            {isOnboardingMode ? (
+              <div
+                className={`flex items-center gap-1 ${styles.textColor} opacity-60 transition-colors border-2 ${styles.borderColor} rounded-lg px-2 py-1 cursor-not-allowed`}
+              >
+                <ShoppingCart size={16} />
+                <span>Cart</span>
+              </div>
+            ) : (
+              <CartButton
+                size="sm"
+                className={`flex items-center gap-1 ${styles.hoverColor} transition-colors border-2 ${styles.borderColor} rounded-lg px-2 py-1`}
+              />
+            )}
 
             {headerData.navLinks.map(({ icon, link, linkText }, index) => {
               const IconComponent = icon ? iconComponents[icon] : null;
               const isPhoneNumber = icon === "phone";
+
+              // Allow phone links even in onboarding mode (tel: links are safe)
+              const shouldAllowNavigation =
+                isOnboardingMode && !link.startsWith("tel:");
+
+              if (shouldAllowNavigation) {
+                return (
+                  <div
+                    key={index}
+                    className={`flex items-center gap-1 ${styles.textColor} opacity-60 border-2 ${styles.borderColor} rounded-lg px-1.5 sm:px-2 py-1 whitespace-nowrap cursor-not-allowed`}
+                    title={isPhoneNumber ? linkText : undefined}
+                  >
+                    {IconComponent && (
+                      <IconComponent
+                        size={14}
+                        className="sm:w-4 sm:h-4 flex-shrink-0"
+                      />
+                    )}
+                    <span
+                      className={`${
+                        isPhoneNumber ? "text-[10px] sm:text-xs md:text-sm" : ""
+                      } ${
+                        isPhoneNumber
+                          ? "truncate max-w-[80px] sm:max-w-[120px] md:max-w-[160px] lg:max-w-none"
+                          : ""
+                      }`}
+                    >
+                      {linkText}
+                    </span>
+                  </div>
+                );
+              }
+
               return (
                 <Link
                   key={index}
                   href={link}
+                  onClick={handleLinkClick}
                   className={`flex items-center gap-1 ${styles.hoverColor} transition-colors border-2 ${styles.borderColor} rounded-lg px-1.5 sm:px-2 py-1 whitespace-nowrap`}
                   title={isPhoneNumber ? linkText : undefined}
                 >
@@ -256,12 +339,13 @@ export default function CommonHeader({
             onClick={toggleMobileMenu}
             className="p-2"
             aria-label={mobileMenuOpen ? "Close menu" : "Open menu"}
+            disabled={isOnboardingMode}
           >
             <Menu className="h-6 w-6" />
           </button>
           <div className="text-center">
-            <Link href="/" aria-label="Home">
-              <div className="h-10 flex items-center justify-center">
+            {isOnboardingMode ? (
+              <div className="h-10 flex items-center justify-center cursor-default">
                 {logoPath ? (
                   <Image
                     src={logoPath as string}
@@ -280,16 +364,52 @@ export default function CommonHeader({
                   </div>
                 )}
               </div>
-            </Link>
+            ) : (
+              <Link href="/" aria-label="Home">
+                <div className="h-10 flex items-center justify-center">
+                  {logoPath ? (
+                    <Image
+                      src={logoPath as string}
+                      width={100}
+                      height={30}
+                      className="max-h-8 w-auto object-contain"
+                      alt={vendorTheme?.name || "EventWizz"}
+                      priority
+                    />
+                  ) : (
+                    <div
+                      className={`flex items-center gap-2 text-lg font-bold ${styles.textColor}`}
+                    >
+                      <ImageIcon size={20} />
+                      EventWizz
+                    </div>
+                  )}
+                </div>
+              </Link>
+            )}
           </div>
           <div className="flex items-center gap-2">
             {/* Mobile Cart Button */}
-            <CartButton
-              size="icon"
-              className={`p-2 ${styles.hoverColor} transition-colors`}
-            />
+            {isOnboardingMode ? (
+              <div
+                className={`p-2 ${styles.textColor} opacity-60 transition-colors cursor-not-allowed`}
+              >
+                <ShoppingCart className="h-5 w-5" />
+              </div>
+            ) : (
+              <CartButton
+                size="icon"
+                className={`p-2 ${styles.hoverColor} transition-colors`}
+              />
+            )}
 
-            {isAuthenticated ? (
+            {isOnboardingMode ? (
+              <div
+                className={`p-2 ${styles.textColor} opacity-60 cursor-not-allowed`}
+              >
+                <Bookmark className="h-5 w-5" />
+              </div>
+            ) : isAuthenticated ? (
               <Link
                 href={`/${session?.user?.account_type}/dashboard`}
                 className={`p-2 ${styles.hoverColor} transition-colors`}
@@ -329,38 +449,74 @@ export default function CommonHeader({
           </div>
 
           <div className="p-4 space-y-4">
-            <Link
-              href={headerData.browseEvent.link}
-              className={`block py-2 ${styles.hoverColor}`}
-              onClick={toggleMobileMenu}
-            >
-              {headerData.browseEvent.linkText}
-            </Link>
-
-            <button
-              className={`flex items-center gap-2 py-2 ${styles.hoverColor}`}
-            >
-              <Search size={18} /> Search
-            </button>
+            {isOnboardingMode ? (
+              <div
+                className={`block py-2 ${styles.textColor} opacity-60 cursor-not-allowed`}
+              >
+                {headerData.browseEvent.linkText}
+              </div>
+            ) : (
+              <Link
+                href={headerData.browseEvent.link}
+                className={`block py-2 ${styles.hoverColor}`}
+                onClick={toggleMobileMenu}
+              >
+                {headerData.browseEvent.linkText}
+              </Link>
+            )}
 
             {/* Mobile Cart Button */}
-            <div className="py-2" onClick={toggleMobileMenu}>
-              <CartButton
-                size="sm"
-                className={`flex items-center gap-2 py-2 ${styles.hoverColor}`}
-              />
-            </div>
+            {isOnboardingMode ? (
+              <div className="py-2">
+                <div
+                  className={`flex items-center gap-2 py-2 ${styles.textColor} opacity-60 cursor-not-allowed`}
+                >
+                  <ShoppingCart size={18} />
+                  <span>Cart</span>
+                </div>
+              </div>
+            ) : (
+              <div className="py-2" onClick={toggleMobileMenu}>
+                <CartButton
+                  size="sm"
+                  className={`flex items-center gap-2 py-2 ${styles.hoverColor}`}
+                />
+              </div>
+            )}
 
             <hr className="border-gray-200" />
 
             {headerData.navLinks.map(({ icon, link, linkText }, index) => {
               const IconComponent = icon ? iconComponents[icon] : null;
+
+              // Allow phone links even in onboarding mode (tel: links are safe)
+              const shouldAllowNavigation =
+                isOnboardingMode && !link.startsWith("tel:");
+
+              if (shouldAllowNavigation) {
+                return (
+                  <div
+                    key={index}
+                    className={`flex items-center gap-2 py-2 ${styles.textColor} opacity-60 cursor-not-allowed`}
+                  >
+                    {IconComponent && <IconComponent size={18} />}
+                    {linkText}
+                  </div>
+                );
+              }
+
               return (
                 <Link
                   key={index}
                   href={link}
                   className={`flex items-center gap-2 py-2 ${styles.hoverColor}`}
-                  onClick={toggleMobileMenu}
+                  onClick={(e) => {
+                    if (isOnboardingMode) {
+                      e.preventDefault();
+                      return;
+                    }
+                    toggleMobileMenu();
+                  }}
                 >
                   {IconComponent && <IconComponent size={18} />}
                   {linkText}

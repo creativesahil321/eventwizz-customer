@@ -289,6 +289,7 @@ export function TiptapEditor({
           <div className="w-px h-full bg-border mx-1" />
           {showAIButton && (
             <Button
+              type="button"
               size="sm"
               variant="outline"
               onClick={handleAIGenerate}
