@@ -110,8 +110,11 @@ export default function AdjustBookingContent({
                 capacity: table.table_size,
                 people_added: table.people,
                 table_count: table.no_tables,
-                allocation: table.allocation,
-                price_per_person: table.price_per_person,
+                allocation: table.allocation, // Now Record<string, number | string>
+                price_per_person:
+                  typeof table.price_per_person === "string"
+                    ? parseFloat(table.price_per_person)
+                    : table.price_per_person,
                 menuChoicesCompleted: 0, // TODO: Get from API if available
               })),
               // Tickets are now displayed separately with full details
@@ -417,15 +420,35 @@ export default function AdjustBookingContent({
                     ),
                     tables: d.items
                       .filter((item) => item.type === "table")
-                      .map((item) => ({
-                        id: `table-${item.capacity}`,
-                        tableConfigId: 0, // Placeholder - not available from booking details API
-                        capacity: item.capacity || 0,
-                        table_count: item.table_count || 0,
-                        allocation: item.allocation || [],
-                        people_added: item.people_added,
-                        price_per_person: item.price_per_person || 0,
-                      })),
+                      .map((item) => {
+                        // Convert Record<string, number | string> to arrays for internal state
+                        const allocationArray: number[] = [];
+                        const parentIdsArray: number[] = [];
+
+                        if (item.allocation) {
+                          Object.entries(item.allocation).forEach(
+                            ([tableId, val]) => {
+                              parentIdsArray.push(parseInt(tableId));
+                              const numericValue =
+                                typeof val === "string"
+                                  ? parseInt(val.replace("+", ""))
+                                  : val;
+                              allocationArray.push(numericValue);
+                            }
+                          );
+                        }
+
+                        return {
+                          id: `table-${item.capacity}`,
+                          tableConfigId: 0, // Placeholder - not available from booking details API
+                          capacity: item.capacity || 0,
+                          table_count: item.table_count || 0,
+                          allocation: allocationArray,
+                          parent_ids: parentIdsArray,
+                          people_added: item.people_added,
+                          price_per_person: item.price_per_person || 0,
+                        };
+                      }),
                   }))}
                 />
               </div>

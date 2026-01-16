@@ -16,6 +16,7 @@ import { cn } from "@/lib/utils";
 import { FaSitemap } from "react-icons/fa";
 import { useFormContext } from "../form-provider";
 import Image from "next/image";
+import Link from "next/link";
 import { ServerContext } from "@/lib/server-context";
 import { useContext } from "react";
 
@@ -40,92 +41,94 @@ export default function Stepper({ activeStep }: { activeStep: number }) {
     theme?.logo?.startsWith("/") ||
     theme?.logo?.startsWith("data:") ||
     theme?.logo?.startsWith("http") ||
-    theme?.logo?.startsWith("https")
+    theme?.logo?.startsWith("https") ||
+    theme?.logo?.startsWith("blob")
       ? theme.logo
-      : "/assets/images/logos/eventwizz-mini-logo.png";
+      : "/assets/images/logos/eventwizz-logo.png";
 
   return (
     <div className="bg-[#12023e] backdrop-blur-md bg-opacity-90 border-b border-white/10 py-5">
       <div className="relative">
-        {/* Main Site Logo - Left Side - Absolute positioned to break out of container */}
-        <div className="absolute left-0 top-1/2 transform -translate-y-1/2 pl-6 z-10">
+        {/* Main Site Logo - Left Side - Responsive sizing for all screens */}
+        <div className="absolute left-0 top-1/2 transform -translate-y-1/2 pl-4 md:pl-6 z-10 pr-4 md:pr-6">
+          <Link href="/" aria-label="Home">
           <Image
             src={logoPath}
-            alt="EventWizz Logo"
-            width={120}
-            height={32}
-            className="h-8 w-auto object-contain"
+            alt={theme?.name || "EventWizz"}
+            width={110}
+            height={30}
+              className="h-5 md:h-6 lg:h-11 xl:h-13 w-auto object-contain max-w-[85px] md:max-w-[95px] lg:max-w-[130px] cursor-pointer hover:opacity-80 transition-opacity"
             priority
           />
+          </Link>
         </div>
 
         {/* Main container for stepper and right side */}
-        <div className="flex items-center justify-between max-w-7xl mx-auto">
-          {/* Stepper - Center */}
-          <div className="relative flex justify-center items-start space-x-6 flex-1 px-6">
-            {/* Background base line */}
-            <div className="absolute top-[22px] left-6 right-6 h-[3px] bg-gray-600 z-0" />
+        <div className="flex items-center justify-between max-w-7xl mx-auto pl-28 md:pl-32 lg:pl-36 xl:pl-40 pr-4">
+          {/* Stepper - Scrollable on medium screens, centered on large */}
+          <div className="relative flex-1 overflow-x-auto overflow-y-visible no-scrollbar">
+            <div className="relative flex justify-center items-start space-x-2 md:space-x-3 lg:space-x-4 min-w-max px-4 md:px-6">
+              {/* Background base line */}
+              <div className="absolute top-[22px] left-4 md:left-6 right-4 md:right-6 h-[3px] bg-gray-600 z-0" />
 
-            {/* Progress filled line */}
-            <div
-              className="absolute top-[22px] left-6 h-[3px] bg-green-500 z-10 transition-all duration-500"
-              style={{
-                width: `calc(${
-                  ((activeStep - 1) / (steps.length - 1)) * 100
-                }% + ${100 / steps.length / 2}%)`,
-              }}
-            />
+              {/* Progress filled line */}
+              <div
+                className="absolute top-[22px] left-4 md:left-6 h-[3px] bg-green-500 z-10 transition-all duration-500"
+                style={{
+                  width: `calc(${
+                    ((activeStep - 1) / (steps.length - 1)) * 100
+                  }% + ${100 / steps.length / 2}%)`,
+                }}
+              />
 
-            {steps.map((step) => {
-              const isCompleted = step.id <= lastCompletedStep; // Use lastCompletedStep here
-              const isCurrent = step.id === activeStep;
+              {steps.map((step) => {
+                const isCompleted = step.id <= lastCompletedStep; // Use lastCompletedStep here
+                const isCurrent = step.id === activeStep;
 
-              const handleClick = async () => {
-                if (isCompleted || step.id === activeStep) {
-                  await setActiveStep(step.id);
-                }
-              };
+                const handleClick = async () => {
+                  if (isCompleted || step.id === activeStep) {
+                    await setActiveStep(step.id);
+                  }
+                };
 
-              return (
-                <div
-                  key={step.id}
-                  className="flex flex-col items-center relative z-20 min-w-[80px]"
-                >
+                return (
                   <div
-                    onClick={handleClick}
-                    role={isCompleted ? "button" : undefined}
-                    tabIndex={isCompleted ? 0 : -1}
-                    aria-disabled={!isCompleted && step.id !== activeStep}
-                    className={cn(
-                      "flex items-center justify-center w-10 h-10 rounded-full border-2 transition-all duration-300 ease-in-out transform",
-                      isCompleted
-                        ? "bg-green-500 text-white border-green-500 hover:brightness-110 hover:scale-110 cursor-pointer"
-                        : isCurrent
-                        ? "bg-white text-green-600 border-green-500 shadow hover:scale-110 cursor-pointer"
-                        : "bg-[#1c1c4d] text-gray-400 border-gray-600 cursor-not-allowed"
-                    )}
+                    key={step.id}
+                    className="flex flex-col items-center relative z-20 min-w-[70px] md:min-w-[80px] flex-shrink-0"
                   >
-                    {step.icon}
-                  </div>
-                  <div className="text-center mt-2 w-20">
-                    <p
+                    <div
+                      onClick={handleClick}
+                      role={isCompleted ? "button" : undefined}
+                      tabIndex={isCompleted ? 0 : -1}
+                      aria-disabled={!isCompleted && step.id !== activeStep}
                       className={cn(
-                        "text-xs font-medium leading-snug",
-                        isCurrent || isCompleted
-                          ? "text-white"
-                          : "text-gray-400"
+                        "flex items-center justify-center w-10 h-10 rounded-full border-2 transition-all duration-300 ease-in-out transform",
+                        isCompleted
+                          ? "bg-green-500 text-white border-green-500 hover:brightness-110 hover:scale-110 cursor-pointer"
+                          : isCurrent
+                          ? "bg-white text-green-600 border-green-500 shadow hover:scale-110 cursor-pointer"
+                          : "bg-[#1c1c4d] text-gray-400 border-gray-600 cursor-not-allowed"
                       )}
                     >
-                      {step.label}
-                    </p>
+                      {step.icon}
+                    </div>
+                    <div className="text-center mt-2 w-20">
+                      <p
+                        className={cn(
+                          "text-xs font-medium leading-snug",
+                          isCurrent || isCompleted
+                            ? "text-white"
+                            : "text-gray-400"
+                        )}
+                      >
+                        {step.label}
+                      </p>
+                    </div>
                   </div>
-                </div>
-              );
-            })}
+                );
+              })}
+            </div>
           </div>
-
-          {/* Right Side - Empty for now, can be used for future elements */}
-          <div className="flex-shrink-0 w-32 pr-6"></div>
         </div>
       </div>
     </div>

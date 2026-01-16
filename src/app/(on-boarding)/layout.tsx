@@ -5,6 +5,12 @@ import "@/assets/scss/app.scss";
 import { tiemposHeadline } from "@/lib/fonts";
 import { cn } from "@/lib/utils";
 import { ServerContextProvider } from "@/lib/server-context";
+import {
+  getRequestHost,
+  getSubdomainFromDomain,
+  fetchServerTheme,
+} from "@/lib/server-theme";
+
 export default async function OnboardingLayout({
   children,
 }: {
@@ -26,7 +32,25 @@ export default async function OnboardingLayout({
     redirect("/vendor/dashboard");
   }
 
-  // Create a default theme for onboarding context
+  // Get domain information from the request
+  const host = await getRequestHost();
+  const subdomain = getSubdomainFromDomain(host);
+
+  // Fetch actual vendor theme from API
+  let vendorTheme = null;
+  try {
+    vendorTheme = await fetchServerTheme(host);
+
+    if (!vendorTheme) {
+      console.warn(
+        "Onboarding: Theme fetching failed, using default EventWizz theme"
+      );
+    }
+  } catch (error) {
+    console.error("Onboarding: Failed to fetch vendor theme:", error);
+  }
+
+  // Fallback theme if vendor theme is not available
   const defaultTheme = {
     colors: {
       primary: "#0F172A",
@@ -51,10 +75,11 @@ export default async function OnboardingLayout({
     },
   };
 
+  // Use vendor theme if available, otherwise use default
+  const themeToUse = vendorTheme || defaultTheme;
+
   return (
-    <ServerContextProvider
-      value={{ theme: defaultTheme, host: null, subdomain: null }}
-    >
+    <ServerContextProvider value={{ theme: themeToUse, host, subdomain }}>
       <section
         className={cn(
           "flex min-h-screen w-full flex-col",

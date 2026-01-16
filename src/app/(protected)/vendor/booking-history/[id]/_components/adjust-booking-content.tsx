@@ -29,7 +29,6 @@ import {
   AlertCircle,
   RotateCcw,
   Trash2,
-  FileDown,
   Eye,
   Loader2,
 } from "lucide-react";
@@ -44,10 +43,35 @@ import { useVendorBookingDetails } from "../../_lib/queries";
 import { Skeleton } from "@/components/ui/skeleton";
 import AddOnsTab from "./add-ons-tab";
 import { useDeleteVendorAddOns } from "@/services/vendor/bookings/hooks/useDeleteVendorAddOns";
-import { vendorBookingsService } from "@/services/vendor/bookings/bookings.service";
 import { VendorRescheduleDateModal } from "./vendor-reschedule-modal";
-import { useVendorRescheduleBooking } from "@/services/vendor/bookings/query";
+import {
+  useVendorRescheduleBooking,
+  useUpdateVendorBookingStatus,
+} from "@/services/vendor/bookings/query";
 import type { VendorRescheduleBookingPayload } from "@/services/vendor/bookings/type";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 interface AdjustBookingContentProps {
   bookingId: string;
@@ -64,9 +88,6 @@ export default function AdjustBookingContent({
   const [expandedAddOns, setExpandedAddOns] = useState<Record<string, boolean>>(
     {}
   );
-  const [downloadingMenuChoices, setDownloadingMenuChoices] = useState<
-    Record<string, boolean>
-  >({});
   const [rescheduleModalOpen, setRescheduleModalOpen] = useState(false);
   const [selectedDateForReschedule, setSelectedDateForReschedule] = useState<{
     date: string;
@@ -79,6 +100,21 @@ export default function AdjustBookingContent({
     date_key: string;
     hasAddons: boolean;
   } | null>(null);
+
+  // Status update confirmation dialog state
+  const [statusUpdateDialog, setStatusUpdateDialog] = useState<{
+    open: boolean;
+    bookingDateId: number | null;
+    currentStatus: string | null;
+    newStatus: number | null;
+    dateLabel: string | null;
+  }>({
+    open: false,
+    bookingDateId: null,
+    currentStatus: null,
+    newStatus: null,
+    dateLabel: null,
+  });
 
   // Fetch booking details from API
   const {
@@ -94,6 +130,9 @@ export default function AdjustBookingContent({
 
   // Reschedule mutation
   const rescheduleMutation = useVendorRescheduleBooking();
+
+  // Update booking status mutation
+  const updateStatusMutation = useUpdateVendorBookingStatus();
 
   // Helper function to safely format amounts (handles null/undefined)
   const formatAmount = (value: number | null | undefined): string => {
@@ -181,25 +220,61 @@ export default function AdjustBookingContent({
     });
   };
 
-  // Handler for downloading menu choices
-  const handleDownloadMenuChoices = async (dateKey: string) => {
-    const downloadKey = `${bookingId}-${dateKey}`;
-    setDownloadingMenuChoices((prev) => ({ ...prev, [downloadKey]: true }));
-
-    try {
-      await vendorBookingsService.exportMenuChoices(
-        parseInt(bookingId),
-        dateKey
-      );
-      toast.success("Menu choices downloaded successfully");
-    } catch (error) {
-      console.error("Error downloading menu choices:", error);
-      toast.error("Failed to download menu choices");
-    } finally {
-      setDownloadingMenuChoices((prev) => ({ ...prev, [downloadKey]: false }));
-    }
+  // Handler for requesting status change (opens confirmation dialog)
+  const handleStatusChangeRequest = (
+    bookingDateId: number,
+    currentStatus: string,
+    newStatus: number,
+    dateLabel: string
+  ) => {
+    setStatusUpdateDialog({
+      open: true,
+      bookingDateId,
+      currentStatus,
+      newStatus,
+      dateLabel,
+    });
   };
 
+  // Handler for confirming and updating payment status
+  const handleConfirmStatusUpdate = () => {
+    if (
+      !statusUpdateDialog.bookingDateId ||
+      statusUpdateDialog.newStatus === null
+    ) {
+      return;
+    }
+
+    updateStatusMutation.mutate(
+      {
+        booking_id: parseInt(bookingId),
+        booking_date_id: statusUpdateDialog.bookingDateId,
+        payment_status: statusUpdateDialog.newStatus,
+      },
+      {
+        onSuccess: (response) => {
+          if (response.status) {
+            // Close dialog
+            setStatusUpdateDialog({
+              open: false,
+              bookingDateId: null,
+              currentStatus: null,
+              newStatus: null,
+              dateLabel: null,
+            });
+            // Success toast is handled by API interceptor
+            // Data will be automatically refetched via query invalidation
+          }
+        },
+        onError: (error) => {
+          // Error toast is handled by API interceptor
+          console.error("Error updating payment status:", error);
+        },
+      }
+    );
+  };
+
+  // Handler for downloading menu choices
   const handleDownload = () => {
     toast.success("Downloading booking receipt...");
     // TODO: Implement download logic
@@ -208,6 +283,43 @@ export default function AdjustBookingContent({
   const handlePrint = () => {
     toast.success("Preparing to print...");
     // TODO: Implement print logic
+  };
+
+  // Helper function to convert payment status string to number
+  // API mapping: 0 => 'Pending', 1 => 'Paid', 2 => 'failed', 3 => 'cancelled', 4 => 'refunded'
+  const getPaymentStatusNumber = (status: string): number => {
+    const statusLower = status.toLowerCase();
+    if (statusLower.includes("paid") || statusLower.includes("full")) {
+      return 1; // Paid
+    }
+    if (statusLower.includes("failed")) {
+      return 2; // Failed
+    }
+    if (statusLower.includes("cancel")) {
+      return 3; // Cancelled
+    }
+    if (statusLower.includes("refund")) {
+      return 4; // Refunded
+    }
+    return 0; // Pending (default)
+  };
+
+  // Helper function to get status label from number
+  const getPaymentStatusLabel = (statusNumber: number): string => {
+    switch (statusNumber) {
+      case 0:
+        return "Pending";
+      case 1:
+        return "Paid";
+      case 2:
+        return "Failed";
+      case 3:
+        return "Cancelled";
+      case 4:
+        return "Refunded";
+      default:
+        return "Unknown";
+    }
   };
 
   const getPaymentStatusBadge = (status: string) => {
@@ -232,6 +344,30 @@ export default function AdjustBookingContent({
       return (
         <Badge className="bg-amber-100 text-amber-700 hover:bg-amber-100">
           <Clock className="h-3 w-3 mr-1" />
+          {status}
+        </Badge>
+      );
+    }
+    if (statusLower.includes("failed")) {
+      return (
+        <Badge className="bg-red-100 text-red-700 hover:bg-red-100">
+          <AlertCircle className="h-3 w-3 mr-1" />
+          {status}
+        </Badge>
+      );
+    }
+    if (statusLower.includes("cancel")) {
+      return (
+        <Badge className="bg-gray-100 text-gray-700 hover:bg-gray-100">
+          <AlertCircle className="h-3 w-3 mr-1" />
+          {status}
+        </Badge>
+      );
+    }
+    if (statusLower.includes("refund")) {
+      return (
+        <Badge className="bg-orange-100 text-orange-700 hover:bg-orange-100">
+          <RotateCcw className="h-3 w-3 mr-1" />
           {status}
         </Badge>
       );
@@ -415,13 +551,27 @@ export default function AdjustBookingContent({
                   <div className="p-1.5 rounded-md bg-blue-50 shrink-0">
                     <User className="h-4 w-4 text-blue-600" />
                   </div>
-                  <div className="min-w-0">
+                  <div className="min-w-0 flex-1">
                     <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">
                       Customer Name
                     </p>
-                    <p className="text-sm font-semibold text-foreground">
-                      {bookingData.user.full_name}
-                    </p>
+                    <TooltipProvider>
+                      <Tooltip delayDuration={300}>
+                        <TooltipTrigger asChild>
+                          <p className="text-sm font-semibold text-foreground truncate cursor-help">
+                            {bookingData.user.full_name}
+                          </p>
+                        </TooltipTrigger>
+                        <TooltipContent
+                          side="top"
+                          className="max-w-xs p-2 bg-popover text-popover-foreground border shadow-lg"
+                        >
+                          <p className="text-sm break-words">
+                            {bookingData.user.full_name}
+                          </p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
                   </div>
                 </div>
 
@@ -430,7 +580,7 @@ export default function AdjustBookingContent({
                   <div className="p-1.5 rounded-md bg-green-50 shrink-0">
                     <Mail className="h-4 w-4 text-green-600" />
                   </div>
-                  <div className="min-w-0">
+                  <div className="min-w-0 flex-1">
                     <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">
                       Email
                     </p>
@@ -463,13 +613,27 @@ export default function AdjustBookingContent({
                     <div className="p-1.5 rounded-md bg-orange-50 shrink-0">
                       <MapPin className="h-4 w-4 text-orange-600" />
                     </div>
-                    <div className="min-w-0">
+                    <div className="min-w-0 flex-1">
                       <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">
                         Location
                       </p>
-                      <p className="text-sm font-semibold text-foreground">
-                        {bookingData.location}
-                      </p>
+                      <TooltipProvider>
+                        <Tooltip delayDuration={300}>
+                          <TooltipTrigger asChild>
+                            <p className="text-sm font-semibold text-foreground truncate cursor-help">
+                              {bookingData.location}
+                            </p>
+                          </TooltipTrigger>
+                          <TooltipContent
+                            side="top"
+                            className="max-w-xs p-2 bg-popover text-popover-foreground border shadow-lg"
+                          >
+                            <p className="text-sm break-words">
+                              {bookingData.location}
+                            </p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
                     </div>
                   </div>
                 )}
@@ -653,7 +817,55 @@ export default function AdjustBookingContent({
                                   </span>
                                 </div>
                               </div>
-                              {getPaymentStatusBadge(dateInfo.payment_status)}
+                              <div className="flex items-center gap-2">
+                                {getPaymentStatusBadge(dateInfo.payment_status)}
+                                <Select
+                                  value={String(
+                                    getPaymentStatusNumber(
+                                      dateInfo.payment_status
+                                    )
+                                  )}
+                                  onValueChange={(value) => {
+                                    const newStatusNum = parseInt(value);
+                                    const currentStatusNum =
+                                      getPaymentStatusNumber(
+                                        dateInfo.payment_status
+                                      );
+                                    // Only open dialog if status is actually changing
+                                    if (newStatusNum !== currentStatusNum) {
+                                      handleStatusChangeRequest(
+                                        dateInfo.booking_date_id,
+                                        dateInfo.payment_status,
+                                        newStatusNum,
+                                        dateInfo.date
+                                      );
+                                    }
+                                  }}
+                                  disabled={updateStatusMutation.isPending}
+                                >
+                                  <SelectTrigger className="h-7 w-[120px] text-xs border-2">
+                                    <div className="flex items-center gap-2">
+                                      {updateStatusMutation.isPending && (
+                                        <Loader2 className="h-3 w-3 animate-spin" />
+                                      )}
+                                      <SelectValue
+                                        placeholder={
+                                          updateStatusMutation.isPending
+                                            ? "Updating..."
+                                            : "Update Status"
+                                        }
+                                      />
+                                    </div>
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="0">Pending</SelectItem>
+                                    <SelectItem value="1">Paid</SelectItem>
+                                    <SelectItem value="2">Failed</SelectItem>
+                                    <SelectItem value="3">Cancelled</SelectItem>
+                                    <SelectItem value="4">Refunded</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              </div>
                             </div>
                           </AccordionTrigger>
                           <AccordionContent className="px-4 pb-4 bg-gray-50/50 border-t">
@@ -849,55 +1061,24 @@ export default function AdjustBookingContent({
                                         {/* Menu Choices Actions */}
                                         {bookingData.is_menu_choice && (
                                           <div className="mt-3 pt-3 border-t border-gray-100">
-                                            <div className="flex flex-col sm:flex-row gap-2">
-                                              <Button
-                                                onClick={() =>
-                                                  router.push(
-                                                    `/vendor/menu-choices/${bookingId}`
-                                                  )
-                                                }
-                                                size="sm"
-                                                className="flex-1 h-9 gap-2"
-                                                style={{
-                                                  backgroundColor:
-                                                    "var(--color-primary)",
-                                                  color:
-                                                    "var(--color-primary-foreground)",
-                                                }}
-                                              >
-                                                <Eye className="h-4 w-4" />
-                                                View Menu Choices
-                                              </Button>
-                                              <Button
-                                                onClick={() =>
-                                                  handleDownloadMenuChoices(
-                                                    dateInfo.date_key
-                                                  )
-                                                }
-                                                size="sm"
-                                                variant="outline"
-                                                className="flex-1 h-9 gap-2 border-2 hover:bg-gray-50"
-                                                disabled={
-                                                  downloadingMenuChoices[
-                                                    `${bookingId}-${dateInfo.date_key}`
-                                                  ]
-                                                }
-                                              >
-                                                {downloadingMenuChoices[
-                                                  `${bookingId}-${dateInfo.date_key}`
-                                                ] ? (
-                                                  <>
-                                                    <Loader2 className="h-4 w-4 animate-spin" />
-                                                    Downloading...
-                                                  </>
-                                                ) : (
-                                                  <>
-                                                    <FileDown className="h-4 w-4" />
-                                                    Download CSV
-                                                  </>
-                                                )}
-                                              </Button>
-                                            </div>
+                                            <Button
+                                              onClick={() =>
+                                                router.push(
+                                                  `/vendor/menu-choices/${bookingId}`
+                                                )
+                                              }
+                                              size="sm"
+                                              className="w-full h-9 gap-2"
+                                              style={{
+                                                backgroundColor:
+                                                  "var(--color-primary)",
+                                                color:
+                                                  "var(--color-primary-foreground)",
+                                              }}
+                                            >
+                                              <Eye className="h-4 w-4" />
+                                              View Menu Choices
+                                            </Button>
                                           </div>
                                         )}
 
@@ -1013,8 +1194,18 @@ export default function AdjustBookingContent({
                                       >
                                         <div className="flex items-center gap-2">
                                           <div className="p-1 rounded bg-purple-100">
-                                            <svg className="h-3.5 w-3.5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                                            <svg
+                                              className="h-3.5 w-3.5 text-purple-600"
+                                              fill="none"
+                                              stroke="currentColor"
+                                              viewBox="0 0 24 24"
+                                            >
+                                              <path
+                                                strokeLinecap="round"
+                                                strokeLinejoin="round"
+                                                strokeWidth={2}
+                                                d="M12 6v6m0 0v6m0-6h6m-6 0H6"
+                                              />
                                             </svg>
                                           </div>
                                           <span className="text-sm font-bold text-purple-900">
@@ -1516,6 +1707,112 @@ export default function AdjustBookingContent({
           onConfirm={handleRescheduleConfirm}
         />
       )}
+
+      {/* Status Update Confirmation Dialog */}
+      <AlertDialog
+        open={statusUpdateDialog.open}
+        onOpenChange={(open) => {
+          if (!open && !updateStatusMutation.isPending) {
+            setStatusUpdateDialog({
+              open: false,
+              bookingDateId: null,
+              currentStatus: null,
+              newStatus: null,
+              dateLabel: null,
+            });
+          }
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirm Payment Status Change</AlertDialogTitle>
+            <AlertDialogDescription className="space-y-2">
+              <p>
+                Are you sure you want to change the payment status for this
+                booking date?
+              </p>
+              {statusUpdateDialog.dateLabel && (
+                <div className="mt-3 p-3 bg-gray-50 rounded-md space-y-2">
+                  <div className="flex items-center gap-2 text-sm">
+                    <Calendar className="h-4 w-4 text-muted-foreground" />
+                    <span className="font-medium">Date:</span>
+                    <span>{statusUpdateDialog.dateLabel}</span>
+                  </div>
+                  <div className="flex items-center gap-4 pt-2 border-t">
+                    <div className="flex-1">
+                      <p className="text-xs text-muted-foreground mb-1">
+                        Current Status
+                      </p>
+                      <Badge variant="secondary" className="text-xs">
+                        {statusUpdateDialog.currentStatus || "Unknown"}
+                      </Badge>
+                    </div>
+                    <div className="text-muted-foreground">
+                      <ArrowLeft className="h-4 w-4" />
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-xs text-muted-foreground mb-1">
+                        New Status
+                      </p>
+                      <Badge
+                        className={
+                          statusUpdateDialog.newStatus === 1
+                            ? "bg-green-100 text-green-700 hover:bg-green-100"
+                            : statusUpdateDialog.newStatus === 2
+                            ? "bg-red-100 text-red-700 hover:bg-red-100"
+                            : statusUpdateDialog.newStatus === 3
+                            ? "bg-gray-100 text-gray-700 hover:bg-gray-100"
+                            : statusUpdateDialog.newStatus === 4
+                            ? "bg-orange-100 text-orange-700 hover:bg-orange-100"
+                            : ""
+                        }
+                      >
+                        {statusUpdateDialog.newStatus !== null
+                          ? getPaymentStatusLabel(statusUpdateDialog.newStatus)
+                          : "Unknown"}
+                      </Badge>
+                    </div>
+                  </div>
+                </div>
+              )}
+              <p className="text-xs text-muted-foreground mt-3">
+                This action will update the payment status for this booking
+                date. Please confirm to proceed.
+              </p>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel
+              disabled={updateStatusMutation.isPending}
+              onClick={() => {
+                setStatusUpdateDialog({
+                  open: false,
+                  bookingDateId: null,
+                  currentStatus: null,
+                  newStatus: null,
+                  dateLabel: null,
+                });
+              }}
+            >
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleConfirmStatusUpdate}
+              disabled={updateStatusMutation.isPending}
+              className="bg-[var(--color-primary)] hover:bg-[var(--color-primary-hover)]"
+            >
+              {updateStatusMutation.isPending ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Updating...
+                </>
+              ) : (
+                "Confirm Change"
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </section>
   );
 }

@@ -17,8 +17,9 @@ import {
 import AttendeeList from "../_components/attendee-list";
 import DateSwitcher from "../_components/date-switcher";
 import TableSwitcher from "../_components/table-switcher";
-import { AlertCircle } from "lucide-react";
+import { AlertCircle, FileDown, Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
 import {
   AttendeeMenuSelection,
   MenuBooking,
@@ -38,6 +39,7 @@ import {
 } from "@/services/vendor/bookings/query";
 import { useVendorBookingById } from "@/services/vendor/bookings/hooks/useVendorBookingById";
 import { MenuTable } from "@/services/customer/bookings/type";
+import { vendorBookingsService } from "@/services/vendor/bookings/bookings.service";
 
 interface MenuChoicesPageProps {
   readonly params: Promise<{
@@ -160,6 +162,9 @@ function MenuChoicesContent({ params }: MenuChoicesPageProps) {
   // Ref to prevent double duplication
   const isDuplicatingRef = useRef<string | null>(null);
   const [duplicatingId, setDuplicatingId] = useState<string | null>(null);
+
+  // Download menu choices state
+  const [downloadingMenuChoices, setDownloadingMenuChoices] = useState(false);
 
   // Track pending saves to prevent exceeding capacity during async operations
   const pendingSavesCountRef = useRef<number>(0);
@@ -509,6 +514,28 @@ function MenuChoicesContent({ params }: MenuChoicesPageProps) {
     return { completed, total };
   }, [currentAttendees, currentTableInfo]);
 
+  /**
+   * Handle download menu choices CSV
+   */
+  const handleDownloadMenuChoices = useCallback(async () => {
+    if (!selectedDateKey) {
+      toast.error("Please select a date");
+      return;
+    }
+
+    setDownloadingMenuChoices(true);
+
+    try {
+      await vendorBookingsService.exportMenuChoices(bookingId, selectedDateKey);
+      toast.success("Menu choices downloaded successfully");
+    } catch (error) {
+      console.error("Error downloading menu choices:", error);
+      toast.error("Failed to download menu choices");
+    } finally {
+      setDownloadingMenuChoices(false);
+    }
+  }, [bookingId, selectedDateKey]);
+
   // Show loading if booking data not available
   if (!currentBooking || !bookingData) {
     return <MenuChoicesPageSkeleton />;
@@ -616,20 +643,42 @@ function MenuChoicesContent({ params }: MenuChoicesPageProps) {
             )}
           </div>
 
-          {/* Context Info */}
-          {currentDateInfo && currentTableInfo && (
-            <div className="flex items-center gap-2 text-xs text-muted-foreground bg-blue-50 px-3 py-1.5 rounded-md border border-blue-100">
-              <AlertCircle className="h-3.5 w-3.5 text-blue-500 flex-shrink-0" />
-              <span className="font-medium text-blue-900">
-                {currentDateInfo.date} - {currentTableInfo.table_name}
-              </span>
-              <span className="text-blue-700">
-                • {currentTableInfo.guests} guests
-                {currentAttendees.length > 0 &&
-                  ` • ${currentAttendees.length} added`}
-              </span>
-            </div>
-          )}
+          {/* Context Info and Download Button */}
+          <div className="flex items-center gap-3 flex-wrap">
+            {currentDateInfo && currentTableInfo && (
+              <div className="flex items-center gap-2 text-xs text-muted-foreground bg-blue-50 px-3 py-1.5 rounded-md border border-blue-100">
+                <AlertCircle className="h-3.5 w-3.5 text-blue-500 flex-shrink-0" />
+                <span className="font-medium text-blue-900">
+                  {currentDateInfo.date} - {currentTableInfo.table_name}
+                </span>
+                <span className="text-blue-700">
+                  • {currentTableInfo.guests} guests
+                  {currentAttendees.length > 0 &&
+                    ` • ${currentAttendees.length} added`}
+                </span>
+              </div>
+            )}
+            {/* Download CSV Button */}
+            <Button
+              onClick={handleDownloadMenuChoices}
+              size="sm"
+              variant="outline"
+              className="h-9 gap-2 border-2 hover:bg-gray-50"
+              disabled={downloadingMenuChoices || !selectedDateKey}
+            >
+              {downloadingMenuChoices ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Downloading...
+                </>
+              ) : (
+                <>
+                  <FileDown className="h-4 w-4" />
+                  Download CSV
+                </>
+              )}
+            </Button>
+          </div>
         </div>
       </div>
 

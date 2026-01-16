@@ -3,8 +3,9 @@ import { DataTableColumnHeader } from "@/components/data-table/data-table-column
 import { Button } from "@/components/ui/button";
 import { Eye } from "lucide-react";
 import React from "react";
-import { Transaction, TransactionStatus } from "../_lib/types";
+import { Transaction } from "../_lib/types";
 import { formatDistanceToNow } from "date-fns";
+import { STATUS_CONFIG } from "../_lib/constants";
 
 /**
  * Normalize currency code - converts currency symbols to ISO 4217 codes
@@ -47,33 +48,6 @@ const normalizeCurrencyCode = (currency: string | undefined | null): string => {
   return "GBP";
 };
 
-// Color configurations for transaction status
-const TRANSACTION_STATUS_COLORS: Record<
-  TransactionStatus,
-  { bg: string; text: string }
-> = {
-  completed: {
-    bg: "#10b981", // green
-    text: "#ffffff",
-  },
-  pending: {
-    bg: "#f59e0b", // amber
-    text: "#ffffff",
-  },
-  failed: {
-    bg: "#ef4444", // red
-    text: "#ffffff",
-  },
-  refunded: {
-    bg: "#6b7280", // gray
-    text: "#ffffff",
-  },
-  cancelled: {
-    bg: "#ef4444", // red
-    text: "#ffffff",
-  },
-};
-
 interface GetTransactionColumnsProps {
   onViewDetails: (transaction: Transaction) => void;
 }
@@ -114,13 +88,13 @@ export function getTransactionColumns({
       accessorKey: "transaction_id",
       header: ({ column }) => (
         <DataTableColumnHeader
-          className="text-foreground"
+          className="text-foreground hidden md:table-cell"
           column={column}
           title="Transaction ID"
         />
       ),
       cell: ({ row }) => (
-        <span className="font-mono text-xs text-muted-foreground">
+        <span className="font-mono text-xs text-muted-foreground hidden md:inline-block">
           {row.getValue("transaction_id")}
         </span>
       ),
@@ -177,22 +151,23 @@ export function getTransactionColumns({
         />
       ),
       cell: ({ row }) => {
-        const status = row.getValue("status") as TransactionStatus;
-        if (!status) return null;
-
-        const colorConfig =
-          TRANSACTION_STATUS_COLORS[status] ||
-          TRANSACTION_STATUS_COLORS.pending;
+        const transaction = row.original;
+        // Use status_key if available, otherwise fallback to status
+        const statusKey =
+          transaction.status_key ||
+          transaction.status?.toLowerCase() ||
+          "pending";
+        const statusConfig = STATUS_CONFIG[statusKey] || STATUS_CONFIG.pending;
 
         return (
           <div
-            className="inline-flex items-center justify-center px-3 py-1.5 rounded-full text-xs font-semibold capitalize"
+            className="inline-flex items-center justify-center px-3 py-1.5 rounded-full text-xs font-semibold"
             style={{
-              backgroundColor: colorConfig.bg,
-              color: colorConfig.text,
+              backgroundColor: statusConfig.badgeBg,
+              color: statusConfig.badgeText,
             }}
           >
-            {status}
+            {statusConfig.label || transaction.status || statusKey}
           </div>
         );
       },
@@ -212,7 +187,9 @@ export function getTransactionColumns({
         const transaction = row.original;
         return (
           <span className="text-sm font-medium">
-            {transaction.payment_method || transaction.gateway || "N/A"}
+            {transaction.payment_method ||
+              transaction.payment_method_key ||
+              "N/A"}
           </span>
         );
       },
@@ -223,7 +200,7 @@ export function getTransactionColumns({
       accessorKey: "description",
       header: ({ column }) => (
         <DataTableColumnHeader
-          className="text-foreground"
+          className="text-foreground hidden lg:table-cell"
           column={column}
           title="Description"
         />
@@ -231,9 +208,13 @@ export function getTransactionColumns({
       cell: ({ row }) => {
         const transaction = row.original;
         return (
-          <span className="text-sm text-muted-foreground line-clamp-1">
+          <span className="text-sm text-muted-foreground line-clamp-1 hidden lg:inline-block">
             {transaction.description ||
-              `${transaction.payment_method || transaction.gateway} payment`}
+              `${
+                transaction.payment_method ||
+                transaction.payment_method_key ||
+                "Payment"
+              }`}
           </span>
         );
       },

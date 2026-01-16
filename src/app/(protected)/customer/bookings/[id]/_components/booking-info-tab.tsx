@@ -39,7 +39,7 @@ interface BookingItem {
   capacity?: number; // For tables: "Table of 10", "Table of 12"
   people_added: number;
   table_count?: number; // Number of tables selected (for tables only)
-  allocation?: number[]; // People per table allocation [8, 4] means 2 tables with 8 and 4 people
+  allocation?: Record<string, number | string>; // key = table_id, value = seat count or "+X" for existing
   menuChoicesCompleted?: number;
   price_per_person?: number; // Price per person for tables
 }
@@ -63,7 +63,7 @@ interface AddOnTable {
   table_size: number;
   price_per_person: string;
   no_tables: number;
-  allocation: number[];
+  allocation: Record<string, number | string>; // key = table_id, value = seat count or "+X"
   people: number;
   total: number;
 }
@@ -698,7 +698,8 @@ export default function BookingInfoTab({ bookingData }: BookingInfoTabProps) {
                                     </div>
                                     {/* Table Allocation Breakdown */}
                                     {item.allocation &&
-                                      item.allocation.length > 0 && (
+                                      Object.keys(item.allocation).length >
+                                        0 && (
                                         <div className="mt-1.5 space-y-1">
                                           <p className="text-xs text-muted-foreground mb-1">
                                             Seating Arrangement:
@@ -710,35 +711,61 @@ export default function BookingInfoTab({ bookingData }: BookingInfoTabProps) {
                                               const isExpanded =
                                                 expandedAllocations[key] ||
                                                 false;
+                                              const allocationEntries =
+                                                Object.entries(
+                                                  item.allocation || {}
+                                                );
                                               const visibleTables = isExpanded
-                                                ? item.allocation
-                                                : item.allocation?.slice(
+                                                ? allocationEntries
+                                                : allocationEntries.slice(
                                                     0,
                                                     MAX_VISIBLE_TABLES
-                                                  ) || [];
+                                                  );
                                               const hasMore =
-                                                (item.allocation?.length || 0) >
+                                                allocationEntries.length >
                                                 MAX_VISIBLE_TABLES;
 
                                               return (
                                                 <>
                                                   {visibleTables.map(
-                                                    (people, tableIdx) => (
-                                                      <div
-                                                        key={tableIdx}
-                                                        className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-blue-50 border border-blue-100"
-                                                      >
-                                                        <span className="text-xs font-medium text-blue-700">
-                                                          Table {tableIdx + 1}:
-                                                        </span>
-                                                        <span className="text-xs font-semibold text-blue-900">
-                                                          {people}{" "}
-                                                          {people === 1
-                                                            ? "Person"
-                                                            : "People"}
-                                                        </span>
-                                                      </div>
-                                                    )
+                                                    (
+                                                      [tableId, people],
+                                                      tableIdx
+                                                    ) => {
+                                                      const displayValue =
+                                                        typeof people ===
+                                                        "string"
+                                                          ? people
+                                                          : people;
+                                                      const numericValue =
+                                                        typeof people ===
+                                                        "string"
+                                                          ? parseInt(
+                                                              people.replace(
+                                                                "+",
+                                                                ""
+                                                              )
+                                                            )
+                                                          : people;
+
+                                                      return (
+                                                        <div
+                                                          key={tableId}
+                                                          className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-blue-50 border border-blue-100"
+                                                        >
+                                                          <span className="text-xs font-medium text-blue-700">
+                                                            Table {tableIdx + 1}
+                                                            :
+                                                          </span>
+                                                          <span className="text-xs font-semibold text-blue-900">
+                                                            {displayValue}{" "}
+                                                            {numericValue === 1
+                                                              ? "Person"
+                                                              : "People"}
+                                                          </span>
+                                                        </div>
+                                                      );
+                                                    }
                                                   )}
                                                   {hasMore && (
                                                     <Button
@@ -761,8 +788,7 @@ export default function BookingInfoTab({ bookingData }: BookingInfoTabProps) {
                                                         <>
                                                           <ChevronDown className="h-3 w-3 mr-1" />
                                                           Show{" "}
-                                                          {(item.allocation
-                                                            ?.length || 0) -
+                                                          {allocationEntries.length -
                                                             MAX_VISIBLE_TABLES}{" "}
                                                           More
                                                         </>
@@ -776,12 +802,13 @@ export default function BookingInfoTab({ bookingData }: BookingInfoTabProps) {
                                         </div>
                                       )}
                                     {/* Price Breakdown - Similar to drinks */}
-                                    {item.price_per_person && (
-                                      <p className="text-xs text-muted-foreground mt-1.5">
-                                        £{item.price_per_person} ×{" "}
-                                        {item.people_added}
-                                      </p>
-                                    )}
+                                    {item.price_per_person &&
+                                      item.people_added > 0 && (
+                                        <p className="text-xs text-muted-foreground mt-1.5">
+                                          £{item.price_per_person} ×{" "}
+                                          {item.people_added}
+                                        </p>
+                                      )}
                                   </div>
                                   <div className="flex items-center gap-3 shrink-0">
                                     {item.price_per_person ? (
@@ -1087,59 +1114,87 @@ export default function BookingInfoTab({ bookingData }: BookingInfoTabProps) {
                                                           {`Table of ${table.table_size}`}
                                                         </span>
                                                         {table.no_tables &&
-                                                          table.no_tables >
-                                                            0 && (
-                                                            <span className="text-xs text-muted-foreground bg-gray-100 px-2 py-0.5 rounded">
-                                                              {table.no_tables}{" "}
-                                                              {table.no_tables ===
-                                                              1
-                                                                ? "Table"
-                                                                : "Tables"}
-                                                            </span>
-                                                          )}
+                                                        table.no_tables > 0 ? (
+                                                          <span className="text-xs text-muted-foreground bg-gray-100 px-2 py-0.5 rounded">
+                                                            {table.no_tables}{" "}
+                                                            {table.no_tables ===
+                                                            1
+                                                              ? "Table"
+                                                              : "Tables"}
+                                                          </span>
+                                                        ) : table.allocation &&
+                                                          Object.values(
+                                                            table.allocation
+                                                          ).some(
+                                                            (val) =>
+                                                              typeof val ===
+                                                                "string" &&
+                                                              val.startsWith(
+                                                                "+"
+                                                              )
+                                                          ) ? (
+                                                          <span className="text-xs text-muted-foreground bg-purple-100 text-purple-700 px-2 py-0.5 rounded">
+                                                            Added to existing
+                                                          </span>
+                                                        ) : null}
                                                       </div>
                                                       {/* Table Allocation Breakdown */}
                                                       {table.allocation &&
-                                                        table.allocation
-                                                          .length > 0 && (
+                                                        Object.keys(
+                                                          table.allocation
+                                                        ).length > 0 && (
                                                           <div className="mt-1.5 space-y-1">
                                                             <p className="text-xs text-muted-foreground mb-1">
                                                               Seating
                                                               Arrangement:
                                                             </p>
                                                             <div className="flex flex-wrap gap-2">
-                                                              {table.allocation.map(
+                                                              {Object.entries(
+                                                                table.allocation
+                                                              ).map(
                                                                 (
-                                                                  people,
+                                                                  [
+                                                                    tableId,
+                                                                    people,
+                                                                  ],
                                                                   tableIdx
                                                                 ) => {
-                                                                  // Detect if this is an existing table with additions
-                                                                  // If allocation is less than 50% of table capacity, it's likely an addition
-                                                                  const isExistingTable =
-                                                                    people <
-                                                                    table.table_size *
-                                                                      0.5;
-                                                                  const displayPeople =
-                                                                    isExistingTable
-                                                                      ? `${people}`
+                                                                  // Check if this is a new table (integer value) or existing (string with "+")
+                                                                  const isNewTable =
+                                                                    typeof people ===
+                                                                    "number";
+                                                                  const displayValue =
+                                                                    typeof people ===
+                                                                    "string"
+                                                                      ? people
+                                                                      : people;
+                                                                  const numericValue =
+                                                                    typeof people ===
+                                                                    "string"
+                                                                      ? parseInt(
+                                                                          people.replace(
+                                                                            "+",
+                                                                            ""
+                                                                          )
+                                                                        )
                                                                       : people;
 
                                                                   return (
                                                                     <div
                                                                       key={
-                                                                        tableIdx
+                                                                        tableId
                                                                       }
                                                                       className={`flex items-center gap-1.5 px-2 py-1 rounded-md border ${
-                                                                        isExistingTable
-                                                                          ? "bg-purple-50 border-purple-200"
-                                                                          : "bg-blue-50 border-blue-100"
+                                                                        isNewTable
+                                                                          ? "bg-green-50 border-green-200"
+                                                                          : "bg-purple-50 border-purple-200"
                                                                       }`}
                                                                     >
                                                                       <span
                                                                         className={`text-xs font-medium ${
-                                                                          isExistingTable
-                                                                            ? "text-purple-700"
-                                                                            : "text-blue-700"
+                                                                          isNewTable
+                                                                            ? "text-green-700"
+                                                                            : "text-purple-700"
                                                                         }`}
                                                                       >
                                                                         Table{" "}
@@ -1149,19 +1204,24 @@ export default function BookingInfoTab({ bookingData }: BookingInfoTabProps) {
                                                                       </span>
                                                                       <span
                                                                         className={`text-xs font-semibold ${
-                                                                          isExistingTable
-                                                                            ? "text-purple-900"
-                                                                            : "text-blue-900"
+                                                                          isNewTable
+                                                                            ? "text-green-900"
+                                                                            : "text-purple-900"
                                                                         }`}
                                                                       >
                                                                         {
-                                                                          displayPeople
+                                                                          displayValue
                                                                         }{" "}
-                                                                        {people ===
+                                                                        {numericValue ===
                                                                         1
                                                                           ? "Person"
                                                                           : "People"}
                                                                       </span>
+                                                                      {isNewTable && (
+                                                                        <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-green-200 text-green-800 uppercase">
+                                                                          New
+                                                                        </span>
+                                                                      )}
                                                                     </div>
                                                                   );
                                                                 }

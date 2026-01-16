@@ -108,190 +108,192 @@ export default function BookingHistoryPage() {
   };
 
   return (
-    <section className="page overflow-x-auto">
-      <Shell className="gap-2 overflow-visible">
-        <div className="bg-white rounded-lg border border-[var(--color-border)] shadow-md p-6 mb-4 min-w-fit">
-          <div className="flex flex-col gap-4">
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center flex-wrap gap-4">
-              <div>
-                <h1 className="text-2xl title-header font-bold text-black flex items-center gap-2">
-                  Booking History
-                  {isFetching && (
-                    <Loader2 className="h-5 w-5 animate-spin text-primary" />
-                  )}
-                </h1>
-                <p className="text-muted-foreground mt-2">
-                  View and manage all booking transactions. Filter by status and
-                  track booking details.
-                </p>
-              </div>
-              <div className="flex flex-col sm:flex-row gap-3 items-center w-full sm:w-auto">
-                <div className="flex flex-1 gap-3 items-center w-full sm:w-auto">
-                  {/* Event Date Filter */}
-                  <div className="flex flex-col gap-1.5">
-                    <Input
-                      type="date"
-                      value={eventDate}
-                      onChange={(e) => setEventDate(e.target.value)}
-                      className="w-full sm:w-[180px]"
-                      disabled={isFetching}
-                    />
-                  </div>
-                  {/* Search */}
-                  <div className="relative flex-1 sm:min-w-[240px]">
-                    <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-                    <Input
-                      placeholder="Search bookings..."
-                      value={globalFilterValue}
-                      onChange={(e) => setGlobalFilterValue(e.target.value)}
-                      className="pl-8 w-full"
-                      disabled={isFetching}
-                    />
-                  </div>
-                  {/* Status Filter */}
-                  <Select
-                    value={statusFilter}
-                    onValueChange={setStatusFilter}
-                    disabled={isFetching}
-                  >
-                    <SelectTrigger className="w-[180px]">
-                      <SelectValue placeholder="Filter by status" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Bookings</SelectItem>
-                      <SelectItem value="confirmed">Confirmed</SelectItem>
-                      <SelectItem value="cancelled">Cancelled</SelectItem>
-                      <SelectItem value="pending">Pending (Draft)</SelectItem>
-                      <SelectItem value="partially_paid">
-                        Partially Paid
-                      </SelectItem>
-                    </SelectContent>
-                  </Select>
+    <section className="page text-black min-w-0">
+      <Shell className="gap-2">
+        <div className="flex flex-col gap-4 min-w-0">
+          <div className="bg-white rounded-lg border border-[var(--color-border)] shadow-md p-6 mb-4 min-w-0">
+            <div className="flex flex-col gap-4">
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center flex-wrap gap-4">
+                <div>
+                  <h1 className="text-2xl title-header font-bold text-black flex items-center gap-2">
+                    Booking History
+                    {isFetching && (
+                      <Loader2 className="h-5 w-5 animate-spin text-primary" />
+                    )}
+                  </h1>
+                  <p className="text-muted-foreground mt-2">
+                    View and manage all booking transactions. Filter by status
+                    and track booking details.
+                  </p>
                 </div>
-                <div className="flex items-center gap-2">
-                  <Button
-                    variant="event-primary"
-                    onClick={handleCSVExport}
-                    disabled={isFetching}
-                  >
-                    CSV
-                  </Button>
+                <div className="flex flex-col sm:flex-row gap-3 items-center w-full sm:w-auto">
+                  <div className="flex flex-1 gap-3 items-center w-full sm:w-auto">
+                    {/* Event Date Filter */}
+                    <div className="flex flex-col gap-1.5">
+                      <Input
+                        type="date"
+                        value={eventDate}
+                        onChange={(e) => setEventDate(e.target.value)}
+                        className="w-full sm:w-[180px]"
+                        disabled={isFetching}
+                      />
+                    </div>
+                    {/* Search */}
+                    <div className="relative flex-1 sm:min-w-[240px]">
+                      <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        placeholder="Search bookings..."
+                        value={globalFilterValue}
+                        onChange={(e) => setGlobalFilterValue(e.target.value)}
+                        className="pl-8 w-full"
+                        disabled={isFetching}
+                      />
+                    </div>
+                    {/* Status Filter */}
+                    <Select
+                      value={statusFilter}
+                      onValueChange={setStatusFilter}
+                      disabled={isFetching}
+                    >
+                      <SelectTrigger className="w-[180px]">
+                        <SelectValue placeholder="Filter by status" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Bookings</SelectItem>
+                        <SelectItem value="confirmed">Confirmed</SelectItem>
+                        <SelectItem value="cancelled">Cancelled</SelectItem>
+                        <SelectItem value="pending">Pending (Draft)</SelectItem>
+                        <SelectItem value="partially_paid">
+                          Partially Paid
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="event-primary"
+                      onClick={handleCSVExport}
+                      disabled={isFetching}
+                    >
+                      CSV
+                    </Button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Summary Section */}
+              <div
+                className={cn(
+                  "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 pt-4 border-t border-[var(--color-border)] transition-opacity duration-200",
+                  isFetching && "opacity-50"
+                )}
+              >
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-blue-100 rounded-lg flex-shrink-0">
+                    <Receipt className="h-5 w-5 text-blue-600" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-xs font-medium text-muted-foreground">
+                      Total Amount
+                    </p>
+                    <p className="text-lg font-bold text-blue-600">
+                      £{summaryTotals.totalAmount.toFixed(2)}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-green-100 rounded-lg flex-shrink-0">
+                    <DollarSign className="h-5 w-5 text-green-600" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-xs font-medium text-muted-foreground">
+                      Total Deposit Amount
+                    </p>
+                    <p className="text-lg font-bold text-green-600">
+                      £{summaryTotals.totalDeposit.toFixed(2)}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-purple-100 rounded-lg flex-shrink-0">
+                    <Tag className="h-5 w-5 text-purple-600" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-xs font-medium text-muted-foreground">
+                      Total Platform Fee
+                    </p>
+                    <p className="text-lg font-bold text-purple-600">
+                      £{summaryTotals.totalPlatformFee.toFixed(2)}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-orange-100 rounded-lg flex-shrink-0">
+                    <Clock className="h-5 w-5 text-orange-600" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-xs font-medium text-muted-foreground">
+                      Total Pending Amount
+                    </p>
+                    <p className="text-lg font-bold text-orange-600">
+                      £{summaryTotals.totalPending.toFixed(2)}
+                    </p>
+                  </div>
                 </div>
               </div>
             </div>
+          </div>
 
-            {/* Summary Section */}
-            <div
-              className={cn(
-                "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 pt-4 border-t border-[var(--color-border)] transition-opacity duration-200",
-                isFetching && "opacity-50"
+          {/* Show skeleton on initial load */}
+          {isLoading ? (
+            <DataTableSkeleton
+              columnCount={8}
+              cellWidths={[
+                "10rem",
+                "40rem",
+                "12rem",
+                "12rem",
+                "8rem",
+                "8rem",
+                "8rem",
+                "8rem",
+              ]}
+              shrinkZero
+            />
+          ) : (
+            <div className="relative">
+              {/* Subtle loading overlay for refetch */}
+              {isFetching && (
+                <div className="absolute inset-0 bg-background/80 backdrop-blur-[1px] z-10 flex items-center justify-center rounded-lg">
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    <span>Updating...</span>
+                  </div>
+                </div>
               )}
-            >
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-blue-100 rounded-lg flex-shrink-0">
-                  <Receipt className="h-5 w-5 text-blue-600" />
-                </div>
-                <div className="min-w-0">
-                  <p className="text-xs font-medium text-muted-foreground">
-                    Total Amount
-                  </p>
-                  <p className="text-lg font-bold text-blue-600">
-                    £{summaryTotals.totalAmount.toFixed(2)}
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-green-100 rounded-lg flex-shrink-0">
-                  <DollarSign className="h-5 w-5 text-green-600" />
-                </div>
-                <div className="min-w-0">
-                  <p className="text-xs font-medium text-muted-foreground">
-                    Total Deposit Amount
-                  </p>
-                  <p className="text-lg font-bold text-green-600">
-                    £{summaryTotals.totalDeposit.toFixed(2)}
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-purple-100 rounded-lg flex-shrink-0">
-                  <Tag className="h-5 w-5 text-purple-600" />
-                </div>
-                <div className="min-w-0">
-                  <p className="text-xs font-medium text-muted-foreground">
-                    Total Platform Fee
-                  </p>
-                  <p className="text-lg font-bold text-purple-600">
-                    £{summaryTotals.totalPlatformFee.toFixed(2)}
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-orange-100 rounded-lg flex-shrink-0">
-                  <Clock className="h-5 w-5 text-orange-600" />
-                </div>
-                <div className="min-w-0">
-                  <p className="text-xs font-medium text-muted-foreground">
-                    Total Pending Amount
-                  </p>
-                  <p className="text-lg font-bold text-orange-600">
-                    £{summaryTotals.totalPending.toFixed(2)}
-                  </p>
-                </div>
-              </div>
+              <Suspense
+                fallback={
+                  <DataTableSkeleton
+                    columnCount={8}
+                    cellWidths={[
+                      "10rem",
+                      "40rem",
+                      "12rem",
+                      "12rem",
+                      "8rem",
+                      "8rem",
+                      "8rem",
+                      "8rem",
+                    ]}
+                    shrinkZero
+                  />
+                }
+              >
+                <HistoryDataTable search={searchParams} tableRef={tableRef} />
+              </Suspense>
             </div>
-          </div>
+          )}
         </div>
-
-        {/* Show skeleton on initial load */}
-        {isLoading ? (
-          <DataTableSkeleton
-            columnCount={8}
-            cellWidths={[
-              "10rem",
-              "40rem",
-              "12rem",
-              "12rem",
-              "8rem",
-              "8rem",
-              "8rem",
-              "8rem",
-            ]}
-            shrinkZero
-          />
-        ) : (
-          <div className="relative">
-            {/* Subtle loading overlay for refetch */}
-            {isFetching && (
-              <div className="absolute inset-0 bg-background/80 backdrop-blur-[1px] z-10 flex items-center justify-center rounded-lg">
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  <span>Updating...</span>
-                </div>
-              </div>
-            )}
-            <Suspense
-              fallback={
-                <DataTableSkeleton
-                  columnCount={8}
-                  cellWidths={[
-                    "10rem",
-                    "40rem",
-                    "12rem",
-                    "12rem",
-                    "8rem",
-                    "8rem",
-                    "8rem",
-                    "8rem",
-                  ]}
-                  shrinkZero
-                />
-              }
-            >
-              <HistoryDataTable search={searchParams} tableRef={tableRef} />
-            </Suspense>
-          </div>
-        )}
       </Shell>
     </section>
   );

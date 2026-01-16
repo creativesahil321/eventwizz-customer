@@ -47,7 +47,7 @@ export function CreateUserForm({
     createCustomerMutation.mutate(data, {
       onSuccess: (response: CustomerCreateResponse) => {
         if (response?.status) {
-          toast.success(response.message || "Customer created successfully");
+          // Success message is handled by axios interceptor
           form.reset();
           if (typeof onSubmitHandler === "function") {
             onSubmitHandler(data as UserType);

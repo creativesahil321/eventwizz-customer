@@ -21,19 +21,21 @@ export default async function Page(props: PageProps) {
     per_page: String(parsedSearch.per_page),
   };
   return (
-    <section className="page overflow-x-auto">
-      <Shell className="gap-2 overflow-visible">
-        <React.Suspense
-          fallback={
-            <DataTableSkeleton
-              columnCount={6}
-              cellWidths={["10rem", "40rem", "12rem", "12rem", "8rem", "8rem"]}
-              shrinkZero
-            />
-          }
-        >
-          <PaymentsTable initialData={initialData} search={paymentSearch} />
-        </React.Suspense>
+    <section className="page text-black min-w-0">
+      <Shell className="gap-2">
+        <div className="flex flex-col gap-4 min-w-0">
+          <React.Suspense
+            fallback={
+              <DataTableSkeleton
+                columnCount={6}
+                cellWidths={["10rem", "40rem", "12rem", "12rem", "8rem", "8rem"]}
+                shrinkZero
+              />
+            }
+          >
+            <PaymentsTable initialData={initialData} search={paymentSearch} />
+          </React.Suspense>
+        </div>
       </Shell>
     </section>
   );

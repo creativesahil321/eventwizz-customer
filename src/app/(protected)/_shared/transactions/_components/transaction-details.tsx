@@ -11,7 +11,6 @@ import {
 import { Button } from "@/components/ui/button";
 import { Transaction } from "../_lib/types";
 import { formatDistanceToNow, format } from "date-fns";
-import { Badge } from "@/components/ui/badge";
 import { STATUS_CONFIG } from "../_lib/constants";
 import {
   Receipt,
@@ -62,6 +61,7 @@ const getStatusIcon = (status: string) => {
   switch (status) {
     case "pending":
       return Clock;
+    case "success":
     case "completed":
       return CheckCircle2;
     case "failed":
@@ -88,31 +88,51 @@ export function TransactionDetailsComponent({
     amount,
     currency,
     status,
+    status_key,
     payment_method,
-    gateway,
+    payment_method_key,
     description,
     created_at,
-    updated_at,
-    metadata,
+    paid_at,
+    booking_number,
   } = transaction;
 
-  const statusConfig = STATUS_CONFIG[status] || STATUS_CONFIG.pending;
-  const StatusIcon = getStatusIcon(status);
-  const PaymentIcon = getPaymentIcon(payment_method || gateway);
+  // Use status_key for config lookup, fallback to status
+  const statusKey = status_key || status?.toLowerCase() || "pending";
+  const statusConfig = STATUS_CONFIG[statusKey] || STATUS_CONFIG.pending;
+  const StatusIcon = getStatusIcon(statusKey);
+  const PaymentIcon = getPaymentIcon(payment_method_key || payment_method);
 
-  // Format dates
-  const formattedDate = formatDistanceToNow(new Date(created_at), {
-    addSuffix: true,
-  });
-  const fullDate = format(new Date(created_at), "PPP p");
-  const updatedDate = format(new Date(updated_at), "PPP p");
+  // Helper function to validate and create Date object
+  const createValidDate = (
+    dateString: string | null | undefined
+  ): Date | null => {
+    if (!dateString) return null;
+    const date = new Date(dateString);
+    return isNaN(date.getTime()) ? null : date;
+  };
 
-  // Format amount
-  const formattedAmount = `${currency}${parseFloat(amount).toFixed(2)}`;
+  // Format dates - handle null/undefined/invalid values
+  const createdDate = createValidDate(created_at);
+  const paidDate = createValidDate(paid_at);
+
+  // Use API's date field if available, otherwise calculate from created_at
+  const relativeDate =
+    transaction.date ||
+    (createdDate
+      ? formatDistanceToNow(createdDate, { addSuffix: true })
+      : "N/A");
+
+  const fullDate = createdDate ? format(createdDate, "PPP p") : "N/A";
+  const paidDateFormatted = paidDate ? format(paidDate, "PPP p") : null;
+
+  // Format amount - amount is already formatted as "£50.00" from API
+  const formattedAmount =
+    amount || `${currency}${parseFloat(String(amount || 0)).toFixed(2)}`;
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[600px] [&>button]:opacity-100 [&>button]:text-gray-600 [&>button]:hover:text-gray-900">
+      <DialogContent className="sm:max-w-[700px] max-w-[95vw] max-h-[90vh] overflow-y-auto [&>button]:opacity-100 [&>button]:text-gray-600 [&>button]:hover:text-gray-900">
         <DialogHeader>
           <DialogTitle className="text-xl flex items-center gap-2 text-black">
             <Receipt className="h-5 w-5 text-[var(--color-primary)]" />
@@ -125,39 +145,38 @@ export function TransactionDetailsComponent({
 
         <div className="py-4 space-y-6 text-black">
           {/* Transaction Header */}
-          <div className="flex items-center gap-4">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
             <div
               className={cn(
-                "h-14 w-14 rounded-full flex items-center justify-center",
+                "h-12 w-12 sm:h-14 sm:w-14 rounded-full flex items-center justify-center flex-shrink-0 mx-auto sm:mx-0",
                 statusConfig.bgColor
               )}
             >
               <PaymentIcon
-                className="h-7 w-7"
+                className="h-6 w-6 sm:h-7 sm:w-7"
                 style={{ color: statusConfig.color }}
               />
             </div>
 
-            <div className="flex-1">
-              <div className="flex items-center gap-2 mb-1">
-                <h3 className="text-lg font-semibold text-black">
+            <div className="flex-1 text-center sm:text-left">
+              <div className="flex flex-col sm:flex-row sm:items-center gap-2 mb-1">
+                <h3 className="text-base sm:text-lg font-semibold text-black">
                   {formattedAmount}
                 </h3>
-                <Badge
-                  variant="outline"
-                  className="text-xs capitalize flex items-center gap-1"
+                <div
+                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold justify-center sm:justify-start"
                   style={{
-                    color: statusConfig.color,
-                    borderColor: statusConfig.color,
+                    backgroundColor: statusConfig.badgeBg,
+                    color: statusConfig.badgeText,
                   }}
                 >
                   <StatusIcon className="h-3 w-3" />
-                  {status}
-                </Badge>
+                  {statusConfig.label || status || statusKey}
+                </div>
               </div>
-              <div className="flex items-center gap-1 text-xs text-muted-foreground">
+              <div className="flex items-center justify-center sm:justify-start gap-1 text-xs text-muted-foreground">
                 <Clock className="h-3 w-3" />
-                <span title={fullDate}>{formattedDate}</span>
+                <span title={fullDate}>{relativeDate}</span>
               </div>
             </div>
           </div>
@@ -167,7 +186,9 @@ export function TransactionDetailsComponent({
             <h4 className="text-xs font-semibold text-muted-foreground mb-1 uppercase tracking-wide">
               Transaction ID
             </h4>
-            <p className="text-base font-mono text-black">{transaction_id}</p>
+            <p className="text-base font-mono text-black break-all break-words overflow-wrap-anywhere">
+              {transaction_id}
+            </p>
           </div>
 
           {/* Description */}
@@ -176,81 +197,74 @@ export function TransactionDetailsComponent({
               <h4 className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wide">
                 Description
               </h4>
-              <p className="text-base">{description}</p>
+              <p className="text-base break-words overflow-wrap-anywhere">
+                {description}
+              </p>
             </div>
           )}
 
           {/* Transaction Details Grid */}
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-1">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+            <div className="space-y-1 min-w-0">
               <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
                 Payment Method
               </p>
-              <p className="text-sm font-medium text-black">
-                {payment_method || gateway}
+              <p className="text-sm font-medium text-black break-words">
+                {payment_method || "N/A"}
               </p>
             </div>
 
-            <div className="space-y-1">
+            <div className="space-y-1 min-w-0">
               <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
                 Gateway
               </p>
-              <p className="text-sm font-medium text-black">{gateway}</p>
+              <p className="text-sm font-medium text-black break-words">
+                {payment_method_key || "N/A"}
+              </p>
             </div>
 
             {booking_id && (
-              <div className="space-y-1">
+              <div className="space-y-1 min-w-0">
                 <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-                  Booking ID
+                  Booking {booking_number ? "Number" : "ID"}
                 </p>
-                <p className="text-sm font-medium text-black">#{booking_id}</p>
+                <p className="text-sm font-medium text-black break-words">
+                  {booking_number || `#${booking_id}`}
+                </p>
               </div>
             )}
 
-            <div className="space-y-1">
+            <div className="space-y-1 min-w-0">
               <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
                 Currency
               </p>
-              <p className="text-sm font-medium text-black">{currency}</p>
+              <p className="text-sm font-medium text-black break-words">
+                {currency}
+              </p>
             </div>
           </div>
 
           {/* Dates */}
           <div className="space-y-3 pt-2 border-t">
-            <div className="flex justify-between items-center">
-              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1 sm:gap-4">
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide flex-shrink-0">
                 Created At
               </p>
-              <p className="text-sm text-black">{fullDate}</p>
+              <p className="text-sm text-black break-words sm:text-right">
+                {fullDate}
+              </p>
             </div>
-            {updated_at !== created_at && (
-              <div className="flex justify-between items-center">
-                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-                  Updated At
+            {paidDateFormatted && (
+              <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1 sm:gap-4">
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide flex-shrink-0">
+                  Paid At
                 </p>
-                <p className="text-sm text-black">{updatedDate}</p>
+                <p className="text-sm text-black break-words sm:text-right">
+                  {paidDateFormatted}
+                </p>
               </div>
             )}
           </div>
-
-          {/* Metadata */}
-          {metadata && Object.keys(metadata).length > 0 && (
-            <div className="space-y-2 pt-2 border-t">
-              <h4 className="text-sm font-semibold">Additional Information</h4>
-              <div className="border rounded-md p-3 space-y-2">
-                {Object.entries(metadata).map(([key, value]) => (
-                  <div key={key} className="flex justify-between">
-                    <span className="text-xs text-muted-foreground capitalize">
-                      {key.replace(/_/g, " ")}:
-                    </span>
-                    <span className="text-xs text-black font-medium">
-                      {String(value)}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
         </div>
 
         <DialogFooter>

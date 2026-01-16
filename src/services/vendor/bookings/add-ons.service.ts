@@ -14,6 +14,7 @@ export interface VendorAddOnsTable {
   price: number;
   total_tables: number;
   sold_tables: number;
+  available_tables: number;
   status: number;
 }
 
@@ -24,6 +25,7 @@ export interface VendorAddOnsTicket {
   price: number;
   total_capacity: number;
   sold_tickets: number;
+  available_tickets: number;
 }
 
 export interface VendorAddOnsDrink {
@@ -32,15 +34,25 @@ export interface VendorAddOnsDrink {
   description: string;
   price: string;
   available_quantity: number;
+  sold_quantity: number;
+  available_drinks: number;
   status: number;
+}
+
+/**
+ * Allocation entry for vendor selected tables
+ */
+export interface VendorAllocationEntry {
+  parent_id: number;
+  seats: number;
 }
 
 export interface VendorAddOnsSelectedTable {
   id: number;
   table_size: number;
   no_tables: number;
-  price: number;
-  allocation: number[];
+  price: string;
+  allocation: VendorAllocationEntry[];
 }
 
 export interface VendorAddOnsData {

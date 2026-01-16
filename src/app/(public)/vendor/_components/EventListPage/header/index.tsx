@@ -1,6 +1,6 @@
 "use client";
 
-import { Bookmark, Menu, Phone, Search, X } from "lucide-react";
+import { Bookmark, Menu, Phone, X } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { useContext, useState, useEffect } from "react";
@@ -86,7 +86,6 @@ export default function HeadersSec({
         ? []
         : [
             {
-              icon: "bookmarks" as IconKey,
               link: "/auth/login",
               linkText: "Log In",
             },
@@ -129,9 +128,6 @@ export default function HeadersSec({
             >
               {headerData.browseEvent.linkText}
             </Link>
-            <button className="flex items-center gap-2 text-sm hover:text-[color:var(--color-primary)] transition-colors border-2 border-[color:var(--color-primary)] rounded-lg px-2 py-1">
-              <Search size={16} /> Search
-            </button>
           </div>
           <div className="w-1/3 text-center">
             <Link href="/" aria-label="Home">
@@ -233,10 +229,6 @@ export default function HeadersSec({
             >
               {headerData.browseEvent.linkText}
             </Link>
-
-            <button className="flex items-center gap-2 py-2 hover:text-[color:var(--color-primary)]">
-              <Search size={18} /> Search
-            </button>
 
             <hr className="border-gray-200" />
 

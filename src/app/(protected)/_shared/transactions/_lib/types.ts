@@ -5,22 +5,26 @@
 
 export interface Transaction {
   id: number;
+  date: string; // e.g., "5 days ago"
   transaction_id: string;
-  booking_id?: number;
-  amount: string;
+  amount: string; // Formatted: "£50.00"
+  amount_raw: number;
   currency: string;
-  status: TransactionStatus;
-  payment_method: string;
-  gateway: string;
-  description?: string;
+  status: string; // Display: "Pending", "Completed", etc.
+  status_key: string; // API key: "pending", "success", etc.
+  payment_method: string; // Display: "Card Payment"
+  payment_method_key: string; // API key: "stripe", "bank_transfer", etc.
+  description: string;
+  booking_id: number;
+  booking_number: string; // e.g., "EV-004"
   created_at: string;
-  updated_at: string;
-  metadata?: Record<string, string | number | boolean>;
+  paid_at: string | null;
 }
 
 export type TransactionStatus =
   | "pending"
-  | "completed"
+  | "success" // API uses "success" for completed
+  | "completed" // Backward compatibility
   | "failed"
   | "refunded"
   | "cancelled";
@@ -36,6 +40,7 @@ export interface TransactionFilters {
   status?: TransactionStatus | "all";
   type?: TransactionType | "all";
   payment_method?: string | "all";
+  payment_date?: string;
   page?: number;
   limit?: number;
   search?: string;

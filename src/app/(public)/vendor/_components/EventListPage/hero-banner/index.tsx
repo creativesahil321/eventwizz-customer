@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useContext } from "react";
+import { useState, useContext, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { ServerContext } from "@/lib/server-context";
@@ -45,9 +45,15 @@ export default function HeroBanner({
   bannerSubHeading: propBannerSubHeading,
 }: HeroBannerProps) {
   const [selectedEvent, setSelectedEvent] = useState("");
+  const [isMounted, setIsMounted] = useState(false);
   const router = useRouter();
   const { theme } = useContext(ServerContext) || { theme: null };
   const vendorTheme = theme as ThemeSchema | null;
+
+  // Ensure Select only renders after client-side hydration to avoid ID mismatches
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
 
   // Get banner content from theme or use defaults - with API data taking priority
   const bannerHeading =
@@ -161,31 +167,39 @@ export default function HeroBanner({
           transition={{ delay: 0.3, duration: 0.8 }}
         >
           <div className="w-full">
-            <Select
-              value={selectedEvent}
-              onValueChange={(value) => {
-                setSelectedEvent(value);
-                // Auto-submit when a selection is made
-                if (value && value !== "all") {
-                  const params = new URLSearchParams();
-                  params.set("event", value);
-                  if (locationName) params.set("location", locationName);
-                  const queryString = params.toString();
-                  router.push(`/search${queryString ? `?${queryString}` : ""}`);
-                }
-              }}
-            >
-              <SelectTrigger className="w-full h-12 bg-white text-black border border-white rounded-md focus:ring-1 focus:ring-purple-500 focus:outline-none">
-                <SelectValue placeholder="Select Events" />
-              </SelectTrigger>
-              <SelectContent>
-                {eventOptions.map((event) => (
-                  <SelectItem key={event.value} value={event.value}>
-                    {event.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            {isMounted ? (
+              <Select
+                value={selectedEvent}
+                onValueChange={(value) => {
+                  setSelectedEvent(value);
+                  // Auto-submit when a selection is made
+                  if (value && value !== "all") {
+                    const params = new URLSearchParams();
+                    params.set("event", value);
+                    if (locationName) params.set("location", locationName);
+                    const queryString = params.toString();
+                    router.push(
+                      `/search${queryString ? `?${queryString}` : ""}`
+                    );
+                  }
+                }}
+              >
+                <SelectTrigger className="w-full h-12 bg-white text-black border border-white rounded-md focus:ring-1 focus:ring-purple-500 focus:outline-none">
+                  <SelectValue placeholder="Select Events" />
+                </SelectTrigger>
+                <SelectContent>
+                  {eventOptions.map((event) => (
+                    <SelectItem key={event.value} value={event.value}>
+                      {event.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            ) : (
+              <div className="w-full h-12 bg-white text-black border border-white rounded-md flex items-center px-3">
+                <span className="text-muted-foreground">Select Events</span>
+              </div>
+            )}
           </div>
         </motion.form>
       </div>

@@ -220,6 +220,7 @@ export interface AddOnsTable {
   price: number;
   total_tables: number;
   sold_tables: number;
+  available_tables: number;
 }
 
 export interface AddOnsTicket {
@@ -229,6 +230,7 @@ export interface AddOnsTicket {
   price: number;
   total_capacity: number;
   sold_tickets: number;
+  available_tickets: number;
 }
 
 export interface AddOnsDrink {
@@ -237,16 +239,25 @@ export interface AddOnsDrink {
   description: string;
   price: string;
   available_quantity: number;
+  sold_quantity: number;
+  available_drinks: number;
   status: number;
+}
+
+/**
+ * Allocation entry for selected tables
+ */
+export interface AllocationEntry {
+  parent_id: number;
+  seats: number;
 }
 
 export interface SelectedTable {
   id: number;
-  price: number;
+  price: string;
   table_size: number;
-  price_per_person: number;
   no_tables: number;
-  allocation: number[];
+  allocation: AllocationEntry[];
 }
 
 export interface AddOnsData {

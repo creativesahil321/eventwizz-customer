@@ -108,9 +108,26 @@ export function getHistoryColumns({
           title="Customer Name"
         />
       ),
-      cell: ({ row }) => (
-        <span className="font-medium text-sm">{row.getValue("user_name")}</span>
-      ),
+      cell: ({ row }) => {
+        const userName = row.getValue("user_name") as string;
+        return (
+          <TooltipProvider>
+            <Tooltip delayDuration={300}>
+              <TooltipTrigger asChild>
+                <span className="font-medium text-sm block max-w-[200px] truncate cursor-help">
+                  {userName}
+                </span>
+              </TooltipTrigger>
+              <TooltipContent
+                side="top"
+                className="max-w-xs p-2 bg-popover text-popover-foreground border shadow-lg"
+              >
+                <p className="text-sm break-words">{userName}</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        );
+      },
       enableSorting: true,
       enableHiding: false,
     },
@@ -282,13 +299,11 @@ export function getHistoryColumns({
             ? parseFloat(depositAmount)
             : depositAmount
           : 0;
-        
+
         if (value === 0 || isNaN(value)) {
-          return (
-            <span className="text-sm text-muted-foreground">—</span>
-          );
+          return <span className="text-sm text-muted-foreground">—</span>;
         }
-        
+
         return (
           <span className="font-semibold text-sm text-green-600">
             £{value.toFixed(2)}
@@ -328,13 +343,11 @@ export function getHistoryColumns({
             ? parseFloat(platformFee)
             : platformFee
           : 0;
-        
+
         if (value === 0 || isNaN(value)) {
-          return (
-            <span className="text-sm text-muted-foreground">—</span>
-          );
+          return <span className="text-sm text-muted-foreground">—</span>;
         }
-        
+
         return (
           <span className="font-semibold text-sm text-purple-600">
             £{value.toFixed(2)}
@@ -374,13 +387,11 @@ export function getHistoryColumns({
             ? parseFloat(pendingAmount)
             : pendingAmount
           : 0;
-        
+
         if (value === 0 || isNaN(value)) {
-          return (
-            <span className="text-sm text-muted-foreground">—</span>
-          );
+          return <span className="text-sm text-muted-foreground">—</span>;
         }
-        
+
         return (
           <span className="font-semibold text-sm text-orange-600">
             £{value.toFixed(2)}

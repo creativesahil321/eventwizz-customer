@@ -292,6 +292,7 @@ export default function CateringTab() {
         const response = await eventsService.storeStepFourData(data);
 
         if (response && response.status) {
+          // Success message is handled by axios interceptor
           // Move to the next step
           await save();
         } else {

@@ -103,7 +103,7 @@ export default function AddOnsTab({
           description: drink.description,
           price: parseFloat(drink.price) || 0,
           quantity: 0,
-          maxQuantity: Math.max(0, drink.available_quantity), // Ensure non-negative
+          maxQuantity: Math.max(0, drink.available_drinks), // Use available_drinks from API
         }));
       setDrinks(transformedDrinks);
 
@@ -115,7 +115,7 @@ export default function AddOnsTab({
           description: ticket.description,
           price: Math.max(0, ticket.price), // Ensure non-negative
           quantity: 0,
-          maxQuantity: Math.max(0, ticket.total_capacity - ticket.sold_tickets),
+          maxQuantity: Math.max(0, ticket.available_tickets), // Use available_tickets from API
         })
       );
       setTickets(transformedTickets);
@@ -128,7 +128,7 @@ export default function AddOnsTab({
           min_persons: Math.max(1, table.min_persons), // At least 1 person
           max_persons: Math.max(table.min_persons, table.max_persons),
           price: Math.max(0, table.price), // Ensure non-negative
-          available: Math.max(0, table.total_tables - table.sold_tables),
+          available: Math.max(0, table.available_tables), // Use available_tables from API
         }));
       setAvailableTableSizes(transformedTables);
 
@@ -138,22 +138,75 @@ export default function AddOnsTab({
         : [];
       const transformedExistingTables: TableData[] = selectedTables.map(
         (selectedTable, index) => {
-          const safeAllocation = Array.isArray(selectedTable.allocation)
-            ? selectedTable.allocation
-            : [];
+          // Handle two allocation formats:
+          // 1. Array of objects (for add-ons): [{parent_id: 110, seats: 20}]
+          // 2. Record/object (for main booking): {"127": 8, "128": 8} or {"127": "+4", "128": "+4"}
+          const allocationData = selectedTable.allocation || [];
+
+          // Extract seats and parent_ids
+          const seats: number[] = [];
+          const parentIds: number[] = [];
+
+          // Check if allocation is an array of objects (add-ons format)
+          if (Array.isArray(allocationData)) {
+            allocationData.forEach((item) => {
+              if (
+                item &&
+                typeof item === "object" &&
+                "parent_id" in item &&
+                "seats" in item
+              ) {
+                // Format: {parent_id: 110, seats: 20}
+                const allocationItem = item as {
+                  parent_id: number;
+                  seats: number;
+                };
+                parentIds.push(Number(allocationItem.parent_id));
+                seats.push(Math.max(0, Number(allocationItem.seats)));
+              }
+            });
+          } else if (
+            typeof allocationData === "object" &&
+            allocationData !== null
+          ) {
+            // Format: Record<string, number | string> - {"127": 8, "128": 8}
+            Object.entries(allocationData).forEach(([tableId, value]) => {
+              parentIds.push(parseInt(tableId));
+              // Parse numeric value from either number or string ("+4" -> 4)
+              const numericValue =
+                typeof value === "string"
+                  ? parseInt(value.replace("+", ""))
+                  : value;
+              seats.push(Math.max(0, numericValue));
+            });
+          }
+
+          // Ensure allocation and parent_ids arrays match table_count
+          // If API returns fewer entries, pad with zeros/defaults
+          const tableCount = selectedTable.no_tables || 1;
+          while (seats.length < tableCount) {
+            seats.push(0);
+            // For missing parent_ids, use sequential IDs starting from the last known ID + 1
+            const lastParentId =
+              parentIds.length > 0 ? Math.max(...parentIds) : 0;
+            parentIds.push(lastParentId + parentIds.length + 1);
+          }
+          // If we have more entries than table_count, trim to match
+          if (seats.length > tableCount) {
+            seats.splice(tableCount);
+            parentIds.splice(tableCount);
+          }
 
           return {
             id: `table-${selectedTable.table_size}-${index}`,
             tableConfigId: Number(selectedTable.id), // Store actual table configuration ID from backend
             capacity: selectedTable.table_size,
-            table_count: selectedTable.no_tables,
-            allocation: safeAllocation.filter((count) => count >= 0), // Remove negative values
-            people_added: safeAllocation.reduce(
-              (sum, count) => sum + Math.max(0, count), // Sum only positive values
-              0
-            ),
-            // Use the table price directly (not divided per person)
-            price_per_person: selectedTable.price || 0,
+            table_count: tableCount,
+            allocation: seats, // Array of seat counts [8, 8]
+            parent_ids: parentIds, // Array of parent IDs [127, 128]
+            people_added: seats.reduce((sum, count) => sum + count, 0), // Sum of all seats
+            // Parse price as number from string format "40.00"
+            price_per_person: parseFloat(selectedTable.price) || 0,
           };
         }
       );
@@ -418,12 +471,9 @@ export default function AddOnsTab({
   const shouldShowNewTables = additionalPeopleCount > 0;
 
   // Calculate how many people need new tables
-  // ALWAYS show new tables for the full additional count - users can choose existing OR new tables
-  // Only deduct from display count what's ALREADY allocated to existing tables
-  const peopleForNewTables =
-    remainingPeople > 0
-      ? remainingPeople // If user allocated to existing, show remaining
-      : additionalPeopleCount; // Otherwise show all (don't force them to use existing)
+  // Show remaining people after existing table allocations
+  // If all guests are allocated to existing tables, peopleForNewTables = 0 (hide new tables section)
+  const peopleForNewTables = Math.max(0, remainingPeople);
 
   // Check if multiple new tables are selected (need allocation)
   const totalNewTablesCount = Object.values(newTables).reduce(
@@ -532,66 +582,94 @@ export default function AddOnsTab({
       }
     }
 
-    // Validate new tables: only require allocation if multiple tables selected
+    // Validate new tables AND total guest allocation
     const totalNewTablesCount = Object.values(newTables).reduce(
       (sum, table) => sum + table.quantity,
       0
     );
 
-    if (totalNewTablesCount > 1) {
-      let totalNewAllocated = 0;
+    // Calculate total people allocated to existing tables
+    let totalExistingAllocated = 0;
+    for (const table of existingTables) {
+      const peopleAdded = tablePeopleAdditions[table.id] || 0;
+      totalExistingAllocated += peopleAdded;
+    }
 
+    // Calculate how many people still need tables (not allocated to existing)
+    const peopleNeedingNewTables = additionalPeopleCount - totalExistingAllocated;
+
+    // Calculate total capacity of selected new tables
+    let totalNewTableCapacity = 0;
+
+    if (totalNewTablesCount > 0) {
       for (const [key, table] of Object.entries(newTables)) {
         if (table.quantity === 0) continue;
 
         const tableSizeId = Number.parseInt(key.replace("size-", ""));
         const tableSize = availableTableSizes.find((t) => t.id === tableSizeId);
 
-        if (!table.allocation || table.allocation.length !== table.quantity) {
-          errors.push(
-            `Table for ${
-              tableSize?.size || 0
-            }: Please use "Manage" button to allocate guests across ${
-              table.quantity
-            } table${table.quantity > 1 ? "s" : ""}`
-          );
-          continue;
-        }
+        if (!tableSize) continue;
 
-        // Validate each table allocation
-        for (let i = 0; i < table.allocation.length; i++) {
-          const guestCount = table.allocation[i];
-          const minPersons = tableSize?.min_persons || 1;
-          const maxPersons = tableSize?.max_persons || 999;
-
-          if (guestCount < minPersons) {
+        // Require allocation if multiple tables of same type selected
+        if (table.quantity > 1) {
+          if (!table.allocation || table.allocation.length !== table.quantity) {
             errors.push(
-              `Table for ${tableSize?.size || 0} - Table ${
-                i + 1
-              }: Minimum ${minPersons} guest${
-                minPersons > 1 ? "s" : ""
-              } required`
+              `Table for ${
+                tableSize.size || 0
+              }: Please use "Manage" button to allocate guests across ${
+                table.quantity
+              } table${table.quantity > 1 ? "s" : ""}`
             );
+            continue;
           }
 
-          if (guestCount > maxPersons) {
-            errors.push(
-              `Table for ${tableSize?.size || 0} - Table ${
-                i + 1
-              }: Maximum ${maxPersons} guests allowed`
-            );
-          }
+          // Validate each table allocation
+          for (let i = 0; i < table.allocation.length; i++) {
+            const guestCount = table.allocation[i];
+            const minPersons = tableSize.min_persons || 1;
+            const maxPersons = tableSize.max_persons || 999;
 
-          totalNewAllocated += guestCount;
+            if (guestCount < minPersons) {
+              errors.push(
+                `Table for ${tableSize.size || 0} - Table ${
+                  i + 1
+                }: Minimum ${minPersons} guest${
+                  minPersons > 1 ? "s" : ""
+                } required`
+              );
+            }
+
+            if (guestCount > maxPersons) {
+              errors.push(
+                `Table for ${tableSize.size || 0} - Table ${
+                  i + 1
+                }: Maximum ${maxPersons} guests allowed`
+              );
+            }
+
+            totalNewTableCapacity += guestCount;
+          }
+        } else {
+          // Single table - add its max capacity
+          totalNewTableCapacity += tableSize.max_persons * table.quantity;
         }
       }
+    }
 
-      // Verify total allocation matches remaining people
-      if (errors.length === 0 && totalNewAllocated !== peopleForNewTables) {
+    // CRITICAL: Check if selected tables can accommodate all remaining people
+    if (errors.length === 0 && peopleNeedingNewTables > 0) {
+      if (totalNewTableCapacity < peopleNeedingNewTables) {
         errors.push(
-          `Total guests allocated (${totalNewAllocated}) must equal remaining people (${peopleForNewTables})`
+          `Selected tables can accommodate ${totalNewTableCapacity} guests, but you need seating for ${peopleNeedingNewTables} guests. Please select more tables.`
         );
       }
+    }
+
+    // Also verify that all people are actually allocated
+    if (errors.length === 0 && totalExistingAllocated < additionalPeopleCount && totalNewTablesCount === 0) {
+      errors.push(
+        `You have ${additionalPeopleCount} guests but only allocated ${totalExistingAllocated}. Please select additional tables.`
+      );
     }
 
     return {
@@ -807,6 +885,7 @@ export default function AddOnsTab({
         // Calculate allocation for existing tables (ONLY additional people, not total)
         let allocation: number[];
         const originalAllocation = table.allocation || [];
+        const parentIds = table.parent_ids || [];
 
         if (hasUpdatedAllocation) {
           // User used "Manage" button - calculate the DIFFERENCE between new and original
@@ -829,10 +908,19 @@ export default function AddOnsTab({
           allocation = Array(table.table_count).fill(0);
         }
 
-        formData.append(
-          `tables[${tableIndex}][allocation]`,
-          JSON.stringify(allocation)
-        );
+        // Send allocation in new format: tables[0][allocation][0][parent_id] and tables[0][allocation][0][seats]
+        allocation.forEach((seats, allocationIndex) => {
+          const parentId = parentIds[allocationIndex] || allocationIndex + 1;
+          formData.append(
+            `tables[${tableIndex}][allocation][${allocationIndex}][parent_id]`,
+            parentId.toString()
+          );
+          formData.append(
+            `tables[${tableIndex}][allocation][${allocationIndex}][seats]`,
+            seats.toString()
+          );
+        });
+
         tableIndex++;
       }
     });
@@ -888,10 +976,19 @@ export default function AddOnsTab({
             allocation = Array(table.quantity).fill(tableSize.min_persons || 1);
           }
 
-          formData.append(
-            `tables[${tableIndex}][allocation]`,
-            JSON.stringify(allocation)
-          );
+          // Send allocation in new format: tables[i][allocation][j][parent_id] and tables[i][allocation][j][seats]
+          // For new tables, use sequential parent_ids starting from 1
+          allocation.forEach((seats, allocationIndex) => {
+            formData.append(
+              `tables[${tableIndex}][allocation][${allocationIndex}][parent_id]`,
+              (allocationIndex + 1).toString()
+            );
+            formData.append(
+              `tables[${tableIndex}][allocation][${allocationIndex}][seats]`,
+              seats.toString()
+            );
+          });
+
           tableIndex++;
         }
       }
@@ -1110,18 +1207,20 @@ export default function AddOnsTab({
                   />
                 )}
 
-                {/* New Tables Section */}
-                {additionalPeopleCount > 0 && shouldShowNewTables && (
-                  <NewTablesSection
-                    peopleForNewTables={peopleForNewTables}
-                    availableTableSizes={availableTableSizes}
-                    newTables={newTables}
-                    totalAvailableSeats={totalAvailableSeats}
-                    allocationValid={allocationValid}
-                    onAddNewTable={handleAddNewTable}
-                    setNewTables={setNewTables}
-                  />
-                )}
+                {/* New Tables Section - Only show if there are people needing new tables */}
+                {additionalPeopleCount > 0 &&
+                  shouldShowNewTables &&
+                  peopleForNewTables > 0 && (
+                    <NewTablesSection
+                      peopleForNewTables={peopleForNewTables}
+                      availableTableSizes={availableTableSizes}
+                      newTables={newTables}
+                      totalAvailableSeats={totalAvailableSeats}
+                      allocationValid={allocationValid}
+                      onAddNewTable={handleAddNewTable}
+                      setNewTables={setNewTables}
+                    />
+                  )}
               </div>
             </AccordionContent>
           </AccordionItem>

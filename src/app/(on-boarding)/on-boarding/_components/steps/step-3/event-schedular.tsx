@@ -142,6 +142,12 @@ const EventScheduler: React.FC<EventSchedulerProps> = ({
                         value={field.value || ""}
                         maxLength={maxLength}
                         onFocus={handleFieldFocus}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            e.preventDefault();
+                            e.stopPropagation();
+                          }
+                        }}
                         onChange={(e) => {
                           field.onChange(e);
                           updateGlobalFormScheduler(

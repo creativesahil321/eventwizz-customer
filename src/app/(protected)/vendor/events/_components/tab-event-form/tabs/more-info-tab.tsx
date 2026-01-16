@@ -194,8 +194,52 @@ export default function MoreInfoTab() {
 
         // Custom validation for required brochure PDF
         if (!data.brochure_pdf && !brochurePdfUrl) {
-          toast.error("Event Brochure PDF is required");
+          toast.error("Event Brochure PDF is required", {
+            description: "Please upload a brochure PDF for your event.",
+            duration: 5000,
+          });
           setActiveField("brochure_pdf");
+          const brochureElement = document.querySelector(
+            '[name="brochure_pdf"]'
+          );
+          if (brochureElement) {
+            brochureElement.scrollIntoView({
+              behavior: "smooth",
+              block: "center",
+            });
+          }
+          setIsLoading(false);
+          return;
+        }
+
+        // Custom validation for required event address
+        if (
+          !data.event_address ||
+          (typeof data.event_address === "string" &&
+            data.event_address.trim().length === 0)
+        ) {
+          toast.error("Event address is required", {
+            description: "Please provide an exact event location address.",
+            duration: 5000,
+          });
+          setActiveField("event_address");
+          // Scroll to event address field
+          const addressSection = document.querySelector(
+            '[data-event-location-section]'
+          );
+          if (addressSection) {
+            addressSection.scrollIntoView({
+              behavior: "smooth",
+              block: "center",
+            });
+          }
+          // Try to focus the address input
+          const addressElement = document.querySelector(
+            '[name="event_address"]'
+          );
+          if (addressElement) {
+            (addressElement as HTMLElement).focus();
+          }
           setIsLoading(false);
           return;
         }
@@ -206,20 +250,41 @@ export default function MoreInfoTab() {
           const errors = form.formState.errors;
           const errorFields = Object.keys(errors);
 
-          // Find the first error field and scroll to it
-          if (errorFields.length > 0) {
-            setActiveField(errorFields[0]);
+          // Prioritize event_address and brochure_pdf errors
+          const priorityFields = ["event_address", "brochure_pdf"];
+          const firstPriorityField = priorityFields.find((field) =>
+            errorFields.includes(field)
+          );
+          const firstErrorField = firstPriorityField || errorFields[0];
+
+          if (firstErrorField) {
+            setActiveField(firstErrorField);
+
+            // Handle scrolling based on field type
+            if (firstErrorField === "event_address") {
+              const addressSection = document.querySelector(
+                '[data-event-location-section]'
+              );
+              if (addressSection) {
+                addressSection.scrollIntoView({
+                  behavior: "smooth",
+                  block: "center",
+                });
+              }
+            }
 
             // Try to find and focus the field with an error
             const errorElement = document.querySelector(
-              `[name="${errorFields[0]}"]`
+              `[name="${firstErrorField}"]`
             );
             if (errorElement) {
               (errorElement as HTMLElement).focus();
-              errorElement.scrollIntoView({
-                behavior: "smooth",
-                block: "center",
-              });
+              if (firstErrorField !== "event_address") {
+                errorElement.scrollIntoView({
+                  behavior: "smooth",
+                  block: "center",
+                });
+              }
             }
           }
 
@@ -239,6 +304,7 @@ export default function MoreInfoTab() {
         const response = await eventsService.storeStepSixData(data);
 
         if (response && response.status) {
+          // Success message is handled by axios interceptor
           // Move to the next step
           await save();
         } else {
@@ -511,7 +577,7 @@ export default function MoreInfoTab() {
           </div>
 
           {/* Event Location Section */}
-          <div className="space-y-4">
+          <div className="space-y-4" data-event-location-section>
             <h2 className="text-xl font-bold title-header">Event Location</h2>
             <p className="text-sm text-gray-500 mt-1 mb-4">
               Provide the exact event location details

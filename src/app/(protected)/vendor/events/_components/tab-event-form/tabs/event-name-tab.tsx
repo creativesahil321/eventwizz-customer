@@ -387,7 +387,7 @@ export default function EventNameTab() {
         form.setValue("event_banner_image", undefined);
         globalForm.setValue("stepOne.event_banner_image", undefined);
 
-        toast.success("Video uploaded successfully");
+        // Success toast will be shown by axios interceptor when form is saved
       } catch (error) {
         console.error("Error handling banner video:", error);
         toast.error("Failed to process video", {
@@ -449,6 +449,33 @@ export default function EventNameTab() {
           // Get all validation errors
           const errors = form.formState.errors;
           const errorFields = Object.keys(errors);
+
+          // Check if banner image/video validation failed
+          if (errors.event_banner_image) {
+            const errorMessage =
+              typeof errors.event_banner_image === "object" &&
+              "message" in errors.event_banner_image
+                ? String(errors.event_banner_image.message)
+                : "Please upload either a banner image or video for your event.";
+            toast.error("Banner required", {
+              description: errorMessage,
+              duration: 5000,
+            });
+            // Scroll to banner section
+            const bannerSection =
+              document
+                .querySelector('[name="event_banner_image"]')
+                ?.closest(".space-y-6") ||
+              document.querySelector("[data-banner-section]");
+            if (bannerSection) {
+              bannerSection.scrollIntoView({
+                behavior: "smooth",
+                block: "center",
+              });
+            }
+            setIsLoading(false);
+            return;
+          }
 
           // Find the first error field and scroll to it
           if (errorFields.length > 0) {
@@ -659,35 +686,19 @@ export default function EventNameTab() {
           }
 
           if (eventId) {
-            // Show success message
-            toast.success(
-              existingEventId
-                ? "Event updated successfully!"
-                : "Event created successfully!",
-              {
-                description: existingEventId
-                  ? "Changes saved"
-                  : "Redirecting to next step...",
-                duration: 3000,
-              }
-            );
-
             // Only redirect if this is a new event
+            // Success message is handled by axios interceptor
             if (!existingEventId) {
               router.push(`/vendor/events/${eventId}`);
             }
           } else {
             console.error("No event_id in response:", response);
-            // Don't show error toast if the message indicates success
+            // Error handling - interceptor will handle API errors
+            // Only show error if response doesn't indicate success
             if (
-              response.message &&
-              response.message.toLowerCase().includes("success")
+              !response.message ||
+              !response.message.toLowerCase().includes("success")
             ) {
-              toast.success("Event updated successfully!", {
-                description: "Changes saved",
-                duration: 3000,
-              });
-            } else {
               toast.error("No event ID received from server");
             }
           }
@@ -815,10 +826,38 @@ export default function EventNameTab() {
                 />
               </div>
 
-              <div className="space-y-4">
+              <div className="space-y-4" data-banner-section>
                 <h3 className="text-lg font-semibold title-header">
                   Add a Cover Photo or Video
                 </h3>
+
+                {/* Show validation error for banner image/video above tabs */}
+                {(form.formState.errors.event_banner_image ||
+                  form.formState.errors.event_banner_video) && (
+                  <div className="rounded-md bg-red-50 p-3 border border-red-200">
+                    <p className="text-sm text-red-600 font-medium">
+                      {(() => {
+                        const imageError =
+                          form.formState.errors.event_banner_image;
+                        const videoError =
+                          form.formState.errors.event_banner_video;
+                        const errorMsg =
+                          (imageError &&
+                          typeof imageError === "object" &&
+                          "message" in imageError
+                            ? String(imageError.message)
+                            : null) ||
+                          (videoError &&
+                          typeof videoError === "object" &&
+                          "message" in videoError
+                            ? String(videoError.message)
+                            : null) ||
+                          "Either a banner image or video is required";
+                        return errorMsg;
+                      })()}
+                    </p>
+                  </div>
+                )}
 
                 <Tabs
                   value={bannerType}
@@ -835,7 +874,9 @@ export default function EventNameTab() {
                       name="event_banner_image"
                       render={() => (
                         <FormItem>
-                          <FormLabel>Banner Image</FormLabel>
+                          <FormLabel>
+                            Banner Image <span className="text-red-500">*</span>
+                          </FormLabel>
                           <FormDescription>
                             Upload a static image for your event banner
                             (recommended size: 1200 x 600px)
@@ -899,7 +940,9 @@ export default function EventNameTab() {
                       name="event_banner_video"
                       render={() => (
                         <FormItem>
-                          <FormLabel>Banner Video</FormLabel>
+                          <FormLabel>
+                            Banner Video <span className="text-red-500">*</span>
+                          </FormLabel>
                           <FormDescription>
                             Upload a video for your event banner (MP4 format,
                             max 10MB)

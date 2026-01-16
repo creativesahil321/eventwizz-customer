@@ -163,6 +163,7 @@ export default function FaqsTab() {
         const response = await eventsService.storeStepSevenData(data);
 
         if (response && response.status) {
+          // Success message is handled by axios interceptor
           // Move to the next step
           await save();
         } else {

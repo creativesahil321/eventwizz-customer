@@ -100,7 +100,10 @@ export function TransactionListComponent({
               {table.getHeaderGroups().map((headerGroup) => (
                 <TableRow key={headerGroup.id} className="bg-gray-50">
                   {headerGroup.headers.map((header) => (
-                    <TableHead key={header.id} className="font-semibold">
+                    <TableHead 
+                      key={header.id} 
+                      className="font-semibold text-xs sm:text-sm px-2 sm:px-4 py-2 sm:py-3 whitespace-nowrap"
+                    >
                       {header.isPlaceholder
                         ? null
                         : flexRender(
@@ -119,7 +122,10 @@ export function TransactionListComponent({
                   className="hover:bg-gray-50 transition-colors"
                 >
                   {row.getVisibleCells().map((cell) => (
-                    <TableCell key={cell.id}>
+                    <TableCell 
+                      key={cell.id}
+                      className="px-2 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm"
+                    >
                       {flexRender(
                         cell.column.columnDef.cell,
                         cell.getContext()
@@ -136,7 +142,7 @@ export function TransactionListComponent({
       {/* Pagination */}
       {meta && meta.last_page > 1 && (
         <Pagination className="mt-4">
-          <PaginationContent>
+          <PaginationContent className="flex-wrap gap-2 justify-center">
             {meta.current_page > 1 && (
               <PaginationItem>
                 <PaginationPrevious

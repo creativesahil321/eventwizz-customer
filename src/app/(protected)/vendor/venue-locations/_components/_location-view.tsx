@@ -38,7 +38,7 @@ export default function ViewLocationDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[550px] max-w-[90vw] text-black">
+      <DialogContent className="sm:max-w-[550px] max-w-[90vw] text-black max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Location Details</DialogTitle>
           <DialogDescription>
@@ -46,7 +46,7 @@ export default function ViewLocationDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-6 py-4">
+        <div className="space-y-6 py-4 min-w-0">
           {location.logo && (
             <div className="flex justify-center mb-4">
               <Image
@@ -59,20 +59,23 @@ export default function ViewLocationDialog({
             </div>
           )}
 
-          <div className="flex items-center justify-between">
-            <h3 className="text-lg font-semibold break-words">
+          <div className="flex items-center justify-between gap-3">
+            <h3 className="text-lg font-semibold break-words min-w-0 flex-1">
               {location.name}
             </h3>
             {isDefault ? (
               <Badge
                 variant="outline"
-                className="border-green-500 text-green-600 flex items-center gap-1"
+                className="border-green-500 text-green-600 flex items-center gap-1 shrink-0"
               >
                 <CheckCircle className="h-3 w-3" />
                 Default Location
               </Badge>
             ) : (
-              <Badge variant="outline" className="text-muted-foreground">
+              <Badge
+                variant="outline"
+                className="text-muted-foreground shrink-0"
+              >
                 Location
               </Badge>
             )}
@@ -114,26 +117,26 @@ export default function ViewLocationDialog({
             </div>
 
             <div className="flex items-start gap-3">
-              <Globe className="h-4 w-4 text-muted-foreground mt-1" />
-              <div>
+              <Globe className="h-4 w-4 text-muted-foreground mt-1 shrink-0" />
+              <div className="min-w-0 flex-1">
                 <p className="text-sm font-medium">Slug</p>
-                <p className="text-sm text-muted-foreground">
+                <p className="text-sm text-muted-foreground break-words">
                   {location.slug || "No slug provided"}
                 </p>
               </div>
             </div>
 
             <div className="flex items-start gap-3">
-              <Calendar className="h-4 w-4 text-muted-foreground mt-1" />
-              <div>
+              <Calendar className="h-4 w-4 text-muted-foreground mt-1 shrink-0" />
+              <div className="min-w-0 flex-1">
                 <p className="text-sm font-medium">Created</p>
-                <p className="text-sm text-muted-foreground">
+                <p className="text-sm text-muted-foreground break-words">
                   {formatDate(location.created_at) || "Unknown"}
                 </p>
                 {location.updated_at && (
                   <>
                     <p className="text-sm font-medium mt-1">Last Updated</p>
-                    <p className="text-sm text-muted-foreground">
+                    <p className="text-sm text-muted-foreground break-words">
                       {formatDate(location.updated_at)}
                     </p>
                   </>

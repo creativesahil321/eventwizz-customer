@@ -69,10 +69,10 @@ export default function CustomersPage() {
   };
 
   return (
-    <section className="page text-black overflow-x-auto">
-      <Shell className="gap-0 overflow-visible">
-        <div className="flex flex-col gap-4">
-          <div className="bg-white rounded-lg border border-[var(--color-border)] shadow-md p-6 mb-0 min-w-fit">
+    <section className="page text-black min-w-0">
+      <Shell className="gap-2">
+        <div className="flex flex-col gap-4 min-w-0">
+          <div className="bg-white rounded-lg border border-[var(--color-border)] shadow-md p-6 mb-4 min-w-0">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center flex-wrap gap-4">
               <div>
                 <h1 className="text-2xl title-header font-bold flex items-center gap-2">

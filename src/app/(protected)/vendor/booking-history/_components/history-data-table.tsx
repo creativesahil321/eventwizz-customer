@@ -133,10 +133,8 @@ function HistoryDataTable({ search, tableRef }: HistoryDataTableProps) {
   }
 
   return (
-    <div className="w-full bg-white rounded-lg border border-[var(--color-border)] shadow-md overflow-hidden">
-      <div className="w-full">
-        <DataTable table={table} />
-      </div>
+    <>
+      <DataTable table={table} />
       {rowAction?.type === "update" && (
         <UpdateHistoryDialog
           open={rowAction?.type === "update"}
@@ -155,7 +153,7 @@ function HistoryDataTable({ search, tableRef }: HistoryDataTableProps) {
           onSuccess={() => rowAction?.row?.toggleSelected(false)}
         />
       )}
-    </div>
+    </>
   );
 }
 

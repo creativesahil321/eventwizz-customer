@@ -289,50 +289,41 @@ export default function ManageRoles({
                 )}
               </div>
 
-              {role.name === "admin" ? (
-                <div className="flex gap-2 items-center">
-                  <Button className="w-full" variant="outline" disabled={true}>
-                    <SquarePen className="h-4 w-4 mr-2" />
-                    Super Admin (Non-Editable)
-                  </Button>
+              <div className="flex gap-2 items-center">
+                <div className="flex-1">
+                  <PermissionsDialog
+                    title={role.title}
+                    roleId={role.id}
+                    permissions={[
+                      {
+                        title: "Role Permissions",
+                        slug: "role-permissions",
+                        permission: role.permissions.map((perm) => ({
+                          id: perm.id,
+                          slug: perm.slug,
+                          label:
+                            perm.title ||
+                            perm.slug.split(".").pop() ||
+                            perm.slug,
+                          title: perm.title,
+                          key: perm.key || perm.slug,
+                          permission: [],
+                        })),
+                      },
+                    ]}
+                    onSave={handleUpdatePermissions}
+                  />
                 </div>
-              ) : (
-                <div className="flex gap-2 items-center">
-                  <div className="flex-1">
-                    <PermissionsDialog
-                      title={role.title}
-                      roleId={role.id}
-                      permissions={[
-                        {
-                          title: "Role Permissions",
-                          slug: "role-permissions",
-                          permission: role.permissions.map((perm) => ({
-                            id: perm.id,
-                            slug: perm.slug,
-                            label:
-                              perm.title ||
-                              perm.slug.split(".").pop() ||
-                              perm.slug,
-                            title: perm.title,
-                            key: perm.key || perm.slug,
-                            permission: [],
-                          })),
-                        },
-                      ]}
-                      onSave={handleUpdatePermissions}
-                    />
-                  </div>
 
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    className="h-10 w-10 text-red-500 hover:text-red-700 hover:bg-red-50 border-[var(--color-border)]"
-                    onClick={() => handleDeleteRole(role)}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
-              )}
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="h-10 w-10 text-red-500 hover:text-red-700 hover:bg-red-50 border-[var(--color-border)]"
+                  onClick={() => handleDeleteRole(role)}
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </div>
             </CardContent>
           </Card>
         ))}

@@ -10,7 +10,8 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Card, CardContent } from "@/components/ui/card";
 import EventCard from "./event-card";
 import EventsTabSkeleton from "./events-skeleton";
-import { useEvents, useBulkUpdateEventStatus } from "../../_lib/queries";
+import { useEvents, useBulkUpdateEventStatus, eventKeys } from "../../_lib/queries";
+import { useQueryClient } from "@tanstack/react-query";
 import EventPagination from "./event-pagination";
 import { Button } from "@/components/ui/button";
 import { RefreshCcw, Check, X, FileEdit } from "lucide-react";
@@ -37,6 +38,7 @@ type EventsProps = {
 
 export default function EventTabs({ search }: EventsProps) {
   const session = useSession();
+  const queryClient = useQueryClient();
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedEvents, setSelectedEvents] = useState<number[]>([]);
 
@@ -200,13 +202,12 @@ export default function EventTabs({ search }: EventsProps) {
     setSelectedEvents([]);
   }, [status, setPage]);
 
-  // Force a refetch of the data with confirmation
+  // Force a refetch of the data immediately
   const refreshData = () => {
-    setConfirmMessage(
-      "Are you sure you want to refresh the events data? This will reload all events from the server."
-    );
-    setShowConfirmModal(true);
-    setPendingAction("refresh");
+    // Invalidate the query cache to ensure fresh data
+    queryClient.invalidateQueries({ queryKey: eventKeys.lists() });
+    // Refetch the current query
+    refetch();
   };
 
   return (

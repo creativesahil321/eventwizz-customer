@@ -48,6 +48,8 @@ export default function GuestAllocationModal({
 }: GuestAllocationModalProps) {
   // Local state for allocations
   const [allocations, setAllocations] = useState<Record<number, number[]>>({});
+  // Track raw input values to allow clearing/editing
+  const [inputValues, setInputValues] = useState<Record<string, string>>({});
   const [isAutoArranging, setIsAutoArranging] = useState(false);
   const [hasBeenAutoArranged, setHasBeenAutoArranged] = useState(false);
 
@@ -97,9 +99,25 @@ export default function GuestAllocationModal({
 
         const autoArranged = autoArrangeGuests(tableData, totalGuests);
         setAllocations(autoArranged);
+        // Initialize input values from auto-arranged allocations
+        const initialInputValues: Record<string, string> = {};
+        Object.entries(autoArranged).forEach(([tableId, allocation]) => {
+          allocation.forEach((value, index) => {
+            initialInputValues[`${tableId}-${index}`] = value.toString();
+          });
+        });
+        setInputValues(initialInputValues);
         setHasBeenAutoArranged(true);
       } else {
         setAllocations(initialAllocations);
+        // Initialize input values from initial allocations
+        const initialInputValues: Record<string, string> = {};
+        Object.entries(initialAllocations).forEach(([tableId, allocation]) => {
+          allocation.forEach((value, index) => {
+            initialInputValues[`${tableId}-${index}`] = value.toString();
+          });
+        });
+        setInputValues(initialInputValues);
         setHasBeenAutoArranged(false);
       }
     }
@@ -142,6 +160,14 @@ export default function GuestAllocationModal({
 
       const autoArranged = autoArrangeGuests(tableData, totalGuests);
       setAllocations(autoArranged);
+      // Update input values from auto-arranged allocations
+      const newInputValues: Record<string, string> = { ...inputValues };
+      Object.entries(autoArranged).forEach(([tableId, allocation]) => {
+        allocation.forEach((value, index) => {
+          newInputValues[`${tableId}-${index}`] = value.toString();
+        });
+      });
+      setInputValues(newInputValues);
       setHasBeenAutoArranged(true);
 
       toast.success("Guests arranged automatically!");
@@ -156,12 +182,16 @@ export default function GuestAllocationModal({
   // Reset to minimum allocations
   const handleReset = () => {
     const resetAllocations: Record<number, number[]> = {};
+    const resetInputValues: Record<string, string> = {};
     selectedTables.forEach((table) => {
-      resetAllocations[table.id] = Array(table.quantity).fill(
-        table.minPersons || 1
-      );
+      const minValue = table.minPersons || 1;
+      resetAllocations[table.id] = Array(table.quantity).fill(minValue);
+      Array.from({ length: table.quantity }, (_, index) => {
+        resetInputValues[`${table.id}-${index}`] = minValue.toString();
+      });
     });
     setAllocations(resetAllocations);
+    setInputValues(resetInputValues);
     setHasBeenAutoArranged(false);
     toast.info("Reset to minimum allocations");
   };
@@ -172,19 +202,96 @@ export default function GuestAllocationModal({
     tableIndex: number,
     value: string
   ) => {
-    const numValue = parseInt(value) || 0;
+    const inputKey = `${tableId}-${tableIndex}`;
 
-    setAllocations((prev) => {
-      const newAllocations = { ...prev };
-      if (!newAllocations[tableId]) {
-        newAllocations[tableId] = [];
+    // Store raw input value (allows empty string for clearing)
+    setInputValues((prev) => ({
+      ...prev,
+      [inputKey]: value,
+    }));
+
+    // Only update numeric allocation if value is a valid number
+    if (value === "" || value === "-") {
+      // Allow empty during editing, don't update numeric state yet
+      return;
+    }
+
+    const numValue = parseInt(value);
+    if (!isNaN(numValue) && numValue >= 0) {
+      setAllocations((prev) => {
+        const newAllocations = { ...prev };
+        if (!newAllocations[tableId]) {
+          newAllocations[tableId] = [];
+        }
+
+        newAllocations[tableId] = [...newAllocations[tableId]];
+        newAllocations[tableId][tableIndex] = numValue;
+
+        return newAllocations;
+      });
+    }
+  };
+
+  // Handle blur to normalize empty/invalid values
+  const handleInputBlur = (
+    tableId: number,
+    tableIndex: number,
+    table: EditableItem
+  ) => {
+    const inputKey = `${tableId}-${tableIndex}`;
+    const rawValue = inputValues[inputKey];
+    const minValue = table.minPersons || 1;
+
+    // If empty or invalid, set to minimum
+    if (!rawValue || rawValue === "" || rawValue === "-") {
+      setInputValues((prev) => ({
+        ...prev,
+        [inputKey]: minValue.toString(),
+      }));
+      setAllocations((prev) => {
+        const newAllocations = { ...prev };
+        if (!newAllocations[tableId]) {
+          newAllocations[tableId] = [];
+        }
+        newAllocations[tableId] = [...newAllocations[tableId]];
+        newAllocations[tableId][tableIndex] = minValue;
+        return newAllocations;
+      });
+    } else {
+      // Validate and clamp to min/max
+      const numValue = parseInt(rawValue);
+      if (isNaN(numValue) || numValue < minValue) {
+        const finalValue = minValue;
+        setInputValues((prev) => ({
+          ...prev,
+          [inputKey]: finalValue.toString(),
+        }));
+        setAllocations((prev) => {
+          const newAllocations = { ...prev };
+          if (!newAllocations[tableId]) {
+            newAllocations[tableId] = [];
+          }
+          newAllocations[tableId] = [...newAllocations[tableId]];
+          newAllocations[tableId][tableIndex] = finalValue;
+          return newAllocations;
+        });
+      } else if (numValue > (table.maxPersons || 999)) {
+        const finalValue = table.maxPersons || 999;
+        setInputValues((prev) => ({
+          ...prev,
+          [inputKey]: finalValue.toString(),
+        }));
+        setAllocations((prev) => {
+          const newAllocations = { ...prev };
+          if (!newAllocations[tableId]) {
+            newAllocations[tableId] = [];
+          }
+          newAllocations[tableId] = [...newAllocations[tableId]];
+          newAllocations[tableId][tableIndex] = finalValue;
+          return newAllocations;
+        });
       }
-
-      newAllocations[tableId] = [...newAllocations[tableId]];
-      newAllocations[tableId][tableIndex] = numValue;
-
-      return newAllocations;
-    });
+    }
   };
 
   // Handle confirmation
@@ -410,8 +517,15 @@ export default function GuestAllocationModal({
                   }}
                 >
                   {Array.from({ length: table.quantity }, (_, index) => {
+                    const inputKey = `${table.id}-${index}`;
+                    const rawInputValue = inputValues[inputKey];
                     const currentValue =
                       allocations[table.id]?.[index] || table.minPersons || 1;
+                    // Use raw input value if available, otherwise use numeric value
+                    const displayValue =
+                      rawInputValue !== undefined
+                        ? rawInputValue
+                        : currentValue.toString();
                     const isValid =
                       currentValue >= (table.minPersons || 1) &&
                       currentValue <= (table.maxPersons || 999);
@@ -421,17 +535,22 @@ export default function GuestAllocationModal({
                         <div className="relative">
                           <Input
                             id={`table-${table.id}-${index}`}
-                            type="number"
+                            type="text"
+                            inputMode="numeric"
                             min={table.minPersons || 1}
                             max={table.maxPersons || 999}
-                            value={currentValue}
-                            onChange={(e) =>
-                              updateTableAllocation(
-                                table.id,
-                                index,
-                                e.target.value
-                              )
+                            value={displayValue}
+                            onChange={(e) => {
+                              // Only allow numbers and empty string
+                              const value = e.target.value;
+                              if (value === "" || /^-?\d*$/.test(value)) {
+                                updateTableAllocation(table.id, index, value);
+                              }
+                            }}
+                            onBlur={() =>
+                              handleInputBlur(table.id, index, table)
                             }
+                            onFocus={(e) => e.target.select()}
                             className={`text-center text-lg font-semibold py-3 ${
                               isValid
                                 ? "border-gray-300 focus:border-blue-500 focus:ring-blue-500"

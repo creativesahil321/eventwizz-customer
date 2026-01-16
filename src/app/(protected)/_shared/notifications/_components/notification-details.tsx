@@ -162,12 +162,12 @@ export function NotificationDetailsComponent({
                 Mark as Unread
               </Button>
             ) : (
-              <Button variant="event-outline" onClick={() => onMarkAsRead(id)}>
+              <Button variant="event-primary" onClick={() => onMarkAsRead(id)}>
                 Mark as Read
               </Button>
             )}
 
-            <Button variant="destructive" onClick={onClose}>
+            <Button variant="event-outline" onClick={onClose}>
               Close
             </Button>
           </div>

@@ -3,7 +3,8 @@ export interface TableData {
   tableConfigId: number; // Actual table configuration ID from backend (required for API)
   capacity: number;
   table_count: number;
-  allocation: number[];
+  allocation: number[]; // Simple array for internal state (e.g., [8, 8])
+  parent_ids: number[]; // Parent IDs from backend (e.g., [127, 128])
   people_added: number;
   price_per_person: number;
 }

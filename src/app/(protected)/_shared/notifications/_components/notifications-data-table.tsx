@@ -53,7 +53,10 @@ export function NotificationsDataTable({
   onMarkAsRead,
   onMarkAsUnread,
 }: NotificationsDataTableProps) {
-  const hasFilters = !!filters.category || !!filters.status;
+  // Check if any filters are actually applied (not "all" or undefined)
+  const hasFilters =
+    (filters.category && filters.category !== "all") ||
+    (filters.status && filters.status !== "all");
 
   // Ensure notifications is always an array
   const safeNotifications = Array.isArray(notifications) ? notifications : [];

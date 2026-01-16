@@ -851,8 +851,18 @@ export default function StepEleven() {
                                   <FormControl>
                                     <Input
                                       {...field}
+                                      type="tel"
+                                      inputMode="numeric"
                                       placeholder="Enter contact number"
                                       className="h-10 bg-[#F9FAFB] border-[#E5E7EB]"
+                                      onChange={(e) => {
+                                        // Only allow numbers, spaces, +, -, and parentheses
+                                        const value = e.target.value.replace(
+                                          /[^0-9+\-() ]/g,
+                                          ""
+                                        );
+                                        field.onChange(value);
+                                      }}
                                     />
                                   </FormControl>
                                   <FormMessage />

@@ -160,6 +160,7 @@ export default function PublishTab() {
         const response = await eventsService.storeStepEightData(submissionData);
 
         if (response && response.status) {
+          // Success message is handled by axios interceptor
           // Move to the next step
           await save();
         } else {

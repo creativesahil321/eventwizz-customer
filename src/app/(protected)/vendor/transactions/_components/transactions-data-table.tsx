@@ -128,8 +128,8 @@ export function TransactionsDataTable({
   }
 
   return (
-    <div className="bg-white rounded-lg border border-[var(--color-border)] shadow-sm overflow-hidden">
-      <div className="overflow-x-auto">
+    <div className="flex w-full min-w-0 flex-col gap-2.5 overflow-auto">
+      <section className="overflow-x-auto bg-white rounded-lg border border-[var(--color-border)] shadow-sm">
         <Table>
           <TableHeader>
             {table.getHeaderGroups().map((headerGroup) => (
@@ -165,7 +165,7 @@ export function TransactionsDataTable({
             ))}
           </TableBody>
         </Table>
-      </div>
+      </section>
       <footer className="bg-background border w-full p-4 my-4 rounded-lg min-w-0">
         <div className="flex flex-col gap-2.5 min-w-0">
           <DataTablePagination table={table} />

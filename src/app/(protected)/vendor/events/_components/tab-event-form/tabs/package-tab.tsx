@@ -286,6 +286,7 @@ export default function PackageTab() {
         const response = await eventsService.storeStepTwoData(data);
 
         if (response && response.status) {
+          // Success message is handled by axios interceptor
           // Move to the next step
           await save();
         } else {

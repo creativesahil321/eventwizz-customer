@@ -4,7 +4,6 @@ import React, { useEffect, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import {
   AlertCircle,
-  ShoppingCart,
   Home,
   ArrowLeft,
   Loader2,
@@ -29,10 +28,6 @@ function PaymentCancelledContent() {
 
     console.log("Payment cancelled for booking:", bookingId);
   }, [searchParams]);
-
-  const handleReturnToCart = () => {
-    router.push("/vendor/checkout");
-  };
 
   const handleGoHome = () => {
     router.push("/");
@@ -135,10 +130,6 @@ function PaymentCancelledContent() {
                   <ul className="space-y-2 text-blue-800 text-sm">
                     <li className="flex items-start gap-2">
                       <span className="text-blue-600">✓</span>
-                      <span>Your cart items are still saved</span>
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <span className="text-blue-600">✓</span>
                       <span>Your selected dates are still reserved</span>
                     </li>
                     <li className="flex items-start gap-2">
@@ -157,17 +148,9 @@ function PaymentCancelledContent() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.8 }}
-          className="space-y-4 mb-8"
+          className="mb-8"
         >
-          <Button
-            onClick={handleReturnToCart}
-            className="w-full bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-lg py-6"
-          >
-            <ShoppingCart className="h-5 w-5 mr-2" />
-            Return to Cart & Complete Payment
-          </Button>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-md mx-auto">
             <Button
               onClick={handleViewBookings}
               variant="event-outline"

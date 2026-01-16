@@ -165,7 +165,9 @@ export default function MenuCategoryDropdown({
         }
       } else {
         // Error toast is handled by axios interceptor
-        console.error("Failed to create menu category: Invalid response format");
+        console.error(
+          "Failed to create menu category: Invalid response format"
+        );
       }
     } catch (error) {
       console.error("Error creating menu category:", error);

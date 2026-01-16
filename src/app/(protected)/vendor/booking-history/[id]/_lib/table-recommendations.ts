@@ -82,7 +82,9 @@ function calculateTableRecommendation(
   table: AvailableTableSize,
   peopleCount: number
 ): TableRecommendation | null {
-  const { min_persons, max_persons, price } = table;
+  const { min_persons, max_persons } = table;
+  // Ensure price is a valid number
+  const price = isNaN(table.price) || table.price < 0 ? 0 : table.price;
 
   // Perfect fit
   if (peopleCount >= min_persons && peopleCount <= max_persons) {
@@ -98,7 +100,9 @@ function calculateTableRecommendation(
       recommendation:
         wastedSeats === 0
           ? `Perfect fit for ${peopleCount} people`
-          : `Great fit - ${wastedSeats} extra seat${wastedSeats > 1 ? "s" : ""}`,
+          : `Great fit - ${wastedSeats} extra seat${
+              wastedSeats > 1 ? "s" : ""
+            }`,
       priority: wastedSeats,
     };
   }
@@ -156,7 +160,13 @@ export function getCostPerPerson(
   rec: TableRecommendation,
   peopleCount: number
 ): number {
-  return rec.totalCost / Math.max(1, peopleCount);
+  // Safeguard against NaN and invalid values
+  const validTotalCost =
+    isNaN(rec.totalCost) || rec.totalCost < 0 ? 0 : rec.totalCost;
+  const validPeopleCount =
+    isNaN(peopleCount) || peopleCount <= 0 ? 1 : peopleCount;
+  const costPerPerson = validTotalCost / validPeopleCount;
+  return isNaN(costPerPerson) ? 0 : costPerPerson;
 }
 
 /**
@@ -181,4 +191,3 @@ export function canAddPeopleToTable(
 
   return { canAdd: true };
 }
-

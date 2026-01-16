@@ -576,13 +576,9 @@ export const stepSixSchema = z
                   .max(40, "Item title must not exceed 40 characters"),
                 description: z
                   .string()
-                  .optional()
+                  .min(1, "Description is required")
                   .refine(
                     (val) => {
-                      // If value is empty or undefined, it's valid (optional field)
-                      if (!val || val.trim() === "") {
-                        return true;
-                      }
                       // Strip HTML tags to get plain text length (same as package_description)
                       const plainText = val.replace(/<[^>]*>/g, "").trim();
                       return plainText.length <= 160;
@@ -967,6 +963,16 @@ export const stepElevenSchema = z
           message: "Contact number is required when duplicating an event",
           path: ["contact_number"],
         });
+      } else {
+        // Validate that contact number contains only valid phone characters
+        const phoneRegex = /^[0-9+\-() ]+$/;
+        if (!phoneRegex.test(data.contact_number)) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: "Contact number can only contain numbers and phone formatting characters (+, -, spaces, parentheses)",
+            path: ["contact_number"],
+          });
+        }
       }
     }
   });

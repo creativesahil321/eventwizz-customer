@@ -93,10 +93,15 @@ export const stepOneSchema = z
       .min(1, "At least one schedule is required")
       .refine(validateTimeSequence, "Times must be in ascending order"),
   })
-  .refine(
-    (data) => {
+  .superRefine((data, ctx) => {
+    // Check if image/video were removed
+    const imageRemoved = data.remove_event_banner_image === true;
+    const videoRemoved = data.remove_event_banner_video === true;
+
       // Require either image OR video, but not both
+    // Don't count removed images/videos as valid
       const hasImage =
+      !imageRemoved &&
         data.event_banner_image &&
         (data.event_banner_image instanceof File ||
           (typeof data.event_banner_image === "string" &&
@@ -104,6 +109,7 @@ export const stepOneSchema = z
             data.event_banner_image !== "null" &&
             data.event_banner_image !== "undefined"));
       const hasVideo =
+      !videoRemoved &&
         data.event_banner_video &&
         (data.event_banner_video instanceof File ||
           (typeof data.event_banner_video === "string" &&
@@ -111,13 +117,14 @@ export const stepOneSchema = z
             data.event_banner_video !== "null" &&
             data.event_banner_video !== "undefined"));
 
-      return hasImage || hasVideo;
-    },
-    {
+    if (!hasImage && !hasVideo) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
       message: "Either a banner image or video is required",
       path: ["event_banner_image"],
+      });
     }
-  );
+  });
 export type StepOneType = z.infer<typeof stepOneSchema>;
 
 //=== Step 2 ===//
@@ -717,7 +724,12 @@ export const stepSixSchema = z
     faq_pdf: z
       .union([z.instanceof(File), z.string().url(), z.null()])
       .optional(),
-    event_address: z.string().min(1, "Event address is required"),
+    event_address: z
+      .string()
+      .min(1, "Event address is required")
+      .refine((val) => val.trim().length > 0, {
+        message: "Event address is required",
+      }),
     latitude: z.number().optional(),
     longitude: z.number().optional(),
     price_start_from: z

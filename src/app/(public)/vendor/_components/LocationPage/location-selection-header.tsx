@@ -70,9 +70,9 @@ export default function LocationSelectionHeader({
             {logo ? (
               <Image
                 src={logo}
-                width={120}
-                height={40}
-                className="max-h-12 w-auto object-contain"
+                width={180}
+                height={60}
+                className="h-14 md:h-16 w-auto object-contain max-w-[200px]"
                 alt={name || "EventWizz"}
                 priority
               />

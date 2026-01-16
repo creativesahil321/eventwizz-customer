@@ -436,7 +436,7 @@ export default function StepTwo() {
                   return (
                     <FormItem>
                       <OnboardingSectionTitle>
-                        Button Text And Link
+                        Button Text
                       </OnboardingSectionTitle>
                       <FormControl>
                         <Input

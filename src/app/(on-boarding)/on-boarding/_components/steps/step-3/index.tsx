@@ -1108,6 +1108,12 @@ export default function StepThree() {
                           onFocus={() =>
                             handleFieldFocus("event_schedular_title")
                           }
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              e.preventDefault();
+                              e.stopPropagation();
+                            }
+                          }}
                           onChange={(e) => {
                             field.onChange(e);
                             globalForm.setValue(

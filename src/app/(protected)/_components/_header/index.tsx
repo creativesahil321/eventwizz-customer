@@ -74,7 +74,7 @@ const Header: React.FC<HeaderProps> = memo(({ menus }) => {
         )}
 
         {/* Help Dropdown */}
-        {/* <div className="hidden md:block">
+        <div className="hidden md:block">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button
@@ -107,7 +107,7 @@ const Header: React.FC<HeaderProps> = memo(({ menus }) => {
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
-        </div> */}
+        </div>
 
         {/* Create Event Button - Show on mobile too with icon only */}
         {isVendor && (
