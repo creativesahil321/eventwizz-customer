@@ -136,7 +136,8 @@ export function NewTablesSection({
             No available tables for {peopleForNewTables} more people
           </h3>
           <p className="text-sm text-orange-700">
-            Please contact support for assistance
+            Add more table configurations through your event management settings
+            to accommodate additional guests.
           </p>
         </div>
       </div>

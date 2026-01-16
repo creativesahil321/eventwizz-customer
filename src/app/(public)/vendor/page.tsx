@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useLocationStore } from "@/store/location.store";
 import { useDomain } from "@/providers/domain-provider/domain-provider";
 import LocationSelectionHeader from "./_components/LocationPage/location-selection-header";
-import LocationGridEnhanced from "./_components/LocationPage/location-grid-enhanced";
+import LocationGrid from "./_components/LocationPage/location-grid";
 import { useLocationStats } from "@/services/common/locations/hooks/useLocationStats";
 import GoogleLocationMap from "./_components/LocationPage/location-map-google";
 import Image from "next/image";
@@ -178,7 +178,7 @@ export default function VendorSiteHomePage() {
             />
           ) : (
             <div className="max-w-6xl mx-auto">
-              <LocationGridEnhanced
+              <LocationGrid
                 locations={allLocations}
                 isLoading={isLoading || isDomainLoading || isLoadingStats}
                 onSelect={handleLocationSelect}

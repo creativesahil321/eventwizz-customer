@@ -596,7 +596,8 @@ export default function AddOnsTab({
     }
 
     // Calculate how many people still need tables (not allocated to existing)
-    const peopleNeedingNewTables = additionalPeopleCount - totalExistingAllocated;
+    const peopleNeedingNewTables =
+      additionalPeopleCount - totalExistingAllocated;
 
     // Calculate total capacity of selected new tables
     let totalNewTableCapacity = 0;
@@ -666,7 +667,11 @@ export default function AddOnsTab({
     }
 
     // Also verify that all people are actually allocated
-    if (errors.length === 0 && totalExistingAllocated < additionalPeopleCount && totalNewTablesCount === 0) {
+    if (
+      errors.length === 0 &&
+      totalExistingAllocated < additionalPeopleCount &&
+      totalNewTablesCount === 0
+    ) {
       errors.push(
         `You have ${additionalPeopleCount} guests but only allocated ${totalExistingAllocated}. Please select additional tables.`
       );
@@ -1078,6 +1083,12 @@ export default function AddOnsTab({
     );
   }
 
+  // Check if all available add-on options are empty
+  const hasNoAvailableOptions =
+    availableTableSizes.length === 0 &&
+    tickets.length === 0 &&
+    drinks.length === 0;
+
   return (
     <div className="space-y-6">
       {/* Date Selector */}
@@ -1087,7 +1098,28 @@ export default function AddOnsTab({
         onDateChange={setSelectedDate}
       />
 
-      {/* Tables & Seating Section - Only show if tables are available or existing */}
+      {/* Informative message when no add-on options are available and no existing tables */}
+      {hasNoAvailableOptions && existingTables.length === 0 && (
+        <div className="border rounded-lg p-6 bg-blue-50 border-blue-200">
+          <div className="flex items-start gap-3">
+            <div className="p-2 rounded-lg bg-blue-100">
+              <UtensilsCrossed className="h-5 w-5 text-blue-600" />
+            </div>
+            <div className="flex-1">
+              <h3 className="font-semibold text-blue-900 mb-1">
+                No Additional Options Available
+              </h3>
+              <p className="text-sm text-blue-700">
+                There are currently no additional tables, tickets, or drinks
+                available for this event date. If you need to make changes to
+                your booking, please contact support.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Tables & Seating Section - Show if tables are available or existing tables need management */}
       {(availableTableSizes.length > 0 || existingTables.length > 0) && (
         <Accordion type="single" collapsible className="w-full">
           <AccordionItem value="tables" className="border rounded-lg px-4">

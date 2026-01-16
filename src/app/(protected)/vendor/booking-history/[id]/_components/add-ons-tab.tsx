@@ -167,28 +167,72 @@ export default function AddOnsTab({
         : [];
       const transformedExistingTables: TableData[] = selectedTables.map(
         (selectedTable, index) => {
-          // Handle new allocation format: Array<{parent_id: number, seats: number}>
-          const allocationData = Array.isArray(selectedTable.allocation)
-            ? selectedTable.allocation
-            : [];
+          // Handle two allocation formats:
+          // 1. Array of objects (for add-ons): [{parent_id: 110, seats: 20}]
+          // 2. Record/object (for main booking): {"127": 8, "128": 8} or {"127": "+4", "128": "+4"}
+          const allocationData = selectedTable.allocation || [];
 
-          // Extract seats and parent_ids from new allocation format
-          const seats = allocationData.map((entry) =>
-            typeof entry === "object" && "seats" in entry
-              ? Math.max(0, entry.seats)
-              : 0
-          );
-          const parentIds = allocationData.map((entry) =>
-            typeof entry === "object" && "parent_id" in entry
-              ? entry.parent_id
-              : 0
-          );
+          // Extract seats and parent_ids
+          const seats: number[] = [];
+          const parentIds: number[] = [];
+
+          // Check if allocation is an array of objects (add-ons format)
+          if (Array.isArray(allocationData)) {
+            allocationData.forEach((item) => {
+              if (
+                item &&
+                typeof item === "object" &&
+                "parent_id" in item &&
+                "seats" in item
+              ) {
+                // Format: {parent_id: 110, seats: 20}
+                const allocationItem = item as {
+                  parent_id: number;
+                  seats: number;
+                };
+                parentIds.push(Number(allocationItem.parent_id));
+                seats.push(Math.max(0, Number(allocationItem.seats)));
+              }
+            });
+          } else if (
+            typeof allocationData === "object" &&
+            allocationData !== null
+          ) {
+            // Format: Record<string, number | string> - {"127": 8, "128": 8}
+            Object.entries(allocationData).forEach(([tableId, value]) => {
+              parentIds.push(parseInt(tableId));
+              // Parse numeric value from either number or string ("+4" -> 4)
+              const numericValue =
+                typeof value === "string"
+                  ? parseInt(value.replace("+", ""))
+                  : typeof value === "number"
+                  ? value
+                  : 0;
+              seats.push(Math.max(0, numericValue));
+            });
+          }
+
+          // Ensure allocation and parent_ids arrays match table_count
+          // If API returns fewer entries, pad with zeros/defaults
+          const tableCount = selectedTable.no_tables || 1;
+          while (seats.length < tableCount) {
+            seats.push(0);
+            // For missing parent_ids, use sequential IDs starting from the last known ID + 1
+            const lastParentId =
+              parentIds.length > 0 ? Math.max(...parentIds) : 0;
+            parentIds.push(lastParentId + parentIds.length + 1);
+          }
+          // If we have more entries than table_count, trim to match
+          if (seats.length > tableCount) {
+            seats.splice(tableCount);
+            parentIds.splice(tableCount);
+          }
 
           return {
             id: `table-${selectedTable.table_size}-${index}`,
             tableConfigId: Number(selectedTable.id), // Store actual table configuration ID from backend
             capacity: selectedTable.table_size,
-            table_count: selectedTable.no_tables,
+            table_count: tableCount,
             allocation: seats, // Array of seat counts [8, 8]
             parent_ids: parentIds, // Array of parent IDs [127, 128]
             people_added: seats.reduce((sum, count) => sum + count, 0), // Sum of all seats
@@ -583,7 +627,8 @@ export default function AddOnsTab({
     }
 
     // Calculate how many people still need tables (not allocated to existing)
-    const peopleNeedingNewTables = additionalPeopleCount - totalExistingAllocated;
+    const peopleNeedingNewTables =
+      additionalPeopleCount - totalExistingAllocated;
 
     // Calculate total capacity of selected new tables
     let totalNewTableCapacity = 0;
@@ -653,7 +698,11 @@ export default function AddOnsTab({
     }
 
     // Also verify that all people are actually allocated
-    if (errors.length === 0 && totalExistingAllocated < additionalPeopleCount && totalNewTablesCount === 0) {
+    if (
+      errors.length === 0 &&
+      totalExistingAllocated < additionalPeopleCount &&
+      totalNewTablesCount === 0
+    ) {
       errors.push(
         `You have ${additionalPeopleCount} guests but only allocated ${totalExistingAllocated}. Please select additional tables.`
       );
@@ -1065,6 +1114,12 @@ export default function AddOnsTab({
     );
   }
 
+  // Check if all available add-on options are empty
+  const hasNoAvailableOptions =
+    availableTableSizes.length === 0 &&
+    tickets.length === 0 &&
+    drinks.length === 0;
+
   return (
     <div className="space-y-6">
       {/* Date Selector */}
@@ -1074,7 +1129,28 @@ export default function AddOnsTab({
         onDateChange={setSelectedDate}
       />
 
-      {/* Tables & Seating Section - Only show if tables are available or existing */}
+      {/* Informative message when no add-on options are available and no existing tables */}
+      {hasNoAvailableOptions && existingTables.length === 0 && (
+        <div className="border rounded-lg p-6 bg-blue-50 border-blue-200">
+          <div className="flex items-start gap-3">
+            <div className="p-2 rounded-lg bg-blue-100">
+              <UtensilsCrossed className="h-5 w-5 text-blue-600" />
+            </div>
+            <div className="flex-1">
+              <h3 className="font-semibold text-blue-900 mb-1">
+                No Additional Options Available
+              </h3>
+              <p className="text-sm text-blue-700">
+                There are currently no additional tables, tickets, or drinks
+                available for this event date. You can add these options through
+                your event management settings.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Tables & Seating Section - Show if tables are available or existing tables need management */}
       {(availableTableSizes.length > 0 || existingTables.length > 0) && (
         <Accordion type="single" collapsible className="w-full">
           <AccordionItem value="tables" className="border rounded-lg px-4">

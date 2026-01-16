@@ -2,108 +2,80 @@
 
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { MapPin, ArrowRight, Calendar, Users } from "lucide-react";
+import { MapPin, ArrowRight, Calendar, Clock } from "lucide-react";
 import { VenueLocation } from "@/types/api.types";
-import { LocationData } from "@/types/theme.types";
-import { motion, AnimatePresence, Variants } from "framer-motion";
+import { LatestUpcomingEvent, LocationData } from "@/types/theme.types";
+import { motion, AnimatePresence } from "framer-motion";
 import { useState } from "react";
+import Image from "next/image";
 
-// Generic location type to handle both API types
 interface LocationGridProps {
   locations: (VenueLocation | LocationData)[];
   isLoading: boolean;
   onSelect: (slug: string) => void;
+  locationStats?: Record<
+    string,
+    {
+      eventsCount: number;
+      venuesCount: number;
+      liveEventsCount: number;
+      upcomingEvent?: { date: string; name: string };
+      categories?: string[];
+      startingPrice?: number;
+      isNew?: boolean;
+    }
+  >;
 }
 
 export default function LocationGrid({
   locations,
   isLoading,
   onSelect,
+  locationStats = {},
 }: LocationGridProps) {
   const [hoveredCard, setHoveredCard] = useState<string | null>(null);
 
-  // Loading skeleton animation
-  const skeletonVariants: Variants = {
-    pulse: {
-      opacity: [0.4, 0.8, 0.4],
-      transition: {
-        duration: 1.5,
-        repeat: Infinity,
-        ease: "easeInOut",
-      },
-    },
-  };
-
   if (isLoading) {
     return (
-      <motion.div
-        className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ duration: 0.5 }}
-      >
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {Array(6)
           .fill(0)
           .map((_, idx) => (
-            <motion.div
+            <Card
               key={idx}
-              className="bg-white/95 backdrop-blur-sm border border-gray-200 rounded-lg overflow-hidden h-64"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.4, delay: idx * 0.08 }}
+              className="overflow-hidden border border-gray-200"
             >
-              <div className="h-full w-full flex flex-col p-6">
-                <motion.div
-                  className="h-full bg-gradient-to-br from-gray-100 to-gray-50 rounded-lg flex flex-col items-center justify-center gap-4"
-                  variants={skeletonVariants}
-                  animate="pulse"
-                >
-                  <div className="w-12 h-12 bg-gray-200 rounded-full" />
-                  <Skeleton className="h-6 w-32 bg-gray-200" />
-                  <Skeleton className="h-4 w-24 bg-gray-200" />
-                </motion.div>
+              <div className="h-48 bg-gray-100" />
+              <div className="p-6 space-y-4">
+                <Skeleton className="h-6 w-32" />
+                <Skeleton className="h-4 w-24" />
+                <Skeleton className="h-10 w-full" />
               </div>
-            </motion.div>
+            </Card>
           ))}
-      </motion.div>
+      </div>
     );
   }
 
   if (!locations || locations.length === 0) {
     return (
-      <motion.div
-        className="text-center py-16"
-        initial={{ opacity: 0, scale: 0.9 }}
-        animate={{ opacity: 1, scale: 1 }}
-        transition={{ duration: 0.6 }}
-      >
-        <div className="bg-white/95 backdrop-blur-sm border border-gray-200 rounded-lg p-12 max-w-md mx-auto">
-          <motion.div
-            initial={{ scale: 0 }}
-            animate={{ scale: 1 }}
-            transition={{ delay: 0.2, type: "spring", stiffness: 100 }}
-          >
-            <MapPin size={48} className="mx-auto mb-4 text-gray-400" />
-          </motion.div>
+      <div className="text-center py-16">
+        <div className="bg-white border border-gray-200 rounded-lg p-12 max-w-md mx-auto">
+          <MapPin size={48} className="mx-auto mb-4 text-gray-400" />
           <h3 className="text-2xl font-semibold text-gray-900 mb-2">
             No Locations Found
           </h3>
-          <p className="text-gray-600 leading-relaxed">
+          <p className="text-gray-600">
             There are no event locations available at the moment. Check back
             soon!
           </p>
         </div>
-      </motion.div>
+      </div>
     );
   }
 
   return (
-    <motion.div
-      className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      transition={{ duration: 0.6 }}
-    >
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
       <AnimatePresence>
         {locations.map((location, idx) => {
           const locationName =
@@ -119,6 +91,28 @@ export default function LocationGrid({
             "id" in location && location.id ? location.id : idx;
           const isHovered = hoveredCard === locationSlug;
 
+          const totalEvents =
+            "total_events" in location &&
+            typeof location.total_events === "number"
+              ? location.total_events
+              : locationStats[locationSlug]?.eventsCount || 0;
+
+          const upcomingEvent =
+            "latest_upcoming_event" in location &&
+            location.latest_upcoming_event
+              ? {
+                  name: (location.latest_upcoming_event as LatestUpcomingEvent)
+                    .name,
+                  date: (location.latest_upcoming_event as LatestUpcomingEvent)
+                    .date,
+                }
+              : locationStats[locationSlug]?.upcomingEvent;
+
+          const coverImage =
+            "cover_image" in location && location.cover_image
+              ? location.cover_image
+              : null;
+
           return (
             <motion.div
               key={locationId}
@@ -127,84 +121,115 @@ export default function LocationGrid({
               exit={{ opacity: 0, scale: 0.95 }}
               transition={{
                 duration: 0.3,
-                delay: idx * 0.08,
-                type: "spring",
-                stiffness: 100,
+                delay: idx * 0.05,
               }}
               onHoverStart={() => setHoveredCard(locationSlug)}
               onHoverEnd={() => setHoveredCard(null)}
             >
               <Card
-                className={`
-                  h-64 overflow-hidden rounded-lg cursor-pointer group relative
-                  bg-white/95 backdrop-blur-sm border border-gray-200
-                  hover:shadow-xl hover:border-gray-300
-                  transition-all duration-300
-                `}
+                className="overflow-hidden border border-gray-200 cursor-pointer group hover:shadow-lg hover:border-gray-300 transition-all duration-200 flex flex-col h-full"
                 onClick={() => onSelect(locationSlug)}
               >
-                <div className="relative h-full flex flex-col p-6">
-                  {/* Location icon and name */}
-                  <div className="flex-1 flex flex-col items-center justify-center text-center">
-                    <motion.div
-                      className="mb-4 p-3 rounded-full bg-gray-100 group-hover:bg-gray-200 transition-colors duration-300"
-                      animate={{
-                        scale: isHovered ? 1.05 : 1,
+                {/* Header Image */}
+                <div
+                  className="relative h-40 overflow-hidden"
+                  style={{ background: "var(--color-background)" }}
+                >
+                  {coverImage && typeof coverImage === "string" ? (
+                    <Image
+                      src={coverImage}
+                      alt={locationName}
+                      fill
+                      className="object-cover transition-transform duration-300 group-hover:scale-105"
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).style.display = "none";
                       }}
-                      transition={{ duration: 0.2 }}
-                    >
-                      <MapPin size={32} className="text-gray-700" />
-                    </motion.div>
+                    />
+                  ) : (
+                    <div
+                      className="absolute inset-0"
+                      style={{ background: "var(--color-background)" }}
+                    />
+                  )}
 
-                    <h3 className="text-2xl font-semibold text-gray-900 mb-3">
-                      {locationName}
-                    </h3>
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent" />
 
-                    {/* Event stats preview */}
-                    <div className="flex items-center gap-4 text-sm text-gray-600 mb-4">
-                      <div className="flex items-center gap-1.5">
-                        <Calendar size={16} />
-                        <span>Events</span>
-                      </div>
-                      <div className="w-1 h-1 rounded-full bg-gray-400" />
-                      <div className="flex items-center gap-1.5">
-                        <Users size={16} />
-                        <span>Venues</span>
-                      </div>
+                  <div className="absolute bottom-4 left-4 right-4">
+                    <div className="flex items-center gap-2">
+                      <MapPin size={18} className="text-white" />
+                      <h3 className="text-lg font-semibold text-white">
+                        {locationName}
+                      </h3>
                     </div>
                   </div>
+                </div>
 
-                  {/* Explore button */}
-                  <motion.button
-                    className="
-                      w-full bg-gray-900 hover:bg-gray-800 text-white py-2.5 px-4 rounded-lg text-sm font-medium
-                      flex items-center justify-center gap-2 transition-colors duration-200
-                    "
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
+                {/* Content */}
+                <div className="p-6 flex-1 flex flex-col">
+                  <div className="space-y-4 flex-1">
+                    {/* Event Count */}
+                    <div className="flex items-center gap-2 text-sm text-gray-600">
+                      <Calendar
+                        size={16}
+                        className="text-[color:var(--color-primary)]"
+                      />
+                      <span className="font-medium text-gray-900">
+                        {totalEvents}
+                      </span>
+                      <span className="text-gray-500">
+                        {totalEvents === 1 ? "Event" : "Events"}
+                      </span>
+                    </div>
+
+                    {/* Upcoming Event */}
+                    {upcomingEvent ? (
+                      <div className="flex items-start gap-3 p-3 bg-gray-50 rounded-lg border border-gray-100">
+                        <Clock
+                          size={16}
+                          className="text-[color:var(--color-primary)] mt-0.5 flex-shrink-0"
+                        />
+                        <div className="flex-1 min-w-0">
+                          <div className="text-sm font-medium text-gray-900 truncate">
+                            {upcomingEvent.name}
+                          </div>
+                          <div className="text-xs text-gray-500 mt-1">
+                            {upcomingEvent.date}
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="p-3 bg-gray-50 rounded-lg border border-gray-100">
+                        <p className="text-xs text-gray-400">
+                          {totalEvents > 0
+                            ? "No upcoming events scheduled"
+                            : "Check back soon for new events"}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Action Button */}
+                  <button
+                    className="w-full mt-6 bg-[color:var(--color-primary)] hover:bg-[color:var(--color-primary)]/90 text-white py-2.5 px-4 rounded-lg text-sm font-medium flex items-center justify-center gap-2 transition-colors duration-200"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onSelect(locationSlug);
+                    }}
                   >
                     <span>Explore Events</span>
                     <motion.div
-                      animate={{ x: isHovered ? 3 : 0 }}
+                      animate={{ x: isHovered ? 4 : 0 }}
                       transition={{ duration: 0.2 }}
                     >
                       <ArrowRight size={16} />
                     </motion.div>
-                  </motion.button>
+                  </button>
                 </div>
-
-                {/* Subtle hover effect overlay */}
-                <motion.div
-                  className="absolute inset-0 bg-gradient-to-b from-transparent to-gray-50/50 pointer-events-none"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: isHovered ? 1 : 0 }}
-                  transition={{ duration: 0.3 }}
-                />
               </Card>
             </motion.div>
           );
         })}
       </AnimatePresence>
-    </motion.div>
+    </div>
   );
 }

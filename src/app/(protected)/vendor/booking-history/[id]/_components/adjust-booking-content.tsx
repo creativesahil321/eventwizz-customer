@@ -1308,18 +1308,30 @@ export default function AdjustBookingContent({
                                                             {`Table of ${table.table_size}`}
                                                           </span>
                                                           {table.no_tables &&
-                                                            table.no_tables >
-                                                              0 && (
-                                                              <span className="text-xs text-muted-foreground bg-gray-100 px-2 py-0.5 rounded">
-                                                                {
-                                                                  table.no_tables
-                                                                }{" "}
-                                                                {table.no_tables ===
-                                                                1
-                                                                  ? "Table"
-                                                                  : "Tables"}
-                                                              </span>
-                                                            )}
+                                                          table.no_tables >
+                                                            0 ? (
+                                                            <span className="text-xs text-muted-foreground bg-gray-100 px-2 py-0.5 rounded">
+                                                              {table.no_tables}{" "}
+                                                              {table.no_tables ===
+                                                              1
+                                                                ? "Table"
+                                                                : "Tables"}
+                                                            </span>
+                                                          ) : table.allocation &&
+                                                            Object.values(
+                                                              table.allocation
+                                                            ).some(
+                                                              (val) =>
+                                                                typeof val ===
+                                                                  "string" &&
+                                                                (val as string).startsWith(
+                                                                  "+"
+                                                                )
+                                                            ) ? (
+                                                            <span className="text-xs text-muted-foreground bg-purple-100 text-purple-700 px-2 py-0.5 rounded">
+                                                              Added to existing
+                                                            </span>
+                                                          ) : null}
                                                         </div>
                                                         {/* Table Allocation Breakdown */}
                                                         {table.allocation &&
@@ -1342,17 +1354,25 @@ export default function AdjustBookingContent({
                                                                     ],
                                                                     tableIdx
                                                                   ) => {
-                                                                    // Check if this is an addition to existing table (starts with "+")
-                                                                    const isAddition =
-                                                                      String(
-                                                                        people
-                                                                      ).startsWith(
-                                                                        "+"
-                                                                      );
-                                                                    const displayPeople =
-                                                                      String(
-                                                                        people
-                                                                      );
+                                                                    // Check if this is a new table (integer value) or existing (string with "+")
+                                                                    const isNewTable =
+                                                                      typeof people ===
+                                                                      "number";
+                                                                    const displayValue =
+                                                                      typeof people ===
+                                                                      "string"
+                                                                        ? people
+                                                                        : people;
+                                                                    const numericValue =
+                                                                      typeof people ===
+                                                                      "string"
+                                                                        ? parseInt(
+                                                                            (people as string).replace(
+                                                                              "+",
+                                                                              ""
+                                                                            )
+                                                                          )
+                                                                        : people;
 
                                                                     return (
                                                                       <div
@@ -1360,16 +1380,16 @@ export default function AdjustBookingContent({
                                                                           tableId
                                                                         }
                                                                         className={`flex items-center gap-1.5 px-2 py-1 rounded-md border ${
-                                                                          isAddition
-                                                                            ? "bg-purple-50 border-purple-200"
-                                                                            : "bg-blue-50 border-blue-100"
+                                                                          isNewTable
+                                                                            ? "bg-green-50 border-green-200"
+                                                                            : "bg-purple-50 border-purple-200"
                                                                         }`}
                                                                       >
                                                                         <span
                                                                           className={`text-xs font-medium ${
-                                                                            isAddition
-                                                                              ? "text-purple-700"
-                                                                              : "text-blue-700"
+                                                                            isNewTable
+                                                                              ? "text-green-700"
+                                                                              : "text-purple-700"
                                                                           }`}
                                                                         >
                                                                           Table{" "}
@@ -1379,24 +1399,24 @@ export default function AdjustBookingContent({
                                                                         </span>
                                                                         <span
                                                                           className={`text-xs font-semibold ${
-                                                                            isAddition
-                                                                              ? "text-purple-900"
-                                                                              : "text-blue-900"
+                                                                            isNewTable
+                                                                              ? "text-green-900"
+                                                                              : "text-purple-900"
                                                                           }`}
                                                                         >
                                                                           {
-                                                                            displayPeople
+                                                                            displayValue
                                                                           }{" "}
-                                                                          {String(
-                                                                            people
-                                                                          ).replace(
-                                                                            /[^0-9]/g,
-                                                                            ""
-                                                                          ) ===
-                                                                          "1"
+                                                                          {numericValue ===
+                                                                          1
                                                                             ? "Person"
                                                                             : "People"}
                                                                         </span>
+                                                                        {isNewTable && (
+                                                                          <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-green-200 text-green-800 uppercase">
+                                                                            New
+                                                                          </span>
+                                                                        )}
                                                                       </div>
                                                                     );
                                                                   }
