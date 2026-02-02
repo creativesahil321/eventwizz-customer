@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { useSession } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 import {
   Form,
@@ -67,9 +68,10 @@ export default function EventNameTab() {
 
   // Initialize form with combined step data
   const stepOneDefaults = globalForm.getValues().stepOne;
+  const { data: session } = useSession();
   const vendorLocationId = (() => {
-    const storedId = localStorage.getItem("vendor_location_id");
-    const parsedId = storedId ? parseInt(storedId, 10) : 0;
+    const sessionLocationId = session?.user?.vendor_location_id;
+    const parsedId = sessionLocationId ? parseInt(sessionLocationId, 10) : 0;
     const globalFormId = globalForm.getValues("stepOne.vendor_location_id");
     const validId =
       !isNaN(parsedId) && parsedId > 0 ? parsedId : globalFormId || 0;

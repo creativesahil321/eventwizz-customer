@@ -1,9 +1,10 @@
 "use client";
-import React from "react";
+import React, { useMemo } from "react";
 import { getColumns } from "./columns";
 import { Customer, DataTableRowAction, SearchParams } from "../_lib/types";
 import { useDataTable } from "@/hooks/data-table/use-data-table";
 import { DataTable } from "@/components/data-table/data-table";
+import { useQueryState, parseAsInteger } from "nuqs";
 
 const DeleteCustomerDialog = dynamic(
   () => import("./_customer-delete").then((mod) => mod.DeleteCustomerDialog),
@@ -11,13 +12,6 @@ const DeleteCustomerDialog = dynamic(
 );
 const RestoreCustomerDialog = dynamic(
   () => import("./_customer-restore").then((mod) => mod.RestoreCustomerDialog),
-  { ssr: false }
-);
-const PermanentDeleteCustomerDialog = dynamic(
-  () =>
-    import("./_customer-permanent-delete").then(
-      (mod) => mod.PermanentDeleteCustomerDialog
-    ),
   { ssr: false }
 );
 const MailCustomerDialog = dynamic(
@@ -52,10 +46,23 @@ export default function CustomerDataTable({
     [setRowAction, currentFilter]
   );
   const columns = React.useMemo(() => getColumn(), [getColumn]);
-  const { data: customers, isLoading } = useCustomers(
-    { ...search },
-    undefined // No initial data needed for client-side rendering
+
+  // Read page and per_page from URL (same as booking history / locations) so pagination triggers refetch
+  const [page] = useQueryState("page", parseAsInteger.withDefault(1));
+  const [per_page] = useQueryState("per_page", parseAsInteger.withDefault(30));
+
+  // Build query params: URL for pagination, search prop for filters
+  const queryParams = useMemo(
+    () => ({
+      page: page ?? 1,
+      per_page: per_page ?? 30,
+      search: typeof search.search === "string" ? search.search : "",
+      status: typeof search.status === "string" ? search.status : "",
+    }),
+    [page, per_page, search.search, search.status]
   );
+
+  const { data: customers, isLoading } = useCustomers(queryParams, undefined);
 
   const vendorCustomers = React.useMemo(
     () => customers?.data ?? [],
@@ -147,17 +154,6 @@ export default function CustomerDataTable({
         <>
           <RestoreCustomerDialog
             open={rowAction?.type === "restore"}
-            onOpenChange={() => setRowAction(null)}
-            customer={rowAction?.row?.original ? rowAction?.row.original : null}
-            showTrigger={false}
-            onSuccess={() => rowAction?.row.toggleSelected(false)}
-          />
-        </>
-      )}
-      {rowAction?.type === "permanent-delete" && (
-        <>
-          <PermanentDeleteCustomerDialog
-            open={rowAction?.type === "permanent-delete"}
             onOpenChange={() => setRowAction(null)}
             customer={rowAction?.row?.original ? rowAction?.row.original : null}
             showTrigger={false}

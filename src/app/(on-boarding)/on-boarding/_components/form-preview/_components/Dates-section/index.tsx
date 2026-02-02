@@ -178,7 +178,7 @@ export default function DatesSection({
     const actualEventName = eventName || "Festive & Fabulous";
     const actualEventImage =
       eventImage ||
-      "https://eventwizz-admin.socreativesupport.com/storage/uploads/vendor/events/event_banner_image68bab4bb983bd.jpg";
+      "http://192.168.1.100:8000/storage/uploads/vendor/events/event_banner_image68bab4bb983bd.jpg";
 
     // Check for cart conflicts BEFORE making API call (only if available)
     if (checkAndHandleConflict) {

@@ -21,6 +21,8 @@ import {
   RescheduleDataResponse,
   RescheduleBookingPayload,
   RescheduleBookingResponse,
+  BookingPaymentPayload,
+  BookingPaymentResponse,
 } from "./type";
 
 export const bookingsService = {
@@ -91,8 +93,8 @@ export const bookingsService = {
         headers:
           payload instanceof FormData
             ? {
-                "Content-Type": "multipart/form-data",
-              }
+              "Content-Type": "multipart/form-data",
+            }
             : undefined,
       }
     );
@@ -205,5 +207,63 @@ export const bookingsService = {
         returnFullResponse: true,
       }
     );
+  },
+
+  /**
+   * Process payment for booking
+   * @param payload - The booking payment payload with dates and add-ons
+   */
+  processBookingPayment: async (
+    payload: BookingPaymentPayload
+  ): Promise<BookingPaymentResponse> => {
+    // Convert payload to FormData format as expected by API
+    const formData = new FormData();
+    formData.append("booking_id", payload.booking_id.toString());
+    formData.append("payment_gateway", payload.payment_gateway.toString());
+
+    // Add dates array
+    payload.dates.forEach((date, dateIndex) => {
+      formData.append(`dates[${dateIndex}][booking_date_id]`, date.booking_date_id.toString());
+
+      // Add add-ons if they exist
+      if (date.add_ons) {
+        // Add tables
+        if (date.add_ons.tables && date.add_ons.tables.length > 0) {
+          date.add_ons.tables.forEach((table, tableIndex) => {
+            formData.append(
+              `dates[${dateIndex}][add_ons][tables][${tableIndex}][booking_date_table_id]`,
+              table.booking_date_table_id.toString()
+            );
+            if (table.event_date_table_id) {
+              formData.append(
+                `dates[${dateIndex}][add_ons][tables][${tableIndex}][event_date_table_id]`,
+                table.event_date_table_id.toString()
+              );
+            }
+          });
+        }
+
+        // Add tickets
+        if (date.add_ons.tickets && date.add_ons.tickets.length > 0) {
+          date.add_ons.tickets.forEach((ticket, ticketIndex) => {
+            formData.append(
+              `dates[${dateIndex}][add_ons][tickets][${ticketIndex}][booking_date_ticket_id]`,
+              ticket.booking_date_ticket_id.toString()
+            );
+          });
+        }
+      }
+    });
+
+    const endpoint = API_ENDPOINTS.CUSTOMER.BOOKINGS.BOOKING_PAYMENT;
+    return api.post<BookingPaymentResponse>(endpoint, formData, {
+      returnFullResponse: true,
+      headers:
+        formData instanceof FormData
+          ? {
+            "Content-Type": "multipart/form-data",
+          }
+          : undefined,
+    });
   },
 };

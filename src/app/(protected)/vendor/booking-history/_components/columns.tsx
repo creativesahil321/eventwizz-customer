@@ -11,6 +11,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { createSelectColumn } from "@/components/data-table/data-table-column-select";
 
 // Color configurations for order status
 const ORDER_STATUS_COLORS = {
@@ -45,6 +46,7 @@ export function getHistoryColumns({
   setRowAction,
 }: GetHistoryColumnsProps): ColumnDef<History>[] {
   return [
+    createSelectColumn<History>(),
     {
       accessorKey: "booking_number",
       header: ({ column }) => (

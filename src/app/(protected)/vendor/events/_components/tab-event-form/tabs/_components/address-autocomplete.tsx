@@ -62,7 +62,7 @@ export default function AddressAutocomplete({
           const hiddenDiv = document.createElement("div");
           document.body.appendChild(hiddenDiv);
           placesService.current = new google.maps.places.PlacesService(
-            hiddenDiv
+            hiddenDiv,
           );
         } catch (error) {
           console.error("Error initializing Google Places services:", error);
@@ -142,13 +142,13 @@ export default function AddressAutocomplete({
                 predictions.map((prediction) => ({
                   description: prediction.description,
                   place_id: prediction.place_id,
-                }))
+                })),
               );
             } else {
               setSuggestions([]);
               console.warn("Google Places API error:", status);
             }
-          }
+          },
         );
       } else {
         // Clear safety timeout
@@ -182,12 +182,12 @@ export default function AddressAutocomplete({
           if (status === google.maps.places.PlacesServiceStatus.OK && place) {
             onSelect(
               suggestion.place_id,
-              place.formatted_address || suggestion.description
+              place.formatted_address || suggestion.description,
             );
           } else {
             onSelect(suggestion.place_id, suggestion.description);
           }
-        }
+        },
       );
     }
   };
@@ -228,10 +228,10 @@ export default function AddressAutocomplete({
                 predictions.map((prediction) => ({
                   description: prediction.description,
                   place_id: prediction.place_id,
-                }))
+                })),
               );
             }
-          }
+          },
         );
       }
     }
@@ -312,14 +312,12 @@ export default function AddressAutocomplete({
         !isSearching &&
         !isSelected &&
         searchQuery.length >= 2 && (
-          <div className="absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg p-4">
-            <div className="flex items-center space-x-2 text-gray-500">
-              <span>🔍</span>
-              <span className="text-sm">
-                No UK addresses found. Try a different search term or use the
-                map below to set your location manually.
-              </span>
-            </div>
+          <div className="absolute z-50 w-full mt-1 rounded-md border border-amber-200 bg-amber-50 p-4 shadow-lg dark:border-amber-800 dark:bg-amber-950/30">
+            <p className="text-sm text-amber-800 dark:text-amber-200">
+              Google didn&apos;t find that location. Please select from the
+              suggestions above, or use the map below to set your location
+              manually.
+            </p>
           </div>
         )}
 

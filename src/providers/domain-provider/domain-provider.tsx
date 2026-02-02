@@ -3,10 +3,8 @@
 import { createContext, useContext, useEffect, ReactNode } from "react";
 import { getDomain, getTenantIdFromDomain } from "@/lib/domain";
 import { useDomainStore } from "@/store/domain.store";
-import { useLocationStore } from "@/store/location.store";
 import { UserType } from "@/types/auth.types";
 import { ThemeSchema } from "@/types/theme.types";
-import { VenueLocation } from "@/types/api.types";
 
 // Use ThemeSchema instead of a limited interface definition
 type TenantSettings = ThemeSchema;
@@ -35,7 +33,6 @@ const DomainContext = createContext<DomainContextType>({
 export const DomainProvider = ({ children }: { children: ReactNode }) => {
   // Use the Zustand store
   const domainStore = useDomainStore();
-  const { setLocations } = useLocationStore();
 
   // Extract only the values we need to check for changes
   const {
@@ -43,50 +40,6 @@ export const DomainProvider = ({ children }: { children: ReactNode }) => {
     settings: currentSettings,
     isLoading,
   } = domainStore;
-
-  // Sync locations from domain store to location store when settings change
-  useEffect(() => {
-    if (currentSettings?.locations && currentSettings.locations.length > 0) {
-      // Transform locations to the expected format, preserving API fields
-      const transformedLocations = currentSettings.locations.map(
-        (location, index) => {
-          const baseLocation = {
-            id: index + 1, // Generate an id
-            name: location.city || "Unknown Location",
-            city: location.city,
-            slug: location.slug,
-            is_default: index === 0, // First location is default
-            address: "",
-            contact_number: "",
-            email: "",
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-          };
-
-          // Preserve API fields from theme settings if they exist
-          // Using type assertion since VenueLocation allows [key: string] but TypeScript
-          // needs explicit typing for object values
-          const locationWithApiFields = baseLocation as VenueLocation & {
-            total_events?: number;
-            latest_upcoming_event?: { name: string; date: string };
-          };
-
-          if (typeof location.total_events === "number") {
-            locationWithApiFields.total_events = location.total_events;
-          }
-
-          if (location.latest_upcoming_event) {
-            locationWithApiFields.latest_upcoming_event =
-              location.latest_upcoming_event;
-          }
-
-          return locationWithApiFields;
-        }
-      );
-
-      setLocations(transformedLocations);
-    }
-  }, [currentSettings, setLocations]);
 
   useEffect(() => {
     const loadDomainData = async () => {

@@ -12,9 +12,10 @@ import { TableToolbarActions } from "./table-toolbar-actions";
 import { TableRow, TableCell } from "@/components/ui/table";
 import { toSentenceCase } from "@/lib/utils";
 import { LocationsTableSkeleton } from "./skeleton-loader";
-import { useLocations } from "../_lib/queries";
+import { useLocations, useToggleLocationStatus } from "../_lib/queries";
 import { Location, LocationRowAction, SearchParams } from "../_lib/types";
 import dynamic from "next/dynamic";
+import { useQueryState, parseAsInteger } from "nuqs";
 
 // Dynamically load dialogs to improve initial load performance
 const CreateLocationDialog = dynamic(() => import("./_location-create"), {
@@ -22,10 +23,6 @@ const CreateLocationDialog = dynamic(() => import("./_location-create"), {
 });
 
 const UpdateLocationDialog = dynamic(() => import("./_location-update"), {
-  ssr: false,
-});
-
-const DeleteLocationDialog = dynamic(() => import("./_location-delete"), {
   ssr: false,
 });
 
@@ -37,7 +34,7 @@ const SetDefaultLocationDialog = dynamic(
   () => import("./_location-set-default"),
   {
     ssr: false,
-  }
+  },
 );
 
 // Status filters for locations
@@ -62,28 +59,67 @@ function VenueLocationsDataTable({
   hideAddButton = false,
 }: LocationsDataTableProps) {
   const [rowAction, setRowAction] = useState<LocationRowAction | null>(null);
+  const toggleStatusMutation = useToggleLocationStatus();
 
-  // Fetch locations data only if initialData is empty
+  // Read page and per_page from URL (same as booking history / customers)
+  const [page] = useQueryState("page", parseAsInteger.withDefault(1));
+  const [per_page] = useQueryState("per_page", parseAsInteger.withDefault(30));
+
+  // Build query params: URL for pagination, search prop for filters
+  const queryParams = useMemo(
+    () => ({
+      page: String(page ?? 1),
+      per_page: String(per_page ?? 30),
+      search: typeof search.search === "string" ? search.search : "",
+    }),
+    [page, per_page, search.search],
+  );
+
   const shouldFetch = initialData.length === 0;
   const {
     data: locationsData,
     isError,
     error,
     isLoading,
-  } = useLocations(search, { enabled: shouldFetch });
+  } = useLocations(queryParams, { enabled: shouldFetch });
 
-  // Process locations data
+  // Support both shapes: { data, meta } (from API) or array (legacy/cache)
   const locations = useMemo(() => {
-    // If we have data from the API and it's an array, use it
-    if (shouldFetch && locationsData && Array.isArray(locationsData)) {
-      return locationsData as Location[];
-    }
-    // Otherwise fall back to initialData
-    return initialData || [];
-  }, [locationsData, initialData, shouldFetch]);
+    if (locationsData == null) return initialData || [];
+    if (Array.isArray(locationsData)) return locationsData as Location[];
+    const data = (locationsData as { data?: Location[] }).data;
+    return Array.isArray(data) ? data : initialData || [];
+  }, [locationsData, initialData]);
 
-  // Get table columns
-  const columns = useMemo(() => getColumns({ setRowAction }), [setRowAction]);
+  const meta = useMemo(() => {
+    if (
+      locationsData != null &&
+      !Array.isArray(locationsData) &&
+      "meta" in locationsData
+    ) {
+      return (locationsData as { meta?: { last_page: number } }).meta;
+    }
+    return undefined;
+  }, [locationsData]);
+
+  const pageSize = per_page ?? 30;
+  // Use API meta.last_page when available so server-side pagination works; otherwise client-side
+  const pageCount = useMemo(
+    () =>
+      meta?.last_page != null
+        ? meta.last_page
+        : Math.max(1, Math.ceil(locations.length / pageSize)),
+    [meta?.last_page, locations.length, pageSize],
+  );
+
+  const columns = useMemo(
+    () =>
+      getColumns({
+        setRowAction,
+        toggleStatusMutation,
+      }),
+    [setRowAction, toggleStatusMutation],
+  );
 
   // Define filter fields for the table
   const filterFields = useMemo<DataTableFilterField<Location>[]>(
@@ -110,18 +146,12 @@ function VenueLocationsDataTable({
         })),
       },
     ],
-    []
-  );
-
-  // Configure data table
-  const pageCount = useMemo(
-    () => Number(search?.per_page) || 30,
-    [search?.per_page]
+    [],
   );
 
   const getRowId = useCallback(
     (originalRow: Location) => String(originalRow?.id || ""),
-    []
+    [],
   );
 
   const { table } = useDataTable({
@@ -196,14 +226,6 @@ function VenueLocationsDataTable({
       {/* Action Dialogs */}
       {rowAction?.type === "update" && (
         <UpdateLocationDialog
-          open
-          onOpenChange={() => setRowAction(null)}
-          location={rowAction?.row?.original}
-        />
-      )}
-
-      {rowAction?.type === "delete" && (
-        <DeleteLocationDialog
           open
           onOpenChange={() => setRowAction(null)}
           location={rowAction?.row?.original}

@@ -12,6 +12,7 @@ import { toSentenceCase } from "@/lib/utils";
 import UpdateHistoryDialog from "./_history-update";
 import MailHistoryDialog from "./_history-mail";
 import { useRouter } from "next/navigation";
+import { useQueryState, parseAsInteger } from "nuqs";
 
 const dynamicStatusFilter = [
   { id: 1, title: "Successful Orders", value: "success", count: 0 },
@@ -41,11 +42,22 @@ function HistoryDataTable({ search, tableRef }: HistoryDataTableProps) {
     }
   }, [rowAction, router]);
 
+  // Read page and per_page from URL params (managed by useDataTable)
+  const [page] = useQueryState(
+    "page",
+    parseAsInteger.withDefault(1)
+  );
+  const [per_page] = useQueryState(
+    "per_page",
+    parseAsInteger.withDefault(30)
+  );
+
   // Convert search params to proper format for query
+  // Use URL params for pagination, search prop for filters
   const queryParams = {
     search: typeof search.search === "string" ? search.search : "",
-    page: Number(search.page) || 1,
-    per_page: Number(search.per_page) || 30,
+    page: page || 1,
+    per_page: per_page || 30,
     status: typeof search.status === "string" ? search.status : "",
     event_date: typeof search.event_date === "string" ? search.event_date : "",
   };

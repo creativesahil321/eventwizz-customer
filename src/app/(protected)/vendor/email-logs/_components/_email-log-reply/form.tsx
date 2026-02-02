@@ -3,7 +3,6 @@ import { EmailLog } from "../../_lib/types";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { SubmitHandler, useForm } from "react-hook-form";
 import { ReplyFormValues, replyFormSchema } from "./schema";
-import { toast } from "sonner";
 import {
   Form,
   FormControl,
@@ -13,21 +12,17 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { PageLoader } from "@/components/ui/page-loader";
-
-const sendMail = async () => {
-  return {
-    status: true,
-  };
-};
+import { TiptapEditor } from "@/components/ui/tiptap-editor";
+import { useResendEmail } from "../../_lib/queries";
 
 type MailFormProp = {
   email: EmailLog;
+  onSuccess?: () => void;
 };
-export default function MailForm({ email }: MailFormProp) {
-  const [loading, setLoading] = React.useState(false);
+export default function MailForm({ email, onSuccess }: MailFormProp) {
+  const resendEmailMutation = useResendEmail();
   const form = useForm<ReplyFormValues>({
     resolver: zodResolver(replyFormSchema),
     defaultValues: {
@@ -37,23 +32,30 @@ export default function MailForm({ email }: MailFormProp) {
     },
   });
 
-  const onSubmit: SubmitHandler<ReplyFormValues> = async () => {
-    setLoading(true);
-    try {
-      const mailResponse = await sendMail();
-      if (mailResponse && "status" in mailResponse && mailResponse.status) {
-        toast.success("Email sent successfully!");
-        form.reset();
-      } else {
-        toast.error("Failed to send email");
-      }
-    } catch (error) {
-      console.log(error);
-    } finally {
-      setTimeout(() => {
-        setLoading(false);
-      }, 1500);
+  const onSubmit: SubmitHandler<ReplyFormValues> = async (data) => {
+    if (!data.id) {
+      return;
     }
+
+    resendEmailMutation.mutate(
+      {
+        id: data.id,
+        subject: data.subject,
+        message: data.message,
+      },
+      {
+        onSuccess: (response) => {
+          if (response.status) {
+            form.reset();
+            onSuccess?.();
+          }
+          // Error handling is done by API interceptor
+        },
+        onError: () => {
+          // Error handling is done by API interceptor
+        },
+      },
+    );
   };
   return (
     <>
@@ -89,10 +91,19 @@ export default function MailForm({ email }: MailFormProp) {
               <FormItem>
                 <FormLabel className="text-left block">Mail Message</FormLabel>
                 <FormControl>
-                  <Textarea
+                  <TiptapEditor
+                    value={field.value || ""}
+                    onChange={field.onChange}
                     placeholder="Please enter the message"
-                    className="text-foreground border-[#e4e4e7] bg-transparent"
-                    {...field}
+                    maxLength={5000}
+                    maxWords={1000}
+                    showAIButton={true}
+                    className="min-h-[200px]"
+                    aiContext={{
+                      title: email?.subject || "Email Reply",
+                      ctaText: "Reply to the email",
+                      ctaUrl: email?.emailTo,
+                    }}
                   />
                 </FormControl>
                 <FormMessage />
@@ -103,13 +114,17 @@ export default function MailForm({ email }: MailFormProp) {
             <Button
               type="submit"
               variant="event-primary"
-              disabled={loading}
+              disabled={resendEmailMutation.isPending || !form.watch("id")}
               className={
-                loading ? "opacity-45 pointer-events-none cursor-wait" : ""
+                resendEmailMutation.isPending
+                  ? "opacity-45 pointer-events-none cursor-wait"
+                  : ""
               }
             >
-              {loading && <PageLoader />}
-              <span>{loading ? "Sending..." : "Send Mail"}</span>
+              {resendEmailMutation.isPending && <PageLoader />}
+              <span>
+                {resendEmailMutation.isPending ? "Sending..." : "Send Mail"}
+              </span>
             </Button>
           </section>
         </form>

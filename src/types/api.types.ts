@@ -40,6 +40,7 @@ export interface VenueLocation {
   contact_number?: string;
   email?: string;
   is_default: boolean;
+  status?: boolean; // Dynamic status field: true = Active, false = Inactive
   created_at?: string;
   updated_at?: string;
   [key: string]: string | number | boolean | undefined;

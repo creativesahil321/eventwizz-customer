@@ -137,7 +137,7 @@ export interface VendorBookingEventDate {
   tickets: VendorBookingTicket[];
   drinks: VendorBookingDrink[];
   addons: VendorBookingAddons;
-  parent_booking_date?: VendorBookingParentDate | null;
+  parent_booking_date?: string | VendorBookingParentDate | null;
 }
 
 export interface VendorBookingDetail {
@@ -398,5 +398,155 @@ export const vendorBookingsService = {
         returnFullResponse: true,
       }
     );
+  },
+
+  /**
+   * Bulk delete bookings
+   * @param bookingIds Array of booking IDs to delete
+   * @returns Promise with bulk delete operation result
+   */
+  bulkDeleteBookings: async (
+    bookingIds: (number | string)[]
+  ): Promise<{ status: boolean; message: string; data: unknown }> => {
+    if (
+      !API_ENDPOINTS.VENDOR.BOOKING_HISTORY.MULTIPLE_ACTIONS?.BULK_DELETE
+    ) {
+      throw new Error("BULK_DELETE endpoint not configured for bookings");
+    }
+
+    // Format payload as FormData with array notation: booking_ids[0]:47, booking_ids[1]:63, etc.
+    const formData = new FormData();
+    bookingIds.forEach((id, index) => {
+      formData.append(`booking_ids[${index}]`, id.toString());
+    });
+
+    return api.post<{ status: boolean; message: string; data: unknown }>(
+      API_ENDPOINTS.VENDOR.BOOKING_HISTORY.MULTIPLE_ACTIONS.BULK_DELETE,
+      formData,
+      {
+        returnFullResponse: true,
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
+      }
+    );
+  },
+
+  /**
+   * Bulk send email to selected bookings
+   * @param bookingIds Array of booking IDs to send email to
+   * @param subject Email subject
+   * @param body Email body (can contain placeholders like {name})
+   * @returns Promise with bulk email send result
+   */
+  bulkEmailSend: async (
+    bookingIds: (number | string)[],
+    subject: string,
+    body: string
+  ): Promise<{ status: boolean; message: string; data: unknown }> => {
+    if (
+      !API_ENDPOINTS.VENDOR.BOOKING_HISTORY.MULTIPLE_ACTIONS?.BULK_EMAIL_SEND
+    ) {
+      throw new Error(
+        "BULK_EMAIL_SEND endpoint not configured for bookings"
+      );
+    }
+
+    // Format payload as FormData with array notation: booking_ids[0]:41, booking_ids[1]:42, etc.
+    const formData = new FormData();
+    bookingIds.forEach((id, index) => {
+      formData.append(`booking_ids[${index}]`, id.toString());
+    });
+    formData.append("subject", subject);
+    formData.append("body", body);
+
+    return api.post<{ status: boolean; message: string; data: unknown }>(
+      API_ENDPOINTS.VENDOR.BOOKING_HISTORY.MULTIPLE_ACTIONS.BULK_EMAIL_SEND,
+      formData,
+      {
+        returnFullResponse: true,
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
+      }
+    );
+  },
+
+  /**
+   * Bulk export bookings to CSV
+   * @param bookingIds Array of booking IDs to export
+   * @param date Export date filter (format: YYYY-MM-DD)
+   * @returns Promise that triggers file download
+   */
+  bulkExportBookings: async (
+    bookingIds: (number | string)[],
+    date: string
+  ): Promise<void> => {
+    if (
+      !API_ENDPOINTS.VENDOR.BOOKING_HISTORY.MULTIPLE_ACTIONS?.BULK_EXPORT
+    ) {
+      throw new Error("BULK_EXPORT endpoint not configured for bookings");
+    }
+
+    // Get token from auth store
+    const token = useAuthStore.getState().token;
+
+    // Get domain from domain store
+    const domain = useDomainStore.getState().domain;
+
+    // Get location ID from session
+    const session = await getSession();
+    const locationId = session?.user?.vendor_location_id;
+
+    // Build headers with required domain and location headers
+    const headers: Record<string, string> = {
+      Authorization: `Bearer ${token}`,
+    };
+
+    if (domain) {
+      headers["X-Domain"] = domain;
+    }
+
+    if (locationId) {
+      headers["X-Venue-Location-Id"] = String(locationId);
+    }
+
+    // Build FormData payload
+    const formData = new FormData();
+    bookingIds.forEach((id, index) => {
+      formData.append(`booking_ids[${index}]`, id.toString());
+    });
+    formData.append("date", date);
+
+    // Use axios directly for blob download
+    const response = await axios.post<Blob>(
+      `${env.NEXT_PUBLIC_API_URL}${API_ENDPOINTS.VENDOR.BOOKING_HISTORY.MULTIPLE_ACTIONS.BULK_EXPORT}`,
+      formData,
+      {
+        responseType: "blob",
+        headers,
+      }
+    );
+
+    // Get filename from Content-Disposition header or use default
+    const contentDisposition = response.headers?.["content-disposition"];
+    let filename = `bookings-export-${date}.csv`;
+    if (contentDisposition) {
+      const filenameMatch = contentDisposition.match(/filename="?(.+)"?/i);
+      if (filenameMatch) {
+        filename = filenameMatch[1];
+      }
+    }
+
+    // Create blob URL and trigger download
+    const blob = new Blob([response.data], { type: "text/csv" });
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(url);
   },
 };

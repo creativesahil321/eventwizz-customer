@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect } from "react";
+import React, { useEffect, useRef, useCallback, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -28,6 +28,7 @@ import { slugify } from "@/lib/utils";
 import { env } from "@/env";
 import GoogleLocationSearch from "@/app/(on-boarding)/on-boarding/_components/steps/step-11/google-location-search";
 import { fetchLocationDetails } from "@/app/(on-boarding)/on-boarding/_components/steps/step-11/_lib/actions";
+import { toast } from "sonner";
 
 interface UpdateLocationDialogProps {
   open: boolean;
@@ -43,8 +44,10 @@ export default function UpdateLocationDialog({
   isSettingDefault = false,
 }: UpdateLocationDialogProps) {
   const { mutate: updateLocation, isPending } = useUpdateLocation(location.id);
+  const addressPlaceIdRef = useRef<string | null>(null);
+  const initialAddressRef = useRef<string>(location.address || "");
+  const [isAddressValid, setIsAddressValid] = useState(true);
 
-  // Ensure is_default is always a boolean in the form
   const form = useForm({
     resolver: zodResolver(locationSchema) as Resolver<LocationFormValues>,
     defaultValues: {
@@ -58,8 +61,8 @@ export default function UpdateLocationDialog({
     },
   });
 
-  // Update form when location changes
   useEffect(() => {
+    initialAddressRef.current = location.address || "";
     form.reset({
       name: location.name || "",
       address: location.address || "",
@@ -69,27 +72,46 @@ export default function UpdateLocationDialog({
       contact_number: location.contact_number || "",
       email: location.email || "",
     });
+    addressPlaceIdRef.current = null;
+    setIsAddressValid(true);
   }, [form, location]);
 
+  const handleAddressClear = useCallback(() => {
+    form.setValue("address", "");
+    form.setValue("city", "");
+    form.setValue("contact_number", "");
+    addressPlaceIdRef.current = null;
+    setIsAddressValid(false);
+  }, [form]);
+
   const onSubmit: SubmitHandler<LocationFormValues> = (data) => {
-    // Generate slug from city if not provided
+    const address = (data.address ?? "").trim();
+    const initialAddress = initialAddressRef.current;
+    const addressChanged = address !== initialAddress;
+
+    if (address && addressChanged && !addressPlaceIdRef.current) {
+      toast.error("Please select a location from the suggestions", {
+        description:
+          "Google didn't find that location. Type to search and choose a suggested UK address.",
+        duration: 5000,
+      });
+      return;
+    }
+
     if (!data.slug) {
       data.slug = slugify(data.city);
     }
 
-    // Preserve the original location name
-    const updatedData = {
-      ...data,
-      name: location.name, // Keep the original name
-    };
-
-    // Use boolean directly without conversion
-    updateLocation(updatedData, {
-      onSuccess: () => {
-        onOpenChange(false);
-        form.reset();
+    updateLocation(
+      { ...data, slug: data.slug },
+      {
+        onSuccess: () => {
+          onOpenChange(false);
+          form.reset();
+          addressPlaceIdRef.current = null;
+        },
       },
-    });
+    );
   };
 
   return (
@@ -102,7 +124,7 @@ export default function UpdateLocationDialog({
           <DialogDescription>
             {isSettingDefault
               ? "Are you sure you want to set this as your default location?"
-              : `Update the details of this location for ${location.name}.`}
+              : "Update the details of this location."}
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>
@@ -114,16 +136,25 @@ export default function UpdateLocationDialog({
               name="address"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Address</FormLabel>
+                  <FormLabel>
+                    Address <span className="text-destructive">*</span>
+                  </FormLabel>
                   <FormControl>
                     <GoogleLocationSearch
                       apiKey={env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}
                       value={field.value || ""}
-                      onChange={(value) => field.onChange(value)}
-                      onSelect={(placeId) =>
-                        fetchLocationDetails(form, placeId)
-                      }
-                      placeholder="Search for a location..."
+                      onChange={(value) => {
+                        field.onChange(value);
+                        setIsAddressValid(false);
+                      }}
+                      onSelect={(placeId) => {
+                        addressPlaceIdRef.current = placeId;
+                        setIsAddressValid(true);
+                        fetchLocationDetails(form, placeId);
+                      }}
+                      onClear={handleAddressClear}
+                      placeholder="Type to search for a UK address or location..."
+                      disabled={isSettingDefault}
                     />
                   </FormControl>
                   <FormMessage />
@@ -135,13 +166,17 @@ export default function UpdateLocationDialog({
               name="city"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>City</FormLabel>
+                  <FormLabel>
+                    City <span className="text-destructive">*</span>
+                  </FormLabel>
                   <FormControl>
                     <Input
-                      placeholder="e.g. London"
+                      placeholder="Select an address above to auto-fill"
                       {...field}
                       autoComplete="off"
+                      readOnly
                       disabled={isSettingDefault}
+                      className="bg-muted cursor-not-allowed"
                     />
                   </FormControl>
                   <FormMessage />
@@ -154,7 +189,9 @@ export default function UpdateLocationDialog({
               name="email"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Email</FormLabel>
+                  <FormLabel>
+                    Email <span className="text-destructive">*</span>
+                  </FormLabel>
                   <FormControl>
                     <Input
                       placeholder="e.g. venue@example.com"
@@ -173,7 +210,9 @@ export default function UpdateLocationDialog({
               name="contact_number"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Contact Number</FormLabel>
+                  <FormLabel>
+                    Contact Number <span className="text-destructive">*</span>
+                  </FormLabel>
                   <FormControl>
                     <Input
                       type="tel"
@@ -185,7 +224,7 @@ export default function UpdateLocationDialog({
                         // Only allow numbers, spaces, dashes, plus signs, and parentheses
                         const value = e.target.value.replace(
                           /[^\d\s\-+()]/g,
-                          ""
+                          "",
                         );
                         e.target.value = value;
                         field.onChange(value);
@@ -207,13 +246,13 @@ export default function UpdateLocationDialog({
               <Button
                 variant="event-primary"
                 type="submit"
-                disabled={isPending}
+                disabled={isPending || !isAddressValid}
               >
                 {isPending
                   ? "Saving..."
                   : isSettingDefault
-                  ? "Set as Default"
-                  : "Update Location"}
+                    ? "Set as Default"
+                    : "Update Location"}
               </Button>
             </DialogFooter>
           </form>

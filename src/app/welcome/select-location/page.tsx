@@ -1,7 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { useLocationStore } from "@/store/location.store";
+import React, { useState, useEffect } from "react";
 import { useSwitchLocation } from "@/app/(protected)/vendor/venue-locations/_lib/hooks";
 import { useLocationsQuery } from "@/app/(protected)/vendor/venue-locations/_lib/queries";
 import { VenueLocation } from "@/types/api.types";
@@ -14,34 +13,31 @@ import Link from "next/link";
 import Image from "next/image";
 import CreateLocationDialog from "@/app/(protected)/vendor/venue-locations/_components/_location-create";
 import { appConfig } from "@/config/app";
-// import { useDomain } from "@/providers/domain-provider/domain-provider";
+import { Badge } from "@/components/ui/badge";
+import { XCircle } from "lucide-react";
 
 export default function WelcomeLocationSelectionPage() {
-  const { allLocations, selectedLocation, setLocations } = useLocationStore();
-  const [selectedLocationId, setSelectedLocationId] = useState<number | null>(
-    selectedLocation?.id || null
-  );
+  const [selectedLocationId, setSelectedLocationId] = useState<number | null>(null);
   const { mutate: switchLocation, isPending } = useSwitchLocation();
   const { data: session } = useSession();
   const router = useRouter();
-  // const { domain } = useDomain();
 
-  // Use TanStack Query to fetch locations
+  // Use TanStack Query to fetch locations (support { data, meta } or array)
   const { data: locationsData, isLoading } = useLocationsQuery();
+  const locationsList = React.useMemo(() => {
+    if (!locationsData) return [];
+    if (Array.isArray(locationsData)) return locationsData;
+    return locationsData.data || [];
+  }, [locationsData]);
 
-  // Update Zustand store when locations are fetched
+  // Auto-select default location on mount
   useEffect(() => {
-    if (locationsData && Array.isArray(locationsData)) {
-      setLocations(locationsData);
-
-      // Automatically select the default location if available
-      if (locationsData.length > 0 && !selectedLocationId) {
-        const defaultLocation =
-          locationsData.find((loc) => loc.is_default) || locationsData[0];
-        setSelectedLocationId(defaultLocation.id);
-      }
+    if (locationsList.length > 0 && !selectedLocationId) {
+      const defaultLocation =
+        locationsList.find((loc) => loc.is_default) || locationsList[0];
+      setSelectedLocationId(defaultLocation.id);
     }
-  }, [locationsData, setLocations, selectedLocationId]);
+  }, [locationsList, selectedLocationId]);
 
   // Handler for selecting a location
   const handleLocationSelect = (location: VenueLocation) => {
@@ -136,16 +132,16 @@ export default function WelcomeLocationSelectionPage() {
               </div>
             ) : (
               <>
-                {allLocations && allLocations.length > 0 ? (
+                {locationsList && locationsList.length > 0 ? (
                   <div className="space-y-3 overflow-y-auto max-h-[400px] pr-2 custom-scrollbar">
-                    {allLocations.map((location) => (
+                    {locationsList.map((location) => (
                       <div
                         key={location.id}
                         className={cn(
                           "border-2 rounded-lg p-4 cursor-pointer transition-all duration-200 group",
                           selectedLocationId === location.id
                             ? "border-[color:var(--color-primary)] bg-gradient-to-br from-[color:var(--color-primary-light,#f0f9fa)] to-blue-50 shadow-md ring-2 ring-[color:var(--color-primary)] ring-opacity-20"
-                            : "border-gray-200 hover:border-gray-300 hover:shadow-md bg-white"
+                            : "border-gray-200 hover:border-gray-300 hover:shadow-md bg-white",
                         )}
                         onClick={() => handleLocationSelect(location)}
                       >
@@ -178,11 +174,22 @@ export default function WelcomeLocationSelectionPage() {
                                   {location.city || "Unknown Location"}
                                 </div>
                               </div>
-                              {location.is_default && (
-                                <div className="flex-shrink-0 text-xs bg-gradient-to-r from-[color:var(--color-primary)] to-blue-600 text-white px-3 py-1 rounded-full font-semibold shadow-sm">
-                                  Default
-                                </div>
-                              )}
+                              <div className="flex items-center gap-2 flex-shrink-0">
+                                {location.is_default && (
+                                  <div className="text-xs bg-gradient-to-r from-[color:var(--color-primary)] to-blue-600 text-white px-3 py-1 rounded-full font-semibold shadow-sm whitespace-nowrap">
+                                    Default
+                                  </div>
+                                )}
+                                {location.status === false && (
+                                  <Badge
+                                    variant="outline"
+                                    className="border-red-500 text-red-600 flex items-center gap-1 h-5 px-2 text-[10px] whitespace-nowrap"
+                                  >
+                                    <XCircle className="h-3 w-3" />
+                                    Inactive
+                                  </Badge>
+                                )}
+                              </div>
                             </div>
 
                             <div className="text-sm text-gray-600 mb-3 ml-12 line-clamp-2">
@@ -237,7 +244,7 @@ export default function WelcomeLocationSelectionPage() {
             )}
 
             {/* Action buttons */}
-            {allLocations && allLocations.length > 0 && (
+            {locationsList && locationsList.length > 0 && (
               <div className="flex justify-end mt-6 pt-6 border-t border-gray-200">
                 <Button
                   onClick={handleConfirm}

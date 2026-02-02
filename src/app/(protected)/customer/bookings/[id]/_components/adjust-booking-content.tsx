@@ -104,6 +104,7 @@ export default function AdjustBookingContent({
             tickets: eventDate.tickets, // Full ticket details
             drinks: eventDate.drinks, // Full drink details
             addons: eventDate.addons, // Include add-ons data
+            reschedule_requests: eventDate.reschedule_requests || [], // Include reschedule requests
             items: [
               ...eventDate.tables.map((table) => ({
                 type: "table" as const,

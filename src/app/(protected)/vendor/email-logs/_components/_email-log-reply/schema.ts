@@ -13,10 +13,10 @@ export const replyFormSchema = z.object({
   message: z
     .string()
     .min(15, {
-      message: "Description must be at least 15 characters.",
+      message: "Message must be at least 15 characters.",
     })
-    .max(300, {
-      message: "Description can not be longer than 300 characters.",
+    .max(5000, {
+      message: "Message can not be longer than 5000 characters.",
     }),
 });
 

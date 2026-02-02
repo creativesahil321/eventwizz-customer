@@ -1,14 +1,33 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { toast } from "sonner";
 import { SearchParams } from "./types";
 import { LocationFormValues } from "./validations";
-import { useLocationStore } from "@/store/location.store";
 import { VenueLocation as ApiVenueLocation } from "@/types/api.types";
 import { locationService } from "@/services/vendor/locations/locations.service";
 import {
   LocationCreatePayload,
   LocationUpdatePayload,
 } from "@/services/vendor/locations/type";
+import { useSession } from "next-auth/react";
+
+// Constants
+const LOCATIONS_STALE_TIME = 10 * 60 * 1000; // 10 minutes
+
+// Helper: Get current location ID from session (no localStorage)
+export const useCurrentLocationId = (): number | null => {
+  const { data: session } = useSession();
+  const locationId = session?.user?.vendor_location_id;
+  return locationId ? Number(locationId) : null;
+};
+
+// API returns meta and links at top level (siblings of data)
+export interface LocationsMeta {
+  current_page: number;
+  last_page: number;
+  per_page: number;
+  total: number;
+  from?: number;
+  to?: number;
+}
 
 // Interface for the actual API response structure
 interface LocationApiResponse {
@@ -17,7 +36,16 @@ interface LocationApiResponse {
     default_venue_location?: ApiVenueLocation;
     data?: ApiVenueLocation[];
   };
+  meta?: LocationsMeta;
+  links?: { first: string; last: string; prev: string | null; next: string | null };
 }
+
+// Query result shape when we need pagination (data + meta)
+export interface LocationsQueryData {
+  data: ApiVenueLocation[];
+  meta?: LocationsMeta;
+}
+
 
 // Type guard to check if response is ApiVenueLocation[]
 function isLocationArray(value: unknown): value is ApiVenueLocation[] {
@@ -32,119 +60,75 @@ const normalizeLocation = (location: unknown): ApiVenueLocation => {
   return {
     ...loc,
     is_default: Boolean(loc.is_default),
+    status: loc.status !== undefined ? Boolean(loc.status) : undefined,
     deleted_at: loc.deleted_at || undefined,
   } as unknown as ApiVenueLocation;
 };
 
-// Shared function to fetch locations from API
-const fetchLocationsFromAPI = async (params?: SearchParams) => {
-  const serviceParams = params
+// Helper: Transform search params to service params
+const transformSearchParams = (params?: SearchParams) => {
+  return params
     ? {
-        page: params.page,
-        per_page: params.per_page,
-        search: params.search,
-        status: params.status,
-      }
+      page: params.page,
+      per_page: params.per_page,
+      search: params.search,
+      status: params.status,
+    }
     : undefined;
+};
 
-  const response = (await locationService.getLocations(
-    serviceParams
-  )) as unknown as LocationApiResponse;
+// Helper: Extract locations array from API response
+const extractLocationsFromResponse = (response: LocationApiResponse): ApiVenueLocation[] => {
+  if (!response?.data) return [];
 
-  // Handle the actual API response structure
-  if (response && response.data) {
-    // Check if it's the new structure with venue_locations array
-    if (
-      response.data.venue_locations &&
-      Array.isArray(response.data.venue_locations)
-    ) {
-      return response.data.venue_locations;
-    }
-    // Check if it's the old structure with direct array
-    else if (Array.isArray(response.data)) {
-      return response.data;
-    }
-    // Check if it's a paginated response
-    else if (response.data.data && Array.isArray(response.data.data)) {
-      return response.data.data;
-    }
+  if (response.data.venue_locations && Array.isArray(response.data.venue_locations)) {
+    return response.data.venue_locations;
   }
-
-  // Fallback: check if response itself is an array
-  if (isLocationArray(response)) {
-    return response;
+  if (response.data.data && Array.isArray(response.data.data)) {
+    return response.data.data;
   }
-
+  if (isLocationArray(response.data)) {
+    return response.data;
+  }
   return [];
 };
 
-// Function to get all locations with filters
+// Function to get all locations with filters (pure React Query, no Zustand store)
 export const useLocations = (
   params: SearchParams,
-  options?: { enabled?: boolean; forceRefresh?: boolean }
+  options?: { enabled?: boolean }
 ) => {
-  // Get locations from store
-  const { allLocations, getLocationId, setLocations, setSelectedLocation } =
-    useLocationStore();
-  const hasStoreLocations = allLocations && allLocations.length > 0;
-  const locationId = getLocationId();
+  // Include pagination and search in query key so URL-driven refetch works
+  const page = params?.page != null ? String(params.page) : undefined;
+  const per_page = params?.per_page != null ? String(params.per_page) : undefined;
+  const search = typeof params?.search === "string" ? params.search : undefined;
 
   return useQuery({
-    // Use a consistent query key with locationId for proper cache invalidation
-    queryKey: ["locations", locationId],
-    queryFn: async () => {
-      // If we have locations in store and not forcing refresh, return those
-      if (hasStoreLocations && !options?.forceRefresh) {
-        return allLocations;
-      }
+    queryKey: ["locations", page, per_page, search],
+    queryFn: async (): Promise<LocationsQueryData> => {
+      const serviceParams = transformSearchParams(params);
+      const response = (await locationService.getLocations(serviceParams)) as unknown as LocationApiResponse;
 
-      // Fetch from API
-      const response = (await locationService.getLocations(
-        params
-      )) as unknown as LocationApiResponse;
-      const locations = await fetchLocationsFromAPI(params);
+      const locations = extractLocationsFromResponse(response);
+      const normalizedLocations = locations.map((location) => normalizeLocation(location));
+      const meta = response?.meta;
 
-      // Process the full response to handle default location
-      if (response && response.data && response.data.default_venue_location) {
-        const defaultLocation = normalizeLocation(
-          response.data.default_venue_location
-        );
-
-        // Set the default location as selected if no location is currently selected
-        const currentStore = useLocationStore.getState();
-        if (!currentStore.selectedLocation) {
-          setSelectedLocation(defaultLocation);
-        }
-      }
-
-      // Update the store with all locations
-      setLocations(locations);
-
-      return locations;
+      return { data: normalizedLocations, meta };
     },
-    // Always return the store data as initialData
-    initialData: hasStoreLocations ? allLocations : undefined,
-    // Keep data fresh for 10 minutes unless force refreshed
-    staleTime: 10 * 60 * 1000,
-    // Skip network request completely if we have data and aren't forcing refresh
-    enabled:
-      options?.enabled !== false &&
-      (!hasStoreLocations || options?.forceRefresh === true),
+    staleTime: LOCATIONS_STALE_TIME,
+    enabled: options?.enabled !== false,
   });
 };
 
-// Simple hook to get all locations (for welcome page) - uses the same logic
-export const useLocationsQuery = () => {
-  return useLocations({}, { enabled: true });
+// Simple hook to get all locations (for welcome page and header)
+export const useLocationsQuery = (enabled: boolean = true) => {
+  return useLocations({}, { enabled });
 };
 
 // Function to get a single location by ID
 export const useLocation = (id: number | string) => {
-  const locationId = useLocationStore((state) => state.getLocationId());
-
   return useQuery({
-    // Include the current locationId in the query key for proper cache invalidation
-    queryKey: ["location", id, locationId],
+    queryKey: ["location", id],
     queryFn: () => locationService.getLocationById(id),
     enabled: !!id,
   });
@@ -153,12 +137,9 @@ export const useLocation = (id: number | string) => {
 // Function to create a new location
 export const useCreateLocation = () => {
   const queryClient = useQueryClient();
-  const { allLocations, setLocations, getLocationId } = useLocationStore();
-  const locationId = getLocationId();
 
   return useMutation({
     mutationFn: (data: LocationFormValues) => {
-      // Use is_default as boolean directly
       const payload: LocationCreatePayload = {
         name: data.name || "",
         city: data.city || "",
@@ -166,46 +147,13 @@ export const useCreateLocation = () => {
         slug: data.slug,
         email: data.email,
         contact_number: data.contact_number,
-        is_default: data.is_default === true, // Ensure it's boolean
+        is_default: data.is_default === true,
       };
       return locationService.createLocation(payload);
     },
-    onSuccess: async (response) => {
-      // Update the store and cache directly with the new location
-      if (response && response.data && allLocations) {
-        try {
-          // Get the newly created location from response
-          const newLocation = response.data;
-
-          // Normalize the location data
-          const normalizedLocation = normalizeLocation(newLocation);
-
-          // Update the Zustand store
-          const updatedLocations: ApiVenueLocation[] = [
-            ...allLocations,
-            normalizedLocation,
-          ];
-          setLocations(updatedLocations);
-
-          // Update the query cache
-          queryClient.setQueryData<ApiVenueLocation[]>(
-            ["locations", locationId],
-            updatedLocations
-          );
-        } catch (err) {
-          console.error("Error processing location data:", err);
-          // Fallback
-          queryClient.invalidateQueries({
-            queryKey: ["locations", locationId],
-          });
-        }
-      } else {
-        // Fallback: invalidate queries if we can't update directly
-        queryClient.invalidateQueries({ queryKey: ["locations", locationId] });
-      }
-    },
-    onError: (error: Error) => {
-      toast.error("Failed to create location: " + error.message);
+    onSuccess: async () => {
+      // Invalidate all location queries to refetch fresh data
+      queryClient.invalidateQueries({ queryKey: ["locations"] });
     },
   });
 };
@@ -213,93 +161,126 @@ export const useCreateLocation = () => {
 // Function to update a location
 export const useUpdateLocation = (id: number | string) => {
   const queryClient = useQueryClient();
-  const {
-    allLocations,
-    setLocations,
-    getLocationId,
-    selectedLocation,
-    setSelectedLocation,
-  } = useLocationStore();
-  const locationId = getLocationId();
 
   return useMutation({
     mutationFn: (data: LocationFormValues) => {
-      // Use is_default as boolean directly
       const payload: LocationUpdatePayload = {
-        name: data.name,
         city: data.city,
         address: data.address,
         slug: data.slug,
-        is_default: data.is_default === true, // Ensure it's boolean
+        is_default: data.is_default === true,
         contact_number: data.contact_number,
         email: data.email,
       };
       return locationService.updateLocation(id, payload);
     },
-    onSuccess: async (response) => {
-      // Update the store and cache directly with the updated location
-      if (response && response.data && allLocations) {
-        try {
-          // Get the updated location from response
-          const updatedLocation = response.data;
+    onSuccess: async () => {
+      // Invalidate all location queries to refetch fresh data
+      queryClient.invalidateQueries({ queryKey: ["locations"] });
+      queryClient.invalidateQueries({ queryKey: ["location", id] });
+    },
+  });
+};
 
-          // Normalize the location data
-          const normalizedLocation = normalizeLocation(updatedLocation);
+// Payload for toggle location status
+type ToggleStatusPayload = {
+  location_id: number | string;
+  status: "active" | "inactive";
+};
 
-          // Update in the array
-          const updatedLocations: ApiVenueLocation[] = allLocations.map(
-            (location) =>
-              location.id === normalizedLocation.id
-                ? normalizedLocation
-                : location
+// Function to toggle location status (active / inactive)  
+export const useToggleLocationStatus = () => {
+  const queryClient = useQueryClient();
+  const { data: session, update: updateSession } = useSession();
+
+  return useMutation({
+    mutationFn: (payload: ToggleStatusPayload) =>
+      locationService.toggleLocationStatus(payload),
+    // Optimistic update for instant UI feedback
+    onMutate: async (payload) => {
+      const locationId = typeof payload.location_id === "string"
+        ? parseInt(payload.location_id, 10)
+        : payload.location_id;
+      const newStatus = payload.status === "active";
+
+      // Cancel any outgoing refetches
+      await queryClient.cancelQueries({ queryKey: ["locations"] });
+
+      // Get current data
+      const previousLocations = queryClient.getQueriesData({ queryKey: ["locations"] });
+
+      // Optimistically update the status
+      queryClient.setQueriesData<ApiVenueLocation[] | { data: ApiVenueLocation[]; meta?: unknown }>(
+        { queryKey: ["locations"], exact: false },
+        (old) => {
+          if (!old) return old;
+
+          const locations = Array.isArray(old) ? old : old?.data || [];
+
+          // Update the status for the matching location
+          const updatedLocations = locations.map((loc: ApiVenueLocation) =>
+            loc.id === locationId
+              ? { ...loc, status: newStatus }
+              : loc
           );
 
-          // If this was the selected location, update it
-          if (selectedLocation?.id === normalizedLocation.id) {
-            setSelectedLocation(normalizedLocation);
-          }
-
-          // If this location was set as default, make sure other locations are not default
-          if (normalizedLocation.is_default === true) {
-            updatedLocations.forEach((loc) => {
-              if (loc.id !== normalizedLocation.id) {
-                loc.is_default = false;
-              }
-            });
-          }
-
-          // Update the Zustand store
-          setLocations(updatedLocations);
-
-          // Update the query cache
-          queryClient.setQueryData<ApiVenueLocation[]>(
-            ["locations", locationId],
-            updatedLocations
-          );
-          queryClient.setQueryData<ApiVenueLocation>(
-            ["location", id, locationId],
-            normalizedLocation
-          );
-        } catch (err) {
-          console.error("Error processing updated location:", err);
-          // Fallback
-          queryClient.invalidateQueries({
-            queryKey: ["locations", locationId],
-          });
-          queryClient.invalidateQueries({
-            queryKey: ["location", id, locationId],
-          });
+          return Array.isArray(old)
+            ? updatedLocations
+            : { ...old, data: updatedLocations };
         }
-      } else {
-        // Fallback: invalidate queries if we can't update directly
-        queryClient.invalidateQueries({ queryKey: ["locations", locationId] });
-        queryClient.invalidateQueries({
-          queryKey: ["location", id, locationId],
+      );
+
+      return { previousLocations, locationId, newStatus };
+    },
+    onSuccess: async (_response, _payload, context) => {
+      // Refetch locations to get backend updates (e.g., default switch)
+      const refetchPromise = queryClient.refetchQueries({
+        queryKey: ["locations"],
+        type: "active"
+      });
+
+      // If we toggled current location to inactive, wait for refetch then switch to new default
+      if (context?.newStatus === false &&
+        session?.user?.vendor_location_id &&
+        Number(session.user.vendor_location_id) === context.locationId) {
+
+        // Wait for locations to refetch
+        await refetchPromise;
+
+        // Get the refreshed locations data
+        const locationQueries = queryClient.getQueriesData<LocationsQueryData>({
+          queryKey: ["locations"]
         });
+
+        // Find the new default location from refreshed data
+        if (locationQueries && locationQueries.length > 0) {
+          const [, locationsData] = locationQueries[0];
+          if (!locationsData) return;
+
+          const locations = locationsData.data || [];
+          const newDefaultLocation = locations.find((loc: ApiVenueLocation) => loc.is_default);
+
+          // Update session to new default if found
+          if (newDefaultLocation && newDefaultLocation.id !== context.locationId) {
+            try {
+              await updateSession({
+                vendor_location_id: String(newDefaultLocation.id),
+              });
+            } catch (error) {
+              console.error("Failed to update session with new default location:", error);
+            }
+          }
+        }
       }
     },
-    onError: (error: Error) => {
-      toast.error("Failed to update location: " + error.message);
+    onError: (error: unknown, _payload, context) => {
+      // Rollback optimistic update on error
+      if (context?.previousLocations) {
+        context.previousLocations.forEach(([queryKey, data]) => {
+          queryClient.setQueryData(queryKey, data);
+        });
+      }
+      console.error("Failed to toggle location status:", error);
     },
   });
 };
@@ -307,82 +288,15 @@ export const useUpdateLocation = (id: number | string) => {
 // Function to delete a location
 export const useDeleteLocation = () => {
   const queryClient = useQueryClient();
-  const {
-    allLocations,
-    setLocations,
-    selectedLocation,
-    setSelectedLocation,
-    getDefaultLocation,
-  } = useLocationStore();
-  const locationId = useLocationStore((state) => state.getLocationId());
 
   return useMutation({
     mutationFn: (id: number | string) => locationService.deleteLocation(id),
-    onSuccess: async (response, deletedId) => {
-      if (!allLocations || allLocations.length === 0) {
-        return;
-      }
-
-      try {
-        // Convert ID to numeric for consistency
-        const numericId =
-          typeof deletedId === "string" ? parseInt(deletedId) : deletedId;
-
-        // Remove from array
-        const updatedLocations: ApiVenueLocation[] = allLocations.filter(
-          (location) => location.id !== numericId
-        );
-
-        // Check if we deleted the currently selected location
-        const wasSelectedLocationDeleted = selectedLocation?.id === numericId;
-
-        // If we deleted the selected location, select a new one
-        if (wasSelectedLocationDeleted && updatedLocations.length > 0) {
-          // Find a new location to select (default or first available)
-          const newSelectedLocation =
-            getDefaultLocation() || updatedLocations[0];
-
-          // Update selected location in store
-          setSelectedLocation(newSelectedLocation);
-
-          // Also update localStorage
-          if (typeof window !== "undefined") {
-            localStorage.setItem(
-              "vendor_location_id",
-              String(newSelectedLocation.id)
-            );
-          }
-
-          // Location data is now handled by Zustand store and TanStack Query
-          // No need to update NextAuth session
-        }
-
-        // Update the Zustand store
-        setLocations(updatedLocations);
-
-        // Update the query cache
-        queryClient.setQueryData<ApiVenueLocation[]>(
-          ["locations", locationId],
-          updatedLocations
-        );
-
-        // Remove the individual location data
-        queryClient.removeQueries({
-          queryKey: ["location", deletedId, locationId],
-        });
-
-        // Invalidate any queries that might depend on location data
-        queryClient.invalidateQueries({ queryKey: ["events"] });
-        queryClient.invalidateQueries({ queryKey: ["dashboard-stats"] });
-      } catch (err) {
-        console.error("Error processing location deletion:", err);
-        // Fallback: invalidate all location-related queries
-        queryClient.invalidateQueries({ queryKey: ["locations"] });
-        queryClient.invalidateQueries({ queryKey: ["location"] });
-      }
-    },
-    onError: (error: Error) => {
-      toast.error("Failed to delete location: " + error.message);
+    onSuccess: async (_response, deletedId) => {
+      // Invalidate all location queries to refetch fresh data
+      queryClient.invalidateQueries({ queryKey: ["locations"] });
+      queryClient.removeQueries({ queryKey: ["location", deletedId] });
+      queryClient.invalidateQueries({ queryKey: ["events"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard-stats"] });
     },
   });
 };

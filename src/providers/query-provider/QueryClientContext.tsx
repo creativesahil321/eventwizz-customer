@@ -13,7 +13,7 @@ export function useSharedQueryClient() {
   const context = useContext(QueryClientContext);
   if (!context) {
     console.warn(
-      "useSharedQueryClient: No QueryClientProvider found. This may cause issues with nested QueryProviders. Consider updating your code to use only the RootQueryProvider."
+      "useSharedQueryClient: No QueryClientProvider found. This may cause issues with nested QueryProviders. Consider updating your code to use only the RootQueryProvider.",
     );
 
     // Create a fallback client instead of throwing an error
@@ -28,7 +28,7 @@ export function useSharedQueryClient() {
           refetchOnReconnect: true,
         },
         mutations: {
-          retry: 1,
+          retry: false, // Don't retry mutations - failures should be handled explicitly
         },
       },
     });
@@ -53,13 +53,13 @@ export function QueryClientProvider({
             refetchOnReconnect: true,
           },
           mutations: {
-            retry: 1,
+            retry: false, // Don't retry mutations - failures should be handled explicitly
             onError: (error) => {
               console.error("Mutation error:", error);
             },
           },
         },
-      })
+      }),
   );
 
   return (

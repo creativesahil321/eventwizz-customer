@@ -18,6 +18,8 @@ import {
   RescheduleDataResponse,
   RescheduleBookingPayload,
   RescheduleBookingResponse,
+  BookingPaymentPayload,
+  BookingPaymentResponse,
 } from "./type";
 // Toast notifications are handled at root level by API client interceptor
 
@@ -252,6 +254,47 @@ export const useRescheduleBooking = () => {
           queryKey: bookingsKeys.lists(),
         });
       }
+    },
+  });
+};
+
+/**
+ * Hook to process booking payment
+ * Handles payment gateway redirect when payment is required
+ */
+export const useBookingPayment = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation<
+    BookingPaymentResponse,
+    Error,
+    BookingPaymentPayload
+  >({
+    mutationFn: (payload) => bookingsService.processBookingPayment(payload),
+    onSuccess: (response, variables) => {
+      if (response.status && response.data?.redirect_url) {
+        console.log("🔄 Redirecting to payment gateway:", {
+          gateway: response.data.gateway,
+          bookingId: response.data.booking_id,
+          paymentId: response.data.payment_id,
+          redirectUrl: response.data.redirect_url,
+        });
+        // Redirect to payment gateway
+        window.location.href = response.data.redirect_url;
+        return; // Prevent further execution if redirecting
+      }
+
+      // Invalidate booking details to refetch updated data
+      queryClient.invalidateQueries({
+        queryKey: bookingsKeys.bookingDetail(variables.booking_id),
+      });
+      queryClient.refetchQueries({
+        queryKey: bookingsKeys.bookingDetail(variables.booking_id),
+        type: "active",
+      });
+      queryClient.invalidateQueries({
+        queryKey: bookingsKeys.lists(),
+      });
     },
   });
 };

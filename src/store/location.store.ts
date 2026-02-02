@@ -1,12 +1,16 @@
 import { create } from "zustand";
-import { persist } from "zustand/middleware";
+import { persist, createJSONStorage } from "zustand/middleware";
 import { immer } from "zustand/middleware/immer";
 import { VenueLocation } from "@/types/api.types";
+
+// Version for data migration - increment when VenueLocation structure changes
+const LOCATION_STORAGE_VERSION = 2;
 
 interface LocationState {
   selectedLocation: VenueLocation | null;
   allLocations: VenueLocation[];
   isLoading: boolean;
+  _version?: number; // Internal version tracking
 
   // Actions
   setSelectedLocation: (location: VenueLocation) => void;
@@ -26,17 +30,20 @@ export const useLocationStore = create<LocationState>()(
       selectedLocation: null,
       allLocations: [],
       isLoading: false,
+      _version: LOCATION_STORAGE_VERSION,
 
       // Actions
       setSelectedLocation: (location) =>
         set((state) => {
-          // Ensure is_default is boolean and preserve all fields
+          // Ensure is_default and status are boolean and preserve all fields
           const normalizedLocation = {
             ...location,
             is_default: Boolean(location.is_default),
+            status: location.status !== undefined ? Boolean(location.status) : true,
           };
 
           state.selectedLocation = normalizedLocation;
+          state._version = LOCATION_STORAGE_VERSION;
 
           // Also update localStorage for backward compatibility
           if (typeof window !== "undefined" && normalizedLocation?.id) {
@@ -49,13 +56,15 @@ export const useLocationStore = create<LocationState>()(
 
       setLocations: (locations) =>
         set((state) => {
-          // Ensure is_default is boolean in all locations and preserve all fields
+          // Ensure is_default and status are boolean in all locations and preserve all fields
           const normalizedLocations = locations.map((loc) => ({
             ...loc,
             is_default: Boolean(loc.is_default),
+            status: loc.status !== undefined ? Boolean(loc.status) : true,
           }));
 
           state.allLocations = normalizedLocations;
+          state._version = LOCATION_STORAGE_VERSION;
 
           // Set default location if none selected
           if (!state.selectedLocation && normalizedLocations.length > 0) {
@@ -80,6 +89,7 @@ export const useLocationStore = create<LocationState>()(
           selectedLocation: null,
           allLocations: [],
           isLoading: false,
+          _version: LOCATION_STORAGE_VERSION,
         }),
 
       // Helper methods
@@ -107,10 +117,29 @@ export const useLocationStore = create<LocationState>()(
     })),
     {
       name: "location-storage",
+      version: LOCATION_STORAGE_VERSION,
+      storage: createJSONStorage(() => localStorage),
       partialize: (state) => ({
         selectedLocation: state.selectedLocation,
         allLocations: state.allLocations,
+        _version: state._version,
       }),
+      // Migration function - clears old data if version doesn't match
+      migrate: (persistedState: unknown, version: number) => {
+        if (version !== LOCATION_STORAGE_VERSION) {
+          // Version mismatch - return fresh state to force re-fetch
+          console.log(
+            `Location storage version mismatch (stored: ${version}, current: ${LOCATION_STORAGE_VERSION}). Clearing cached data.`
+          );
+          return {
+            selectedLocation: null,
+            allLocations: [],
+            isLoading: false,
+            _version: LOCATION_STORAGE_VERSION,
+          };
+        }
+        return persistedState as LocationState;
+      },
     }
   )
 );

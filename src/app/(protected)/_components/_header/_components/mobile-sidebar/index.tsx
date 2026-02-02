@@ -1,6 +1,6 @@
 "use client";
 
-import { memo, useState } from "react";
+import { memo, useState, useMemo } from "react";
 import { MenuItemProps } from "@/config/menus/types";
 import MobileLogo from "./mobile-logo";
 import { Button } from "@/components/ui/button";
@@ -14,7 +14,7 @@ import {
 import { AlignLeft } from "lucide-react";
 import MobileMenuItem from "./mobile-menu-item";
 import { useSession } from "next-auth/react";
-import { useLocationStore } from "@/store/location.store";
+import { useLocationsQuery } from "@/app/(protected)/vendor/venue-locations/_lib/queries";
 import { LocationSelector } from "@/components/location-selector";
 
 interface MobileSidebarProps {
@@ -24,9 +24,17 @@ interface MobileSidebarProps {
 const MobileSidebar: React.FC<MobileSidebarProps> = memo(({ menus = [] }) => {
   const [open, setOpen] = useState(false);
   const { data: session } = useSession();
-  const { allLocations } = useLocationStore();
   const isVendor = session?.user?.account_type === "vendor";
-  const hasMultipleLocations = allLocations.length > 1;
+
+  // Fetch locations to check count (only for vendors)
+  // IMPORTANT: Only fetch if user is vendor to avoid 403 errors on customer pages
+  const { data: locationsData } = useLocationsQuery(isVendor);
+  const locationsList = useMemo(() => {
+    if (!locationsData) return [];
+    if (Array.isArray(locationsData)) return locationsData;
+    return locationsData.data || [];
+  }, [locationsData]);
+  const hasMultipleLocations = locationsList.length > 1;
 
   const handleClose = () => {
     setTimeout(() => {

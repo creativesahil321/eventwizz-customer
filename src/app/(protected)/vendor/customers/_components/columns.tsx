@@ -9,9 +9,9 @@ import {
   UserPlus,
   UserRoundX,
   RotateCcw,
-  Trash2,
 } from "lucide-react";
 import { formatDate } from "@/lib/utils";
+import { createSelectColumn } from "@/components/data-table/data-table-column-select";
 
 // Map of status to CSS color variables
 const STATUS_COLORS = {
@@ -44,6 +44,7 @@ export function getColumns({
   currentFilter = "all",
 }: GetColumnsProps): ColumnDef<Customer>[] {
   return [
+    createSelectColumn<Customer>(),
     {
       accessorKey: "first_name",
       header: ({ column }) => (
@@ -194,25 +195,17 @@ export function getColumns({
           customer.deleted_at !== null && customer.deleted_at !== undefined;
 
         if (isViewingDeleted || hasDeletedAt) {
-          // Show restore and permanent delete buttons for deleted customers
+          // Show only restore button for deleted customers with dynamic theme
           return (
             <>
               <nav className="flex space-x-3">
                 <Button
                   onClick={() => setRowAction({ row, type: "restore" })}
                   variant="default"
+                  className="bg-green-600 hover:bg-green-700 text-white border-green-600 hover:border-green-700 dark:bg-green-500 dark:hover:bg-green-600 dark:text-white dark:border-green-500"
                   title="Restore Customer"
                 >
                   <RotateCcw size={16} />
-                </Button>
-                <Button
-                  onClick={() =>
-                    setRowAction({ row, type: "permanent-delete" })
-                  }
-                  variant="destructive"
-                  title="Permanent Delete"
-                >
-                  <Trash2 size={16} />
                 </Button>
               </nav>
             </>

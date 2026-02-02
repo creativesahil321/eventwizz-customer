@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -27,19 +27,19 @@ import { LocationFormValues, locationSchema } from "../_lib/validations";
 import { useCreateLocation } from "../_lib/queries";
 import { slugify } from "@/lib/utils";
 import { useSession } from "next-auth/react";
-import { useLocationStore } from "@/store/location.store";
 import GoogleLocationSearch from "@/app/(on-boarding)/on-boarding/_components/steps/step-11/google-location-search";
 import { env } from "@/env";
 import { fetchLocationDetails } from "@/app/(on-boarding)/on-boarding/_components/steps/step-11/_lib/actions";
+import { toast } from "sonner";
 
 export default function CreateLocationDialog() {
   const [open, setOpen] = React.useState(false);
+  const [isAddressValid, setIsAddressValid] = useState(false);
+  const addressPlaceIdRef = useRef<string | null>(null);
   const { mutate: createLocation, isPending } = useCreateLocation();
   const { data: session } = useSession();
-  const { selectedLocation } = useLocationStore();
 
-  // Get the venue name from the selected location or session
-  const venueName = selectedLocation?.name || "Venue";
+  const venueName = session?.user?.name || "Venue";
 
   const form = useForm({
     resolver: zodResolver(locationSchema) as Resolver<LocationFormValues>,
@@ -52,16 +52,48 @@ export default function CreateLocationDialog() {
     },
   });
 
-  const onSubmit: SubmitHandler<LocationFormValues> = (data) => {
-    // Generate name from venue name
-    const locationName = venueName;
+  const handleAddressClear = React.useCallback(() => {
+    form.setValue("address", "");
+    form.setValue("city", "");
+    form.setValue("contact_number", "");
+    addressPlaceIdRef.current = null;
+    setIsAddressValid(false);
+  }, [form]);
 
-    // Generate slug from city name if not provided
+  const handleOpenChange = React.useCallback(
+    (next: boolean) => {
+      setOpen(next);
+      if (!next) {
+        addressPlaceIdRef.current = null;
+        setIsAddressValid(false);
+        form.reset({
+          address: "",
+          city: "",
+          email: "",
+          contact_number: "",
+          is_default: false,
+        });
+      }
+    },
+    [form],
+  );
+
+  const onSubmit: SubmitHandler<LocationFormValues> = (data) => {
+    const address = (data.address ?? "").trim();
+    if (address && !addressPlaceIdRef.current) {
+      toast.error("Please select a location from the suggestions", {
+        description:
+          "Google didn't find that location. Type to search and choose a suggested UK address.",
+        duration: 5000,
+      });
+      return;
+    }
+
+    const locationName = venueName;
     if (!data.slug) {
       data.slug = slugify(data.city);
     }
 
-    // Add the name to the data
     const completeData = {
       ...data,
       name: locationName,
@@ -69,14 +101,14 @@ export default function CreateLocationDialog() {
 
     createLocation(completeData, {
       onSuccess: () => {
-        setOpen(false);
         form.reset();
+        handleOpenChange(false);
       },
     });
   };
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>
         <Button variant="event-primary" size="sm" className="gap-1">
           <Plus className="h-3.5 w-3.5" />
@@ -98,16 +130,24 @@ export default function CreateLocationDialog() {
               name="address"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Address</FormLabel>
+                  <FormLabel>
+                    Address <span className="text-destructive">*</span>
+                  </FormLabel>
                   <FormControl>
                     <GoogleLocationSearch
                       apiKey={env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}
                       value={field.value || ""}
-                      onChange={(value) => field.onChange(value)}
-                      onSelect={(placeId) =>
-                        fetchLocationDetails(form, placeId)
-                      }
-                      placeholder="Search for a location..."
+                      onChange={(value) => {
+                        field.onChange(value);
+                        setIsAddressValid(false);
+                      }}
+                      onSelect={(placeId) => {
+                        addressPlaceIdRef.current = placeId;
+                        setIsAddressValid(true);
+                        fetchLocationDetails(form, placeId);
+                      }}
+                      onClear={handleAddressClear}
+                      placeholder="Type to search for a UK address or location..."
                     />
                   </FormControl>
                   <FormMessage />
@@ -119,12 +159,16 @@ export default function CreateLocationDialog() {
               name="city"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>City</FormLabel>
+                  <FormLabel>
+                    City <span className="text-destructive">*</span>
+                  </FormLabel>
                   <FormControl>
                     <Input
-                      placeholder="e.g. London"
+                      placeholder="Select an address above to auto-fill"
                       {...field}
                       autoComplete="off"
+                      readOnly
+                      className="bg-muted cursor-not-allowed"
                     />
                   </FormControl>
                   <FormMessage />
@@ -137,7 +181,9 @@ export default function CreateLocationDialog() {
               name="email"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Email</FormLabel>
+                  <FormLabel>
+                    Email <span className="text-destructive">*</span>
+                  </FormLabel>
                   <FormControl>
                     <Input
                       placeholder="e.g. venue@example.com"
@@ -155,7 +201,9 @@ export default function CreateLocationDialog() {
               name="contact_number"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Contact Number</FormLabel>
+                  <FormLabel>
+                    Contact Number <span className="text-destructive">*</span>
+                  </FormLabel>
                   <FormControl>
                     <Input
                       type="tel"
@@ -164,7 +212,10 @@ export default function CreateLocationDialog() {
                       autoComplete="off"
                       onChange={(e) => {
                         // Only allow numbers, spaces, dashes, plus signs, and parentheses
-                        const value = e.target.value.replace(/[^\d\s\-+()]/g, "");
+                        const value = e.target.value.replace(
+                          /[^\d\s\-+()]/g,
+                          "",
+                        );
                         e.target.value = value;
                         field.onChange(value);
                       }}
@@ -178,14 +229,14 @@ export default function CreateLocationDialog() {
               <Button
                 type="button"
                 variant="event-outline"
-                onClick={() => setOpen(false)}
+                onClick={() => handleOpenChange(false)}
               >
                 Cancel
               </Button>
               <Button
                 variant="event-primary"
                 type="submit"
-                disabled={isPending}
+                disabled={isPending || !isAddressValid}
               >
                 {isPending ? "Saving..." : "Save Location"}
               </Button>

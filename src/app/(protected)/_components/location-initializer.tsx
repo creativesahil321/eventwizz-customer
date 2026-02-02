@@ -11,9 +11,7 @@ export function LocationInitializer() {
   const userAccountType = session?.user?.account_type || accountType;
   const isVendor = userAccountType === "vendor";
 
-  // Use TanStack Query to fetch locations - this will automatically
-  // populate the Zustand store and set the default location
-  // Only enable the query for vendor users to prevent vendor endpoint access by admin and other user types
+  // Fetch locations on mount for vendors only (pure React Query, no store)
   useLocations({}, { enabled: isVendor });
 
   return <LocationInitializerProvider>{null}</LocationInitializerProvider>;

@@ -185,6 +185,25 @@ export interface BookingEventDate {
   tickets: BookingTicketDetails[];
   drinks: BookingDrinkDetails[];
   addons?: BookingAddOnsData;
+  reschedule_requests?: Array<{
+    id: number;
+    booking_id: number;
+    bookings_date_id: number;
+    event_date_id: number;
+    event_date: string;
+    payment_method: string;
+    unpaid_amount: number;
+    table_details: Array<{
+      event_date_table_id: number;
+      allocated_seat: number[];
+      table_size: number;
+      price_per_person: number;
+      total: number;
+    }>;
+    drink_details: unknown[];
+    created_at: string;
+    updated_at: string;
+  }>;
 }
 
 /**
@@ -545,5 +564,82 @@ export interface RescheduleBookingResponse {
   status: boolean;
   message: string;
   data?: RescheduleBookingResponseData;
+  errors?: string[];
+}
+
+/**
+ * Payment date add-on table
+ */
+export interface PaymentDateAddOnTable {
+  booking_date_table_id: number;
+  event_date_table_id?: number; // Optional, may not be needed
+}
+
+/**
+ * Payment date add-on ticket
+ */
+export interface PaymentDateAddOnTicket {
+  booking_date_ticket_id: number;
+}
+
+/**
+ * Payment date add-ons
+ */
+export interface PaymentDateAddOns {
+  tables?: PaymentDateAddOnTable[];
+  tickets?: PaymentDateAddOnTicket[];
+}
+
+/**
+ * Payment date entry
+ */
+export interface PaymentDate {
+  booking_date_id: number;
+  add_ons?: PaymentDateAddOns;
+}
+
+/**
+ * Payload for booking payment API
+ */
+export interface BookingPaymentPayload {
+  booking_id: number;
+  payment_gateway: number; // Payment gateway ID (1 = stripe, etc.)
+  dates: PaymentDate[];
+}
+
+/**
+ * Payment details in response
+ */
+export interface BookingPaymentDetails {
+  payment_id: number;
+  amount: string;
+  currency: string;
+  status: string;
+  transaction_id: string;
+}
+
+/**
+ * Response data from booking payment API
+ */
+export interface BookingPaymentResponseData {
+  payment_id: number;
+  booking_id: number;
+  total_amount: number;
+  pending_amount: number;
+  add_ons_amount: number;
+  booking_date_ids: number[];
+  date_wise_pending: Record<string, number>;
+  gateway: string;
+  redirect_url: string;
+  payment_details: BookingPaymentDetails;
+}
+
+/**
+ * Complete response type for booking payment operations
+ */
+export interface BookingPaymentResponse {
+  status: boolean;
+  message: string;
+  data?: BookingPaymentResponseData;
   errors?: string[];
 }

@@ -479,7 +479,13 @@ apiClient.interceptors.response.use(
           }
           break;
         case 404:
-          // Handle not found
+          // Handle not found - show error toast with message from response
+          const notFoundData = error.response.data as ApiErrorResponse;
+          if (notFoundData?.message && !isLogoutInProgress) {
+            safeToast.error(notFoundData.message);
+          } else if (!isLogoutInProgress) {
+            safeToast.error("Resource not found");
+          }
           break;
         case 422:
           // Handle validation errors

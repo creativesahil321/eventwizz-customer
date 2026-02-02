@@ -101,7 +101,7 @@ export function SitePreview({ formValues }: Readonly<SitePreviewProps>) {
         latitude={0}
       />
       <SubscribeSection />
-      <FooterSection />
+      <FooterSection copyright={formValues.copyright} />
     </div>
   );
 }

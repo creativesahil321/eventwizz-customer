@@ -212,7 +212,6 @@ export default function AdjustBookingContent({
       onSuccess: () => {
         setRescheduleModalOpen(false);
         setSelectedDateForReschedule(null);
-        toast.success("Booking date rescheduled successfully");
       },
       onError: (error) => {
         toast.error(error.message || "Failed to reschedule booking date");
@@ -746,7 +745,10 @@ export default function AdjustBookingContent({
                                   <div className="mb-1">
                                     <div className="flex items-center gap-2 flex-wrap">
                                       <p className="font-semibold text-sm text-muted-foreground line-through">
-                                        {dateInfo.parent_booking_date.date}
+                                        {typeof dateInfo.parent_booking_date ===
+                                        "string"
+                                          ? dateInfo.parent_booking_date
+                                          : dateInfo.parent_booking_date.date}
                                       </p>
                                       <RotateCcw className="h-3 w-3 text-amber-600" />
                                       <p className="font-semibold text-sm text-foreground">
@@ -1619,56 +1621,58 @@ export default function AdjustBookingContent({
                                   )}
 
                                   {/* Show Parent Booking Date Info for Rescheduled Bookings */}
-                                  {dateInfo.parent_booking_date && (
-                                    <div className="mt-4 pt-4 border-t">
-                                      <div className="flex items-center gap-2 mb-3">
-                                        <RotateCcw className="h-4 w-4 text-amber-600" />
-                                        <span className="text-xs font-semibold text-amber-900">
-                                          Original Booking (Before Reschedule)
-                                        </span>
-                                      </div>
-                                      <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 space-y-2">
-                                        <p className="text-sm font-medium text-amber-900">
-                                          {dateInfo.parent_booking_date.date}
-                                        </p>
-                                        <div className="grid grid-cols-3 gap-2 text-xs">
-                                          <div>
-                                            <p className="text-amber-700">
-                                              Total
-                                            </p>
-                                            <p className="font-semibold text-amber-900">
-                                              {formatAmount(
-                                                dateInfo.parent_booking_date
-                                                  .total_amount
-                                              )}
-                                            </p>
-                                          </div>
-                                          <div>
-                                            <p className="text-amber-700">
-                                              Paid
-                                            </p>
-                                            <p className="font-semibold text-green-600">
-                                              {formatAmount(
-                                                dateInfo.parent_booking_date
-                                                  .paid_amount
-                                              )}
-                                            </p>
-                                          </div>
-                                          <div>
-                                            <p className="text-amber-700">
-                                              Pending
-                                            </p>
-                                            <p className="font-semibold text-red-600">
-                                              {formatAmount(
-                                                dateInfo.parent_booking_date
-                                                  .pending_payment
-                                              )}
-                                            </p>
+                                  {dateInfo.parent_booking_date &&
+                                    typeof dateInfo.parent_booking_date ===
+                                      "object" && (
+                                      <div className="mt-4 pt-4 border-t">
+                                        <div className="flex items-center gap-2 mb-3">
+                                          <RotateCcw className="h-4 w-4 text-amber-600" />
+                                          <span className="text-xs font-semibold text-amber-900">
+                                            Original Booking (Before Reschedule)
+                                          </span>
+                                        </div>
+                                        <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 space-y-2">
+                                          <p className="text-sm font-medium text-amber-900">
+                                            {dateInfo.parent_booking_date.date}
+                                          </p>
+                                          <div className="grid grid-cols-3 gap-2 text-xs">
+                                            <div>
+                                              <p className="text-amber-700">
+                                                Total
+                                              </p>
+                                              <p className="font-semibold text-amber-900">
+                                                {formatAmount(
+                                                  dateInfo.parent_booking_date
+                                                    .total_amount
+                                                )}
+                                              </p>
+                                            </div>
+                                            <div>
+                                              <p className="text-amber-700">
+                                                Paid
+                                              </p>
+                                              <p className="font-semibold text-green-600">
+                                                {formatAmount(
+                                                  dateInfo.parent_booking_date
+                                                    .paid_amount
+                                                )}
+                                              </p>
+                                            </div>
+                                            <div>
+                                              <p className="text-amber-700">
+                                                Pending
+                                              </p>
+                                              <p className="font-semibold text-red-600">
+                                                {formatAmount(
+                                                  dateInfo.parent_booking_date
+                                                    .pending_payment
+                                                )}
+                                              </p>
+                                            </div>
                                           </div>
                                         </div>
                                       </div>
-                                    </div>
-                                  )}
+                                    )}
                                 </CardContent>
                               </Card>
                             </div>

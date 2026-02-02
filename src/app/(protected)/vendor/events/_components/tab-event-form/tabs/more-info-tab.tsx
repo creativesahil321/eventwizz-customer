@@ -32,7 +32,7 @@ export default function MoreInfoTab() {
 
   // Address search function ref for map integration
   const addressSearchFunctionRef = useRef<((address: string) => void) | null>(
-    null
+    null,
   );
   // Get event_id from global form
   const getEventId = (): number => {
@@ -88,7 +88,7 @@ export default function MoreInfoTab() {
     (fieldName: string) => {
       setActiveField?.(fieldName);
     },
-    [setActiveField]
+    [setActiveField],
   );
 
   // Initialize URL values from global form on mount
@@ -200,7 +200,7 @@ export default function MoreInfoTab() {
           });
           setActiveField("brochure_pdf");
           const brochureElement = document.querySelector(
-            '[name="brochure_pdf"]'
+            '[name="brochure_pdf"]',
           );
           if (brochureElement) {
             brochureElement.scrollIntoView({
@@ -225,7 +225,7 @@ export default function MoreInfoTab() {
           setActiveField("event_address");
           // Scroll to event address field
           const addressSection = document.querySelector(
-            '[data-event-location-section]'
+            "[data-event-location-section]",
           );
           if (addressSection) {
             addressSection.scrollIntoView({
@@ -235,7 +235,7 @@ export default function MoreInfoTab() {
           }
           // Try to focus the address input
           const addressElement = document.querySelector(
-            '[name="event_address"]'
+            '[name="event_address"]',
           );
           if (addressElement) {
             (addressElement as HTMLElement).focus();
@@ -253,7 +253,7 @@ export default function MoreInfoTab() {
           // Prioritize event_address and brochure_pdf errors
           const priorityFields = ["event_address", "brochure_pdf"];
           const firstPriorityField = priorityFields.find((field) =>
-            errorFields.includes(field)
+            errorFields.includes(field),
           );
           const firstErrorField = firstPriorityField || errorFields[0];
 
@@ -263,7 +263,7 @@ export default function MoreInfoTab() {
             // Handle scrolling based on field type
             if (firstErrorField === "event_address") {
               const addressSection = document.querySelector(
-                '[data-event-location-section]'
+                "[data-event-location-section]",
               );
               if (addressSection) {
                 addressSection.scrollIntoView({
@@ -275,7 +275,7 @@ export default function MoreInfoTab() {
 
             // Try to find and focus the field with an error
             const errorElement = document.querySelector(
-              `[name="${firstErrorField}"]`
+              `[name="${firstErrorField}"]`,
             );
             if (errorElement) {
               (errorElement as HTMLElement).focus();
@@ -322,7 +322,7 @@ export default function MoreInfoTab() {
         setIsLoading(false);
       }
     },
-    [brochurePdfUrl, form, globalForm, save, setActiveField]
+    [brochurePdfUrl, form, globalForm, save, setActiveField],
   );
 
   return (
@@ -382,7 +382,7 @@ export default function MoreInfoTab() {
                                 form.setValue("remove_brochure_pdf", true);
                                 globalForm.setValue(
                                   "stepSix.remove_brochure_pdf",
-                                  true
+                                  true,
                                 );
                                 handleBrochureUpload(null);
                               }}
@@ -459,7 +459,7 @@ export default function MoreInfoTab() {
                                 form.setValue("remove_brochure_pdf_2", true);
                                 globalForm.setValue(
                                   "stepSix.remove_brochure_pdf_2",
-                                  true
+                                  true,
                                 );
                                 handleBrochureUpload2(null);
                               }}
@@ -538,7 +538,7 @@ export default function MoreInfoTab() {
                                 form.setValue("remove_faq_pdf", true);
                                 globalForm.setValue(
                                   "stepSix.remove_faq_pdf",
-                                  true
+                                  true,
                                 );
                                 handleFaqUpload(null);
                               }}

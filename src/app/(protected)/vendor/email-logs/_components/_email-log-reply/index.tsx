@@ -17,15 +17,22 @@ interface MailDialogProps
   extends React.ComponentPropsWithoutRef<typeof Dialog> {
   email: EmailLog | null;
   showTrigger?: boolean;
+  onSuccess?: () => void;
 }
 
 export function EmailReplyDialog({
   email,
   showTrigger = true,
   onOpenChange,
+  onSuccess,
   ...props
 }: MailDialogProps) {
   const fullName = email?.role;
+
+  const handleSuccess = () => {
+    onOpenChange?.(false);
+    onSuccess?.();
+  };
 
   return (
     <Dialog onOpenChange={onOpenChange} {...props}>
@@ -43,7 +50,7 @@ export function EmailReplyDialog({
             <span>Reply to </span>
             <span className="capitalize">{fullName}</span>
           </DialogTitle>
-          {email && <MailForm email={email} />}
+          {email && <MailForm email={email} onSuccess={handleSuccess} />}
         </DialogHeader>
       </DialogContent>
     </Dialog>

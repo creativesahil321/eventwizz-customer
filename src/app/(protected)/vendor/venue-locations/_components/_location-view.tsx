@@ -15,7 +15,6 @@ import {
   MapPin,
   Mail,
   Phone,
-  Globe,
   Calendar,
 } from "lucide-react";
 import { formatDate } from "@/lib/utils";
@@ -112,16 +111,6 @@ export default function ViewLocationDialog({
                 <p className="text-sm font-medium">Contact Number</p>
                 <p className="text-sm text-muted-foreground break-words">
                   {location.contact_number || "No contact number provided"}
-                </p>
-              </div>
-            </div>
-
-            <div className="flex items-start gap-3">
-              <Globe className="h-4 w-4 text-muted-foreground mt-1 shrink-0" />
-              <div className="min-w-0 flex-1">
-                <p className="text-sm font-medium">Slug</p>
-                <p className="text-sm text-muted-foreground break-words">
-                  {location.slug || "No slug provided"}
                 </p>
               </div>
             </div>

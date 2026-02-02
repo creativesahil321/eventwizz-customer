@@ -1,54 +1,50 @@
 "use client";
 
-import React, { useState } from "react";
-import { Button } from "@/components/ui/button";
-import { RefreshCw, Search } from "lucide-react";
+import React, { useState, useEffect } from "react";
+import { Search } from "lucide-react";
 import VenueLocationsDataTable from "./_components/locations-data-table";
 import dynamic from "next/dynamic";
 import { Shell } from "@/components/shell";
 import { useLocations } from "./_lib/queries";
 import { SearchParams } from "./_lib/types";
 import { Input } from "@/components/ui/input";
+import { useDebounce } from "@/hooks/data-table/use-debounce";
+import { useQueryState, parseAsInteger } from "nuqs";
 
 // Dynamic import of the location create dialog
 const CreateLocationDialog = dynamic(
   () => import("./_components/_location-create"),
   {
     ssr: false,
-  }
+  },
 );
 
-// Simple wrapper component for the dialog
+// Simple wrapper component for the dialog.
 function CreateLocationButton() {
   return <CreateLocationDialog />;
 }
 
 export default function VenueLocationsPage() {
   const [globalFilterValue, setGlobalFilterValue] = useState("");
-  const [forceRefresh, setForceRefresh] = React.useState(false);
+  const [, setPage] = useQueryState("page", parseAsInteger.withDefault(1));
 
-  // Default search params
+  // Debounce search (same as booking history / customers)
+  const debouncedSearch = useDebounce(globalFilterValue, 500);
+
+  // Reset page to 1 when search changes
+  useEffect(() => {
+    setPage(1);
+  }, [debouncedSearch, setPage]);
+
   const searchParams: SearchParams = {
     page: "1",
     per_page: "30",
-    search: globalFilterValue,
+    search: debouncedSearch,
   };
 
-  // Use the store data first, only fetch if not available or forcing refresh
-  const { isLoading } = useLocations(searchParams, {
+  const { isLoading, isFetching } = useLocations(searchParams, {
     enabled: true,
-    forceRefresh,
   });
-
-  // Reset force refresh after data fetch
-  if (forceRefresh && !isLoading) {
-    setForceRefresh(false);
-  }
-
-  // Handle refresh button click
-  const handleRefresh = () => {
-    setForceRefresh(true);
-  };
 
   return (
     <section className="page text-black min-w-0">
@@ -73,20 +69,10 @@ export default function VenueLocationsPage() {
                     value={globalFilterValue}
                     onChange={(e) => setGlobalFilterValue(e.target.value)}
                     className="pl-8 w-full"
+                    disabled={isFetching}
                   />
                 </div>
-                <div className="flex items-center gap-2">
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    className="h-8 w-8"
-                    onClick={handleRefresh}
-                    disabled={isLoading}
-                  >
-                    <RefreshCw
-                      className={`h-4 w-4 ${isLoading ? "animate-spin" : ""}`}
-                    />
-                  </Button>
+                <div className="flex items-center gap-2 flex-wrap">
                   <CreateLocationButton />
                 </div>
               </div>
@@ -97,8 +83,8 @@ export default function VenueLocationsPage() {
             initialData={[]}
             search={searchParams}
             globalFilterValue={globalFilterValue}
-            hideToolbar={true}
-            hideAddButton={true}
+            hideToolbar
+            hideAddButton
           />
         </div>
       </Shell>

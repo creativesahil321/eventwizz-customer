@@ -1,7 +1,11 @@
 import React from "react";
 import { ColumnDef } from "@tanstack/react-table";
-import { Location, LocationRowAction } from "../_lib/types";
-import { CheckCircle, Settings, ChevronDown } from "lucide-react";
+import {
+  Location,
+  LocationRowAction,
+  ToggleLocationStatusMutation,
+} from "../_lib/types";
+import { Settings, ChevronDown, XCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -23,18 +27,13 @@ import { DataTableColumnHeader } from "@/components/data-table/data-table-column
 
 interface GetColumnsOptions {
   setRowAction: React.Dispatch<React.SetStateAction<LocationRowAction | null>>;
+  toggleStatusMutation?: ToggleLocationStatusMutation;
 }
 
 export const getColumns = ({
   setRowAction,
+  toggleStatusMutation,
 }: GetColumnsOptions): ColumnDef<Location>[] => [
-  {
-    id: "sno",
-    header: "S.No",
-    cell: ({ row }) => <span className="font-medium">{row.index + 1}</span>,
-    enableSorting: false,
-    enableHiding: false,
-  },
   {
     accessorKey: "city",
     header: ({ column }) => (
@@ -116,19 +115,27 @@ export const getColumns = ({
     enableSorting: true,
   },
   {
-    accessorKey: "is_default",
+    accessorKey: "status",
     header: "Status",
     cell: ({ row }) => {
-      const isDefault = row.original.is_default === true;
-      return isDefault ? (
-        <Badge
-          variant="outline"
-          className="border-green-500 text-green-600 flex items-center gap-1"
-        >
-          <CheckCircle className="h-3 w-3" />
-          Default
-        </Badge>
-      ) : (
+      // Get status from API - explicitly check for false
+      const status = row.original.status;
+
+      // Show Inactive if status is explicitly false
+      if (status === false) {
+        return (
+          <Badge
+            variant="outline"
+            className="border-red-500 text-red-600 flex items-center gap-1"
+          >
+            <XCircle className="h-3 w-3" />
+            Inactive
+          </Badge>
+        );
+      }
+
+      // Show Active if status is true, undefined, or any other truthy value
+      return (
         <Badge variant="outline" className="text-muted-foreground">
           Active
         </Badge>
@@ -206,19 +213,43 @@ export const getColumns = ({
             >
               Edit location
             </DropdownMenuItem>
-            {!row.original.is_default && (
+            {toggleStatusMutation &&
+              (row.original.status === false ? (
+                <DropdownMenuItem
+                  className="text-green-600 focus:text-green-600"
+                  disabled={toggleStatusMutation.isPending}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    toggleStatusMutation.mutate({
+                      location_id: row.original.id,
+                      status: "active",
+                    });
+                  }}
+                >
+                  Active
+                </DropdownMenuItem>
+              ) : (
+                <DropdownMenuItem
+                  className="text-amber-600 focus:text-amber-600"
+                  disabled={toggleStatusMutation.isPending}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    toggleStatusMutation.mutate({
+                      location_id: row.original.id,
+                      status: "inactive",
+                    });
+                  }}
+                >
+                  Inactive
+                </DropdownMenuItem>
+              ))}
+            {!row.original.is_default && row.original.status !== false && (
               <DropdownMenuItem
                 onClick={() => setRowAction({ type: "setDefault", row })}
               >
                 Set as default
-              </DropdownMenuItem>
-            )}
-            {!row.original.is_default && (
-              <DropdownMenuItem
-                className="text-red-600 focus:text-red-600"
-                onClick={() => setRowAction({ type: "delete", row })}
-              >
-                Delete location
               </DropdownMenuItem>
             )}
           </DropdownMenuContent>

@@ -1,6 +1,6 @@
 "use client";
 
-import type { DataTableFilterField } from "@/types";
+import type { DataTableFilterItem, Option } from "@/types";
 import type { Table } from "@tanstack/react-table";
 import { X } from "lucide-react";
 import * as React from "react";
@@ -24,7 +24,7 @@ import {
 interface DataTableToolbarProps<TData>
   extends React.HTMLAttributes<HTMLDivElement> {
   table: Table<TData>;
-  filterFields?: DataTableFilterField<TData>[];
+  filterFields?: DataTableFilterItem[];
   showViewOptions?: boolean;
 }
 
@@ -57,7 +57,6 @@ export function DataTableToolbar<TData>({
       {...props}
     >
       <div className="flex flex-1 items-center gap-2 relative">
-        <h2 className="text-2xl mb-0 title-header font-bold">Email Logs</h2>
         <section className="flex space-x-4 items-center flex-1">
           {searchableColumns.length > 0 &&
             searchableColumns.map(
@@ -69,7 +68,7 @@ export function DataTableToolbar<TData>({
                   >
                     <Label htmlFor="search">Search By</Label>
                     <DebouncedInput
-                      placeholder={column.placeholder}
+                      placeholder={column.placeholder as string}
                       value={
                         (table
                           .getColumn(String(column.id))
@@ -92,7 +91,7 @@ export function DataTableToolbar<TData>({
               const colInstance = table.getColumn(String(column.id));
               if (!colInstance) return null;
 
-              if ((column as any).type === "dropdown") {
+              if ((column as { type?: string }).type === "dropdown") {
                 const currentValue = colInstance.getFilterValue();
                 const valueArray = Array.isArray(currentValue)
                   ? currentValue
@@ -112,7 +111,7 @@ export function DataTableToolbar<TData>({
                     <SelectContent>
                       <SelectGroup>
                         <SelectLabel>{column.label}</SelectLabel>
-                        {(column.options ?? []).map((option: any) => (
+                          {(column.options as { value: string; label: string; count?: number }[] ?? []).map((option) => (
                           <SelectItem key={option.value} value={option.value}>
                             {toSentenceCase(option.label)}{" "}
                             {option.count ? `(${option.count})` : ""}
@@ -127,8 +126,8 @@ export function DataTableToolbar<TData>({
                   <DataTableFacetedFilter
                     key={String(column.id)}
                     column={colInstance}
-                    title={column.label}
-                    options={column.options ?? []}
+                    title={column.label as string}
+                    options={(column.options as unknown as Option[]) ?? []}
                   />
                 );
               }

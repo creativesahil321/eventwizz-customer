@@ -11,8 +11,9 @@ import {
 import { Trash } from "lucide-react";
 import { EmailLog } from "../../_lib/types";
 
-interface EmailDialogProps
-  extends React.ComponentPropsWithoutRef<typeof Dialog> {
+interface EmailDialogProps extends React.ComponentPropsWithoutRef<
+  typeof Dialog
+> {
   email: EmailLog | unknown;
   showTrigger?: boolean;
 }
@@ -24,7 +25,7 @@ export function EmailShowDialog({
   ...props
 }: EmailDialogProps) {
   const formattedDate = new Date(
-    (template as EmailLog)?.created_at as string
+    (template as EmailLog)?.created_at as string,
   ).toLocaleString();
   return (
     <Dialog onOpenChange={onOpenChange} {...props}>
@@ -63,9 +64,16 @@ export function EmailShowDialog({
                 </div>
               </div>
               <div className="flex-1">
-                <p className="whitespace-pre-line text-foreground opacity-80">
-                  {(template as EmailLog)?.body as string}
-                </p>
+                <div
+                  className="prose prose-sm max-w-full text-foreground opacity-80 break-words whitespace-normal overflow-hidden"
+                  style={{
+                    wordBreak: "break-word",
+                    overflowWrap: "break-word",
+                  }}
+                  dangerouslySetInnerHTML={{
+                    __html: ((template as EmailLog)?.body as string) || "",
+                  }}
+                />
               </div>
             </div>
           )}

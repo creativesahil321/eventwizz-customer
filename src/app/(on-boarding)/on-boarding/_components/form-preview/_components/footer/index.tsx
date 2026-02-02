@@ -97,7 +97,7 @@ export default function FooterSection({
 
   return (
     <>
-      <section className={`w-full ${textColorClass}`}>
+      <section className={`w-full ${textColorClass} bg-[color:var(--color-footer)]`}>
         <div className="container mx-auto px-5 py-5">
           <div
             className="w-full border-b py-5"

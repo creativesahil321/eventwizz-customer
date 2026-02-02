@@ -150,3 +150,16 @@ export interface SwitchLocationData {
 }
 
 export type SwitchLocationResponse = BaseApiResponse<SwitchLocationData>;
+
+/**
+ * Payload for toggle location status operation
+ */
+export interface ToggleLocationStatusPayload {
+  location_id: number | string;
+  status: "active" | "inactive";
+}
+
+/**
+ * Response type for toggle location status operation
+ */
+export type ToggleLocationStatusResponse = BaseApiResponse<null>;

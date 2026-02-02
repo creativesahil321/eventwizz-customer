@@ -5,6 +5,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Alert } from "@/components/ui/alert";
 import {
   Accordion,
   AccordionContent,
@@ -31,8 +32,14 @@ import { RescheduleDateModal } from "./reschedule-date-modal";
 import { SingleDatePaymentModal } from "./single-date-payment-modal";
 import { toast } from "sonner";
 import { useDeleteAddOns } from "@/services/customer/bookings/hooks/useDeleteAddOns";
-import { useRescheduleBooking } from "@/services/customer/bookings/query";
-import type { RescheduleBookingPayload } from "@/services/customer/bookings/type";
+import {
+  useRescheduleBooking,
+  useBookingPayment,
+} from "@/services/customer/bookings/query";
+import type {
+  RescheduleBookingPayload,
+  BookingPaymentPayload,
+} from "@/services/customer/bookings/type";
 
 interface BookingItem {
   type: "table" | "ticket";
@@ -46,6 +53,7 @@ interface BookingItem {
 
 interface AddOnTicket {
   id?: number;
+  booking_date_ticket_id?: number;
   title: string;
   description: string;
   price_per_ticket: string;
@@ -60,6 +68,9 @@ interface AddOnDrink {
 }
 
 interface AddOnTable {
+  id?: number;
+  booking_date_table_id?: number;
+  event_date_table_id?: number;
   table_size: number;
   price_per_person: string;
   no_tables: number;
@@ -88,6 +99,26 @@ interface BookingDrink {
   quantity: number;
 }
 
+interface RescheduleRequest {
+  id: number;
+  booking_id: number;
+  bookings_date_id: number;
+  event_date_id: number;
+  event_date: string;
+  payment_method: string;
+  unpaid_amount: number;
+  table_details: Array<{
+    event_date_table_id: number;
+    allocated_seat: number[];
+    table_size: number;
+    price_per_person: number;
+    total: number;
+  }>;
+  drink_details: unknown[];
+  created_at: string;
+  updated_at: string;
+}
+
 interface BookingDate {
   id: string;
   booking_date_id: number;
@@ -104,6 +135,7 @@ interface BookingDate {
   tickets?: BookingTicket[]; // Full ticket details
   drinks?: BookingDrink[]; // Full drink details
   addons?: AddOnsData; // Add-ons data
+  reschedule_requests?: RescheduleRequest[]; // Pending reschedule requests from vendor
 }
 
 interface PaymentSummaryData {
@@ -138,6 +170,10 @@ interface BookingData {
   booked_by?: string;
   location?: string;
   is_menu_choice?: boolean;
+  payment_gateways?: Array<{
+    id: number;
+    slug: string;
+  }>;
   summary: PaymentSummaryData;
   summaryFormatted: PaymentSummaryFormattedData;
 }
@@ -150,6 +186,7 @@ export default function BookingInfoTab({ bookingData }: BookingInfoTabProps) {
   const router = useRouter();
   const deleteAddOnsMutation = useDeleteAddOns();
   const rescheduleMutation = useRescheduleBooking();
+  const paymentMutation = useBookingPayment();
   const [expandedAllocations, setExpandedAllocations] = useState<
     Record<string, boolean>
   >({});
@@ -163,6 +200,8 @@ export default function BookingInfoTab({ bookingData }: BookingInfoTabProps) {
     useState(false);
   const [selectedDateForPayment, setSelectedDateForPayment] =
     useState<BookingDate | null>(null);
+  const [selectedRescheduleRequest, setSelectedRescheduleRequest] =
+    useState<RescheduleRequest | null>(null);
 
   const summary: PaymentSummaryData = bookingData.summary || {
     subTotal: 0,
@@ -267,8 +306,8 @@ export default function BookingInfoTab({ bookingData }: BookingInfoTabProps) {
   };
 
   const handlePayAll = () => {
-    // TODO: Navigate to payment page for all dates
-    console.log("Pay all dates");
+    // TODO: Implement pay all dates functionality
+    toast.info("Pay all dates feature coming soon");
   };
 
   // Handle Reschedule
@@ -315,22 +354,79 @@ export default function BookingInfoTab({ bookingData }: BookingInfoTabProps) {
 
   const handleSingleDatePaymentClick = (dateInfo: BookingDate) => {
     setSelectedDateForPayment(dateInfo);
+    setSelectedRescheduleRequest(null); // Clear reschedule request for regular payment
     setSingleDatePaymentModalOpen(true);
   };
 
-  const handleSingleDatePaymentConfirm = (paymentData: {
-    dateKey: string;
-    paymentPlan: "full" | "deposit";
-    paymentMethod: "card" | "bank-transfer";
-    amount: number;
-  }) => {
-    console.log("Payment data:", paymentData);
-    toast.success(
-      `Payment of £${paymentData.amount.toFixed(2)} initiated successfully!`
-    );
-    // TODO: Call payment API here
-    setSingleDatePaymentModalOpen(false);
-    setSelectedDateForPayment(null);
+  const handleRescheduleAcceptanceClick = (
+    dateInfo: BookingDate,
+    rescheduleRequest: RescheduleRequest
+  ) => {
+    setSelectedDateForPayment(dateInfo);
+    setSelectedRescheduleRequest(rescheduleRequest);
+    setSingleDatePaymentModalOpen(true);
+  };
+
+  const handleSingleDatePaymentConfirm = () => {
+    if (!selectedDateForPayment) {
+      toast.error("No date selected for payment");
+      return;
+    }
+
+    // Get payment gateway ID (default to first gateway or 1 for stripe)
+    const paymentGatewayId = bookingData.payment_gateways?.[0]?.id || 1;
+
+    // Build payment payload
+    const paymentPayload: BookingPaymentPayload = {
+      booking_id: parseInt(bookingData.booking_id),
+      payment_gateway: paymentGatewayId,
+      dates: [
+        {
+          booking_date_id: selectedDateForPayment.booking_date_id,
+          add_ons: {
+            // Extract table IDs from addons if available
+            tables:
+              selectedDateForPayment.addons?.tables
+                ?.map((table) => ({
+                  booking_date_table_id:
+                    table.booking_date_table_id || table.id || 0,
+                  event_date_table_id: table.event_date_table_id,
+                }))
+                .filter((table) => table.booking_date_table_id > 0) || [],
+            // Extract ticket IDs from addons if available
+            tickets:
+              selectedDateForPayment.addons?.tickets
+                ?.map((ticket) => ({
+                  booking_date_ticket_id:
+                    ticket.booking_date_ticket_id || ticket.id || 0,
+                }))
+                .filter((ticket) => ticket.booking_date_ticket_id > 0) || [],
+          },
+        },
+      ],
+    };
+
+    // Call payment API
+    paymentMutation.mutate(paymentPayload, {
+      onSuccess: (response) => {
+        if (response.status) {
+          // If redirect URL is present, the mutation will handle redirect
+          // Otherwise, close modal and show success
+          if (!response.data?.redirect_url) {
+            toast.success(
+              response.message || "Payment processed successfully!"
+            );
+            setSingleDatePaymentModalOpen(false);
+            setSelectedDateForPayment(null);
+          }
+          // If redirect_url exists, window.location.href is called in the mutation
+        }
+      },
+      onError: (error) => {
+        console.error("Error processing payment:", error);
+        // Error toasts are handled by API interceptor
+      },
+    });
   };
 
   const getPaymentStatusBadge = (status: string) => {
@@ -387,7 +483,8 @@ export default function BookingInfoTab({ bookingData }: BookingInfoTabProps) {
 
             {/* Pay All Button - Only show if there are multiple dates with pending payments (2+ unpaid dates) */}
             {bookingData.dates.length > 1 &&
-              bookingData.dates.filter((d) => d.paymentStatus !== "paid").length > 1 && (
+              bookingData.dates.filter((d) => d.paymentStatus !== "paid")
+                .length > 1 && (
                 <Button
                   onClick={handlePayAll}
                   size="sm"
@@ -511,6 +608,17 @@ export default function BookingInfoTab({ bookingData }: BookingInfoTabProps) {
                                   Add-ons
                                 </Badge>
                               )}
+                            {/* Reschedule Request Badge */}
+                            {dateInfo.reschedule_requests &&
+                              dateInfo.reschedule_requests.length > 0 && (
+                                <Badge
+                                  variant="secondary"
+                                  className="text-[10px] px-1.5 py-0.5 h-5 bg-amber-100 text-amber-700 hover:bg-amber-100 border-0 font-medium animate-pulse"
+                                >
+                                  <RotateCcw className="h-2.5 w-2.5 mr-0.5" />
+                                  Reschedule Request
+                                </Badge>
+                              )}
                             {/* Total Price */}
                             <span className="text-xs text-muted-foreground">
                               •
@@ -561,6 +669,95 @@ export default function BookingInfoTab({ bookingData }: BookingInfoTabProps) {
                   </div>
                   <AccordionContent className="px-4 pb-4 bg-gradient-to-br from-gray-50/80 to-white border-t">
                     <div className="pt-3">
+                      {/* Vendor Reschedule Request Alert */}
+                      {dateInfo.reschedule_requests &&
+                        dateInfo.reschedule_requests.length > 0 && (
+                          <div className="mb-4">
+                            {dateInfo.reschedule_requests.map((request) => (
+                              <Alert
+                                key={request.id}
+                                className="border-2 border-amber-300 bg-gradient-to-br from-amber-50 to-orange-50"
+                              >
+                                <div className="flex items-start gap-3">
+                                  <div className="p-2 bg-amber-100 rounded-full shrink-0">
+                                    <RotateCcw className="h-5 w-5 text-amber-700" />
+                                  </div>
+                                  <div className="flex-1 space-y-3">
+                                    <div>
+                                      <h4 className="font-semibold text-amber-900 mb-1">
+                                        Reschedule Request from Vendor
+                                      </h4>
+                                      <p className="text-sm text-amber-800">
+                                        The vendor has requested to reschedule
+                                        your booking to a new date. Please
+                                        review the changes below.
+                                      </p>
+                                    </div>
+
+                                    {/* Date Change Info */}
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                      <div className="bg-white border border-amber-200 rounded-lg p-3">
+                                        <p className="text-xs text-amber-700 font-medium mb-1">
+                                          Current Date
+                                        </p>
+                                        <p className="font-semibold text-amber-900 line-through">
+                                          {dateInfo.date}
+                                        </p>
+                                      </div>
+                                      <div className="bg-amber-100 border border-amber-300 rounded-lg p-3">
+                                        <p className="text-xs text-amber-700 font-medium mb-1">
+                                          New Proposed Date
+                                        </p>
+                                        <p className="font-semibold text-amber-900">
+                                          {request.event_date}
+                                        </p>
+                                      </div>
+                                    </div>
+
+                                    {/* Price Information */}
+                                    {request.unpaid_amount > 0 && (
+                                      <div className="bg-white border border-amber-200 rounded-lg p-3">
+                                        <div className="flex items-center justify-between">
+                                          <div>
+                                            <p className="text-xs text-amber-700 font-medium">
+                                              Additional Payment Required
+                                            </p>
+                                            <p className="text-xs text-amber-600 mt-0.5">
+                                              Price difference for the new date
+                                            </p>
+                                          </div>
+                                          <p className="text-lg font-bold text-amber-900">
+                                            £{request.unpaid_amount.toFixed(2)}
+                                          </p>
+                                        </div>
+                                      </div>
+                                    )}
+
+                                    {/* Action Button */}
+                                    <div className="flex gap-2">
+                                      <Button
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          handleRescheduleAcceptanceClick(
+                                            dateInfo,
+                                            request
+                                          );
+                                        }}
+                                        className="bg-amber-600 hover:bg-amber-700 text-white"
+                                      >
+                                        <CheckCircle2 className="h-4 w-4 mr-2" />
+                                        {request.unpaid_amount > 0
+                                          ? "Accept & Pay Now"
+                                          : "Accept Reschedule"}
+                                      </Button>
+                                    </div>
+                                  </div>
+                                </div>
+                              </Alert>
+                            ))}
+                          </div>
+                        )}
+
                       {/* Booking Breakdown Card with Amount Info */}
                       <Card className="border-2 bg-gradient-to-br from-white to-gray-50/50 shadow-sm">
                         <CardContent className="p-4">
@@ -1675,6 +1872,7 @@ export default function BookingInfoTab({ bookingData }: BookingInfoTabProps) {
           onClose={() => {
             setSingleDatePaymentModalOpen(false);
             setSelectedDateForPayment(null);
+            setSelectedRescheduleRequest(null);
           }}
           dateInfo={{
             date: selectedDateForPayment.date,
@@ -1703,6 +1901,7 @@ export default function BookingInfoTab({ bookingData }: BookingInfoTabProps) {
             partialPaymentOption:
               summary.depositSelected > 0 ? summary.depositSelected : undefined,
           }}
+          rescheduleRequest={selectedRescheduleRequest}
           onConfirm={handleSingleDatePaymentConfirm}
         />
       )}

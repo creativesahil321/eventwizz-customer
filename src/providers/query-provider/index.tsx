@@ -24,13 +24,13 @@ export function RootQueryProvider({ children }: { children: React.ReactNode }) {
             refetchOnReconnect: true,
           },
           mutations: {
-            retry: 1,
+            retry: false, // Don't retry mutations - failures should be handled explicitly
             onError: (error) => {
               console.error("Mutation error:", error);
             },
           },
         },
-      })
+      }),
   );
 
   const isDev = env.NEXT_PUBLIC_DEV_MODE;
@@ -58,7 +58,7 @@ export default function QueryProvider({
   enableDevtools?: boolean;
 }) {
   console.warn(
-    "Using nested QueryProvider is deprecated. Use RootQueryProvider at the app root instead."
+    "Using nested QueryProvider is deprecated. Use RootQueryProvider at the app root instead.",
   );
 
   const queryClient = useSharedQueryClient();

@@ -96,6 +96,7 @@ export const API_ENDPOINTS = {
       CREATE: "/vendor/locations",
       UPDATE: "/vendor/locations/{id}",
       DELETE: "/vendor/locations/{id}",
+      TOGGLE_LOCATION_STATUS: "/vendor/locations/toggle-status",
     },
     NOTIFICATIONS: {
       ALL: "/vendor/notifications",
@@ -120,6 +121,12 @@ export const API_ENDPOINTS = {
       SEND_MAIL: "/vendor/customers/send-mail-to-customer",
       LOGIN_AS_CUSTOMER: "/vendor/customers/login-as-customer",
       SEND_BULK_MAIL: "/vendor/customers/send-mail-to-all-customers",
+      MULTIPLE_ACTIONS: {
+        BULK_ACTIVATE: "/vendor/customers/bulk-activate",
+        BULK_DEACTIVATE: "/vendor/customers/bulk-deactivate",
+        BULK_DELETE: "/vendor/customers/bulk-delete",
+        BULK_RESTORE: "/vendor/customers/bulk-restore",
+      }
     },
     BOOKING_HISTORY: {
       GET_ALL: "/vendor/bookings",
@@ -147,6 +154,18 @@ export const API_ENDPOINTS = {
           "/vendor/bookings/reschedule/{booking_id}/{date_id}/{new_date_id}",
         SAVE: "/vendor/bookings/reschedule/store",
       },
+
+      MULTIPLE_ACTIONS: {
+        BULK_EMAIL_SEND: "/vendor/bookings/bulk-email",
+        BULK_EXPORT: "/vendor/bookings/bulk-export",
+        BULK_DELETE: "/vendor/bookings/bulk-delete",
+      }
+    },
+    EMAIL_LOGS: {
+      GET_ALL: "vendor/email-logs",
+      DELETE: "/vendor/email-logs/delete/{id}",
+      RESEND: "/vendor/email-logs/resend",
+      BULK_DELETE: "/vendor/email-logs/bulk-delete",
     },
     TRANSACTIONS: {
       GET_ALL:
@@ -172,6 +191,7 @@ export const API_ENDPOINTS = {
       SAVE_ADDONS: "/customer/bookings/add-ons/store",
       DELETE_ADD_ONS:
         "/customer/bookings/delete-add-ons/{id}/{date}/{keyword}/{type}", // TABLES case = keyword will be tables size and type will be tables , DRINKS case = keyword will be id and type will be drinks , TICKETS case = keyword will be id and type will be tickets
+      BOOKING_PAYMENT: "/customer/bookings/pay",
     },
     MENU_CHOICES: {
       ADD_MENU: "/customer/bookings/menu-items/{id}/{date}/{table_id}",

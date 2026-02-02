@@ -1,13 +1,13 @@
 "use client";
 
-import React, { useState } from "react";
-import { Button } from "@/components/ui/button";
+import React, { useState, useEffect } from "react";
+import type { Table } from "@tanstack/react-table";
 import { Search, DollarSign, Clock, Receipt, Loader2, Tag } from "lucide-react";
 import HistoryDataTable from "./_components/history-data-table";
 import { Shell } from "@/components/shell";
 import { SearchParams } from "./_lib/types";
+import { History } from "./_lib/types";
 import { Input } from "@/components/ui/input";
-import { exportTableToCSV } from "@/lib/export";
 import {
   Select,
   SelectContent,
@@ -20,15 +20,38 @@ import { DataTableSkeleton } from "@/components/data-table/data-table-skeleton";
 import { useHistory } from "./_lib/queries";
 import { cn } from "@/lib/utils";
 import { useDebounce } from "@/hooks/data-table/use-debounce";
+import { useQueryState, parseAsInteger } from "nuqs";
+import { TableToolbarActions } from "./_components/table-toolbar-actions";
 
 export default function BookingHistoryPage() {
   const [globalFilterValue, setGlobalFilterValue] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [eventDate, setEventDate] = useState("");
-  const tableRef = React.useRef<unknown>(null);
+  const [, setSelectedRowCount] = useState(0);
+  const tableRef = React.useRef<Table<History> | null>(null);
+  const [, setPage] = useQueryState("page", parseAsInteger.withDefault(1));
+
+  // Poll table selection so header re-renders and shows bulk actions (same pattern as customers page)
+  useEffect(() => {
+    const updateSelectedCount = () => {
+      if (tableRef.current) {
+        const count =
+          tableRef.current.getFilteredSelectedRowModel().rows.length;
+        setSelectedRowCount(count);
+      }
+    };
+    updateSelectedCount();
+    const interval = setInterval(updateSelectedCount, 200);
+    return () => clearInterval(interval);
+  }, []);
 
   // Debounce search input using existing hook
   const debouncedSearch = useDebounce(globalFilterValue, 500);
+
+  // Reset page to 1 when search, status, or date filters change
+  useEffect(() => {
+    setPage(1);
+  }, [debouncedSearch, statusFilter, eventDate, setPage]);
 
   // Build search params based on current filters
   const searchParams: SearchParams = {
@@ -96,17 +119,6 @@ export default function BookingHistoryPage() {
     return { totalAmount, totalDeposit, totalPending, totalPlatformFee };
   }, [historyData?.summary, historyData?.data]);
 
-  // Handle CSV export
-  const handleCSVExport = () => {
-    if (tableRef.current) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      exportTableToCSV(tableRef.current as any, {
-        filename: "booking-history",
-        excludeColumns: ["select", "actions"],
-      });
-    }
-  };
-
   return (
     <section className="page text-black min-w-0">
       <Shell className="gap-2">
@@ -170,13 +182,9 @@ export default function BookingHistoryPage() {
                     </Select>
                   </div>
                   <div className="flex items-center gap-2">
-                    <Button
-                      variant="event-primary"
-                      onClick={handleCSVExport}
-                      disabled={isFetching}
-                    >
-                      CSV
-                    </Button>
+                    {tableRef.current && (
+                      <TableToolbarActions table={tableRef.current} />
+                    )}
                   </div>
                 </div>
               </div>
@@ -185,7 +193,7 @@ export default function BookingHistoryPage() {
               <div
                 className={cn(
                   "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 pt-4 border-t border-[var(--color-border)] transition-opacity duration-200",
-                  isFetching && "opacity-50"
+                  isFetching && "opacity-50",
                 )}
               >
                 <div className="flex items-center gap-3">

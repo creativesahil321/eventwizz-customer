@@ -2,9 +2,6 @@
 
 import { Trash } from "lucide-react";
 import * as React from "react";
-import { toast } from "sonner";
-import { deleteEmailLog } from "./actions";
-
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -29,6 +26,7 @@ import {
 import { useMediaQuery } from "@/hooks/use-media-query";
 import { EmailLog } from "../../_lib/types";
 import { PageLoader } from "@/components/ui/page-loader";
+import { useDeleteEmailLog } from "../../_lib/queries";
 
 interface DeleteEmailDialogProps
   extends React.ComponentPropsWithoutRef<typeof Dialog> {
@@ -43,21 +41,25 @@ export function DeleteEmailDialog({
   onSuccess,
   ...props
 }: DeleteEmailDialogProps) {
-  const [isDeletePending, startDeleteTransition] = React.useTransition();
   const isDesktop = useMediaQuery("(min-width: 640px)");
+  const deleteEmailLogMutation = useDeleteEmailLog();
 
   function onDelete() {
-    startDeleteTransition(async () => {
-      const { error } = await deleteEmailLog(email);
+    if (!email?.id) {
+      return;
+    }
 
-      if (error) {
-        toast.error(error);
-        return;
-      }
-
-      props.onOpenChange?.(false);
-      toast.success("Email log deleted");
-      onSuccess?.();
+    deleteEmailLogMutation.mutate(email.id, {
+      onSuccess: (response) => {
+        if (response.status) {
+          props.onOpenChange?.(false);
+          onSuccess?.();
+        }
+        // Error handling is done by API interceptor
+      },
+      onError: () => {
+        // Error handling is done by API interceptor
+      },
     });
   }
 
@@ -88,9 +90,9 @@ export function DeleteEmailDialog({
               aria-label="Delete selected rows"
               variant="destructive"
               onClick={onDelete}
-              disabled={isDeletePending}
+              disabled={deleteEmailLogMutation.isPending || !email?.id}
             >
-              {isDeletePending && <PageLoader />}
+              {deleteEmailLogMutation.isPending && <PageLoader />}
               Delete
             </Button>
           </DialogFooter>
@@ -125,9 +127,9 @@ export function DeleteEmailDialog({
             aria-label="Delete selected rows"
             variant="destructive"
             onClick={onDelete}
-            disabled={isDeletePending}
+            disabled={deleteEmailLogMutation.isPending || !email?.id}
           >
-            {isDeletePending && <PageLoader />}
+            {deleteEmailLogMutation.isPending && <PageLoader />}
             Delete
           </Button>
         </DrawerFooter>

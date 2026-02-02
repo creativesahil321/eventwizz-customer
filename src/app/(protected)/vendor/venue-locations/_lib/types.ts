@@ -38,14 +38,21 @@ export interface VenueLocation {
   logo?: string;
   cover_image?: string;
   is_default: boolean;
+  status?: boolean; // Dynamic status field: true = Active, false = Inactive
   created_at?: string;
   updated_at?: string;
 }
 
 // Type for row action handling
 export type DataTableRowAction<TData> = {
-  type: "update" | "delete" | "view" | "setDefault";
+  type: "update" | "view" | "setDefault";
   row: Row<TData>;
+};
+
+// Mutation for toggle status
+export type ToggleLocationStatusMutation = {
+  mutate: (variables: { location_id: number | string; status: "active" | "inactive" }) => void;
+  isPending: boolean;
 };
 
 // Type for API success response

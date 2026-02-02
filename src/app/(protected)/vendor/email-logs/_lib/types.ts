@@ -1,47 +1,30 @@
 import { QueryOptions } from "@tanstack/react-query";
 import { Row } from "@tanstack/react-table";
+import type {
+  EmailLogItem,
+  EmailLogsResponse,
+  EmailLogsQueryParams,
+} from "@/services/vendor/email-logs/email-logs.service";
 
 /**
  * Email Log interface representing an email record
+ * Extends EmailLogItem with additional mapped fields for UI compatibility
  */
-export interface EmailLog {
-  id: number | string;
-  emailTo: string;
-  emailFrom?: string;
-  subject: string;
-  body: string;
-  role: string;
-  created_at: string;
-  updated_at?: string;
-  status?: "sent" | "failed" | "pending";
+export interface EmailLog extends Omit<EmailLogItem, "email_to" | "content"> {
+  emailTo: string; // Maps from email_to for UI compatibility
+  body: string; // Maps from content for UI compatibility
+  created_at: string; // Maps from date for UI compatibility
+  // Keep original fields from EmailLogItem
+  email_to: string;
+  content: string;
+  date: string;
 }
 
 /**
  * API response for email logs
+ * Re-export from service for convenience
  */
-export interface EmailLogResponse {
-  status: number | boolean;
-  message: string;
-  data: {
-    data: EmailLog[];
-    links: {
-      first: string;
-      last: string;
-      prev: string | null;
-      next: string | null;
-    };
-    meta: {
-      current_page: number;
-      from: number;
-      last_page: number;
-      path: string;
-      per_page: number;
-      to: number;
-      total: number;
-    };
-  };
-  error: string[];
-}
+export type { EmailLogsResponse } from "@/services/vendor/email-logs/email-logs.service";
 
 /**
  * Data table row action type
@@ -53,15 +36,9 @@ export type DataTableRowAction<TData> = {
 
 /**
  * Email log query parameters
+ * Re-export from service for convenience
  */
-export interface EmailLogQueryParams {
-  page?: number;
-  per_page?: number;
-  search?: string;
-  start_date?: string;
-  end_date?: string;
-  status?: string;
-}
+export type { EmailLogsQueryParams as EmailLogQueryParams } from "@/services/vendor/email-logs/email-logs.service";
 
 /**
  * Email reply payload
@@ -87,19 +64,16 @@ export type SearchParams = {
   page?: string;
   per_page?: string;
   status?: string;
-  from?: string;
-  to?: string;
+  search?: string;
+  from_date?: string;
+  to_date?: string;
   filters?: string;
   [key: string]: string | string[] | undefined;
 };
 
-export type AdminEmailLogsParams = {
-  search?: string;
-  page?: number | string;
-  per_page?: number | string;
-  status?: string;
-};
-
-export type UseEmailLogQueryParams = AdminEmailLogsParams & {
-  options?: QueryOptions<EmailLog, Error>;
+/**
+ * Use Email Log Query Parameters
+ */
+export type UseEmailLogQueryParams = EmailLogsQueryParams & {
+  options?: QueryOptions<EmailLogsResponse, Error>;
 };

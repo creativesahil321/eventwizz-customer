@@ -16,7 +16,11 @@ import { useContext } from "react";
 import { ServerContext } from "@/lib/server-context";
 import { ThemeSchema } from "@/types/theme.types";
 
-export default function FooterSection() {
+interface FooterSectionProps {
+  copyright?: string | null;
+}
+
+export default function FooterSection({ copyright }: FooterSectionProps = {}) {
   const { theme } = useContext(ServerContext);
   // Cast theme to our known structure
   const vendorTheme = theme as ThemeSchema;
@@ -164,7 +168,8 @@ export default function FooterSection() {
       </div>
       <div className="container mx-auto pt-6 px-4 md:px-0 text-center text-[color:var(--color-text-dimmed)]">
         <p className="text-sm md:text-base">
-          {vendorTheme?.copyright ||
+          {copyright ||
+            vendorTheme?.copyright ||
             `© ${currentYear} ${
               vendorTheme?.name || "EventWizz"
             }. All rights reserved.`}

@@ -320,6 +320,26 @@
   .animate-pageTransition {
     animation: pageTransition 0.3s ease-out forwards;
   }
+
+  /* Loading bar animation for filter transitions */
+  @keyframes loading {
+    0% {
+      transform: translateX(-100%);
+      width: 30%;
+    }
+    50% {
+      transform: translateX(0%);
+      width: 60%;
+    }
+    100% {
+      transform: translateX(100%);
+      width: 30%;
+    }
+  }
+
+  .animate-loading {
+    animation: loading 1.5s ease-in-out infinite;
+  }
 }
 
 /* Tiptap Editor Styles */
@@ -342,4 +362,40 @@
   float: left;
   height: 0;
   pointer-events: none;
+}
+
+/* React Day Picker Styles */
+.rdp {
+  --rdp-cell-size: 2.25rem;
+  --rdp-accent-color: var(--color-primary);
+  --rdp-background-color: var(--color-accent);
+}
+
+.rdp-day_button {
+  border: none;
+  cursor: pointer;
+}
+
+.rdp-day_button:hover:not([disabled]):not(.rdp-day_selected) {
+  background-color: var(--color-accent);
+  color: var(--color-accent-foreground);
+}
+
+.rdp-day_button:focus-visible {
+  outline: 2px solid var(--color-ring);
+  outline-offset: 2px;
+}
+
+.rdp-day_selected,
+.rdp-day_selected:hover {
+  background-color: var(--color-primary) !important;
+  color: var(--color-primary-foreground) !important;
+}
+
+.rdp-day_selected:hover {
+  background-color: var(--color-primary-hover) !important;
+}
+
+.rdp-day_today:not(.rdp-day_selected) {
+  font-weight: 600;
 }

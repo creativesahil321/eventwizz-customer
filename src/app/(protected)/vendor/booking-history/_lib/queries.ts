@@ -1,5 +1,7 @@
 import {
   useQuery,
+  useMutation,
+  useQueryClient,
   keepPreviousData,
   UseQueryOptions,
 } from "@tanstack/react-query";
@@ -187,5 +189,69 @@ export const useVendorBookingDetails = (
     gcTime: 10 * 60 * 1000, // 10 minutes
     refetchOnMount: true,
     refetchOnReconnect: true,
+  });
+};
+
+/**
+ * Hook to bulk delete bookings
+ */
+export const useBulkDeleteBookings = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation<
+    { status: boolean; message: string; data: unknown },
+    Error,
+    (number | string)[]
+  >({
+    mutationFn: async (bookingIds) => {
+      return vendorBookingsService.bulkDeleteBookings(bookingIds);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: bookingHistoryKeys.lists() });
+    },
+    onError: (error: Error) => {
+      console.error("Error bulk deleting bookings:", error);
+    },
+  });
+};
+
+/**
+ * Hook to bulk send email to bookings
+ */
+export const useBulkEmailSend = () => {
+  return useMutation<
+    { status: boolean; message: string; data: unknown },
+    Error,
+    { bookingIds: (number | string)[]; subject: string; body: string }
+  >({
+    mutationFn: async ({ bookingIds, subject, body }) => {
+      const response = await vendorBookingsService.bulkEmailSend(
+        bookingIds,
+        subject,
+        body
+      );
+      return response;
+    },
+    onError: (error: Error) => {
+      console.error("Error sending bulk email:", error);
+    },
+  });
+};
+
+/**
+ * Hook to bulk export bookings to CSV
+ */
+export const useBulkExportBookings = () => {
+  return useMutation<
+    void,
+    Error,
+    { bookingIds: (number | string)[]; date: string }
+  >({
+    mutationFn: async ({ bookingIds, date }) => {
+      await vendorBookingsService.bulkExportBookings(bookingIds, date);
+    },
+    onError: (error: Error) => {
+      console.error("Error exporting bookings:", error);
+    },
   });
 };

@@ -9,6 +9,8 @@ import {
   LocationUpdateResponse,
   LocationDeleteResponse,
   SwitchLocationResponse,
+  ToggleLocationStatusPayload,
+  ToggleLocationStatusResponse,
 } from "./type";
 import {
   getCurrentUserRole,
@@ -165,5 +167,24 @@ export const locationService = {
           },
         };
       });
+  },
+
+  /**
+   * Toggle the status of a location (active / inactive)
+   * @param payload { location_id, status: "active" | "inactive" }
+   * @returns Promise with the API response
+   */
+  toggleLocationStatus: (payload: ToggleLocationStatusPayload) => {
+    const role = getCurrentUserRole();
+    const endpoints = getEndpointsByRole<typeof API_ENDPOINTS.VENDOR.LOCATION>(
+      "LOCATION",
+      role
+    );
+
+    return api.post<ToggleLocationStatusResponse>(
+      endpoints.TOGGLE_LOCATION_STATUS,
+      payload,
+      { returnFullResponse: true }
+    );
   },
 };

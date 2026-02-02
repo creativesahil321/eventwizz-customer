@@ -45,7 +45,7 @@ export default function SetDefaultLocationDialog({
             Set Default Location
           </DialogTitle>
           <DialogDescription className="break-words">
-            Are you sure you want to set <strong>{location.name}</strong>
+            Are you sure you want to set
             {location.city && (
               <>
                 {" "}

@@ -137,6 +137,11 @@ export function VendorRescheduleDateModal({
   };
 
   const handleReviewConfirm = () => {
+    // If price doesn't increase, submit directly from review
+    if (priceDifference <= 0) {
+      handleFinalConfirm();
+      return;
+    }
     setCurrentStep("confirm");
   };
 
@@ -144,8 +149,6 @@ export function VendorRescheduleDateModal({
     if (
       !selectedDate ||
       isProcessing ||
-      !termsAccepted ||
-      !paymentMethod ||
       isSubmittingRef.current ||
       !currentDateData
     ) {
@@ -158,6 +161,12 @@ export function VendorRescheduleDateModal({
     const unpaidAmountCalc =
       newPriceCalc > currentPriceCalc ? newPriceCalc - currentPriceCalc : 0;
 
+    // Check if terms and payment method are required
+    const requiresPayment = unpaidAmountCalc > 0;
+    if (requiresPayment && (!termsAccepted || !paymentMethod)) {
+      return;
+    }
+
     // Prepare table details payload
     const tableDetails = selectedDate.table_details.map((table) => ({
       event_date_table_id: table.event_date_table_id,
@@ -169,6 +178,10 @@ export function VendorRescheduleDateModal({
 
     isSubmittingRef.current = true;
 
+    // Determine payment method to send
+    const finalPaymentMethod: "online" | "offline" =
+      requiresPayment && paymentMethod ? paymentMethod : "offline";
+
     // Call parent with full payload
     onConfirm({
       booking_id: bookingId,
@@ -177,8 +190,8 @@ export function VendorRescheduleDateModal({
       new_date: selectedDate.dateKey,
       total_amount: selectedDate.price,
       unpaid_amount: unpaidAmountCalc,
-      payment_gateway: paymentMethod === "online" ? "stripe" : "offline",
-      payment_method: paymentMethod,
+      payment_gateway: finalPaymentMethod === "online" ? "stripe" : "offline",
+      payment_method: finalPaymentMethod,
       table_details: tableDetails,
     });
 
@@ -651,12 +664,13 @@ export function VendorRescheduleDateModal({
                         <span>Tables:</span>
                         <span>{currentDateData.tables}</span>
                       </div>
-                      {currentDateData.drinks !== undefined && currentDateData.drinks !== null && (
-                        <div className="flex items-center justify-between text-red-700">
-                          <span>Drinks:</span>
-                          <span>{currentDateData.drinks}</span>
-                        </div>
-                      )}
+                      {currentDateData.drinks !== undefined &&
+                        currentDateData.drinks !== null && (
+                          <div className="flex items-center justify-between text-red-700">
+                            <span>Drinks:</span>
+                            <span>{currentDateData.drinks}</span>
+                          </div>
+                        )}
                     </div>
                   </div>
 
@@ -686,25 +700,123 @@ export function VendorRescheduleDateModal({
                         <span>Tables:</span>
                         <span>{selectedDate.tables}</span>
                       </div>
-                      {selectedDate.drinks !== undefined && selectedDate.drinks !== null && (
-                        <div className="flex items-center justify-between text-green-700">
-                          <span>Drinks:</span>
-                          <span>{selectedDate.drinks}</span>
-                        </div>
-                      )}
+                      {selectedDate.drinks !== undefined &&
+                        selectedDate.drinks !== null && (
+                          <div className="flex items-center justify-between text-green-700">
+                            <span>Drinks:</span>
+                            <span>{selectedDate.drinks}</span>
+                          </div>
+                        )}
                     </div>
                   </div>
                 </div>
 
                 {/* Price Difference Message - Only show if price increases */}
                 {isPriceIncrease && (
-                  <div className="border border-orange-200 bg-orange-50 rounded-lg p-4">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm font-medium text-orange-900">
-                        Additional Payment Required from Customer:
-                      </span>
-                      <span className="text-lg font-bold text-orange-900">
-                        £{priceDifference.toFixed(2)}
+                  <>
+                    <div className="border border-orange-200 bg-orange-50 rounded-lg p-4">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm font-medium text-orange-900">
+                          Additional Payment Required from Customer:
+                        </span>
+                        <span className="text-lg font-bold text-orange-900">
+                          £{priceDifference.toFixed(2)}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Payment Method Selection - Show only if price increases */}
+                    <div className="border rounded-lg p-3 sm:p-4 bg-white">
+                      <h4 className="font-semibold text-sm text-gray-900 mb-3">
+                        Payment Method
+                      </h4>
+                      <p className="text-xs text-gray-600 mb-3">
+                        Select how the customer will pay for the additional
+                        amount:
+                      </p>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <Button
+                          type="button"
+                          variant={
+                            paymentMethod === "online"
+                              ? "event-primary"
+                              : "event-outline"
+                          }
+                          className={`h-auto py-4 px-4 flex flex-col items-start gap-2 ${
+                            paymentMethod === "online"
+                              ? "bg-[var(--color-primary)] text-white hover:bg-[var(--color-primary-hover)] border-[var(--color-primary)]"
+                              : "border-2 hover:border-blue-300 hover:bg-blue-50"
+                          }`}
+                          onClick={() => setPaymentMethod("online")}
+                          disabled={isProcessing}
+                        >
+                          <div className="flex items-center gap-2 w-full">
+                            <CreditCard className="h-5 w-5" />
+                            <span className="font-semibold">
+                              Online Payment
+                            </span>
+                          </div>
+                          <span
+                            className={`text-xs ${
+                              paymentMethod === "online"
+                                ? "text-blue-100"
+                                : "text-gray-600"
+                            }`}
+                          >
+                            Customer will pay online via payment gateway
+                          </span>
+                        </Button>
+                        <Button
+                          type="button"
+                          variant={
+                            paymentMethod === "offline"
+                              ? "event-primary"
+                              : "event-outline"
+                          }
+                          className={`h-auto py-4 px-4 flex flex-col items-start gap-2 ${
+                            paymentMethod === "offline"
+                              ? "bg-[var(--color-primary)] text-white hover:bg-[var(--color-primary-hover)] border-[var(--color-primary)]"
+                              : "border-2 hover:border-blue-300 hover:bg-blue-50"
+                          }`}
+                          onClick={() => setPaymentMethod("offline")}
+                          disabled={isProcessing}
+                        >
+                          <div className="flex items-center gap-2 w-full">
+                            <Receipt className="h-5 w-5" />
+                            <span className="font-semibold">
+                              Offline Payment
+                            </span>
+                          </div>
+                          <span
+                            className={`text-xs ${
+                              paymentMethod === "offline"
+                                ? "text-blue-100"
+                                : "text-gray-600"
+                            }`}
+                          >
+                            Customer will pay manually (cash, bank transfer,
+                            etc.)
+                          </span>
+                        </Button>
+                      </div>
+                      {!paymentMethod && (
+                        <p className="text-xs text-red-600 mt-2">
+                          Please select a payment method to continue
+                        </p>
+                      )}
+                    </div>
+                  </>
+                )}
+
+                {/* No additional payment message */}
+                {!isPriceIncrease && (
+                  <div className="border border-green-200 bg-green-50 rounded-lg p-4">
+                    <div className="flex items-center gap-2">
+                      <CheckCircle2 className="h-4 w-4 text-green-600" />
+                      <span className="text-sm font-medium text-green-900">
+                        {priceDifference === 0
+                          ? "No additional payment required - same price"
+                          : "No additional payment required - new date is less expensive"}
                       </span>
                     </div>
                   </div>
@@ -752,82 +864,6 @@ export function VendorRescheduleDateModal({
                       </span>
                     </div>
                   </div>
-                </div>
-
-                {/* Payment Method Selection */}
-                <div className="border rounded-lg p-3 sm:p-4 bg-white">
-                  <h4 className="font-semibold text-sm text-gray-900 mb-3">
-                    Payment Method
-                  </h4>
-                  <p className="text-xs text-gray-600 mb-3">
-                    Select how the customer will pay for the additional amount
-                    (if any):
-                  </p>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <Button
-                      type="button"
-                      variant={
-                        paymentMethod === "online"
-                          ? "event-primary"
-                          : "event-outline"
-                      }
-                      className={`h-auto py-4 px-4 flex flex-col items-start gap-2 ${
-                        paymentMethod === "online"
-                          ? "bg-[var(--color-primary)] text-white hover:bg-[var(--color-primary-hover)] border-[var(--color-primary)]"
-                          : "border-2 hover:border-blue-300 hover:bg-blue-50"
-                      }`}
-                      onClick={() => setPaymentMethod("online")}
-                      disabled={isProcessing}
-                    >
-                      <div className="flex items-center gap-2 w-full">
-                        <CreditCard className="h-5 w-5" />
-                        <span className="font-semibold">Online Payment</span>
-                      </div>
-                      <span
-                        className={`text-xs ${
-                          paymentMethod === "online"
-                            ? "text-blue-100"
-                            : "text-gray-600"
-                        }`}
-                      >
-                        Customer will pay online via payment gateway
-                      </span>
-                    </Button>
-                    <Button
-                      type="button"
-                      variant={
-                        paymentMethod === "offline"
-                          ? "event-primary"
-                          : "event-outline"
-                      }
-                      className={`h-auto py-4 px-4 flex flex-col items-start gap-2 ${
-                        paymentMethod === "offline"
-                          ? "bg-[var(--color-primary)] text-white hover:bg-[var(--color-primary-hover)] border-[var(--color-primary)]"
-                          : "border-2 hover:border-blue-300 hover:bg-blue-50"
-                      }`}
-                      onClick={() => setPaymentMethod("offline")}
-                      disabled={isProcessing}
-                    >
-                      <div className="flex items-center gap-2 w-full">
-                        <Receipt className="h-5 w-5" />
-                        <span className="font-semibold">Offline Payment</span>
-                      </div>
-                      <span
-                        className={`text-xs ${
-                          paymentMethod === "offline"
-                            ? "text-blue-100"
-                            : "text-gray-600"
-                        }`}
-                      >
-                        Customer will pay manually (cash, bank transfer, etc.)
-                      </span>
-                    </Button>
-                  </div>
-                  {!paymentMethod && (
-                    <p className="text-xs text-red-600 mt-2">
-                      Please select a payment method to continue
-                    </p>
-                  )}
                 </div>
 
                 {/* Terms and Conditions */}
@@ -926,10 +962,20 @@ export function VendorRescheduleDateModal({
               <Button
                 variant="event-primary"
                 onClick={handleReviewConfirm}
+                disabled={isPriceIncrease && !paymentMethod}
                 className="w-full sm:w-auto"
               >
-                Continue
-                <ArrowRight className="h-4 w-4 ml-2" />
+                {isPriceIncrease ? (
+                  <>
+                    Continue
+                    <ArrowRight className="h-4 w-4 ml-2" />
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle2 className="h-4 w-4 mr-2" />
+                    Confirm Change
+                  </>
+                )}
               </Button>
             )}
 

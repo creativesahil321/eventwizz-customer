@@ -340,4 +340,140 @@ export const customersService = {
       }
     );
   },
+
+  /**
+   * Bulk activate customers
+   * @param customerIds Array of customer IDs to activate
+   * @returns Promise with bulk activate operation result
+   */
+  bulkActivateCustomers: (customerIds: (number | string)[]) => {
+    const role = getCurrentUserRole();
+    const endpoints = getEndpointsByRole<typeof API_ENDPOINTS.VENDOR.CUSTOMERS>(
+      "CUSTOMERS",
+      role
+    );
+
+    if (!endpoints.MULTIPLE_ACTIONS?.BULK_ACTIVATE) {
+      throw new Error("BULK_ACTIVATE endpoint not configured for customers");
+    }
+
+    // Format payload as FormData with array notation: customer_ids[0]:36, customer_ids[1]:5, etc.
+    const formData = new FormData();
+    customerIds.forEach((id, index) => {
+      formData.append(`customer_ids[${index}]`, id.toString());
+    });
+
+    return api.post<{ status: boolean; message: string; data: unknown }>(
+      endpoints.MULTIPLE_ACTIONS.BULK_ACTIVATE,
+      formData,
+      {
+        returnFullResponse: true,
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
+      }
+    );
+  },
+
+  /**
+   * Bulk deactivate customers
+   * @param customerIds Array of customer IDs to deactivate
+   * @returns Promise with bulk deactivate operation result
+   */
+  bulkDeactivateCustomers: (customerIds: (number | string)[]) => {
+    const role = getCurrentUserRole();
+    const endpoints = getEndpointsByRole<typeof API_ENDPOINTS.VENDOR.CUSTOMERS>(
+      "CUSTOMERS",
+      role
+    );
+
+    if (!endpoints.MULTIPLE_ACTIONS?.BULK_DEACTIVATE) {
+      throw new Error("BULK_DEACTIVATE endpoint not configured for customers");
+    }
+
+    // Format payload as FormData with array notation: customer_ids[0]:36, customer_ids[1]:5, etc.
+    const formData = new FormData();
+    customerIds.forEach((id, index) => {
+      formData.append(`customer_ids[${index}]`, id.toString());
+    });
+
+    return api.post<{ status: boolean; message: string; data: unknown }>(
+      endpoints.MULTIPLE_ACTIONS.BULK_DEACTIVATE,
+      formData,
+      {
+        returnFullResponse: true,
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
+      }
+    );
+  },
+
+  /**
+   * Bulk delete customers
+   * @param customerIds Array of customer IDs to delete
+   * @returns Promise with bulk delete operation result
+   */
+  bulkDeleteCustomers: (customerIds: (number | string)[]) => {
+    const role = getCurrentUserRole();
+    const endpoints = getEndpointsByRole<typeof API_ENDPOINTS.VENDOR.CUSTOMERS>(
+      "CUSTOMERS",
+      role
+    );
+
+    if (!endpoints.MULTIPLE_ACTIONS?.BULK_DELETE) {
+      throw new Error("BULK_DELETE endpoint not configured for customers");
+    }
+
+    // Format payload as FormData with array notation: customer_ids[0]:4, customer_ids[1]:36, etc.
+    const formData = new FormData();
+    customerIds.forEach((id, index) => {
+      formData.append(`customer_ids[${index}]`, id.toString());
+    });
+
+    return api.post<{ status: boolean; message: string; data: unknown }>(
+      endpoints.MULTIPLE_ACTIONS.BULK_DELETE,
+      formData,
+      {
+        returnFullResponse: true,
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
+      }
+    );
+  },
+
+  /**
+   * Bulk restore customers
+   * @param customerIds Array of customer IDs to restore
+   * @returns Promise with bulk restore operation result
+   */
+  bulkRestoreCustomers: (customerIds: (number | string)[]) => {
+    const role = getCurrentUserRole();
+    const endpoints = getEndpointsByRole<typeof API_ENDPOINTS.VENDOR.CUSTOMERS>(
+      "CUSTOMERS",
+      role
+    );
+
+    if (!endpoints.MULTIPLE_ACTIONS?.BULK_RESTORE) {
+      throw new Error("BULK_RESTORE endpoint not configured for customers");
+    }
+
+    // Format payload as FormData with array notation: customer_ids[0]:4, customer_ids[1]:36, etc.
+    const formData = new FormData();
+    customerIds.forEach((id, index) => {
+      formData.append(`customer_ids[${index}]`, id.toString());
+    });
+
+    return api.post<{ status: boolean; message: string; data: unknown }>(
+      endpoints.MULTIPLE_ACTIONS.BULK_RESTORE,
+      formData,
+      {
+        returnFullResponse: true,
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
+      }
+    );
+  },
 };

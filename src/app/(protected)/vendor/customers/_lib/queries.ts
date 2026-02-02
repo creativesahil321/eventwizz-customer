@@ -213,3 +213,91 @@ export const useSendBulkEmailToAllCustomers = () => {
     },
   });
 };
+
+export const useBulkActivateCustomers = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation<
+    { status: boolean; message: string; data: unknown },
+    Error,
+    (number | string)[]
+  >({
+    mutationFn: async (customerIds) => {
+      const response = await customersService.bulkActivateCustomers(customerIds);
+      return response;
+    },
+    onSuccess: () => {
+      // Invalidate customers list to refresh data
+      queryClient.invalidateQueries({ queryKey: customerKeys.lists() });
+    },
+    onError: (error: Error) => {
+      console.error("Error bulk activating customers:", error);
+    },
+  });
+};
+
+export const useBulkDeactivateCustomers = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation<
+    { status: boolean; message: string; data: unknown },
+    Error,
+    (number | string)[]
+  >({
+    mutationFn: async (customerIds) => {
+      const response = await customersService.bulkDeactivateCustomers(customerIds);
+      return response;
+    },
+    onSuccess: () => {
+      // Invalidate customers list to refresh data
+      queryClient.invalidateQueries({ queryKey: customerKeys.lists() });
+    },
+    onError: (error: Error) => {
+      console.error("Error bulk deactivating customers:", error);
+    },
+  });
+};
+
+export const useBulkDeleteCustomers = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation<
+    { status: boolean; message: string; data: unknown },
+    Error,
+    (number | string)[]
+  >({
+    mutationFn: async (customerIds) => {
+      const response = await customersService.bulkDeleteCustomers(customerIds);
+      return response;
+    },
+    onSuccess: () => {
+      // Invalidate customers list to refresh data
+      queryClient.invalidateQueries({ queryKey: customerKeys.lists() });
+    },
+    onError: (error: Error) => {
+      console.error("Error bulk deleting customers:", error);
+    },
+  });
+};
+
+export const useBulkRestoreCustomers = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation<
+    { status: boolean; message: string; data: unknown },
+    Error,
+    (number | string)[]
+  >({
+    mutationFn: async (customerIds) => {
+      const response = await customersService.bulkRestoreCustomers(customerIds);
+      return response;
+    },
+    onSuccess: () => {
+      // Invalidate customers list to refresh data
+      queryClient.invalidateQueries({ queryKey: customerKeys.lists() });
+    },
+    onError: (error: Error) => {
+      console.error("Error bulk restoring customers:", error);
+    },
+  });
+};

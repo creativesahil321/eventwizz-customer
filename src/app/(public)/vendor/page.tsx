@@ -1,8 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { useLocationStore } from "@/store/location.store";
 import { useDomain } from "@/providers/domain-provider/domain-provider";
 import LocationSelectionHeader from "./_components/LocationPage/location-selection-header";
 import LocationGrid from "./_components/LocationPage/location-grid";
@@ -15,11 +14,13 @@ import { Button } from "@/components/ui/button";
 
 export default function VendorSiteHomePage() {
   const router = useRouter();
-  const { allLocations } = useLocationStore();
+  const { settings, isLoading: isDomainLoading } = useDomain();
   const [isLoading, setIsLoading] = useState(true);
   const [viewMode, setViewMode] = useState<"map" | "grid">("grid");
   const [isMobile, setIsMobile] = useState(false);
-  const { settings, isLoading: isDomainLoading } = useDomain();
+  
+  // Get locations from domain settings
+  const allLocations = useMemo(() => settings?.locations || [], [settings?.locations]);
 
   // Detect mobile devices
   useEffect(() => {

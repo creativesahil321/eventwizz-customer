@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import {
   Dialog,
   DialogContent,
@@ -8,13 +8,18 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { useLocationStore } from "@/store/location.store";
+import {
+  useLocationsQuery,
+  useCurrentLocationId,
+} from "@/app/(protected)/vendor/venue-locations/_lib/queries";
 import { useSwitchLocation } from "@/app/(protected)/vendor/venue-locations/_lib/hooks";
 import { VenueLocation } from "@/types/api.types";
 import { cn } from "@/lib/utils";
 import { useRouter } from "next/navigation";
 import { PageLoader } from "../ui/page-loader";
 import { InfoCircledIcon } from "@radix-ui/react-icons";
+import { Badge } from "@/components/ui/badge";
+import { XCircle } from "lucide-react";
 
 interface LocationSelectorModalProps {
   isOpen: boolean;
@@ -27,19 +32,28 @@ export function LocationSelectorModal({
   onClose,
   redirectPath = "/vendor/dashboard",
 }: LocationSelectorModalProps) {
-  const { allLocations, selectedLocation } = useLocationStore();
+  const { data: locationsData } = useLocationsQuery();
+  const currentLocationId = useCurrentLocationId();
+
+  // Extract locations from result (support { data, meta } or array)
+  const allLocations = useMemo(() => {
+    if (!locationsData) return [];
+    if (Array.isArray(locationsData)) return locationsData;
+    return locationsData.data || [];
+  }, [locationsData]);
+
   const [selectedLocationId, setSelectedLocationId] = useState<number | null>(
-    selectedLocation?.id || null
+    currentLocationId || null,
   );
   const { mutate: switchLocation, isPending } = useSwitchLocation();
   const router = useRouter();
 
-  // Update selected location when store changes
+  // Update selected location when current location changes
   useEffect(() => {
-    if (selectedLocation?.id) {
-      setSelectedLocationId(selectedLocation.id);
+    if (currentLocationId) {
+      setSelectedLocationId(currentLocationId);
     }
-  }, [selectedLocation]);
+  }, [currentLocationId]);
 
   // Handler for selecting a location
   const handleLocationSelect = (location: VenueLocation) => {
@@ -113,17 +127,28 @@ export function LocationSelectorModal({
                       "border rounded-md p-4 cursor-pointer transition-all",
                       selectedLocationId === location.id
                         ? "border-teal-600 bg-teal-50"
-                        : "border-gray-200 hover:border-gray-300"
+                        : "border-gray-200 hover:border-gray-300",
                     )}
                     onClick={() => handleLocationSelect(location)}
                   >
                     <div className="flex items-center justify-between">
                       <div className="font-medium text-lg">{location.name}</div>
-                      {location.is_default && (
-                        <div className="text-xs bg-teal-100 text-teal-800 px-2 py-1 rounded">
-                          Default
-                        </div>
-                      )}
+                      <div className="flex items-center gap-2">
+                        {location.is_default && (
+                          <div className="text-xs bg-teal-100 text-teal-800 px-2 py-1 rounded whitespace-nowrap">
+                            Default
+                          </div>
+                        )}
+                        {location.status === false && (
+                          <Badge
+                            variant="outline"
+                            className="border-red-500 text-red-600 flex items-center gap-1 h-5 px-2 text-[10px] whitespace-nowrap"
+                          >
+                            <XCircle className="h-3 w-3" />
+                            Inactive
+                          </Badge>
+                        )}
+                      </div>
                     </div>
                     <div className="text-sm text-gray-500 mt-1">
                       {location.city || ""}

@@ -22,7 +22,7 @@ import { PermissionGuard } from "@/components/permission";
 import NotificationBell from "./_components/notification-bell";
 import { LocationSelector } from "@/components/location-selector";
 import { useSession } from "next-auth/react";
-import { useLocationStore } from "@/store/location.store";
+import { useLocationsQuery } from "@/app/(protected)/vendor/venue-locations/_lib/queries";
 
 interface HeaderProps {
   menus?: MenuItemProps[];
@@ -31,17 +31,25 @@ interface HeaderProps {
 const Header: React.FC<HeaderProps> = memo(({ menus }) => {
   const { sidebarCollapsed: collapsed } = useDomainStore();
   const { data: session } = useSession();
-  const { allLocations } = useLocationStore();
   const isVendor = session?.user?.account_type === "vendor";
-  const hasMultipleLocations = allLocations.length > 1;
+
+  // Fetch locations to check count (only for vendors)
+  // IMPORTANT: Only fetch if user is vendor to avoid 403 errors on customer pages
+  const { data: locationsData } = useLocationsQuery(isVendor);
+  const locationsList = useMemo(() => {
+    if (!locationsData) return [];
+    if (Array.isArray(locationsData)) return locationsData;
+    return locationsData.data || [];
+  }, [locationsData]);
+  const hasMultipleLocations = locationsList.length > 1;
 
   const headerClass = useMemo(
     () =>
       cn(
         "flex-none min-w-0 bg-[var(--color-header)]  dark:border-b backdrop-blur-lg px-4 py-3 md:px-6 md:py-4 flex items-center justify-between sticky top-0 z-50 shadow-base transition-all duration-300 overflow-hidden",
-        collapsed ? "xl:ml-[60px]" : "xl:ml-[264px]"
+        collapsed ? "xl:ml-[60px]" : "xl:ml-[264px]",
       ),
-    [collapsed]
+    [collapsed],
   );
 
   return (
