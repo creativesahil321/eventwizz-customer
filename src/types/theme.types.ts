@@ -66,12 +66,22 @@ export interface SEO {
 }
 
 /**
- * Location data structure
+ * Latest upcoming event information for a location
+ */
+export interface LatestUpcomingEvent {
+  name: string;
+  date: string;
+}
+
+/**
+ * Location data structure with event information
  */
 export interface LocationData {
-  is_default: unknown;
+  is_default?: unknown;
   city: string;
   slug: string;
+  total_events?: number;
+  latest_upcoming_event?: LatestUpcomingEvent;
 }
 
 /**

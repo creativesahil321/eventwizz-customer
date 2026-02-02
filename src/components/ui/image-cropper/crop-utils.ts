@@ -168,7 +168,7 @@ async function compressImageBlob(
     if (!(compressedFile instanceof File)) {
       console.warn("⚠️ imageCompression returned Blob, converting to File");
       return new File([compressedFile], originalFilename, {
-        type: compressedFile.type || blob.type,
+        type: (compressedFile as unknown as File).type || blob.type,
         lastModified: Date.now(),
       });
     }

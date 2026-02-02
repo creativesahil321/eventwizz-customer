@@ -104,7 +104,7 @@ export default function DrinkSection({
           <div className="mt-3 inline-flex items-center gap-2 bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200 px-3 py-1 rounded-full text-xs sm:text-sm font-medium">
             <span>🍹</span>
             <span>
-              {getTotalDrinks()} drink{getTotalDrinks() > 1 ? "s" : ""} selected
+              {getTotalDrinks()} item{getTotalDrinks() > 1 ? "s" : ""} selected
             </span>
           </div>
         )}

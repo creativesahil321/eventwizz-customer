@@ -180,9 +180,11 @@ export function SiteEssentialsForm() {
 
       const result = await onSubmit(payload);
       if (result) {
-        // Reset the preview store after successful submission
-        // This clears any temporary blob URLs and prevents stale data
-        clearPreviewData();
+        // Update the preview store with saved form values
+        // This ensures theme colors are available for event preview pages
+        // even if the user didn't click Preview button
+        const completeFormValues = form.getValues();
+        setPreviewData(completeFormValues);
 
         router.refresh();
         toast({

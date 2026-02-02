@@ -109,7 +109,17 @@ export function BrandingTab({ shouldResetImages = false }: BrandingTabProps) {
 
       if (!validation.isValid) {
         const toast = (await import("sonner")).toast;
-        toast.error(validation.errors.join(". ") || "Invalid video file", {
+        // Use a unique toast ID to prevent duplicates
+        const toastId = `video-validation-error-${file.name}-${file.size}`;
+        
+        // Combine all errors into a single message
+        const errorMessage = validation.errors.length > 0
+          ? validation.errors[0] // Show only the first (most important) error
+          : "Invalid video file";
+        
+        // Show single toast with unique ID to prevent duplicates
+        toast.error(errorMessage, {
+          id: toastId,
           description:
             "Please upload an MP4 video with H.264 codec for best compatibility.",
         });

@@ -291,10 +291,18 @@ export default function BookingInfoTab({ bookingData }: BookingInfoTabProps) {
     rescheduleMutation.mutate(payload, {
       onSuccess: (response) => {
         if (response.status) {
-          // Toast is handled by API interceptor, just close modal
-          // Data will be refetched automatically via query invalidation
-          setRescheduleModalOpen(false);
-          setSelectedDateForReschedule(null);
+          // Check if payment gateway redirect is required
+          // If redirect_url exists, the mutation hook will handle the redirect
+          // and the modal will stay open during the redirect process
+          if (!response.data?.payment?.redirect_url) {
+            // No payment required, close modal
+            // Toast is handled by API interceptor
+            // Data will be refetched automatically via query invalidation
+            setRescheduleModalOpen(false);
+            setSelectedDateForReschedule(null);
+          }
+          // If payment redirect exists, keep modal open during redirect
+          // The page will navigate away to payment gateway
         }
         // Error toasts are handled by API interceptor
       },
@@ -377,9 +385,9 @@ export default function BookingInfoTab({ bookingData }: BookingInfoTabProps) {
               </h3>
             </div>
 
-            {/* Pay All Button - Only show if there are multiple dates with pending payments */}
+            {/* Pay All Button - Only show if there are multiple dates with pending payments (2+ unpaid dates) */}
             {bookingData.dates.length > 1 &&
-              bookingData.dates.some((d) => d.paymentStatus !== "paid") && (
+              bookingData.dates.filter((d) => d.paymentStatus !== "paid").length > 1 && (
                 <Button
                   onClick={handlePayAll}
                   size="sm"

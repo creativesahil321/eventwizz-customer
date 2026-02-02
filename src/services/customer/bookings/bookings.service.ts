@@ -20,6 +20,7 @@ import {
   SaveMenuChoicePayload,
   RescheduleDataResponse,
   RescheduleBookingPayload,
+  RescheduleBookingResponse,
 } from "./type";
 
 export const bookingsService = {
@@ -195,9 +196,9 @@ export const bookingsService = {
    */
   rescheduleBooking: async (
     payload: RescheduleBookingPayload
-  ): Promise<{ status: boolean; message: string; data?: unknown }> => {
+  ): Promise<RescheduleBookingResponse> => {
     const endpoint = API_ENDPOINTS.CUSTOMER.BOOKINGS.SAVE_RESCHEDULE_BOOKING;
-    return api.post<{ status: boolean; message: string; data?: unknown }>(
+    return api.post<RescheduleBookingResponse>(
       endpoint,
       payload,
       {

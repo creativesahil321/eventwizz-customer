@@ -92,11 +92,11 @@ export function ExistingTablesSection({
                     <Button
                       variant="outline"
                       size="sm"
-                      className="text-purple-700 border-purple-300 hover:bg-purple-100 text-xs h-8"
+                      className="text-blue-700 border-blue-300 hover:bg-blue-100 text-xs h-8"
                       onClick={() => onManageSeating(table.id)}
                     >
                       <Settings className="h-3 w-3 mr-1" />
-                      Adjust
+                      Manage
                     </Button>
                   )}
                 <Button

@@ -7,6 +7,7 @@ export interface EventComponentProps {
 }
 
 export interface GalleryComponentProps {
-  galleryImages?: GalleryImage[];
+  // Support both formats: array of strings (URLs) or array of objects with {id, url}
+  galleryImages?: GalleryImage[] | string[];
   galleryTitle?: string;
 }

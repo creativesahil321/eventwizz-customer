@@ -1131,7 +1131,10 @@ export default function AdjustBookingContent({
                                               </p>
                                             </div>
                                             <p className="text-sm font-semibold text-foreground shrink-0">
-                                              {formatAmount(ticket.total)}
+                                              {formatAmount(
+                                                ticket.price_per_ticket *
+                                                  ticket.quantity
+                                              )}
                                             </p>
                                           </div>
                                         ))}
@@ -1165,7 +1168,9 @@ export default function AdjustBookingContent({
                                               </p>
                                             </div>
                                             <p className="text-sm font-semibold text-foreground shrink-0">
-                                              {formatAmount(drink.total)}
+                                              {formatAmount(
+                                                drink.price * drink.quantity
+                                              )}
                                             </p>
                                           </div>
                                         ))}
@@ -1324,7 +1329,9 @@ export default function AdjustBookingContent({
                                                               (val) =>
                                                                 typeof val ===
                                                                   "string" &&
-                                                                (val as string).startsWith(
+                                                                (
+                                                                  val as string
+                                                                ).startsWith(
                                                                   "+"
                                                                 )
                                                             ) ? (
@@ -1367,7 +1374,9 @@ export default function AdjustBookingContent({
                                                                       typeof people ===
                                                                       "string"
                                                                         ? parseInt(
-                                                                            (people as string).replace(
+                                                                            (
+                                                                              people as string
+                                                                            ).replace(
                                                                               "+",
                                                                               ""
                                                                             )

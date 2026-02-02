@@ -17,6 +17,7 @@ import {
   useUpdateProfile,
   useUpdatePassword,
   useProfileData,
+  AVATAR_MAX_FILE_SIZE,
 } from "@/app/(protected)/_shared/profile/_lib";
 import { ProfileSkeleton } from "@/app/(protected)/_shared/profile/_components/profile-skeleton";
 import { useProfileSync } from "@/components/shared/profile-update-sync";
@@ -87,7 +88,7 @@ export default function ProfilePage() {
   const updatePasswordMutation = useUpdatePassword("vendor");
 
   // Handle avatar files change from FileUploader
-  const handleAvatarFilesChange = (files: File[]) => {
+  const handleAvatarFilesChange = async (files: File[]) => {
     setAvatarFiles(files);
 
     if (files.length > 0) {
@@ -216,7 +217,7 @@ export default function ProfilePage() {
                       value={avatarFiles}
                       onValueChange={handleAvatarFilesChange}
                       maxFileCount={1}
-                      maxSize={10 * 1024 * 1024}
+                      maxSize={AVATAR_MAX_FILE_SIZE}
                       accept={{
                         "image/*": [".jpg", ".jpeg", ".png", ".webp"],
                       }}

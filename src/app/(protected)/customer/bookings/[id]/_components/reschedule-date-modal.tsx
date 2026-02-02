@@ -594,10 +594,12 @@ export function RescheduleDateModal({
                         <span>Tables:</span>
                         <span>{currentDateData.tables}</span>
                       </div>
-                      <div className="flex items-center justify-between text-red-700">
-                        <span>Drinks:</span>
-                        <span>{currentDateData.drinks}</span>
-                      </div>
+                      {currentDateData.drinks !== undefined && currentDateData.drinks !== null && (
+                        <div className="flex items-center justify-between text-red-700">
+                          <span>Drinks:</span>
+                          <span>{currentDateData.drinks}</span>
+                        </div>
+                      )}
                     </div>
                   </div>
 
@@ -627,10 +629,12 @@ export function RescheduleDateModal({
                         <span>Tables:</span>
                         <span>{selectedDate.tables}</span>
                       </div>
-                      <div className="flex items-center justify-between text-green-700">
-                        <span>Drinks:</span>
-                        <span>{selectedDate.drinks}</span>
-                      </div>
+                      {selectedDate.drinks !== undefined && selectedDate.drinks !== null && (
+                        <div className="flex items-center justify-between text-green-700">
+                          <span>Drinks:</span>
+                          <span>{selectedDate.drinks}</span>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>

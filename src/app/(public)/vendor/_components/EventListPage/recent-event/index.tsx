@@ -37,10 +37,33 @@ export default function RecentEventsGlimpse({
     "Recent Events Glimpse";
 
   // Use API images if available, otherwise use defaults
-  const images =
-    galleryImages.length > 0
-      ? galleryImages.map((img) => img.url)
-      : defaultEventImages;
+  // Handle both formats: array of strings (URLs) or array of objects with {id, url}
+  const images = useMemo(() => {
+    if (galleryImages.length === 0) {
+      return defaultEventImages;
+    }
+    
+    const extractedImages = galleryImages
+      .map((img) => {
+        // If img is a string (URL), return it directly
+        if (typeof img === "string") {
+          return img;
+        }
+        // If img is an object with url property, return the url
+        if (typeof img === "object" && img !== null && "url" in img) {
+          return img.url;
+        }
+        // Fallback: try to convert to string
+        return String(img);
+      })
+      .filter((url) => {
+        // Filter out empty strings, null, undefined, or invalid URLs
+        return url && typeof url === "string" && url.trim().length > 0;
+      });
+    
+    // If no valid images found, use defaults
+    return extractedImages.length > 0 ? extractedImages : defaultEventImages;
+  }, [galleryImages]);
 
   // Check if we only have one image
   const isSingleImage = images.length === 1;

@@ -17,6 +17,7 @@ import {
   SaveMenuChoicePayload,
   RescheduleDataResponse,
   RescheduleBookingPayload,
+  RescheduleBookingResponse,
 } from "./type";
 // Toast notifications are handled at root level by API client interceptor
 
@@ -205,18 +206,34 @@ export const useRescheduleData = (
 
 /**
  * Hook to reschedule a booking date
+ * Handles payment gateway redirect if payment is required
  */
 export const useRescheduleBooking = () => {
   const queryClient = useQueryClient();
 
   return useMutation<
-    { status: boolean; message: string; data?: unknown },
+    RescheduleBookingResponse,
     Error,
     RescheduleBookingPayload
   >({
     mutationFn: (payload) => bookingsService.rescheduleBooking(payload),
     onSuccess: (response, variables) => {
       if (response.status) {
+        // Check if payment gateway redirect is required
+        if (response.data?.payment?.redirect_url) {
+          console.log("🔄 Redirecting to payment gateway for reschedule:", {
+            gateway: response.data.payment_gateway,
+            rescheduleRequestId: response.data.reschedule_request_id,
+            unpaidAmount: response.data.unpaid_amount,
+            redirectUrl: response.data.payment.redirect_url,
+          });
+
+          // Redirect to the payment gateway URL provided by backend
+          window.location.href = response.data.payment.redirect_url;
+          return;
+        }
+
+        // If no payment required, invalidate and refetch booking data
         // Invalidate booking details to refetch updated data
         queryClient.invalidateQueries({
           queryKey: bookingsKeys.bookingDetail(variables.booking_id),

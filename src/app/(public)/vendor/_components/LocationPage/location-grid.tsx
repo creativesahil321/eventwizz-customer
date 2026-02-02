@@ -4,7 +4,7 @@ import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { MapPin, ArrowRight, Calendar, Clock } from "lucide-react";
 import { VenueLocation } from "@/types/api.types";
-import { LatestUpcomingEvent, LocationData } from "@/types/theme.types";
+import { LocationData } from "@/types/theme.types";
 import { motion, AnimatePresence } from "framer-motion";
 import { useState } from "react";
 import Image from "next/image";
@@ -13,25 +13,12 @@ interface LocationGridProps {
   locations: (VenueLocation | LocationData)[];
   isLoading: boolean;
   onSelect: (slug: string) => void;
-  locationStats?: Record<
-    string,
-    {
-      eventsCount: number;
-      venuesCount: number;
-      liveEventsCount: number;
-      upcomingEvent?: { date: string; name: string };
-      categories?: string[];
-      startingPrice?: number;
-      isNew?: boolean;
-    }
-  >;
 }
 
 export default function LocationGrid({
   locations,
   isLoading,
   onSelect,
-  locationStats = {},
 }: LocationGridProps) {
   const [hoveredCard, setHoveredCard] = useState<string | null>(null);
 
@@ -91,22 +78,20 @@ export default function LocationGrid({
             "id" in location && location.id ? location.id : idx;
           const isHovered = hoveredCard === locationSlug;
 
+          // Get event data directly from location object (from API)
+          // Check if location has the API fields (LocationData type)
+          const locationData = location as LocationData;
           const totalEvents =
-            "total_events" in location &&
-            typeof location.total_events === "number"
-              ? location.total_events
-              : locationStats[locationSlug]?.eventsCount || 0;
+            typeof locationData.total_events === "number"
+              ? locationData.total_events
+              : 0;
 
-          const upcomingEvent =
-            "latest_upcoming_event" in location &&
-            location.latest_upcoming_event
-              ? {
-                  name: (location.latest_upcoming_event as LatestUpcomingEvent)
-                    .name,
-                  date: (location.latest_upcoming_event as LatestUpcomingEvent)
-                    .date,
-                }
-              : locationStats[locationSlug]?.upcomingEvent;
+          const upcomingEvent = locationData.latest_upcoming_event
+            ? {
+                name: locationData.latest_upcoming_event.name,
+                date: locationData.latest_upcoming_event.date,
+              }
+            : null;
 
           const coverImage =
             "cover_image" in location && location.cover_image

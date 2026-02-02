@@ -1,22 +1,23 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import React, { useState, useEffect, lazy, Suspense } from "react";
 import { ArrowLeft } from "lucide-react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
 import { FormProvider as RHFFormProvider } from "react-hook-form";
 import { useEventFormContext } from "../events-form-provider";
 
-// Import Tab Components
-import EventNameTab from "./tabs/event-name-tab";
-import PackageTab from "./tabs/package-tab";
-import DatesTab from "./tabs/dates-tab";
-import CateringTab from "./tabs/catering-tab";
-import DrinksTab from "./tabs/drinks-tab";
-import MoreInfoTab from "./tabs/more-info-tab";
-import FaqsTab from "./tabs/faqs-tab";
-import PublishTab from "./tabs/publish-tab";
+// Lazy load Tab Components for better performance and smooth transitions
+const EventNameTab = lazy(() => import("./tabs/event-name-tab"));
+const PackageTab = lazy(() => import("./tabs/package-tab"));
+const DatesTab = lazy(() => import("./tabs/dates-tab"));
+const CateringTab = lazy(() => import("./tabs/catering-tab"));
+const DrinksTab = lazy(() => import("./tabs/drinks-tab"));
+const MoreInfoTab = lazy(() => import("./tabs/more-info-tab"));
+const FaqsTab = lazy(() => import("./tabs/faqs-tab"));
+const PublishTab = lazy(() => import("./tabs/publish-tab"));
 import { EventPreview } from "../event-preview";
 import { useEventData } from "../../_lib/hooks/useEventData";
 import { useParams } from "next/navigation";
@@ -60,6 +61,34 @@ const steps = [
   },
 ];
 
+// Loading skeleton for tab content - matches onboarding pattern
+const TabContentLoader = () => (
+  <div className="w-full animate-fadeIn">
+    <div className="bg-white rounded-lg p-2 sm:p-4 md:p-6 space-y-6">
+      {/* Header skeleton */}
+      <div className="mb-6">
+        <Skeleton className="h-7 w-2/3 rounded-lg" />
+      </div>
+      {/* Form fields skeleton */}
+      {[1, 2, 3, 4].map((field, index) => (
+        <div
+          key={field}
+          className="space-y-2"
+          style={{ animationDelay: `${index * 100}ms` }}
+        >
+          <Skeleton className="h-4 w-1/4 rounded-md" />
+          <Skeleton className="h-10 w-full rounded-lg" />
+        </div>
+      ))}
+      {/* Action buttons skeleton */}
+      <div className="flex justify-end gap-3 mt-8">
+        <Skeleton className="h-10 w-24 rounded-md" />
+        <Skeleton className="h-10 w-24 rounded-md" />
+      </div>
+    </div>
+  </div>
+);
+
 export default function TabEventForm() {
   // Get the global form context
   const { form: formContext, currentStep } = useEventFormContext();
@@ -89,6 +118,9 @@ export default function TabEventForm() {
   }, [currentStep]);
 
   // Handle tab navigation
+  const handleTabChange = (value: string) => {
+    setActiveTab(value);
+  };
 
   const navigateToPreviousTab = () => {
     const currentIndex = steps.findIndex((step) => step.value === activeTab);
@@ -110,7 +142,7 @@ export default function TabEventForm() {
         <RHFFormProvider {...formContext}>
           <Tabs
             value={activeTab}
-            onValueChange={setActiveTab}
+            onValueChange={handleTabChange}
             className="w-full"
           >
             <div className="flex justify-between items-center mb-4">
@@ -127,7 +159,7 @@ export default function TabEventForm() {
                         key={step.id}
                         value={step.value}
                         disabled={isDisabled}
-                        className={`px-2 sm:px-3 md:px-4 lg:px-5 py-1.5 h-auto text-xs sm:text-sm font-medium whitespace-nowrap rounded-md data-[state=active]:bg-[var(--color-primary)] data-[state=active]:text-white data-[state=active]:shadow-sm flex items-center justify-center gap-1 sm:gap-1.5 flex-shrink-0 md:flex-1 md:min-w-0 ${
+                        className={`px-2 sm:px-3 md:px-4 lg:px-5 py-1.5 h-auto text-xs sm:text-sm font-medium whitespace-nowrap rounded-md data-[state=active]:bg-[var(--color-primary)] data-[state=active]:text-white data-[state=active]:shadow-sm flex items-center justify-center gap-1 sm:gap-1.5 flex-shrink-0 md:flex-1 md:min-w-0 transition-all duration-300 ease-in-out ${
                           isDisabled ? "opacity-50 cursor-not-allowed" : ""
                         } ${
                           currentStep && step.id === currentStep
@@ -152,57 +184,100 @@ export default function TabEventForm() {
             </div>
 
             <Card className="shadow-sm">
-              <div className="space-y-6">
-                <TabsContent value="event-name" className="mt-0 w-full">
+              <div className="space-y-6 relative min-h-[400px]">
+                <TabsContent 
+                  value="event-name" 
+                  className="mt-0 w-full"
+                >
                   <div className="bg-white rounded-lg p-2 sm:p-4 md:p-6">
-                    <EventNameTab />
+                    <Suspense fallback={<TabContentLoader />}>
+                      <EventNameTab />
+                    </Suspense>
                   </div>
                 </TabsContent>
 
-                <TabsContent value="package" className="mt-0 w-full">
+                <TabsContent 
+                  value="package" 
+                  className="mt-0 w-full"
+                >
                   <div className="bg-white rounded-lg p-2 sm:p-4 md:p-6">
-                    <PackageTab />
+                    <Suspense fallback={<TabContentLoader />}>
+                      <PackageTab />
+                    </Suspense>
                   </div>
                 </TabsContent>
 
-                <TabsContent value="dates" className="mt-0 w-full">
+                <TabsContent 
+                  value="dates" 
+                  className="mt-0 w-full"
+                >
                   <div className="bg-white rounded-lg p-2 sm:p-4 md:p-6">
-                    <DatesTab />
+                    <Suspense fallback={<TabContentLoader />}>
+                      <DatesTab />
+                    </Suspense>
                   </div>
                 </TabsContent>
 
-                <TabsContent value="menu" className="mt-0 w-full">
+                <TabsContent 
+                  value="menu" 
+                  className="mt-0 w-full"
+                >
                   <div className="bg-white rounded-lg p-2 sm:p-4 md:p-6">
-                    <CateringTab />
+                    <Suspense fallback={<TabContentLoader />}>
+                      <CateringTab />
+                    </Suspense>
                   </div>
                 </TabsContent>
 
-                <TabsContent value="drinks" className="mt-0 w-full">
+                <TabsContent 
+                  value="drinks" 
+                  className="mt-0 w-full"
+                >
                   <div className="bg-white rounded-lg p-2 sm:p-4 md:p-6">
-                    <DrinksTab />
+                    <Suspense fallback={<TabContentLoader />}>
+                      <DrinksTab />
+                    </Suspense>
                   </div>
                 </TabsContent>
 
-                <TabsContent value="more-info" className="mt-0 w-full">
+                <TabsContent 
+                  value="more-info" 
+                  className="mt-0 w-full"
+                >
                   <div className="bg-white rounded-lg p-2 sm:p-4 md:p-6">
-                    <MoreInfoTab />
+                    <Suspense fallback={<TabContentLoader />}>
+                      <MoreInfoTab />
+                    </Suspense>
                   </div>
                 </TabsContent>
 
-                <TabsContent value="faqs" className="mt-0 w-full">
+                <TabsContent 
+                  value="faqs" 
+                  className="mt-0 w-full"
+                >
                   <div className="bg-white rounded-lg p-2 sm:p-4 md:p-6">
-                    <FaqsTab />
+                    <Suspense fallback={<TabContentLoader />}>
+                      <FaqsTab />
+                    </Suspense>
                   </div>
                 </TabsContent>
 
-                <TabsContent value="publish" className="mt-0 w-full">
+                <TabsContent 
+                  value="publish" 
+                  className="mt-0 w-full"
+                >
                   <div className="bg-white rounded-lg p-2 sm:p-4 md:p-6">
-                    <PublishTab />
+                    <Suspense fallback={<TabContentLoader />}>
+                      <PublishTab />
+                    </Suspense>
                   </div>
                 </TabsContent>
 
                 {/* Live Preview (read-only) */}
-                <TabsContent value="preview" className="mt-0 w-full">
+                <TabsContent 
+                  value="preview" 
+                  className="mt-0 w-full"
+                >
                   <div className="bg-white rounded-lg p-0 sm:p-0">
                     <EventPreview
                       data={(eventData as { data?: object })?.data || {}}

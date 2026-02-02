@@ -459,7 +459,7 @@ export interface AvailableRescheduleDate {
   price: number;
   people: number;
   tables: number;
-  drinks: number;
+  drinks?: number; // Optional - not always returned by API
   table_details: RescheduleTableDetail[];
 }
 
@@ -472,7 +472,7 @@ export interface RescheduleCurrentDate {
   price: string;
   people: number;
   tables: number;
-  drinks: number;
+  drinks?: number; // Optional - not always returned by API
 }
 
 /**
@@ -513,4 +513,37 @@ export interface RescheduleBookingPayload {
   unpaid_amount: number;
   payment_gateway: string; // Payment gateway slug like "stripe"
   table_details: RescheduleTableDetailPayload[];
+}
+
+/**
+ * Payment details returned when payment is required for rescheduling
+ */
+export interface ReschedulePaymentData {
+  payment_id: number;
+  gateway: string;
+  redirect_url: string;
+  amount: string;
+  currency: string;
+  status: string;
+}
+
+/**
+ * Response data from reschedule booking API
+ * Contains reschedule request ID and payment details if payment is required
+ */
+export interface RescheduleBookingResponseData {
+  unpaid_amount?: number;
+  reschedule_request_id?: number;
+  payment_gateway?: string;
+  payment?: ReschedulePaymentData;
+}
+
+/**
+ * Complete response type for reschedule booking operations
+ */
+export interface RescheduleBookingResponse {
+  status: boolean;
+  message: string;
+  data?: RescheduleBookingResponseData;
+  errors?: string[];
 }

@@ -151,7 +151,6 @@ export type EventsResponse = BaseApiResponse<EventsResponseData>;
  * Event detail type definition for single event page
  */
 export interface EventDetail {
-  event_address?: string | null;
   event_schedular_background_image: string | null;
   menu_background_image: string | null;
   address: string;
