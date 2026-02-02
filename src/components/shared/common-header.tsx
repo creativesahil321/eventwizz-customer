@@ -8,7 +8,6 @@ import {
   ImageIcon,
   ShoppingCart,
 } from "lucide-react";
-import Image from "next/image";
 import Link from "next/link";
 import { useContext, useState, useEffect } from "react";
 import { ServerContext } from "@/lib/server-context";
@@ -16,6 +15,7 @@ import { LucideIcon } from "lucide-react";
 import { useSession } from "next-auth/react";
 import { ThemeSchema } from "@/types/theme.types";
 import CartButton from "./cart-button";
+import { addCacheBusting } from "@/lib/image-utils";
 // import { useIsPreviewMode } from "@/contexts/preview-context"; // Available for future use
 
 // Define icon mapping with proper typing
@@ -207,13 +207,10 @@ export default function CommonHeader({
             {isOnboardingMode ? (
               <div className="h-14 flex items-center justify-center cursor-default">
                 {logoPath ? (
-                  <Image
-                    src={logoPath as string}
-                    width={120}
-                    height={40}
+                  <img
+                    src={addCacheBusting(logoPath as string)}
                     className="max-h-12 w-auto object-contain"
                     alt={vendorTheme?.name || "EventWizz"}
-                    priority
                   />
                 ) : (
                   <div
@@ -228,13 +225,10 @@ export default function CommonHeader({
               <Link href="/" aria-label="Home">
                 <div className="h-14 flex items-center justify-center">
                   {logoPath ? (
-                    <Image
-                      src={logoPath as string}
-                      width={120}
-                      height={40}
+                    <img
+                      src={addCacheBusting(logoPath as string)}
                       className="max-h-12 w-auto object-contain"
                       alt={vendorTheme?.name || "EventWizz"}
-                      priority
                     />
                   ) : (
                     <div
@@ -347,13 +341,10 @@ export default function CommonHeader({
             {isOnboardingMode ? (
               <div className="h-10 flex items-center justify-center cursor-default">
                 {logoPath ? (
-                  <Image
-                    src={logoPath as string}
-                    width={100}
-                    height={30}
+                  <img
+                    src={addCacheBusting(logoPath as string)}
                     className="max-h-8 w-auto object-contain"
                     alt={vendorTheme?.name || "EventWizz"}
-                    priority
                   />
                 ) : (
                   <div
@@ -368,13 +359,10 @@ export default function CommonHeader({
               <Link href="/" aria-label="Home">
                 <div className="h-10 flex items-center justify-center">
                   {logoPath ? (
-                    <Image
-                      src={logoPath as string}
-                      width={100}
-                      height={30}
+                    <img
+                      src={addCacheBusting(logoPath as string)}
                       className="max-h-8 w-auto object-contain"
                       alt={vendorTheme?.name || "EventWizz"}
-                      priority
                     />
                   ) : (
                     <div

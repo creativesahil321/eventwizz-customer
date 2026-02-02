@@ -1,5 +1,4 @@
 import React, { memo, useMemo } from "react";
-import Image from "next/image";
 import { ChevronDown, LogOut, Settings, User as UserIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -12,6 +11,7 @@ import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { useAuthStore } from "@/store/auth.store";
 import { logout } from "@/lib/auth/logout";
+import { addCacheBusting } from "@/lib/image-utils";
 
 // Helper function to check if a URL is valid
 const isValidUrl = (url: string | null | undefined): boolean => {
@@ -104,12 +104,10 @@ const UserDropdown = memo(() => {
         <DropdownMenuTrigger asChild>
           <Button className="flex items-center gap-2 bg-transparent text-[var(--color-text)] shadow-none hover:bg-transparent pr-2">
             {isValidUrl(userImage) ? (
-              <Image
+              <img
                 className="h-[32px] w-[32px] rounded-full object-cover"
-                src={userImage as string}
+                src={addCacheBusting(userImage as string)}
                 alt="User Avatar"
-                width={38}
-                height={38}
               />
             ) : (
               <div className="h-[32px] w-[32px] rounded-full bg-blue-100 text-blue-800 flex items-center justify-center text-sm font-medium">

@@ -8,12 +8,12 @@ import {
   CarouselNext,
 } from "@/components/ui/carousel";
 
-import Image from "next/image";
 import { useContext, useMemo } from "react";
 import { cn } from "@/lib/utils";
 import { ServerContext } from "@/lib/server-context";
 import { ThemeSchema } from "@/types/theme.types";
 import { GalleryComponentProps } from "../event-types";
+import { addCacheBusting } from "@/lib/image-utils";
 
 // Default fallback images
 const defaultEventImages = [
@@ -145,13 +145,10 @@ export default function RecentEventsGlimpse({
         // Single image layout - full width
         <div className="w-full">
           <div className="h-[300px] md:h-[400px] lg:h-[500px] overflow-hidden relative">
-            <Image
-              src={images[0]}
+            <img
+              src={addCacheBusting(images[0])}
               alt="Recent Event"
-              width={1920}
-              height={1080}
               className="w-full h-full object-cover transition-transform duration-300 hover:scale-105"
-              priority
             />
           </div>
         </div>
@@ -179,11 +176,9 @@ export default function RecentEventsGlimpse({
                   className="pl-4 md:basis-1/2 lg:basis-1/3"
                 >
                   <div className="h-64 md:h-72 overflow-hidden relative">
-                    <Image
-                      src={src}
+                    <img
+                      src={addCacheBusting(src)}
                       alt={`Recent Event ${index + 1}`}
-                      width={600}
-                      height={400}
                       className="w-full h-full object-cover transition-transform duration-300 hover:scale-105"
                     />
                   </div>

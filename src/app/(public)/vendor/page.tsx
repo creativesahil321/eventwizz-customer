@@ -18,9 +18,12 @@ export default function VendorSiteHomePage() {
   const [isLoading, setIsLoading] = useState(true);
   const [viewMode, setViewMode] = useState<"map" | "grid">("grid");
   const [isMobile, setIsMobile] = useState(false);
-  
+
   // Get locations from domain settings
-  const allLocations = useMemo(() => settings?.locations || [], [settings?.locations]);
+  const allLocations = useMemo(
+    () => settings?.locations || [],
+    [settings?.locations]
+  );
 
   // Detect mobile devices
   useEffect(() => {

@@ -17,8 +17,8 @@ import { SectionTitle } from "../ui/section-title";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { TiptapEditor } from "@/components/ui/tiptap-editor";
-import Image from "next/image";
 import { VideoFormatInfo } from "@/components/shared/video-format-info";
+import { addCacheBusting } from "@/lib/image-utils";
 
 interface BrandingTabProps {
   shouldResetImages?: boolean;
@@ -290,13 +290,10 @@ export function BrandingTab({ shouldResetImages = false }: BrandingTabProps) {
               <FormControl>
                 {logoUrl ? (
                   <div className="space-y-2">
-                    <Image
-                      src={logoUrl}
+                    <img
+                      src={addCacheBusting(logoUrl)}
                       alt="Logo preview"
                       className="max-h-40 object-contain mx-auto"
-                      width={240}
-                      height={60}
-                      loading="lazy"
                     />
                     <button
                       type="button"
@@ -340,13 +337,10 @@ export function BrandingTab({ shouldResetImages = false }: BrandingTabProps) {
               <FormControl>
                 {faviconUrl ? (
                   <div className="space-y-2">
-                    <Image
-                      src={faviconUrl}
+                    <img
+                      src={addCacheBusting(faviconUrl)}
                       alt="Favicon preview"
                       className="max-h-16 object-contain mx-auto"
-                      width={32}
-                      height={32}
-                      loading="lazy"
                     />
                     <button
                       type="button"
@@ -484,13 +478,10 @@ export function BrandingTab({ shouldResetImages = false }: BrandingTabProps) {
                   <FormControl>
                     {landingPageImageUrl ? (
                       <div className="space-y-2">
-                        <Image
-                          src={landingPageImageUrl}
+                        <img
+                          src={addCacheBusting(landingPageImageUrl)}
                           alt="Landing page image preview"
                           className="max-h-40 object-contain mx-auto"
-                          width={1200}
-                          height={600}
-                          loading="lazy"
                         />
                         <button
                           type="button"

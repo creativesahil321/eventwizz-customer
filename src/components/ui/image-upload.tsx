@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import Image from "next/image";
 import { Upload, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -59,12 +58,10 @@ export function ImageUpload({
       >
         {preview ? (
           <div className="relative w-full h-full">
-            <Image
+            <img
               src={preview}
               alt="Uploaded image"
-              fill
-              style={{ objectFit: "contain" }}
-              className="rounded-md"
+              className="absolute inset-0 w-full h-full object-contain rounded-md"
             />
             <button
               type="button"

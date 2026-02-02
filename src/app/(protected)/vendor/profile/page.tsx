@@ -8,7 +8,6 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Form, FormLabel } from "@/components/ui/form";
 import { FileUploader } from "@/components/ui/file-uploader";
-import Image from "next/image";
 import {
   profileSchema,
   passwordUpdateSchema,
@@ -21,6 +20,7 @@ import {
 } from "@/app/(protected)/_shared/profile/_lib";
 import { ProfileSkeleton } from "@/app/(protected)/_shared/profile/_components/profile-skeleton";
 import { useProfileSync } from "@/components/shared/profile-update-sync";
+import { addCacheBusting } from "@/lib/image-utils";
 
 export default function ProfilePage() {
   const { data: session } = useSession();
@@ -190,12 +190,10 @@ export default function ProfilePage() {
                   <div className="relative">
                     <div className="w-32 h-32 rounded-full overflow-hidden border-4 border-gray-100 shadow-lg bg-gray-50">
                       {avatarPreview ? (
-                        <Image
-                          src={avatarPreview}
+                        <img
+                          src={addCacheBusting(avatarPreview, profileData?.updated_at)}
                           alt="Profile picture"
                           className="w-full h-full object-cover"
-                          width={128}
-                          height={128}
                         />
                       ) : (
                         <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-blue-100 to-purple-100">

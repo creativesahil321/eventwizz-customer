@@ -8,7 +8,6 @@ import {
   CarouselNext,
 } from "@/components/ui/carousel";
 
-import Image from "next/image";
 import Link from "next/link";
 import { ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -17,6 +16,7 @@ import { cn } from "@/lib/utils";
 import { ServerContext } from "@/lib/server-context";
 import { ThemeSchema } from "@/types/theme.types";
 import { Event } from "@/services/common/events/type";
+import { addCacheBusting } from "@/lib/image-utils";
 
 // Sample event data - using local image assets
 const eventImages = [
@@ -199,11 +199,9 @@ export default function PopularEvents({
               {/* Image section - takes 40% on desktop */}
               <div className="md:w-2/5 relative">
                 <div className="aspect-[4/3] md:aspect-auto md:h-full w-full">
-                  <Image
-                    src={event.image}
+                  <img
+                    src={addCacheBusting(event.image)}
                     alt={event.title}
-                    width={500}
-                    height={350}
                     className="w-full h-full object-cover"
                   />
                 </div>
@@ -291,13 +289,10 @@ export default function PopularEvents({
                   <div className={cn("p-2 h-full", itemWidth)}>
                     <div className="overflow-hidden bg-white rounded-lg shadow-md hover:shadow-lg transition-shadow duration-300 h-full flex flex-col">
                       <div className="relative aspect-[3/4] w-full overflow-hidden flex-shrink-0">
-                        <Image
-                          src={data.image}
+                        <img
+                          src={addCacheBusting(data.image)}
                           alt={data.title}
-                          width={400}
-                          height={533}
                           className="w-full h-full object-cover transition-transform duration-300 hover:scale-105"
-                          priority={index === 0}
                         />
                       </div>
                       <div className="p-4 relative text-black flex-1 flex flex-col">

@@ -1,13 +1,13 @@
 "use client";
 
 import { Bookmark, Menu, Phone, X } from "lucide-react";
-import Image from "next/image";
 import Link from "next/link";
 import { useContext, useState, useEffect } from "react";
 import { ServerContext } from "@/lib/server-context";
 import { LucideIcon } from "lucide-react";
 import { useSession } from "next-auth/react";
 import { ThemeSchema } from "@/types/theme.types";
+import { addCacheBusting } from "@/lib/image-utils";
 
 // Define icon mapping with proper typing
 type IconKey = "phone" | "bookmarks";
@@ -132,13 +132,10 @@ export default function HeadersSec({
           <div className="w-1/3 text-center">
             <Link href="/" aria-label="Home">
               <div className="h-14 flex items-center justify-center">
-                <Image
-                  src={logoPath}
-                  width={120}
-                  height={40}
+                <img
+                  src={addCacheBusting(logoPath)}
                   className="max-h-12 w-auto object-contain"
                   alt={vendorTheme?.name || "EventWizz"}
-                  priority
                 />
               </div>
             </Link>
@@ -172,13 +169,10 @@ export default function HeadersSec({
           <div className="text-center">
             <Link href="/" aria-label="Home">
               <div className="h-10 flex items-center justify-center">
-                <Image
-                  src={logoPath}
-                  width={100}
-                  height={30}
+                <img
+                  src={addCacheBusting(logoPath)}
                   className="max-h-8 w-auto object-contain"
                   alt={vendorTheme?.name || "EventWizz"}
-                  priority
                 />
               </div>
             </Link>

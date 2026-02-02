@@ -3,8 +3,8 @@
 import { Skeleton } from "@/components/ui/skeleton";
 import { ServerContext } from "@/lib/server-context";
 import { cn } from "@/lib/utils";
-import Image from "next/image";
 import { useContext } from "react";
+import { addCacheBusting } from "@/lib/image-utils";
 
 interface OnboardingSkeletonProps {
   className?: string;
@@ -30,13 +30,10 @@ export function OnboardingFormSkeleton({
       <div className="relative">
         {/* Logo - Responsive sizing for all screens */}
         <div className="absolute left-0 top-1/2 transform -translate-y-1/2 pl-4 md:pl-6 z-10 pr-4 md:pr-6">
-          <Image
-            src={logoPath}
+          <img
+            src={addCacheBusting(logoPath)}
             alt={theme?.name || "EventWizz"}
-            width={110}
-            height={30}
             className="h-5 md:h-6 lg:h-11 xl:h-13 w-auto object-contain max-w-[85px] md:max-w-[95px] lg:max-w-[130px] animate-pulse"
-            priority
           />
         </div>
 

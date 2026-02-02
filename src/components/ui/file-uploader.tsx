@@ -1,7 +1,6 @@
 "use client";
 
 import * as React from "react";
-import Image from "next/image";
 import { FileText, Upload, X } from "lucide-react";
 import Dropzone, {
   type DropzoneProps,
@@ -639,13 +638,10 @@ interface FilePreviewProps {
 function FilePreview({ file }: FilePreviewProps) {
   if (file.type.startsWith("image/")) {
     return (
-      <Image
+      <img
         src={file.preview}
         alt={file.name}
-        width={48}
-        height={48}
-        loading="lazy"
-        className="aspect-square shrink-0 rounded-md object-cover"
+        className="w-12 h-12 aspect-square shrink-0 rounded-md object-cover"
       />
     );
   }

@@ -18,7 +18,7 @@ import {
   Calendar,
 } from "lucide-react";
 import { formatDate } from "@/lib/utils";
-import Image from "next/image";
+import { addCacheBusting } from "@/lib/image-utils";
 
 interface ViewLocationDialogProps {
   open: boolean;
@@ -48,11 +48,9 @@ export default function ViewLocationDialog({
         <div className="space-y-6 py-4 min-w-0">
           {location.logo && (
             <div className="flex justify-center mb-4">
-              <Image
-                src={location.logo}
+              <img
+                src={addCacheBusting(location.logo, location.updated_at)}
                 alt={`${location.name} logo`}
-                width={80}
-                height={80}
                 className="h-20 w-auto object-contain rounded-md"
               />
             </div>

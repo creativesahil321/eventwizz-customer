@@ -3,10 +3,10 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Clock, Dot, Eye } from "lucide-react";
-import Image from "next/image";
 import { Event } from "../../_lib/types";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
+import { addCacheBusting } from "@/lib/image-utils";
 
 type EventCardProps = {
   event: Event;
@@ -110,12 +110,10 @@ export default function EventCard({
           <div className="p-2 sm:p-3 bg-background rounded-md shadow-2xl w-full">
             {event.image ? (
               <div className="relative w-full aspect-[4/3] overflow-hidden rounded-md rounded-bl-none rounded-br-none group">
-                <Image
-                  fill
-                  src={event.image}
+                <img
+                  src={addCacheBusting(event.image, event.updated_at)}
                   alt={event.name}
-                  className="object-cover"
-                  sizes="(max-width: 640px) 100vw, (max-width: 768px) 50vw, (max-width: 1024px) 33vw, (max-width: 1280px) 25vw, 20vw"
+                  className="absolute inset-0 w-full h-full object-cover"
                 />
                 {/* Overview Button - Top Right */}
                 {!selectionMode && (

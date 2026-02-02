@@ -1,11 +1,11 @@
 "use client";
 
 import { cn } from "@/lib/utils";
-import Image from "next/image";
 import Link from "next/link";
 import { useContext } from "react";
 import { ServerContext } from "@/lib/server-context";
 import { appConfig } from "@/config/app";
+import { addCacheBusting } from "@/lib/image-utils";
 
 interface LogoProps {
   collapsed: boolean;
@@ -35,22 +35,16 @@ const Logo: React.FC<LogoProps> = ({ collapsed }) => {
       <span className="transition-all duration-300 ease-linear">
         <Link href="/">
           {collapsed ? (
-            <Image
+            <img
               className="h-8 w-auto"
               src={appConfig.mini_logo}
               alt={theme?.name || "EventWizz"}
-              width={32}
-              height={32}
-              priority
             />
           ) : (
-            <Image
+            <img
               className="h-8 w-auto object-contain drop-shadow-[2px_4px_6px_black]"
-              src={logoPath}
+              src={addCacheBusting(logoPath)}
               alt={theme?.name || "EventWizz"}
-              width={110}
-              height={30}
-              priority
             />
           )}
         </Link>
