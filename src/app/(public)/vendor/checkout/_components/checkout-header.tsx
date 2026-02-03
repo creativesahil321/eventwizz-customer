@@ -3,8 +3,8 @@
 import { useRouter } from "next/navigation";
 import { ArrowLeft, Shield, Lock } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import Image from "next/image";
 import { CheckoutHeaderProps } from "../_lib/types";
+import { addCacheBusting } from "@/lib/image-utils";
 
 export default function CheckoutHeader({ settings }: CheckoutHeaderProps) {
   const router = useRouter();
@@ -27,8 +27,8 @@ export default function CheckoutHeader({ settings }: CheckoutHeaderProps) {
           {/* Logo */}
           <div className="flex items-center">
             {settings?.logo ? (
-              <Image
-                src={settings.logo}
+              <img
+                src={addCacheBusting(settings.logo)}
                 alt={settings.name || "EventWizz"}
                 width={120}
                 height={40}

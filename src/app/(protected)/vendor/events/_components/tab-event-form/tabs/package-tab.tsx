@@ -18,10 +18,10 @@ import { FileUploader } from "@/components/ui/file-uploader";
 import { Trash, PlusCircle, GripVertical } from "lucide-react";
 import { toast } from "sonner";
 import { Accept } from "react-dropzone";
-import Image from "next/image";
 import { useEventFormContext } from "../../events-form-provider";
 import { StepTwoType, stepTwoSchema } from "../schema";
 import { eventsService } from "@/services/vendor/events/events.service";
+import { addCacheBusting } from "@/lib/image-utils";
 
 // Define interfaces for gallery items and files with preview
 interface FileWithPreview extends File {
@@ -402,9 +402,11 @@ export default function PackageTab() {
                     <div>
                       {packageImageUrl ? (
                         <div className="relative w-full">
-                          <Image
-                            src={packageImageUrl}
-                            alt="Package"
+                          <img
+                            src={addCacheBusting(
+                              (packageImageUrl as string) || ""
+                            )}
+                            alt="Package Image"
                             width={400}
                             height={200}
                             className="max-h-60 object-contain mx-auto mb-2"
@@ -640,14 +642,14 @@ export default function PackageTab() {
                                   <GripVertical className="h-4 w-4 text-gray-600" />
                                 </div>
 
-                                <Image
-                                  src={
+                                <img
+                                  src={addCacheBusting(
                                     typeof item === "string"
-                                      ? item
-                                      : (item as GalleryItem).url ||
-                                        (item as FileWithPreview).preview ||
-                                        ""
-                                  }
+                                      ? (item as string)
+                                      : (((item as GalleryItem).url ||
+                                          (item as FileWithPreview).preview ||
+                                          "") as string)
+                                  )}
                                   alt={`Gallery image ${index + 1}`}
                                   width={200}
                                   height={200}

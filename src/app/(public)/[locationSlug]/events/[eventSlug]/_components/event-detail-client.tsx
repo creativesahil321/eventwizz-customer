@@ -3,7 +3,6 @@
 import { useEventDetail } from "../_lib/hooks";
 import { EventDetail } from "@/services/common/events/type";
 import { useRef } from "react";
-import Image from "next/image";
 
 // Import event components from onboarding flow
 import AboutEventSec from "@/app/(on-boarding)/on-boarding/_components/form-preview/_components/About-event-sec";
@@ -21,6 +20,7 @@ import FooterSection from "@/app/(public)/vendor/_components/EventListPage/foote
 import EventGallery from "@/app/(on-boarding)/on-boarding/_components/form-preview/_components/Event-gallery";
 import { ThemeAnimationManager } from "@/components/theme-animations/theme-animation-manager";
 import { CartConflictProvider } from "@/app/(public)/vendor/checkout/_components/cart-conflict-provider";
+import { addCacheBusting } from "@/lib/image-utils";
 
 interface EventDetailClientProps {
   event: EventDetail;
@@ -100,13 +100,10 @@ export default function EventDetailClient({
             </>
           ) : (
             eventData.event_banner_image && (
-              <Image
-                src={eventData.event_banner_image}
+              <img
+                src={addCacheBusting(eventData.event_banner_image)}
                 alt={eventData.event_name || "Event banner"}
                 className={heroStyles.videoBackground}
-                fill
-                priority
-                sizes="100vw"
                 style={{ objectFit: "cover" }}
               />
             )

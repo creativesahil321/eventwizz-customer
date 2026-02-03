@@ -53,6 +53,8 @@ export default function PackageSection({
                 <img
                   src={addCacheBusting(getImageSrc(image))}
                   alt="Package Image"
+                  width={500}
+                  height={400}
                   className="max-w-full max-h-full object-contain"
                 />
               </div>

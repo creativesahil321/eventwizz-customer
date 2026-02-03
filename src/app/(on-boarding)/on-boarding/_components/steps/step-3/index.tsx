@@ -29,9 +29,9 @@ import { useEventCategories } from "@/services/vendor/events/query";
 import { useSession } from "next-auth/react";
 import { TiptapEditor } from "@/components/ui/tiptap-editor";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import Image from "next/image";
 import { setEventIdInForm } from "../../../_lib/hooks/useEventId";
 import { VideoFormatInfo } from "@/components/shared/video-format-info";
+import { addCacheBusting } from "@/lib/image-utils";
 
 export default function StepThree() {
   const {
@@ -702,8 +702,10 @@ export default function StepThree() {
                           >
                             {headerBannerUrl ? (
                               <div className="relative w-full">
-                                <Image
-                                  src={headerBannerUrl}
+                                <img
+                                  src={addCacheBusting(
+                                    headerBannerUrl as string
+                                  )}
                                   alt="Event Banner"
                                   className="max-h-40 object-contain mx-auto mb-2"
                                   width={100}

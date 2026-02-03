@@ -32,8 +32,8 @@ import { onboardingService } from "@/services/vendor/onboarding/onboarding.servi
 import { Accept } from "react-dropzone";
 import GalleryUploader from "./gallery-uploader";
 import { useSession } from "next-auth/react";
-import Image from "next/image";
 import { useEventId } from "../../../_lib/hooks/useEventId";
+import { addCacheBusting } from "@/lib/image-utils";
 
 // Define an interface for files with preview
 interface FileWithPreview extends File {
@@ -419,9 +419,9 @@ const StepFour = () => {
                           >
                             {packageImageUrl ? (
                               <div className="relative w-full">
-                                <Image
-                                  src={packageImageUrl}
-                                  alt="Package"
+                                <img
+                                  src={addCacheBusting(packageImageUrl)}
+                                  alt="Package Image"
                                   className="max-h-60 object-contain mx-auto mb-2"
                                   width={100}
                                   height={100}

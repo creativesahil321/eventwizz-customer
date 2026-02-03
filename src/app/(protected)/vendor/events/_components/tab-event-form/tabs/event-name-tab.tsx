@@ -32,7 +32,7 @@ import { useEventFormContext } from "../../events-form-provider";
 import { StepOneType, stepOneSchema } from "../schema";
 import { eventsService } from "@/services/vendor/events/events.service";
 import { useRouter } from "next/navigation";
-import Image from "next/image";
+import { addCacheBusting } from "@/lib/image-utils";
 
 export default function EventNameTab() {
   // No need to use session update as we get data from API
@@ -887,13 +887,12 @@ export default function EventNameTab() {
                             <div>
                               {bannerImageUrl ? (
                                 <div className="space-y-2">
-                                  <Image
-                                    src={bannerImageUrl}
+                                  <img
+                                    src={addCacheBusting(bannerImageUrl)}
                                     alt="Banner"
                                     width={400}
                                     height={200}
                                     className="max-h-60 object-contain mx-auto"
-                                    quality={100}
                                   />
                                   <Button
                                     type="button"
@@ -1247,8 +1246,8 @@ export default function EventNameTab() {
                       <FormControl>
                         {typeof field.value === "string" && field.value ? (
                           <div className="relative w-full">
-                            <Image
-                              src={field.value}
+                            <img
+                              src={addCacheBusting(field.value)}
                               alt="Scheduler Background"
                               width={400}
                               height={200}

@@ -14,7 +14,6 @@ import {
   Ticket,
   Wine,
 } from "lucide-react";
-import Image from "next/image";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { useGetCartData } from "@/services/customer/cart/query";
@@ -37,6 +36,7 @@ import { handleCheckoutError } from "@/services/customer/checkout/utils";
 import { useCartEditStore } from "@/store/cart-edit.store";
 import { usePaymentGatewaySelection } from "@/store/payment-gateway-selection.store";
 import PaymentGatewaySelector from "./payment-gateway-selector";
+import { addCacheBusting } from "@/lib/image-utils";
 // PaymentInfo import removed as it's not used in this component
 
 type BookingSummaryProps = Record<string, never>;
@@ -336,16 +336,10 @@ export default function BookingSummary({}: BookingSummaryProps) {
           {/* Event Details - Minimal Compact */}
           <div className="flex items-center gap-2 pb-2 border-b">
             <div className="relative w-8 h-8 rounded overflow-hidden bg-gray-100 flex-shrink-0">
-              <Image
-                src={currentEventApiData?.event_image || ""}
+              <img
+                src={addCacheBusting(currentEventApiData?.event_image || "")}
                 alt={currentEventApiData?.event_name || "Event"}
-                fill
-                className="object-cover"
-                onError={(e) => {
-                  // Fallback image
-                  (e.target as HTMLImageElement).src =
-                    "https://via.placeholder.com/40x40?text=Event";
-                }}
+                className="absolute inset-0 w-full h-full object-cover"
               />
             </div>
             <div className="flex-1 min-w-0">

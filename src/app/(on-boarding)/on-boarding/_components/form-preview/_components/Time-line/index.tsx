@@ -1,5 +1,6 @@
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useRef, useEffect, useState, useMemo } from "react";
+import { addCacheBusting } from "@/lib/image-utils";
 
 type EventScheduler = {
   id?: string;
@@ -180,11 +181,10 @@ export default function Timeline({
     <section className="w-full py-10 sm:py-16 px-2 sm:px-4 relative overflow-hidden bg-black">
       {eventSchedularBackgroundImage && (
         <div className="w-full h-full absolute top-0 left-0">
-          <Image
-            src={eventSchedularBackgroundImage}
+          <img
+            src={addCacheBusting(eventSchedularBackgroundImage)}
             alt="Event Scheduler Background Image"
-            fill
-            className="object-cover opacity-30 z-0"
+            className="absolute inset-0 w-full h-full object-cover opacity-30 z-0"
           />
         </div>
       )}

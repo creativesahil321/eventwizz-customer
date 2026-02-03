@@ -1,6 +1,5 @@
 "use client";
 
-import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -21,6 +20,7 @@ import {
 } from "lucide-react";
 import { Booking } from "../_lib/types";
 import { formatBookingStatus } from "../_lib/utils";
+import { addCacheBusting } from "@/lib/image-utils";
 
 interface BookingCardProps {
   booking: Booking;
@@ -69,17 +69,14 @@ export default function BookingCard({
 
       {/* Event Image */}
       <div className="relative w-full h-48 bg-muted flex-shrink-0 z-0">
-        <Image
-          src={
+        <img
+          src={addCacheBusting(
             booking.event_image && booking.event_image.trim() !== ""
               ? booking.event_image
               : "/assets/images/events/event-date-banner.jpg"
-          }
+          )}
           alt={booking.event_name}
-          fill
-          className="object-cover"
-          unoptimized={false}
-          priority={false}
+          className="absolute inset-0 w-full h-full object-cover"
         />
       </div>
 

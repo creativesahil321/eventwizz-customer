@@ -22,8 +22,8 @@ import {
 import { onboardingService } from "@/services/vendor/onboarding/onboarding.service";
 import { toast } from "sonner";
 import { TiptapEditor } from "@/components/ui/tiptap-editor";
-import Image from "next/image";
 import { useSession } from "next-auth/react";
+import { addCacheBusting } from "@/lib/image-utils";
 
 export default function StepTwo() {
   const {
@@ -174,8 +174,8 @@ export default function StepTwo() {
                       >
                         {logoUrl ? (
                           <div className="relative w-full">
-                            <Image
-                              src={logoUrl}
+                            <img
+                              src={addCacheBusting(logoUrl)}
                               alt="Logo"
                               className="max-h-40 object-contain mx-auto mb-2"
                               width={100}
@@ -224,8 +224,8 @@ export default function StepTwo() {
                       >
                         {coverUrl ? (
                           <div className="relative w-full">
-                            <Image
-                              src={coverUrl}
+                            <img
+                              src={addCacheBusting(coverUrl)}
                               alt="Cover Image"
                               className="max-h-40 object-contain mx-auto mb-2"
                               width={100}

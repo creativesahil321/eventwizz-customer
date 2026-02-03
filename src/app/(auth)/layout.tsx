@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { useContext, useEffect, useState } from "react";
@@ -9,6 +8,7 @@ import { useDomain } from "@/providers/domain-provider/domain-provider";
 import { AuthContent } from "./_components/auth-content";
 import { ServerContext } from "@/lib/server-context";
 import { AuthSkeleton } from "./_components/auth-skeleton";
+import { addCacheBusting } from "@/lib/image-utils";
 
 export default function AuthLayout({
   children,
@@ -76,13 +76,10 @@ export default function AuthLayout({
       <header className="w-full h-16 bg-[var(--color-header)] text-[var(--color-header-foreground,var(--color-foreground))]">
         <div className="max-w-[1400px] h-full mx-auto px-4 sm:px-6 flex items-center justify-between">
           <Link href="/" className="flex items-center space-x-2">
-            <Image
+            <img
               className="h-8 w-auto object-contain"
               alt="EventWizz"
-              height={32}
-              width={140}
-              src={logoPath}
-              priority
+              src={addCacheBusting(logoPath)}
             />
           </Link>
           <nav>

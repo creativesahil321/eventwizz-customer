@@ -23,7 +23,6 @@ import { Label } from "@/components/ui/label";
 import { useEventMenuCategories } from "@/services/vendor/events/query";
 import { EventMenuCategory } from "@/services/vendor/events/type";
 import MenuCategoryDropdown from "@/app/(on-boarding)/on-boarding/_components/steps/step-6/menu-category-dropdown";
-import Image from "next/image";
 import { FileUploader } from "@/components/ui/file-uploader";
 
 export default function CateringTab() {
