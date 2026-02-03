@@ -1,6 +1,5 @@
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
 import {
   Facebook,
@@ -15,6 +14,7 @@ import {
 import { useContext } from "react";
 import { ServerContext } from "@/lib/server-context";
 import { ThemeSchema } from "@/types/theme.types";
+import { addCacheBusting } from "@/lib/image-utils";
 
 interface FooterSectionProps {
   copyright?: string | null;
@@ -99,13 +99,10 @@ export default function FooterSection({ copyright }: FooterSectionProps = {}) {
       <div className="container mx-auto border-b border-white/20 text-center pb-6">
         <Link href="/">
           <div className="h-20 flex items-center justify-center">
-            <Image
-              src={logoPath}
-              width={120}
-              height={40}
+            <img
+              src={addCacheBusting(logoPath)}
               className="max-h-12 w-auto object-contain"
               alt={vendorTheme?.name || "EventWizz"}
-              priority
             />
           </div>
         </Link>

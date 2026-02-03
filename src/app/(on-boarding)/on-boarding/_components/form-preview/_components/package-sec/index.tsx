@@ -1,9 +1,9 @@
 "use client";
 
 import { ImageIcon } from "lucide-react";
-import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { useOnboarding } from "@/hooks/use-onboarding";
+import { addCacheBusting } from "@/lib/image-utils";
 
 type PackageDetail = {
   title: string;
@@ -50,11 +50,9 @@ export default function PackageSection({
           <div className="bg-white rounded-lg shadow-md overflow-hidden border">
             {image ? (
               <div className="relative p-4 w-full bg-gray-50 flex items-center justify-center">
-                <Image
-                  src={getImageSrc(image)}
+                <img
+                  src={addCacheBusting(getImageSrc(image))}
                   alt="Package Image"
-                  width={500}
-                  height={400}
                   className="max-w-full max-h-full object-contain"
                 />
               </div>

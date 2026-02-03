@@ -1,6 +1,5 @@
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Menu, ChevronDown, MapPin } from "lucide-react";
@@ -12,7 +11,8 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { useLocationStore } from "@/store/location.store";
+import { useDomain } from "@/providers/domain-provider/domain-provider";
+import { addCacheBusting } from "@/lib/image-utils";
 
 interface LocationSelectionHeaderProps {
   logo?: string;
@@ -25,7 +25,10 @@ export default function LocationSelectionHeader({
 }: LocationSelectionHeaderProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [dropdownOpen, setDropdownOpen] = useState(false); // State for controlling dropdown visibility
-  const { allLocations, isLoading } = useLocationStore();
+  const { settings, isLoading: isDomainLoading } = useDomain();
+
+  const allLocations = settings?.locations || [];
+  const isLoading = isDomainLoading;
 
   // Close mobile menu if user clicks outside
   const handleClickOutside = useCallback(
@@ -68,13 +71,10 @@ export default function LocationSelectionHeader({
             transition={{ duration: 0.5 }}
           >
             {logo ? (
-              <Image
-                src={logo}
-                width={180}
-                height={60}
+              <img
+                src={addCacheBusting(logo)}
                 className="h-14 md:h-16 w-auto object-contain max-w-[200px]"
                 alt={name || "EventWizz"}
-                priority
               />
             ) : (
               <h1 className="text-xl font-bold text-gray-900">
@@ -127,7 +127,7 @@ export default function LocationSelectionHeader({
                               onClick={() => setMobileMenuOpen(false)}
                             >
                               <MapPin size={14} className="text-gray-600" />
-                              <span>{locationName}</span>
+                              <span>{locationName as string}</span>
                             </Link>
                           </DropdownMenuItem>
                         );
@@ -212,7 +212,7 @@ export default function LocationSelectionHeader({
                               onClick={() => setDropdownOpen(false)}
                             >
                               <MapPin size={14} className="text-gray-600" />
-                              <span>{locationName}</span>
+                              <span>{locationName as string}</span>
                             </Link>
                           </DropdownMenuItem>
                         );

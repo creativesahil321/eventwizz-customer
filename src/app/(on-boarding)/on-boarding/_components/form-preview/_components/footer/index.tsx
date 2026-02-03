@@ -10,8 +10,8 @@ import {
   Youtube,
 } from "lucide-react";
 import Link from "next/link";
-import Image from "next/image";
 import { useOnboarding } from "@/hooks/use-onboarding";
+import { addCacheBusting } from "@/lib/image-utils";
 
 // Social media icon mapping
 const socialIcons = {
@@ -105,12 +105,10 @@ export default function FooterSection({
           >
             <div className="flex flex-row gap-2 justify-center items-center">
               {logo ? (
-                <Image
-                  src={logoSrc as string}
+                <img
+                  src={addCacheBusting(logoSrc as string)}
                   alt={logo as string}
                   className="h-12 w-auto"
-                  width={100}
-                  height={50}
                 />
               ) : (
                 <div className="flex flex-row gap-2 items-center">

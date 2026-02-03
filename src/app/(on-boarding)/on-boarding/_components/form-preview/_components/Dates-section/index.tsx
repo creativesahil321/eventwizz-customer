@@ -2,7 +2,6 @@
 
 import { Button } from "@/components/ui/button";
 import { CircleChevronLeft, CircleChevronRight } from "lucide-react";
-import Image from "next/image";
 import { useState, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useRouter } from "next/navigation";
@@ -19,6 +18,7 @@ import { useCartConflictCheck } from "@/app/(public)/vendor/checkout/_components
 import { useGetCartData } from "@/services/customer/cart/query";
 import { useOnboarding } from "@/hooks/use-onboarding";
 import { useIsPreviewMode } from "@/contexts/preview-context";
+import { addCacheBusting } from "@/lib/image-utils";
 
 // Define proper user interface for session
 interface SessionUser {
@@ -521,12 +521,10 @@ export default function DatesSection({
     >
       {/* Background - completely black with subtle pattern */}
       <div className="absolute inset-0 z-0">
-        <Image
-          src="/assets/images/events/event-date-banner.jpg"
+        <img
+          src={addCacheBusting("/assets/images/events/event-date-banner.jpg")}
           alt="Event background"
-          fill
-          className="object-cover"
-          priority
+          className="absolute inset-0 w-full h-full object-cover"
         />
         <div
           className="absolute inset-0 opacity-20"

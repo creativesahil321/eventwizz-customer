@@ -2,10 +2,10 @@
 
 import React, { useState, useContext } from "react";
 import Link from "next/link";
-import Image from "next/image";
 import { Input } from "@/components/ui/input";
 import { Facebook, Instagram, Linkedin, Twitter, Youtube } from "lucide-react";
 import { ServerContext } from "@/lib/server-context";
+import { addCacheBusting } from "@/lib/image-utils";
 
 type ThemeAPIResponse = {
   colors?: {
@@ -57,12 +57,10 @@ export default function AdminFooter() {
           {/* Logo and Name */}
           <div className="mb-6 md:mb-0">
             <div className="flex items-center mb-4">
-              <Image
-                src={logoPath}
+              <img
+                src={addCacheBusting(logoPath)}
                 alt={apiTheme?.name || "EventWizz"}
-                width={110}
-                height={50}
-                className="mr-2"
+                className="mr-2 h-[50px] w-auto"
               />
             </div>
 

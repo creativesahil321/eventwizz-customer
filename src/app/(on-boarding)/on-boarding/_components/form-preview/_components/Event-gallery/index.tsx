@@ -1,6 +1,6 @@
 "use client";
 
-import Image from "next/image";
+import { addCacheBusting } from "@/lib/image-utils";
 
 type PackageImage = {
   path: string;
@@ -52,11 +52,11 @@ export default function EventGallery({ gallery }: PackageSectionProps) {
                 key={i}
                 className="rounded-md overflow-hidden aspect-[4/3] shadow-md"
               >
-                <Image
-                  src={typeof img === "string" ? img : getImageSrc(img)}
+                <img
+                  src={addCacheBusting(
+                    typeof img === "string" ? img : getImageSrc(img)
+                  )}
                   alt={`Event Gallery Image ${i + 1}`}
-                  width={300}
-                  height={100}
                   className="w-full h-full object-cover"
                 />
               </div>
@@ -72,11 +72,11 @@ export default function EventGallery({ gallery }: PackageSectionProps) {
                 key={`second-row-${i}`}
                 className="overflow-hidden aspect-[4/3] shadow-md"
               >
-                <Image
-                  src={typeof img === "string" ? img : getImageSrc(img)}
+                <img
+                  src={addCacheBusting(
+                    typeof img === "string" ? img : getImageSrc(img)
+                  )}
                   alt={`Event Gallery Image ${i + 5}`}
-                  width={300}
-                  height={225}
                   className="w-full h-full object-cover"
                 />
               </div>

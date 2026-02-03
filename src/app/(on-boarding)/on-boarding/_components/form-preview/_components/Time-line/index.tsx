@@ -1,6 +1,5 @@
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useRef, useEffect, useState, useMemo } from "react";
-import Image from "next/image";
 
 type EventScheduler = {
   id?: string;

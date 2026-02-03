@@ -1,5 +1,5 @@
 import { Navigation2 } from "lucide-react";
-import Image from "next/image";
+import { addCacheBusting } from "@/lib/image-utils";
 
 type MenuItem = {
   title: string;
@@ -56,12 +56,12 @@ export default function MenuSection({
     <section className="w-full px-5 py-5 relative relative">
       {/* Background */}
       <div className="absolute inset-0 z-0">
-        <Image
-          src={menu_background_image || "/assets/images/events/menus.webp"}
+        <img
+          src={addCacheBusting(
+            menu_background_image || "/assets/images/events/menus.webp"
+          )}
           alt="Event background"
-          fill
-          className="object-cover opacity-30"
-          priority
+          className="absolute inset-0 w-full h-full object-cover opacity-30"
         />
         {/* Dark overlay */}
         <div className="absolute inset-0 bg-black/70" />

@@ -2,11 +2,11 @@
 
 import { useState, useContext } from "react";
 import Link from "next/link";
-import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { Menu, X, Search } from "lucide-react";
 import { ServerContext } from "@/lib/server-context";
 import { useSession } from "next-auth/react";
+import { addCacheBusting } from "@/lib/image-utils";
 
 export default function AdminHeader() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -33,13 +33,10 @@ export default function AdminHeader() {
         {/* Logo */}
         <div className="flex-shrink-0">
           <Link href="/" className="flex items-center">
-            <Image
-              src={logoPath}
+            <img
+              src={addCacheBusting(logoPath)}
               alt={theme?.name || "EventWizz"}
-              width={110}
-              height={30}
               className="h-8 w-auto"
-              priority
             />
           </Link>
         </div>
