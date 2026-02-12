@@ -75,7 +75,7 @@ function MenuChoicesContent({ params }: MenuChoicesPageProps) {
         const bookingsResponse = data as { data: BookingItem[] };
         if (Array.isArray(bookingsResponse.data)) {
           const booking = bookingsResponse.data.find(
-            (b) => b.booking_id === bookingId
+            (b) => b.booking_id === bookingId,
           );
           if (booking) {
             return booking;
@@ -113,7 +113,7 @@ function MenuChoicesContent({ params }: MenuChoicesPageProps) {
     bookingId,
     selectedDateKey,
     selectedTableIdNumeric,
-    !!bookingId && !!selectedDateKey && !!selectedTableIdNumeric
+    !!bookingId && !!selectedDateKey && !!selectedTableIdNumeric,
   );
 
   // Save menu choice mutation (saves immediately on add/update)
@@ -140,7 +140,7 @@ function MenuChoicesContent({ params }: MenuChoicesPageProps) {
               table_name: `Table ${index + 1}`,
               seats: table.table_size,
               guests: table.allocated_seat,
-            })
+            }),
           );
         } else if (bookingDate.table) {
           // Use table from bookings list API
@@ -171,7 +171,7 @@ function MenuChoicesContent({ params }: MenuChoicesPageProps) {
       (sum, date) =>
         sum +
         date.tables.reduce((tableSum, table) => tableSum + table.guests, 0),
-      0
+      0,
     );
 
     return {
@@ -219,7 +219,7 @@ function MenuChoicesContent({ params }: MenuChoicesPageProps) {
     const persistedChoices = menuItemsData.data.menu_choices.filter(
       (choice) =>
         choice.table_id === selectedTableIdNumeric &&
-        (choice.date_key === selectedDateKey || choice.date_key === null)
+        (choice.date_key === selectedDateKey || choice.date_key === null),
     );
 
     if (persistedChoices.length === 0) {
@@ -231,7 +231,7 @@ function MenuChoicesContent({ params }: MenuChoicesPageProps) {
       const menuSelections = choice.menu_selections || {};
       const legacyFields = mapMenuSelectionsToLegacy(
         menuSelections,
-        categoryOrder
+        categoryOrder,
       );
 
       return {
@@ -263,7 +263,7 @@ function MenuChoicesContent({ params }: MenuChoicesPageProps) {
     if (currentBooking && currentBooking.booking_dates.length > 0) {
       // Find first date with table
       const firstDate = currentBooking.booking_dates.find(
-        (d) => d.table?.table_id
+        (d) => d.table?.table_id,
       );
 
       if (
@@ -282,7 +282,7 @@ function MenuChoicesContent({ params }: MenuChoicesPageProps) {
     if (!selectedDateKey || !currentBooking) return;
 
     const bookingDate = currentBooking.booking_dates.find(
-      (d) => d.date_key === selectedDateKey
+      (d) => d.date_key === selectedDateKey,
     );
 
     if (bookingDate?.table?.table_id) {
@@ -348,7 +348,7 @@ function MenuChoicesContent({ params }: MenuChoicesPageProps) {
       attendeeData: Omit<
         AttendeeMenuSelection,
         "id" | "booking_id" | "date_key" | "table_id"
-      >
+      >,
     ) => {
       // Get menu items to map categories to API fields
       const menuItemsForDate = menuItemsData?.data?.event_menu || [];
@@ -357,7 +357,7 @@ function MenuChoicesContent({ params }: MenuChoicesPageProps) {
       // Transform menu selections to choices array format (new format)
       const choices = mapMenuSelectionsToChoicesArray(
         menuSelections,
-        menuItemsForDate
+        menuItemsForDate,
       );
 
       // Validate that we have choices
@@ -414,7 +414,7 @@ function MenuChoicesContent({ params }: MenuChoicesPageProps) {
         // Always decrement pending saves counter after save completes
         pendingSavesCountRef.current = Math.max(
           0,
-          pendingSavesCountRef.current - 1
+          pendingSavesCountRef.current - 1,
         );
       }
     },
@@ -426,7 +426,7 @@ function MenuChoicesContent({ params }: MenuChoicesPageProps) {
       totalGuests,
       currentTableInfo,
       editingAttendee,
-    ]
+    ],
   );
 
   /**
@@ -461,11 +461,11 @@ function MenuChoicesContent({ params }: MenuChoicesPageProps) {
       // Escape special regex characters in base name
       const escapedBaseName = baseNameClean.replaceAll(
         /[.*+?^${}()|[\]\\]/g,
-        "\\$&"
+        "\\$&",
       );
       // Build regex pattern - escaped base name + copy pattern
       const copyPattern = new RegExp(
-        `^${escapedBaseName}\\s*\\(Copy(?:\\s+(\\d+))?\\)$`
+        `^${escapedBaseName}\\s*\\(Copy(?:\\s+(\\d+))?\\)$`,
       );
 
       const existingCopyNumbers: number[] = [];
@@ -488,7 +488,7 @@ function MenuChoicesContent({ params }: MenuChoicesPageProps) {
         ? `${baseNameClean} (Copy)`
         : `${baseNameClean} (Copy ${nextCopyNumber})`;
     },
-    []
+    [],
   );
 
   /**
@@ -548,7 +548,7 @@ function MenuChoicesContent({ params }: MenuChoicesPageProps) {
           title: attendee.title,
           fullName: generateUniqueDuplicateName(
             attendee.fullName,
-            currentAttendees
+            currentAttendees,
           ),
           menuSelections: attendee.menuSelections,
           starter: attendee.starter,
@@ -581,7 +581,7 @@ function MenuChoicesContent({ params }: MenuChoicesPageProps) {
       handleSaveAttendee,
       totalGuests,
       handleTableFullError,
-    ]
+    ],
   );
 
   /**
@@ -727,10 +727,10 @@ function MenuChoicesContent({ params }: MenuChoicesPageProps) {
         </div>
       </div>
 
-      {/* Main Content - Form on Left, List on Right */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-        {/* Left Column - Menu Selection Form */}
-        <div>
+      {/* Main Content - Fixed height so both panels match; form and attendees scroll inside */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 items-stretch lg:min-h-[28rem] lg:max-h-[calc(100vh-12rem)] lg:h-[calc(100vh-12rem)]">
+        {/* Left Column - Menu Selection Form (scrolls when content overflows) */}
+        <div className="flex flex-col min-h-0 h-full">
           {isLoadingMenuItems ? (
             <MenuSelectionFormSkeleton />
           ) : (
@@ -745,8 +745,8 @@ function MenuChoicesContent({ params }: MenuChoicesPageProps) {
           )}
         </div>
 
-        {/* Right Column - Attendee List */}
-        <div>
+        {/* Right Column - Attendee List (fixed height, list scrolls inside) */}
+        <div className="min-h-0 flex flex-col h-full">
           <AttendeeList
             attendees={currentAttendees}
             totalGuests={totalGuests}

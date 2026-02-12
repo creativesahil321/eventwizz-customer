@@ -44,12 +44,24 @@ export default function EventOverviewClient({
   // Intersection observer ref for infinite scroll
   const loadMoreRef = useRef<HTMLDivElement>(null);
 
-  // Fetch event overview data with infinite scroll
+    // Single source for "all" tab: one request for both list and tab counts
+  const {
+    data: allDataResponse,
+    isLoading: allDataLoading,
+    isError: allDataError,
+  } = useEventOverview({
+    eventId,
+    dateStatus: "all",
+    page: 1,
+    perPage: 1000,
+  });
+
+  // Infinite scroll only for "available" and "sold_out" tabs (avoids duplicate overview request when on "all")
   const {
     data: infiniteData,
-    isLoading,
+    isLoading: infiniteLoading,
     isFetching,
-    isError,
+    isError: infiniteError,
     fetchNextPage,
     hasNextPage,
     isFetchingNextPage,
@@ -58,16 +70,7 @@ export default function EventOverviewClient({
     dateStatus: selectedTab,
     perPage: 10,
     dateFilter: dateFilter || undefined,
-  });
-
-  // Fetch "all" data separately to get accurate counts for all tabs
-  // This runs in parallel and is used only for tab counts (not for display)
-  // We fetch with a high perPage to ensure we get all records for accurate counting
-  const { data: allDataResponse } = useEventOverview({
-    eventId,
-    dateStatus: "all",
-    page: 1,
-    perPage: 1000, // High limit to get all records for accurate tab counts
+    enabled: selectedTab !== "all",
   });
 
   // Setup intersection observer for infinite scroll
@@ -97,16 +100,22 @@ export default function EventOverviewClient({
     };
   }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
 
-  // Show skeleton only on initial load (when no data exists yet)
-  const showSkeleton = isLoading && !infiniteData;
+  const isAllTab = selectedTab === "all";
+  const showSkeleton =
+    (isAllTab && allDataLoading && !allDataResponse) ||
+    (!isAllTab && infiniteLoading && !infiniteData);
 
-  // Loading state - only show skeleton on initial load
   if (showSkeleton) {
     return <EventOverviewSkeleton />;
   }
 
-  // Error state
-  if (isError || !infiniteData?.pages[0]?.success) {
+  const allSuccess = allDataResponse?.success !== false;
+  const infiniteSuccess = infiniteData?.pages[0]?.success !== false;
+  const hasError =
+    (isAllTab && (allDataError || !allSuccess)) ||
+    (!isAllTab && (infiniteError || !infiniteSuccess));
+
+  if (hasError) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
         <EmptyPlaceholder
@@ -118,16 +127,13 @@ export default function EventOverviewClient({
     );
   }
 
-  // Extract data from infinite query response
   const firstPage = infiniteData?.pages[0];
-  const eventData = firstPage?.event;
-  const paginationMeta = firstPage?.meta;
+  const eventData = isAllTab ? allDataResponse?.event : firstPage?.event;
+  const paginationMeta = isAllTab ? allDataResponse?.meta : firstPage?.meta;
+  const tableData = isAllTab
+    ? allDataResponse?.data || []
+    : infiniteData?.pages.flatMap((page) => page.data || []) || [];
 
-  // Flatten all pages into a single array
-  const tableData =
-    infiniteData?.pages.flatMap((page) => page.data || []) || [];
-
-  // If no data available after loading, show skeleton
   if (!eventData || !paginationMeta) {
     return <EventOverviewSkeleton />;
   }
@@ -204,7 +210,7 @@ export default function EventOverviewClient({
   return (
     <div className="space-y-6 relative">
       {/* Subtle loading overlay for tab/filter changes (not initial load) */}
-      {isFetching && !isLoading && !isFetchingNextPage && (
+      {isFetching && !infiniteLoading && !isFetchingNextPage && (
         <div className="absolute inset-0 bg-background/50 backdrop-blur-sm z-50 flex items-center justify-center rounded-lg pointer-events-none opacity-0 animate-[fadeIn_0.2s_ease-out_forwards]">
           <div className="flex items-center gap-2.5 text-sm text-foreground bg-background/95 px-5 py-2.5 rounded-lg shadow-lg border border-border">
             <Loader2 className="h-4 w-4 animate-spin text-primary" />

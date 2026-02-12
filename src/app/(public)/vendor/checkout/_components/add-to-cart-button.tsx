@@ -65,8 +65,6 @@ export default function AddToCartButton({
         // Default behavior - redirect to simple checkout page
         router.push("/vendor/checkout");
       }
-
-      toast.success(`Added ${event.name} to your cart!`);
     } catch (error) {
       console.error("Error adding to cart:", error);
       toast.error("Failed to add to cart. Please try again.");

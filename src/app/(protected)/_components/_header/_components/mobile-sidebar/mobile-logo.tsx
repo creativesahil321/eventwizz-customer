@@ -1,18 +1,31 @@
 "use client";
 
-import { memo } from "react";
+import { memo, useContext } from "react";
 import Link from "next/link";
-import Image from "next/image";
+import { ServerContext } from "@/lib/server-context";
+import { appConfig } from "@/config/app";
+import { addCacheBusting } from "@/lib/image-utils";
 
 const MobileLogo: React.FC = memo(() => {
+  const { theme } = useContext(ServerContext);
+
+  const logoPath =
+    theme?.logo?.startsWith("/") ||
+    theme?.logo?.startsWith("data:") ||
+    theme?.logo?.startsWith("http") ||
+    theme?.logo?.startsWith("https") ||
+    theme?.logo?.startsWith("blob")
+      ? theme.logo
+      : appConfig.logo;
+
   return (
     <Link href="/" className="flex items-center gap-2">
-      <Image
-        src="/assets/images/logos/eventwizz-logo.png"
-        alt="EventWizz"
+      <img
+        src={addCacheBusting(logoPath)}
+        alt={theme?.name || "EventWizz"}
         width={110}
         height={30}
-        className="h-8 w-auto"
+        className="h-8 w-auto object-contain"
       />
     </Link>
   );

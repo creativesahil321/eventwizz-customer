@@ -286,6 +286,15 @@ export default function PackageTab() {
         const response = await eventsService.storeStepTwoData(data);
 
         if (response && response.status) {
+          // Sync form with saved gallery from response (cap at 8; backend may return more until delete logic is fixed)
+          const responseData = response.data as
+            | { gallery?: Array<{ id: number; url: string }> }
+            | undefined;
+          if (responseData?.gallery && Array.isArray(responseData.gallery)) {
+            const cappedGallery = responseData.gallery.slice(0, 8);
+            globalForm.setValue("stepTwo.gallery", cappedGallery);
+            form.setValue("gallery", cappedGallery);
+          }
           // Success message is handled by axios interceptor
           // Move to the next step
           await save();
@@ -708,6 +717,7 @@ export default function PackageTab() {
                           }}
                           maxFileCount={8 - (field.value?.length || 0)}
                           maxSize={5 * 1024 * 1024}
+                          moreLabel
                           accept={{
                             "image/png": [],
                             "image/jpeg": [],

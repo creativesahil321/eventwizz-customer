@@ -351,7 +351,7 @@ export default function LocationMap({
         <div className="flex items-center gap-2">
           <MapPin className="h-4 w-4 text-red-600 flex-shrink-0" />
           <p className="text-xs text-gray-600 mt-1">Event location</p>
-          <p className="text-xs text-gray-800 font-medium truncate">
+          <p className="text-xs text-[var(--color-text-primary)] font-medium truncate">
             {currentLocation?.address}
           </p>
         </div>

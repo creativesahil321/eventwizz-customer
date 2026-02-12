@@ -143,6 +143,13 @@ interface FileUploaderProps extends React.HTMLAttributes<HTMLDivElement> {
    * @example autoCompressMaxSizeMB={2}
    */
   autoCompressMaxSizeMB?: number;
+
+  /**
+   * When true, label shows "X more images" (for gallery/add-more contexts) instead of "X files"
+   * @type boolean
+   * @default false
+   */
+  moreLabel?: boolean;
 }
 
 export function FileUploader(props: FileUploaderProps) {
@@ -164,6 +171,7 @@ export function FileUploader(props: FileUploaderProps) {
     cropConfig = {},
     autoCompress = true,
     autoCompressMaxSizeMB = 2,
+    moreLabel = false,
     className,
     ...dropzoneProps
   } = props;
@@ -529,14 +537,19 @@ export function FileUploader(props: FileUploaderProps) {
                       Drag {`'n'`} drop files here, or click to select files
                     </p>
                     <p className="text-sm text-muted-foreground/70">
-                      You can upload
-                      {maxFileCount > 1
-                        ? ` ${
-                            maxFileCount === Infinity
-                              ? "multiple"
-                              : maxFileCount
-                          } files`
-                        : ` a file`}
+                      {moreLabel
+                        ? maxFileCount > 1
+                          ? `You can add ${maxFileCount === Infinity ? "more" : maxFileCount} more images`
+                          : "You can add 1 more image"
+                        : `You can upload${
+                            maxFileCount > 1
+                              ? ` ${
+                                  maxFileCount === Infinity
+                                    ? "multiple"
+                                    : maxFileCount
+                                } files`
+                              : ` a file`
+                          }`}
                       {!isVideoUploader && autoCompress
                         ? ` (images will be automatically optimized)`
                         : ` (up to ${formatBytes(maxSize)} each)`}

@@ -4,8 +4,12 @@
  * Handles all API calls related to customer bookings.
  */
 
+import axios from "axios";
+import { getSession } from "next-auth/react";
 import { api } from "../../core/api-client";
 import { API_ENDPOINTS } from "../../core/endpoints";
+import { env } from "@/env";
+import { useDomainStore } from "@/store/domain.store";
 import {
   BookingsQueryParams,
   BookingsResponse,
@@ -265,5 +269,58 @@ export const bookingsService = {
           }
           : undefined,
     });
+  },
+
+  /**
+   * Download booking invoice as PDF
+   * @param bookingId - The booking ID
+   * @returns Promise that triggers file download
+   */
+  downloadBookingInvoice: async (bookingId: number): Promise<void> => {
+    const endpoint = API_ENDPOINTS.CUSTOMER.BOOKINGS.BOOKING_INVOICE.replace(
+      "{id}",
+      bookingId.toString()
+    );
+
+    const session = await getSession();
+    const token = session?.user?.token as string | undefined;
+    const domain = useDomainStore.getState().domain;
+
+    const headers: Record<string, string> = {};
+    if (token) {
+      headers.Authorization = `Bearer ${token}`;
+    }
+    if (domain) {
+      headers["X-Domain"] = domain;
+    }
+
+    const response = await axios.get<Blob>(
+      `${env.NEXT_PUBLIC_API_URL}${endpoint}`,
+      {
+        responseType: "blob",
+        headers,
+      }
+    );
+
+    const contentDisposition = response.headers?.["content-disposition"];
+    let filename = `invoice-booking-${bookingId}.pdf`;
+    if (contentDisposition) {
+      const filenameMatch = contentDisposition.match(/filename="?(.+)"?/i);
+      if (filenameMatch?.[1]) {
+        filename = filenameMatch[1].trim();
+      }
+    }
+
+    const blob = new Blob([response.data], {
+      type: response.headers?.["content-type"] || "application/pdf",
+    });
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(url);
   },
 };

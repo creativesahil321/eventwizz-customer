@@ -132,6 +132,26 @@ export function EventPreview({ data, siteEssentials }: EventPreviewProps) {
           description: d.title,
         }))}
       />
+
+      {/* Dates - derive display price from tickets and/or tables (fixes £0 in preview) */}
+      <DatesSection
+        dates={
+          data.stepThree?.dates?.map((date) => {
+            const ticketPrices = (date.tickets ?? [])
+              .map((t) => Number(t.price))
+              .filter((n) => !Number.isNaN(n) && n >= 0);
+            const tablePrices = (date.tables ?? [])
+              .map((t) => Number(t.price))
+              .filter((n) => !Number.isNaN(n) && n >= 0);
+            const allPrices = [...ticketPrices, ...tablePrices];
+            const price = allPrices.length > 0 ? Math.min(...allPrices) : 0;
+            return {
+              event_date: date.event_date,
+              price,
+            };
+          }) || []
+        }
+      />
       {/* Gallery */}
       <EventGallery
         gallery={
@@ -176,16 +196,6 @@ export function EventPreview({ data, siteEssentials }: EventPreviewProps) {
         menu_description={data.stepFour?.menu_description || ""}
         catering_option={data.stepFour?.catering_option || 0}
         menu_background_image={data.stepFour?.menu_background_image || null}
-      />
-
-      {/* Dates */}
-      <DatesSection
-        dates={
-          data.stepThree?.dates?.map((date) => ({
-            event_date: date.event_date,
-            price: date.tickets?.[0]?.price || 0,
-          })) || []
-        }
       />
 
       {/* Location & Price (More Info subset) */}

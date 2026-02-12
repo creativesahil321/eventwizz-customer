@@ -45,7 +45,7 @@ interface MenuSelectionFormProps {
     attendee: Omit<
       AttendeeMenuSelection,
       "id" | "booking_id" | "date_key" | "table_id"
-    >
+    >,
   ) => void;
   readonly onCancelEdit?: () => void;
 }
@@ -127,7 +127,7 @@ export default function MenuSelectionForm({
           sides: editingAttendee.sides,
         },
         categoryOrder,
-        existingMenuSelections
+        existingMenuSelections,
       );
 
       // Reset form data (like form.reset() in onboarding)
@@ -213,12 +213,12 @@ export default function MenuSelectionForm({
       // Show toast with specific missing fields (like onboarding)
       toast.error(
         `Please fill in the following required fields: ${missingFields.join(
-          ", "
+          ", ",
         )}`,
         {
           description: "Please complete all required fields before submitting.",
           duration: 5000,
-        }
+        },
       );
 
       // Scroll to first missing field (like onboarding)
@@ -235,11 +235,11 @@ export default function MenuSelectionForm({
           // Find the category index and scroll to it
           const categoryTitle = firstError.path[1] as string;
           const categoryIndex = menuItems.findIndex(
-            (cat) => cat.title === categoryTitle
+            (cat) => cat.title === categoryTitle,
           );
           if (categoryIndex >= 0) {
             const categoryElement = document.querySelector(
-              `#category-${categoryIndex}`
+              `#category-${categoryIndex}`,
             );
             categoryElement?.scrollIntoView({
               behavior: "smooth",
@@ -256,7 +256,7 @@ export default function MenuSelectionForm({
     const categoryOrder = getCategoryOrder(menuItems);
     const legacyFields = mapMenuSelectionsToLegacy(
       formData.menuSelections,
-      categoryOrder
+      categoryOrder,
     );
 
     // Create attendee data
@@ -320,7 +320,7 @@ export default function MenuSelectionForm({
   }, [allergenData]);
 
   return (
-    <Card className="shadow-lg h-fit sticky top-4 border-2">
+    <Card className="shadow-lg h-full min-h-0 flex flex-col border-2">
       <CardHeader
         className="rounded-t-lg border-b-2 py-4"
         style={{
@@ -346,7 +346,7 @@ export default function MenuSelectionForm({
           )}
         </CardTitle>
       </CardHeader>
-      <CardContent className="p-6">
+      <CardContent className="flex-1 min-h-0 p-6 flex flex-col overflow-y-auto">
         <form onSubmit={handleSubmit} className="space-y-6">
           {/* Attendee Details Section */}
           <div className="space-y-4">

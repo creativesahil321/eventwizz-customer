@@ -5,7 +5,7 @@ import { DataTable } from "@/components/data-table/data-table";
 import { getColumns } from "./columns";
 import { DataTableRowAction, EmailLog, SearchParams } from "../_lib/types";
 import { useEmailLogs } from "../_lib/queries";
-import { EmailReplyDialog } from "./_email-log-reply";
+import { ResendEmailDialog } from "./_email-log-resend";
 import { DeleteEmailDialog } from "./_email-log-delete";
 import { EmailShowDialog } from "./_email-log-show";
 import { useQueryState, parseAsInteger } from "nuqs";
@@ -91,12 +91,13 @@ function EmailLogsDataTable({ initialData, search, tableRef }: EmailLogDataTable
       <div className="w-full min-w-0 overflow-x-auto">
         <DataTable table={table} className="min-w-0" />
       </div>
-      {rowAction?.type === "reply" && (
-        <EmailReplyDialog
-          email={rowAction?.row?.original ? rowAction?.row.original : null}
-          open={rowAction?.type === "reply"}
-          onOpenChange={() => setRowAction(null)}
-          showTrigger={false}
+      {rowAction?.type === "resend" && (
+        <ResendEmailDialog
+          email={rowAction?.row?.original ? rowAction.row.original : null}
+          open={rowAction?.type === "resend"}
+          onOpenChange={(open) => {
+          if (!open) setRowAction(null);
+        }}
         />
       )}
       {rowAction?.type === "show" && (

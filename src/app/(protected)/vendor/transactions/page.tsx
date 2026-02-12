@@ -2,7 +2,7 @@
 
 import React, { useState, useCallback } from "react";
 import { Button } from "@/components/ui/button";
-import { Search, Download, Loader2 } from "lucide-react";
+import { Search, Download, Loader2, RotateCcw } from "lucide-react";
 import { Shell } from "@/components/shell";
 import { SearchParams } from "./_lib/types";
 import { Input } from "@/components/ui/input";
@@ -28,6 +28,15 @@ export default function TransactionsPage() {
 
   // Debounce search input using existing hook
   const debouncedSearch = useDebounce(globalFilterValue, 500);
+
+  const hasActiveFilters =
+    !!debouncedSearch || statusFilter !== "all" || !!bookingDate;
+
+  const handleResetAllFilters = () => {
+    setGlobalFilterValue("");
+    setStatusFilter("all");
+    setBookingDate("");
+  };
 
   // Build search params based on current filters
   const searchParams: SearchParams = {
@@ -134,6 +143,19 @@ export default function TransactionsPage() {
                       />
                     </div>
                   </div>
+                  {hasActiveFilters && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleResetAllFilters}
+                      disabled={isFetching}
+                      className="gap-2 shrink-0"
+                      aria-label="Reset all filters"
+                    >
+                      <RotateCcw className="h-4 w-4" />
+                      Reset all
+                    </Button>
+                  )}
                 </div>
 
                 {/* Export Button */}

@@ -31,7 +31,7 @@ export type { EmailLogsResponse } from "@/services/vendor/email-logs/email-logs.
  */
 export type DataTableRowAction<TData> = {
   row: Row<TData>;
-  type: "show" | "delete" | "reply";
+  type: "show" | "delete" | "resend";
 };
 
 /**

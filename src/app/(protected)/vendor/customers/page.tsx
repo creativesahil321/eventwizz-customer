@@ -53,11 +53,11 @@ import { Customer } from "./_lib/types";
 const CreateCustomerDialog = dynamic(
   () =>
     import("./_components/_customer-create").then(
-      (mod) => mod.CreateCustomerDialog,
+      (mod) => mod.CreateCustomerDialog
     ),
   {
     ssr: false,
-  },
+  }
 );
 
 // Simple wrapper component for the dialog
@@ -79,6 +79,14 @@ export default function CustomersPage() {
   useEffect(() => {
     setPage(1);
   }, [debouncedSearch, statusFilter, setPage]);
+
+  const hasActiveFilters = !!debouncedSearch || statusFilter !== "all";
+
+  const handleResetAllFilters = () => {
+    setGlobalFilterValue("");
+    setStatusFilter("all");
+    setPage(1);
+  };
 
   // Search params for loading state (data table reads page/per_page from URL)
   const searchParams: SearchParams = {
@@ -160,7 +168,7 @@ export default function CustomersPage() {
     // Check if all selected customers have deleted_at set
     return selectedCustomers.every(
       (customer) =>
-        customer.deleted_at !== null && customer.deleted_at !== undefined,
+        customer.deleted_at !== null && customer.deleted_at !== undefined
     );
   };
 
@@ -176,7 +184,7 @@ export default function CustomersPage() {
     const selectedCustomers = getSelectedCustomers();
     if (selectedCustomers.length === 0) return false;
     return selectedCustomers.every(
-      (customer) => customer.status === "inactive",
+      (customer) => customer.status === "inactive"
     );
   };
 
@@ -316,6 +324,19 @@ export default function CustomersPage() {
                       <SelectItem value="delete">Deleted</SelectItem>
                     </SelectContent>
                   </Select>
+                  {hasActiveFilters && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleResetAllFilters}
+                      disabled={isFetching}
+                      className="gap-2 shrink-0"
+                      aria-label="Reset all filters"
+                    >
+                      <RotateCcw className="h-4 w-4" />
+                      Reset all
+                    </Button>
+                  )}
                 </div>
                 <div className="flex items-center gap-2 flex-wrap">
                   {/* Hide CSV and Bulk Mail when rows are selected to avoid confusion */}

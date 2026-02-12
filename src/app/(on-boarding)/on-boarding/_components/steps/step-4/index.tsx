@@ -180,13 +180,12 @@ const StepFour = () => {
             );
           }
 
-          // Update gallery URLs if returned
+          // Update gallery URLs if returned (cap at 8; backend may return more until delete logic is fixed)
           if (responseData?.gallery && Array.isArray(responseData.gallery)) {
-            console.log("🔄 Updating gallery from backend response");
-            globalForm.setValue(
-              "stepFour.gallery",
+            const cappedGallery = (
               responseData.gallery as (File | { id: number; url: string })[]
-            );
+            ).slice(0, 8);
+            globalForm.setValue("stepFour.gallery", cappedGallery);
           }
 
           // INSTANT TRANSITION: Set active step FIRST for smooth UX

@@ -33,21 +33,18 @@ const Logo: React.FC<LogoProps> = ({ collapsed }) => {
       })}
     >
       <span className="transition-all duration-300 ease-linear">
-        <Link href="/">
-          {collapsed ? (
-            <img
-              className="h-8 w-auto"
-              src={appConfig.mini_logo}
-              alt={theme?.name || "EventWizz"}
-            />
-          ) : (
+        {collapsed ? (
+          /* Mini logo removed per product request - collapsed sidebar shows no logo */
+          <span className="h-8 w-8 block" aria-hidden />
+        ) : (
+          <Link href="/">
             <img
               className="h-8 w-auto object-contain drop-shadow-[2px_4px_6px_black]"
               src={addCacheBusting(logoPath)}
               alt={theme?.name || "EventWizz"}
             />
-          )}
-        </Link>
+          </Link>
+        )}
         <span className="sr-only text-sm font-semibold">
           {theme?.name || "EventWizz"}
         </span>

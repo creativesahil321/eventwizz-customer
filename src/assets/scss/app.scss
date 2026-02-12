@@ -11,6 +11,12 @@
         background-color: var(--color-primary);
         border-radius: 0px 5px 5px 0px;
     }
+
+    @media (max-width: 640px) {
+        &::before {
+            left: -16px;
+        }
+    }
 }
 
 /* Custom Scrollbar for Payment Options */

@@ -182,19 +182,19 @@ export default function BookingSummary({}: BookingSummaryProps) {
       // Validate cart data before proceeding
       if (!currentEventApiData) {
         throw new Error(
-          "Event data not available. Please refresh the page and try again."
+          "Event data not available. Please refresh the page and try again.",
         );
       }
 
       if (availableDates.length === 0) {
         throw new Error(
-          "No dates selected. Please add items to your cart first."
+          "No dates selected. Please add items to your cart first.",
         );
       }
 
       if (!currentEventSlug) {
         throw new Error(
-          "No event selected. Please add items to your cart first."
+          "No event selected. Please add items to your cart first.",
         );
       }
 
@@ -206,7 +206,7 @@ export default function BookingSummary({}: BookingSummaryProps) {
 
       const validation = validateCheckoutRequirements(
         currentEventSlug,
-        editingData
+        editingData,
       );
       if (!validation.isValid) {
         throw new Error(`Validation failed: ${validation.errors.join(", ")}`);
@@ -217,7 +217,7 @@ export default function BookingSummary({}: BookingSummaryProps) {
         currentEventSlug,
         editingData,
         apiCartData,
-        selectedGateway
+        selectedGateway,
       );
       if (!checkoutData) {
         throw new Error("Failed to prepare checkout data. Please try again.");
@@ -226,7 +226,7 @@ export default function BookingSummary({}: BookingSummaryProps) {
       const summary = calculateCheckoutSummary(
         currentEventSlug,
         editingData,
-        apiCartData
+        apiCartData,
       );
 
       console.log("🛒 Checkout Summary:", {
@@ -280,7 +280,7 @@ export default function BookingSummary({}: BookingSummaryProps) {
       currentEventApiData,
       initializedPaymentTypes,
       currentEventSlug ?? undefined,
-      getDateData
+      getDateData,
     );
   }, [
     currentEventApiData,
@@ -406,7 +406,7 @@ export default function BookingSummary({}: BookingSummaryProps) {
                           // Use actual guest allocation
                           const totalGuests = t.allocation.reduce(
                             (sum, guests) => sum + guests,
-                            0
+                            0,
                           );
                           // Only charge if guests are actually allocated
                           if (totalGuests > 0) {
@@ -500,7 +500,7 @@ export default function BookingSummary({}: BookingSummaryProps) {
                                 updatePaymentType(
                                   currentEventSlug!,
                                   date,
-                                  "full"
+                                  "full",
                                 )
                               }
                               className="text-green-600 flex-shrink-0"
@@ -532,7 +532,7 @@ export default function BookingSummary({}: BookingSummaryProps) {
                                     updatePaymentType(
                                       currentEventSlug!,
                                       date,
-                                      "deposit"
+                                      "deposit",
                                     )
                                   }
                                   className="text-blue-600 flex-shrink-0"
@@ -676,7 +676,7 @@ export default function BookingSummary({}: BookingSummaryProps) {
                   ) {
                     e.preventDefault();
                     console.log(
-                      "🚫 Button click ignored - checkout already in progress"
+                      "🚫 Button click ignored - checkout already in progress",
                     );
                     return;
                   }
@@ -687,7 +687,7 @@ export default function BookingSummary({}: BookingSummaryProps) {
                     if (hasValidationErrors) {
                       toast.error(
                         validationErrorMessage ||
-                          "Please select at least one table or ticket for each date"
+                          "Please select at least one table or ticket for each date",
                       );
                     } else {
                       toast.error("Please save all changes first");

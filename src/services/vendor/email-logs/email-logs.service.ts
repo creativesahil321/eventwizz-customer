@@ -16,7 +16,7 @@ export interface EmailLogItem {
   content: string;
   type: "automatic" | "manual";
   role: string;
-  status: "Success" | "Failed";
+  status: "Success" | "Pending" | "Processing" | "Failed";
   failure_reason: string;
   date: string;
   updated_at: string;
@@ -109,15 +109,11 @@ export const vendorEmailLogsService = {
   },
 
   /**
-   * Resend an email
-   * @param payload Resend email payload (id, subject, message)
+   * Resend an email (same original email, no reply/edit)
+   * @param payload Resend email payload (id only)
    * @returns Promise with response
    */
-  resendEmail: (payload: {
-    id: number | string;
-    subject: string;
-    message: string;
-  }) => {
+  resendEmail: (payload: { id: number | string }) => {
     return api.post<ApiResponse<unknown>>(
       API_ENDPOINTS.VENDOR.EMAIL_LOGS.RESEND,
       payload,

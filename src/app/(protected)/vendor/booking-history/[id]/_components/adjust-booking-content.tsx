@@ -9,14 +9,13 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import {
   ArrowLeft,
+  ArrowRight,
   Calendar,
   Receipt,
   User,
   Mail,
   Phone,
   MapPin,
-  Download,
-  Printer,
   CreditCard,
   CheckCircle2,
   UtensilsCrossed,
@@ -273,17 +272,6 @@ export default function AdjustBookingContent({
     );
   };
 
-  // Handler for downloading menu choices
-  const handleDownload = () => {
-    toast.success("Downloading booking receipt...");
-    // TODO: Implement download logic
-  };
-
-  const handlePrint = () => {
-    toast.success("Preparing to print...");
-    // TODO: Implement print logic
-  };
-
   // Helper function to convert payment status string to number
   // API mapping: 0 => 'Pending', 1 => 'Paid', 2 => 'failed', 3 => 'cancelled', 4 => 'refunded'
   const getPaymentStatusNumber = (status: string): number => {
@@ -501,27 +489,6 @@ export default function AdjustBookingContent({
                 <ArrowLeft className="h-4 w-4" />
                 Back to Booking History
               </Button>
-
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleDownload}
-                  className="gap-2"
-                >
-                  <Download className="h-4 w-4" />
-                  Download
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handlePrint}
-                  className="gap-2"
-                >
-                  <Printer className="h-4 w-4" />
-                  Print
-                </Button>
-              </div>
             </div>
 
             <Separator />
@@ -1771,8 +1738,8 @@ export default function AdjustBookingContent({
                     <span className="font-medium">Date:</span>
                     <span>{statusUpdateDialog.dateLabel}</span>
                   </div>
-                  <div className="flex items-center gap-4 pt-2 border-t">
-                    <div className="flex-1">
+                  <div className="flex items-center gap-3 pt-2 border-t">
+                    <div className="flex-1 min-w-0">
                       <p className="text-xs text-muted-foreground mb-1">
                         Current Status
                       </p>
@@ -1780,10 +1747,13 @@ export default function AdjustBookingContent({
                         {statusUpdateDialog.currentStatus || "Unknown"}
                       </Badge>
                     </div>
-                    <div className="text-muted-foreground">
-                      <ArrowLeft className="h-4 w-4" />
-                    </div>
-                    <div className="flex-1">
+                    <span
+                      className="flex-shrink-0 text-muted-foreground"
+                      aria-hidden
+                    >
+                      <ArrowRight className="h-4 w-4" />
+                    </span>
+                    <div className="flex-1 min-w-0">
                       <p className="text-xs text-muted-foreground mb-1">
                         New Status
                       </p>

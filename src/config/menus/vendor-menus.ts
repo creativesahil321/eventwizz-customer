@@ -181,4 +181,14 @@ export const vendorMenus: MenuItemProps[] = [
     permissions: "",
     menu: [],
   },
+  {
+    id: 19,
+    title: "Settings",
+    icon: "settings",
+    href: createVendorUrl("/vendor/settings"),
+    url: createVendorUrl("/vendor/settings"),
+    type: "title",
+    permissions: "",
+    menu: [],
+  },
 ];

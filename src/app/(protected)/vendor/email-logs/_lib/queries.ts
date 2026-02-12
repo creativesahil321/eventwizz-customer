@@ -100,12 +100,10 @@ export const useDeleteEmailLog = () => {
 };
 
 /**
- * Resend email payload
+ * Resend email payload - only id is sent (reply system removed)
  */
 export interface ResendEmailPayload {
   id: number | string;
-  subject: string;
-  message: string;
 }
 
 /**

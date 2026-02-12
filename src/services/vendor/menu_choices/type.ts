@@ -23,6 +23,8 @@ export interface MenuChoicesQueryParams {
   event_type?: string;
   menu?: string;
   status?: string;
+  event_id?: number;
+  event_date?: string;
 }
 
 /**
@@ -154,3 +156,60 @@ export type MenuChoiceUpdateResponse = BaseApiResponse<MenuChoiceDetail>;
  * Response type for delete operation
  */
 export type MenuChoiceDeleteResponse = BaseApiResponse<[]>;
+
+/**
+ * Customer menu choices list item (vendor booking menu choices API)
+ */
+export interface CustomerMenuChoiceListItem {
+  id: number;
+  booking_id: number;
+  booking_date_id: number;
+  event_id?: number;
+  event_name: string;
+  event_date: string;
+  event_date_raw: string;
+  customer_name: string;
+  customer_email: string;
+  customer_phone: string;
+  status: string;
+}
+
+/** Event with its dates (from customer menu choices list response) */
+export interface EventWithDates {
+  event_id: number;
+  event_name: string;
+  dates: string[];
+}
+
+/**
+ * Paginated response for customer menu choices list
+ */
+export interface CustomerMenuChoicesListResponse {
+  status: boolean;
+  message: string;
+  data: CustomerMenuChoiceListItem[];
+  links: {
+    first: string;
+    last: string;
+    prev: string | null;
+    next: string | null;
+  };
+  meta: {
+    current_page: number;
+    from: number;
+    last_page: number;
+    per_page: number;
+    to: number;
+    total: number;
+    links: Array<{
+      url: string | null;
+      label: string;
+      page: number | null;
+      active: boolean;
+    }>;
+    path: string;
+  };
+  errors: string[];
+  /** Events that have menu choices, with their date keys for the filter dropdowns */
+  events_with_dates?: EventWithDates[];
+}

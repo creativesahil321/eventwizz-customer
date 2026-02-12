@@ -1,5 +1,12 @@
 "use client";
-import React, { useEffect, useState, lazy, Suspense, useRef } from "react";
+import React, {
+  useEffect,
+  useState,
+  useMemo,
+  lazy,
+  Suspense,
+  useRef,
+} from "react";
 import { useFormContext } from "../form-provider";
 import { OnboardingFormData } from "../form-provider/schema";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -120,6 +127,38 @@ export default function FormPreview() {
   const moreInfoRef = useRef<HTMLDivElement>(null);
   const faqRef = useRef<HTMLDivElement>(null);
   const previewContainerRef = useRef<HTMLDivElement>(null);
+
+  // Stable gallery for preview: reuse File.preview when set (avoids new blob URLs on reorder so preview updates instantly)
+  const galleryPreviewItems = useMemo(() => {
+    const gallery = formState.stepFour?.gallery;
+    if (!gallery || gallery.length === 0) {
+      return Array(8).fill({
+        path: "/assets/images/gallery-image.png",
+        relativePath: "/assets/images/gallery-image.png",
+        preview: "/assets/images/gallery-image.png",
+      });
+    }
+    return gallery.map((image) => {
+      if (image instanceof File) {
+        const fileWithPreview = image as File & { preview?: string };
+        return {
+          path: image.name,
+          relativePath: image.name,
+          preview: fileWithPreview.preview || URL.createObjectURL(image),
+        };
+      }
+      if (typeof image === "object" && image !== null && "url" in image) {
+        const galleryItem = image as { id: number; url: string };
+        return {
+          path: galleryItem.url,
+          relativePath: galleryItem.url,
+          preview: galleryItem.url,
+        };
+      }
+      return image as { path: string; relativePath: string; preview: string };
+    });
+  }, [formState.stepFour?.gallery]);
+
   // Force re-render when form data changes
   useEffect(() => {
     const subscription = form.watch((value) => {
@@ -456,43 +495,7 @@ export default function FormPreview() {
           )}`}
         >
           <Suspense fallback={<SectionLoader />}>
-            <EventGallery
-              gallery={
-                formState.stepFour?.gallery &&
-                formState.stepFour.gallery.length > 0
-                  ? formState.stepFour.gallery.map((image) => {
-                      if (image instanceof File) {
-                        return {
-                          path: image.name,
-                          relativePath: image.name,
-                          preview: URL.createObjectURL(image),
-                        };
-                      }
-                      // Handle backend gallery items with {id, url} format
-                      if (
-                        typeof image === "object" &&
-                        image !== null &&
-                        "url" in image
-                      ) {
-                        const galleryItem = image as {
-                          id: number;
-                          url: string;
-                        };
-                        return {
-                          path: galleryItem.url,
-                          relativePath: galleryItem.url,
-                          preview: galleryItem.url,
-                        };
-                      }
-                      return image;
-                    })
-                  : Array(8).fill({
-                      path: "/assets/images/gallery-image.png",
-                      relativePath: "/assets/images/gallery-image.png",
-                      preview: "/assets/images/gallery-image.png",
-                    })
-              }
-            />
+            <EventGallery gallery={galleryPreviewItems} />
           </Suspense>
         </div>
 

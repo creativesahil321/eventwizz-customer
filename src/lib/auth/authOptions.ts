@@ -44,6 +44,7 @@ interface CustomUser {
   event_id?: string | number | null;
   status?: string;
   permissions?: string[];
+  has_payment_provider?: boolean;
 }
 
 // Define the API user type with all required fields
@@ -71,6 +72,7 @@ interface LoginResponse {
   isOnboarded?: boolean;
   event_id?: number;
   permissions?: string[];
+  has_payment_provider?: boolean;
 }
 
 // Extend the credentials type to include our custom fields
@@ -306,6 +308,7 @@ export const authOptions: NextAuthOptions = {
             event_id: event_id || data.event_id, // Use the extracted value or fallback
             status: user.status,
             permissions: data.permissions || [],
+            has_payment_provider: data.has_payment_provider ?? false,
           } as unknown as import("next-auth").User;
         } catch {
           throw new Error("Invalid email or password.");
@@ -366,6 +369,9 @@ export const authOptions: NextAuthOptions = {
         if (customUser.permissions) {
           token.permissions = customUser.permissions;
         }
+
+        // Payment gateway setup state (vendor)
+        token.has_payment_provider = customUser.has_payment_provider ?? false;
       }
 
       // Handle session updates
@@ -412,6 +418,10 @@ export const authOptions: NextAuthOptions = {
         if (session?.permissions) {
           token.permissions = session.permissions;
         }
+
+        if (session?.has_payment_provider !== undefined) {
+          token.has_payment_provider = session.has_payment_provider;
+        }
       }
 
       return token;
@@ -439,6 +449,7 @@ export const authOptions: NextAuthOptions = {
           event_id: token.event_id,
           status: token.status,
           permissions: token.permissions || [],
+          has_payment_provider: Boolean(token.has_payment_provider),
         },
       };
 

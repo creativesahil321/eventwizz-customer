@@ -326,7 +326,6 @@ export default function CartManager({}: CartManagerProps) {
       toast.success("Cart cleared successfully!");
     } catch (error) {
       console.error("Error clearing cart:", error);
-      toast.error("Failed to clear cart. Please try again.");
     } finally {
       setIsProcessing(false);
     }

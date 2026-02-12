@@ -225,10 +225,10 @@ export const mapMenuSelectionsToChoicesArray = (
   Object.entries(menuSelections).forEach(([categoryTitle, itemId]) => {
     // Find the category by title
     const category = menuCategories.find((cat) => cat.title === categoryTitle);
-    
+
     if (category && category.id && itemId) {
       const menuItemId = Number.parseInt(itemId);
-      
+
       // Only add if both IDs are valid
       if (!Number.isNaN(menuItemId) && menuItemId > 0) {
         choices.push({

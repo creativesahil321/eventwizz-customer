@@ -1,7 +1,14 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { Search, Loader2, Trash2, MoreHorizontal, ChevronDown } from "lucide-react";
+import {
+  Search,
+  Loader2,
+  Trash2,
+  MoreHorizontal,
+  ChevronDown,
+  RotateCcw,
+} from "lucide-react";
 import { Shell } from "@/components/shell";
 import { SearchParams } from "./_lib/types";
 import { Input } from "@/components/ui/input";
@@ -47,6 +54,15 @@ export default function EmailLogsPage() {
     setPage(1);
   }, [debouncedSearch, fromDate, toDate, setPage]);
 
+  const hasActiveFilters =
+    !!debouncedSearch || !!dateRange?.from || !!dateRange?.to;
+
+  const handleResetAllFilters = () => {
+    setGlobalFilterValue("");
+    setDateRange(undefined);
+    setPage(1);
+  };
+
   // Build search params based on current filters
   const searchParams: SearchParams = {
     page: "1",
@@ -57,10 +73,7 @@ export default function EmailLogsPage() {
   };
 
   // Fetch data for loading state
-  const {
-    isLoading,
-    isFetching,
-  } = useEmailLogs({
+  const { isLoading, isFetching } = useEmailLogs({
     search: debouncedSearch,
     page: 1,
     per_page: 30,
@@ -75,7 +88,8 @@ export default function EmailLogsPage() {
   React.useEffect(() => {
     const updateSelectedCount = () => {
       if (tableRef.current) {
-        const count = tableRef.current.getFilteredSelectedRowModel().rows.length;
+        const count =
+          tableRef.current.getFilteredSelectedRowModel().rows.length;
         setSelectedRowCount(count);
       }
     };
@@ -124,7 +138,7 @@ export default function EmailLogsPage() {
 
   const isBulkOperationLoading = bulkDeleteMutation.isPending;
   const hasSelectedRows = selectedRowCount > 0;
-  
+
   // Show loading overlay only when fetching (not on initial load)
   const showLoadingOverlay = isFetching && !isLoading;
 
@@ -174,7 +188,19 @@ export default function EmailLogsPage() {
                       </div>
                     )}
                   </div>
-                  
+                  {hasActiveFilters && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleResetAllFilters}
+                      disabled={isFetching}
+                      className="gap-2 shrink-0"
+                      aria-label="Reset all filters"
+                    >
+                      <RotateCcw className="h-4 w-4" />
+                      Reset all
+                    </Button>
+                  )}
                   {/* Professional Bulk Actions Dropdown - Only shows when rows are selected */}
                   {hasSelectedRows && (
                     <DropdownMenu>
@@ -212,7 +238,8 @@ export default function EmailLogsPage() {
                           )}
                           <span>Delete Selected</span>
                           <span className="ml-auto text-xs text-muted-foreground">
-                            {selectedRowCount} {selectedRowCount === 1 ? "log" : "logs"}
+                            {selectedRowCount}{" "}
+                            {selectedRowCount === 1 ? "log" : "logs"}
                           </span>
                         </DropdownMenuItem>
                       </DropdownMenuContent>
@@ -251,18 +278,20 @@ export default function EmailLogsPage() {
                   </div>
                 </div>
               )}
-              
+
               {/* Subtle loading indicator at top of table */}
               {showLoadingOverlay && (
                 <div className="absolute top-0 left-0 right-0 h-1 bg-gray-100/50 rounded-t-lg overflow-hidden z-40">
                   <div className="h-full bg-[var(--color-primary)] animate-loading" />
                 </div>
               )}
-              
-              <div className={cn(
-                "transition-opacity duration-300",
-                showLoadingOverlay && "opacity-60"
-              )}>
+
+              <div
+                className={cn(
+                  "transition-opacity duration-300",
+                  showLoadingOverlay && "opacity-60"
+                )}
+              >
                 <Suspense
                   fallback={
                     <DataTableSkeleton

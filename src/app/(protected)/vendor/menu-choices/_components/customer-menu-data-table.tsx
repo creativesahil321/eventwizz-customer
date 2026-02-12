@@ -1,81 +1,79 @@
 "use client";
 
-import {
-  useMemo,
-  useState,
-  useCallback,
-  useImperativeHandle,
-  forwardRef,
-} from "react";
+import { useMemo, useCallback, useImperativeHandle, forwardRef } from "react";
 import { DataTable } from "@/components/data-table/data-table";
 import { useDataTable } from "@/hooks/data-table/use-data-table";
 import { getCustomerMenuColumns } from "./customer-menu-columns";
 import { CustomerMenuChoice } from "../_lib/customer-menu-types";
-import { dummyCustomerMenuChoices } from "../_lib/dummy-data";
 import type { Table } from "@tanstack/react-table";
+import { useCustomerMenuChoicesList } from "../_lib/queries";
+import { useQueryState, parseAsInteger } from "nuqs";
+import { DataTableSkeleton } from "@/components/data-table/data-table-skeleton";
+import type { CustomerMenuChoiceListItem } from "@/services/vendor/menu_choices/type";
+
+interface CustomerMenuSearchParams {
+  page?: number;
+  per_page?: number;
+  search?: string;
+  event_id?: number;
+  event_date?: string;
+  event_name?: string;
+}
 
 interface CustomerMenuDataTableProps {
-  search?: {
-    page?: string;
-    per_page?: string;
-    search?: string;
-  };
+  search?: CustomerMenuSearchParams;
 }
 
 export interface CustomerMenuDataTableRef {
   table: Table<CustomerMenuChoice> | null;
 }
 
+function mapApiItemToRow(item: CustomerMenuChoiceListItem): CustomerMenuChoice {
+  return {
+    id: String(item.id),
+    event_name: item.event_name,
+    event_date: item.event_date,
+    event_date_raw: item.event_date_raw,
+    customer_name: item.customer_name,
+    customer_email: item.customer_email,
+    customer_phone: item.customer_phone ?? "",
+    status: item.status,
+    booking_id: item.booking_id,
+    booking_date_id: item.booking_date_id,
+    date_key: item.event_date_raw,
+  };
+}
+
 const CustomerMenuDataTable = forwardRef<
   CustomerMenuDataTableRef,
   CustomerMenuDataTableProps
 >(({ search = {} }, ref) => {
-  const [data, setData] = useState<CustomerMenuChoice[]>(
-    dummyCustomerMenuChoices
-  );
-  const [deletingIds, setDeletingIds] = useState<Set<string>>(new Set());
+  const [page] = useQueryState("page", parseAsInteger.withDefault(1));
+  const [per_page] = useQueryState("per_page", parseAsInteger.withDefault(30));
 
-  // Handle delete action
-  const handleDelete = useCallback((id: string) => {
-    setData((prev) => prev.filter((item) => item.id !== id));
-    setDeletingIds((prev) => {
-      const next = new Set(prev);
-      next.delete(id);
-      return next;
-    });
-  }, []);
+  const queryParams = {
+    search: typeof search?.search === "string" ? search.search : "",
+    page: page ?? 1,
+    per_page: per_page ?? 30,
+    event_id: search?.event_id,
+    event_date: search?.event_date,
+    event_name: search?.event_name,
+  };
 
-  const isDeleting = useCallback(
-    (id: string) => deletingIds.has(id),
-    [deletingIds]
-  );
+  const {
+    data: response,
+    isLoading,
+    isError,
+  } = useCustomerMenuChoicesList(queryParams);
 
-  const columns = useMemo(
-    () => getCustomerMenuColumns({ onDelete: handleDelete, isDeleting }),
-    [handleDelete, isDeleting]
-  );
-
-  // Filter data based on global search
-  const filteredData = useMemo(() => {
-    if (!search?.search || search.search.trim() === "") {
-      return data;
-    }
-
-    const searchTerm = search.search.toLowerCase().trim();
-    return data.filter((item) => {
-      return (
-        item.event_name.toLowerCase().includes(searchTerm) ||
-        item.customer_email.toLowerCase().includes(searchTerm) ||
-        item.customer_phone.toLowerCase().includes(searchTerm) ||
-        item.event_date.toLowerCase().includes(searchTerm) ||
-        item.status.toLowerCase().includes(searchTerm)
-      );
-    });
-  }, [data, search?.search]);
+  const rows = useMemo(() => {
+    const list = response?.data ?? [];
+    return list.map(mapApiItemToRow);
+  }, [response?.data]);
 
   const pageCount = useMemo(
-    () => Number(search?.per_page) || 30,
-    [search?.per_page]
+    () => response?.meta?.last_page ?? 1,
+    [response?.meta?.last_page]
   );
 
   const getRowId = useCallback(
@@ -83,8 +81,17 @@ const CustomerMenuDataTable = forwardRef<
     []
   );
 
+  const columns = useMemo(
+    () =>
+      getCustomerMenuColumns({
+        onDelete: () => {},
+        isDeleting: () => false,
+      }),
+    []
+  );
+
   const { table } = useDataTable({
-    data: filteredData,
+    data: rows,
     columns,
     pageCount,
     enableAdvancedFilter: false,
@@ -94,12 +101,41 @@ const CustomerMenuDataTable = forwardRef<
       columnPinning: { right: ["actions"] },
     },
     getRowId,
+    shallow: false,
+    clearOnDefault: true,
   });
 
-  // Expose table via ref
   useImperativeHandle(ref, () => ({
     table,
   }));
+
+  if (isLoading) {
+    return (
+      <DataTableSkeleton
+        columnCount={7}
+        cellWidths={[
+          "4rem",
+          "12rem",
+          "12rem",
+          "16rem",
+          "12rem",
+          "10rem",
+          "6rem",
+        ]}
+        shrinkZero
+      />
+    );
+  }
+
+  if (isError) {
+    return (
+      <div className="bg-white rounded-lg border border-[var(--color-border)] shadow-md p-6">
+        <div className="text-red-500">
+          Error loading customer menu choices. Please try again later.
+        </div>
+      </div>
+    );
+  }
 
   return <DataTable table={table} />;
 });

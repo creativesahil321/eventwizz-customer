@@ -93,29 +93,45 @@ export function FormProvider({
 
         // Map the event data to our form structure
         const eventDataAny = eventData as unknown as EventSchemaType; // Type cast to handle dynamic properties
-        
+
         // Transform Step 6 location data (lat/long → latitude/longitude)
-        type StepSixWithLegacy = typeof eventDataAny.stepSix & { lat?: string | number; long?: string | number };
+        type StepSixWithLegacy = typeof eventDataAny.stepSix & {
+          lat?: string | number;
+          long?: string | number;
+        };
         const stepSixData = eventDataAny.stepSix as StepSixWithLegacy;
-        
+
         const transformedStepSix = stepSixData
           ? {
               ...stepSixData,
-              latitude: stepSixData.latitude || 
-                        (typeof stepSixData.lat === 'string' 
-                          ? parseFloat(stepSixData.lat) 
-                          : stepSixData.lat),
-              longitude: stepSixData.longitude || 
-                         (typeof stepSixData.long === 'string' 
-                           ? parseFloat(stepSixData.long) 
-                           : stepSixData.long),
+              latitude:
+                stepSixData.latitude ||
+                (typeof stepSixData.lat === "string"
+                  ? parseFloat(stepSixData.lat)
+                  : stepSixData.lat),
+              longitude:
+                stepSixData.longitude ||
+                (typeof stepSixData.long === "string"
+                  ? parseFloat(stepSixData.long)
+                  : stepSixData.long),
             }
           : initialData.stepSix;
-        
+
+        // Cap gallery at 8 when loading from API (backend may return more until delete logic is fixed)
+        const stepTwoData = eventDataAny.stepTwo || initialData.stepTwo;
+        const rawGallery = stepTwoData?.gallery;
+        const cappedGallery =
+          Array.isArray(rawGallery) && rawGallery.length > 8
+            ? rawGallery.slice(0, 8)
+            : rawGallery;
+
         const mappedData: Partial<EventSchemaType> = {
           // Map all steps from the server data
           stepOne: eventDataAny.stepOne || initialData.stepOne,
-          stepTwo: eventDataAny.stepTwo || initialData.stepTwo,
+          stepTwo: {
+            ...stepTwoData,
+            gallery: cappedGallery ?? initialData.stepTwo?.gallery ?? [],
+          } as EventSchemaType["stepTwo"],
           stepThree: eventDataAny.stepThree || initialData.stepThree,
           stepFour: eventDataAny.stepFour || initialData.stepFour,
           stepFive: eventDataAny.stepFive || initialData.stepFive,

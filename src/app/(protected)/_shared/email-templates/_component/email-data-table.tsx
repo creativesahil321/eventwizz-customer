@@ -7,9 +7,9 @@ import { DataTable } from "@/components/data-table/data-table";
 import { useEmailTemplates } from "../_lib/queries";
 import { DataTableToolbar } from "./data-table-toolbar";
 import { ShowEmailTemplateDialog } from "./_view-template";
-import EmailTemplateEditModal from "./email-template-edit-modal";
 import { TableCell, TableRow } from "@/components/ui/table";
 import EmailTemplatesSkeleton from "./email-templates-skeleton";
+import EmailTemplateEditModal from "./email-template-edit-modal";
 
 type EmailTemplateProps = {
   initialData: EmailTemplate[];
@@ -51,12 +51,12 @@ export default function EmailTemplatesTable({
 
   const getColumn = React.useCallback(
     () => getColumns({ setRowAction }),
-    [setRowAction]
+    [setRowAction],
   );
   const columns = React.useMemo(() => getColumn(), [getColumn]);
   const getRowId = React.useCallback(
     (originalRow: EmailTemplate) => String(originalRow?.id || ""),
-    []
+    [],
   );
 
   // Extract metadata from API response
@@ -82,7 +82,7 @@ export default function EmailTemplatesTable({
     if (metaData) {
       const total = metaData.total || 0;
       const perPage = Number(
-        metaData.per_page || memoizedSearch?.per_page || 10
+        metaData.per_page || memoizedSearch?.per_page || 10,
       );
       const lastPage = metaData.last_page || Math.ceil(total / perPage) || 1;
 
@@ -123,7 +123,7 @@ export default function EmailTemplatesTable({
     enableAdvancedFilter: false,
     enableClientSideSorting: true,
     initialState: {
-      sorting: [{ id: "created_at", desc: true }],
+      sorting: [{ id: "title", desc: false }],
       columnPinning: { right: ["actions"] },
     },
     getRowId,
@@ -190,10 +190,10 @@ export default function EmailTemplatesTable({
       )}
       {rowAction?.type === "update" && (
         <EmailTemplateEditModal
-          isOpen={rowAction?.type === "update"}
-          onClose={() => setRowAction(null)}
-          templateId={rowAction?.row?.original?.id}
-          onSaved={handleEditSuccess}
+          open={rowAction?.type === "update"}
+          onOpenChange={(open: boolean) => !open && setRowAction(null)}
+          template={rowAction?.row?.original ?? null}
+          onSuccess={handleEditSuccess}
         />
       )}
     </section>

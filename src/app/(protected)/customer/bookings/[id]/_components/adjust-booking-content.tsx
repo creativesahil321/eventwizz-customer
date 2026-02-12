@@ -11,14 +11,14 @@ import {
   Calendar,
   Receipt,
   UtensilsCrossed,
-  Download,
-  Printer,
+  FileDown,
   MapPin,
 } from "lucide-react";
 import BookingInfoTab from "./booking-info-tab";
 import AddOnsTab from "./add-ons-tab";
 import { toast } from "sonner";
 import { useBookingDetails } from "@/services/customer/bookings/query";
+import { bookingsService } from "@/services/customer/bookings/bookings.service";
 import { Skeleton } from "@/components/ui/skeleton";
 
 interface AdjustBookingContentProps {
@@ -30,6 +30,7 @@ export default function AdjustBookingContent({
 }: AdjustBookingContentProps) {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState("booking-info");
+  const [isDownloadingInvoice, setIsDownloadingInvoice] = useState(false);
 
   // Fetch booking details from API
   const {
@@ -138,14 +139,18 @@ export default function AdjustBookingContent({
       })()
     : null;
 
-  const handleDownload = () => {
-    toast.success("Downloading booking receipt...");
-    // TODO: Implement download logic
-  };
-
-  const handlePrint = () => {
-    toast.success("Preparing to print...");
-    // TODO: Implement print logic
+  const handleDownloadInvoice = async () => {
+    if (isDownloadingInvoice) return;
+    setIsDownloadingInvoice(true);
+    try {
+      await bookingsService.downloadBookingInvoice(parseInt(bookingId));
+      toast.success("Invoice downloaded successfully");
+    } catch (err) {
+      console.error("Invoice download failed:", err);
+      toast.error("Failed to download invoice. Please try again.");
+    } finally {
+      setIsDownloadingInvoice(false);
+    }
   };
 
   const getStatusVariant = (status: string) => {
@@ -279,20 +284,12 @@ export default function AdjustBookingContent({
               <Button
                 variant="outline"
                 size="sm"
-                onClick={handleDownload}
+                onClick={handleDownloadInvoice}
+                disabled={isDownloadingInvoice}
                 className="gap-2"
               >
-                <Download className="h-4 w-4" />
-                Download
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handlePrint}
-                className="gap-2"
-              >
-                <Printer className="h-4 w-4" />
-                Print
+                <FileDown className="h-4 w-4" />
+                {isDownloadingInvoice ? "Downloading…" : "Download Invoice"}
               </Button>
             </div>
           </div>

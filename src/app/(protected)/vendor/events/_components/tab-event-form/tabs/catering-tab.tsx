@@ -24,6 +24,7 @@ import { useEventMenuCategories } from "@/services/vendor/events/query";
 import { EventMenuCategory } from "@/services/vendor/events/type";
 import MenuCategoryDropdown from "@/app/(on-boarding)/on-boarding/_components/steps/step-6/menu-category-dropdown";
 import { FileUploader } from "@/components/ui/file-uploader";
+import { addCacheBusting } from "@/lib/image-utils";
 
 export default function CateringTab() {
   const [isLoading, setIsLoading] = useState(false);
@@ -588,12 +589,10 @@ export default function CateringTab() {
                     <FormControl>
                       {typeof field.value === "string" && field.value ? (
                         <div className="relative w-full">
-                          <Image
-                            src={field.value}
+                          <img
+                            src={addCacheBusting(field.value)}
                             alt="Menu Background"
-                            width={400}
-                            height={200}
-                            className="max-h-60 object-contain mx-auto mb-2"
+                            className="max-h-60 object-contain mx-auto mb-2 w-full"
                           />
                           <Button
                             type="button"

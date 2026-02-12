@@ -55,3 +55,17 @@ export interface MenuSelectionState {
     };
   };
 }
+
+/** Params for customer menu choices list query (pagination + search) */
+export interface UseMenuChoicesQueryParams {
+  search?: string;
+  page?: number;
+  per_page?: number;
+  event_type?: string;
+  menu?: string;
+  status?: string;
+  event_id?: number;
+  event_date?: string;
+  event_name?: string;
+  options?: { enabled?: boolean };
+}

@@ -53,18 +53,18 @@ export function getColumns({
       },
     },
     {
-      accessorKey: "when_received",
+      accessorKey: "subject",
       header: ({ column }) => (
         <DataTableColumnHeader
           className="text-foreground"
           column={column}
-          title="When Do They Received"
+          title="Subject"
         />
       ),
       cell: ({ row }) => {
         return (
           <span className="font-medium max-w-[160px] truncate block hidden md:table-cell">
-            {row.getValue("when_received")}
+            {row.getValue("subject")}
           </span>
         );
       },
@@ -72,35 +72,6 @@ export function getColumns({
       enableHiding: false,
       meta: {
         className: "hidden md:table-cell",
-      },
-    },
-    {
-      accessorKey: "status",
-      header: ({ column }) => (
-        <DataTableColumnHeader
-          className="text-foreground"
-          column={column}
-          title="Status"
-        />
-      ),
-      cell: ({ row }) => {
-        const status = row.getValue("status") as string;
-        return (
-          <span
-            className={`font-medium capitalize hidden sm:inline-block ${
-              status.toLowerCase() === "active"
-                ? "text-success"
-                : "text-destructive"
-            }`}
-          >
-            {status}
-          </span>
-        );
-      },
-      enableSorting: true,
-      enableHiding: false,
-      meta: {
-        className: "hidden sm:table-cell",
       },
     },
     {

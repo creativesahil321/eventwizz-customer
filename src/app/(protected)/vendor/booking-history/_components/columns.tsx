@@ -134,39 +134,6 @@ export function getHistoryColumns({
       enableHiding: false,
     },
     {
-      accessorKey: "booking_date",
-      header: ({ column }) => (
-        <DataTableColumnHeader
-          className="text-foreground"
-          column={column}
-          title="Booking Date"
-        />
-      ),
-      cell: ({ row }) => {
-        const dateValue = row.getValue("booking_date");
-        const date = new Date(dateValue as string);
-        if (isNaN(date.getTime()))
-          return <span className="text-foreground text-sm">Invalid Date</span>;
-        const day = String(date.getDate()).padStart(2, "0");
-        const month = String(date.getMonth() + 1).padStart(2, "0");
-        const year = date.getFullYear();
-        return (
-          <span className="text-foreground text-sm">{`${day}-${month}-${year}`}</span>
-        );
-      },
-      enableSorting: true,
-      enableHiding: false,
-      sortingFn: (rowA, rowB) => {
-        const dateA = new Date(
-          rowA.getValue("booking_date") as string
-        ).getTime();
-        const dateB = new Date(
-          rowB.getValue("booking_date") as string
-        ).getTime();
-        return dateA - dateB;
-      },
-    },
-    {
       accessorKey: "date",
       header: ({ column }) => (
         <DataTableColumnHeader
@@ -412,6 +379,39 @@ export function getHistoryColumns({
             ? parseFloat(rowB.getValue("pending_amount") as string) || 0
             : (rowB.getValue("pending_amount") as number) || 0;
         return amountA - amountB;
+      },
+    },
+    {
+      accessorKey: "booking_date",
+      header: ({ column }) => (
+        <DataTableColumnHeader
+          className="text-foreground"
+          column={column}
+          title="Booking Date"
+        />
+      ),
+      cell: ({ row }) => {
+        const dateValue = row.getValue("booking_date");
+        const date = new Date(dateValue as string);
+        if (isNaN(date.getTime()))
+          return <span className="text-foreground text-sm">Invalid Date</span>;
+        const day = String(date.getDate()).padStart(2, "0");
+        const month = String(date.getMonth() + 1).padStart(2, "0");
+        const year = date.getFullYear();
+        return (
+          <span className="text-foreground text-sm">{`${day}-${month}-${year}`}</span>
+        );
+      },
+      enableSorting: true,
+      enableHiding: false,
+      sortingFn: (rowA, rowB) => {
+        const dateA = new Date(
+          rowA.getValue("booking_date") as string
+        ).getTime();
+        const dateB = new Date(
+          rowB.getValue("booking_date") as string
+        ).getTime();
+        return dateA - dateB;
       },
     },
     {

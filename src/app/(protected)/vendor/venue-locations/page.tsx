@@ -1,12 +1,13 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { Search } from "lucide-react";
+import { Search, RotateCcw } from "lucide-react";
 import VenueLocationsDataTable from "./_components/locations-data-table";
 import dynamic from "next/dynamic";
 import { Shell } from "@/components/shell";
 import { useLocations } from "./_lib/queries";
 import { SearchParams } from "./_lib/types";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useDebounce } from "@/hooks/data-table/use-debounce";
 import { useQueryState, parseAsInteger } from "nuqs";
@@ -16,7 +17,7 @@ const CreateLocationDialog = dynamic(
   () => import("./_components/_location-create"),
   {
     ssr: false,
-  },
+  }
 );
 
 // Simple wrapper component for the dialog.
@@ -35,6 +36,13 @@ export default function VenueLocationsPage() {
   useEffect(() => {
     setPage(1);
   }, [debouncedSearch, setPage]);
+
+  const hasActiveFilters = !!debouncedSearch;
+
+  const handleResetAllFilters = () => {
+    setGlobalFilterValue("");
+    setPage(1);
+  };
 
   const searchParams: SearchParams = {
     page: "1",
@@ -72,6 +80,19 @@ export default function VenueLocationsPage() {
                     disabled={isFetching}
                   />
                 </div>
+                {hasActiveFilters && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleResetAllFilters}
+                    disabled={isFetching}
+                    className="gap-2 shrink-0"
+                    aria-label="Reset all filters"
+                  >
+                    <RotateCcw className="h-4 w-4" />
+                    Reset all
+                  </Button>
+                )}
                 <div className="flex items-center gap-2 flex-wrap">
                   <CreateLocationButton />
                 </div>

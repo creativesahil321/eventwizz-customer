@@ -2,11 +2,20 @@
 
 import React, { useState, useEffect } from "react";
 import type { Table } from "@tanstack/react-table";
-import { Search, DollarSign, Clock, Receipt, Loader2, Tag } from "lucide-react";
+import {
+  Search,
+  DollarSign,
+  Clock,
+  Receipt,
+  Loader2,
+  Tag,
+  RotateCcw,
+} from "lucide-react";
 import HistoryDataTable from "./_components/history-data-table";
 import { Shell } from "@/components/shell";
 import { SearchParams } from "./_lib/types";
 import { History } from "./_lib/types";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -52,6 +61,16 @@ export default function BookingHistoryPage() {
   useEffect(() => {
     setPage(1);
   }, [debouncedSearch, statusFilter, eventDate, setPage]);
+
+  const hasActiveFilters =
+    !!debouncedSearch || statusFilter !== "all" || !!eventDate;
+
+  const handleResetAllFilters = () => {
+    setGlobalFilterValue("");
+    setStatusFilter("all");
+    setEventDate("");
+    setPage(1);
+  };
 
   // Build search params based on current filters
   const searchParams: SearchParams = {
@@ -138,20 +157,20 @@ export default function BookingHistoryPage() {
                     and track booking details.
                   </p>
                 </div>
-                <div className="flex flex-col sm:flex-row gap-3 items-center w-full sm:w-auto">
-                  <div className="flex flex-1 gap-3 items-center w-full sm:w-auto">
+                <div className="flex flex-col sm:flex-row flex-wrap gap-3 items-center w-full sm:w-auto min-w-0">
+                  <div className="flex flex-wrap gap-3 items-center w-full sm:min-w-0 sm:max-w-full min-w-0">
                     {/* Event Date Filter */}
-                    <div className="flex flex-col gap-1.5">
+                    <div className="flex flex-col gap-1.5 shrink-0 w-full sm:w-[180px]">
                       <Input
                         type="date"
                         value={eventDate}
                         onChange={(e) => setEventDate(e.target.value)}
-                        className="w-full sm:w-[180px]"
+                        className="w-full min-w-0 sm:w-[180px]"
                         disabled={isFetching}
                       />
                     </div>
                     {/* Search */}
-                    <div className="relative flex-1 sm:min-w-[240px]">
+                    <div className="relative flex-1 min-w-[200px] sm:min-w-[180px] max-w-full">
                       <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
                       <Input
                         placeholder="Search bookings..."
@@ -167,7 +186,7 @@ export default function BookingHistoryPage() {
                       onValueChange={setStatusFilter}
                       disabled={isFetching}
                     >
-                      <SelectTrigger className="w-[180px]">
+                      <SelectTrigger className="w-full sm:w-[180px] shrink-0 min-w-[140px]">
                         <SelectValue placeholder="Filter by status" />
                       </SelectTrigger>
                       <SelectContent>
@@ -180,8 +199,22 @@ export default function BookingHistoryPage() {
                         </SelectItem>
                       </SelectContent>
                     </Select>
+                    {/* Reset all filters - visible when any filter is active */}
+                    {hasActiveFilters && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleResetAllFilters}
+                        disabled={isFetching}
+                        className="gap-2 shrink-0"
+                        aria-label="Reset all filters"
+                      >
+                        <RotateCcw className="h-4 w-4" />
+                        Reset all
+                      </Button>
+                    )}
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 shrink-0 flex-shrink-0">
                     {tableRef.current && (
                       <TableToolbarActions table={tableRef.current} />
                     )}
@@ -193,7 +226,7 @@ export default function BookingHistoryPage() {
               <div
                 className={cn(
                   "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 pt-4 border-t border-[var(--color-border)] transition-opacity duration-200",
-                  isFetching && "opacity-50",
+                  isFetching && "opacity-50"
                 )}
               >
                 <div className="flex items-center gap-3">

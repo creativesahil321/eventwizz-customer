@@ -359,7 +359,7 @@ export default function StepTen() {
 
       // Then handle async operations in background
       Promise.all([
-        updateSession({ on_boarding_step: 11, payment_setup_skipped: true }),
+        updateSession({ on_boarding_step: 11 }),
         save(),
       ]).catch((error) => {
         console.error("Background save error:", error);
@@ -409,7 +409,6 @@ export default function StepTen() {
         Promise.all([
           updateSession({
             on_boarding_step: 11,
-            payment_setup_skipped: false,
             has_payment_provider: true,
           }),
           save(),

@@ -144,7 +144,7 @@ export default function DateAccordion({
         // Use actual guest allocation
         const totalGuests = item.allocation.reduce(
           (sum, guests) => sum + guests,
-          0
+          0,
         );
         return sum + pricePerPerson * totalGuests;
       } else {
@@ -175,7 +175,7 @@ export default function DateAccordion({
         if (!validation.isValid) {
           toast.error(
             validation.errorMessage ||
-              "Please select at least one table or ticket"
+              "Please select at least one table or ticket",
           );
           setIsSaving(false);
           return;
@@ -186,7 +186,7 @@ export default function DateAccordion({
         if (!allocationValidation.isValid) {
           toast.error(
             allocationValidation.errors[0] ||
-              "Please complete guest allocation for your tables"
+              "Please complete guest allocation for your tables",
           );
           setIsSaving(false);
           return;
@@ -197,7 +197,7 @@ export default function DateAccordion({
         // Even if no items, we should still call the API to remove items from server
         // This handles the case where user removes all items
         toast.info(
-          `Removing all items for ${format(new Date(date), "MMM dd, yyyy")}`
+          `Removing all items for ${format(new Date(date), "MMM dd, yyyy")}`,
         );
       }
 
@@ -205,7 +205,7 @@ export default function DateAccordion({
       if (process.env.NODE_ENV === "development") {
         console.log(
           `🔍 Saving ${format(new Date(date), "MMM dd, yyyy")}:`,
-          cartData
+          cartData,
         );
       }
 
@@ -217,7 +217,7 @@ export default function DateAccordion({
         if (serverEventData) {
           const priceValidation = await validateCartPrices(
             cartData,
-            serverEventData
+            serverEventData,
           );
 
           if (!priceValidation.isValid) {
@@ -226,7 +226,7 @@ export default function DateAccordion({
 
             // Show user-friendly error message
             toast.error(
-              "Price data appears to be outdated. Please refresh the page and try again."
+              "Price data appears to be outdated. Please refresh the page and try again.",
             );
             setIsSaving(false);
             return;
@@ -235,20 +235,15 @@ export default function DateAccordion({
           // Sanitize prices to ensure server values are used
           const sanitizedCartData = sanitizeCartPrices(
             cartData,
-            serverEventData
+            serverEventData,
           );
 
           const response = await storeEventBooking(sanitizedCartData);
 
           if (response?.status === true) {
             markDateAsSaved(eventSlug, date);
-            toast.success(
-              `Changes saved for ${format(new Date(date), "MMM dd, yyyy")}`
-            );
           } else {
-            const errorMessage = response?.message || "Unknown error occurred";
             console.error("API Error Response:", response);
-            toast.error(`Failed to save changes: ${errorMessage}`);
           }
         } else {
           // Fallback if server data not available
@@ -256,13 +251,8 @@ export default function DateAccordion({
 
           if (response?.status === true) {
             markDateAsSaved(eventSlug, date);
-            toast.success(
-              `Changes saved for ${format(new Date(date), "MMM dd, yyyy")}`
-            );
           } else {
-            const errorMessage = response?.message || "Unknown error occurred";
             console.error("API Error Response:", response);
-            toast.error(`Failed to save changes: ${errorMessage}`);
           }
         }
       } else {
@@ -271,13 +261,8 @@ export default function DateAccordion({
 
         if (response?.status === true) {
           markDateAsSaved(eventSlug, date);
-          toast.success(
-            `Changes saved for ${format(new Date(date), "MMM dd, yyyy")}`
-          );
         } else {
-          const errorMessage = response?.message || "Unknown error occurred";
           console.error("API Error Response:", response);
-          toast.error(`Failed to save changes: ${errorMessage}`);
         }
       }
     } catch (error) {
@@ -296,30 +281,28 @@ export default function DateAccordion({
           error.message.includes("Failed to fetch")
         ) {
           toast.error(
-            "Network error. Please check your connection and try again."
+            "Network error. Please check your connection and try again.",
           );
         } else if (
           error.message.includes("401") ||
           error.message.includes("Unauthorized")
         ) {
           toast.error(
-            "Session expired. Please refresh the page and log in again."
+            "Session expired. Please refresh the page and log in again.",
           );
         } else if (
           error.message.includes("400") ||
           error.message.includes("Bad Request")
         ) {
           toast.error(
-            "Invalid data. Please check your selections and try again."
+            "Invalid data. Please check your selections and try again.",
           );
         } else if (error.message.includes("500")) {
-          toast.error("Server error. Please try again in a few moments.");
         } else {
-          toast.error(`Failed to save changes: ${error.message}`);
         }
       } else {
         toast.error(
-          "An unexpected error occurred while saving. Please try again."
+          "An unexpected error occurred while saving. Please try again.",
         );
       }
     } finally {
@@ -330,7 +313,7 @@ export default function DateAccordion({
   const handleQuantityChange = (
     itemType: "table" | "ticket" | "drink",
     itemId: number,
-    change: number
+    change: number,
   ) => {
     const currentQuantity = getTotalQuantity(eventSlug, date, itemType, itemId);
     const newQuantity = Math.max(0, currentQuantity + change);
@@ -464,8 +447,8 @@ export default function DateAccordion({
               dateData.tables.length > 0
                 ? "tables"
                 : dateData.tickets.length > 0
-                ? "tickets"
-                : "drinks"
+                  ? "tickets"
+                  : "drinks"
             }
             className="w-full overflow-hidden"
           >
@@ -478,12 +461,12 @@ export default function DateAccordion({
                 ].filter(Boolean).length === 3
                   ? "grid-cols-3"
                   : [
-                      dateData.tables.length > 0,
-                      dateData.tickets.length > 0,
-                      dateData.drinks.length > 0,
-                    ].filter(Boolean).length === 2
-                  ? "grid-cols-2"
-                  : "grid-cols-1"
+                        dateData.tables.length > 0,
+                        dateData.tickets.length > 0,
+                        dateData.drinks.length > 0,
+                      ].filter(Boolean).length === 2
+                    ? "grid-cols-2"
+                    : "grid-cols-1"
               }`}
             >
               {dateData.tables.length > 0 && (
@@ -594,7 +577,7 @@ export default function DateAccordion({
                               date,
                               "ticket",
                               ticket.id,
-                              0
+                              0,
                             )
                           }
                           size="sm"
@@ -641,7 +624,7 @@ export default function DateAccordion({
                               date,
                               "drink",
                               drink.id,
-                              0
+                              0,
                             )
                           }
                           size="sm"

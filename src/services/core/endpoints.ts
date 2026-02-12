@@ -41,6 +41,13 @@ export const API_ENDPOINTS = {
       PAYMENT_GATEWAYS: "/vendor/onboarding/payment-gateway-connect",
       PAYMENT_RETURN: "/vendor/onboarding/return",
     },
+    PAYMENT_GATEWAYS: {
+      GET_ALL: "/vendor/payment-gateway",
+      ENABLE_DISABLE_PAYMENT_GATEWAY: "/vendor/payment-gateway/{id}/is-enabled",
+      CONNECT_PAYMENT_GATEWAY: "/vendor/payment-gateway/connect",
+      DELETE_PAYMENT_GATEWAY: "/vendor/payment-gateway/{id}",
+      RETURN_URL: "/vendor/payment-gateway/return/{gateway}?account={account_id}",
+    },
     EVENT: {
       GET_EVENTS: "/vendor/events",
       GET_EVENT: "/vendor/events/show/{eventId}",
@@ -58,8 +65,7 @@ export const API_ENDPOINTS = {
 
     EMAIL_TEMPLATES: {
       GET_ALL: "/vendor/email-templates",
-      GET_BY_ID: "/vendor/email-templates/edit/{id}",
-      UPDATE: "/vendor/email-templates/update/{id}",
+      UPDATE: "/vendor/email-templates/{id}",
     },
     ROLES: {
       GET_ALL: "/vendor/roles",
@@ -107,8 +113,12 @@ export const API_ENDPOINTS = {
     },
 
     MENU_CHOICES: {
+      GET_ALL: "/vendor/bookings/customer-menu-choices",
       ADD_MENU: "/vendor/bookings/menu-items/{id}/{date}/{table_id}",
       SAVE_MENU_CHOICES: "/vendor/bookings/menu-items/store",
+      EXPORT_SINGLE_MENU_CHOICES_CSV:
+        "/vendor/bookings/customer-menu-choices/{id}/export",
+      EXPORT_BY_DATE: "/vendor/bookings/customer-menu-choices/export",
     },
     CUSTOMERS: {
       GET_ALL: "/vendor/customers",
@@ -192,6 +202,7 @@ export const API_ENDPOINTS = {
       DELETE_ADD_ONS:
         "/customer/bookings/delete-add-ons/{id}/{date}/{keyword}/{type}", // TABLES case = keyword will be tables size and type will be tables , DRINKS case = keyword will be id and type will be drinks , TICKETS case = keyword will be id and type will be tickets
       BOOKING_PAYMENT: "/customer/bookings/pay",
+      BOOKING_INVOICE: "/customer/bookings/invoice/{id}",
     },
     MENU_CHOICES: {
       ADD_MENU: "/customer/bookings/menu-items/{id}/{date}/{table_id}",

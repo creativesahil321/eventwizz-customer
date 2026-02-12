@@ -95,8 +95,10 @@ const UserDropdown = memo(() => {
   const userEmail = user?.email || session?.user?.email || "";
   const accountType = user?.account_type || session?.user?.account_type;
 
-  // Hide Settings for customers
+  // Hide Settings for customers; label "Payment Settings" for vendor, "Settings" for admin
   const showSettings = accountType !== "customer";
+  const settingsLabel =
+    accountType === "vendor" ? "Payment Settings" : "Settings";
 
   return (
     <div className="relative">
@@ -145,7 +147,7 @@ const UserDropdown = memo(() => {
               className="cursor-pointer"
               onClick={() => router.push(settingsUrl)}
             >
-              <Settings size={16} className="mr-2" /> Settings
+              <Settings size={16} className="mr-2" /> {settingsLabel}
             </DropdownMenuItem>
           )}
           <DropdownMenuItem className="cursor-pointer" onClick={() => logout()}>

@@ -44,14 +44,18 @@ export function EmailReplyDialog({
           </Button>
         </DialogTrigger>
       ) : null}
-      <DialogContent className="border-none bg-background dark:border text-foreground">
-        <DialogHeader>
+      <DialogContent className="border-none bg-background dark:border text-foreground max-h-[90vh] flex flex-col overflow-hidden p-0">
+        <DialogHeader className="shrink-0 px-6 pt-6 pb-2">
           <DialogTitle className="text-foreground">
             <span>Reply to </span>
             <span className="capitalize">{fullName}</span>
           </DialogTitle>
-          {email && <MailForm email={email} onSuccess={handleSuccess} />}
         </DialogHeader>
+        {email && (
+          <div className="flex-1 min-h-0 overflow-y-auto px-6 pb-6">
+            <MailForm email={email} onSuccess={handleSuccess} />
+          </div>
+        )}
       </DialogContent>
     </Dialog>
   );

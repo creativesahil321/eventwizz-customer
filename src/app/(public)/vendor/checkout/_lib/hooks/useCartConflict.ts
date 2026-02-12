@@ -204,7 +204,6 @@ export function useCartConflict(): UseCartConflictReturn {
       router.push(`/${locationSlug}/events/${conflictInfo.newEvent.slug}`);
     } catch (error) {
       console.error("Error clearing cart:", error);
-      toast.error("Failed to clear cart. Please try again.");
     } finally {
       setIsProcessing(false);
     }
@@ -234,7 +233,6 @@ export function useCartConflict(): UseCartConflictReturn {
       router.push("/vendor/checkout");
     } catch (error) {
       console.error("Error redirecting to checkout:", error);
-      toast.error("Failed to redirect. Please try again.");
     } finally {
       setIsProcessing(false);
     }

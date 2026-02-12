@@ -13,7 +13,6 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { ScrollArea } from "@/components/ui/scroll-area";
 
 interface AllergenModalProps {
   open: boolean;
@@ -66,13 +65,13 @@ export default function AllergenModal({
   initialData,
 }: AllergenModalProps) {
   const [selectedAllergens, setSelectedAllergens] = useState<string[]>(
-    initialData?.allergens || []
+    initialData?.allergens || [],
   );
   const [selectedDietary, setSelectedDietary] = useState<string[]>(
-    initialData?.dietaryRequirements || []
+    initialData?.dietaryRequirements || [],
   );
   const [additionalNotes, setAdditionalNotes] = useState(
-    initialData?.additionalNotes || ""
+    initialData?.additionalNotes || "",
   );
 
   // Update state when initialData changes (reset if null/undefined)
@@ -91,13 +90,13 @@ export default function AllergenModal({
 
   const handleAllergenToggle = (id: string) => {
     setSelectedAllergens((prev) =>
-      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
+      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id],
     );
   };
 
   const handleDietaryToggle = (id: string) => {
     setSelectedDietary((prev) =>
-      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
+      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id],
     );
   };
 
@@ -118,29 +117,32 @@ export default function AllergenModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90vh]">
-        <DialogHeader>
-          <DialogTitle className="text-2xl font-bold text-black">
-            Allergen and Dietary Requirements
-          </DialogTitle>
-          <DialogDescription className="text-black">
-            Please select all allergens and dietary requirements that apply to
-            you. This information helps us ensure your meal is safe and
-            suitable.
-          </DialogDescription>
-        </DialogHeader>
+      <DialogContent className="flex h-[90dvh] max-h-[90dvh] w-[calc(100vw-2rem)] max-w-2xl flex-col gap-0 overflow-hidden p-0">
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden p-4 sm:p-6">
+          <DialogHeader className="shrink-0 space-y-1">
+            <DialogTitle className="text-xl font-bold text-black sm:text-2xl">
+              Allergen and Dietary Requirements
+            </DialogTitle>
+            <DialogDescription className="text-black text-sm">
+              Please select all allergens and dietary requirements that apply to
+              you. This information helps us ensure your meal is safe and
+              suitable.
+            </DialogDescription>
+          </DialogHeader>
 
-        <ScrollArea className="max-h-[60vh] pr-4">
-          <div className="space-y-6">
+          <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden pr-2 sm:pr-4">
+          <div className="space-y-6 pb-4">
             {/* Allergens Section */}
             <div className="space-y-4">
               <div className="border-b pb-2">
-                <h3 className="text-lg font-semibold text-black">Allergens</h3>
+                <h3 className="text-base font-semibold text-black sm:text-lg">
+                  Allergens
+                </h3>
                 <p className="text-sm text-muted-foreground text-black">
                   Select any allergens you need to avoid
                 </p>
               </div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
                 {commonAllergens.map((allergen) => (
                   <div
                     key={allergen.id}
@@ -165,14 +167,14 @@ export default function AllergenModal({
             {/* Dietary Requirements Section */}
             <div className="space-y-4">
               <div className="border-b pb-2">
-                <h3 className="text-lg font-semibold text-black">
+                <h3 className="text-base font-semibold text-black sm:text-lg">
                   Dietary Requirements
                 </h3>
                 <p className="text-sm text-muted-foreground text-black">
                   Select your dietary preferences
                 </p>
               </div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
                 {dietaryOptions.map((option) => (
                   <div key={option.id} className="flex items-center space-x-2">
                     <Checkbox
@@ -209,26 +211,27 @@ export default function AllergenModal({
               />
             </div>
           </div>
-        </ScrollArea>
+        </div>
 
-        <DialogFooter className="flex gap-3">
-          <Button
-            type="button"
-            variant="outline"
-            onClick={handleClear}
-            className="w-full sm:w-auto text-black"
-          >
-            Clear All
-          </Button>
-          <Button
-            type="button"
-            variant="event-primary"
-            onClick={handleSave}
-            className="w-full sm:w-auto"
-          >
-            Save Requirements
-          </Button>
-        </DialogFooter>
+          <DialogFooter className="mt-auto shrink-0 flex-wrap gap-2 border-t border-border bg-background pt-4 sm:gap-3">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={handleClear}
+              className="w-full sm:w-auto text-black"
+            >
+              Clear All
+            </Button>
+            <Button
+              type="button"
+              variant="event-primary"
+              onClick={handleSave}
+              className="w-full sm:w-auto"
+            >
+              Save Requirements
+            </Button>
+          </DialogFooter>
+        </div>
       </DialogContent>
     </Dialog>
   );

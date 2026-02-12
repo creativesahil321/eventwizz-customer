@@ -1,16 +1,21 @@
 import { Row } from "@tanstack/react-table";
 
 export type EmailTemplate = {
-  updated_at: unknown;
-  body: unknown;
-  email: unknown;
-  subject: unknown;
-  created_at: EmailTemplate;
   id: number;
   title: string;
   who_received: string;
   when_received: string;
   status: string;
+  /** From list API */
+  subject?: string;
+  body?: string;
+  name?: string;
+  signature?: string;
+  short_codes?: string[];
+  /** Optional display fields */
+  updated_at?: unknown;
+  email?: unknown;
+  created_at?: unknown;
 };
 
 export type SearchParams = {

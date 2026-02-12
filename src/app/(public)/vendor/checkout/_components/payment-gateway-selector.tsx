@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   CreditCard,
   Building2,
@@ -78,6 +78,7 @@ export default function PaymentGatewaySelector({
   showError = false,
 }: PaymentGatewaySelectorProps) {
   const [isExpanded, setIsExpanded] = useState(false);
+  const hasAutoSelectedRef = useRef(false);
 
   // Filter available gateways based on what's provided by the API
   const filteredGateways = availableGateways
@@ -87,13 +88,26 @@ export default function PaymentGatewaySelector({
     }))
     .filter((gateway) => gateway.id); // Filter out undefined gateways
 
+  // Auto-select single gateway in useEffect (not during render)
+  useEffect(() => {
+    if (
+      filteredGateways.length === 1 &&
+      !selectedGateway &&
+      !hasAutoSelectedRef.current
+    ) {
+      hasAutoSelectedRef.current = true;
+      console.log(
+        `🔄 Auto-selecting payment gateway: ${filteredGateways[0].name}`
+      );
+      // Use setTimeout to ensure this happens after render
+      setTimeout(() => {
+        onGatewaySelect(filteredGateways[0].apiId.toString());
+      }, 0);
+    }
+  }, [filteredGateways, selectedGateway, onGatewaySelect]);
+
   if (filteredGateways.length === 0) {
     return null;
-  }
-
-  // If only one gateway, auto-select it
-  if (filteredGateways.length === 1 && !selectedGateway) {
-    onGatewaySelect(filteredGateways[0].apiId.toString());
   }
 
   const selectedGatewayConfig = selectedGateway
@@ -121,8 +135,8 @@ export default function PaymentGatewaySelector({
         </div>
       )}
 
-      {/* All Gateway Options - Show all if no selection or if expanded */}
-      {(!selectedGateway || isExpanded) && (
+      {/* All Gateway Options - Show all if no selection or if expanded OR if only one gateway */}
+      {(!selectedGateway || isExpanded || filteredGateways.length === 1) && (
         <div className="space-y-1.5">
           {filteredGateways.map((gateway) => {
             const isSelected = selectedGateway === gateway.apiId.toString();
@@ -139,7 +153,8 @@ export default function PaymentGatewaySelector({
                     : "border-gray-200 bg-white hover:bg-gray-50"
                 } ${disabled ? "opacity-50 cursor-not-allowed" : ""}`}
                 onClick={() => {
-                  if (!disabled) {
+                  if (!disabled && !isSelected) {
+                    // Only call onGatewaySelect if not already selected
                     onGatewaySelect(gateway.apiId.toString());
                     if (filteredGateways.length > 1) {
                       setIsExpanded(false);
@@ -177,7 +192,7 @@ export default function PaymentGatewaySelector({
         </div>
       )}
 
-      {/* Selected Gateway Display (Compact) - Only show when collapsed */}
+      {/* Selected Gateway Display (Compact) - Only show when collapsed AND multiple gateways */}
       {selectedGatewayConfig && !isExpanded && filteredGateways.length > 1 && (
         <motion.div
           initial={{ opacity: 0 }}

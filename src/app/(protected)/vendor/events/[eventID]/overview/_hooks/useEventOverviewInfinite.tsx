@@ -21,6 +21,8 @@ interface UseEventOverviewInfiniteParams {
   dateStatus: "all" | "available" | "sold_out";
   perPage?: number;
   dateFilter?: string; // Date filter in YYYY-MM-DD format
+  /** When false, the query is disabled. Use to avoid duplicate fetch when "all" data is loaded elsewhere. */
+  enabled?: boolean;
 }
 
 // Types matching the actual API response
@@ -106,6 +108,7 @@ export function useEventOverviewInfinite({
   dateStatus,
   perPage = 10,
   dateFilter,
+  enabled: enabledProp = true,
 }: UseEventOverviewInfiniteParams) {
   const { data: session } = useSession();
 
@@ -134,7 +137,7 @@ export function useEventOverviewInfinite({
       // No more pages
       return undefined;
     },
-    enabled: !!session?.user?.token && !!eventId,
+    enabled: enabledProp !== false && !!session?.user?.token && !!eventId,
     staleTime: 1000 * 60 * 5, // 5 minutes
     refetchOnWindowFocus: false,
   });

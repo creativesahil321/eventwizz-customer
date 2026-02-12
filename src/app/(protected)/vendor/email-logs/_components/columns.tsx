@@ -2,7 +2,14 @@ import { ColumnDef } from "@tanstack/react-table";
 import { DataTableColumnHeader } from "@/components/data-table/data-table-column-header";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Trash, Eye, Reply, AlertCircle, CheckCircle2 } from "lucide-react";
+import {
+  Trash,
+  Eye,
+  RotateCw,
+  AlertCircle,
+  CheckCircle2,
+  Clock,
+} from "lucide-react";
 import React from "react";
 import { DataTableRowAction, EmailLog } from "../_lib/types";
 import {
@@ -29,6 +36,18 @@ const getStatusBadge = (status: EmailLog["status"]) => {
       variant: "default" as const,
       className: "bg-green-100 text-green-800 border-green-200",
       icon: CheckCircle2,
+    },
+    Pending: {
+      label: "Pending",
+      variant: "secondary" as const,
+      className: "bg-amber-100 text-amber-800 border-amber-200",
+      icon: Clock,
+    },
+    Processing: {
+      label: "Processing",
+      variant: "secondary" as const,
+      className: "bg-blue-100 text-blue-800 border-blue-200",
+      icon: RotateCw,
     },
     Failed: {
       label: "Failed",
@@ -122,15 +141,13 @@ export function getColumns({
       cell: ({ row }) => {
         // Use only the date field, not updated_at
         const dateValue = row.original.date;
-        
+
         if (!dateValue) {
           return <span className="text-muted-foreground">—</span>;
         }
 
         // Display date exactly as it comes from API: "Jan 01, 2026 10:21 AM"
-        return (
-          <span className="text-foreground font-medium">{dateValue}</span>
-        );
+        return <span className="text-foreground font-medium">{dateValue}</span>;
       },
       enableSorting: true,
       enableHiding: false,
@@ -152,7 +169,7 @@ export function getColumns({
       cell: ({ row }) => {
         const failureReason = row.getValue("failure_reason") as string;
         const status = row.original.status;
-        
+
         if (status === "Failed" && failureReason) {
           return (
             <TooltipProvider>
@@ -180,7 +197,7 @@ export function getColumns({
             </TooltipProvider>
           );
         }
-        
+
         return <span className="text-muted-foreground text-sm">—</span>;
       },
       enableSorting: false,
@@ -211,9 +228,10 @@ export function getColumns({
             </Button>
             <Button
               variant="event-primary"
-              onClick={() => setRowAction({ row, type: "reply" })}
+              onClick={() => setRowAction({ row, type: "resend" })}
+              title="Resend email"
             >
-              <Reply size={16} />
+              <RotateCw size={16} />
             </Button>
           </nav>
         );

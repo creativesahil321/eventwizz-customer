@@ -85,7 +85,7 @@ export default function AttendeeList({
   const isTableFull = attendees.length >= totalGuests;
 
   return (
-    <Card className="h-full shadow-lg border-2 flex flex-col">
+    <Card className="h-full min-h-0 shadow-lg border-2 flex flex-col overflow-hidden">
       <CardHeader
         className="rounded-t-lg border-b-2 flex-shrink-0 py-4"
         style={{
@@ -122,8 +122,8 @@ export default function AttendeeList({
         </div>
       </CardHeader>
 
-      <CardContent className="p-0 flex-1 flex flex-col min-h-0">
-        <ScrollArea className="flex-1 min-h-[400px]">
+      <CardContent className="p-0 flex-1 flex flex-col min-h-0 overflow-hidden">
+        <ScrollArea className="flex-1 min-h-0 h-full">
           <div className="p-3">
             {attendees.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-16 px-4 text-center">

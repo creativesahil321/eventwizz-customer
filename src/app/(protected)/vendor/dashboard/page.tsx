@@ -4,6 +4,7 @@ import DashboardOrders from "./_components/dashboard-orders";
 import DashboardBookingsTable from "./_components/_bookings-table";
 import SalesHistory from "./_components/_sales-history";
 import BestSales from "./_components/_best-sales";
+import { PaymentSetupAlert } from "./_components/payment-setup-alert";
 import { searchParamsCache } from "./_lib/validations";
 import {
   fetchAdminDashboardBestSales,
@@ -36,6 +37,9 @@ export default async function Page(props: PageProps) {
       <Suspense fallback={<PageLoader />}>
         <PermissionDebug />
         <section className="w-full relative flex flex-col space-y-8">
+          {/* Payment Setup Alert */}
+          <PaymentSetupAlert />
+          
           <section className="w-full relative">
             <DashboardSummary title="Summary" items={dashboard} />
           </section>

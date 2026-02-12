@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { AlertCircle, X, CreditCard } from "lucide-react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
+import { AuthUser } from "@/types/auth.types";
 
 interface PaymentSetupReminderProps {
   className?: string;
@@ -57,9 +58,8 @@ export function PaymentSetupReminder({
 
     // Check if payment setup is needed
     // Note: These properties will be added to session type in implementation
-    const user = session?.user as any;
-    const needsPaymentSetup =
-      user?.payment_setup_skipped === true || !user?.has_payment_provider;
+    const user = session?.user as unknown as AuthUser;
+    const needsPaymentSetup = !user?.has_payment_provider;
 
     setIsVisible(needsPaymentSetup);
   }, [session]);
@@ -79,7 +79,7 @@ export function PaymentSetupReminder({
       variant="default"
       className={cn(
         "mb-6 border-l-4 border-l-amber-500 bg-amber-50 border-amber-200",
-        className
+        className,
       )}
     >
       <div className="flex items-start gap-3">
@@ -155,9 +155,8 @@ export function PaymentSetupReminderCompact({
 
   useEffect(() => {
     // Note: These properties will be added to session type in implementation
-    const user = session?.user as any;
-    const needsPaymentSetup =
-      user?.payment_setup_skipped === true || !user?.has_payment_provider;
+    const user = session?.user as unknown as AuthUser;
+    const needsPaymentSetup = !user?.has_payment_provider;
 
     setIsVisible(needsPaymentSetup);
   }, [session]);
@@ -170,7 +169,7 @@ export function PaymentSetupReminderCompact({
     <div
       className={cn(
         "flex items-center gap-2 px-3 py-2 bg-amber-50 border border-amber-200 rounded-md",
-        className
+        className,
       )}
     >
       <AlertCircle className="h-4 w-4 text-amber-600 flex-shrink-0" />

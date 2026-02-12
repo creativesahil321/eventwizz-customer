@@ -435,15 +435,16 @@ export const eventsService = {
       formData.append(`package_details[${index}][title]`, detail.title);
     });
 
-    // Handle gallery images - both new files and existing backend images
+    // Handle gallery images - both new files and existing backend images (see docs/backend-api/GALLERY_API_FRONTEND_GUIDE.md)
     if (data.gallery && data.gallery.length > 0) {
       let fileIndex = 0;
       let existingImageIndex = 0;
+      const galleryOrder: Array<{ type: "existing"; id: number } | { type: "new"; index: number }> = [];
 
       data.gallery.forEach((item) => {
-        // New file upload - accept both File and Blob (cropped images)
         if (item instanceof File || item instanceof Blob) {
           formData.append(`event_gallery_images[${fileIndex}]`, item);
+          galleryOrder.push({ type: "new", index: fileIndex });
           fileIndex++;
         } else if (
           typeof item === "object" &&
@@ -451,18 +452,17 @@ export const eventsService = {
           "id" in item &&
           "url" in item
         ) {
-          // Existing backend image - send the ID to keep it
-          formData.append(
-            `existing_gallery_images[${existingImageIndex}][id]`,
-            (item as { id: number; url: string }).id.toString()
-          );
-          formData.append(
-            `existing_gallery_images[${existingImageIndex}][url]`,
-            (item as { id: number; url: string }).url
-          );
+          const existing = item as { id: number; url: string };
+          formData.append(`existing_gallery_images[${existingImageIndex}][id]`, existing.id.toString());
+          formData.append(`existing_gallery_images[${existingImageIndex}][url]`, existing.url);
+          galleryOrder.push({ type: "existing", id: existing.id });
           existingImageIndex++;
         }
       });
+
+      if (galleryOrder.length > 0) {
+        formData.append("gallery_order", JSON.stringify(galleryOrder));
+      }
     }
 
     const response = await request<ApiResponse>({

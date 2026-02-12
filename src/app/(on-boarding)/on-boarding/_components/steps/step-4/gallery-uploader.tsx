@@ -50,14 +50,20 @@ const GalleryUploader: React.FC<GalleryUploaderProps> = ({ field }) => {
   const [draggedItem, setDraggedItem] = useState<number | null>(null);
   const [draggedOverItem, setDraggedOverItem] = useState<number | null>(null);
 
-  // Initialize galleryItems from field.value on mount and when field.value changes
+  // Initialize galleryItems from field.value on mount and when field.value changes (cap at 8)
   useEffect(() => {
     if (field.value && Array.isArray(field.value)) {
-      setGalleryItems(field.value);
+      const capped =
+        field.value.length > 8 ? field.value.slice(0, 8) : field.value;
+      setGalleryItems(capped);
+      if (field.value.length > 8) {
+        field.onChange(capped);
+        globalForm.setValue("stepFour.gallery", capped);
+      }
     } else {
       setGalleryItems([]);
     }
-  }, [field.value]);
+  }, [field, field.value, globalForm]);
 
   const handleGalleryChange = (files: FileWithPreview[]) => {
     if (!files.length) return;
@@ -72,9 +78,8 @@ const GalleryUploader: React.FC<GalleryUploaderProps> = ({ field }) => {
       return file;
     });
 
-    // Combine new files with existing gallery items (that aren't Files)
-    const currentItems = galleryItems.filter((item) => !isFile(item));
-    const updatedGalleryItems = [...currentItems, ...filesWithPreviews];
+    // Append new files to existing gallery (keep all: backend items + existing Files)
+    const updatedGalleryItems = [...galleryItems, ...filesWithPreviews];
 
     // Limit to maximum 8 items
     const limitedGalleryItems = updatedGalleryItems.slice(0, 8);
@@ -225,21 +230,17 @@ const GalleryUploader: React.FC<GalleryUploaderProps> = ({ field }) => {
         </div>
       )}
 
-      {/* Only show uploader if less than 8 images */}
+      {/* Only show uploader if less than 8 images — use value={[]} so FileUploader is dropzone-only; gallery grid above shows all items (avoids duplicate file list) */}
       {galleryItems.length < 8 && (
         <FormControl>
           <article className="w-full">
             <FileUploader
-              value={galleryItems.filter(isFile) as File[]}
+              value={[]}
               onValueChange={handleGalleryChange as (files: File[]) => void}
               maxFileCount={8 - galleryItems.length}
               maxSize={5 * 1024 * 1024}
               disabled={galleryUploading}
-              onRemove={(index?: string | number) => {
-                if (typeof index === "number") {
-                  handleRemoveGalleryItem(index);
-                }
-              }}
+              moreLabel
               accept={{
                 "image/png": [],
                 "image/jpeg": [],

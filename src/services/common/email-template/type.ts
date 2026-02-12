@@ -11,6 +11,8 @@ export interface EmailTemplate {
   banner?: string | null;
   title: string;
   subject: string;
+  body?: string;
+  signature?: string;
   salutation?: string;
   message_body?: string;
   footer_status?: number;
@@ -81,19 +83,9 @@ export interface EmailTemplateCreateRequest {
 }
 
 export interface EmailTemplateUpdateRequest {
-  name?: string;
-  title?: string;
   subject?: string;
-  salutation?: string;
-  message_body?: string;
-  footer_status?: number;
-  footer_body?: string;
-  button_level?: string;
-  button_link?: string;
-  bottom_status?: number;
-  bottom_title?: string;
-  bottom_body?: string;
-  status?: number;
+  body?: string;
+  signature?: string;
 }
 
 export interface EmailTemplateSendRequest {

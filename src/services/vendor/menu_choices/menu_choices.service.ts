@@ -1,18 +1,52 @@
+import axios from "axios";
+import { getSession } from "next-auth/react";
 import { api } from "@/services/core/api-client";
 import { API_ENDPOINTS } from "@/services/core/endpoints";
-import {
-  CreateMenuChoicePayload,
-  UpdateMenuChoicePayload,
-  MenuChoicesResponse,
-  MenuChoiceResponse,
-  MenuChoiceCreateResponse,
-  MenuChoiceUpdateResponse,
-  MenuChoiceDeleteResponse,
-} from "./type";
+import { env } from "@/env";
+import { useDomainStore } from "@/store/domain.store";
+import { CustomerMenuChoicesListResponse } from "./type";
 import {
   getCurrentUserRole,
   getEndpointsByRole,
 } from "@/lib/utils/api-endpoints";
+
+/** Shared: fetch blob from API and trigger CSV download (DRY for export endpoints). */
+async function fetchBlobAndDownload(
+  url: string,
+  options: { params?: Record<string, unknown>; defaultFilename: string }
+): Promise<void> {
+  const session = await getSession();
+  const token = session?.user?.token as string | undefined;
+  const domain = useDomainStore.getState().domain;
+  const headers: Record<string, string> = {};
+  if (token) headers.Authorization = `Bearer ${token}`;
+  if (domain) headers["X-Domain"] = domain;
+
+  const response = await axios.get<Blob>(url, {
+    ...(options.params && { params: options.params }),
+    responseType: "blob",
+    headers,
+  });
+
+  const contentDisposition = response.headers?.["content-disposition"];
+  let filename = options.defaultFilename;
+  if (contentDisposition) {
+    const match = contentDisposition.match(/filename="?(.+)"?/i);
+    if (match?.[1]) filename = match[1].trim();
+  }
+
+  const blob = new Blob([response.data], {
+    type: response.headers?.["content-type"] || "text/csv",
+  });
+  const objectUrl = window.URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = objectUrl;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  window.URL.revokeObjectURL(objectUrl);
+}
 
 /**
  * Menu Choices Service
@@ -20,164 +54,63 @@ import {
  */
 export const menuChoicesService = {
   /**
-   * Fetch all menu choices with optional search parameters
-   * @param params Search parameters (page, per_page, search, status)
-   * @returns Promise with menu choices data
+   * Fetch customer menu choices list with pagination and search
+   * @param params page, per_page, search
+   * @returns Promise with paginated customer menu choices (data, links, meta)
    */
-  getMenuChoices: (params?: {
+  getCustomerMenuChoices: (params?: {
     search?: string;
-    page?: number | string;
-    per_page?: number | string;
-    event_type?: string;
-    menu?: string;
-    status?: string;
+    page?: number;
+    per_page?: number;
+    event_id?: number;
+    event_date?: string;
+    event_name?: string;
   }) => {
     const role = getCurrentUserRole();
     const endpoints = getEndpointsByRole<
       typeof API_ENDPOINTS.VENDOR.MENU_CHOICES
     >("MENU_CHOICES", role);
 
-    return api.get<MenuChoicesResponse>(endpoints.GET_ALL, {
-      params,
+    return api.get<CustomerMenuChoicesListResponse>(endpoints.GET_ALL, {
+      params: {
+        search: params?.search || undefined,
+        page: params?.page ?? 1,
+        per_page: params?.per_page ?? 30,
+        event_id: params?.event_id ?? undefined,
+        event_date: params?.event_date || undefined,
+        event_name: params?.event_name || undefined,
+      },
       returnFullResponse: true,
     });
   },
 
   /**
-   * Fetch a specific menu choice by ID
-   * @param id Menu choice ID
-   * @returns Promise with menu choice data
+   * Export a single customer menu choice as CSV (triggers file download)
+   * @param id Customer menu choice record ID
    */
-  getMenuChoiceById: (id: number | string) => {
-    const role = getCurrentUserRole();
-    const endpoints = getEndpointsByRole<
-      typeof API_ENDPOINTS.VENDOR.MENU_CHOICES
-    >("MENU_CHOICES", role);
-
-    const url = endpoints.SHOW.replace("{id}", id.toString());
-    return api.get<MenuChoiceResponse>(url, {
-      returnFullResponse: true,
+  exportSingleMenuChoiceCsv: async (id: number | string): Promise<void> => {
+    const endpoint =
+      API_ENDPOINTS.VENDOR.MENU_CHOICES.EXPORT_SINGLE_MENU_CHOICES_CSV.replace(
+        "{id}",
+        String(id)
+      );
+    await fetchBlobAndDownload(`${env.NEXT_PUBLIC_API_URL}${endpoint}`, {
+      defaultFilename: `menu-choice-${id}.csv`,
     });
   },
 
   /**
-   * Create a new menu choice
-   * @param data Menu choice data
-   * @returns Promise with created menu choice data
+   * Export all customer menu choices for an event date as CSV (date-wise, all users)
+   * GET .../customer-menu-choices/export?event_id=93&event_date=2026-01-30
    */
-  createMenuChoice: (data: CreateMenuChoicePayload) => {
-    const role = getCurrentUserRole();
-    const endpoints = getEndpointsByRole<
-      typeof API_ENDPOINTS.VENDOR.MENU_CHOICES
-    >("MENU_CHOICES", role);
-
-    // Convert boolean status to number if needed
-    const payload = {
-      ...data,
-      status:
-        typeof data.status === "boolean" ? (data.status ? 1 : 0) : data.status,
-    };
-
-    return api.post<MenuChoiceCreateResponse>(endpoints.CREATE, payload, {
-      returnFullResponse: true,
+  exportByDateCsv: async (
+    eventId: number,
+    eventDate: string
+  ): Promise<void> => {
+    const endpoint = API_ENDPOINTS.VENDOR.MENU_CHOICES.EXPORT_BY_DATE;
+    await fetchBlobAndDownload(`${env.NEXT_PUBLIC_API_URL}${endpoint}`, {
+      params: { event_id: eventId, event_date: eventDate },
+      defaultFilename: `menu-choices-${eventId}-${eventDate}.csv`,
     });
-  },
-
-  /**
-   * Update an existing menu choice
-   * @param id Menu choice ID
-   * @param data Menu choice data to update
-   * @returns Promise with updated menu choice data
-   */
-  updateMenuChoice: (id: number | string, data: UpdateMenuChoicePayload) => {
-    const role = getCurrentUserRole();
-    const endpoints = getEndpointsByRole<
-      typeof API_ENDPOINTS.VENDOR.MENU_CHOICES
-    >("MENU_CHOICES", role);
-
-    // Convert boolean status to number if needed
-    const payload = {
-      ...data,
-      status:
-        typeof data.status === "boolean" ? (data.status ? 1 : 0) : data.status,
-    };
-
-    const url = endpoints.UPDATE.replace("{id}", id.toString());
-    return api.post<MenuChoiceUpdateResponse>(url, payload, {
-      returnFullResponse: true,
-    });
-  },
-
-  /**
-   * Delete a menu choice
-   * @param id Menu choice ID to delete
-   * @returns Promise with delete operation result
-   */
-  deleteMenuChoice: (id: number | string) => {
-    const role = getCurrentUserRole();
-    const endpoints = getEndpointsByRole<
-      typeof API_ENDPOINTS.VENDOR.MENU_CHOICES
-    >("MENU_CHOICES", role);
-
-    const url = endpoints.DELETE.replace("{id}", id.toString());
-    return api
-      .delete<MenuChoiceDeleteResponse>(url, {
-        returnFullResponse: true,
-      })
-      .catch((error) => {
-        console.error("API error in deleteMenuChoice:", error);
-
-        if (error.response && error.response.data) {
-          return error.response.data;
-        }
-
-        return {
-          status: false,
-          message: error.message || "Failed to delete menu choice",
-          errors: [],
-          data: [],
-        };
-      });
-  },
-
-  /**
-   * Update a menu choice's status
-   * @param id Menu choice ID
-   * @param status Boolean indicating desired status (true for active, false for inactive)
-   * @returns Promise with status update result
-   */
-  updateMenuChoiceStatus: (id: number | string, status: boolean = true) => {
-    const role = getCurrentUserRole();
-    const endpoints = getEndpointsByRole<
-      typeof API_ENDPOINTS.VENDOR.MENU_CHOICES
-    >("MENU_CHOICES", role);
-
-    const url = endpoints.UPDATE_STATUS.replace("{id}", id.toString());
-
-    // Send the status as a string value as required by the API
-    return api
-      .post<MenuChoiceUpdateResponse>(
-        url,
-        {
-          status: status ? "active" : "inactive",
-        },
-        {
-          returnFullResponse: true,
-        }
-      )
-      .catch((error) => {
-        console.error("API error in updateMenuChoiceStatus:", error);
-
-        if (error.response && error.response.data) {
-          return error.response.data;
-        }
-
-        return {
-          status: false,
-          message: error.message || "Failed to update menu choice status",
-          errors: [],
-          data: null,
-        };
-      });
   },
 };

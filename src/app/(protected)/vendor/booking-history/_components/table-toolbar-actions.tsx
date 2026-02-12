@@ -46,7 +46,7 @@ export function TableToolbarActions({ table }: TableToolbarActionsProps) {
     body: "",
   });
   const [exportDate, setExportDate] = useState(
-    new Date().toISOString().split("T")[0],
+    new Date().toISOString().split("T")[0]
   );
   const bulkDeleteMutation = useBulkDeleteBookings();
   const bulkEmailMutation = useBulkEmailSend();
@@ -194,15 +194,15 @@ export function TableToolbarActions({ table }: TableToolbarActionsProps) {
 
       {/* Bulk Email Dialog */}
       <Dialog open={emailDialogOpen} onOpenChange={setEmailDialogOpen}>
-        <DialogContent className="sm:max-w-[700px] text-black">
-          <DialogHeader>
+        <DialogContent className="sm:max-w-[700px] max-h-[90vh] flex flex-col overflow-hidden text-black">
+          <DialogHeader className="flex-shrink-0">
             <DialogTitle>Send Bulk Email</DialogTitle>
             <DialogDescription>
               Send email to {selectedRows.length} selected booking(s). You can
               use placeholders like {"{name}"} in the body.
             </DialogDescription>
           </DialogHeader>
-          <div className="grid gap-4 py-4">
+          <div className="flex-1 min-h-0 overflow-y-auto grid gap-4 py-4">
             <div className="grid gap-2">
               <Label htmlFor="subject">Subject</Label>
               <Input
@@ -237,7 +237,7 @@ export function TableToolbarActions({ table }: TableToolbarActionsProps) {
               </p>
             </div>
           </div>
-          <DialogFooter>
+          <DialogFooter className="flex-shrink-0">
             <Button
               type="button"
               variant="event-outline"

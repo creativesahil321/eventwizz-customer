@@ -17,6 +17,8 @@ interface UseEventOverviewParams {
   dateStatus?: "all" | "available" | "sold_out";
   datePerPage?: number;
   datePage?: number;
+  /** When false, the query is disabled. Use to lazy-load (e.g. only when date dropdown is open). */
+  enabled?: boolean;
 }
 
 export function useEventOverview({
@@ -24,6 +26,7 @@ export function useEventOverview({
   dateStatus = "all",
   datePerPage = 10,
   datePage = 1,
+  enabled: enabledProp = true,
 }: UseEventOverviewParams) {
   const { data: session } = useSession();
   const token = session?.user?.token;
@@ -37,30 +40,26 @@ export function useEventOverview({
     eventId !== "{eventId}" &&
     !isNaN(parseInt(eventId));
 
-  const {
-    data: overviewData,
-    isLoading,
-    isError,
-    error,
-    refetch,
-  } = useQuery<EventOverviewResponse>({
-    queryKey: eventOverviewKeys.detail(eventId, dateStatus, datePage),
-    queryFn: () =>
-      eventsService.getEventOverview(eventId, {
-        date_status: dateStatus,
-        date_per_page: datePerPage,
-        date_page: datePage,
-      }),
-    enabled: !!token && !!isValidEventId,
-    staleTime: 1000 * 60 * 5, // 5 minutes
-    refetchOnWindowFocus: false,
-  });
-
+  const { data, isLoading, isError, error, refetch } =
+    useQuery<EventOverviewResponse>({
+      queryKey: eventOverviewKeys.detail(eventId, dateStatus, datePage),
+      queryFn: async () => {
+        const response = await eventsService.getEventOverview(eventId, {
+          date_status: dateStatus,
+          date_per_page: datePerPage,
+          date_page: datePage,
+        });
+        return response as unknown as EventOverviewResponse;
+      },
+      enabled: enabledProp !== false && !!token && !!isValidEventId,
+      staleTime: 1000 * 60 * 5, // 5 minutes
+      refetchOnWindowFocus: false,
+    });
   return {
-    overviewData,
-    isLoading,
-    isError,
-    error,
-    refetch,
+    overviewData: data as EventOverviewResponse,
+    isLoading: isLoading,
+    isError: isError,
+    error: error,
+    refetch: refetch,
   };
 }

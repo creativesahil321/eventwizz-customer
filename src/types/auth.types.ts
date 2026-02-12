@@ -47,10 +47,13 @@ export interface LoginResponse {
     isOnboarded?: boolean;
     event_id?: number;
     permissions?: string[];
+    /** True if vendor has connected at least one payment gateway (Stripe/PayPal/TrueLayer). */
+    has_payment_provider?: boolean;
   };
 }
 // Update the AuthUser interface to standardize role and user_type
 export interface AuthUser {
+  has_payment_provider?: boolean;
   uuid?: string | null;
   first_name?: string;
   last_name?: string;
