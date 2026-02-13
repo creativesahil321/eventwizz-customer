@@ -191,7 +191,7 @@ export default function BookingInfoTab({ bookingData }: BookingInfoTabProps) {
     Record<string, boolean>
   >({});
   const [expandedAddOns, setExpandedAddOns] = useState<Record<string, boolean>>(
-    {}
+    {},
   );
   const [rescheduleModalOpen, setRescheduleModalOpen] = useState(false);
   const [selectedDateForReschedule, setSelectedDateForReschedule] =
@@ -286,7 +286,7 @@ export default function BookingInfoTab({ bookingData }: BookingInfoTabProps) {
     type: "table" | "drink" | "ticket",
     itemName: string,
     dateId: string,
-    keyword: string | number
+    keyword: string | number,
   ) => {
     const bookingId = parseInt(bookingData.id, 10);
     if (isNaN(bookingId)) {
@@ -360,7 +360,7 @@ export default function BookingInfoTab({ bookingData }: BookingInfoTabProps) {
 
   const handleRescheduleAcceptanceClick = (
     dateInfo: BookingDate,
-    rescheduleRequest: RescheduleRequest
+    rescheduleRequest: RescheduleRequest,
   ) => {
     setSelectedDateForPayment(dateInfo);
     setSelectedRescheduleRequest(rescheduleRequest);
@@ -414,7 +414,7 @@ export default function BookingInfoTab({ bookingData }: BookingInfoTabProps) {
           // Otherwise, close modal and show success
           if (!response.data?.redirect_url) {
             toast.success(
-              response.message || "Payment processed successfully!"
+              response.message || "Payment processed successfully!",
             );
             setSingleDatePaymentModalOpen(false);
             setSelectedDateForPayment(null);
@@ -508,15 +508,15 @@ export default function BookingInfoTab({ bookingData }: BookingInfoTabProps) {
           >
             {bookingData.dates.map((dateInfo, index) => {
               const tableItems = dateInfo.items.filter(
-                (item) => item.type === "table"
+                (item) => item.type === "table",
               );
               const totalTableCount = tableItems.reduce(
                 (sum, item) => sum + (item.table_count ?? 1),
-                0
+                0,
               );
               const totalTableGuests = tableItems.reduce(
                 (sum, item) => sum + item.people_added,
-                0
+                0,
               );
 
               return (
@@ -582,11 +582,11 @@ export default function BookingInfoTab({ bookingData }: BookingInfoTabProps) {
                                 <span className="text-xs text-muted-foreground">
                                   {dateInfo.drinks.reduce(
                                     (sum, d) => sum + d.quantity,
-                                    0
+                                    0,
                                   )}{" "}
                                   {dateInfo.drinks.reduce(
                                     (sum, d) => sum + d.quantity,
-                                    0
+                                    0,
                                   ) === 1
                                     ? "Drink"
                                     : "Drinks"}
@@ -740,7 +740,7 @@ export default function BookingInfoTab({ bookingData }: BookingInfoTabProps) {
                                           e.stopPropagation();
                                           handleRescheduleAcceptanceClick(
                                             dateInfo,
-                                            request
+                                            request,
                                           );
                                         }}
                                         className="bg-amber-600 hover:bg-amber-700 text-white"
@@ -846,7 +846,7 @@ export default function BookingInfoTab({ bookingData }: BookingInfoTabProps) {
                             {/* Booking Breakdown Section */}
                             <div className="space-y-3">
                               <div
-                                className="flex items-center justify-between pb-2 border-b"
+                                className="flex flex-col gap-1 pb-2 border-b sm:flex-row sm:items-center sm:justify-between"
                                 style={{ borderColor: "var(--color-primary)" }}
                               >
                                 <span className="text-xs font-semibold text-foreground">
@@ -858,9 +858,9 @@ export default function BookingInfoTab({ bookingData }: BookingInfoTabProps) {
                               </div>
 
                               {tableItems.length > 0 && (
-                                <div className="flex items-center justify-between px-3 py-2 rounded-md bg-blue-50 border border-blue-100">
-                                  <div className="flex items-center gap-2">
-                                    <UtensilsCrossed className="h-4 w-4 text-blue-600" />
+                                <div className="flex flex-col gap-2 rounded-md bg-blue-50 border border-blue-100 px-3 py-2 sm:flex-row sm:items-center sm:justify-between">
+                                  <div className="flex min-w-0 flex-wrap items-center gap-2">
+                                    <UtensilsCrossed className="h-4 w-4 shrink-0 text-blue-600" />
                                     <span className="text-xs font-semibold text-blue-900">
                                       Tables Included
                                     </span>
@@ -872,7 +872,7 @@ export default function BookingInfoTab({ bookingData }: BookingInfoTabProps) {
                                       )
                                     </span>
                                   </div>
-                                  <span className="text-xs font-semibold text-blue-900">
+                                  <span className="shrink-0 text-xs font-semibold text-blue-900">
                                     {totalTableGuests}{" "}
                                     {totalTableGuests === 1
                                       ? "Guest"
@@ -884,16 +884,16 @@ export default function BookingInfoTab({ bookingData }: BookingInfoTabProps) {
                               {tableItems.map((item, idx) => (
                                 <div
                                   key={idx}
-                                  className="flex items-start justify-between py-2 border-b border-gray-100 last:border-0 gap-4"
+                                  className="flex flex-col gap-2 border-b border-gray-100 py-2 last:border-0 sm:flex-row sm:items-start sm:justify-between sm:gap-4"
                                 >
-                                  <div className="flex-1 min-w-0">
-                                    <div className="flex items-center gap-2 mb-1">
+                                  <div className="min-w-0 flex-1">
+                                    <div className="mb-1 flex flex-wrap items-center gap-2">
                                       <span className="text-sm font-medium text-foreground">
                                         {`Table of ${item.capacity}`}
                                       </span>
                                       {item.table_count &&
                                         item.table_count > 0 && (
-                                          <span className="text-xs text-muted-foreground bg-gray-100 px-2 py-0.5 rounded">
+                                          <span className="rounded bg-gray-100 px-2 py-0.5 text-xs text-muted-foreground">
                                             {item.table_count}{" "}
                                             {item.table_count === 1
                                               ? "Table"
@@ -918,13 +918,13 @@ export default function BookingInfoTab({ bookingData }: BookingInfoTabProps) {
                                                 false;
                                               const allocationEntries =
                                                 Object.entries(
-                                                  item.allocation || {}
+                                                  item.allocation || {},
                                                 );
                                               const visibleTables = isExpanded
                                                 ? allocationEntries
                                                 : allocationEntries.slice(
                                                     0,
-                                                    MAX_VISIBLE_TABLES
+                                                    MAX_VISIBLE_TABLES,
                                                   );
                                               const hasMore =
                                                 allocationEntries.length >
@@ -935,7 +935,7 @@ export default function BookingInfoTab({ bookingData }: BookingInfoTabProps) {
                                                   {visibleTables.map(
                                                     (
                                                       [tableId, people],
-                                                      tableIdx
+                                                      tableIdx,
                                                     ) => {
                                                       const displayValue =
                                                         typeof people ===
@@ -948,8 +948,8 @@ export default function BookingInfoTab({ bookingData }: BookingInfoTabProps) {
                                                           ? parseInt(
                                                               people.replace(
                                                                 "+",
-                                                                ""
-                                                              )
+                                                                "",
+                                                              ),
                                                             )
                                                           : people;
 
@@ -970,7 +970,7 @@ export default function BookingInfoTab({ bookingData }: BookingInfoTabProps) {
                                                           </span>
                                                         </div>
                                                       );
-                                                    }
+                                                    },
                                                   )}
                                                   {hasMore && (
                                                     <Button
@@ -980,7 +980,7 @@ export default function BookingInfoTab({ bookingData }: BookingInfoTabProps) {
                                                       onClick={() =>
                                                         toggleAllocationExpansion(
                                                           dateInfo.id,
-                                                          idx
+                                                          idx,
                                                         )
                                                       }
                                                     >
@@ -1015,9 +1015,9 @@ export default function BookingInfoTab({ bookingData }: BookingInfoTabProps) {
                                         </p>
                                       )}
                                   </div>
-                                  <div className="flex items-center gap-3 shrink-0">
+                                  <div className="flex shrink-0 flex-wrap items-center gap-3">
                                     {item.price_per_person ? (
-                                      <p className="text-sm font-semibold text-foreground shrink-0">
+                                      <p className="shrink-0 text-sm font-semibold text-foreground whitespace-nowrap">
                                         £
                                         {(
                                           item.price_per_person *
@@ -1029,11 +1029,11 @@ export default function BookingInfoTab({ bookingData }: BookingInfoTabProps) {
                                         <span className="text-xs text-muted-foreground">
                                           Total People
                                         </span>
-                                        <div className="flex items-center gap-2 px-2.5 py-1 rounded-md bg-gray-50">
+                                        <div className="flex items-center gap-2 rounded-md bg-gray-50 px-2.5 py-1">
                                           <span className="text-sm font-semibold text-foreground">
                                             {String(item.people_added).padStart(
                                               2,
-                                              "0"
+                                              "0",
                                             )}
                                           </span>
                                         </div>
@@ -1044,7 +1044,7 @@ export default function BookingInfoTab({ bookingData }: BookingInfoTabProps) {
                                         <Button
                                           onClick={() => handleMenuChoices()}
                                           size="sm"
-                                          className="h-7 px-3 gap-1.5 cursor-pointer text-xs shrink-0"
+                                          className="h-7 shrink-0 cursor-pointer gap-1.5 px-3 text-xs whitespace-nowrap"
                                           style={{
                                             backgroundColor:
                                               "var(--color-primary)",
@@ -1079,7 +1079,7 @@ export default function BookingInfoTab({ bookingData }: BookingInfoTabProps) {
                                         (
                                         {dateInfo.tickets.reduce(
                                           (sum, t) => sum + t.quantity,
-                                          0
+                                          0,
                                         )}{" "}
                                         total)
                                       </span>
@@ -1088,23 +1088,23 @@ export default function BookingInfoTab({ bookingData }: BookingInfoTabProps) {
                                       {dateInfo.tickets.map((ticket, idx) => (
                                         <div
                                           key={idx}
-                                          className="flex items-start justify-between py-2 border-b border-gray-100 last:border-0 gap-4"
+                                          className="flex flex-col gap-2 border-b border-gray-100 py-2 last:border-0 sm:flex-row sm:items-start sm:justify-between sm:gap-4"
                                         >
-                                          <div className="flex-1 min-w-0">
+                                          <div className="min-w-0 flex-1">
                                             <p className="text-sm font-medium text-foreground">
                                               {ticket.title}
                                             </p>
                                             {ticket.description && (
-                                              <p className="text-xs text-muted-foreground mt-0.5">
+                                              <p className="mt-0.5 text-xs text-muted-foreground">
                                                 {ticket.description}
                                               </p>
                                             )}
-                                            <p className="text-xs text-muted-foreground mt-0.5">
+                                            <p className="mt-0.5 text-xs text-muted-foreground">
                                               £{ticket.price_per_ticket} ×{" "}
                                               {ticket.quantity}
                                             </p>
                                           </div>
-                                          <p className="text-sm font-semibold text-foreground shrink-0">
+                                          <p className="shrink-0 text-sm font-semibold text-foreground whitespace-nowrap">
                                             £
                                             {(
                                               ticket.price_per_ticket *
@@ -1137,7 +1137,7 @@ export default function BookingInfoTab({ bookingData }: BookingInfoTabProps) {
                                         (
                                         {dateInfo.drinks.reduce(
                                           (sum, d) => sum + d.quantity,
-                                          0
+                                          0,
                                         )}{" "}
                                         items)
                                       </span>
@@ -1146,17 +1146,17 @@ export default function BookingInfoTab({ bookingData }: BookingInfoTabProps) {
                                       {dateInfo.drinks.map((drink, idx) => (
                                         <div
                                           key={idx}
-                                          className="flex items-start justify-between py-2 border-b border-gray-100 last:border-0 gap-4"
+                                          className="flex flex-col gap-2 border-b border-gray-100 py-2 last:border-0 sm:flex-row sm:items-start sm:justify-between sm:gap-4"
                                         >
-                                          <div className="flex-1 min-w-0">
+                                          <div className="min-w-0 flex-1">
                                             <p className="text-sm font-medium text-foreground">
                                               {drink.title}
                                             </p>
-                                            <p className="text-xs text-muted-foreground mt-0.5">
+                                            <p className="mt-0.5 text-xs text-muted-foreground">
                                               £{drink.price} × {drink.quantity}
                                             </p>
                                           </div>
-                                          <p className="text-sm font-semibold text-foreground shrink-0">
+                                          <p className="shrink-0 text-sm font-semibold text-foreground whitespace-nowrap">
                                             £
                                             {(
                                               drink.price * drink.quantity
@@ -1199,10 +1199,10 @@ export default function BookingInfoTab({ bookingData }: BookingInfoTabProps) {
                                         expandedAddOns[dateInfo.id] === true
                                       }
                                       aria-controls={`addons-content-${dateInfo.id}`}
-                                      className="flex items-center justify-between w-full py-2.5 px-3 border-2 border-purple-400 rounded-md transition-all duration-200 group cursor-pointer bg-white hover:bg-purple-50 hover:-translate-y-0.5 hover:shadow-md hover:border-purple-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-400 focus-visible:ring-offset-2"
+                                      className="flex w-full cursor-pointer flex-col items-start gap-2 rounded-md border-2 border-purple-400 bg-white px-3 py-2.5 transition-all duration-200 hover:-translate-y-0.5 hover:border-purple-500 hover:bg-purple-50 hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-400 focus-visible:ring-offset-2 group sm:flex-row sm:items-center sm:justify-between"
                                     >
-                                      <div className="flex items-center gap-2">
-                                        <div className="p-1 rounded bg-purple-100">
+                                      <div className="flex min-w-0 flex-wrap items-center gap-2">
+                                        <div className="shrink-0 rounded bg-purple-100 p-1">
                                           <svg
                                             className="h-3.5 w-3.5 text-purple-600"
                                             fill="none"
@@ -1220,13 +1220,13 @@ export default function BookingInfoTab({ bookingData }: BookingInfoTabProps) {
                                         <span className="text-sm font-bold text-purple-900">
                                           Add-ons Included
                                         </span>
-                                        <div className="flex items-center gap-2">
+                                        <div className="flex flex-wrap items-center gap-2">
                                           {(() => {
                                             const tablesCount =
                                               dateInfo.addons.tables?.reduce(
                                                 (sum, table) =>
                                                   sum + (table.no_tables || 0),
-                                                0
+                                                0,
                                               ) || 0;
                                             const ticketsCount =
                                               dateInfo.addons.tickets?.reduce(
@@ -1234,9 +1234,9 @@ export default function BookingInfoTab({ bookingData }: BookingInfoTabProps) {
                                                   sum +
                                                   parseInt(
                                                     ticket.quantity || "0",
-                                                    10
+                                                    10,
                                                   ),
-                                                0
+                                                0,
                                               ) || 0;
                                             const drinksCount =
                                               dateInfo.addons.drinks?.reduce(
@@ -1244,9 +1244,9 @@ export default function BookingInfoTab({ bookingData }: BookingInfoTabProps) {
                                                   sum +
                                                   parseInt(
                                                     drink.quantity || "0",
-                                                    10
+                                                    10,
                                                   ),
-                                                0
+                                                0,
                                               ) || 0;
 
                                             return (
@@ -1289,11 +1289,13 @@ export default function BookingInfoTab({ bookingData }: BookingInfoTabProps) {
                                           })()}
                                         </div>
                                       </div>
-                                      {expandedAddOns[dateInfo.id] === true ? (
-                                        <ChevronUp className="h-4 w-4 text-purple-600 group-hover:text-purple-700 transition-colors" />
-                                      ) : (
-                                        <ChevronDown className="h-4 w-4 text-purple-600 group-hover:text-purple-700 transition-colors" />
-                                      )}
+                                      <div className="shrink-0">
+                                        {expandedAddOns[dateInfo.id] === true ? (
+                                          <ChevronUp className="h-4 w-4 text-purple-600 transition-colors group-hover:text-purple-700" />
+                                        ) : (
+                                          <ChevronDown className="h-4 w-4 text-purple-600 transition-colors group-hover:text-purple-700" />
+                                        )}
+                                      </div>
                                     </button>
 
                                     {/* Add-ons Content */}
@@ -1311,16 +1313,16 @@ export default function BookingInfoTab({ bookingData }: BookingInfoTabProps) {
                                                 (table, idx) => (
                                                   <div
                                                     key={idx}
-                                                    className="flex items-start justify-between py-2 border-b border-gray-100 last:border-0 gap-4"
+                                                    className="flex flex-col gap-2 border-b border-gray-100 py-2 last:border-0 sm:flex-row sm:items-start sm:justify-between sm:gap-4"
                                                   >
-                                                    <div className="flex-1 min-w-0">
-                                                      <div className="flex items-center gap-2 mb-1">
+                                                    <div className="min-w-0 flex-1">
+                                                      <div className="mb-1 flex flex-wrap items-center gap-2">
                                                         <span className="text-sm font-medium text-foreground">
                                                           {`Table of ${table.table_size}`}
                                                         </span>
                                                         {table.no_tables &&
                                                         table.no_tables > 0 ? (
-                                                          <span className="text-xs text-muted-foreground bg-gray-100 px-2 py-0.5 rounded">
+                                                          <span className="rounded bg-gray-100 px-2 py-0.5 text-xs text-muted-foreground">
                                                             {table.no_tables}{" "}
                                                             {table.no_tables ===
                                                             1
@@ -1329,16 +1331,16 @@ export default function BookingInfoTab({ bookingData }: BookingInfoTabProps) {
                                                           </span>
                                                         ) : table.allocation &&
                                                           Object.values(
-                                                            table.allocation
+                                                            table.allocation,
                                                           ).some(
                                                             (val) =>
                                                               typeof val ===
                                                                 "string" &&
                                                               val.startsWith(
-                                                                "+"
-                                                              )
+                                                                "+",
+                                                              ),
                                                           ) ? (
-                                                          <span className="text-xs text-muted-foreground bg-purple-100 text-purple-700 px-2 py-0.5 rounded">
+                                                          <span className="rounded bg-purple-100 px-2 py-0.5 text-xs text-purple-700 text-muted-foreground">
                                                             Added to existing
                                                           </span>
                                                         ) : null}
@@ -1346,7 +1348,7 @@ export default function BookingInfoTab({ bookingData }: BookingInfoTabProps) {
                                                       {/* Table Allocation Breakdown */}
                                                       {table.allocation &&
                                                         Object.keys(
-                                                          table.allocation
+                                                          table.allocation,
                                                         ).length > 0 && (
                                                           <div className="mt-1.5 space-y-1">
                                                             <p className="text-xs text-muted-foreground mb-1">
@@ -1355,14 +1357,14 @@ export default function BookingInfoTab({ bookingData }: BookingInfoTabProps) {
                                                             </p>
                                                             <div className="flex flex-wrap gap-2">
                                                               {Object.entries(
-                                                                table.allocation
+                                                                table.allocation,
                                                               ).map(
                                                                 (
                                                                   [
                                                                     tableId,
                                                                     people,
                                                                   ],
-                                                                  tableIdx
+                                                                  tableIdx,
                                                                 ) => {
                                                                   // Check if this is a new table (integer value) or existing (string with "+")
                                                                   const isNewTable =
@@ -1379,8 +1381,8 @@ export default function BookingInfoTab({ bookingData }: BookingInfoTabProps) {
                                                                       ? parseInt(
                                                                           people.replace(
                                                                             "+",
-                                                                            ""
-                                                                          )
+                                                                            "",
+                                                                          ),
                                                                         )
                                                                       : people;
 
@@ -1429,7 +1431,7 @@ export default function BookingInfoTab({ bookingData }: BookingInfoTabProps) {
                                                                       )}
                                                                     </div>
                                                                   );
-                                                                }
+                                                                },
                                                               )}
                                                             </div>
                                                           </div>
@@ -1445,8 +1447,8 @@ export default function BookingInfoTab({ bookingData }: BookingInfoTabProps) {
                                                         </p>
                                                       )}
                                                     </div>
-                                                    <div className="flex items-center gap-3 shrink-0">
-                                                      <p className="text-sm font-semibold text-foreground shrink-0">
+                                                    <div className="flex shrink-0 flex-wrap items-center gap-3">
+                                                      <p className="shrink-0 text-sm font-semibold text-foreground whitespace-nowrap">
                                                         £
                                                         {table.total.toFixed(2)}
                                                       </p>
@@ -1458,20 +1460,20 @@ export default function BookingInfoTab({ bookingData }: BookingInfoTabProps) {
                                                             "table",
                                                             `Table of ${table.table_size}`,
                                                             dateInfo.id,
-                                                            table.table_size
+                                                            table.table_size,
                                                           )
                                                         }
                                                         disabled={
                                                           deleteAddOnsMutation.isPending
                                                         }
-                                                        className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
+                                                        className="h-8 w-8 shrink-0 p-0 text-red-600 hover:bg-red-50 hover:text-red-700"
                                                         title="Delete table"
                                                       >
                                                         <Trash2 className="h-4 w-4" />
                                                       </Button>
                                                     </div>
                                                   </div>
-                                                )
+                                                ),
                                               )}
                                             </div>
                                           )}
@@ -1488,26 +1490,26 @@ export default function BookingInfoTab({ bookingData }: BookingInfoTabProps) {
                                                   (drink, idx) => (
                                                     <div
                                                       key={idx}
-                                                      className="flex items-start justify-between py-2 border-b border-gray-100 last:border-0 gap-4"
+                                                      className="flex flex-col gap-2 border-b border-gray-100 py-2 last:border-0 sm:flex-row sm:items-start sm:justify-between sm:gap-4"
                                                     >
-                                                      <div className="flex-1 min-w-0">
+                                                      <div className="min-w-0 flex-1">
                                                         <p className="text-sm font-medium text-foreground">
                                                           {drink.title}
                                                         </p>
-                                                        <p className="text-xs text-muted-foreground mt-0.5">
+                                                        <p className="mt-0.5 text-xs text-muted-foreground">
                                                           £{drink.price} ×{" "}
                                                           {drink.quantity}
                                                         </p>
                                                       </div>
-                                                      <div className="flex items-center gap-3 shrink-0">
-                                                        <p className="text-sm font-semibold text-foreground shrink-0">
+                                                      <div className="flex shrink-0 flex-wrap items-center gap-3">
+                                                        <p className="shrink-0 text-sm font-semibold text-foreground whitespace-nowrap">
                                                           £
                                                           {(
                                                             parseFloat(
-                                                              drink.price
+                                                              drink.price,
                                                             ) *
                                                             parseInt(
-                                                              drink.quantity
+                                                              drink.quantity,
                                                             )
                                                           ).toFixed(2)}
                                                         </p>
@@ -1517,7 +1519,7 @@ export default function BookingInfoTab({ bookingData }: BookingInfoTabProps) {
                                                           onClick={() => {
                                                             if (!drink.id) {
                                                               toast.error(
-                                                                "Unable to delete: Drink ID not available. Please refresh the page."
+                                                                "Unable to delete: Drink ID not available. Please refresh the page.",
                                                               );
                                                               return;
                                                             }
@@ -1525,20 +1527,20 @@ export default function BookingInfoTab({ bookingData }: BookingInfoTabProps) {
                                                               "drink",
                                                               drink.title,
                                                               dateInfo.id,
-                                                              drink.id
+                                                              drink.id,
                                                             );
                                                           }}
                                                           disabled={
                                                             deleteAddOnsMutation.isPending
                                                           }
-                                                          className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
+                                                          className="h-8 w-8 shrink-0 p-0 text-red-600 hover:bg-red-50 hover:text-red-700"
                                                           title="Delete drink"
                                                         >
                                                           <Trash2 className="h-4 w-4" />
                                                         </Button>
                                                       </div>
                                                     </div>
-                                                  )
+                                                  ),
                                                 )}
                                               </div>
                                             </div>
@@ -1557,18 +1559,18 @@ export default function BookingInfoTab({ bookingData }: BookingInfoTabProps) {
                                                   (ticket, idx) => (
                                                     <div
                                                       key={idx}
-                                                      className="flex items-start justify-between py-2 border-b border-gray-100 last:border-0 gap-4"
+                                                      className="flex flex-col gap-2 border-b border-gray-100 py-2 last:border-0 sm:flex-row sm:items-start sm:justify-between sm:gap-4"
                                                     >
-                                                      <div className="flex-1 min-w-0">
+                                                      <div className="min-w-0 flex-1">
                                                         <p className="text-sm font-medium text-foreground">
                                                           {ticket.title}
                                                         </p>
                                                         {ticket.description && (
-                                                          <p className="text-xs text-muted-foreground mt-0.5">
+                                                          <p className="mt-0.5 text-xs text-muted-foreground">
                                                             {ticket.description}
                                                           </p>
                                                         )}
-                                                        <p className="text-xs text-muted-foreground mt-0.5">
+                                                        <p className="mt-0.5 text-xs text-muted-foreground">
                                                           £
                                                           {
                                                             ticket.price_per_ticket
@@ -1576,15 +1578,15 @@ export default function BookingInfoTab({ bookingData }: BookingInfoTabProps) {
                                                           × {ticket.quantity}
                                                         </p>
                                                       </div>
-                                                      <div className="flex items-center gap-3 shrink-0">
-                                                        <p className="text-sm font-semibold text-foreground shrink-0">
+                                                      <div className="flex shrink-0 flex-wrap items-center gap-3">
+                                                        <p className="shrink-0 text-sm font-semibold text-foreground whitespace-nowrap">
                                                           £
                                                           {(
                                                             parseFloat(
-                                                              ticket.price_per_ticket
+                                                              ticket.price_per_ticket,
                                                             ) *
                                                             parseInt(
-                                                              ticket.quantity
+                                                              ticket.quantity,
                                                             )
                                                           ).toFixed(2)}
                                                         </p>
@@ -1594,7 +1596,7 @@ export default function BookingInfoTab({ bookingData }: BookingInfoTabProps) {
                                                           onClick={() => {
                                                             if (!ticket.id) {
                                                               toast.error(
-                                                                "Unable to delete: Ticket ID not available. Please refresh the page."
+                                                                "Unable to delete: Ticket ID not available. Please refresh the page.",
                                                               );
                                                               return;
                                                             }
@@ -1602,20 +1604,20 @@ export default function BookingInfoTab({ bookingData }: BookingInfoTabProps) {
                                                               "ticket",
                                                               ticket.title,
                                                               dateInfo.id,
-                                                              ticket.id
+                                                              ticket.id,
                                                             );
                                                           }}
                                                           disabled={
                                                             deleteAddOnsMutation.isPending
                                                           }
-                                                          className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
+                                                          className="h-8 w-8 shrink-0 p-0 text-red-600 hover:bg-red-50 hover:text-red-700"
                                                           title="Delete ticket"
                                                         >
                                                           <Trash2 className="h-4 w-4" />
                                                         </Button>
                                                       </div>
                                                     </div>
-                                                  )
+                                                  ),
                                                 )}
                                               </div>
                                             </div>
@@ -1789,10 +1791,10 @@ export default function BookingInfoTab({ bookingData }: BookingInfoTabProps) {
                   bookingData.payment_status?.toLowerCase() === "paid"
                     ? "text-green-600"
                     : bookingData.payment_status?.toLowerCase() === "pending" ||
-                      bookingData.payment_status?.toLowerCase() ===
-                        "partial payment"
-                    ? "text-yellow-600"
-                    : "text-red-600"
+                        bookingData.payment_status?.toLowerCase() ===
+                          "partial payment"
+                      ? "text-yellow-600"
+                      : "text-red-600"
                 }`}
               >
                 <div
@@ -1800,11 +1802,11 @@ export default function BookingInfoTab({ bookingData }: BookingInfoTabProps) {
                     bookingData.payment_status?.toLowerCase() === "paid"
                       ? "bg-green-500"
                       : bookingData.payment_status?.toLowerCase() ===
-                          "pending" ||
-                        bookingData.payment_status?.toLowerCase() ===
-                          "partial payment"
-                      ? "bg-yellow-500"
-                      : "bg-red-500"
+                            "pending" ||
+                          bookingData.payment_status?.toLowerCase() ===
+                            "partial payment"
+                        ? "bg-yellow-500"
+                        : "bg-red-500"
                   } ${
                     bookingData.payment_status?.toLowerCase() === "pending" ||
                     bookingData.payment_status?.toLowerCase() ===
@@ -1837,24 +1839,24 @@ export default function BookingInfoTab({ bookingData }: BookingInfoTabProps) {
               (selectedDateForReschedule.tickets
                 ? selectedDateForReschedule.tickets.reduce(
                     (sum, ticket) => sum + ticket.quantity,
-                    0
+                    0,
                   )
                 : 0),
             tables: getTableCount(selectedDateForReschedule.items),
             tickets: selectedDateForReschedule.tickets
               ? selectedDateForReschedule.tickets.reduce(
                   (sum, ticket) => sum + ticket.quantity,
-                  0
+                  0,
                 )
               : 0,
             drinks: selectedDateForReschedule.drinks
               ? selectedDateForReschedule.drinks.reduce(
                   (sum, d) => sum + d.quantity,
-                  0
+                  0,
                 )
               : 0,
             price: parseFloat(
-              selectedDateForReschedule.total.replace("£", "").replace(",", "")
+              selectedDateForReschedule.total.replace("£", "").replace(",", ""),
             ),
           }}
           bookingId={parseInt(bookingData.booking_id)}
@@ -1878,24 +1880,24 @@ export default function BookingInfoTab({ bookingData }: BookingInfoTabProps) {
             date: selectedDateForPayment.date,
             dateKey: selectedDateForPayment.id,
             totalAmount: parseFloat(
-              selectedDateForPayment.total.replace("£", "").replace(",", "")
+              selectedDateForPayment.total.replace("£", "").replace(",", ""),
             ),
             paidAmount: selectedDateForPayment.partialPayment
               ? parseFloat(
                   selectedDateForPayment.partialPayment
                     .replace("£", "")
-                    .replace(",", "")
+                    .replace(",", ""),
                 )
               : 0,
             pendingPayment:
               parseFloat(
-                selectedDateForPayment.total.replace("£", "").replace(",", "")
+                selectedDateForPayment.total.replace("£", "").replace(",", ""),
               ) -
               (selectedDateForPayment.partialPayment
                 ? parseFloat(
                     selectedDateForPayment.partialPayment
                       .replace("£", "")
-                      .replace(",", "")
+                      .replace(",", ""),
                   )
                 : 0),
             partialPaymentOption:

@@ -72,7 +72,7 @@ export function TicketsSection({
                       {ticket.title}
                     </h4>
                     {ticket.description && (
-                      <p className="text-sm text-gray-600 mb-1">
+                      <p className="mb-1 break-words text-sm text-gray-600">
                         {ticket.description}
                       </p>
                     )}

@@ -1090,7 +1090,7 @@ export default function AdjustBookingContent({
                                                 {ticket.title}
                                               </p>
                                               {ticket.description && (
-                                                <p className="text-xs text-muted-foreground mt-0.5">
+                                                <p className="mt-0.5 break-words text-xs text-muted-foreground">
                                                   {ticket.description}
                                                 </p>
                                               )}
@@ -1529,7 +1529,7 @@ export default function AdjustBookingContent({
                                                             {ticket.title}
                                                           </p>
                                                           {ticket.description && (
-                                                            <p className="text-xs text-muted-foreground mt-0.5">
+                                                            <p className="mt-0.5 break-words text-xs text-muted-foreground">
                                                               {
                                                                 ticket.description
                                                               }

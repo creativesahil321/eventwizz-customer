@@ -69,7 +69,7 @@ export function DrinksSection({
                       {drink.title}
                     </h4>
                     {drink.description && (
-                      <p className="text-sm text-gray-600 mb-1">
+                      <p className="mb-1 break-words text-sm text-gray-600">
                         {drink.description}
                       </p>
                     )}

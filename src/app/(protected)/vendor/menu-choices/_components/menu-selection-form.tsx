@@ -272,25 +272,25 @@ export default function MenuSelectionForm({
   }, [allergenData]);
 
   return (
-    <Card className="shadow-lg h-full min-h-0 flex flex-col border-2">
+    <Card className="flex h-full min-h-0 flex-col overflow-hidden border-2 shadow-lg">
       <CardHeader
-        className="rounded-t-lg border-b-2 py-4"
+        className="shrink-0 rounded-t-lg border-b-2 py-4"
         style={{
           backgroundColor: "var(--color-primary)",
           color: "var(--color-primary-foreground)",
         }}
       >
-        <CardTitle className="text-lg sm:text-xl flex items-center gap-2.5">
+        <CardTitle className="flex items-center gap-2.5 text-lg sm:text-xl">
           {editingAttendee ? (
             <>
-              <div className="p-2 bg-white/20 rounded-lg">
+              <div className="rounded-lg bg-white/20 p-2">
                 <Save className="h-5 w-5" />
               </div>
               <span>Edit Menu Selection</span>
             </>
           ) : (
             <>
-              <div className="p-2 bg-white/20 rounded-lg">
+              <div className="rounded-lg bg-white/20 p-2">
                 <UserPlus className="h-5 w-5" />
               </div>
               <span>Add Menu Selection</span>
@@ -298,13 +298,16 @@ export default function MenuSelectionForm({
           )}
         </CardTitle>
       </CardHeader>
-      <CardContent className="flex-1 min-h-0 p-6 flex flex-col overflow-y-auto">
+      <CardContent className="flex min-h-0 flex-1 flex-col overflow-x-hidden overflow-y-auto px-4 py-4 sm:p-6">
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+          <form
+            onSubmit={form.handleSubmit(onSubmit)}
+            className="min-w-0 space-y-6"
+          >
             {/* Attendee Details Section */}
             <div className="space-y-4">
               <div className="flex items-center gap-2 pb-2">
-                <div className="p-1.5 rounded-md bg-primary/10">
+                <div className="rounded-md bg-primary/10 p-1.5">
                   <User className="h-4 w-4 text-primary" />
                 </div>
                 <h3 className="font-semibold text-base text-foreground">
@@ -312,12 +315,12 @@ export default function MenuSelectionForm({
                 </h3>
               </div>
 
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                 <FormField
                   control={form.control}
                   name="title"
                   render={({ field }) => (
-                    <FormItem>
+                    <FormItem className="min-w-0">
                       <FormLabel className="text-sm font-medium">
                         Title
                       </FormLabel>
@@ -326,7 +329,7 @@ export default function MenuSelectionForm({
                         value={field.value}
                       >
                         <FormControl>
-                          <SelectTrigger className="w-full h-10">
+                          <SelectTrigger className="h-10 w-full min-w-0">
                             <SelectValue placeholder="Select" />
                           </SelectTrigger>
                         </FormControl>
@@ -348,7 +351,7 @@ export default function MenuSelectionForm({
                   control={form.control}
                   name="fullName"
                   render={({ field }) => (
-                    <FormItem className="col-span-2">
+                    <FormItem className="min-w-0 sm:col-span-2">
                       <FormLabel className="text-sm font-medium">
                         Full Name <span className="text-destructive">*</span>
                       </FormLabel>
@@ -356,7 +359,7 @@ export default function MenuSelectionForm({
                         <Input
                           placeholder="Enter full name"
                           {...field}
-                          className="w-full h-10"
+                          className="h-10 w-full min-w-0"
                         />
                       </FormControl>
                       <FormMessage />
@@ -382,58 +385,84 @@ export default function MenuSelectionForm({
                     key={category.title}
                     control={form.control}
                     name={`menuSelections.${category.title}`}
-                    render={({ field }) => (
-                      <FormItem
-                        className={`p-4 rounded-lg border-2 bg-gradient-to-br ${style.gradient} to-transparent hover:${style.borderColor} transition-colors`}
-                      >
-                        <div className="flex items-center gap-2.5">
-                          <div className={`p-1.5 rounded-md ${style.bgColor}`}>
-                            <Icon className={`h-5 w-5 ${style.textColor}`} />
-                          </div>
-                          <div className="flex-1">
-                            <FormLabel className="text-sm font-semibold text-foreground">
-                              {category.title}
-                              {isRequired && (
-                                <span className="text-destructive"> *</span>
-                              )}
-                            </FormLabel>
-                            <p className="text-xs text-muted-foreground">
-                              {isRequired
-                                ? "Select an item"
-                                : "Select an item (optional)"}
-                            </p>
-                          </div>
-                        </div>
-                        <Select
-                          onValueChange={field.onChange}
-                          value={field.value}
+                    render={({ field }) => {
+                      const selectedItem = field.value
+                        ? category.items.find(
+                            (i) => i.id.toString() === field.value
+                          )
+                        : null;
+                      return (
+                        <FormItem
+                          className={`min-w-0 overflow-hidden rounded-lg border-2 bg-gradient-to-br p-4 ${style.gradient} to-transparent transition-colors hover:${style.borderColor}`}
                         >
-                          <FormControl>
-                            <SelectTrigger className="w-full h-11 bg-white">
-                              <SelectValue
-                                placeholder={`Select from ${category.title}`}
+                          <div className="flex min-w-0 items-center gap-2.5">
+                            <div
+                              className={`shrink-0 rounded-md p-1.5 ${style.bgColor}`}
+                            >
+                              <Icon
+                                className={`h-5 w-5 ${style.textColor}`}
                               />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            {category.items.map((item) => (
-                              <SelectItem
-                                key={item.id}
-                                value={item.id.toString()}
-                              >
-                                {item.name}
-                                {item.desc && (
-                                  <span className="text-xs text-muted-foreground ml-2">
-                                    - {item.desc}
-                                  </span>
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <FormLabel className="block truncate text-sm font-semibold text-foreground sm:whitespace-normal">
+                                {category.title}
+                                {isRequired && (
+                                  <span className="text-destructive"> *</span>
                                 )}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
+                              </FormLabel>
+                              <p className="text-xs text-muted-foreground">
+                                {isRequired
+                                  ? "Select an item"
+                                  : "Select an item (optional)"}
+                              </p>
+                            </div>
+                          </div>
+                          <Select
+                            onValueChange={field.onChange}
+                            value={field.value}
+                          >
+                            <FormControl>
+                              <SelectTrigger className="h-11 min-w-0 w-full bg-white [&_[data-slot=select-value]]:min-w-0 [&_[data-slot=select-value]]:truncate">
+                                {selectedItem ? (
+                                  <span
+                                    className="min-w-0 truncate text-left"
+                                    data-slot="select-value"
+                                  >
+                                    {selectedItem.name}
+                                  </span>
+                                ) : (
+                                  <SelectValue
+                                    placeholder={`Select from ${category.title}`}
+                                  />
+                                )}
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent
+                              className="max-w-[min(100vw-2rem,var(--radix-select-trigger-width))]"
+                              position="popper"
+                            >
+                              {category.items.map((item) => (
+                                <SelectItem
+                                  key={item.id}
+                                  value={item.id.toString()}
+                                  className="flex flex-col items-start gap-1 whitespace-normal break-words py-2.5 text-left"
+                                >
+                                  <span className="w-full font-medium">
+                                    {item.name}
+                                  </span>
+                                  {item.desc && (
+                                    <span className="w-full break-words pr-6 text-xs text-muted-foreground">
+                                      {item.desc}
+                                    </span>
+                                  )}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      );
+                    }}
                   />
                 );
               })}
