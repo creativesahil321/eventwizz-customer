@@ -72,7 +72,7 @@ export function TransactionsDataTable({
   }
 
   return (
-    <section className="w-full min-w-0 relative text-black">
+    <section className="w-full min-w-0 relative text-black pb-20 sm:pb-6">
       <div className="min-w-0 bg-white p-4 sm:p-6 rounded-md shadow-sm">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 mb-4 sm:mb-6">
           <h1 className="text-xl sm:text-2xl title-header font-bold">
@@ -112,23 +112,23 @@ export function TransactionsDataTable({
             </div>
           </div>
 
-          {/* Date Filter */}
-          <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 w-full sm:w-auto">
-            <span className="text-sm font-medium mb-1 sm:mb-0">Date</span>
-            <div className="relative w-full sm:w-[180px]">
-              <Calendar className="absolute left-3 top-1/2 z-10 h-4 w-4 -translate-y-1/2 transform text-muted-foreground pointer-events-none" />
+          {/* Date Filter - min-width so placeholder and native picker icon aren't truncated on small screens */}
+          <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 w-full sm:w-auto min-w-0">
+            <span className="text-sm font-medium mb-1 sm:mb-0 shrink-0">Date</span>
+            <div className="relative w-full min-w-[8.5rem] sm:w-[180px]">
+              <Calendar className="absolute left-3 top-1/2 z-10 h-4 w-4 -translate-y-1/2 shrink-0 text-muted-foreground pointer-events-none" />
               <Input
                 type="date"
                 value={filters.payment_date || ""}
                 onChange={(e) =>
                   onFilterChange({ payment_date: e.target.value })
                 }
-                className="pl-9 h-9 w-full"
+                className="pl-9 pr-9 h-9 w-full min-w-0"
                 aria-label="Filter by payment date (dd-mm-yyyy)"
               />
               {!filters.payment_date && (
                 <span
-                  className="pointer-events-none absolute left-9 top-1/2 z-[5] -translate-y-1/2 text-sm text-gray-500"
+                  className="pointer-events-none absolute left-9 right-9 top-1/2 z-[5] -translate-y-1/2 text-sm text-gray-500 truncate"
                   aria-hidden
                 >
                   dd-mm-yyyy

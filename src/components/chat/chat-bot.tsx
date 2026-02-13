@@ -101,7 +101,7 @@ export function ChatBot() {
           onClick={() => setIsOpen(true)}
           size="icon"
           variant="event-primary"
-          className="fixed bottom-6 right-4 z-50 flex h-12 w-12 rounded-full shadow-lg sm:bottom-8 sm:right-6 sm:h-14 sm:w-14"
+          className="fixed bottom-20 right-4 z-50 flex h-12 w-12 rounded-full shadow-lg sm:bottom-8 sm:right-6 sm:h-14 sm:w-14"
           aria-label="Open chat"
         >
           <MessageSquare className="h-5 w-5 sm:h-6 sm:w-6" />
