@@ -114,7 +114,9 @@ export function TransactionsDataTable({
 
           {/* Date Filter - min-width so placeholder and native picker icon aren't truncated on small screens */}
           <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 w-full sm:w-auto min-w-0">
-            <span className="text-sm font-medium mb-1 sm:mb-0 shrink-0">Date</span>
+            <span className="text-sm font-medium mb-1 sm:mb-0 shrink-0">
+              Date
+            </span>
             <div className="relative w-full min-w-[8.5rem] sm:w-[180px]">
               <Calendar className="absolute left-3 top-1/2 z-10 h-4 w-4 -translate-y-1/2 shrink-0 text-muted-foreground pointer-events-none" />
               <Input
@@ -216,7 +218,7 @@ export function TransactionsDataTable({
         </div>
       ) : (
         <div className="bg-white mt-2 rounded-md shadow-sm overflow-hidden">
-          <div className="overflow-x-auto -mx-2 sm:mx-0">
+          <div className="overflow-x-auto px-4 sm:px-6">
             <div className="min-w-full inline-block align-middle">
               <TransactionListComponent
                 transactions={safeTransactions}
