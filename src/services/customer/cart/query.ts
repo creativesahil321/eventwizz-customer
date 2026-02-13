@@ -53,16 +53,14 @@ export const useStoreEventBooking = () => {
         );
         clearDrinks();
 
-        // 🔄 SYNC FIX: Remove stale cache first, then refetch fresh data
-        queryClient.removeQueries({ queryKey: ["cart-data"] });
+        // 🔄 Invalidate and refetch WITHOUT removing cache - keeps current UI visible
+        // (removeQueries would clear cache → full skeleton flash; invalidate keeps data during refetch)
         queryClient.invalidateQueries({ queryKey: ["cart-data"] });
-        
-        // Force immediate refetch to sync with backend
-        queryClient.refetchQueries({ 
+        queryClient.refetchQueries({
           queryKey: ["cart-data"],
-          type: "active" // Only refetch if there are active observers
+          type: "active",
         });
-        
+
         console.log("✅ Cache synchronized with backend");
       }
     },
