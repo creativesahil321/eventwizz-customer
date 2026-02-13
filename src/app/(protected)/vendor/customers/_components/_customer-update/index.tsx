@@ -50,16 +50,18 @@ export function UpdateCustomerDialog({
           </Button>
         </DialogTrigger>
       ) : null}
-      <DialogContent className="border bg-background text-black max-w-2xl">
-        <DialogHeader className="mb-3">
+      <DialogContent className="flex max-h-[90vh] max-w-2xl flex-col border bg-background text-black p-6 sm:max-h-[85vh]">
+        <DialogHeader className="shrink-0 mb-3">
           <DialogTitle className="text-foreground">
             Update Customer - {fullName}
           </DialogTitle>
         </DialogHeader>
-        <UpdateCustomerForm
-          onSubmitHandler={onSubmitHandler}
-          customer={customer}
-        />
+        <div className="min-h-0 flex-1 overflow-y-auto pr-2 -mr-2">
+          <UpdateCustomerForm
+            onSubmitHandler={onSubmitHandler}
+            customer={customer}
+          />
+        </div>
       </DialogContent>
     </Dialog>
   );

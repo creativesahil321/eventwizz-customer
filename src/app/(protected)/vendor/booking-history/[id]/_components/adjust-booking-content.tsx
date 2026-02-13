@@ -500,12 +500,14 @@ export default function AdjustBookingContent({
                   <h1 className="text-2xl sm:text-3xl title-header font-bold text-black mb-2">
                     {bookingData.event_name}
                   </h1>
-                  <div className="flex items-center gap-2 mb-4">
-                    <Badge className="font-mono bg-blue-600 text-white hover:bg-blue-700 border-0">
+                  <div className="flex flex-wrap items-center gap-2 mb-4">
+                    <Badge className="shrink-0 font-mono bg-blue-600 text-white hover:bg-blue-700 border-0">
                       <Receipt className="h-3 w-3 mr-1" />
                       {bookingData.booking_number}
                     </Badge>
-                    {getPaymentStatusBadge(bookingData.payment_status)}
+                    <span className="shrink-0">
+                      {getPaymentStatusBadge(bookingData.payment_status)}
+                    </span>
                   </div>
                 </div>
               </div>
@@ -702,91 +704,93 @@ export default function AdjustBookingContent({
                           className="border-2 rounded-lg overflow-hidden bg-white shadow-sm"
                         >
                           <AccordionTrigger className="px-4 py-3 hover:bg-gray-50 hover:no-underline">
-                            <div className="flex items-center gap-3 text-left w-full">
-                              <div className="w-10 h-10 rounded-full bg-[var(--color-primary)] flex items-center justify-center text-sm font-bold text-white shrink-0">
-                                {index + 1}
-                              </div>
-                              <div className="flex-1 min-w-0">
-                                {/* Show rescheduled date information */}
-                                {dateInfo.parent_booking_date ? (
-                                  <div className="mb-1">
-                                    <div className="flex items-center gap-2 flex-wrap">
-                                      <p className="font-semibold text-sm text-muted-foreground line-through">
-                                        {typeof dateInfo.parent_booking_date ===
-                                        "string"
-                                          ? dateInfo.parent_booking_date
-                                          : dateInfo.parent_booking_date.date}
-                                      </p>
-                                      <RotateCcw className="h-3 w-3 text-amber-600" />
-                                      <p className="font-semibold text-sm text-foreground">
-                                        {dateInfo.date}
-                                      </p>
+                            <div className="flex w-full flex-col gap-2 text-left sm:flex-row sm:items-center sm:gap-3">
+                              <div className="flex min-w-0 flex-1 items-start gap-3 sm:items-center">
+                                <div className="w-10 h-10 rounded-full bg-[var(--color-primary)] flex items-center justify-center text-sm font-bold text-white shrink-0">
+                                  {index + 1}
+                                </div>
+                                <div className="min-w-0 flex-1">
+                                  {/* Show rescheduled date information */}
+                                  {dateInfo.parent_booking_date ? (
+                                    <div className="mb-1">
+                                      <div className="flex items-center gap-2 flex-wrap">
+                                        <p className="font-semibold text-sm text-muted-foreground line-through">
+                                          {typeof dateInfo.parent_booking_date ===
+                                          "string"
+                                            ? dateInfo.parent_booking_date
+                                            : dateInfo.parent_booking_date.date}
+                                        </p>
+                                        <RotateCcw className="h-3 w-3 text-amber-600 shrink-0" />
+                                        <p className="font-semibold text-sm text-foreground">
+                                          {dateInfo.date}
+                                        </p>
+                                      </div>
+                                      <Badge
+                                        variant="outline"
+                                        className="mt-1 text-xs border-amber-300 bg-amber-50 text-amber-700"
+                                      >
+                                        Rescheduled
+                                      </Badge>
                                     </div>
-                                    <Badge
-                                      variant="outline"
-                                      className="mt-1 text-xs border-amber-300 bg-amber-50 text-amber-700"
-                                    >
-                                      Rescheduled
-                                    </Badge>
+                                  ) : (
+                                    <p className="font-semibold text-sm text-foreground">
+                                      {dateInfo.date}
+                                    </p>
+                                  )}
+                                  <div className="flex items-center gap-3 flex-wrap mt-1 text-xs text-muted-foreground">
+                                    {/* Tables */}
+                                    {totalDateTables > 0 && (
+                                      <div className="flex items-center gap-1">
+                                        <UtensilsCrossed className="h-3.5 w-3.5 shrink-0" />
+                                        <span>
+                                          {totalDateTables}{" "}
+                                          {totalDateTables === 1
+                                            ? "Table"
+                                            : "Tables"}
+                                        </span>
+                                      </div>
+                                    )}
+                                    {/* Tickets */}
+                                    {totalDateTickets > 0 && (
+                                      <div className="flex items-center gap-1">
+                                        <Ticket className="h-3.5 w-3.5 shrink-0" />
+                                        <span>
+                                          {totalDateTickets}{" "}
+                                          {totalDateTickets === 1
+                                            ? "Ticket"
+                                            : "Tickets"}
+                                        </span>
+                                      </div>
+                                    )}
+                                    {/* Drinks */}
+                                    {totalDateDrinks > 0 && (
+                                      <div className="flex items-center gap-1">
+                                        <Wine className="h-3.5 w-3.5 shrink-0" />
+                                        <span>
+                                          {totalDateDrinks}{" "}
+                                          {totalDateDrinks === 1
+                                            ? "Drink"
+                                            : "Drinks"}
+                                        </span>
+                                      </div>
+                                    )}
+                                    {/* Add-ons Badge */}
+                                    {hasAddons && (
+                                      <Badge
+                                        variant="secondary"
+                                        className="text-[10px] px-1.5 py-0.5 h-5 bg-purple-100 text-purple-700 hover:bg-purple-100 border-0 font-medium"
+                                      >
+                                        Add-ons
+                                      </Badge>
+                                    )}
+                                    <span>•</span>
+                                    <span className="font-semibold text-foreground">
+                                      {formatAmount(dateInfo.total_amount)}
+                                    </span>
                                   </div>
-                                ) : (
-                                  <p className="font-semibold text-sm text-foreground">
-                                    {dateInfo.date}
-                                  </p>
-                                )}
-                                <div className="flex items-center gap-3 flex-wrap mt-1 text-xs text-muted-foreground">
-                                  {/* Tables */}
-                                  {totalDateTables > 0 && (
-                                    <div className="flex items-center gap-1">
-                                      <UtensilsCrossed className="h-3.5 w-3.5" />
-                                      <span>
-                                        {totalDateTables}{" "}
-                                        {totalDateTables === 1
-                                          ? "Table"
-                                          : "Tables"}
-                                      </span>
-                                    </div>
-                                  )}
-                                  {/* Tickets */}
-                                  {totalDateTickets > 0 && (
-                                    <div className="flex items-center gap-1">
-                                      <Ticket className="h-3.5 w-3.5" />
-                                      <span>
-                                        {totalDateTickets}{" "}
-                                        {totalDateTickets === 1
-                                          ? "Ticket"
-                                          : "Tickets"}
-                                      </span>
-                                    </div>
-                                  )}
-                                  {/* Drinks */}
-                                  {totalDateDrinks > 0 && (
-                                    <div className="flex items-center gap-1">
-                                      <Wine className="h-3.5 w-3.5" />
-                                      <span>
-                                        {totalDateDrinks}{" "}
-                                        {totalDateDrinks === 1
-                                          ? "Drink"
-                                          : "Drinks"}
-                                      </span>
-                                    </div>
-                                  )}
-                                  {/* Add-ons Badge */}
-                                  {hasAddons && (
-                                    <Badge
-                                      variant="secondary"
-                                      className="text-[10px] px-1.5 py-0.5 h-5 bg-purple-100 text-purple-700 hover:bg-purple-100 border-0 font-medium"
-                                    >
-                                      Add-ons
-                                    </Badge>
-                                  )}
-                                  <span>•</span>
-                                  <span className="font-semibold text-foreground">
-                                    {formatAmount(dateInfo.total_amount)}
-                                  </span>
                                 </div>
                               </div>
-                              <div className="flex items-center gap-2">
+                              <div className="flex w-full flex-shrink-0 flex-col gap-2 sm:w-auto sm:flex-row sm:items-center sm:gap-2">
                                 {getPaymentStatusBadge(dateInfo.payment_status)}
                                 <Select
                                   value={String(
@@ -800,7 +804,6 @@ export default function AdjustBookingContent({
                                       getPaymentStatusNumber(
                                         dateInfo.payment_status
                                       );
-                                    // Only open dialog if status is actually changing
                                     if (newStatusNum !== currentStatusNum) {
                                       handleStatusChangeRequest(
                                         dateInfo.booking_date_id,
@@ -812,10 +815,10 @@ export default function AdjustBookingContent({
                                   }}
                                   disabled={updateStatusMutation.isPending}
                                 >
-                                  <SelectTrigger className="h-7 w-[120px] text-xs border-2">
+                                  <SelectTrigger className="h-7 w-full min-w-0 text-xs border-2 sm:w-[120px]">
                                     <div className="flex items-center gap-2">
                                       {updateStatusMutation.isPending && (
-                                        <Loader2 className="h-3 w-3 animate-spin" />
+                                        <Loader2 className="h-3 w-3 animate-spin shrink-0" />
                                       )}
                                       <SelectValue
                                         placeholder={

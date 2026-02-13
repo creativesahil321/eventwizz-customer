@@ -66,10 +66,10 @@ export default function PermissionDebug() {
   }
 
   return (
-    <div className="fixed bottom-4 right-4 z-50 z-100">
+    <div className="fixed bottom-4 left-4 z-40">
       <button
         onClick={() => setExpanded(!expanded)}
-        className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded shadow-lg"
+        className="rounded bg-amber-600 px-3 py-1.5 text-xs font-bold text-black shadow-lg hover:bg-amber-700 sm:px-4 sm:py-2 sm:text-sm"
       >
         Permission Debug {expanded ? "▲" : "▼"}
       </button>

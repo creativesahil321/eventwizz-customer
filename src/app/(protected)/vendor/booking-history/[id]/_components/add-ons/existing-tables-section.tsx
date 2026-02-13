@@ -59,7 +59,7 @@ export function ExistingTablesSection({
     return (
       <div className="space-y-3">
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-2.5">
-          <p className="text-xs text-blue-900">
+          <p className="text-xs text-blue-900 break-words">
             <span className="font-medium">
               {totalAvailableSeats} seats available
             </span>{" "}
@@ -72,20 +72,20 @@ export function ExistingTablesSection({
           return (
             <div
               key={table.id}
-              className="flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50"
+              className="flex flex-col gap-3 p-3 border rounded-lg hover:bg-gray-50 sm:flex-row sm:items-center sm:justify-between"
             >
-              <div className="flex-1">
-                <div className="flex items-center gap-2">
-                  <h4 className="font-medium text-sm">
+              <div className="min-w-0 flex-1">
+                <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                  <h4 className="font-medium text-sm shrink-0">
                     Table for {table.capacity}
                   </h4>
-                  <span className="text-xs text-muted-foreground">
+                  <span className="text-xs text-muted-foreground break-words">
                     {table.table_count} table{table.table_count > 1 ? "s" : ""}{" "}
                     • {table.availableSeats} seats free
                   </span>
                 </div>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2 shrink-0">
                 {table.table_count > 1 &&
                   peopleToAdd > 0 &&
                   onManageSeating && (
@@ -139,7 +139,7 @@ export function ExistingTablesSection({
     <div className="space-y-3">
       {totalAvailableSeats > 0 && (
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-2.5">
-          <p className="text-xs text-blue-900">
+          <p className="text-xs text-blue-900 break-words">
             <span className="font-medium">
               {totalAvailableSeats} seats available
             </span>{" "}
@@ -153,20 +153,20 @@ export function ExistingTablesSection({
         return (
           <div
             key={table.id}
-            className="flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50"
+            className="flex flex-col gap-3 p-3 border rounded-lg hover:bg-gray-50 sm:flex-row sm:items-center sm:justify-between"
           >
-            <div className="flex-1">
-              <div className="flex items-center gap-2">
-                <h4 className="font-medium text-sm">
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                <h4 className="font-medium text-sm shrink-0">
                   Table for {table.capacity}
                 </h4>
-                <span className="text-xs text-muted-foreground">
+                <span className="text-xs text-muted-foreground break-words">
                   {table.table_count} table{table.table_count > 1 ? "s" : ""} •{" "}
                   {table.availableSeats} seats free
                 </span>
               </div>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2 shrink-0">
               {table.table_count > 1 && peopleToAdd > 0 && onManageSeating && (
                 <Button
                   variant="outline"

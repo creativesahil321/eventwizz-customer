@@ -525,8 +525,8 @@ export default function BookingInfoTab({ bookingData }: BookingInfoTabProps) {
                   value={`date-${index}`}
                   className="border-2 rounded-lg overflow-hidden bg-white shadow-sm hover:shadow-md transition-shadow"
                 >
-                  <div className="flex items-center justify-between px-4 py-3 hover:bg-gradient-to-r hover:from-gray-50 hover:to-white transition-all">
-                    <AccordionTrigger className="flex-1 hover:no-underline py-0 cursor-pointer">
+                  <div className="flex flex-col gap-3 px-4 py-3 hover:bg-gradient-to-r hover:from-gray-50 hover:to-white transition-all sm:flex-row sm:items-center sm:justify-between">
+                    <AccordionTrigger className="flex-1 hover:no-underline py-0 cursor-pointer min-w-0">
                       <div className="flex items-center gap-3 text-left w-full">
                         <div
                           className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold text-white shrink-0"
@@ -630,13 +630,13 @@ export default function BookingInfoTab({ bookingData }: BookingInfoTabProps) {
                         </div>
                       </div>
                     </AccordionTrigger>
-                    <div className="flex items-center gap-2 shrink-0 ml-3">
+                    <div className="flex flex-col gap-2 items-end shrink-0 sm:ml-3 sm:flex-row sm:items-center sm:gap-2">
                       {dateInfo.paymentStatus !== "paid" ? (
                         <>
                           {(() => {
                             const pendingAmount = getPendingAmount(dateInfo);
                             return pendingAmount ? (
-                              <div className="flex flex-col items-end gap-1">
+                              <div className="flex flex-col items-end gap-0.5">
                                 <p className="text-xs text-muted-foreground">
                                   Pending
                                 </p>
@@ -652,7 +652,7 @@ export default function BookingInfoTab({ bookingData }: BookingInfoTabProps) {
                               handleSingleDatePaymentClick(dateInfo);
                             }}
                             size="sm"
-                            className="gap-1.5 cursor-pointer h-8 px-3"
+                            className="gap-1.5 cursor-pointer h-8 px-3 w-full sm:w-auto"
                             style={{
                               backgroundColor: "var(--color-primary)",
                               color: "var(--color-primary-foreground)",
@@ -1681,7 +1681,13 @@ export default function BookingInfoTab({ bookingData }: BookingInfoTabProps) {
               </h3>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div
+              className={
+                summary.addOns > 0
+                  ? "grid grid-cols-1 sm:grid-cols-2 gap-3"
+                  : "grid grid-cols-1 gap-3"
+              }
+            >
               <div className="flex items-center justify-between px-3 py-2 rounded-lg bg-white/70 border border-gray-200">
                 <div>
                   <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
@@ -1696,19 +1702,21 @@ export default function BookingInfoTab({ bookingData }: BookingInfoTabProps) {
                 </span>
               </div>
 
-              <div className="flex items-center justify-between px-3 py-2 rounded-lg bg-purple-50/80 border border-purple-100">
-                <div>
-                  <p className="text-[11px] uppercase tracking-wide text-purple-700 font-semibold">
-                    Add-ons Total
-                  </p>
-                  <p className="text-sm font-medium text-purple-900">
-                    Extras & upgrades
-                  </p>
+              {summary.addOns > 0 && (
+                <div className="flex items-center justify-between px-3 py-2 rounded-lg bg-purple-50/80 border border-purple-100">
+                  <div>
+                    <p className="text-[11px] uppercase tracking-wide text-purple-700 font-semibold">
+                      Add-ons Total
+                    </p>
+                    <p className="text-sm font-medium text-purple-900">
+                      Extras & upgrades
+                    </p>
+                  </div>
+                  <span className="text-sm font-semibold text-purple-900">
+                    {summaryFormatted.addOns}
+                  </span>
                 </div>
-                <span className="text-sm font-semibold text-purple-900">
-                  {summaryFormatted.addOns}
-                </span>
-              </div>
+              )}
             </div>
 
             {/* Grand Total */}
@@ -1721,7 +1729,9 @@ export default function BookingInfoTab({ bookingData }: BookingInfoTabProps) {
                   Grand Total
                 </p>
                 <p className="text-sm font-medium text-foreground">
-                  Includes all selected add-ons
+                  {summary.addOns > 0
+                    ? "Includes all selected add-ons"
+                    : "Package total"}
                 </p>
               </div>
               <span

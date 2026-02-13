@@ -159,15 +159,26 @@ export default function BookingHistoryPage() {
                 </div>
                 <div className="flex flex-col sm:flex-row flex-wrap gap-3 items-center w-full sm:w-auto min-w-0">
                   <div className="flex flex-wrap gap-3 items-center w-full sm:min-w-0 sm:max-w-full min-w-0">
-                    {/* Event Date Filter */}
-                    <div className="flex flex-col gap-1.5 shrink-0 w-full sm:w-[180px]">
-                      <Input
-                        type="date"
-                        value={eventDate}
-                        onChange={(e) => setEventDate(e.target.value)}
-                        className="w-full min-w-0 sm:w-[180px]"
-                        disabled={isFetching}
-                      />
+                    {/* Event Date Filter - visible format hint when empty (fixes invisible placeholder on mobile) */}
+                    <div className="flex flex-col gap-1 shrink-0 w-full sm:w-[180px]">
+                      <div className="relative w-full">
+                        <Input
+                          type="date"
+                          value={eventDate}
+                          onChange={(e) => setEventDate(e.target.value)}
+                          className="w-full min-w-0 sm:w-[180px]"
+                          disabled={isFetching}
+                          aria-label="Filter by event date (dd-mm-yyyy)"
+                        />
+                        {!eventDate && (
+                          <span
+                            className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-500"
+                            aria-hidden
+                          >
+                            dd-mm-yyyy
+                          </span>
+                        )}
+                      </div>
                     </div>
                     {/* Search */}
                     <div className="relative flex-1 min-w-[200px] sm:min-w-[180px] max-w-full">

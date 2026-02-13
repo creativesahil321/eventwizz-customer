@@ -130,12 +130,12 @@ export function NewTablesSection({
     return (
       <div className="space-y-3">
         {totalAvailableSeats > 0 && <div className="h-px bg-gray-200" />}
-        <div className="text-center py-6 bg-orange-50 rounded-lg border border-orange-200">
+        <div className="py-6 px-4 bg-orange-50 rounded-lg border border-orange-200 overflow-visible">
           <AlertCircle className="h-8 w-8 text-orange-500 mx-auto mb-3" />
-          <h3 className="font-medium text-orange-900 mb-2">
+          <h3 className="font-medium text-orange-900 mb-2 text-center break-words">
             No available tables for {peopleForNewTables} more people
           </h3>
-          <p className="text-sm text-orange-700">
+          <p className="text-sm text-orange-700 text-center break-words min-w-0">
             Add more table configurations through your event management settings
             to accommodate additional guests.
           </p>
@@ -194,15 +194,15 @@ export function NewTablesSection({
                     isDisabled ? "cursor-not-allowed" : ""
                   }`}
                 >
-                  <div className="flex items-center justify-between p-4">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1">
-                        <h4 className="font-medium text-gray-900">
+                  <div className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2 mb-1">
+                        <h4 className="font-medium text-gray-900 break-words">
                           Table for {rec.table.size} ({rec.table.min_persons}-
                           {rec.table.max_persons} persons)
                         </h4>
                         {index === 0 && (
-                          <Badge className="text-xs bg-green-100 text-green-800 border-green-200">
+                          <Badge className="shrink-0 text-xs bg-green-100 text-green-800 border-green-200">
                             <Star className="h-3 w-3 mr-1" />
                             Best
                           </Badge>
@@ -319,9 +319,9 @@ export function NewTablesSection({
                               : ""
                           } ${!isEligible && !isDisabled ? "opacity-75" : ""}`}
                         >
-                          <div className="flex items-center justify-between p-4">
-                            <div className="flex-1 min-w-0">
-                              <h4 className="font-medium text-gray-900 mb-1">
+                          <div className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
+                            <div className="min-w-0 flex-1">
+                              <h4 className="font-medium text-gray-900 mb-1 break-words">
                                 Table for {rec.table.size} (
                                 {rec.table.min_persons}-{rec.table.max_persons}{" "}
                                 persons)
@@ -396,14 +396,14 @@ export function NewTablesSection({
           )}
         </div>
       ) : (
-        <div className="text-center py-6 bg-orange-50 rounded-lg border border-orange-200">
+        <div className="py-6 px-4 bg-orange-50 rounded-lg border border-orange-200 overflow-visible">
           <AlertCircle className="h-8 w-8 text-orange-500 mx-auto mb-3" />
-          <h3 className="font-medium text-orange-900 mb-2">
+          <h3 className="font-medium text-orange-900 mb-2 text-center break-words">
             Sorry, we haven&apos;t yet available tables for{" "}
             {peopleForRecommendations} people
           </h3>
-          <p className="text-sm text-orange-700 mb-3">
-            Kindly contact with support so they can arrange
+          <p className="text-sm text-orange-700 text-center break-words min-w-0">
+            Kindly contact with support so they can arrange tables for you.
           </p>
         </div>
       )}

@@ -116,7 +116,7 @@ export function TransactionsDataTable({
           <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 w-full sm:w-auto">
             <span className="text-sm font-medium mb-1 sm:mb-0">Date</span>
             <div className="relative w-full sm:w-[180px]">
-              <Calendar className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none z-10" />
+              <Calendar className="absolute left-3 top-1/2 z-10 h-4 w-4 -translate-y-1/2 transform text-muted-foreground pointer-events-none" />
               <Input
                 type="date"
                 value={filters.payment_date || ""}
@@ -124,7 +124,16 @@ export function TransactionsDataTable({
                   onFilterChange({ payment_date: e.target.value })
                 }
                 className="pl-9 h-9 w-full"
+                aria-label="Filter by payment date (dd-mm-yyyy)"
               />
+              {!filters.payment_date && (
+                <span
+                  className="pointer-events-none absolute left-9 top-1/2 z-[5] -translate-y-1/2 text-sm text-gray-500"
+                  aria-hidden
+                >
+                  dd-mm-yyyy
+                </span>
+              )}
             </div>
           </div>
 

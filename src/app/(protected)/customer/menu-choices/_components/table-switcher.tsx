@@ -28,30 +28,31 @@ export default function TableSwitcher({
   const selectedTable = tables.find((t) => t.table_id === selectedTableId);
 
   return (
-    <div className="flex items-center gap-3">
-      <div className="flex items-center gap-2 min-w-0">
-        <UtensilsCrossed className="h-4 w-4 text-amber-600 flex-shrink-0" />
-        <span className="text-sm font-medium text-muted-foreground whitespace-nowrap">
+    <div className="flex w-full min-w-0 items-center gap-2 sm:gap-3">
+      <div className="flex shrink-0 items-center gap-2">
+        <UtensilsCrossed className="h-4 w-4 shrink-0 text-amber-600" />
+        <span className="whitespace-nowrap text-sm font-medium text-muted-foreground">
           Table Selection
         </span>
       </div>
 
-      <Select value={selectedTableId} onValueChange={onTableChange}>
-        <SelectTrigger className="h-9 bg-white flex-1 min-w-0">
-          <SelectValue placeholder="Select a table">
-            <div className="flex items-center gap-2 min-w-0">
-              <span className="font-medium text-sm truncate">
-                {selectedTable?.table_name || "Select a table"}
-              </span>
-              {selectedTable && (
-                <span className="text-xs text-muted-foreground flex items-center gap-1 flex-shrink-0">
-                  <Users className="h-3 w-3" />
-                  {selectedTable.guests}/{selectedTable.seats}
+      <div className="min-w-0 flex-1">
+        <Select value={selectedTableId} onValueChange={onTableChange}>
+          <SelectTrigger className="h-9 w-full min-w-0 bg-white [&_[data-slot=select-value]]:min-w-0 [&_[data-slot=select-value]]:truncate">
+            <SelectValue placeholder="Select a table">
+              <div className="flex min-w-0 w-full items-center gap-1.5">
+                <span className="min-w-0 truncate text-left font-medium text-sm">
+                  {selectedTable?.table_name || "Select a table"}
                 </span>
-              )}
-            </div>
-          </SelectValue>
-        </SelectTrigger>
+                {selectedTable && (
+                  <span className="shrink-0 flex items-center gap-1 text-xs text-muted-foreground">
+                    <Users className="h-3 w-3" />
+                    {selectedTable.guests}/{selectedTable.seats}
+                  </span>
+                )}
+              </div>
+            </SelectValue>
+          </SelectTrigger>
         <SelectContent>
           {tables.map((table) => (
             <SelectItem key={table.table_id} value={table.table_id}>
@@ -81,7 +82,8 @@ export default function TableSwitcher({
             </SelectItem>
           ))}
         </SelectContent>
-      </Select>
+        </Select>
+      </div>
     </div>
   );
 }

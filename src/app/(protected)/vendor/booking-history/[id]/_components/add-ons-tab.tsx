@@ -1155,9 +1155,9 @@ export default function AddOnsTab({
         <Accordion type="single" collapsible className="w-full">
           <AccordionItem value="tables" className="border rounded-lg px-4">
             <AccordionTrigger className="hover:no-underline">
-              <div className="flex items-center gap-3 flex-1">
+              <div className="flex items-center gap-3 flex-1 min-w-0">
                 <div
-                  className="p-2 rounded-lg"
+                  className="p-2 rounded-lg shrink-0"
                   style={{
                     backgroundColor: "var(--color-primary-light, #f0f0f0)",
                   }}
@@ -1167,16 +1167,16 @@ export default function AddOnsTab({
                     style={{ color: "var(--color-primary)" }}
                   />
                 </div>
-                <div className="text-left flex-1">
+                <div className="text-left flex-1 min-w-0">
                   <h3 className="font-semibold">Tables & Seating</h3>
-                  <p className="text-sm text-muted-foreground">
+                  <p className="text-sm text-muted-foreground break-words">
                     Add more people or tables to your booking
                   </p>
                 </div>
               </div>
             </AccordionTrigger>
-            <AccordionContent>
-              <div className="space-y-4 pt-4">
+            <AccordionContent className="min-w-0">
+              <div className="space-y-4 pt-4 min-w-0">
                 {/* People Count Selector */}
                 <PeopleCountSelector
                   count={additionalPeopleCount}

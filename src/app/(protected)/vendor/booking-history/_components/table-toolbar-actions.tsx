@@ -270,12 +270,23 @@ export function TableToolbarActions({ table }: TableToolbarActionsProps) {
           <div className="grid gap-4 py-4">
             <div className="grid gap-2">
               <Label htmlFor="export-date">Export Date</Label>
-              <Input
-                id="export-date"
-                type="date"
-                value={exportDate}
-                onChange={(e) => setExportDate(e.target.value)}
-              />
+              <div className="relative w-full">
+                <Input
+                  id="export-date"
+                  type="date"
+                  value={exportDate}
+                  onChange={(e) => setExportDate(e.target.value)}
+                  aria-label="Export date (dd-mm-yyyy)"
+                />
+                {!exportDate && (
+                  <span
+                    className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-500"
+                    aria-hidden
+                  >
+                    dd-mm-yyyy
+                  </span>
+                )}
+              </div>
             </div>
           </div>
           <DialogFooter>

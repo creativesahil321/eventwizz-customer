@@ -930,26 +930,36 @@ export default function StepFive() {
                         Event Date
                       </FormLabel>
                       <FormControl>
-                        <Input
-                          type="date"
-                          placeholder="Select date"
-                          {...field}
-                          min={getTodayDateString()} // Add min attribute to prevent past dates
-                          className="w-full h-11 bg-[#F9FAFB] border-[#E5E7EB] focus:ring-2 focus:ring-blue-500"
-                          onFocus={() =>
-                            handleFieldFocus(`dates.${dateIndex}.event_date`)
-                          }
-                          onChange={(e) => {
-                            const newDate = e.target.value;
-                            if (
-                              newDate &&
-                              !validateDateUniqueness(dateIndex, newDate)
-                            ) {
-                              return; // Don't update if validation fails
+                        <div className="relative w-full">
+                          <Input
+                            type="date"
+                            placeholder="Select date"
+                            {...field}
+                            min={getTodayDateString()} // Add min attribute to prevent past dates
+                            className="w-full h-11 bg-[#F9FAFB] border-[#E5E7EB] focus:ring-2 focus:ring-blue-500"
+                            onFocus={() =>
+                              handleFieldFocus(`dates.${dateIndex}.event_date`)
                             }
-                            field.onChange(newDate);
-                          }}
-                        />
+                            onChange={(e) => {
+                              const newDate = e.target.value;
+                              if (
+                                newDate &&
+                                !validateDateUniqueness(dateIndex, newDate)
+                              ) {
+                                return; // Don't update if validation fails
+                              }
+                              field.onChange(newDate);
+                            }}
+                          />
+                          {!field.value && (
+                            <span
+                              className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-500"
+                              aria-hidden
+                            >
+                              dd-mm-yyyy
+                            </span>
+                          )}
+                        </div>
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -1262,18 +1272,28 @@ export default function StepFive() {
                                     <FormItem>
                                       <FormLabel>Deposit Due Date</FormLabel>
                                       <FormControl>
-                                        <Input
-                                          type="date"
-                                          placeholder="Select due date"
-                                          {...field}
-                                          min={getTodayDateString()}
-                                          className="w-full"
-                                          onFocus={() =>
-                                            handleFieldFocus(
-                                              `dates.${dateIndex}.deposit_due_date`
-                                            )
-                                          }
-                                        />
+                                        <div className="relative w-full">
+                                          <Input
+                                            type="date"
+                                            placeholder="Select due date"
+                                            {...field}
+                                            min={getTodayDateString()}
+                                            className="w-full"
+                                            onFocus={() =>
+                                              handleFieldFocus(
+                                                `dates.${dateIndex}.deposit_due_date`
+                                              )
+                                            }
+                                          />
+                                          {!field.value && (
+                                            <span
+                                              className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-500"
+                                              aria-hidden
+                                            >
+                                              dd-mm-yyyy
+                                            </span>
+                                          )}
+                                        </div>
                                       </FormControl>
                                       <FormMessage />
                                     </FormItem>

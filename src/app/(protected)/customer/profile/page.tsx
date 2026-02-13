@@ -201,9 +201,9 @@ export default function ProfilePage() {
                 <FormLabel className="block mb-3 text-black font-medium">
                   Profile Picture
                 </FormLabel>
-                <div className="flex items-center gap-6">
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:gap-6">
                   {/* Avatar Preview */}
-                  <div className="relative">
+                  <div className="relative shrink-0">
                     <div className="w-32 h-32 rounded-full overflow-hidden border-4 border-gray-100 shadow-lg bg-gray-50">
                       {avatarPreview ? (
                         <img
@@ -225,8 +225,8 @@ export default function ProfilePage() {
                     </div>
                   </div>
 
-                  {/* Upload Section */}
-                  <div className="flex-1">
+                  {/* Upload Section - full width on mobile so dropzone text is visible */}
+                  <div className="min-w-0 flex-1">
                     <FileUploader
                       value={avatarFiles}
                       onValueChange={handleAvatarFilesChange}
@@ -243,8 +243,8 @@ export default function ProfilePage() {
                       autoCompress={true}
                       autoCompressMaxSizeMB={1}
                     />
-                    <p className="text-xs text-gray-500 mt-2">
-                      Recommended: Square image, at least 200x200px
+                    <p className="mt-2 text-xs text-gray-500">
+                      Recommended: Square image, at least 200×200px
                     </p>
                   </div>
                 </div>

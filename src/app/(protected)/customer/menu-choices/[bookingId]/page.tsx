@@ -17,7 +17,8 @@ import {
 import AttendeeList from "../_components/attendee-list";
 import DateSwitcher from "../_components/date-switcher";
 import TableSwitcher from "../_components/table-switcher";
-import { AlertCircle } from "lucide-react";
+import { AlertCircle, CheckCircle2 } from "lucide-react";
+import { Card, CardContent } from "@/components/ui/card";
 import { toast } from "sonner";
 import {
   AttendeeMenuSelection,
@@ -317,6 +318,9 @@ function MenuChoicesContent({ params }: MenuChoicesPageProps) {
   // Note: We calculate this directly (not memoized) to always get the latest ref value
   const isTableFull =
     currentAttendees.length + pendingSavesCountRef.current >= totalGuests;
+
+  // Show form only when there's room to add OR user is editing an attendee (avoids showing a disabled form when all filled)
+  const showForm = !isTableFull || editingAttendee !== null;
 
   /**
    * Handle date selection change
@@ -691,9 +695,9 @@ function MenuChoicesContent({ params }: MenuChoicesPageProps) {
         </div>
 
         {/* Date/Table Selection and Context - Compact Row */}
-        <div className="flex flex-col sm:flex-row sm:items-center gap-3 pt-4">
-          {/* Date and Table Switchers - Inline */}
-          <div className="flex flex-wrap items-center gap-3 flex-1">
+        <div className="flex flex-col gap-3 pt-4 sm:flex-row sm:items-center">
+          {/* Date and Table Switchers - Inline, constrain width on mobile */}
+          <div className="flex min-w-0 flex-1 flex-wrap items-center gap-3">
             {bookingData.dates.length > 1 && (
               <DateSwitcher
                 dates={bookingData.dates}
@@ -712,12 +716,12 @@ function MenuChoicesContent({ params }: MenuChoicesPageProps) {
 
           {/* Compact Context Info */}
           {currentDateInfo && currentTableInfo && (
-            <div className="flex items-center gap-2 text-xs text-muted-foreground bg-blue-50 px-3 py-1.5 rounded-md border border-blue-100">
-              <AlertCircle className="h-3.5 w-3.5 text-blue-500 flex-shrink-0" />
-              <span className="font-medium text-blue-900">
-                {currentDateInfo.date} - {currentTableInfo.table_name}
+            <div className="flex min-w-0 items-center gap-2 overflow-hidden rounded-md border border-blue-100 bg-blue-50 px-3 py-1.5 text-xs text-muted-foreground">
+              <AlertCircle className="h-3.5 w-3.5 shrink-0 text-blue-500" />
+              <span className="min-w-0 truncate font-medium text-blue-900">
+                {currentDateInfo.date} – {currentTableInfo.table_name}
               </span>
-              <span className="text-blue-700">
+              <span className="shrink-0 text-blue-700">
                 • {currentTableInfo.guests} guests
                 {currentAttendees.length > 0 &&
                   ` • ${currentAttendees.length} added`}
@@ -729,11 +733,11 @@ function MenuChoicesContent({ params }: MenuChoicesPageProps) {
 
       {/* Main Content - Fixed height so both panels match; form and attendees scroll inside */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 items-stretch lg:min-h-[28rem] lg:max-h-[calc(100vh-12rem)] lg:h-[calc(100vh-12rem)]">
-        {/* Left Column - Menu Selection Form (scrolls when content overflows) */}
+        {/* Left Column - Menu Selection Form, or "All set" when table full and not editing */}
         <div className="flex flex-col min-h-0 h-full">
           {isLoadingMenuItems ? (
             <MenuSelectionFormSkeleton />
-          ) : (
+          ) : showForm ? (
             <MenuSelectionForm
               eventName={bookingData.event_name}
               editingAttendee={editingAttendee}
@@ -742,6 +746,23 @@ function MenuChoicesContent({ params }: MenuChoicesPageProps) {
               onSaveAttendee={handleSaveAttendee}
               onCancelEdit={handleCancelEdit}
             />
+          ) : (
+            <Card className="flex h-full min-h-0 flex-col border-2 shadow-lg">
+              <CardContent className="flex flex-1 flex-col items-center justify-center gap-3 p-6 text-center">
+                <div className="rounded-full bg-green-100 p-3">
+                  <CheckCircle2 className="h-10 w-10 text-green-600" />
+                </div>
+                <div className="space-y-1">
+                  <p className="font-semibold text-foreground">
+                    All menu choices added
+                  </p>
+                  <p className="text-sm text-muted-foreground">
+                    Click <strong>Edit</strong> on an attendee below to change
+                    their selection.
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
           )}
         </div>
 

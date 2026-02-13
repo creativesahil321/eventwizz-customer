@@ -102,13 +102,24 @@ export default function TransactionsPage() {
                 <div className="flex flex-1 gap-3 items-center w-full sm:w-auto">
                   {/* Booking Date */}
                   <div className="flex flex-col gap-1.5">
-                    <Input
-                      type="date"
-                      value={bookingDate}
-                      onChange={(e) => setBookingDate(e.target.value)}
-                      className="w-full sm:w-[180px]"
-                      disabled={isFetching}
-                    />
+                    <div className="relative w-full sm:w-[180px]">
+                      <Input
+                        type="date"
+                        value={bookingDate}
+                        onChange={(e) => setBookingDate(e.target.value)}
+                        className="w-full sm:w-[180px]"
+                        disabled={isFetching}
+                        aria-label="Filter by booking date (dd-mm-yyyy)"
+                      />
+                      {!bookingDate && (
+                        <span
+                          className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-500"
+                          aria-hidden
+                        >
+                          dd-mm-yyyy
+                        </span>
+                      )}
+                    </div>
                   </div>
 
                   {/* Status Filter */}

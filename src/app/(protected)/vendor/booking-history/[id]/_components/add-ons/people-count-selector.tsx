@@ -21,14 +21,14 @@ export function PeopleCountSelector({
   onInputKeyDown,
 }: PeopleCountSelectorProps) {
   return (
-    <div className="flex items-center justify-between p-2.5 bg-blue-50 rounded-lg border border-blue-200">
-      <div className="flex items-center gap-2">
-        <Users className="h-3.5 w-3.5 text-blue-600" />
+    <div className="flex flex-col gap-3 p-2.5 bg-blue-50 rounded-lg border border-blue-200 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex items-center gap-2 min-w-0">
+        <Users className="h-3.5 w-3.5 shrink-0 text-blue-600" />
         <span className="text-xs font-medium text-blue-900">
           People in group:
         </span>
       </div>
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2 shrink-0">
         <Button
           variant="outline"
           size="sm"

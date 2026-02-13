@@ -310,12 +310,23 @@ export default function EventOverviewClient({
               </p>
             </div>
             <div className="flex items-center gap-2 w-full md:w-auto">
-              <Input
-                type="date"
-                value={dateFilter}
-                onChange={(e) => handleDateFilterChange(e.target.value)}
-                className="w-full md:w-[180px]"
-              />
+              <div className="relative w-full md:w-[180px]">
+                <Input
+                  type="date"
+                  value={dateFilter}
+                  onChange={(e) => handleDateFilterChange(e.target.value)}
+                  className="w-full md:w-[180px]"
+                  aria-label="Filter by date (dd-mm-yyyy)"
+                />
+                {!dateFilter && (
+                  <span
+                    className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-500"
+                    aria-hidden
+                  >
+                    dd-mm-yyyy
+                  </span>
+                )}
+              </div>
               {dateFilter ? (
                 <Button
                   type="button"

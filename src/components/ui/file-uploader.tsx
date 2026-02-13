@@ -503,7 +503,7 @@ export function FileUploader(props: FileUploaderProps) {
             <div
               {...getRootProps()}
               className={cn(
-                "group relative grid h-52 w-full cursor-pointer place-items-center rounded-lg border-2 border-dashed border-muted-foreground/25 px-5 py-2.5 text-center transition hover:bg-muted/25",
+                "group relative grid min-h-52 w-full cursor-pointer place-items-center rounded-lg border-2 border-dashed border-muted-foreground/25 px-4 py-4 text-center transition hover:bg-muted/25 sm:px-5 sm:py-2.5",
                 "ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
                 isDragActive && "border-muted-foreground/50",
                 isDisabled && "pointer-events-none opacity-60",
@@ -514,7 +514,7 @@ export function FileUploader(props: FileUploaderProps) {
               <input {...getInputProps()} />
               {isDragActive ? (
                 <div className="flex flex-col items-center justify-center gap-4 sm:px-5">
-                  <div className="rounded-full border border-dashed p-3">
+                  <div className="rounded-full border border-dashed p-3 shrink-0">
                     <Upload
                       className="size-7 text-muted-foreground"
                       aria-hidden="true"
@@ -525,14 +525,14 @@ export function FileUploader(props: FileUploaderProps) {
                   </p>
                 </div>
               ) : (
-                <div className="flex flex-col items-center justify-center gap-4 sm:px-5">
-                  <div className="rounded-full border border-dashed p-3">
+                <div className="flex min-h-0 w-full flex-col items-center justify-center gap-4 px-1 sm:px-5">
+                  <div className="rounded-full border border-dashed p-3 shrink-0">
                     <Upload
                       className="size-7 text-muted-foreground"
                       aria-hidden="true"
                     />
                   </div>
-                  <div className="flex flex-col gap-px">
+                  <div className="flex min-w-0 flex-col gap-1 text-center">
                     <p className="font-medium text-muted-foreground">
                       Drag {`'n'`} drop files here, or click to select files
                     </p>
