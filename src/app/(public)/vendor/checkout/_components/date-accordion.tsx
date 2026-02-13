@@ -334,17 +334,20 @@ export default function DateAccordion({
         className="cursor-pointer hover:bg-gray-50 transition-colors py-3"
         onClick={onToggle}
       >
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-3">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex min-w-0 flex-1 items-center gap-2 sm:space-x-3">
             <Calendar
-              className="h-5 w-5"
+              className="h-5 w-5 flex-shrink-0"
               style={{ color: "var(--color-primary)" }}
             />
-            <CardTitle className="text-base font-medium text-black">
+            <CardTitle className="truncate text-base font-medium text-black">
               {formatDate(date)}
             </CardTitle>
           </div>
-          <div className="flex items-center space-x-3">
+          <div
+            className="flex flex-shrink-0 flex-wrap items-center gap-2 sm:gap-3"
+            onClick={(e) => e.stopPropagation()}
+          >
             {/* Validation Error Badge */}
             {hasValidationError && (
               <Badge
@@ -355,7 +358,6 @@ export default function DateAccordion({
               </Badge>
             )}
 
-            {/* Unsaved Changes Indicator */}
             {/* Auto-Saving Status Badge */}
             {isAutoSaving && (
               <Badge
@@ -367,18 +369,18 @@ export default function DateAccordion({
               </Badge>
             )}
 
-            {/* Unsaved Badge - Only show if not auto-saving and no validation errors */}
+            {/* Unsaved Badge */}
             {hasChanges && !isAutoSaving && !hasValidationError && (
               <Badge
                 variant="secondary"
-                className="text-xs bg-blue-50 text-blue-700 border-blue-200"
+                className="text-xs bg-blue-50 text-blue-700 border-blue-200 whitespace-nowrap"
               >
-                <Clock className="w-3 h-3 mr-1" />
+                <Clock className="h-3 w-3 mr-1 flex-shrink-0" />
                 <span>Auto-save in 2s...</span>
               </Badge>
             )}
 
-            {/* Manual Save Button - Now subtle, for manual override */}
+            {/* Manual Save Button */}
             {hasChanges && !isAutoSaving && (
               <Button
                 variant="outline"
@@ -388,7 +390,7 @@ export default function DateAccordion({
                   handleSaveDate();
                 }}
                 disabled={isSaving}
-                className="text-xs text-gray-600 hover:text-gray-900"
+                className="shrink-0 text-xs text-gray-600 hover:text-gray-900"
                 title="Click to save immediately"
               >
                 {isSaving ? (
@@ -398,8 +400,8 @@ export default function DateAccordion({
                   </>
                 ) : (
                   <>
-                    <Save className="w-3 h-3 mr-1" />
-                    Save Now
+                    <Save className="w-3 h-3 mr-1 flex-shrink-0" />
+                    <span className="whitespace-nowrap">Save Now</span>
                   </>
                 )}
               </Button>
@@ -414,14 +416,14 @@ export default function DateAccordion({
                   e.stopPropagation();
                   onRemoveDate(date);
                 }}
-                className="text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200"
+                className="shrink-0 text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200"
               >
-                <Trash2 className="w-3 h-3" />
+                <Trash2 className="h-3 w-3" />
               </Button>
             )}
 
             {totalAmount > 0 && (
-              <div className="text-right">
+              <div className="text-right shrink-0">
                 <p className="text-sm text-gray-600">Date Total</p>
                 <p
                   className="font-semibold"
@@ -432,9 +434,9 @@ export default function DateAccordion({
               </div>
             )}
             {isExpanded ? (
-              <ChevronUp className="h-4 w-4 text-gray-400" />
+              <ChevronUp className="h-4 w-4 shrink-0 text-gray-400" />
             ) : (
-              <ChevronDown className="h-4 w-4 text-gray-400" />
+              <ChevronDown className="h-4 w-4 shrink-0 text-gray-400" />
             )}
           </div>
         </div>

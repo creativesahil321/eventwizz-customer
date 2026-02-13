@@ -388,7 +388,7 @@ export default function TableRecommendations({
         </div>
       </div>
 
-      {/* Guest Allocation Section */}
+      {/* Guest Allocation Section - responsive: stack on mobile so buttons aren't cut off */}
       {needsAllocation && selectedTables.length > 0 && (
         <div
           className={`border rounded-lg p-4 ${
@@ -397,16 +397,16 @@ export default function TableRecommendations({
               : "bg-blue-50 border-blue-200"
           }`}
         >
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex min-w-0 flex-1 items-start gap-2">
               <Settings
-                className={`h-4 w-4 ${
+                className={`h-4 w-4 flex-shrink-0 ${
                   allocationValidation.isValid
                     ? "text-green-600"
                     : "text-blue-600"
                 }`}
               />
-              <div>
+              <div className="min-w-0">
                 <h4
                   className={`text-sm font-medium ${
                     allocationValidation.isValid
@@ -431,7 +431,7 @@ export default function TableRecommendations({
                 </p>
               </div>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-shrink-0 flex-wrap items-center gap-2 sm:justify-end">
               {allocationValidation.isValid ? (
                 <Badge className="bg-green-100 text-green-800 border-green-200">
                   <CheckCircle className="h-3 w-3 mr-1" />
@@ -440,7 +440,7 @@ export default function TableRecommendations({
               ) : (
                 <Badge
                   variant="outline"
-                  className="border-orange-300 text-orange-700"
+                  className="border-orange-300 text-orange-700 whitespace-nowrap"
                 >
                   <AlertCircle className="h-3 w-3 mr-1" />
                   Needs Setup
@@ -450,10 +450,10 @@ export default function TableRecommendations({
                 onClick={() => setShowAllocationModal(true)}
                 size="sm"
                 variant="outline"
-                className="text-blue-700 border-blue-300 hover:bg-blue-100"
+                className="shrink-0 text-blue-700 border-blue-300 hover:bg-blue-100"
               >
-                <Settings className="h-3 w-3 mr-1" />
-                Manage Seating
+                <Settings className="h-3 w-3 mr-1 flex-shrink-0" />
+                <span className="whitespace-nowrap">Manage Seating</span>
               </Button>
             </div>
           </div>

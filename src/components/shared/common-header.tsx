@@ -1,7 +1,7 @@
 "use client";
 
 import {
-  Bookmark,
+  UserCircle,
   Menu,
   Phone,
   X,
@@ -19,10 +19,10 @@ import { addCacheBusting } from "@/lib/image-utils";
 // import { useIsPreviewMode } from "@/contexts/preview-context"; // Available for future use
 
 // Define icon mapping with proper typing
-type IconKey = "phone" | "bookmarks";
+type IconKey = "phone" | "profile";
 const iconComponents: Record<IconKey, LucideIcon> = {
   phone: Phone,
-  bookmarks: Bookmark,
+  profile: UserCircle,
 };
 
 // Interface for navigation links
@@ -394,22 +394,25 @@ export default function CommonHeader({
             {isOnboardingMode ? (
               <div
                 className={`p-2 ${styles.textColor} opacity-60 cursor-not-allowed`}
+                aria-label="Profile"
               >
-                <Bookmark className="h-5 w-5" />
+                <UserCircle className="h-5 w-5" />
               </div>
             ) : isAuthenticated ? (
               <Link
                 href={`/${session?.user?.account_type}/dashboard`}
                 className={`p-2 ${styles.hoverColor} transition-colors`}
+                aria-label="Dashboard"
               >
-                <Bookmark className="h-5 w-5" />
+                <UserCircle className="h-5 w-5" />
               </Link>
             ) : (
               <Link
                 href="/auth/login"
                 className={`p-2 ${styles.hoverColor} transition-colors`}
+                aria-label="Log in"
               >
-                <Bookmark className="h-5 w-5" />
+                <UserCircle className="h-5 w-5" />
               </Link>
             )}
           </div>
