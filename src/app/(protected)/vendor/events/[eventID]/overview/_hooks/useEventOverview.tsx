@@ -1,6 +1,6 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, keepPreviousData } from "@tanstack/react-query";
 import { eventsService } from "@/services/vendor/events/events.service";
 import { useSession } from "next-auth/react";
 
@@ -131,5 +131,6 @@ export function useEventOverview({
     enabled: !!session?.user?.token && !!eventId,
     staleTime: 1000 * 60 * 5, // 5 minutes
     refetchOnWindowFocus: false,
+    placeholderData: keepPreviousData,
   });
 }

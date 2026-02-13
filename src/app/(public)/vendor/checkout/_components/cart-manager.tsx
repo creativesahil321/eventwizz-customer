@@ -19,6 +19,7 @@ import {
   getAvailableDates,
   calculatePaymentAmounts,
   extractCurrentEventData,
+  extractEventsFromApiResponse,
 } from "../_lib/cart-calculations";
 import { CART_METADATA_KEYS_SET } from "@/lib/constants/cart-meta-keys";
 
@@ -49,7 +50,7 @@ export default function CartManager({}: CartManagerProps) {
     isFetching: isFetchingCartData,
     error: cartError,
   } = useGetCartData(
-    session?.user?.account_type === "customer" && !isPreviewMode
+    session?.user?.account_type === "customer" && !isPreviewMode,
   );
 
   // Edit store for temporary state
@@ -85,14 +86,14 @@ export default function CartManager({}: CartManagerProps) {
   // Generate event booking URL (with #booking hash anchor)
   const eventDetailsUrl = useMemo(
     () => generateEventBookingUrl(locationSlug, currentEventSlug),
-    [locationSlug, currentEventSlug]
+    [locationSlug, currentEventSlug],
   );
 
   // 🍷 DRINK CLEANUP: Set current event and auto-clear drinks if switching events
   useEffect(() => {
     if (currentEventSlug) {
       console.log(
-        `🍷 Setting current event in drink store: ${currentEventSlug}`
+        `🍷 Setting current event in drink store: ${currentEventSlug}`,
       );
       setCurrentEvent(currentEventSlug);
     }
@@ -118,7 +119,7 @@ export default function CartManager({}: CartManagerProps) {
     syncCart(currentEventSlug).then((wasCleared) => {
       if (wasCleared) {
         console.log(
-          "🔄 Cart data was cleared due to mismatches, reinitializing..."
+          "🔄 Cart data was cleared due to mismatches, reinitializing...",
         );
         // Cart was cleared, reinitialize from API
         setTimeout(() => {
@@ -130,20 +131,27 @@ export default function CartManager({}: CartManagerProps) {
     });
   }, [currentEventSlug, currentEventApiData, syncCart, initializeFromAPI]);
 
-  // Initialize and sync edit store when API data loads
+  // 🔄 SYNC FIX: Enhanced cart synchronization with stale data cleanup
   useEffect(() => {
-    if (!currentEventSlug || !currentEventApiData) return;
+    if (!currentEventSlug) return;
 
     // Get current editing data from store to avoid dependency issues
     const currentEditingData = useCartEditStore.getState().editingData;
 
-    // Handle case where API data is completely removed (empty cart)
-    if (!currentEventApiData && currentEditingData[currentEventSlug]) {
-      console.log(
-        "🗑️ API data removed, clearing Zustand store for",
-        currentEventSlug
-      );
-      removeAllDates(currentEventSlug);
+    // ⚠️ CRITICAL FIX: If API data is completely empty, clear ALL Zustand data
+    if (!currentEventApiData || Object.keys(currentEventApiData).length === 0) {
+      // Check if we have any stale Zustand data
+      const hasStaleZustandData = Object.keys(currentEditingData).length > 0;
+
+      if (hasStaleZustandData) {
+        console.warn(
+          "🚨 API cart is empty but Zustand has stale data. Clearing all Zustand cart data...",
+        );
+        clearAllCarts(); // Clear ALL events, not just current one
+        return;
+      }
+
+      console.log("✅ Cart is empty (both API and Zustand)");
       return;
     }
 
@@ -155,12 +163,12 @@ export default function CartManager({}: CartManagerProps) {
       // If data exists, sync any new dates that might have been added
       const newDates = getNewDatesFromAPI(
         currentEventSlug,
-        currentEventApiData
+        currentEventApiData,
       );
       if (newDates.length > 0) {
         console.log(
           `🔄 Found ${newDates.length} new date(s) to sync:`,
-          newDates
+          newDates,
         );
         syncNewDatesFromAPI(currentEventSlug, currentEventApiData);
       } else {
@@ -169,31 +177,53 @@ export default function CartManager({}: CartManagerProps) {
 
       // Check for removed dates that need to be cleaned up from Zustand
       const apiDates = Object.keys(currentEventApiData).filter(
-        (key) => !CART_METADATA_KEYS_SET.has(key)
+        (key) => !CART_METADATA_KEYS_SET.has(key),
       );
       const zustandDates = Object.keys(currentEditingData[currentEventSlug]);
       const removedDates = zustandDates.filter(
-        (date) => !apiDates.includes(date)
+        (date) => !apiDates.includes(date),
       );
 
       if (removedDates.length > 0) {
         console.log(
           `🗑️ Found ${removedDates.length} removed date(s) to clean up:`,
-          removedDates
+          removedDates,
         );
         removedDates.forEach((date) => {
           removeDate(currentEventSlug, date);
         });
       }
     }
+
+    // 🧹 CLEANUP: Check for stale events in Zustand that don't exist in API
+    const allApiEventSlugs = extractEventsFromApiResponse(apiCartData).map(
+      (e) => e.event_slug,
+    );
+    const allZustandEventSlugs = Object.keys(currentEditingData);
+    const staleEventSlugs = allZustandEventSlugs.filter(
+      (slug) => !allApiEventSlugs.includes(slug),
+    );
+
+    if (staleEventSlugs.length > 0) {
+      console.warn(
+        `🗑️ Found ${staleEventSlugs.length} stale event(s) in Zustand:`,
+        staleEventSlugs,
+      );
+      staleEventSlugs.forEach((slug) => {
+        console.log(`🗑️ Removing stale event: ${slug}`);
+        removeAllDates(slug);
+      });
+    }
   }, [
     currentEventApiData,
     currentEventSlug,
+    apiCartData,
     initializeFromAPI,
     syncNewDatesFromAPI,
     getNewDatesFromAPI,
     removeAllDates,
     removeDate,
+    clearAllCarts,
     // Removed editingData from dependencies to prevent infinite loop
   ]);
 
@@ -257,7 +287,7 @@ export default function CartManager({}: CartManagerProps) {
       currentEventApiData,
       initializedPaymentTypes,
       currentEventSlug ?? undefined,
-      getDateData
+      getDateData,
     );
   }, [
     currentEventApiData,
@@ -322,8 +352,6 @@ export default function CartManager({}: CartManagerProps) {
 
       // Reset expanded dates
       setExpandedDates(new Set());
-
-      toast.success("Cart cleared successfully!");
     } catch (error) {
       console.error("Error clearing cart:", error);
     } finally {

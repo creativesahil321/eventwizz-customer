@@ -4,7 +4,7 @@ import { ShoppingCart } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { useGetCartData } from "@/services/customer/cart/query";
 import { extractEventsFromApiResponse } from "@/app/(public)/vendor/checkout/_lib/cart-calculations";
-import { useMemo } from "react";
+import { useMemo, useEffect } from "react";
 import Link from "next/link";
 import { ApiEventCartData } from "@/lib/types/cart.types";
 import { useIsPreviewMode } from "@/contexts/preview-context";
@@ -16,6 +16,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { detectAndFixStaleZustand } from "@/lib/utils/cart-sync-helper";
 
 interface CartButtonProps {
   className?: string;
@@ -37,49 +38,28 @@ export default function CartButton({
   // Get editing state from Zustand store
   const { editingData } = useCartEditStore();
 
+  // 🔄 SYNC FIX: Detect and fix stale Zustand data on component mount
+  useEffect(() => {
+    if (!isLoading && apiCartData) {
+      const wasFixed = detectAndFixStaleZustand(apiCartData);
+      if (wasFixed) {
+        console.log("🎉 Stale cart data cleaned up successfully");
+      }
+    }
+  }, [apiCartData, isLoading]);
+
   // Calculate total dates across all events (instead of total items)
+  // 🔄 SYNC FIX: Always prioritize API data as source of truth, then validate against Zustand
   const cartSummary = useMemo(() => {
-    // First check if we have editing data (local state) - this takes priority
-    let totalDatesFromEditing = 0;
-    let totalEventsFromEditing = 0;
-
-    if (editingData && Object.keys(editingData).length > 0) {
-      Object.values(editingData).forEach((eventData) => {
-        // Simply count all dates in this event (no heavy calculations)
-        const dateCount = Object.keys(eventData).length;
-        if (dateCount > 0) {
-          totalDatesFromEditing += dateCount;
-          totalEventsFromEditing++;
-        }
-      });
-    }
-
-    // If we have editing data with items, use that (local changes take priority)
-    if (totalDatesFromEditing > 0) {
-      console.log("🛒 Cart Button: Using editing data", {
-        totalDatesFromEditing,
-        totalEventsFromEditing,
-        editingDataKeys: Object.keys(editingData),
-      });
-      return {
-        totalDates: totalDatesFromEditing,
-        totalEvents: totalEventsFromEditing,
-        hasItems: true,
-      };
-    }
-
-    // Otherwise, fall back to API data
-    if (!apiCartData || isLoading) {
-      console.log("🛒 Cart Button: No data available", {
-        apiCartData: !!apiCartData,
-        isLoading,
-      });
+    // Step 1: Get API data (source of truth)
+    if (isLoading) {
+      console.log("🛒 Cart Button: Loading...");
       return { totalDates: 0, totalEvents: 0, hasItems: false };
     }
 
     const eventsArray = extractEventsFromApiResponse(apiCartData);
-    let totalDates = 0;
-    let totalEvents = 0;
+    let totalDatesFromAPI = 0;
+    let totalEventsFromAPI = 0;
 
     eventsArray.forEach((event: ApiEventCartData) => {
       // Get all date keys (excluding metadata keys)
@@ -97,21 +77,56 @@ export default function CartButton({
 
       // Simply count all date keys (no heavy calculations)
       if (dateKeys.length > 0) {
-        totalDates += dateKeys.length;
-        totalEvents++;
+        totalDatesFromAPI += dateKeys.length;
+        totalEventsFromAPI++;
       }
     });
 
-    console.log("🛒 Cart Button: Using API data", {
-      totalDates,
-      totalEvents,
-      apiDataKeys: Object.keys(apiCartData || {}),
+    // Step 2: Check Zustand for unsaved changes (overlay on top of API data)
+    let totalDatesFromEditing = 0;
+    let totalEventsFromEditing = 0;
+
+    if (editingData && Object.keys(editingData).length > 0) {
+      Object.values(editingData).forEach((eventData) => {
+        // Simply count all dates in this event (no heavy calculations)
+        const dateCount = Object.keys(eventData).length;
+        if (dateCount > 0) {
+          totalDatesFromEditing += dateCount;
+          totalEventsFromEditing++;
+        }
+      });
+    }
+
+    // Step 3: Use API data as base, but show editing data if it has MORE dates (unsaved additions)
+    // This ensures the badge is accurate with the backend state
+    const finalTotalDates = Math.max(totalDatesFromAPI, totalDatesFromEditing);
+    const finalTotalEvents = Math.max(totalEventsFromAPI, totalEventsFromEditing);
+
+    console.log("🛒 Cart Button Sync:", {
+      apiDates: totalDatesFromAPI,
+      zustandDates: totalDatesFromEditing,
+      finalDates: finalTotalDates,
+      apiEvents: totalEventsFromAPI,
+      zustandEvents: totalEventsFromEditing,
     });
 
+    // ⚠️ CRITICAL FIX: If API is empty but Zustand has data, Zustand is stale
+    if (totalDatesFromAPI === 0 && totalDatesFromEditing > 0) {
+      console.warn(
+        "🚨 Zustand cart is stale! API is empty but Zustand has data. This will be cleared on next cart sync."
+      );
+      // Return API state (empty) as source of truth
+      return {
+        totalDates: 0,
+        totalEvents: 0,
+        hasItems: false,
+      };
+    }
+
     return {
-      totalDates,
-      totalEvents,
-      hasItems: totalDates > 0,
+      totalDates: finalTotalDates,
+      totalEvents: finalTotalEvents,
+      hasItems: finalTotalDates > 0,
     };
   }, [apiCartData, isLoading, editingData]);
 

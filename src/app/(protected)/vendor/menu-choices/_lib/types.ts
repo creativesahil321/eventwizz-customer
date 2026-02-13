@@ -33,7 +33,7 @@ export interface AttendeeMenuSelection {
   booking_id: number;
   date_key: string;
   table_id: string;
-  title: string;
+  title?: string;
   fullName: string;
   // Dynamic menu selections: key is category title, value is item ID
   menuSelections: Record<string, string>;

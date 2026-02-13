@@ -1,6 +1,6 @@
 "use client";
 
-import { useInfiniteQuery } from "@tanstack/react-query";
+import { useInfiniteQuery, keepPreviousData } from "@tanstack/react-query";
 import { eventsService } from "@/services/vendor/events/events.service";
 import { useSession } from "next-auth/react";
 
@@ -140,5 +140,6 @@ export function useEventOverviewInfinite({
     enabled: enabledProp !== false && !!session?.user?.token && !!eventId,
     staleTime: 1000 * 60 * 5, // 5 minutes
     refetchOnWindowFocus: false,
+    placeholderData: keepPreviousData,
   });
 }

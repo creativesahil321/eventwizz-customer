@@ -13,6 +13,7 @@ import {
   Ticket,
   GlassWater,
   Loader2,
+  X,
 } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -48,12 +49,14 @@ export default function EventOverviewClient({
   const {
     data: allDataResponse,
     isLoading: allDataLoading,
+    isFetching: allDataFetching,
     isError: allDataError,
   } = useEventOverview({
     eventId,
     dateStatus: "all",
     page: 1,
     perPage: 1000,
+    dateFilter: dateFilter || undefined,
   });
 
   // Infinite scroll only for "available" and "sold_out" tabs (avoids duplicate overview request when on "all")
@@ -101,6 +104,17 @@ export default function EventOverviewClient({
   }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
 
   const isAllTab = selectedTab === "all";
+  // Only show "Refreshing" overlay after a short delay to avoid flashing on date/tab change
+  const isRefetching = isAllTab ? allDataFetching : isFetching;
+  const [showRefreshOverlay, setShowRefreshOverlay] = useState(false);
+  useEffect(() => {
+    if (!isRefetching) {
+      setShowRefreshOverlay(false);
+      return;
+    }
+    const timer = window.setTimeout(() => setShowRefreshOverlay(true), 400);
+    return () => window.clearTimeout(timer);
+  }, [isRefetching]);
   const showSkeleton =
     (isAllTab && allDataLoading && !allDataResponse) ||
     (!isAllTab && infiniteLoading && !infiniteData);
@@ -209,8 +223,8 @@ export default function EventOverviewClient({
 
   return (
     <div className="space-y-6 relative">
-      {/* Subtle loading overlay for tab/filter changes (not initial load) */}
-      {isFetching && !infiniteLoading && !isFetchingNextPage && (
+      {/* Subtle loading overlay for tab/filter changes, only after short delay to avoid flash */}
+      {showRefreshOverlay && (
         <div className="absolute inset-0 bg-background/50 backdrop-blur-sm z-50 flex items-center justify-center rounded-lg pointer-events-none opacity-0 animate-[fadeIn_0.2s_ease-out_forwards]">
           <div className="flex items-center gap-2.5 text-sm text-foreground bg-background/95 px-5 py-2.5 rounded-lg shadow-lg border border-border">
             <Loader2 className="h-4 w-4 animate-spin text-primary" />
@@ -295,14 +309,28 @@ export default function EventOverviewClient({
                 View and manage all table bookings for this event
               </p>
             </div>
-            <div className="w-full md:w-[180px]">
+            <div className="flex items-center gap-2 w-full md:w-auto">
               <Input
                 type="date"
                 value={dateFilter}
                 onChange={(e) => handleDateFilterChange(e.target.value)}
-                className="w-full"
-                disabled={isFetching}
+                className="w-full md:w-[180px]"
               />
+              {dateFilter ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setDateFilter("");
+                    window.scrollTo({ top: 0, behavior: "smooth" });
+                  }}
+                  className="shrink-0"
+                >
+                  <X className="h-4 w-4 mr-1.5" />
+                  Reset filter
+                </Button>
+              ) : null}
             </div>
           </div>
         </CardHeader>
