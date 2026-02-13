@@ -11,7 +11,6 @@ import {
   useDeleteCartDate,
   useClearAllCart,
 } from "@/services/customer/cart/query";
-import { toast } from "sonner";
 import { useIsPreviewMode } from "@/contexts/preview-context";
 import { useSession } from "next-auth/react";
 import { ANIMATION_VARIANTS } from "../_lib/constants";
@@ -323,8 +322,6 @@ export default function CartManager({}: CartManagerProps) {
         removeDate(currentEventSlug, date);
       }
 
-      toast.success(`Removed items for ${date}`);
-
       // Update expanded dates
       setExpandedDates((prev) => {
         const newSet = new Set(prev);
@@ -333,7 +330,6 @@ export default function CartManager({}: CartManagerProps) {
       });
     } catch (error) {
       console.error("Error removing date:", error);
-      toast.error("Failed to remove date. Please try again.");
     } finally {
       setIsProcessing(false);
     }
@@ -359,8 +355,9 @@ export default function CartManager({}: CartManagerProps) {
     }
   };
 
-  // Show loading state with professional skeleton (initial load or refetching)
-  if (isLoadingCartData) {
+  // Show skeleton only on initial load (no data yet). Keep current UI during background refetch (e.g. after autosave).
+  const isInitialLoad = isLoadingCartData && !apiCartData;
+  if (isInitialLoad) {
     return <CartSkeletonLoader />;
   }
 

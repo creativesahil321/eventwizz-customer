@@ -45,7 +45,7 @@ export default function EventOverviewClient({
   // Intersection observer ref for infinite scroll
   const loadMoreRef = useRef<HTMLDivElement>(null);
 
-    // Single source for "all" tab: one request for both list and tab counts
+  // Single source for "all" tab: one request for both list and tab counts
   const {
     data: allDataResponse,
     isLoading: allDataLoading,
@@ -88,7 +88,7 @@ export default function EventOverviewClient({
       {
         threshold: 0.1, // Trigger when 10% of the element is visible
         rootMargin: "100px", // Start loading 100px before reaching the element
-      }
+      },
     );
 
     const currentRef = loadMoreRef.current;
@@ -177,12 +177,12 @@ export default function EventOverviewClient({
   const sortedTables = [...tableData].sort(
     (
       a: EventOverviewResponse["data"][0],
-      b: EventOverviewResponse["data"][0]
+      b: EventOverviewResponse["data"][0],
     ) => {
       const dateA = new Date(a.eventDate.split("-").reverse().join("-"));
       const dateB = new Date(b.eventDate.split("-").reverse().join("-"));
       return dateA.getTime() - dateB.getTime();
-    }
+    },
   );
 
   // Calculate accurate tab counts using "all" data
@@ -202,7 +202,7 @@ export default function EventOverviewClient({
   const soldOutCount =
     allDataForCounts.length > 0
       ? allDataForCounts.filter(
-          (t: EventOverviewResponse["data"][0]) => t.soldOut
+          (t: EventOverviewResponse["data"][0]) => t.soldOut,
         ).length
       : tableData.filter((t: EventOverviewResponse["data"][0]) => t.soldOut)
           .length;
@@ -210,7 +210,7 @@ export default function EventOverviewClient({
   const availableCount =
     allDataForCounts.length > 0
       ? allDataForCounts.filter(
-          (t: EventOverviewResponse["data"][0]) => !t.soldOut
+          (t: EventOverviewResponse["data"][0]) => !t.soldOut,
         ).length
       : tableData.filter((t: EventOverviewResponse["data"][0]) => !t.soldOut)
           .length;
@@ -328,7 +328,7 @@ export default function EventOverviewClient({
                   className="shrink-0"
                 >
                   <X className="h-4 w-4 mr-1.5" />
-                  Reset filter
+                  Reset
                 </Button>
               ) : null}
             </div>
@@ -363,17 +363,17 @@ export default function EventOverviewClient({
                       selectedTab === "sold_out"
                         ? "No Sold Out Dates"
                         : selectedTab === "available"
-                        ? "No Available Dates"
-                        : "No Dates Found"
+                          ? "No Available Dates"
+                          : "No Dates Found"
                     }
                     description={
                       dateFilter
                         ? "No booking dates found matching the selected date."
                         : selectedTab === "sold_out"
-                        ? "There are no sold out booking dates for this event."
-                        : selectedTab === "available"
-                        ? "There are no available booking dates for this event."
-                        : "No booking dates found for this event."
+                          ? "There are no sold out booking dates for this event."
+                          : selectedTab === "available"
+                            ? "There are no available booking dates for this event."
+                            : "No booking dates found for this event."
                     }
                   />
                 </div>
@@ -388,7 +388,7 @@ export default function EventOverviewClient({
                       style={{
                         animation: `fadeInUp 0.4s ease-out ${Math.min(
                           index * 50,
-                          300
+                          300,
                         )}ms both`,
                       }}
                     >
@@ -425,14 +425,14 @@ export default function EventOverviewClient({
                                 </p>
                                 <div className="space-y-0.5 max-h-32 overflow-y-auto">
                                   {table.tables.filter(
-                                    (t: TableConfig) => t.count > 0
+                                    (t: TableConfig) => t.count > 0,
                                   ).length > 0 ? (
                                     table.tables
                                       .filter((t: TableConfig) => t.count > 0)
                                       .map(
                                         (
                                           tableConfig: TableConfig,
-                                          idx: number
+                                          idx: number,
                                         ) => (
                                           <p key={idx} className="text-sm">
                                             <span className="font-semibold">
@@ -443,7 +443,7 @@ export default function EventOverviewClient({
                                               ({tableConfig.price})
                                             </span>
                                           </p>
-                                        )
+                                        ),
                                       )
                                   ) : (
                                     <p className="text-sm text-muted-foreground">
@@ -506,7 +506,7 @@ export default function EventOverviewClient({
                                         .map(
                                           (
                                             tableConfig: TableConfig,
-                                            idx: number
+                                            idx: number,
                                           ) => {
                                             const left =
                                               tableConfig.total -
@@ -514,7 +514,7 @@ export default function EventOverviewClient({
                                             const percentBooked = Math.round(
                                               (tableConfig.sold /
                                                 tableConfig.total) *
-                                                100
+                                                100,
                                             );
                                             const isFullyBooked = left === 0;
                                             const isLowAvailability =
@@ -527,8 +527,8 @@ export default function EventOverviewClient({
                                                   isFullyBooked
                                                     ? "bg-red-50 border-red-200"
                                                     : isLowAvailability
-                                                    ? "bg-amber-50 border-amber-200"
-                                                    : "bg-green-50 border-green-200"
+                                                      ? "bg-amber-50 border-amber-200"
+                                                      : "bg-green-50 border-green-200"
                                                 }`}
                                               >
                                                 {/* Table type header */}
@@ -572,8 +572,8 @@ export default function EventOverviewClient({
                                                       isFullyBooked
                                                         ? "bg-red-500"
                                                         : isLowAvailability
-                                                        ? "bg-amber-500"
-                                                        : "bg-green-500"
+                                                          ? "bg-amber-500"
+                                                          : "bg-green-500"
                                                     }`}
                                                     style={{
                                                       width: `${percentBooked}%`,
@@ -582,7 +582,7 @@ export default function EventOverviewClient({
                                                 </div>
                                               </div>
                                             );
-                                          }
+                                          },
                                         )}
                                     </div>
                                   </div>
@@ -708,7 +708,7 @@ export default function EventOverviewClient({
                                 {Math.round(
                                   (table.tablesBooked /
                                     (table.tablesBooked + table.tablesLeft)) *
-                                    100
+                                    100,
                                 )}
                                 %
                               </span>
@@ -719,15 +719,15 @@ export default function EventOverviewClient({
                                   table.soldOut
                                     ? "bg-red-500"
                                     : table.tablesLeft < 5
-                                    ? "bg-amber-500"
-                                    : "bg-green-500"
+                                      ? "bg-amber-500"
+                                      : "bg-green-500"
                                 }`}
                                 style={{
                                   width: `${Math.min(
                                     (table.tablesBooked /
                                       (table.tablesBooked + table.tablesLeft)) *
                                       100,
-                                    100
+                                    100,
                                   )}%`,
                                 }}
                               />

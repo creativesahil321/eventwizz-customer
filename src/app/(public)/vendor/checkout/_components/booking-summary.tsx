@@ -289,8 +289,9 @@ export default function BookingSummary({}: BookingSummaryProps) {
     getDateData,
   ]);
 
-  // Professional loading state with skeleton (initial load or refetching)
-  if (isLoadingCartData) {
+  // Show skeleton only on initial load (no data yet). Keep current UI during background refetch (e.g. after autosave).
+  const isInitialLoad = isLoadingCartData && !apiCartData;
+  if (isInitialLoad) {
     return <BookingSummarySkeleton />;
   }
 
