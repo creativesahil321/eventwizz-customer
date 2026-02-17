@@ -44,7 +44,7 @@ export function EmailReplyDialog({
           </Button>
         </DialogTrigger>
       ) : null}
-      <DialogContent className="border-none bg-background dark:border text-foreground max-h-[90vh] flex flex-col overflow-hidden p-0">
+      <DialogContent className="border-none bg-background dark:border text-foreground max-h-[min(90vh,calc(100vh-7rem))] flex flex-col overflow-hidden p-0">
         <DialogHeader className="shrink-0 px-6 pt-6 pb-2">
           <DialogTitle className="text-foreground">
             <span>Reply to </span>

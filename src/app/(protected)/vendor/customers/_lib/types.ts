@@ -56,7 +56,6 @@ export type DataTableRowAction<TData> = {
     | "delete"
     | "edit"
     | "mail"
-    | "login-as"
     | "restore"
     | "permanent-delete";
 };

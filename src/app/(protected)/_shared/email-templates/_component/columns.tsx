@@ -1,6 +1,11 @@
 import { ColumnDef } from "@tanstack/react-table";
 import { DataTableColumnHeader } from "@/components/data-table/data-table-column-header";
 import { Button } from "@/components/ui/button";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { SquarePen } from "lucide-react";
 import React from "react";
 import { DataTableRowAction, EmailTemplate } from "../_lib/types";
@@ -24,13 +29,31 @@ export function getColumns({
           title="Title"
         />
       ),
-      cell: ({ row }) => (
-        <span className="font-medium max-w-[180px] truncate block">
-          {row.getValue("title")}
-        </span>
-      ),
+      cell: ({ row }) => {
+        const title = row.getValue("title") as string;
+        return (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span
+                className="font-medium min-w-0 max-w-[320px] truncate block cursor-default"
+                title={title}
+              >
+                {title}
+              </span>
+            </TooltipTrigger>
+            <TooltipContent
+              side="top"
+              className="max-w-sm break-words whitespace-normal"
+            >
+              {title}
+            </TooltipContent>
+          </Tooltip>
+        );
+      },
       enableSorting: true,
       enableHiding: false,
+      size: 280,
+      minSize: 200,
     },
     {
       accessorKey: "who_received",
@@ -62,14 +85,30 @@ export function getColumns({
         />
       ),
       cell: ({ row }) => {
+        const subject = row.getValue("subject") as string;
         return (
-          <span className="font-medium max-w-[160px] truncate block hidden md:table-cell">
-            {row.getValue("subject")}
-          </span>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span
+                className="font-medium min-w-0 max-w-[320px] truncate block hidden md:table-cell cursor-default"
+                title={subject}
+              >
+                {subject}
+              </span>
+            </TooltipTrigger>
+            <TooltipContent
+              side="top"
+              className="max-w-sm break-words whitespace-normal"
+            >
+              {subject}
+            </TooltipContent>
+          </Tooltip>
         );
       },
       enableSorting: true,
       enableHiding: false,
+      size: 280,
+      minSize: 200,
       meta: {
         className: "hidden md:table-cell",
       },

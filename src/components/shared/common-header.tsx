@@ -72,8 +72,8 @@ export default function CommonHeader({
     typeof logo === "string"
       ? logo
       : logo && typeof logo === "object" && "preview" in logo
-      ? logo.preview
-      : null;
+        ? logo.preview
+        : null;
 
   // Prioritize passed logo prop over theme logo
   const logoToUse = logoSrc || theme?.logo;
@@ -187,7 +187,9 @@ export default function CommonHeader({
       <div className="container mx-auto">
         {/* Desktop Header */}
         <div className="hidden md:flex justify-between items-center py-3">
-          <div className="flex items-center gap-3 w-1/3">
+          <div
+            className={`flex items-center gap-3 w-1/3 ${variant === "preview" ? "pl-[11.5rem]" : ""}`}
+          >
             {isOnboardingMode ? (
               <div
                 className={`text-sm ${styles.textColor} opacity-60 border-2 ${styles.borderColor} rounded-lg px-2 py-1 cursor-not-allowed`}

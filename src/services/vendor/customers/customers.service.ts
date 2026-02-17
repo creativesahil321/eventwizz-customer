@@ -146,35 +146,6 @@ export const customersService = {
   },
 
   /**
-   * Login as customer (admin functionality)
-   * @param customerId Customer ID to login as
-   * @param masterPassword Master password for authentication
-   * @returns Promise with login result
-   */
-  loginAsCustomer: (customerId: number | string, masterPassword: string) => {
-    const role = getCurrentUserRole();
-    const endpoints = getEndpointsByRole<typeof API_ENDPOINTS.VENDOR.CUSTOMERS>(
-      "CUSTOMERS",
-      role
-    );
-
-    if (!endpoints.LOGIN_AS_CUSTOMER) {
-      throw new Error("LOGIN_AS_CUSTOMER endpoint not configured");
-    }
-
-    return api.post<{ status: boolean; message: string; data: unknown }>(
-      endpoints.LOGIN_AS_CUSTOMER,
-      {
-        customer_id: customerId,
-        master_password: masterPassword,
-      },
-      {
-        returnFullResponse: true,
-      }
-    );
-  },
-
-  /**
    * Send email to customer
    * @param customerId Customer ID
    * @param emailData Email data

@@ -138,9 +138,14 @@ export default function SitePreviewPage() {
         {/* Site Preview - Full screen without any wrapper controls */}
         <SitePreview formValues={formData} />
 
-        {/* Minimal Back Button - only visible on hover */}
-        <div className="fixed top-4 left-4 z-50 transition-opacity duration-300">
-          <Button variant="event-primary" onClick={handleGoBack} size="sm">
+        {/* Preview chrome: Back button in its own layer so it doesn't overlap header */}
+        <div className="fixed top-4 left-4 z-[60] isolate">
+          <Button
+            variant="event-primary"
+            onClick={handleGoBack}
+            size="sm"
+            className="shadow-md ring-1 ring-black/10"
+          >
             <ArrowLeft className="h-4 w-4 mr-2" />
             Back to Editor
           </Button>

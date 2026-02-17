@@ -2,7 +2,7 @@
 
 import React, { useState, useCallback } from "react";
 import { Button } from "@/components/ui/button";
-import { Search, Download, Loader2, RotateCcw } from "lucide-react";
+import { Search, Download, Loader2, RotateCcw, Calendar } from "lucide-react";
 import { Shell } from "@/components/shell";
 import { SearchParams } from "./_lib/types";
 import { Input } from "@/components/ui/input";
@@ -68,15 +68,15 @@ export default function TransactionsPage() {
   };
 
   return (
-    <section className="page text-black min-w-0">
-      <Shell className="gap-2">
-        <div className="flex flex-col gap-4 min-w-0">
+    <section className="page text-black min-w-0 max-w-full overflow-x-hidden">
+      <Shell className="gap-2 overflow-x-hidden">
+        <div className="flex flex-col gap-4 min-w-0 max-w-full">
           {/* Header Section */}
-          <div className="bg-white rounded-lg border border-[var(--color-border)] shadow-md p-6 mb-4 min-w-0">
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center flex-wrap gap-4">
+          <div className="bg-white rounded-lg border border-[var(--color-border)] shadow-md p-4 sm:p-6 mb-4 min-w-0 max-w-full overflow-hidden">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center flex-wrap gap-4 min-w-0">
               {/* Title and Earnings */}
-              <div>
-                <h1 className="text-2xl title-header font-bold text-black flex items-center gap-2">
+              <div className="min-w-0">
+                <h1 className="text-xl sm:text-2xl title-header font-bold text-black flex items-center gap-2 break-words">
                   Transaction History
                   {isFetching && (
                     <Loader2 className="h-5 w-5 animate-spin text-primary" />
@@ -98,22 +98,24 @@ export default function TransactionsPage() {
               </div>
 
               {/* Filters Section */}
-              <div className="flex flex-col sm:flex-row gap-3 items-center w-full sm:w-auto">
-                <div className="flex flex-1 gap-3 items-center w-full sm:w-auto">
+              <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center w-full min-w-0 sm:w-auto max-w-full">
+                <div className="flex flex-col sm:flex-row flex-1 gap-3 items-stretch sm:items-center w-full min-w-0 sm:w-auto flex-wrap">
                   {/* Booking Date */}
-                  <div className="flex flex-col gap-1.5">
-                    <div className="relative w-full sm:w-[180px]">
+                  <div className="flex flex-col gap-1.5 min-w-0 max-w-full">
+                    <div className="relative w-full max-w-full min-w-0 sm:w-[180px]">
+                      <Calendar className="absolute left-3 top-1/2 z-10 h-4 w-4 -translate-y-1/2 shrink-0 text-muted-foreground pointer-events-none" />
                       <Input
                         type="date"
                         value={bookingDate}
                         onChange={(e) => setBookingDate(e.target.value)}
-                        className="w-full sm:w-[180px]"
+                        className="w-full max-w-full min-w-0 sm:w-[180px] pl-9 pr-9 box-border"
+                        style={{ maxWidth: "100%" }}
                         disabled={isFetching}
                         aria-label="Filter by booking date (dd-mm-yyyy)"
                       />
                       {!bookingDate && (
                         <span
-                          className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-500"
+                          className="pointer-events-none absolute left-9 right-9 top-1/2 -translate-y-1/2 text-sm text-gray-500 truncate sm:hidden"
                           aria-hidden
                         >
                           dd-mm-yyyy
@@ -123,13 +125,13 @@ export default function TransactionsPage() {
                   </div>
 
                   {/* Status Filter */}
-                  <div className="flex flex-col gap-1.5">
+                  <div className="flex flex-col gap-1.5 min-w-0 max-w-full">
                     <Select
                       value={statusFilter}
                       onValueChange={setStatusFilter}
                       disabled={isFetching}
                     >
-                      <SelectTrigger className="w-full sm:w-[180px]">
+                      <SelectTrigger className="w-full max-w-full min-w-0 sm:w-[180px]">
                         <SelectValue placeholder="All Status" />
                       </SelectTrigger>
                       <SelectContent>
@@ -143,14 +145,14 @@ export default function TransactionsPage() {
                   </div>
 
                   {/* Search */}
-                  <div className="flex flex-col gap-1.5">
-                    <div className="relative">
-                      <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                  <div className="flex flex-col gap-1.5 min-w-0 max-w-full">
+                    <div className="relative w-full max-w-full min-w-0">
+                      <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground shrink-0" />
                       <Input
                         placeholder="TXN ID / Booking Num..."
                         value={globalFilterValue}
                         onChange={(e) => setGlobalFilterValue(e.target.value)}
-                        className="pl-8 w-full sm:w-[220px]"
+                        className="pl-8 w-full max-w-full min-w-0 sm:w-[220px]"
                       />
                     </div>
                   </div>

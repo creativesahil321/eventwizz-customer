@@ -8,7 +8,7 @@ export default function SiteEssentialsPage() {
   const { isLoading } = useSiteEssentials();
 
   return (
-    <div className="px-2 sm:px-4">
+    <div className="px-4 sm:px-6 max-w-full overflow-x-hidden">
       {isLoading ? (
         <SiteEssentialsFormSkeleton />
       ) : (

@@ -111,17 +111,17 @@ export default function EventCard({
             {event.image ? (
               <div className="relative w-full aspect-[4/3] overflow-hidden rounded-md rounded-bl-none rounded-br-none group">
                 <img
-                  src={addCacheBusting(event.image, event.updated_at)}
+                  src={addCacheBusting(event.image, event.updated_at?.toString() || null)}
                   alt={event.name}
                   className="absolute inset-0 w-full h-full object-cover"
                 />
-                {/* Overview Button - Top Right */}
+                {/* Overview Button - Top Right (always visible, not hover-only) */}
                 {!selectionMode && (
                   <Button
                     size="sm"
                     variant="secondary"
                     onClick={handleOverviewClick}
-                    className="absolute top-2 right-2 z-10 bg-white/90 hover:bg-white text-black shadow-lg backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-opacity duration-200 h-8 px-3 text-xs font-medium"
+                    className="absolute top-2 right-2 z-10 bg-white/90 hover:bg-white text-black shadow-lg backdrop-blur-sm h-8 px-3 text-xs font-medium"
                   >
                     <Eye className="w-3.5 h-3.5 mr-1.5" />
                     View Stats

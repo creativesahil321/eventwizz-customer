@@ -67,7 +67,7 @@ export default function StaffManagement({
   // State for delete confirmation
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [staffToDelete, setStaffToDelete] = useState<StaffMemberType | null>(
-    null
+    null,
   );
   // Track staff IDs being updated
   const [updatingStaffIds, setUpdatingStaffIds] = useState<number[]>([]);
@@ -128,7 +128,7 @@ export default function StaffManagement({
           // Remove this staff ID from the updating list on error
           setUpdatingStaffIds((prev) => prev.filter((id) => id !== staff.id));
         },
-      }
+      },
     );
   };
 
@@ -181,8 +181,8 @@ export default function StaffManagement({
               className="shadow-sm border border-[var(--color-border)] hover:shadow-md transition-all duration-300 bg-white flex flex-col overflow-hidden"
             >
               <CardHeader className="pb-2 flex-shrink-0">
-                <div className="flex justify-between items-start gap-3">
-                  <CardTitle className="flex items-center gap-2 relative min-w-0 flex-1 max-w-[calc(100%-120px)]">
+                <div className="flex flex-wrap justify-between items-start gap-x-3 gap-y-2">
+                  <CardTitle className="flex items-center gap-2 relative min-w-0 flex-1 max-w-full">
                     <div className="h-10 w-10 rounded-full bg-gray-200 flex items-center justify-center text-gray-500 flex-shrink-0">
                       {member.avatar ? (
                         <Image
@@ -211,32 +211,35 @@ export default function StaffManagement({
 
                   {/* Only show status toggle if user has permission to update staff */}
                   <PermissionGuard permissionKey="update-staff">
-                    <div className="flex-shrink-0">
+                    <div className="flex-shrink-0 min-w-[5.5rem]">
                       <Button
                         variant="ghost"
                         size="sm"
-                        className={`px-2 md:px-3 py-1 h-auto text-xs whitespace-nowrap ${
+                        className={`px-2 sm:px-3 py-1 h-auto text-xs whitespace-nowrap ${
                           member.status === "active"
                             ? "bg-[var(--color-primary-light)] text-[var(--color-primary)]"
                             : "bg-gray-100 text-gray-500"
                         }`}
                         onClick={() => handleToggleStatus(member)}
                         disabled={isUpdating}
+                        title={
+                          member.status === "active" ? "Active" : "Inactive"
+                        }
                       >
                         {isUpdating ? (
                           <>
-                            <Loader2 className="h-3 w-3 md:mr-1 animate-spin flex-shrink-0" />
-                            <span className="hidden md:inline">Updating</span>
+                            <Loader2 className="h-3 w-3 sm:mr-1 animate-spin flex-shrink-0" />
+                            <span>Updating</span>
                           </>
                         ) : member.status === "active" ? (
                           <>
-                            <UserCheck className="h-3 w-3 md:mr-1 flex-shrink-0" />
-                            <span className="hidden md:inline">Active</span>
+                            <UserCheck className="h-3 w-3 sm:mr-1 flex-shrink-0" />
+                            <span>Active</span>
                           </>
                         ) : (
                           <>
-                            <UserX className="h-3 w-3 md:mr-1 flex-shrink-0" />
-                            <span className="hidden md:inline">Inactive</span>
+                            <UserX className="h-3 w-3 sm:mr-1 flex-shrink-0" />
+                            <span>Inactive</span>
                           </>
                         )}
                       </Button>

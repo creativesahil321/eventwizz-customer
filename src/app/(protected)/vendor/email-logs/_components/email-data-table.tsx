@@ -87,9 +87,13 @@ function EmailLogsDataTable({ initialData, search, tableRef }: EmailLogDataTable
   }
 
   return (
-    <section className="w-full min-w-0 relative">
+    <section className="w-full max-w-full min-w-0 relative">
       <div className="w-full min-w-0 overflow-x-auto">
-        <DataTable table={table} className="min-w-0" />
+        <DataTable
+          table={table}
+          tableClassName="min-w-[700px]"
+          className="min-w-0"
+        />
       </div>
       {rowAction?.type === "resend" && (
         <ResendEmailDialog

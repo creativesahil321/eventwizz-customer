@@ -36,8 +36,13 @@ export default function AdminFooter() {
 
   // Cast to our known API structure
   const apiTheme = theme as unknown as ThemeAPIResponse;
+  // Use same logo logic as header: support /, data:, http(s), blob so Site Essentials logo shows correctly
   const logoPath =
-    theme?.logo?.startsWith("/") || theme?.logo?.startsWith("data:")
+    theme?.logo?.startsWith("/") ||
+    theme?.logo?.startsWith("data:") ||
+    theme?.logo?.startsWith("http") ||
+    theme?.logo?.startsWith("https") ||
+    theme?.logo?.startsWith("blob")
       ? theme.logo
       : "/assets/images/logos/eventwizz-logo.png";
 

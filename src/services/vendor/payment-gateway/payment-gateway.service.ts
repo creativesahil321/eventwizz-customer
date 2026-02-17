@@ -104,29 +104,42 @@ export const vendorPaymentGatewayService = {
   /**
    * Connect a payment gateway (initiates OAuth/onboarding).
    * POST /vendor/payment-gateway/connect
-   * Payload: { payment_gateway } and optionally { replace_id } when replacing an existing account.
-   * For a new account, omit replace_id.
+   * Payload: { payment_gateway, source, replace_id (optional) }
+   * @param gateway Payment gateway to connect
+   * @param source Where the connection is initiated from ("settings" or "onboarding")
+   * @param replaceId Optional ID of existing account to replace
    */
   connectPaymentGateway: async (
     gateway: "truelayer" | "stripe" | "paypal" | "worldpay" | "klarna",
+    source: "settings" | "onboarding" = "settings",
     replaceId?: number
   ): Promise<{
     status: boolean;
     message: string;
     data?: {
+      status?: string;
+      charges_enabled?: boolean;
+      payouts_enabled?: boolean;
+      connection_status?: string;
+      details_submitted?: boolean;
+      stripe_account_id?: string;
       onboarding_url?: string;
       auth_url?: string;
       account_id?: string;
       gateway: string;
-      connection_status?: string;
       return_url?: string;
       refresh_url?: string;
     };
     errors: string[];
   }> => {
     try {
-      const payload: { payment_gateway: string; replace_id?: number } = {
+      const payload: {
+        payment_gateway: string;
+        source: string;
+        replace_id?: number;
+      } = {
         payment_gateway: gateway,
+        source,
       };
       if (replaceId != null) payload.replace_id = replaceId;
 
@@ -134,11 +147,16 @@ export const vendorPaymentGatewayService = {
         status: boolean;
         message: string;
         data?: {
+          status?: string;
+          charges_enabled?: boolean;
+          payouts_enabled?: boolean;
+          connection_status?: string;
+          details_submitted?: boolean;
+          stripe_account_id?: string;
           onboarding_url?: string;
           auth_url?: string;
           account_id?: string;
           gateway: string;
-          connection_status?: string;
           return_url?: string;
           refresh_url?: string;
         };
@@ -209,46 +227,51 @@ export const vendorPaymentGatewayService = {
   /**
    * Handle payment gateway return after OAuth/authorization.
    * Calls GET /vendor/payment-gateway/return/{gateway}?account={account_id}
-   * (and any other query params from the provider redirect).
    * @param gateway Payment gateway name
-   * @param returnParams Params from the return URL (e.g. account, account_id from Stripe/PayPal)
+   * @param accountId The stripe_account_id or merchant_id returned from connect
    */
   handlePaymentGatewayReturn: async (
     gateway: "stripe" | "paypal" | "truelayer" | "worldpay" | "klarna",
-    returnParams?: Record<string, string>
+    accountId: string
   ): Promise<{
-    success?: boolean;
-    status?: boolean;
+    status: boolean;
     message: string;
-    gateway?: string;
-    account_status?: string;
-    account_data?: {
-      account_id?: string;
+    data?: {
+      status?: string;
       charges_enabled?: boolean;
       payouts_enabled?: boolean;
+      connection_status?: string;
       details_submitted?: boolean;
+      stripe_account_id?: string;
+      account_id?: string;
+      merchant_id?: string;
+      connected?: boolean;
+      gateway?: string;
     };
     errors?: string[];
   }> => {
     try {
-      const accountId =
-        returnParams?.account ?? returnParams?.account_id ?? "";
       const url = API_ENDPOINTS.VENDOR.PAYMENT_GATEWAYS.RETURN_URL.replace(
         "{gateway}",
         gateway
-      )
-        .replace("{account_id}", encodeURIComponent(accountId));
+      ).replace("{account_id}", encodeURIComponent(accountId));
 
       const response = await api.get<{
         status: boolean;
         message: string;
         data?: {
+          status?: string;
+          charges_enabled?: boolean;
+          payouts_enabled?: boolean;
+          connection_status?: string;
+          details_submitted?: boolean;
+          stripe_account_id?: string;
           account_id?: string;
           merchant_id?: string;
-          connected: boolean;
-          gateway: string;
+          connected?: boolean;
+          gateway?: string;
         };
-        errors: string[];
+        errors?: string[];
       }>(url, {
         returnFullResponse: true,
       });

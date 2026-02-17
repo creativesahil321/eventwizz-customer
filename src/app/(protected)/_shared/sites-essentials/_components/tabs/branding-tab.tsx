@@ -31,10 +31,10 @@ export function BrandingTab({ shouldResetImages = false }: BrandingTabProps) {
   const [logoFiles, setLogoFiles] = useState<File[]>([]);
   const [faviconFiles, setFaviconFiles] = useState<File[]>([]);
   const [landingPageImageFiles, setLandingPageImageFiles] = useState<File[]>(
-    []
+    [],
   );
   const [landingPageVideoFiles, setLandingPageVideoFiles] = useState<File[]>(
-    []
+    [],
   );
 
   // URL strings from backend
@@ -561,7 +561,7 @@ export function BrandingTab({ shouldResetImages = false }: BrandingTabProps) {
                             value={landingPageVideoFiles}
                             onValueChange={handleLandingPageVideoChange}
                             maxFileCount={1}
-                            maxSize={100 * 1024 * 1024} // 100MB - Custom validation in handler
+                            maxSize={10 * 1024 * 1024} // 10MB for banner video
                             onRemove={handleRemoveLandingPageVideo}
                             accept={{
                               "video/mp4": [],
@@ -586,7 +586,7 @@ export function BrandingTab({ shouldResetImages = false }: BrandingTabProps) {
                                 >
                                   <source
                                     src={URL.createObjectURL(
-                                      landingPageVideoFiles[0]
+                                      landingPageVideoFiles[0],
                                     )}
                                     type="video/mp4"
                                   />

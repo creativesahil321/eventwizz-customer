@@ -3,7 +3,7 @@
 import React from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { CheckCircle2, Loader2, Power, Trash2, Plus } from "lucide-react";
+import { CheckCircle2, Loader2, Power, Trash2, Plus, RefreshCw } from "lucide-react";
 import type { PaymentGatewayAccount } from "@/services/vendor/payment-gateway/payment-gateway.service";
 
 interface MultiAccountGatewayCardProps {
@@ -16,6 +16,8 @@ interface MultiAccountGatewayCardProps {
   onEnable: (accountId: number) => void;
   onDisable: (accountId: number) => void;
   onRemove: (accountId: number) => void;
+  /** Called when user wants to complete/reconnect a pending account */
+  onReconnect?: (accountId: number) => void;
   disabled?: boolean;
   features?: string[];
   bankDetails?: {
@@ -34,6 +36,7 @@ export function MultiAccountGatewayCard({
   onEnable,
   onDisable,
   onRemove,
+  onReconnect,
   disabled = false,
   features = [],
   bankDetails,
@@ -149,57 +152,103 @@ export function MultiAccountGatewayCard({
         </div>
       )}
 
-      {/* Inactive Accounts */}
+      {/* Inactive / Pending Accounts */}
       {inactiveAccounts.length > 0 && (
         <div className="px-6 py-4 bg-gray-50">
           <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-3">
-            Inactive Accounts
+            {inactiveAccounts.some((a) => a.account_status === "pending")
+              ? "Pending & Inactive Accounts"
+              : "Inactive Accounts"}
           </p>
           <div className="space-y-2">
-            {inactiveAccounts.map((account) => (
-              <div
-                key={account.id}
-                className="flex items-center justify-between gap-4 p-3 bg-white border border-gray-200 rounded-lg"
-              >
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-1">
-                    <Badge variant="outline" className="bg-gray-100 text-gray-900">
-                      Disabled
-                    </Badge>
+            {inactiveAccounts.map((account) => {
+              const isPending = account.account_status === "pending";
+              const canReconnect = isPending && onReconnect;
+
+              return (
+                <div
+                  key={account.id}
+                  className={`flex items-center justify-between gap-4 p-3 rounded-lg border ${
+                    isPending
+                      ? "bg-amber-50 border-amber-200"
+                      : "bg-white border-gray-200"
+                  }`}
+                >
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1">
+                      {isPending ? (
+                        <Badge className="bg-amber-600 hover:bg-amber-700 text-white">
+                          Pending
+                        </Badge>
+                      ) : (
+                        <Badge variant="outline" className="bg-gray-100 text-gray-900">
+                          Disabled
+                        </Badge>
+                      )}
+                    </div>
+                    <p className="text-sm text-gray-600 font-mono truncate">
+                      {account.account_id}
+                    </p>
+                    {isPending && (
+                      <p className="text-xs text-amber-700 mt-1">
+                        Setup was interrupted — complete to start accepting payments
+                      </p>
+                    )}
                   </div>
-                  <p className="text-sm text-gray-600 font-mono truncate">
-                    {account.account_id}
-                  </p>
+                  <div className="flex items-center gap-2">
+                    {canReconnect ? (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => onReconnect(account.id)}
+                        disabled={disabled || isConnecting}
+                        className="border-amber-400 text-amber-700 hover:bg-amber-100"
+                      >
+                        {isConnecting ? (
+                          <>
+                            <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                            Reconnecting...
+                          </>
+                        ) : (
+                          <>
+                            <RefreshCw className="w-3 h-3 mr-1" />
+                            Complete Setup
+                          </>
+                        )}
+                      </Button>
+                    ) : (
+                      !isPending && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => onEnable(account.id)}
+                          disabled={disabled}
+                          className="border-blue-300 text-blue-600 hover:bg-blue-50"
+                        >
+                          <Power className="w-3 h-3 mr-1" />
+                          Enable
+                        </Button>
+                      )
+                    )}
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => onRemove(account.id)}
+                      disabled={disabled}
+                      className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => onEnable(account.id)}
-                    disabled={disabled}
-                    className="border-blue-300 text-blue-600 hover:bg-blue-50"
-                  >
-                    <Power className="w-3 h-3 mr-1" />
-                    Enable
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => onRemove(account.id)}
-                    disabled={disabled}
-                    className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </Button>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}
 
-      {/* Add Another Account */}
-      {accounts.length > 0 && (
+      {/* Add Another Account - only show when fewer than 2 accounts */}
+      {accounts.length > 0 && accounts.length < 2 && (
         <div className="px-6 py-3 bg-gray-50 border-t border-gray-200">
           <Button
             variant="ghost"

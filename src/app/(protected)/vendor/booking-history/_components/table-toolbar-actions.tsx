@@ -225,7 +225,7 @@ export function TableToolbarActions({ table }: TableToolbarActionsProps) {
                 maxLength={5000}
                 maxWords={1000}
                 showAIButton
-                className="min-h-[200px]"
+                className="min-h-[200px] max-h-[40vh] overflow-y-auto"
                 aiContext={{
                   title: "Bulk booking email",
                   description:
@@ -280,7 +280,7 @@ export function TableToolbarActions({ table }: TableToolbarActionsProps) {
                 />
                 {!exportDate && (
                   <span
-                    className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-500"
+                    className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-500 sm:hidden"
                     aria-hidden
                   >
                     dd-mm-yyyy

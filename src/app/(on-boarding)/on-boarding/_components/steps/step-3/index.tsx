@@ -813,7 +813,7 @@ export default function StepThree() {
                                     )
                                   }
                                   maxFileCount={1}
-                                  maxSize={100 * 1024 * 1024} // 100MB - Custom validation in handler
+                                  maxSize={10 * 1024 * 1024} // 10MB for banner video
                                   onRemove={() =>
                                     handleRemoveBannerVideo(field.onChange)
                                   }

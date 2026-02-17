@@ -26,8 +26,6 @@ const UpdateCustomerDialog = dynamic(
 import dynamic from "next/dynamic";
 import { useCustomers } from "../_lib/queries";
 import { DataTableFilterField } from "@/hooks/data-table/use-data-table";
-// import { TableToolbarActions } from "./table-toolbar-actions";
-import LoginAs from "./_customer-login-as";
 import { CustomersTableSkeleton } from "./skeleton-loader";
 type CustomersDataTableProps = {
   search: SearchParams;
@@ -132,17 +130,6 @@ export default function CustomerDataTable({
         <>
           <MailCustomerDialog
             open={rowAction?.type === "mail"}
-            onOpenChange={() => setRowAction(null)}
-            customer={rowAction?.row?.original ? rowAction?.row.original : null}
-            showTrigger={false}
-            onSuccess={() => rowAction?.row.toggleSelected(false)}
-          />
-        </>
-      )}
-      {rowAction?.type === "login-as" && (
-        <>
-          <LoginAs
-            open={rowAction?.type === "login-as"}
             onOpenChange={() => setRowAction(null)}
             customer={rowAction?.row?.original ? rowAction?.row.original : null}
             showTrigger={false}

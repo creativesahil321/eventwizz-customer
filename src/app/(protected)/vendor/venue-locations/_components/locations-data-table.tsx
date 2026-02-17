@@ -192,10 +192,11 @@ function VenueLocationsDataTable({
   }
 
   return (
-    <section className="w-full min-w-0 relative">
+    <section className="w-full max-w-full min-w-0 relative pb-20 sm:pb-4">
       <div className="w-full min-w-0 overflow-x-auto">
         <DataTable
           table={table}
+          tableClassName="min-w-[760px]"
           className="min-w-0"
           emptyStateRenderer={() => (
             <TableRow>

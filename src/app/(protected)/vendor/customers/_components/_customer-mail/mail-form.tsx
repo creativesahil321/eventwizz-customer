@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect } from "react";
 import { mailForm, MailFormValues } from "./schema";
 import { SubmitHandler, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -17,11 +17,12 @@ const defaultValues: Partial<MailFormValues> = {
   attachments: [],
 };
 
+export const CUSTOMER_MAIL_FORM_ID = "customer-mail-form";
+
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { PageLoader } from "@/components/ui/page-loader";
 import { useSendEmailToCustomer } from "../../_lib/queries";
 import { useState } from "react";
 import { Upload, X, Paperclip } from "lucide-react";
@@ -48,7 +49,7 @@ const FileUploadField = ({
 
       // Check file size (10MB limit per file)
       const oversizedFiles = newFiles.filter(
-        (file) => file.size > 10 * 1024 * 1024
+        (file) => file.size > 10 * 1024 * 1024,
       );
       if (oversizedFiles.length > 0) {
         toast.error("File size must be less than 10MB");
@@ -162,9 +163,11 @@ const FileUploadField = ({
 const MailForm = ({
   customer,
   onSubmitHandler,
+  onPendingChange,
 }: {
   customer: Customer;
   onSubmitHandler: () => void;
+  onPendingChange?: (isPending: boolean) => void;
 }) => {
   const sendEmailMutation = useSendEmailToCustomer();
 
@@ -172,6 +175,10 @@ const MailForm = ({
     resolver: zodResolver(mailForm),
     defaultValues,
   });
+
+  useEffect(() => {
+    onPendingChange?.(sendEmailMutation.isPending);
+  }, [sendEmailMutation.isPending, onPendingChange]);
 
   const onSubmit: SubmitHandler<MailFormValues> = async (data) => {
     sendEmailMutation.mutate(
@@ -199,79 +206,68 @@ const MailForm = ({
           console.error("Error sending email:", error);
           toast.error("Failed to send email");
         },
-      }
+      },
     );
   };
   return (
-    <>
-      <Form {...form}>
-        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8 py-6">
-          <FormField
-            control={form.control}
-            name="subject"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel className="text-left block">Subject</FormLabel>
-                <FormControl>
-                  <Input
-                    placeholder="Subject "
-                    className="text-foreground"
-                    {...field}
-                  />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-          <FormField
-            control={form.control}
-            name="message"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel className="text-left block">Mail Message</FormLabel>
-                <FormControl>
-                  <Textarea
-                    placeholder="Please enter the message"
-                    className="text-foreground bg-transparent"
-                    {...field}
-                  />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-          <FormField
-            control={form.control}
-            name="attachments"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel className="text-left block">Attachments</FormLabel>
-                <FormControl>
-                  <FileUploadField
-                    value={field.value || []}
-                    onChange={field.onChange}
-                  />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-          <section className="w-full text-right">
-            <Button
-              type="submit"
-              variant="event-primary"
-              disabled={sendEmailMutation.isPending}
-              className="space-x-2"
-            >
-              {sendEmailMutation.isPending && <PageLoader />}
-              <span>
-                {sendEmailMutation.isPending ? `Sending...` : `Send Mail`}
-              </span>
-            </Button>
-          </section>
-        </form>
-      </Form>
-    </>
+    <Form {...form}>
+      <form
+        id={CUSTOMER_MAIL_FORM_ID}
+        onSubmit={form.handleSubmit(onSubmit)}
+        className="space-y-8 py-4"
+      >
+        <FormField
+          control={form.control}
+          name="subject"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel className="text-left block">Subject</FormLabel>
+              <FormControl>
+                <Input
+                  placeholder="Subject "
+                  className="text-foreground"
+                  {...field}
+                />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        <FormField
+          control={form.control}
+          name="message"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel className="text-left block">Mail Message</FormLabel>
+              <FormControl>
+                <Textarea
+                  placeholder="Please enter the message"
+                  className="text-foreground bg-transparent"
+                  {...field}
+                />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        <FormField
+          control={form.control}
+          name="attachments"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel className="text-left block">Attachments</FormLabel>
+              <FormControl>
+                <FileUploadField
+                  value={field.value || []}
+                  onChange={field.onChange}
+                />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+      </form>
+    </Form>
   );
 };
 

@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { vendorPaymentGatewayService } from "@/services/vendor/payment-gateway/payment-gateway.service";
-import { toast } from "sonner";
 import { Loader2, CheckCircle2, AlertCircle } from "lucide-react";
 import { useSession } from "next-auth/react";
 
@@ -20,7 +19,7 @@ export default function PaymentGatewayReturnPage() {
     const handleReturn = async () => {
       // Check if this is from settings page
       const fromSettings = localStorage.getItem("settings_payment_setup");
-      
+
       // Get gateway from URL params
       const gateway = searchParams.get("gateway") as
         | "stripe"
@@ -30,7 +29,6 @@ export default function PaymentGatewayReturnPage() {
       if (!gateway) {
         setStatus("error");
         setMessage("Invalid gateway specified");
-        toast.error("Invalid gateway specified");
         setTimeout(() => {
           router.push("/vendor/settings");
         }, 2000);
@@ -38,19 +36,40 @@ export default function PaymentGatewayReturnPage() {
       }
 
       try {
-        // Collect all query parameters
-        const params: Record<string, string> = {};
-        searchParams.forEach((value, key) => {
-          if (key !== "gateway") {
-            params[key] = value;
-          }
-        });
+        // Get account ID: URL params first (Stripe/backend often append on redirect when return opens in popup), then localStorage
+        const accountFromUrl =
+          searchParams.get("account") || searchParams.get("account_id") || "";
+        let accountId = accountFromUrl;
 
-        // Call the return handler
+        if (!accountId) {
+          if (gateway === "stripe") {
+            accountId = localStorage.getItem("stripe_account_id") || "";
+          } else if (gateway === "paypal") {
+            accountId = localStorage.getItem("paypal_merchant_id") || "";
+          } else if (gateway === "truelayer") {
+            accountId = "";
+          }
+        }
+
+        if (!accountId) {
+          setStatus("error");
+          setMessage("Missing account information. Please try connecting again.");
+          // If opened as popup, close it so user isn't stuck; parent can try again
+          setTimeout(() => {
+            if (typeof window !== "undefined" && window.opener) {
+              window.close();
+            } else {
+              router.push("/vendor/settings?tab=payment-gateways");
+            }
+          }, 2000);
+          return;
+        }
+
+        // Call the return handler with the account ID
         const response =
           await vendorPaymentGatewayService.handlePaymentGatewayReturn(
             gateway,
-            params
+            accountId
           );
 
         if (response.status) {
@@ -58,7 +77,6 @@ export default function PaymentGatewayReturnPage() {
           setMessage(
             response.message || `${gateway} connected successfully!`
           );
-          toast.success(`${gateway} connected successfully!`);
 
           // Update session
           await updateSession({ has_payment_provider: true });
@@ -69,6 +87,10 @@ export default function PaymentGatewayReturnPage() {
           localStorage.setItem(`${gateway}_connection_success`, "true");
           if (gateway === "stripe") {
             localStorage.setItem("stripe_connection_success", "true");
+            localStorage.removeItem("stripe_account_id"); // Clean up after successful connection
+          }
+          if (gateway === "paypal") {
+            localStorage.removeItem("paypal_merchant_id"); // Clean up after successful connection
           }
 
           // If opened as popup from vendor settings, close window so parent stays the only window
@@ -87,10 +109,6 @@ export default function PaymentGatewayReturnPage() {
             response.message ||
               `Failed to connect ${gateway}. Please try again.`
           );
-          toast.error(
-            response.message ||
-              `Failed to connect ${gateway}. Please try again.`
-          );
 
           setTimeout(() => {
             if (typeof window !== "undefined" && window.opener) {
@@ -106,7 +124,6 @@ export default function PaymentGatewayReturnPage() {
         console.error("Return handling error:", error);
         setStatus("error");
         setMessage("An error occurred while processing your connection");
-        toast.error("An error occurred while processing your connection");
 
         setTimeout(() => {
           if (typeof window !== "undefined" && window.opener) {
@@ -145,7 +162,9 @@ export default function PaymentGatewayReturnPage() {
               </h2>
               <p className="text-gray-600">{message}</p>
               <p className="text-sm text-gray-500 mt-4">
-                Redirecting you back...
+                {typeof window !== "undefined" && window.opener
+                  ? "This window will close automatically..."
+                  : "Redirecting you back..."}
               </p>
             </>
           )}
@@ -158,7 +177,9 @@ export default function PaymentGatewayReturnPage() {
               </h2>
               <p className="text-gray-600">{message}</p>
               <p className="text-sm text-gray-500 mt-4">
-                Redirecting you back...
+                {typeof window !== "undefined" && window.opener
+                  ? "This window will close automatically..."
+                  : "Redirecting you back..."}
               </p>
             </>
           )}

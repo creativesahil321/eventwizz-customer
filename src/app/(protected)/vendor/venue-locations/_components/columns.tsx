@@ -11,8 +11,6 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
@@ -36,6 +34,7 @@ export const getColumns = ({
 }: GetColumnsOptions): ColumnDef<Location>[] => [
   {
     accessorKey: "city",
+    meta: { className: "pl-4 min-w-0" },
     header: ({ column }) => (
       <DataTableColumnHeader
         className="text-foreground"
@@ -49,7 +48,7 @@ export const getColumns = ({
         <TooltipProvider>
           <Tooltip>
             <TooltipTrigger asChild>
-              <div className="max-w-[200px] truncate" title={city}>
+              <div className="max-w-[200px] min-w-0 truncate" title={city}>
                 {city}
               </div>
             </TooltipTrigger>
@@ -64,6 +63,7 @@ export const getColumns = ({
   },
   {
     accessorKey: "address",
+    meta: { className: "min-w-0 max-w-[220px]" },
     header: "Address",
     cell: ({ row }) => {
       const address = row.original.address || "-";
@@ -71,7 +71,7 @@ export const getColumns = ({
         <TooltipProvider>
           <Tooltip>
             <TooltipTrigger asChild>
-              <div className="max-w-[200px] truncate" title={address}>
+              <div className="min-w-0 max-w-[200px] truncate" title={address}>
                 {address}
               </div>
             </TooltipTrigger>
@@ -187,22 +187,21 @@ export const getColumns = ({
   {
     id: "actions",
     header: "Actions",
+    meta: { className: "pr-4 whitespace-nowrap" },
     cell: ({ row }) => {
       return (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="event-primary" size="sm">
+            <Button variant="event-primary" size="sm" className="shrink-0">
               <span className="sr-only">Open menu</span>
-              <Settings className="h-3.5 w-3.5 text-gray-600" />
+              <Settings className="h-3.5 w-3.5 text-gray-600 shrink-0" />
               <span className="hidden sm:inline-block text-xs font-medium">
                 Actions
               </span>
-              <ChevronDown className="h-3 w-3 ml-0.5  text-[var(--color-secondary)]" />
+              <ChevronDown className="h-3 w-3 ml-0.5 shrink-0 text-[var(--color-secondary)]" />
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-[180px]">
-            <DropdownMenuLabel>Actions</DropdownMenuLabel>
-            <DropdownMenuSeparator />
             <DropdownMenuItem
               onClick={() => setRowAction({ type: "view", row })}
             >

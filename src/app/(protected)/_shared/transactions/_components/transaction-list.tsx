@@ -56,7 +56,7 @@ export function TransactionListComponent({
 
   const columns = useMemo(
     () => getTransactionColumns({ onViewDetails }),
-    [onViewDetails],
+    [onViewDetails]
   );
 
   const table = useReactTable({
@@ -100,15 +100,15 @@ export function TransactionListComponent({
               {table.getHeaderGroups().map((headerGroup) => (
                 <TableRow key={headerGroup.id} className="bg-gray-50">
                   {headerGroup.headers.map((header) => (
-                    <TableHead
-                      key={header.id}
+                    <TableHead 
+                      key={header.id} 
                       className="font-semibold text-xs sm:text-sm px-3 sm:px-4 py-2 sm:py-3 whitespace-nowrap first:pl-4"
                     >
                       {header.isPlaceholder
                         ? null
                         : flexRender(
                             header.column.columnDef.header,
-                            header.getContext(),
+                            header.getContext()
                           )}
                     </TableHead>
                   ))}
@@ -122,13 +122,13 @@ export function TransactionListComponent({
                   className="hover:bg-gray-50 transition-colors"
                 >
                   {row.getVisibleCells().map((cell) => (
-                    <TableCell
+                    <TableCell 
                       key={cell.id}
                       className="px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm first:pl-4"
                     >
                       {flexRender(
                         cell.column.columnDef.cell,
-                        cell.getContext(),
+                        cell.getContext()
                       )}
                     </TableCell>
                   ))}
@@ -175,7 +175,7 @@ export function TransactionListComponent({
                 (page) =>
                   page > 1 &&
                   page < meta.last_page &&
-                  Math.abs(page - meta.current_page) <= 1,
+                  Math.abs(page - meta.current_page) <= 1
               )
               .map((page) => (
                 <PaginationItem key={page}>

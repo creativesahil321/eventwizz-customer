@@ -124,7 +124,7 @@ export default function MailHistoryDialog({
               maxLength={5000}
               maxWords={1000}
               showAIButton
-              className="min-h-[200px]"
+              className="min-h-[200px] max-h-[40vh] overflow-y-auto"
               aiContext={{
                 title: "Booking email",
                 description:

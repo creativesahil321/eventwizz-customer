@@ -113,7 +113,7 @@ export function ChatBot() {
         <div
           className={cn(
             "fixed bottom-10 right-6 bg-white dark:bg-gray-900 rounded-xl shadow-2xl z-50 w-80 md:w-96 transition-all duration-300 overflow-hidden border border-gray-200 dark:border-gray-700",
-            isMinimized ? "h-16" : "h-[530px]"
+            isMinimized ? "h-16" : "h-[530px]",
           )}
         >
           {/* Chat header */}
@@ -160,7 +160,7 @@ export function ChatBot() {
                         "flex items-start space-x-2 min-w-0",
                         message.role === "user"
                           ? "flex-row-reverse space-x-reverse"
-                          : "flex-row"
+                          : "flex-row",
                       )}
                     >
                       <div
@@ -168,7 +168,7 @@ export function ChatBot() {
                           "flex-shrink-0 h-8 w-8 rounded-full flex items-center justify-center",
                           message.role === "assistant"
                             ? "bg-[var(--color-primary)]"
-                            : "bg-gray-200 dark:bg-gray-700"
+                            : "bg-gray-200 dark:bg-gray-700",
                         )}
                       >
                         {message.role === "assistant" ? (
@@ -182,10 +182,16 @@ export function ChatBot() {
                           "max-w-[75%] min-w-0 rounded-2xl px-4 py-2.5 shadow-sm overflow-hidden",
                           message.role === "user"
                             ? "bg-[var(--color-primary)] rounded-tr-none text-white"
-                            : "bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-tl-none border border-gray-100 dark:border-gray-600"
+                            : "bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-tl-none border border-gray-100 dark:border-gray-600",
                         )}
                       >
-                        <p className="text-sm leading-relaxed whitespace-pre-wrap break-words" style={{ wordBreak: "break-word", overflowWrap: "anywhere" }}>
+                        <p
+                          className="text-sm leading-relaxed whitespace-pre-wrap break-words"
+                          style={{
+                            wordBreak: "break-word",
+                            overflowWrap: "anywhere",
+                          }}
+                        >
                           {message.content}
                         </p>
                       </div>

@@ -437,12 +437,14 @@ export function SiteEssentialsForm() {
           </Card>
         </Tabs>
 
-        <div className="flex flex-col sm:flex-row justify-center gap-3 sm:gap-2 sm:justify-end mt-6 sticky bottom-4 z-10">
+        {/* Action buttons under the form (not sticky) */}
+        <div className="flex flex-col sm:flex-row justify-center gap-3 sm:gap-4 sm:justify-end mt-8 pt-6 pb-2 border-t border-border">
           <Button
             variant="event-primary"
             onClick={handlePreviewClick}
             type="button"
             disabled={previewLoading}
+            className="flex items-center gap-2"
           >
             {previewLoading ? (
               <Loader2 className="h-4 w-4 animate-spin" />
@@ -456,6 +458,7 @@ export function SiteEssentialsForm() {
             type="button"
             onClick={handleReset}
             disabled={previewLoading || submitting}
+            className="flex items-center gap-2"
           >
             <RotateCcw className="h-4 w-4" /> Reset
           </Button>
@@ -463,7 +466,7 @@ export function SiteEssentialsForm() {
             variant="event-primary"
             type="submit"
             disabled={submitting || isLoading || previewLoading}
-            className="flex items-center gap-2 w-full sm:w-auto py-2 min-w-[100px] shadow-md text-sm rounded-lg"
+            className="flex items-center gap-2 w-full sm:w-auto py-2 min-w-[100px] text-sm rounded-lg"
           >
             {submitting ? (
               <Loader2 className="h-4 w-4 animate-spin" />

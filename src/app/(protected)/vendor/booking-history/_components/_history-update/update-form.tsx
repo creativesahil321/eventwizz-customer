@@ -146,7 +146,7 @@ export function UpdateHistoryForm({
                       <Input type="date" {...field} />
                       {!field.value && (
                         <span
-                          className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-500"
+                          className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-500 sm:hidden"
                           aria-hidden
                         >
                           dd-mm-yyyy
@@ -371,7 +371,7 @@ export function UpdateHistoryForm({
                       <Input type="date" {...field} />
                       {!field.value && (
                         <span
-                          className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-500"
+                          className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-500 sm:hidden"
                           aria-hidden
                         >
                           dd-mm-yyyy

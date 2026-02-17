@@ -71,21 +71,19 @@ export default function AdminHeader() {
 
         {/* Auth Buttons */}
         <div className="hidden md:flex items-center space-x-4">
-          <Link href="/auth/register">
-            <Button
-              variant="event-primary"
-              size="sm"
-              className="rounded-full px-6"
-            >
-              Become a Vendor
-            </Button>
-          </Link>
-          <Link
-            href="/admin/venues"
-            className="text-sm font-medium hover:text-[color:var(--color-primary)] transition-colors"
-          >
-            Find Venues
-          </Link>
+          {!isAuthenticated && (
+            <>
+              <Link href="/auth/register">
+                <Button
+                  variant="event-primary"
+                  size="sm"
+                  className="rounded-full px-6"
+                >
+                  Become a Vendor
+                </Button>
+              </Link>
+            </>
+          )}
 
           {isAuthenticated ? (
             <Link
@@ -158,12 +156,7 @@ export default function AdminHeader() {
             >
               FAQs
             </Link>
-            <Link
-              href="/admin/venues"
-              className="text-sm font-medium hover:text-[color:var(--color-primary)] transition-colors py-2 border-b text-[color:var(--color-text)]"
-            >
-              Find Venues
-            </Link>
+
             <div className="flex flex-col space-y-2 pt-2">
               <Link href="/admin/request-demo">
                 <Button variant="event-primary" className="w-full rounded-full">

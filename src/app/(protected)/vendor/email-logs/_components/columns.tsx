@@ -95,9 +95,17 @@ export function getColumns({
       header: ({ column }) => (
         <DataTableColumnHeader column={column} title="Subject" />
       ),
-      cell: ({ row }) => (
-        <span className="font-medium">{row.getValue("subject")}</span>
-      ),
+      cell: ({ row }) => {
+        const subject = (row.getValue("subject") as string) ?? "";
+        return (
+          <span
+            className="font-medium block min-w-0 max-w-full truncate"
+            title={subject}
+          >
+            {subject}
+          </span>
+        );
+      },
       enableSorting: true,
       enableHiding: false,
       size: 350,

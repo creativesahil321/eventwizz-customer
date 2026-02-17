@@ -33,8 +33,8 @@ export default function TransactionsPage() {
     : undefined;
 
   return (
-    <section className="page overflow-x-auto">
-      <Shell className="gap-2 overflow-visible">
+    <section className="page max-w-full overflow-x-hidden">
+      <Shell className="gap-2 overflow-x-hidden">
         <TransactionsDataTable
           transactions={transactions}
           meta={formattedMeta}

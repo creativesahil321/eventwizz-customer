@@ -17,12 +17,15 @@ interface DataTableProps<TData> extends React.ComponentProps<"div"> {
   table: TanstackTable<TData>;
   floatingBar?: React.ReactNode | null;
   emptyStateRenderer?: () => React.ReactNode;
+  /** Optional class for the table element (e.g. min-w-[800px] for horizontal scroll on mobile) */
+  tableClassName?: string;
 }
 
 export function DataTable<TData>({
   table,
   floatingBar = null,
   emptyStateRenderer,
+  tableClassName,
   children,
   className,
   ...props
@@ -49,7 +52,7 @@ export function DataTable<TData>({
     >
       {children}
       <section className="overflow-x-auto rounded-md border text-black">
-        <Table className="w-full">
+        <Table className={cn("w-full", tableClassName)}>
           <TableHeader>
             {table.getHeaderGroups().map((headerGroup) => (
               <TableRow key={headerGroup.id}>

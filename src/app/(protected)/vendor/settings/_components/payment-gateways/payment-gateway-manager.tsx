@@ -179,17 +179,19 @@ export function PaymentGatewayManager() {
       toast.info("Connecting to Stripe...", { duration: 2000 });
 
       const response =
-        await vendorPaymentGatewayService.connectPaymentGateway("stripe");
+        await vendorPaymentGatewayService.connectPaymentGateway("stripe", "settings");
 
       if (!response.status) {
+        toast.error(response.message || "Failed to connect to Stripe");
         return;
       }
 
       const onboarding_url = response.data?.onboarding_url;
-      const account_id = response.data?.account_id;
+      const stripe_account_id = response.data?.stripe_account_id || response.data?.account_id;
 
-      if (onboarding_url && account_id) {
-        localStorage.setItem("stripe_account_id", account_id);
+      if (onboarding_url && stripe_account_id) {
+        // Store the stripe_account_id for the return handler
+        localStorage.setItem("stripe_account_id", stripe_account_id);
 
         const stripeWindow = window.open(
           onboarding_url,
@@ -212,6 +214,7 @@ export function PaymentGatewayManager() {
               );
               if (connectionSuccess === "true") {
                 localStorage.removeItem("stripe_connection_success");
+                localStorage.removeItem("stripe_account_id");
                 toast.success("Stripe connected successfully!", {
                   duration: 2000,
                 });
@@ -224,6 +227,7 @@ export function PaymentGatewayManager() {
                   "Stripe window closed. If you completed the setup, your account is under review.",
                   { duration: 4000 },
                 );
+                // Don't remove stripe_account_id yet - might need it for verification
                 refetch();
               }
             }
@@ -235,9 +239,11 @@ export function PaymentGatewayManager() {
         }
       } else {
         console.error("Invalid response structure:", response);
+        toast.error("Invalid response from server. Please try again.");
       }
     } catch (error) {
       console.error("Stripe connection error:", error);
+      toast.error("An error occurred while connecting to Stripe");
     } finally {
       setLoading(false);
       setConnectingGateway(null);
@@ -252,9 +258,10 @@ export function PaymentGatewayManager() {
       toast.info("Connecting to PayPal...", { duration: 2000 });
 
       const response =
-        await vendorPaymentGatewayService.connectPaymentGateway("paypal");
+        await vendorPaymentGatewayService.connectPaymentGateway("paypal", "settings");
 
       if (!response.status) {
+        toast.error(response.message || "Failed to connect to PayPal");
         return;
       }
 
@@ -285,6 +292,7 @@ export function PaymentGatewayManager() {
               );
               if (connectionSuccess === "true") {
                 localStorage.removeItem("paypal_connection_success");
+                localStorage.removeItem("paypal_merchant_id");
                 toast.success("PayPal connected successfully!", {
                   duration: 2000,
                 });
@@ -308,14 +316,233 @@ export function PaymentGatewayManager() {
         }
       } else {
         console.error("Invalid response structure:", response);
+        toast.error("Invalid response from server. Please try again.");
       }
     } catch (error) {
       console.error("PayPal connection error:", error);
+      toast.error("An error occurred while connecting to PayPal");
     } finally {
       setLoading(false);
       setConnectingGateway(null);
     }
   };
+
+  // Reconnect / Complete setup for a pending Stripe account
+  const handleStripeReconnect = useCallback(
+    async (replaceId: number) => {
+      try {
+        setLoading(true);
+        setConnectingGateway("stripe");
+        toast.info("Reconnecting to Stripe...", { duration: 2000 });
+
+        const response =
+          await vendorPaymentGatewayService.connectPaymentGateway(
+            "stripe",
+            "settings",
+            replaceId
+          );
+
+        if (!response.status) {
+          toast.error(response.message || "Failed to reconnect to Stripe");
+          return;
+        }
+
+        const onboarding_url = response.data?.onboarding_url;
+        const stripe_account_id =
+          response.data?.stripe_account_id || response.data?.account_id;
+
+        if (onboarding_url && stripe_account_id) {
+          localStorage.setItem("stripe_account_id", stripe_account_id);
+
+          const stripeWindow = window.open(
+            onboarding_url,
+            "_blank",
+            "width=800,height=800"
+          );
+
+          if (stripeWindow) {
+            toast.success(
+              "Complete your Stripe setup in the opened window.",
+              { duration: 5000 }
+            );
+
+            const checkInterval = setInterval(() => {
+              if (stripeWindow.closed) {
+                clearInterval(checkInterval);
+                const connectionSuccess = localStorage.getItem(
+                  "stripe_connection_success"
+                );
+                if (connectionSuccess === "true") {
+                  localStorage.removeItem("stripe_connection_success");
+                  localStorage.removeItem("stripe_account_id");
+                  toast.success("Stripe connected successfully!", {
+                    duration: 2000,
+                  });
+                  setTimeout(() => {
+                    refetch();
+                    updateSession({ has_payment_provider: true });
+                  }, 1000);
+                } else {
+                  toast.info(
+                    "Window closed. If you completed setup, your account may be under review.",
+                    { duration: 4000 }
+                  );
+                  refetch();
+                }
+              }
+            }, 1000);
+          } else {
+            toast.error(
+              "Pop-up blocked! Please allow pop-ups to complete Stripe setup."
+            );
+          }
+        } else {
+          toast.error("Invalid response from server. Please try again.");
+        }
+      } catch (error) {
+        console.error("Stripe reconnect error:", error);
+        toast.error("An error occurred while reconnecting to Stripe");
+      } finally {
+        setLoading(false);
+        setConnectingGateway(null);
+      }
+    },
+    [refetch, updateSession]
+  );
+
+  // Reconnect / Complete setup for a pending PayPal account
+  const handlePayPalReconnect = useCallback(
+    async (replaceId: number) => {
+      try {
+        setLoading(true);
+        setConnectingGateway("paypal");
+        toast.info("Reconnecting to PayPal...", { duration: 2000 });
+
+        const response =
+          await vendorPaymentGatewayService.connectPaymentGateway(
+            "paypal",
+            "settings",
+            replaceId
+          );
+
+        if (!response.status) {
+          toast.error(response.message || "Failed to reconnect to PayPal");
+          return;
+        }
+
+        const onboarding_url = response.data?.onboarding_url;
+        const account_id = response.data?.account_id;
+
+        if (onboarding_url && account_id) {
+          localStorage.setItem("paypal_merchant_id", account_id);
+
+          const paypalWindow = window.open(
+            onboarding_url,
+            "_blank",
+            "width=800,height=800"
+          );
+
+          if (paypalWindow) {
+            toast.success(
+              "Complete your PayPal setup in the opened window.",
+              { duration: 5000 }
+            );
+
+            const checkInterval = setInterval(() => {
+              if (paypalWindow.closed) {
+                clearInterval(checkInterval);
+                const connectionSuccess = localStorage.getItem(
+                  "paypal_connection_success"
+                );
+                if (connectionSuccess === "true") {
+                  localStorage.removeItem("paypal_connection_success");
+                  localStorage.removeItem("paypal_merchant_id");
+                  toast.success("PayPal connected successfully!", {
+                    duration: 2000,
+                  });
+                  setTimeout(() => {
+                    refetch();
+                    updateSession({ has_payment_provider: true });
+                  }, 1000);
+                } else {
+                  toast.info(
+                    "Window closed. If you completed setup, your account may be under review.",
+                    { duration: 4000 }
+                  );
+                  refetch();
+                }
+              }
+            }, 1000);
+          } else {
+            toast.error(
+              "Pop-up blocked! Please allow pop-ups to complete PayPal setup."
+            );
+          }
+        } else {
+          toast.error("Invalid response from server. Please try again.");
+        }
+      } catch (error) {
+        console.error("PayPal reconnect error:", error);
+        toast.error("An error occurred while reconnecting to PayPal");
+      } finally {
+        setLoading(false);
+        setConnectingGateway(null);
+      }
+    },
+    [refetch, updateSession]
+  );
+
+  // Reconnect / Complete setup for a pending TrueLayer account
+  const handleTrueLayerReconnect = useCallback(
+    async (replaceId: number) => {
+      try {
+        setLoading(true);
+        setConnectingGateway("truelayer");
+        const loadingToast = toast.loading("Reconnecting to TrueLayer...");
+
+        const response =
+          await vendorPaymentGatewayService.connectPaymentGateway(
+            "truelayer",
+            "settings",
+            replaceId
+          );
+
+        if (!response.status) {
+          toast.error(response.message || "Failed to reconnect to TrueLayer", {
+            id: loadingToast,
+          });
+          return;
+        }
+
+        const auth_url = response.data?.auth_url;
+
+        if (auth_url) {
+          localStorage.setItem("truelayer_connecting", "true");
+          localStorage.setItem("settings_payment_setup", "true");
+
+          toast.success("Redirecting to TrueLayer...", {
+            id: loadingToast,
+            duration: 1000,
+          });
+
+          setTimeout(() => {
+            window.location.href = auth_url;
+          }, 1000);
+        } else {
+          toast.error("Invalid response from server. Please try again.", {
+            id: loadingToast,
+          });
+        }
+      } catch (error) {
+        console.error("TrueLayer reconnect error:", error);
+        toast.error("An error occurred while reconnecting to TrueLayer");
+      } finally {
+        setLoading(false);
+        setConnectingGateway(null);
+      }
+    },
+    []
+  );
 
   // Handler for TrueLayer Connect
   const handleTrueLayerConnect = async () => {
@@ -325,9 +552,12 @@ export function PaymentGatewayManager() {
       const loadingToast = toast.loading("Connecting to TrueLayer...");
 
       const response =
-        await vendorPaymentGatewayService.connectPaymentGateway("truelayer");
+        await vendorPaymentGatewayService.connectPaymentGateway("truelayer", "settings");
 
       if (!response.status) {
+        toast.error(response.message || "Failed to connect to TrueLayer", {
+          id: loadingToast,
+        });
         return;
       }
 
@@ -347,9 +577,13 @@ export function PaymentGatewayManager() {
         }, 1000);
       } else {
         console.error("Invalid response structure:", response);
+        toast.error("Invalid response from server. Please try again.", {
+          id: loadingToast,
+        });
       }
     } catch (error) {
       console.error("TrueLayer connection error:", error);
+      toast.error("An error occurred while connecting to TrueLayer");
     } finally {
       setLoading(false);
       setConnectingGateway(null);
@@ -402,6 +636,7 @@ export function PaymentGatewayManager() {
           accounts={getGatewayAccounts("truelayer")}
           isConnecting={connectingGateway === "truelayer"}
           onConnect={handleTrueLayerConnect}
+          onReconnect={handleTrueLayerReconnect}
           onEnable={handleEnable}
           onDisable={handleDisable}
           onRemove={handleRemoveClick}
@@ -459,6 +694,7 @@ export function PaymentGatewayManager() {
             accounts={getGatewayAccounts("stripe")}
             isConnecting={connectingGateway === "stripe"}
             onConnect={handleStripeConnect}
+            onReconnect={handleStripeReconnect}
             onEnable={handleEnable}
             onDisable={handleDisable}
             onRemove={handleRemoveClick}
@@ -485,6 +721,7 @@ export function PaymentGatewayManager() {
             accounts={getGatewayAccounts("paypal")}
             isConnecting={connectingGateway === "paypal"}
             onConnect={handlePayPalConnect}
+            onReconnect={handlePayPalReconnect}
             onEnable={handleEnable}
             onDisable={handleDisable}
             onRemove={handleRemoveClick}

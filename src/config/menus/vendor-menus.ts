@@ -183,7 +183,7 @@ export const vendorMenus: MenuItemProps[] = [
   },
   {
     id: 19,
-    title: "Settings",
+    title: "Payment Settings",
     icon: "settings",
     href: createVendorUrl("/vendor/settings"),
     url: createVendorUrl("/vendor/settings"),

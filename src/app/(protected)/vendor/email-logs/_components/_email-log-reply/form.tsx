@@ -60,7 +60,10 @@ export default function MailForm({ email, onSuccess }: MailFormProp) {
   return (
     <>
       <Form {...form}>
-        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8 py-6">
+        <form
+          onSubmit={form.handleSubmit(onSubmit)}
+          className="space-y-8 py-6 pb-24"
+        >
           <FormField
             control={form.control}
             name="id"
@@ -98,7 +101,7 @@ export default function MailForm({ email, onSuccess }: MailFormProp) {
                     maxLength={5000}
                     maxWords={1000}
                     showAIButton={true}
-                    className="min-h-[200px]"
+                    className="min-h-[200px] max-h-[40vh] overflow-y-auto"
                     aiContext={{
                       title: email?.subject || "Email Reply",
                       ctaText: "Reply to the email",
@@ -110,7 +113,7 @@ export default function MailForm({ email, onSuccess }: MailFormProp) {
               </FormItem>
             )}
           />
-          <section className="w-full text-right">
+          <section className="sticky bottom-0 z-10 flex w-full justify-end pt-4 pb-2 mt-4">
             <Button
               type="submit"
               variant="event-primary"

@@ -128,16 +128,16 @@ export function TransactionsDataTable({
   }
 
   return (
-    <div className="flex w-full min-w-0 flex-col gap-2.5 overflow-auto">
-      <section className="overflow-x-auto bg-white rounded-lg border border-[var(--color-border)] shadow-sm">
-        <Table>
+    <div className="flex w-full max-w-full min-w-0 flex-col gap-2.5">
+      <section className="overflow-x-auto overflow-y-visible bg-white rounded-lg border border-[var(--color-border)] shadow-sm">
+        <Table className="min-w-[900px]">
           <TableHeader>
             {table.getHeaderGroups().map((headerGroup) => (
               <TableRow key={headerGroup.id} className="bg-gray-50">
                 {headerGroup.headers.map((header) => (
                   <TableHead
                     key={header.id}
-                    className="font-semibold py-4 px-4"
+                    className="font-semibold py-4 px-3 sm:px-4 first:pl-4 last:pr-4 whitespace-nowrap"
                   >
                     {header.isPlaceholder
                       ? null
@@ -157,7 +157,10 @@ export function TransactionsDataTable({
                 className="border-b hover:bg-slate-100 transition-colors"
               >
                 {row.getVisibleCells().map((cell) => (
-                  <TableCell key={cell.id} className="py-4 px-4">
+                  <TableCell
+                    key={cell.id}
+                    className="py-4 px-3 sm:px-4 first:pl-4 last:pr-4 whitespace-nowrap"
+                  >
                     {flexRender(cell.column.columnDef.cell, cell.getContext())}
                   </TableCell>
                 ))}

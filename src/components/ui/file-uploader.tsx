@@ -552,7 +552,9 @@ export function FileUploader(props: FileUploaderProps) {
                           }`}
                       {!isVideoUploader && autoCompress
                         ? ` (images will be automatically optimized)`
-                        : ` (up to ${formatBytes(maxSize)} each)`}
+                        : !isVideoUploader
+                          ? ` (up to ${formatBytes(maxSize)} each)`
+                          : ""}
                     </p>
                     {!isVideoUploader && (enableCropping || autoCompress) && (
                       <p className="text-xs text-blue-600 font-medium mt-1">

@@ -19,7 +19,7 @@ import {
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { X, Search, Calendar } from "lucide-react";
+import { X, Search } from "lucide-react";
 import { TransactionsTableSkeleton } from "./skeleton-loader";
 
 interface TransactionsDataTableProps {
@@ -72,9 +72,9 @@ export function TransactionsDataTable({
   }
 
   return (
-    <section className="w-full min-w-0 relative text-black pb-20 sm:pb-6">
-      <div className="min-w-0 bg-white p-4 sm:p-6 rounded-md shadow-sm">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 mb-4 sm:mb-6">
+    <section className="w-full max-w-full min-w-0 relative text-black pb-20 sm:pb-6 overflow-x-hidden">
+      <div className="min-w-0 max-w-full bg-white p-4 sm:p-6 rounded-md shadow-sm overflow-hidden">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 mb-4 sm:mb-6 min-w-0">
           <h1 className="text-xl sm:text-2xl title-header font-bold">
             Transactions
           </h1>
@@ -96,11 +96,11 @@ export function TransactionsDataTable({
           )}
         </div>
 
-        <div className="flex flex-col sm:flex-row flex-wrap gap-3 sm:gap-4 mb-4 sm:mb-6">
+        <div className="flex flex-col sm:flex-row flex-wrap gap-3 sm:gap-4 mb-4 sm:mb-6 min-w-0">
           {/* Search Input */}
-          <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 w-full sm:flex-1 sm:max-w-xs">
-            <span className="text-sm font-medium mb-1 sm:mb-0">Search</span>
-            <div className="relative w-full">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 w-full min-w-0 sm:flex-1 sm:max-w-xs">
+            <span className="text-sm font-medium mb-1 sm:mb-0 shrink-0">Search</span>
+            <div className="relative w-full min-w-0 max-w-full">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
                 type="text"
@@ -112,36 +112,35 @@ export function TransactionsDataTable({
             </div>
           </div>
 
-          {/* Date Filter - min-width so placeholder and native picker icon aren't truncated on small screens */}
-          <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 w-full sm:w-auto min-w-0">
-            <span className="text-sm font-medium mb-1 sm:mb-0 shrink-0">
-              Date
-            </span>
-            <div className="relative w-full min-w-[8.5rem] sm:w-[180px]">
-              <Calendar className="absolute left-3 top-1/2 z-10 h-4 w-4 -translate-y-1/2 shrink-0 text-muted-foreground pointer-events-none" />
-              <Input
-                type="date"
-                value={filters.payment_date || ""}
-                onChange={(e) =>
-                  onFilterChange({ payment_date: e.target.value })
-                }
-                className="pl-9 pr-9 h-9 w-full min-w-0"
-                aria-label="Filter by payment date (dd-mm-yyyy)"
-              />
-              {!filters.payment_date && (
-                <span
-                  className="pointer-events-none absolute left-9 right-9 top-1/2 z-[5] -translate-y-1/2 text-sm text-gray-500 truncate"
-                  aria-hidden
-                >
-                  dd-mm-yyyy
-                </span>
-              )}
+          {/* Date Filter - format hint when empty, hidden on sm+ to avoid overlap with browser calendar icon (same as vendor booking date filter) */}
+          <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 w-full min-w-0 sm:w-auto max-w-full">
+            <span className="text-sm font-medium mb-1 sm:mb-0 shrink-0">Date</span>
+            <div className="flex flex-col gap-1 shrink-0 w-full sm:w-[180px]">
+              <div className="relative w-full">
+                <Input
+                  type="date"
+                  value={filters.payment_date || ""}
+                  onChange={(e) =>
+                    onFilterChange({ payment_date: e.target.value })
+                  }
+                  className="w-full min-w-0 sm:w-[180px] h-9 box-border"
+                  aria-label="Filter by payment date (dd-mm-yyyy)"
+                />
+                {!filters.payment_date && (
+                  <span
+                    className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-500 sm:hidden"
+                    aria-hidden
+                  >
+                    dd-mm-yyyy
+                  </span>
+                )}
+              </div>
             </div>
           </div>
 
           {/* Status Filter */}
-          <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 w-full sm:w-auto">
-            <span className="text-sm font-medium mb-1 sm:mb-0">Status</span>
+          <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 w-full min-w-0 sm:w-auto max-w-full">
+            <span className="text-sm font-medium mb-1 sm:mb-0 shrink-0">Status</span>
             <Select
               value={filters.status || "all"}
               onValueChange={(value) =>
@@ -151,7 +150,7 @@ export function TransactionsDataTable({
                 } as Partial<TransactionFilters>)
               }
             >
-              <SelectTrigger className="w-full sm:w-[180px] h-9">
+              <SelectTrigger className="w-full max-w-full min-w-0 sm:w-[180px] h-9">
                 <SelectValue placeholder="All Status" />
               </SelectTrigger>
               <SelectContent>
@@ -165,8 +164,8 @@ export function TransactionsDataTable({
           </div>
 
           {/* Payment Method Filter */}
-          <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 w-full sm:w-auto">
-            <span className="text-sm font-medium mb-1 sm:mb-0">Method</span>
+          <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 w-full min-w-0 sm:w-auto max-w-full">
+            <span className="text-sm font-medium mb-1 sm:mb-0 shrink-0">Method</span>
             <Select
               value={filters.payment_method || "all"}
               onValueChange={(value) =>
@@ -175,7 +174,7 @@ export function TransactionsDataTable({
                 })
               }
             >
-              <SelectTrigger className="w-full sm:w-[180px] h-9">
+              <SelectTrigger className="w-full max-w-full min-w-0 sm:w-[180px] h-9">
                 <SelectValue placeholder="All Methods" />
               </SelectTrigger>
               <SelectContent>
@@ -193,7 +192,7 @@ export function TransactionsDataTable({
             <Button
               variant="event-outline"
               size="sm"
-              className="h-9 w-full sm:w-auto mt-1 sm:mt-0 sm:self-end"
+              className="h-9 w-full max-w-full sm:w-auto mt-1 sm:mt-0 sm:self-end shrink-0"
               onClick={() => {
                 setSearchInput("");
                 onFilterChange({
@@ -217,8 +216,8 @@ export function TransactionsDataTable({
           </p>
         </div>
       ) : (
-        <div className="bg-white mt-2 rounded-md shadow-sm overflow-hidden">
-          <div className="overflow-x-auto px-4 sm:px-6">
+        <div className="bg-white mt-2 rounded-md shadow-sm overflow-hidden max-w-full">
+          <div className="overflow-x-auto px-4 sm:px-6 max-w-full">
             <div className="min-w-full inline-block align-middle">
               <TransactionListComponent
                 transactions={safeTransactions}

@@ -12,6 +12,7 @@ import {
   MoreHorizontal,
   Trash2,
   RotateCcw,
+  FileDown,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -324,41 +325,58 @@ export default function CustomersPage() {
                       <SelectItem value="delete">Deleted</SelectItem>
                     </SelectContent>
                   </Select>
-                  {hasActiveFilters && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={handleResetAllFilters}
-                      disabled={isFetching}
-                      className="gap-2 shrink-0"
-                      aria-label="Reset all filters"
-                    >
-                      <RotateCcw className="h-4 w-4" />
-                      Reset all
-                    </Button>
-                  )}
                 </div>
                 <div className="flex items-center gap-2 flex-wrap">
-                  {/* Hide CSV and Bulk Mail when rows are selected to avoid confusion */}
-                  {!hasSelectedRows && (
-                    <>
+                  {/* Actions: Export, Bulk Mail, Reset - consolidated to reduce clutter */}
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
                       <Button
-                        variant="event-primary"
+                        variant="outline"
+                        size="sm"
+                        disabled={isFetching}
+                        className="gap-2"
+                        aria-label="Table actions"
+                      >
+                        <MoreHorizontal className="h-4 w-4" />
+                        Actions
+                        <ChevronDown className="h-4 w-4 opacity-50" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-52">
+                      {hasActiveFilters && (
+                        <>
+                          <DropdownMenuItem
+                            onClick={handleResetAllFilters}
+                            disabled={isFetching}
+                            className="cursor-pointer gap-2"
+                          >
+                            <RotateCcw className="h-4 w-4" />
+                            Reset filters
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                        </>
+                      )}
+                      <DropdownMenuItem
                         onClick={handleCSVExport}
                         disabled={isFetching}
+                        className="cursor-pointer gap-2"
                       >
-                        CSV
-                      </Button>
-                      <Link href="/vendor/send-email-to-all">
-                        <Button variant="outline" size="sm">
-                          <Mail className="mr-2 h-4 w-4" />
+                        <FileDown className="h-4 w-4" />
+                        Export CSV
+                      </DropdownMenuItem>
+                      <DropdownMenuItem asChild>
+                        <Link
+                          href="/vendor/send-email-to-all"
+                          className="flex items-center gap-2 cursor-pointer"
+                        >
+                          <Mail className="h-4 w-4" />
                           Bulk Mail
-                        </Button>
-                      </Link>
-                    </>
-                  )}
+                        </Link>
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
 
-                  {/* Professional Bulk Actions Dropdown - Only shows when rows are selected */}
+                  {/* Bulk Actions - only when rows are selected */}
                   {hasSelectedRows && (
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>

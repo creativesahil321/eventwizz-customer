@@ -143,23 +143,23 @@ export default function EmailLogsPage() {
   const showLoadingOverlay = isFetching && !isLoading;
 
   return (
-    <section className="page text-black min-w-0">
-      <Shell className="gap-2">
-        <div className="flex flex-col gap-4 min-w-0">
-          <div className="bg-white rounded-lg border border-[var(--color-border)] shadow-md p-6 mb-4 min-w-0">
+    <section className="page text-black min-w-0 max-w-full overflow-x-hidden pb-20 sm:pb-4">
+      <Shell className="gap-2 overflow-x-hidden">
+        <div className="flex flex-col gap-4 min-w-0 max-w-full">
+          <div className="bg-white rounded-lg border border-[var(--color-border)] shadow-md p-4 sm:p-6 mb-4 min-w-0 max-w-full overflow-hidden">
             <div className="flex flex-col gap-4">
-              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center flex-wrap gap-4">
-                <div>
-                  <h1 className="text-2xl title-header font-bold text-black">
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center flex-wrap gap-4 min-w-0">
+                <div className="min-w-0">
+                  <h1 className="text-xl sm:text-2xl title-header font-bold text-black break-words">
                     Email Logs
                   </h1>
-                  <p className="text-muted-foreground mt-2">
+                  <p className="text-muted-foreground mt-2 break-words">
                     View and manage all email logs. Search for specific emails.
                   </p>
                 </div>
-                <div className="flex flex-col sm:flex-row gap-3 items-center w-full sm:w-auto">
+                <div className="flex w-full flex-col gap-3 sm:flex-row sm:items-center sm:w-auto min-w-0 max-w-full">
                   {/* Search */}
-                  <div className="relative flex-1 sm:min-w-[240px]">
+                  <div className="relative w-full min-w-0 sm:min-w-[240px] sm:flex-1">
                     <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
                     <Input
                       placeholder="Search emails..."
@@ -174,7 +174,7 @@ export default function EmailLogsPage() {
                   </div>
 
                   {/* Date Range Picker */}
-                  <div className="w-full sm:w-auto sm:min-w-[280px] relative">
+                  <div className="w-full min-w-0 sm:w-auto sm:min-w-[280px] relative">
                     <DateRangePicker
                       date={dateRange}
                       onDateChange={setDateRange}

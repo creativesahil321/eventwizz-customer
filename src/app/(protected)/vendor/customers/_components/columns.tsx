@@ -3,13 +3,7 @@ import { Customer, DataTableRowAction } from "../_lib/types";
 import { DataTableColumnHeader } from "@/components/data-table/data-table-column-header";
 import React from "react";
 import { Button } from "@/components/ui/button";
-import {
-  Mail,
-  Pencil,
-  UserPlus,
-  UserRoundX,
-  RotateCcw,
-} from "lucide-react";
+import { Mail, Pencil, Trash2, RotateCcw } from "lucide-react";
 import { formatDate } from "@/lib/utils";
 import { createSelectColumn } from "@/components/data-table/data-table-column-select";
 
@@ -107,11 +101,19 @@ export function getColumns({
           title="Phone"
         />
       ),
-      cell: ({ row }) => (
-        <>
-          <span className="text-foreground">{row.getValue("phone")}</span>
-        </>
-      ),
+      cell: ({ row }) => {
+        const phone = row.getValue("phone") as string | null | undefined;
+        const hasPhone = phone != null && String(phone).trim() !== "";
+        return (
+          <span
+            className={
+              hasPhone ? "text-foreground" : "text-muted-foreground italic"
+            }
+          >
+            {hasPhone ? phone : "—"}
+          </span>
+        );
+      },
       enableSorting: false,
       enableHiding: false,
     },
@@ -217,13 +219,6 @@ export function getColumns({
           <>
             <nav className="flex space-x-3">
               <Button
-                onClick={() => setRowAction({ row, type: "login-as" })}
-                variant="event-outline"
-                title="Login as Customer"
-              >
-                <UserPlus size={16} />
-              </Button>
-              <Button
                 onClick={() => setRowAction({ row, type: "edit" })}
                 variant="event-outline"
                 title="Edit Customer"
@@ -242,7 +237,7 @@ export function getColumns({
                 variant="destructive"
                 title="Delete Customer"
               >
-                <UserRoundX size={16} />
+                <Trash2 size={16} />
               </Button>
             </nav>
           </>

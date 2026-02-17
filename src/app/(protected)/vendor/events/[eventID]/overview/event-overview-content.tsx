@@ -320,10 +320,10 @@ export default function EventOverviewClient({
                 />
                 {!dateFilter && (
                   <span
-                    className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-500"
-                    aria-hidden
-                  >
-                    dd-mm-yyyy
+className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-500 sm:hidden"
+                  aria-hidden
+                >
+                  dd-mm-yyyy
                   </span>
                 )}
               </div>

@@ -129,7 +129,6 @@ export const API_ENDPOINTS = {
       RESTORE: "/vendor/customers/restore/{id}",
       PERMANENT_DELETE: "/vendor/customers/permanent-delete/{id}",
       SEND_MAIL: "/vendor/customers/send-mail-to-customer",
-      LOGIN_AS_CUSTOMER: "/vendor/customers/login-as-customer",
       SEND_BULK_MAIL: "/vendor/customers/send-mail-to-all-customers",
       MULTIPLE_ACTIONS: {
         BULK_ACTIVATE: "/vendor/customers/bulk-activate",
@@ -282,7 +281,6 @@ export const API_ENDPOINTS = {
       RANKINGS: "/admin/customers/{id}/rankings",
 
       MANUALLY_ADD_COMMISSION: "/admin/customers/{id}/manual-add-commission",
-      LOGIN_AS_CUSTOMER: "/admin/customers/login-as-customer",
       ADD_OR_SUBSTRACT_MONEY: "/admin/customers/{key}/add-or-subtract-amount",
       EMAIL_TO_ALL_CUSTOMER: "/admin/customers/send-mail-to-all",
 
