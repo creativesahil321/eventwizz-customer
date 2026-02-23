@@ -79,40 +79,34 @@ function SessionValidator() {
     if (status === "loading") return; // Still loading
 
     if (status === "authenticated" && session?.user) {
-      // Sync NextAuth session to Zustand store
       setSession(session);
 
-      // Sync permissions if available
-      if (session.user.permissions !== undefined) {
-        // For customers with empty permissions, don't sync - let usePermissions fetch them
-        if (
-          session.user.permissions.length === 0 &&
-          session.user.account_type === "customer"
-        ) {
-          // Don't set permissions, let usePermissions hook handle it with delay
-        } else {
-          // For non-customers or users with existing permissions, sync immediately
-          setPermissions(session.user.permissions);
+      const isCustomer = session.user.account_type === "customer";
 
-          // Also store in localStorage for backup
-          try {
-            sessionStorage.setItem(
-              "permissions-backup",
-              JSON.stringify(session.user.permissions)
-            );
-            localStorage.setItem(
-              "permission-storage",
-              JSON.stringify({
-                state: {
-                  permissions: session.user.permissions,
-                  isLoaded: true,
-                },
-                version: 0,
-              })
-            );
-          } catch (e) {
-            console.error("Error storing permissions:", e);
-          }
+      if (isCustomer) {
+        // Customers have no roles/permissions; mark store as loaded with empty array
+        // Do NOT write permission-storage to localStorage
+        setPermissions([]);
+      } else if (
+        session.user.permissions !== undefined &&
+        Array.isArray(session.user.permissions) &&
+        session.user.permissions.length > 0
+      ) {
+        setPermissions(session.user.permissions);
+        try {
+          sessionStorage.setItem(
+            "permissions-backup",
+            JSON.stringify(session.user.permissions)
+          );
+          localStorage.setItem(
+            "permission-storage",
+            JSON.stringify({
+              state: { permissions: session.user.permissions, isLoaded: true },
+              version: 0,
+            })
+          );
+        } catch (e) {
+          console.error("Error storing permissions:", e);
         }
       }
     } else if (status === "unauthenticated") {

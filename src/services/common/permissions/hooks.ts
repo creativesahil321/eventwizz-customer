@@ -86,10 +86,12 @@ export function useLoadPermissions() {
 
   // Effect to load permissions if they're not in Zustand store
   useEffect(() => {
-    // Only try to fetch permissions if:
-    // 1. User is authenticated
-    // 2. Permissions are not already loaded
-    // 3. We haven't already attempted to fetch in this session
+    // Customers do not use permissions; mark as loaded immediately and skip API
+    if (isAuthenticated && active_role === "customer") {
+      if (!isLoaded) setPermissions([]);
+      return;
+    }
+
     if (
       isAuthenticated &&
       !isLoaded &&

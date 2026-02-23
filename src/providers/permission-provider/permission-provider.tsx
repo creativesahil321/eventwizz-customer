@@ -19,45 +19,50 @@ interface PermissionProviderProps {
  */
 export function PermissionProvider({ children }: PermissionProviderProps) {
   const { data: session, status: sessionStatus } = useSession();
-  const { setPermissions, reset, permissions } = usePermissionStore();
+  const { setPermissions, reset, permissions, isLoaded } = usePermissionStore();
   const [handled, setHandled] = useState(false);
   const prevStatusRef = useRef(sessionStatus);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const initializedRef = useRef(false);
 
-  // Use the API fallback mechanism when needed
+  // Use the API fallback mechanism when needed (only for vendor/admin)
   const { refetchPermissions } = useLoadPermissions();
 
-  // Synchronously hydrate permissions on mount
-  // This helps prevent flashing of unauthorized menu items
+  const isCustomer = session?.user?.account_type === "customer";
+
+  // Synchronously hydrate permissions on mount (skip for customers)
   useEffect(() => {
     if (!initializedRef.current) {
       initializedRef.current = true;
-      // Try to synchronously hydrate from storage
-      hydratePermissionsSync();
+      if (!isCustomer) {
+        hydratePermissionsSync();
+      }
     }
-  }, []);
+  }, [isCustomer]);
 
-  // Effect to sync permissions with session and handle backup sources
+  // Effect to sync permissions – completely skipped for customers
   useEffect(() => {
-    // Don't do anything if we're still loading
-    if (sessionStatus === "loading") {
-      return;
-    }
+    if (sessionStatus === "loading") return;
 
-    // Check if this is a transition from loading to another state
     const isInitialLoad =
       prevStatusRef.current === "loading" &&
       (sessionStatus === "authenticated" ||
         sessionStatus === "unauthenticated");
     prevStatusRef.current = sessionStatus;
 
-    // Check the current state first
+    // Customers never need permissions; mark as loaded once and bail out
+    if (sessionStatus === "authenticated" && isCustomer) {
+      if (!isLoaded || !handled) {
+        setPermissions([]);
+        setHandled(true);
+      }
+      return;
+    }
+
     const status = getPermissionStatus();
     const isBrowser = typeof window !== "undefined";
 
     if (sessionStatus === "authenticated") {
-      // If session exists and has permissions, update the store
       if (
         session?.user?.permissions &&
         Array.isArray(session.user.permissions) &&
@@ -65,8 +70,6 @@ export function PermissionProvider({ children }: PermissionProviderProps) {
       ) {
         setPermissions(session.user.permissions);
         setHandled(true);
-
-        // Clear any pending reset timer
         if (timerRef.current) {
           clearTimeout(timerRef.current);
           timerRef.current = null;
@@ -74,14 +77,12 @@ export function PermissionProvider({ children }: PermissionProviderProps) {
         return;
       }
 
-      // If permissions are already loaded, don't overwrite them
       if (status.hasPermissions && permissions.length > 0 && !isInitialLoad) {
         setHandled(true);
         return;
       }
     }
 
-    // Try to load from backup in sessionStorage
     if (isBrowser && !handled) {
       try {
         const backupPermissions = sessionStorage.getItem("permissions-backup");
@@ -97,10 +98,9 @@ export function PermissionProvider({ children }: PermissionProviderProps) {
           }
         }
       } catch {
-        // Silent error - fallback to next source
+        /* silent */
       }
 
-      // Try to load permissions from localStorage directly
       try {
         const storedPermissions = localStorage.getItem("permission-storage");
         if (storedPermissions) {
@@ -116,10 +116,10 @@ export function PermissionProvider({ children }: PermissionProviderProps) {
           }
         }
       } catch {
-        // Silent error - fallback to next source
+        /* silent */
       }
 
-      // If authenticated but no permissions found in storage, try API fallback
+      // API fallback – vendor/admin only
       if (sessionStatus === "authenticated" && !handled) {
         refetchPermissions()
           .then(({ data }) => {
@@ -129,32 +129,23 @@ export function PermissionProvider({ children }: PermissionProviderProps) {
             }
           })
           .catch(() => {
-            // Silently fail - we've tried our best to get permissions
+            /* silent */
           });
         return;
       }
     }
 
-    // Only reset if definitely logged out and we haven't already handled permissions
-    // Add a delay to ensure NextAuth has fully initialized
     if (sessionStatus === "unauthenticated" && !handled) {
-      // Clear any existing timer
-      if (timerRef.current) {
-        clearTimeout(timerRef.current);
-      }
-
-      // Set a new timer with delay to ensure NextAuth is fully initialized
+      if (timerRef.current) clearTimeout(timerRef.current);
       timerRef.current = setTimeout(() => {
-        // Double-check session status before resetting
         if (sessionStatus === "unauthenticated") {
           reset();
           setHandled(true);
         }
         timerRef.current = null;
-      }, 1000); // Wait a second to be sure
+      }, 1000);
     }
 
-    // Cleanup function to clear the timer if the component unmounts
     return () => {
       if (timerRef.current) {
         clearTimeout(timerRef.current);
@@ -164,6 +155,8 @@ export function PermissionProvider({ children }: PermissionProviderProps) {
   }, [
     session,
     sessionStatus,
+    isCustomer,
+    isLoaded,
     setPermissions,
     reset,
     permissions,

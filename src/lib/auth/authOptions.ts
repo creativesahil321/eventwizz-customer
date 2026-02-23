@@ -427,9 +427,30 @@ export const authOptions: NextAuthOptions = {
       return token;
     },
     async session({ session, token }) {
-      // Merge the token data into the session using only essential fields
-      // This reduces session size to prevent cookie chunking
-      const sessionData = {
+      const isCustomer = token.account_type === "customer";
+
+      // Customer session is minimal – no vendor/onboarding/permission fields
+      if (isCustomer) {
+        return {
+          ...session,
+          user: {
+            email: session.user?.email ?? null,
+            name: session.user?.name ?? null,
+            account_type: token.account_type as string,
+            active_role: token.active_role as string,
+            user_id: token.user_id as string,
+            token: token.token as string,
+            uuid: token.uuid as string | undefined,
+            first_name: token.first_name,
+            last_name: token.last_name,
+            avatar: token.avatar,
+            status: token.status,
+            permissions: [],
+          },
+        };
+      }
+
+      return {
         ...session,
         user: {
           email: session.user?.email ?? null,
@@ -443,7 +464,6 @@ export const authOptions: NextAuthOptions = {
           first_name: token.first_name,
           last_name: token.last_name,
           avatar: token.avatar,
-          // Essential status fields
           on_boarding_step: token.on_boarding_step,
           vendor_location_id: token.vendor_location_id,
           event_id: token.event_id,
@@ -452,8 +472,6 @@ export const authOptions: NextAuthOptions = {
           has_payment_provider: Boolean(token.has_payment_provider),
         },
       };
-
-      return sessionData;
     },
     async signIn({ user, account }) {
       // Handle OAuth providers (Google, Facebook, Azure AD)
