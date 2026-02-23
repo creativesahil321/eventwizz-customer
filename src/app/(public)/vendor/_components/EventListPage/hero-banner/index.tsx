@@ -1,17 +1,9 @@
 "use client";
 
-import { useState, useContext, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useContext } from "react";
 import { motion } from "framer-motion";
 import { ServerContext } from "@/lib/server-context";
 import { ThemeSchema } from "@/types/theme.types";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 // Default fallback media
 // const FALLBACK_VIDEO_URL =
 //   "https://www.bestpartiesever.com/wp-content/uploads/2025/03/Website-video-combined-edit-online-video-cutter.com-1.mp4";
@@ -44,16 +36,8 @@ export default function HeroBanner({
   bannerHeading: propBannerHeading,
   bannerSubHeading: propBannerSubHeading,
 }: HeroBannerProps) {
-  const [selectedEvent, setSelectedEvent] = useState("");
-  const [isMounted, setIsMounted] = useState(false);
-  const router = useRouter();
   const { theme } = useContext(ServerContext) || { theme: null };
   const vendorTheme = theme as ThemeSchema | null;
-
-  // Ensure Select only renders after client-side hydration to avoid ID mismatches
-  useEffect(() => {
-    setIsMounted(true);
-  }, []);
 
   // Get banner content from theme or use defaults - with API data taking priority
   const bannerHeading =
@@ -82,32 +66,6 @@ export default function HeroBanner({
     !!apiVideoUrl ||
     !!themeVideoUrl ||
     (!apiVideoUrl && !apiImageUrl && !themeVideoUrl && !themeImageUrl);
-
-  // Event options for the dropdown - using dummy data for now
-  // TODO: Pass actual events from API to populate this dropdown
-  const eventOptions = [
-    { label: "Select Events", value: "all" },
-    { label: "Lipstick, Powder & Paint", value: "lipstick" },
-    { label: "The Take That Experience", value: "takethat" },
-    { label: "Wreath Making & Afternoon", value: "wreath" },
-    { label: "Heatwave", value: "heatwave" },
-  ];
-
-  const handleSearch = (e: React.FormEvent) => {
-    e.preventDefault();
-
-    const params = new URLSearchParams();
-
-    if (selectedEvent && selectedEvent !== "all") {
-      params.set("event", selectedEvent);
-    }
-    if (locationName) {
-      params.set("location", locationName);
-    }
-
-    const queryString = params.toString();
-    router.push(`/search${queryString ? `?${queryString}` : ""}`);
-  };
 
   return (
     <section
@@ -154,54 +112,10 @@ export default function HeroBanner({
             {bannerHeading}
           </h1>
 
-          <p className="text-xl text-white/80 max-w-2xl mx-auto mb-8">
+          <p className="text-xl text-white/80 max-w-2xl mx-auto">
             {bannerSubheading}
           </p>
         </motion.div>
-
-        <motion.form
-          onSubmit={handleSearch}
-          className="max-w-sm mx-auto"
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.3, duration: 0.8 }}
-        >
-          <div className="w-full">
-            {isMounted ? (
-              <Select
-                value={selectedEvent}
-                onValueChange={(value) => {
-                  setSelectedEvent(value);
-                  // Auto-submit when a selection is made
-                  if (value && value !== "all") {
-                    const params = new URLSearchParams();
-                    params.set("event", value);
-                    if (locationName) params.set("location", locationName);
-                    const queryString = params.toString();
-                    router.push(
-                      `/search${queryString ? `?${queryString}` : ""}`
-                    );
-                  }
-                }}
-              >
-                <SelectTrigger className="w-full h-12 bg-white text-black border border-white rounded-md focus:ring-1 focus:ring-purple-500 focus:outline-none">
-                  <SelectValue placeholder="Select Events" />
-                </SelectTrigger>
-                <SelectContent>
-                  {eventOptions.map((event) => (
-                    <SelectItem key={event.value} value={event.value}>
-                      {event.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            ) : (
-              <div className="w-full h-12 bg-white text-black border border-white rounded-md flex items-center px-3">
-                <span className="text-muted-foreground">Select Events</span>
-              </div>
-            )}
-          </div>
-        </motion.form>
       </div>
     </section>
   );

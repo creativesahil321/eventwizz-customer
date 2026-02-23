@@ -10,7 +10,7 @@ export const vendorMenus: MenuItemProps[] = [
     href: createVendorUrl("/vendor/dashboard"),
     url: createVendorUrl("/vendor/dashboard"),
     type: "title",
-    permissions: "",
+    permissions: "read-dashboard",
     menu: [],
   },
   {
@@ -20,7 +20,7 @@ export const vendorMenus: MenuItemProps[] = [
     href: createVendorUrl("/vendor/events"),
     url: createVendorUrl("/vendor/events"),
     type: "title",
-    permissions: "",
+    permissions: "read-event",
   },
   {
     id: 3,
@@ -29,7 +29,7 @@ export const vendorMenus: MenuItemProps[] = [
     href: createVendorUrl("/vendor/customers"),
     url: createVendorUrl("/vendor/customers"),
     type: "title",
-    permissions: "",
+    permissions: "read-customer",
     menu: [],
   },
   {
@@ -39,7 +39,7 @@ export const vendorMenus: MenuItemProps[] = [
     href: createVendorUrl("/vendor/booking-history"),
     url: createVendorUrl("/vendor/booking-history"),
     type: "title",
-    permissions: "",
+    permissions: "read-booking",
   },
   {
     id: 5,
@@ -58,7 +58,7 @@ export const vendorMenus: MenuItemProps[] = [
     href: createVendorUrl("/vendor/menu-choices"),
     url: createVendorUrl("/vendor/menu-choices"),
     type: "title",
-    permissions: "",
+    permissions: "read-event-menu",
     menu: [],
   },
   {
@@ -68,7 +68,7 @@ export const vendorMenus: MenuItemProps[] = [
     href: createVendorUrl("/vendor/transactions"),
     url: createVendorUrl("/vendor/transactions"),
     type: "title",
-    permissions: "",
+    permissions: "read-transaction",
     menu: [],
   },
   {
@@ -78,7 +78,7 @@ export const vendorMenus: MenuItemProps[] = [
     href: createVendorUrl("/vendor/sites-essentials"),
     url: createVendorUrl("/vendor/sites-essentials"),
     type: "title",
-    permissions: "read-site-essentials",
+    permissions: "read-site-essential",
     menu: [],
   },
   {
@@ -88,7 +88,7 @@ export const vendorMenus: MenuItemProps[] = [
     href: createVendorUrl("/vendor/venue-locations"),
     url: createVendorUrl("/vendor/venue-locations"),
     type: "title",
-    permissions: "",
+    permissions: "read-event-location",
     menu: [],
   },
   {
@@ -98,7 +98,7 @@ export const vendorMenus: MenuItemProps[] = [
     href: createVendorUrl("/vendor/marketing"),
     url: createVendorUrl("/vendor/marketing"),
     type: "title",
-    permissions: "",
+    permissions: "read-marketing",
     menu: [],
   },
   {
@@ -108,7 +108,7 @@ export const vendorMenus: MenuItemProps[] = [
     href: createVendorUrl("/vendor/newsletter"),
     url: createVendorUrl("/vendor/newsletter"),
     type: "title",
-    permissions: "",
+    permissions: "read-newsletter",
     menu: [],
   },
   {
@@ -118,7 +118,7 @@ export const vendorMenus: MenuItemProps[] = [
     href: createVendorUrl("/vendor/email-logs"),
     url: createVendorUrl("/vendor/email-logs"),
     type: "title",
-    permissions: "",
+    permissions: "read-email-log",
     menu: [],
   },
   {
@@ -128,7 +128,7 @@ export const vendorMenus: MenuItemProps[] = [
     href: createVendorUrl("/vendor/manage-roles"),
     url: createVendorUrl("/vendor/manage-roles"),
     type: "title",
-    permissions: "roles.read",
+    permissions: "read-role-permission",
     menu: [],
   },
   {
@@ -138,7 +138,7 @@ export const vendorMenus: MenuItemProps[] = [
     href: createVendorUrl("/vendor/staff-management"),
     url: createVendorUrl("/vendor/staff-management"),
     type: "title",
-    permissions: "staff.read",
+    permissions: "read-staff",
     menu: [],
   },
   {
@@ -148,7 +148,7 @@ export const vendorMenus: MenuItemProps[] = [
     href: createVendorUrl("/vendor/seo-tools"),
     url: createVendorUrl("/vendor/seo-tools"),
     type: "title",
-    permissions: "",
+    permissions: "read-seo-tool",
     menu: [],
   },
   {
@@ -158,7 +158,7 @@ export const vendorMenus: MenuItemProps[] = [
     href: createVendorUrl("/vendor/notifications"),
     url: createVendorUrl("/vendor/notifications"),
     type: "title",
-    permissions: "",
+    permissions: "read-notification",
     menu: [],
   },
   {
@@ -178,7 +178,7 @@ export const vendorMenus: MenuItemProps[] = [
     href: createVendorUrl("/vendor/dispute-resolution"),
     url: createVendorUrl("/vendor/dispute-resolution"),
     type: "title",
-    permissions: "",
+    permissions: "read-dispute",
     menu: [],
   },
   {
@@ -188,7 +188,7 @@ export const vendorMenus: MenuItemProps[] = [
     href: createVendorUrl("/vendor/settings"),
     url: createVendorUrl("/vendor/settings"),
     type: "title",
-    permissions: "",
+    permissions: "read-account",
     menu: [],
   },
 ];

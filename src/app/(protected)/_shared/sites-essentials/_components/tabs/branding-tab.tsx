@@ -19,12 +19,19 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { TiptapEditor } from "@/components/ui/tiptap-editor";
 import { VideoFormatInfo } from "@/components/shared/video-format-info";
 import { addCacheBusting } from "@/lib/image-utils";
+import { LocationIndicator } from "@/components/location-indicator";
+import { MapPin } from "lucide-react";
 
 interface BrandingTabProps {
-  shouldResetImages?: boolean;
+  /** Server values from API – source of truth after location switch so UI updates immediately */
+  serverCoverImage?: string;
+  serverCoverVideo?: string;
 }
 
-export function BrandingTab({ shouldResetImages = false }: BrandingTabProps) {
+export function BrandingTab({
+  serverCoverImage,
+  serverCoverVideo,
+}: BrandingTabProps) {
   const form = useFormContext<SiteEssentialsFormValues>();
 
   // File objects for new uploads
@@ -46,29 +53,63 @@ export function BrandingTab({ shouldResetImages = false }: BrandingTabProps) {
   const [bannerType, setBannerType] = useState<"image" | "video">("image");
   const [isValidatingVideo, setIsValidatingVideo] = useState(false);
 
-  // Initialize URL states from form values if they exist
+  // Sync banner state from SERVER props first (runs as soon as location data refetches – no form timing issues)
   useEffect(() => {
-    const logoValue = form.getValues("logo");
-    const faviconValue = form.getValues("favicon");
-    const coverImageValue = form.getValues("cover_image");
-    const coverVideoValue = form.getValues("cover_video");
+    const hasImage = Boolean(serverCoverImage && serverCoverImage.length > 0);
+    const hasVideo = Boolean(serverCoverVideo && serverCoverVideo.length > 0);
+    setLandingPageImageFiles([]);
+    setLandingPageVideoFiles([]);
+    if (hasImage) {
+      setLandingPageImageUrl(serverCoverImage!);
+    } else {
+      setLandingPageImageUrl("");
+    }
+    if (hasVideo) {
+      setLandingPageVideoUrl(serverCoverVideo!);
+    } else {
+      setLandingPageVideoUrl("");
+    }
+    setBannerType(hasVideo ? "video" : "image");
+  }, [serverCoverImage, serverCoverVideo]);
 
-    // Initialize URL states if the form contains string URLs
-    if (typeof logoValue === "string" && logoValue) {
-      setLogoUrl(logoValue);
+  // Watch form for logo/favicon and for when user uploads new file (form then has File; we don’t overwrite with server in that case)
+  const watchedLogo = form.watch("logo");
+  const watchedFavicon = form.watch("favicon");
+  const watchedCoverImage = form.watch("cover_image");
+  const watchedCoverVideo = form.watch("cover_video");
+
+  // Sync logo/favicon from form; for cover_image/cover_video only sync when user has selected a File (so we show their upload), otherwise server props drive banner
+  useEffect(() => {
+    if (typeof watchedLogo === "string" && watchedLogo) {
+      setLogoFiles([]);
+      setLogoUrl(watchedLogo);
+    } else if (watchedLogo !== undefined && !(watchedLogo instanceof File)) {
+      setLogoFiles([]);
+      setLogoUrl("");
     }
-    if (typeof faviconValue === "string" && faviconValue) {
-      setFaviconUrl(faviconValue);
+    if (typeof watchedFavicon === "string" && watchedFavicon) {
+      setFaviconFiles([]);
+      setFaviconUrl(watchedFavicon);
+    } else if (watchedFavicon !== undefined && !(watchedFavicon instanceof File)) {
+      setFaviconFiles([]);
+      setFaviconUrl("");
     }
-    if (typeof coverImageValue === "string" && coverImageValue) {
-      setLandingPageImageUrl(coverImageValue);
+    // Only sync banner from form when value is a File (user just picked a file); otherwise server props are source of truth
+    if (watchedCoverImage instanceof File) {
+      setLandingPageImageFiles([watchedCoverImage]);
+      setLandingPageImageUrl("");
+      setLandingPageVideoFiles([]);
+      setLandingPageVideoUrl("");
       setBannerType("image");
     }
-    if (typeof coverVideoValue === "string" && coverVideoValue) {
-      setLandingPageVideoUrl(coverVideoValue);
+    if (watchedCoverVideo instanceof File) {
+      setLandingPageVideoFiles([watchedCoverVideo]);
+      setLandingPageVideoUrl("");
+      setLandingPageImageFiles([]);
+      setLandingPageImageUrl("");
       setBannerType("video");
     }
-  }, [form]);
+  }, [watchedLogo, watchedFavicon, watchedCoverImage, watchedCoverVideo]);
 
   const handleLogoFileChange = (files: File[]) => {
     setLogoFiles(files);
@@ -181,49 +222,6 @@ export function BrandingTab({ shouldResetImages = false }: BrandingTabProps) {
     setBannerType("image");
   };
 
-  // Reset file states when shouldResetImages changes to true
-  useEffect(() => {
-    if (shouldResetImages) {
-      // Clear all file states and reset to URL states if available
-      setLogoFiles([]);
-      setFaviconFiles([]);
-      setLandingPageImageFiles([]);
-      setLandingPageVideoFiles([]);
-
-      // Reinitialize URL states from current form values
-      const logoValue = form.getValues("logo");
-      const faviconValue = form.getValues("favicon");
-      const coverImageValue = form.getValues("cover_image");
-      const coverVideoValue = form.getValues("cover_video");
-
-      if (typeof logoValue === "string" && logoValue) {
-        setLogoUrl(logoValue);
-      } else {
-        setLogoUrl("");
-      }
-
-      if (typeof faviconValue === "string" && faviconValue) {
-        setFaviconUrl(faviconValue);
-      } else {
-        setFaviconUrl("");
-      }
-
-      if (typeof coverImageValue === "string" && coverImageValue) {
-        setLandingPageImageUrl(coverImageValue);
-        setBannerType("image");
-      } else {
-        setLandingPageImageUrl("");
-      }
-
-      if (typeof coverVideoValue === "string" && coverVideoValue) {
-        setLandingPageVideoUrl(coverVideoValue);
-        setBannerType("video");
-      } else {
-        setLandingPageVideoUrl("");
-      }
-    }
-  }, [shouldResetImages, form]);
-
   // Cleanup object URLs to prevent memory leaks
   useEffect(() => {
     return () => {
@@ -236,12 +234,24 @@ export function BrandingTab({ shouldResetImages = false }: BrandingTabProps) {
   }, [landingPageVideoFiles]);
 
   return (
-    <div className="space-y-6">
-      <SectionTitle
-        title="Site Branding"
-        description="Configure your site identity"
-      />
-      <Separator className="my-4" />
+    <div className="space-y-8">
+      {/* ============================================ */}
+      {/* GLOBAL BRANDING SECTION - Applies to ALL Locations */}
+      {/* ============================================ */}
+      <div className="rounded-lg border-2 border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900 p-6 space-y-6">
+        <div className="space-y-2">
+          <SectionTitle
+            title="Global Site Branding"
+            description="These settings apply to all locations"
+          />
+          <div className="inline-flex items-center gap-2 text-xs text-muted-foreground bg-gray-100 dark:bg-gray-800 px-3 py-1.5 rounded-md">
+            <span className="font-medium">🌍 Global</span>
+            <span>·</span>
+            <span>Same across all locations</span>
+          </div>
+        </div>
+        
+        <Separator className="my-4" />
 
       <div className="grid gap-6 md:grid-cols-2">
         <FormField
@@ -372,8 +382,38 @@ export function BrandingTab({ shouldResetImages = false }: BrandingTabProps) {
           )}
         />
       </div>
+      </div>
 
-      <Separator className="my-4" />
+      {/* ============================================ */}
+      {/* LOCATION-SPECIFIC SECTION - Eye-catching so vendors don't miss it */}
+      {/* ============================================ */}
+      <div className="relative rounded-xl border-2 border-blue-400 dark:border-blue-600 bg-gradient-to-br from-blue-50 to-slate-50 dark:from-blue-950/50 dark:to-slate-900/50 p-0 overflow-hidden shadow-sm">
+        {/* Thick left accent */}
+        <div className="absolute left-0 top-0 bottom-0 w-1.5 bg-blue-500 dark:bg-blue-400" aria-hidden />
+
+        {/* Unmissable top banner */}
+        <div className="flex flex-wrap items-center gap-3 px-6 py-4 bg-blue-100/90 dark:bg-blue-900/60 border-b border-blue-200 dark:border-blue-700">
+          <div className="flex items-center gap-2.5">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-blue-500 dark:bg-blue-600 text-white shadow-sm">
+              <MapPin className="h-5 w-5" />
+            </div>
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wider text-blue-700 dark:text-blue-300">
+                For this location only
+              </p>
+              <p className="text-sm font-bold text-blue-900 dark:text-blue-100">
+                All fields below apply only to this location
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 ml-auto rounded-lg bg-white dark:bg-slate-800 px-3 py-2 border border-blue-200 dark:border-blue-700 shadow-sm">
+            <span className="text-xs font-medium text-muted-foreground">Editing:</span>
+            <LocationIndicator variant="light" />
+          </div>
+        </div>
+
+        <div className="p-6 space-y-6">
+      <Separator className="my-0 -mx-6" />
 
       <SectionTitle
         title="Landing Page Content"
@@ -536,10 +576,11 @@ export function BrandingTab({ shouldResetImages = false }: BrandingTabProps) {
                   <FormControl>
                     <div className="space-y-4">
                       {landingPageVideoUrl ? (
-                        <div className="space-y-2">
+                        <div className="space-y-2" key={landingPageVideoUrl}>
                           <video
                             controls
                             className="w-full h-auto max-h-[200px] object-contain bg-gray-100 rounded-lg"
+                            key={landingPageVideoUrl}
                           >
                             <source
                               src={landingPageVideoUrl}
@@ -612,6 +653,7 @@ export function BrandingTab({ shouldResetImages = false }: BrandingTabProps) {
         title="About Section"
         description="Configure the about section on your homepage"
       />
+      
       <Separator className="my-4" />
 
       <FormField
@@ -733,7 +775,7 @@ export function BrandingTab({ shouldResetImages = false }: BrandingTabProps) {
 
       <SectionTitle
         title="Event Sections"
-        description="Configure event section titles"
+        description="Configure event section titles (location-specific)"
       />
 
       <div className="grid gap-6 md:grid-cols-2">
@@ -808,7 +850,7 @@ export function BrandingTab({ shouldResetImages = false }: BrandingTabProps) {
 
       <SectionTitle
         title="Gallery Section"
-        description="Configure the gallery section on your homepage"
+        description="Configure the gallery section on your homepage (location-specific)"
       />
 
       <div className="grid gap-6">
@@ -845,6 +887,9 @@ export function BrandingTab({ shouldResetImages = false }: BrandingTabProps) {
           }}
         />
       </div>
+        </div>
+      </div>
+
     </div>
   );
 }

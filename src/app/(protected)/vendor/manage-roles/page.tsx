@@ -5,11 +5,17 @@ import { RolesSkeletonLoader } from "../../_shared/manage-roles/_component/skele
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { PlusCircle } from "lucide-react";
+import { PermissionGuard } from "@/components/permission/PermissionGuard";
+import { PermissionRoute } from "@/components/permission";
 
 export default function Page() {
   return (
-    <section className="page bg-[var(--color-background,#f3f4f6)]">
-      <Shell>
+    <PermissionRoute
+      permissionKey="read-role-permission"
+      fallbackPath="/vendor/dashboard"
+    >
+      <section className="page bg-[var(--color-background,#f3f4f6)]">
+        <Shell>
         <React.Suspense fallback={<RolesSkeletonLoader />}>
           <section className="w-full relative">
             <div className="bg-white rounded-lg border border-[var(--color-border)] shadow-md p-6 mb-6 text-black">
@@ -17,14 +23,16 @@ export default function Page() {
                 <h1 className="text-2xl title-header font-bold">
                   Manage Roles & Permissions
                 </h1>
-                <Link href="./manage-roles/create" className="shrink-0">
-                  <Button
-                    variant="event-primary"
-                    className="flex items-center gap-1"
-                  >
-                    <PlusCircle className="h-4 w-4 mr-1" /> Create Role
-                  </Button>
-                </Link>
+                <PermissionGuard permissionKey="create-role-permission">
+                  <Link href="./manage-roles/create" className="shrink-0">
+                    <Button
+                      variant="event-primary"
+                      className="flex items-center gap-1"
+                    >
+                      <PlusCircle className="h-4 w-4 mr-1" /> Create Role
+                    </Button>
+                  </Link>
+                </PermissionGuard>
               </div>
               <p className="text-muted-foreground mt-2">
                 Manage staff roles and permissions to control access to
@@ -38,5 +46,6 @@ export default function Page() {
         </React.Suspense>
       </Shell>
     </section>
+    </PermissionRoute>
   );
 }

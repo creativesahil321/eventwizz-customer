@@ -50,7 +50,6 @@ export const updateSiteEssentials = async (
     if (hasFiles) {
       // Create FormData for multipart request
       const formData = new FormData();
-      formData.append("_method", "PATCH");
 
       Object.entries(data).forEach(([key, value]) => {
         if (value instanceof File || value instanceof Blob) {
@@ -67,7 +66,10 @@ export const updateSiteEssentials = async (
 
       const response = await api.post<SiteEssentialsResponse>(
         endpoints.UPDATE,
-        formData,
+        {
+          ...data,
+          _method: "PATCH",
+        },
         {
           returnFullResponse: true,
           headers: {

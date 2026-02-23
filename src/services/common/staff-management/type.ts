@@ -14,8 +14,10 @@ export interface StaffMember {
   username?: string;
   created_at?: string;
   updated_at?: string;
-  custom_permissions?: string[];
-  permissions?: Array<{ key: string; name?: string }>;
+  vendor_location_id?: number;
+  vendor_location_ids?: number[];
+  /** List API: location names. Single-staff API: objects with id and city */
+  locations?: string[] | { id: number; city?: string }[];
 }
 
 /**
@@ -65,8 +67,8 @@ export interface CreateStaffPayload {
   role_id: number;
   password: string;
   password_confirmation: string;
-  custom_permissions?: string[];
-  permissions?: string[];
+  vendor_location_id?: number;
+  vendor_location_ids?: number[];
 }
 
 /**
@@ -82,8 +84,8 @@ export interface UpdateStaffPayload {
   password?: string;
   password_confirmation?: string;
   phone?: string;
-  custom_permissions?: string[];
-  permissions?: string[];
+  vendor_location_id?: number;
+  vendor_location_ids?: number[];
 }
 
 /**

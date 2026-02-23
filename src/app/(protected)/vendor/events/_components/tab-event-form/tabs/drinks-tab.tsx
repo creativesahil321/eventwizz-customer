@@ -21,7 +21,7 @@ import { X, PlusCircle } from "lucide-react";
 
 export default function DrinksTab() {
   const [isLoading, setIsLoading] = useState(false);
-  const { form: globalForm, save, setActiveField } = useEventFormContext();
+  const { form: globalForm, save, setActiveField, readOnly } = useEventFormContext();
 
   // Get event_id from global form
   const getEventId = (): number => {
@@ -393,8 +393,8 @@ export default function DrinksTab() {
           </div>
 
           <div className="flex justify-end gap-4 pt-4">
-            <Button type="submit" disabled={isLoading} variant="event-primary">
-              {isLoading ? "Saving..." : "Save & Next"}
+            <Button type="submit" disabled={isLoading || readOnly} variant="event-primary">
+              {readOnly ? "View only" : isLoading ? "Saving..." : "Save & Next"}
             </Button>
           </div>
         </form>

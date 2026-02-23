@@ -28,7 +28,7 @@ import { addCacheBusting } from "@/lib/image-utils";
 
 export default function CateringTab() {
   const [isLoading, setIsLoading] = useState(false);
-  const { form: globalForm, save } = useEventFormContext();
+  const { form: globalForm, save, readOnly } = useEventFormContext();
   const [menuBackgroundImage, setMenuBackgroundImage] = useState<File[] | null>(
     null
   );
@@ -649,8 +649,8 @@ export default function CateringTab() {
             </div>
           )}
           <div className="flex justify-end gap-4 pt-4">
-            <Button type="submit" disabled={isLoading} variant="event-primary">
-              {isLoading ? "Saving..." : "Save & Next"}
+            <Button type="submit" disabled={isLoading || readOnly} variant="event-primary">
+              {readOnly ? "View only" : isLoading ? "Saving..." : "Save & Next"}
             </Button>
           </div>
         </form>

@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useDebounce } from "@/hooks/data-table/use-debounce";
 import { useQueryState, parseAsInteger } from "nuqs";
+import { PermissionRoute } from "@/components/permission";
 
 // Dynamic import of the location create dialog
 const CreateLocationDialog = dynamic(
@@ -55,8 +56,12 @@ export default function VenueLocationsPage() {
   });
 
   return (
-    <section className="page text-black min-w-0 max-w-full overflow-x-hidden">
-      <Shell className="gap-2 overflow-x-hidden">
+    <PermissionRoute
+      permissionKey="read-event-location"
+      fallbackPath="/vendor/dashboard"
+    >
+      <section className="page text-black min-w-0 max-w-full overflow-x-hidden">
+        <Shell className="gap-2 overflow-x-hidden">
         <div className="flex flex-col gap-4 min-w-0 max-w-full">
           <div className="bg-white rounded-lg border border-[var(--color-border)] shadow-md p-4 sm:p-6 mb-4 min-w-0 max-w-full overflow-hidden">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center flex-wrap gap-4 min-w-0">
@@ -110,5 +115,6 @@ export default function VenueLocationsPage() {
         </div>
       </Shell>
     </section>
+    </PermissionRoute>
   );
 }

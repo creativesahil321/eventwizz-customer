@@ -99,15 +99,12 @@ export default function CreateRoleForm({
   const form = useForm<CreateRoleFormValues>({
     resolver: zodResolver(createRoleSchema),
     defaultValues: {
-      slug: "",
       label: "",
       permissions: [],
     },
   });
 
   const [formError, setFormError] = useState<string | null>(null);
-  // Track if slug was manually edited
-  const [slugManuallyEdited, setSlugManuallyEdited] = useState(false);
 
   async function onSubmit(values: CreateRoleFormValues) {
     try {
@@ -270,104 +267,46 @@ export default function CreateRoleForm({
               </div>
             )}
 
-            {/* Role Information Fields */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-              <div className="space-y-2">
-                <FormField
-                  control={form.control}
-                  name="label"
-                  render={({ field }) => (
-                    <FormItem className="space-y-1">
-                      <FormLabel className="text-sm font-semibold">
-                        Role Name
-                      </FormLabel>
-                      <FormControl>
-                        <Input
-                          placeholder="E.g., Marketing Manager"
-                          {...field}
-                          maxLength={50}
-                          onChange={(e) => {
-                            // Limit to 50 characters
-                            const value = e.target.value.slice(0, 50);
-                            e.target.value = value;
-
-                            // Call the original onChange handler
-                            field.onChange(e);
-
-                            // Get label value
-                            const labelValue = value;
-
-                            // Generate slug from label
-                            const generatedSlug = labelValue
-                              .toLowerCase()
-                              .replace(/\s+/g, "-")
-                              .replace(/[^a-z0-9-]/g, "");
-
-                            // Update slug if it hasn't been manually edited
-                            if (!slugManuallyEdited) {
-                              form.setValue("slug", generatedSlug, {
-                                shouldValidate: true,
-                              });
-                            }
-                          }}
-                          className="h-10"
-                        />
-                      </FormControl>
-                      <div className="flex items-center justify-between">
-                        <FormDescription className="text-xs text-black/50">
-                          A descriptive name for this role.
-                        </FormDescription>
-                        <span className="text-xs text-muted-foreground">
-                          {field.value?.length || 0}/50
-                        </span>
-                      </div>
-                      <FormMessage className="text-xs" />
-                    </FormItem>
-                  )}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <FormField
-                  control={form.control}
-                  name="slug"
-                  render={({ field }) => (
-                    <FormItem className="space-y-1">
-                      <FormLabel className="text-sm font-semibold">
-                        Role Slug
-                      </FormLabel>
-                      <FormControl>
-                        <Input
-                          placeholder="E.g., marketing-manager"
-                          {...field}
-                          maxLength={50}
-                          onChange={(e) => {
-                            // Limit to 50 characters
-                            const value = e.target.value.slice(0, 50);
-                            e.target.value = value;
-                            field.onChange(e);
-                            // Mark slug as manually edited if user types in it
-                            if (value !== "") {
-                              setSlugManuallyEdited(true);
-                            }
-                          }}
-                          className="h-10"
-                        />
-                      </FormControl>
-                      <div className="flex items-center justify-between">
-                        <FormDescription className="text-xs text-black/50">
-                          A unique identifier (lowercase letters, numbers,
-                          hyphens only).
-                        </FormDescription>
-                        <span className="text-xs text-muted-foreground">
-                          {field.value?.length || 0}/50
-                        </span>
-                      </div>
-                      <FormMessage className="text-xs" />
-                    </FormItem>
-                  )}
-                />
-              </div>
+            {/* Role Information */}
+            <div className="space-y-2 mb-6">
+              <FormField
+                control={form.control}
+                name="label"
+                render={({ field }) => (
+                  <FormItem className="space-y-1">
+                    <FormLabel className="text-sm font-semibold">
+                      Role Name
+                    </FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder="E.g., Marketing Manager"
+                        {...field}
+                        maxLength={50}
+                        onChange={(e) => {
+                          const raw = e.target.value.slice(0, 50);
+                          const value = raw.replace(
+                            /[^a-zA-Z0-9\s\-']/g,
+                            ""
+                          );
+                          e.target.value = value;
+                          field.onChange(value);
+                        }}
+                        className="h-10"
+                      />
+                    </FormControl>
+                    <div className="flex items-center justify-between">
+                      <FormDescription className="text-xs text-black/50">
+                        Letters, numbers, spaces, hyphens and apostrophes
+                        only.
+                      </FormDescription>
+                      <span className="text-xs text-muted-foreground">
+                        {field.value?.length || 0}/50
+                      </span>
+                    </div>
+                    <FormMessage className="text-xs" />
+                  </FormItem>
+                )}
+              />
             </div>
 
             {/* Permissions Section */}

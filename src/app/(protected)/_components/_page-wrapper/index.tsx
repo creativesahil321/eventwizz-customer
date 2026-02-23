@@ -13,6 +13,7 @@ import { logout } from "@/lib/auth/logout";
  * 1. Provides layout structure for all protected pages
  * 2. Performs security validation on every page to prevent unauthorized access
  * 3. Handles responsive layout adjustments based on sidebar state
+ * Note: Customers do not use roles/permissions; only vendor/admin do.
  */
 export default function PageWrapper({
   children,
@@ -20,37 +21,35 @@ export default function PageWrapper({
   children: React.ReactNode;
 }) {
   const { sidebarCollapsed: collapsed } = useDomainStore();
-  const { isAuthenticated, isSessionChecked } = useAuthStore();
+  const { isAuthenticated, isSessionChecked, account_type } = useAuthStore();
   const { isLoaded: permissionsLoaded } = usePermissionStore();
   const router = useRouter();
+  const isCustomer = account_type === "customer";
 
   // Security validation that runs on every protected page
   useEffect(() => {
-    // Skip during initial render when session is still being checked
     if (!isSessionChecked) return;
 
-    // Redirect unauthenticated users to login
     if (!isAuthenticated) {
       router.replace("/auth/login");
       return;
     }
 
-    // Handle security breach: missing permissions with active session
-    // This can happen if localStorage is cleared or manipulated
+    // Customers do not use permissions; skip permission check for them
+    if (isCustomer) return;
+
+    // For vendor/admin: handle missing permissions (e.g. localStorage cleared)
     if (isAuthenticated && !permissionsLoaded) {
       const performSecurityLogout = async () => {
         try {
-          // Use the centralized logout utility with security violation flag
           await logout({ securityViolation: true });
         } catch {
-          // Fallback redirect in case of errors
           window.location.href = "/auth/login";
         }
       };
-
       performSecurityLogout();
     }
-  }, [isAuthenticated, isSessionChecked, permissionsLoaded, router]);
+  }, [isAuthenticated, isSessionChecked, permissionsLoaded, isCustomer, router]);
 
   return (
     <main

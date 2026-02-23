@@ -118,12 +118,14 @@ const MenuItemComponent: React.FC<MenuItemComponentProps> = ({ menu }) => {
   const searchParams = useSearchParams();
   const isActive = isMenuActive(menu, pathname, searchParams);
   const { checkMenuPermission } = useMenuPermission();
-  const { isAuthenticated } = useAuthStore();
+  const { isAuthenticated, account_type } = useAuthStore();
+  const isCustomer = account_type === "customer";
 
-  // Check if user has permission for this menu item
-  // If not authenticated, bypass permission checks
+  // Customers do not use permissions; always show. Otherwise check permission.
   const hasPermission =
-    !isAuthenticated || checkMenuPermission(menu.permissions);
+    !isAuthenticated ||
+    isCustomer ||
+    checkMenuPermission(menu.permissions);
 
   const hasChildren = useMemo(
     () => Boolean(menu.menu && menu.menu.length > 0),

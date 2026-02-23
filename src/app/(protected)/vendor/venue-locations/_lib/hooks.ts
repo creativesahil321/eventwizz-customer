@@ -2,7 +2,8 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { locationService } from "@/services/vendor/locations/locations.service";
 import { useSession } from "next-auth/react";
 import { VenueLocation } from "@/types/api.types";
-import { LocationsQueryData } from "./queries";
+import { useSitePreviewStore } from "@/store/site-preview.store";
+import { LocationsQueryData, LOCATION_DEPENDENT_QUERY_KEYS } from "./queries";
 
 /**
  * Hook for switching the current location
@@ -59,12 +60,18 @@ export function useSwitchLocation() {
         }
       }
 
-      // Only invalidate locations query (minimal refetch)
-      // Don't invalidate other queries unless actually changing context
       queryClient.invalidateQueries({
         queryKey: ["locations"],
-        refetchType: "active" // Only refetch active queries
+        refetchType: "active",
       });
+
+      // Refetch location-dependent data so APIs hit with new vendor_location_id
+      LOCATION_DEPENDENT_QUERY_KEYS.forEach((queryKey) => {
+        queryClient.invalidateQueries({ queryKey, refetchType: "active" });
+      });
+
+      // Clear site essentials preview store so it doesn't show previous location's data
+      useSitePreviewStore.getState().clearPreviewData();
     },
     onError: (error: unknown, _locationId, context) => {
       // Rollback optimistic update on error

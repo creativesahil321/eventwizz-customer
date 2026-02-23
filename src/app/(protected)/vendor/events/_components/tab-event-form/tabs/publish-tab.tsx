@@ -46,7 +46,7 @@ const extraOptions = [
 export default function PublishTab() {
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
-  const { form: globalForm, save, setActiveField } = useEventFormContext();
+  const { form: globalForm, save, setActiveField, readOnly } = useEventFormContext();
 
   // Get event_id from global form
   const getEventId = (): number => {
@@ -322,7 +322,7 @@ export default function PublishTab() {
                             <FormControl>
                               <RadioGroupItem
                                 value="active"
-                                disabled={isEventCancelled}
+                                disabled={isEventCancelled || readOnly}
                               />
                             </FormControl>
                             <FormLabel
@@ -342,7 +342,7 @@ export default function PublishTab() {
                             <FormControl>
                               <RadioGroupItem
                                 value="draft"
-                                disabled={isEventCancelled}
+                                disabled={isEventCancelled || readOnly}
                               />
                             </FormControl>
                             <FormLabel
@@ -499,11 +499,11 @@ export default function PublishTab() {
               </Button>
               <Button
                 type="submit"
-                disabled={isLoading || isEventCancelled}
+                disabled={isLoading || isEventCancelled || readOnly}
                 variant="event-primary"
-                title={isEventCancelled ? "Cannot submit cancelled events" : ""}
+                title={readOnly ? "View only" : isEventCancelled ? "Cannot submit cancelled events" : ""}
               >
-                {isLoading ? "Saving..." : "Submit Event"}
+                {readOnly ? "View only" : isLoading ? "Saving..." : "Submit Event"}
               </Button>
             </div>
           </form>

@@ -17,6 +17,7 @@ import {
   AlertCircle,
   Trash2,
   Loader2,
+  MapPin,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
@@ -39,6 +40,11 @@ import {
 import { PermissionGuard } from "@/components/permission/PermissionGuard";
 import { StaffLoadingSkeleton } from "./skeleton-loader";
 import Image from "next/image";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 interface StaffManagementProps {
   searchParams?: {
@@ -197,15 +203,26 @@ export default function StaffManagement({
                       )}
                     </div>
                     <div className="min-w-0 flex-1 overflow-hidden">
-                      <span className="text-lg font-semibold block truncate">
-                        {member.first_name} {member.last_name}
-                      </span>
-                      <span
-                        className="text-sm text-gray-500 block truncate"
-                        title={member.email}
-                      >
-                        {member.email}
-                      </span>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span className="text-lg font-semibold block truncate cursor-default">
+                            {member.first_name} {member.last_name}
+                          </span>
+                        </TooltipTrigger>
+                        <TooltipContent side="top" className="max-w-[min(320px,90vw)]">
+                          {member.first_name} {member.last_name}
+                        </TooltipContent>
+                      </Tooltip>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span className="text-sm text-gray-500 block truncate cursor-default">
+                            {member.email}
+                          </span>
+                        </TooltipTrigger>
+                        <TooltipContent side="top" className="max-w-[min(320px,90vw)]">
+                          {member.email}
+                        </TooltipContent>
+                      </Tooltip>
                     </div>
                   </CardTitle>
 
@@ -246,18 +263,54 @@ export default function StaffManagement({
                     </div>
                   </PermissionGuard>
                 </div>
-                <CardDescription className="mt-2 text-muted-foreground flex items-center gap-2 min-w-0">
-                  <Badge className="bg-blue-50 text-blue-700 border-blue-100 capitalize flex-shrink-0">
-                    {member.role}
-                  </Badge>
+                <CardDescription className="mt-2 text-muted-foreground flex flex-col gap-1.5 min-w-0">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span className="inline-block max-w-[140px] min-w-0">
+                          <Badge className="bg-blue-50 text-blue-700 border-blue-100 capitalize flex-shrink-0 w-full max-w-full truncate cursor-default">
+                            {member.role}
+                          </Badge>
+                        </span>
+                      </TooltipTrigger>
+                      <TooltipContent side="top" className="max-w-[min(320px,90vw)]">
+                        {member.role}
+                      </TooltipContent>
+                    </Tooltip>
+                  </div>
                   {member.phone && (
-                    <span
-                      className="text-sm text-gray-500 truncate min-w-0 flex-1"
-                      title={member.phone}
-                    >
+                    <span className="text-sm text-gray-500 break-all min-w-0 w-full" title={member.phone}>
                       {member.phone}
                     </span>
                   )}
+                  {member.locations && member.locations.length > 0 && (() => {
+                    const cityNames = member.locations.map((loc) =>
+                      typeof loc === "string" ? loc : (loc as { city?: string; name?: string }).city ?? (loc as { city?: string; name?: string }).name ?? ""
+                    ).filter(Boolean);
+                    if (cityNames.length === 0) return null;
+                    return (
+                      <div className="flex items-start gap-1.5 min-w-0 w-full mt-1">
+                        <MapPin className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0 mt-0.5" aria-hidden />
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <span className="text-sm text-muted-foreground line-clamp-2 cursor-default">
+                              {cityNames.length <= 3
+                                ? cityNames.join(", ")
+                                : `${cityNames.slice(0, 2).join(", ")} +${cityNames.length - 2} more`}
+                            </span>
+                          </TooltipTrigger>
+                          <TooltipContent side="top" className="max-w-[min(320px,90vw)]">
+                            <span className="font-medium">Assigned locations</span>
+                            <ul className="mt-1 list-none text-sm">
+                              {cityNames.map((name, i) => (
+                                <li key={`${name}-${i}`}>{name}</li>
+                              ))}
+                            </ul>
+                          </TooltipContent>
+                        </Tooltip>
+                      </div>
+                    );
+                  })()}
                 </CardDescription>
               </CardHeader>
               <CardContent className="pt-2 flex-shrink-0">

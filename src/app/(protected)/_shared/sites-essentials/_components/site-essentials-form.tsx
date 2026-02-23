@@ -31,7 +31,6 @@ export function SiteEssentialsForm() {
   const { toast } = useToast();
   const { setPreviewData, previewData, clearPreviewData } =
     useSitePreviewStore();
-  const [shouldResetImages, setShouldResetImages] = useState(false);
 
   // Get the current user role
   const { account_type } = useAuthStore();
@@ -44,18 +43,6 @@ export function SiteEssentialsForm() {
   );
   const [showErrorSummary, setShowErrorSummary] = useState(false);
   const [activeTab, setActiveTab] = useState("branding");
-
-  // Reset the shouldResetImages flag after it's been used
-  useEffect(() => {
-    if (shouldResetImages) {
-      // Reset the flag after a short delay to ensure it's been processed
-      const timer = setTimeout(() => {
-        setShouldResetImages(false);
-      }, 100);
-
-      return () => clearTimeout(timer);
-    }
-  }, [shouldResetImages]);
 
   // Load preview data into form if available
   // BUT never override File objects - form submission should use form's File objects, not preview store data
@@ -81,6 +68,29 @@ export function SiteEssentialsForm() {
       }
     }
   }, [form, previewData]);
+
+  // Reset form when siteEssentials data changes (e.g., after location switch)
+  // This ensures the form always reflects the current location's data
+  useEffect(() => {
+    if (siteEssentials && !previewData) {
+      try {
+        // Create a deep copy to avoid read-only issues
+        const serverData = JSON.parse(JSON.stringify(siteEssentials));
+        
+        // Reset form with fresh server data
+        form.reset(serverData, {
+          keepErrors: false,
+          keepDirty: false,
+          keepIsSubmitted: false,
+          keepTouched: false,
+          keepIsValid: false,
+          keepSubmitCount: false,
+        });
+      } catch (error) {
+        console.error("Error resetting form with site essentials data:", error);
+      }
+    }
+  }, [siteEssentials, previewData, form]);
 
   // Combined useEffect for form validation and error tracking
   useEffect(() => {
@@ -244,9 +254,6 @@ export function SiteEssentialsForm() {
           keepSubmitCount: false,
         });
 
-        // Trigger image reset
-        setShouldResetImages(true);
-
         // Clear preview data
         clearPreviewData();
 
@@ -373,7 +380,18 @@ export function SiteEssentialsForm() {
                   </Badge>
                 )}
                 <div className="bg-white rounded-lg p-3 sm:p-6">
-                  <BrandingTab shouldResetImages={shouldResetImages} />
+                  <BrandingTab
+                    serverCoverImage={
+                      typeof siteEssentials?.cover_image === "string"
+                        ? siteEssentials.cover_image
+                        : undefined
+                    }
+                    serverCoverVideo={
+                      typeof siteEssentials?.cover_video === "string"
+                        ? siteEssentials.cover_video
+                        : undefined
+                    }
+                  />
                 </div>
               </TabsContent>
 

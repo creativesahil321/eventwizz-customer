@@ -23,7 +23,7 @@ import EventLocationMap from "./_components/event-location-map";
 
 export default function MoreInfoTab() {
   const [isLoading, setIsLoading] = useState(false);
-  const { form: globalForm, save, setActiveField } = useEventFormContext();
+  const { form: globalForm, save, setActiveField, readOnly } = useEventFormContext();
 
   // Track if we have string URLs from backend
   const [brochurePdfUrl, setBrochurePdfUrl] = useState<string | null>(null);
@@ -736,8 +736,8 @@ export default function MoreInfoTab() {
           </div>
 
           <div className="flex justify-end gap-4 pt-4">
-            <Button type="submit" disabled={isLoading} variant="event-primary">
-              {isLoading ? "Saving..." : "Save & Next"}
+            <Button type="submit" disabled={isLoading || readOnly} variant="event-primary">
+              {readOnly ? "View only" : isLoading ? "Saving..." : "Save & Next"}
             </Button>
           </div>
         </form>

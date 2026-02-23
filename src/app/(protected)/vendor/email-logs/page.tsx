@@ -28,10 +28,13 @@ import {
 import type { Table } from "@tanstack/react-table";
 import { EmailLog } from "./_lib/types";
 import { toast } from "sonner";
+import { PermissionGuard } from "@/components/permission/PermissionGuard";
+import { PermissionRoute } from "@/components/permission";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
 import { DateRange } from "react-day-picker";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
+import { LocationIndicator } from "@/components/location-indicator";
 
 export default function EmailLogsPage() {
   const [globalFilterValue, setGlobalFilterValue] = useState("");
@@ -143,17 +146,22 @@ export default function EmailLogsPage() {
   const showLoadingOverlay = isFetching && !isLoading;
 
   return (
-    <section className="page text-black min-w-0 max-w-full overflow-x-hidden pb-20 sm:pb-4">
-      <Shell className="gap-2 overflow-x-hidden">
+    <PermissionRoute
+      permissionKey="read-email-log"
+      fallbackPath="/vendor/dashboard"
+    >
+      <section className="page text-black min-w-0 max-w-full overflow-x-hidden pb-20 sm:pb-4">
+        <Shell className="gap-2 overflow-x-hidden">
         <div className="flex flex-col gap-4 min-w-0 max-w-full">
           <div className="bg-white rounded-lg border border-[var(--color-border)] shadow-md p-4 sm:p-6 mb-4 min-w-0 max-w-full overflow-hidden">
             <div className="flex flex-col gap-4">
               <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center flex-wrap gap-4 min-w-0">
-                <div className="min-w-0">
+                <div className="min-w-0 flex flex-col gap-3">
                   <h1 className="text-xl sm:text-2xl title-header font-bold text-black break-words">
                     Email Logs
                   </h1>
-                  <p className="text-muted-foreground mt-2 break-words">
+                  <LocationIndicator variant="card" context="Email logs" />
+                  <p className="text-muted-foreground break-words">
                     View and manage all email logs. Search for specific emails.
                   </p>
                 </div>
@@ -203,47 +211,49 @@ export default function EmailLogsPage() {
                   )}
                   {/* Professional Bulk Actions Dropdown - Only shows when rows are selected */}
                   {hasSelectedRows && (
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          disabled={isBulkOperationLoading || isFetching}
-                          className="transition-all animate-in fade-in-0 slide-in-from-top-2 duration-200"
-                        >
-                          {isBulkOperationLoading ? (
-                            <>
+                    <PermissionGuard permissionKey="delete-email-log">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            disabled={isBulkOperationLoading || isFetching}
+                            className="transition-all animate-in fade-in-0 slide-in-from-top-2 duration-200"
+                          >
+                            {isBulkOperationLoading ? (
+                              <>
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                Processing...
+                              </>
+                            ) : (
+                              <>
+                                <MoreHorizontal className="mr-2 h-4 w-4" />
+                                Bulk Actions ({selectedRowCount})
+                                <ChevronDown className="ml-2 h-4 w-4 opacity-50" />
+                              </>
+                            )}
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-56">
+                          <DropdownMenuItem
+                            onClick={handleBulkDelete}
+                            disabled={bulkDeleteMutation.isPending}
+                            className="cursor-pointer focus:bg-red-50 focus:text-red-700"
+                          >
+                            {bulkDeleteMutation.isPending ? (
                               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                              Processing...
-                            </>
-                          ) : (
-                            <>
-                              <MoreHorizontal className="mr-2 h-4 w-4" />
-                              Bulk Actions ({selectedRowCount})
-                              <ChevronDown className="ml-2 h-4 w-4 opacity-50" />
-                            </>
-                          )}
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="w-56">
-                        <DropdownMenuItem
-                          onClick={handleBulkDelete}
-                          disabled={bulkDeleteMutation.isPending}
-                          className="cursor-pointer focus:bg-red-50 focus:text-red-700"
-                        >
-                          {bulkDeleteMutation.isPending ? (
-                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                          ) : (
-                            <Trash2 className="mr-2 h-4 w-4 text-red-600" />
-                          )}
-                          <span>Delete Selected</span>
-                          <span className="ml-auto text-xs text-muted-foreground">
-                            {selectedRowCount}{" "}
-                            {selectedRowCount === 1 ? "log" : "logs"}
-                          </span>
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
+                            ) : (
+                              <Trash2 className="mr-2 h-4 w-4 text-red-600" />
+                            )}
+                            <span>Delete Selected</span>
+                            <span className="ml-auto text-xs text-muted-foreground">
+                              {selectedRowCount}{" "}
+                              {selectedRowCount === 1 ? "log" : "logs"}
+                            </span>
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </PermissionGuard>
                   )}
                 </div>
               </div>
@@ -321,5 +331,6 @@ export default function EmailLogsPage() {
         </div>
       </Shell>
     </section>
+    </PermissionRoute>
   );
 }

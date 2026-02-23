@@ -21,6 +21,7 @@ export type Role = {
   description: string;
   slug?: string;
   label?: string;
+  is_default?: boolean;
 };
 
 export type RolesData = {

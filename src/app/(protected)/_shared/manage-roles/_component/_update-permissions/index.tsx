@@ -43,10 +43,11 @@ interface PermissionsDialogProps {
   title?: string;
   roleId: string | number;
   permissions: PermissionGroup[];
+  isDefault?: boolean;
   onSave?: (
     roleId: string | number,
     updatedPermissions: { [permission: string]: boolean },
-    roleData: { slug: string; label: string }
+    roleData: { label: string }
   ) => void;
 }
 
@@ -54,18 +55,15 @@ export default function PermissionsDialog({
   roleId,
   onSave,
   title: initialTitle,
+  isDefault = false,
 }: PermissionsDialogProps) {
-  // State for permission toggles
   const [permissionState, setPermissionState] = useState<{
     [key: string]: boolean;
   }>({});
 
-  // Dialog state
   const [open, setOpen] = useState(false);
   const [isAllChecked, setIsAllChecked] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
-  // Track if slug was manually edited
-  const [slugManuallyEdited, setSlugManuallyEdited] = useState(false);
 
   // Group permissions by category
   const [displayPermissions, setDisplayPermissions] = useState<
@@ -83,39 +81,12 @@ export default function PermissionsDialog({
   const { data: permissionsData, isLoading: permissionsLoading } =
     usePermissions();
 
-  // Set up form
   const form = useForm<UpdatePermissionsFormValues>({
     resolver: zodResolver(updatePermissionsSchema),
     defaultValues: {
-      slug: "",
       label: "",
     },
   });
-
-  // Auto-generate slug from label
-  useEffect(() => {
-    const subscription = form.watch((value, { name }) => {
-      if (name === "label") {
-        const labelValue = value.label || "";
-        const generatedSlug = labelValue
-          .toLowerCase()
-          .replace(/\s+/g, "-")
-          .replace(/[^a-z0-9-]/g, "");
-
-        // Only update slug if user hasn't manually edited it yet
-        // or if it's currently empty
-        const currentSlug = form.getValues("slug");
-        if (!currentSlug || currentSlug === "") {
-          form.setValue("slug", generatedSlug, {
-            shouldValidate: true,
-            shouldDirty: true,
-          });
-        }
-      }
-    });
-
-    return () => subscription.unsubscribe();
-  }, [form]);
 
   // Refetch role data when dialog opens
   useEffect(() => {
@@ -124,11 +95,9 @@ export default function PermissionsDialog({
     }
   }, [open, roleId, refetchRole]);
 
-  // Initialize role data from fetched data
   useEffect(() => {
     if (roleData) {
       form.reset({
-        slug: roleData.slug || "",
         label: roleData.label || "",
       });
     }
@@ -195,15 +164,69 @@ export default function PermissionsDialog({
     );
   };
 
+  const getPermKey = (perm: PermissionItem) =>
+    perm.id?.toString() || perm.slug;
+
+  const isWriteAction = (perm: PermissionItem) => {
+    const s = (perm.slug || perm.label || "").toLowerCase();
+    if (s.includes("read")) return false;
+    return (
+      s.includes("create") ||
+      s.includes("delete") ||
+      s.includes("edit") ||
+      s.includes("update")
+    );
+  };
+
+  const isReadPermission = (perm: PermissionItem) =>
+    (perm.slug || perm.label || "").toLowerCase().includes("read");
+
+  const findReadPermissionInGroup = (group: ProcessedPermissionGroup) =>
+    group.permissions.find((p) => isReadPermission(p));
+
+  const hasWriteEnabledInGroup = (
+    group: ProcessedPermissionGroup,
+    state: { [key: string]: boolean }
+  ) =>
+    group.permissions.some(
+      (p) => isWriteAction(p) && (state[getPermKey(p)] === true)
+    );
+
   const togglePermission = (permId: string) => {
+    if (isDefault) return;
     setPermissionState((prev) => {
+      const isEnabling = !prev[permId];
       const newState = { ...prev, [permId]: !prev[permId] };
+
+      if (isEnabling) {
+        for (const group of displayPermissions) {
+          const perm = group.permissions.find((p) => getPermKey(p) === permId);
+          if (!perm || !isWriteAction(perm)) continue;
+          const readPerm = findReadPermissionInGroup(group);
+          if (readPerm) {
+            const readKey = getPermKey(readPerm);
+            newState[readKey] = true;
+          }
+          break;
+        }
+      } else {
+        for (const group of displayPermissions) {
+          const perm = group.permissions.find((p) => getPermKey(p) === permId);
+          if (!perm || !isReadPermission(perm)) continue;
+          if (hasWriteEnabledInGroup(group, prev)) {
+            return prev;
+          }
+          break;
+        }
+      }
+
       updateAllCheckedState(newState);
       return newState;
     });
   };
 
   const toggleAllPermissions = (checked: boolean) => {
+    if (isDefault) return;
     const newState: { [key: string]: boolean } = {};
 
     displayPermissions.forEach((group) => {
@@ -250,7 +273,6 @@ export default function PermissionsDialog({
       setFormError(null);
 
       const roleDataToSave = {
-        slug: formValues.slug,
         label: formValues.label,
       };
 
@@ -282,17 +304,18 @@ export default function PermissionsDialog({
       <DialogTrigger asChild>
         <Button variant="event-primary" className="w-full">
           <LucideIcons.Shield className="h-4 w-4 mr-2" />
-          Edit Permissions
+          {isDefault ? "View Permissions" : "Edit Permissions"}
         </Button>
       </DialogTrigger>
-      <DialogContent className="max-w-[calc(100%-1rem)] sm:max-w-[95vw] md:max-w-[600px] lg:max-w-[825px]">
-        <DialogHeader>
+      <DialogContent className="max-h-[90vh] max-w-[calc(100%-1rem)] flex flex-col overflow-hidden sm:max-w-[95vw] md:max-w-[600px] lg:max-w-[825px]">
+        <DialogHeader className="shrink-0">
           <DialogTitle className="text-[var(--color-primary)] text-base sm:text-lg">
             Permissions for {roleData?.label || initialTitle || ""}
           </DialogTitle>
           <DialogDescription className="text-xs sm:text-sm">
-            Toggle the permissions for this role to control access to different
-            parts of your account.
+            {isDefault
+              ? "Default role — view only. Permissions cannot be changed."
+              : "Toggle the permissions for this role to control access to different parts of your account."}
             {getPermissionCount() > 0 && (
               <Badge className="ml-2 bg-[var(--color-primary)] text-white text-xs">
                 {getPermissionCount()} enabled
@@ -301,108 +324,55 @@ export default function PermissionsDialog({
           </DialogDescription>
         </DialogHeader>
 
+        <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden -mx-1 px-1">
         <Form {...form}>
-          {/* Role Information Fields */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4 text-black min-w-0">
-            <div className="space-y-2">
-              <FormField
-                control={form.control}
-                name="label"
-                render={({ field }) => (
-                  <FormItem className="space-y-1">
-                    <FormLabel
-                      htmlFor="role-label"
-                      className="text-sm font-medium"
-                    >
-                      Role Label
-                    </FormLabel>
-                    <FormControl>
-                      <Input
-                        id="role-label"
-                        {...field}
-                        maxLength={50}
-                        onChange={(e) => {
-                          // Limit to 50 characters
-                          const value = e.target.value.slice(0, 50);
-                          e.target.value = value;
-
-                          // Call the original onChange handler
-                          field.onChange(e);
-
-                          // Get label value
-                          const labelValue = value;
-
-                          // Generate slug from label
-                          const generatedSlug = labelValue
-                            .toLowerCase()
-                            .replace(/\s+/g, "-")
-                            .replace(/[^a-z0-9-]/g, "");
-
-                          // Update slug if it hasn't been manually edited
-                          if (!slugManuallyEdited) {
-                            form.setValue("slug", generatedSlug, {
-                              shouldValidate: true,
-                            });
-                          }
-                        }}
-                        placeholder="Enter role label"
-                        className="w-full"
-                      />
-                    </FormControl>
-                    <div className="flex items-center justify-between">
-                      <FormMessage className="text-xs" />
-                      <span className="text-xs text-muted-foreground">
-                        {field.value?.length || 0}/50
-                      </span>
-                    </div>
-                  </FormItem>
-                )}
-              />
-            </div>
-            <div className="space-y-2">
-              <FormField
-                control={form.control}
-                name="slug"
-                render={({ field }) => (
-                  <FormItem className="space-y-1">
-                    <FormLabel
-                      htmlFor="role-slug"
-                      className="text-sm font-medium"
-                    >
-                      Role Slug
-                    </FormLabel>
-                    <FormControl>
-                      <Input
-                        id="role-slug"
-                        {...field}
-                        maxLength={50}
-                        onChange={(e) => {
-                          // Limit to 50 characters
-                          const value = e.target.value.slice(0, 50);
-                          e.target.value = value;
-                          field.onChange(e);
-                          // Mark slug as manually edited if user types in it
-                          if (value !== "") {
-                            setSlugManuallyEdited(true);
-                          }
-                        }}
-                        placeholder="Enter role slug"
-                        className="w-full"
-                      />
-                    </FormControl>
+          <div className="grid grid-cols-1 gap-4 mb-4 text-black min-w-0">
+            <FormField
+              control={form.control}
+              name="label"
+              render={({ field }) => (
+                <FormItem className="space-y-1">
+                  <FormLabel
+                    htmlFor="role-label"
+                    className="text-sm font-medium"
+                  >
+                    Role name
+                  </FormLabel>
+                  <FormControl>
+                    <Input
+                      id="role-label"
+                      {...field}
+                      maxLength={50}
+                      disabled={isDefault}
+                      readOnly={isDefault}
+                      onChange={(e) => {
+                        if (isDefault) return;
+                        const raw = e.target.value.slice(0, 50);
+                        const value = raw.replace(
+                          /[^a-zA-Z0-9\s\-']/g,
+                          ""
+                        );
+                        e.target.value = value;
+                        field.onChange(value);
+                      }}
+                      placeholder="E.g., Event Manager"
+                      className="w-full"
+                    />
+                  </FormControl>
+                  {!isDefault && (
                     <div className="flex items-center justify-between">
                       <FormDescription className="text-xs">
-                        Lowercase letters, numbers, and hyphens only
+                        Letters, numbers, spaces, hyphens and apostrophes only
                       </FormDescription>
                       <span className="text-xs text-muted-foreground">
                         {field.value?.length || 0}/50
                       </span>
                     </div>
-                    <FormMessage className="text-xs" />
-                  </FormItem>
-                )}
-              />
-            </div>
+                  )}
+                  <FormMessage className="text-xs" />
+                </FormItem>
+              )}
+            />
           </div>
         </Form>
 
@@ -414,23 +384,24 @@ export default function PermissionsDialog({
           </div>
         )}
 
-        {/* Global toggle all switch */}
-        <div className="flex items-center justify-between sm:justify-end mb-2 border-b pb-2 text-black min-w-0">
-          <Label
-            htmlFor="toggle-all"
-            className="mr-2 font-medium text-sm sm:text-base"
-          >
-            Toggle All Permissions
-          </Label>
-          <Switch
-            id="toggle-all"
-            checked={isAllChecked}
-            onCheckedChange={toggleAllPermissions}
-            className="data-[state=checked]:bg-[var(--color-primary)] shrink-0"
-          />
-        </div>
+        {!isDefault && (
+          <div className="flex items-center justify-between sm:justify-end mb-2 border-b pb-2 text-black min-w-0">
+            <Label
+              htmlFor="toggle-all"
+              className="mr-2 font-medium text-sm sm:text-base"
+            >
+              Toggle All Permissions
+            </Label>
+            <Switch
+              id="toggle-all"
+              checked={isAllChecked}
+              onCheckedChange={toggleAllPermissions}
+              className="data-[state=checked]:bg-[var(--color-primary)] shrink-0"
+            />
+          </div>
+        )}
 
-        <ScrollArea className="h-[300px] sm:h-[350px] overflow-y-auto rounded-md border p-2 sm:p-4 text-black min-w-0">
+        <ScrollArea className="min-h-[200px] rounded-md border p-2 sm:p-4 text-black min-w-0">
           {isLoading ? (
             <div className="text-center p-4 sm:p-8">
               <LucideIcons.Loader2 className="h-8 w-8 sm:h-12 sm:w-12 text-[var(--color-primary)] mx-auto mb-4 animate-spin" />
@@ -453,30 +424,37 @@ export default function PermissionsDialog({
                   </div>
                   <Separator className="mb-3" />
                   <div className="grid grid-cols-1 gap-2 sm:gap-3 py-2 min-w-0">
-                    {group.permissions.map((perm) => (
-                      <div
-                        key={perm.id || perm.slug}
-                        className="flex items-center space-x-2 p-1 rounded hover:bg-[var(--color-background-hover)] min-w-0"
-                      >
-                        <Switch
-                          id={perm.id?.toString() || perm.slug}
-                          checked={
-                            permissionState[perm.id?.toString() || perm.slug] ||
-                            false
-                          }
-                          onCheckedChange={() =>
-                            togglePermission(perm.id?.toString() || perm.slug)
-                          }
-                          className="data-[state=checked]:bg-[var(--color-primary)] shrink-0"
-                        />
-                        <Label
-                          htmlFor={perm.id?.toString() || perm.slug}
-                          className="capitalize cursor-pointer flex-1 min-w-0 text-xs sm:text-sm truncate"
+                    {group.permissions.map((perm) => {
+                      const permKey = getPermKey(perm);
+                      const isRead = isReadPermission(perm);
+                      const readRequiredByWrite =
+                        isRead && hasWriteEnabledInGroup(group, permissionState);
+                      return (
+                        <div
+                          key={perm.id || perm.slug}
+                          className="flex items-center space-x-2 p-1 rounded hover:bg-[var(--color-background-hover)] min-w-0"
                         >
-                          {perm.label}
-                        </Label>
-                      </div>
-                    ))}
+                          <Switch
+                            id={permKey}
+                            checked={permissionState[permKey] || false}
+                            onCheckedChange={() => togglePermission(permKey)}
+                            disabled={isDefault || readRequiredByWrite}
+                            className="data-[state=checked]:bg-[var(--color-primary)] shrink-0"
+                          />
+                          <Label
+                            htmlFor={permKey}
+                            className="capitalize cursor-pointer flex-1 min-w-0 text-xs sm:text-sm truncate"
+                            title={
+                              readRequiredByWrite
+                                ? "Required when Create, Edit, Update or Delete is enabled"
+                                : undefined
+                            }
+                          >
+                            {perm.label}
+                          </Label>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               ))}
@@ -493,8 +471,9 @@ export default function PermissionsDialog({
             </div>
           )}
         </ScrollArea>
+        </div>
 
-        <DialogFooter className="flex flex-col sm:flex-row gap-2 sm:gap-0 mt-4 min-w-0">
+        <DialogFooter className="shrink-0 flex flex-col sm:flex-row gap-2 sm:gap-0 mt-4 min-w-0">
           <Button
             onClick={() => setOpen(false)}
             type="button"
@@ -502,18 +481,20 @@ export default function PermissionsDialog({
             className="w-full sm:w-auto sm:mr-2"
           >
             <LucideIcons.X className="h-4 w-4 mr-2" />
-            Cancel
+            {isDefault ? "Close" : "Cancel"}
           </Button>
-          <Button
-            onClick={handleSave}
-            type="submit"
-            disabled={isLoading}
-            variant="event-primary"
-            className="w-full sm:w-auto"
-          >
-            <LucideIcons.Save className="h-4 w-4 mr-2" />
-            Save changes
-          </Button>
+          {!isDefault && (
+            <Button
+              onClick={handleSave}
+              type="submit"
+              disabled={isLoading}
+              variant="event-primary"
+              className="w-full sm:w-auto"
+            >
+              <LucideIcons.Save className="h-4 w-4 mr-2" />
+              Save changes
+            </Button>
+          )}
         </DialogFooter>
       </DialogContent>
     </Dialog>

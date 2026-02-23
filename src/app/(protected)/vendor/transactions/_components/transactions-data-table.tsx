@@ -22,8 +22,7 @@ import {
 } from "@/components/ui/table";
 import { DataTableRowAction, SearchParams, Transaction } from "../_lib/types";
 import { getTransactionColumns } from "./columns";
-import { useVendorTransactions } from "../_lib/queries";
-import { toast } from "sonner";
+import { useVendorTransactions, useDownloadSingleReceipt } from "../_lib/queries";
 import { DataTablePagination } from "@/components/data-table/data-table-pagination";
 import { TransactionsTableSkeleton } from "./skeleton-loader";
 
@@ -52,14 +51,16 @@ export function TransactionsDataTable({
     [setRowAction]
   );
 
-  // Fetch transactions using TanStack Query
   const { data, isLoading, isError } = useVendorTransactions({
     search: search.search,
     status: search.status,
-    booking_date: search.from,
+    from_date: search.from_date,
+    to_date: search.to_date,
     page: Number(search.page) || 1,
     per_page: Number(search.per_page) || 30,
   });
+
+  const downloadReceiptMutation = useDownloadSingleReceipt();
 
   // Update earnings when data changes
   useEffect(() => {
@@ -87,16 +88,12 @@ export function TransactionsDataTable({
     },
   });
 
-  // Handle receipt download
   useEffect(() => {
-    if (rowAction?.type === "download") {
-      const transaction = rowAction.row.original;
-      toast.success(
-        `Downloading receipt for booking ${transaction.booking_number}`
-      );
-      // In production, trigger actual download here
-      setRowAction(null);
-    }
+    if (rowAction?.type !== "download") return;
+    const transaction = rowAction.row.original;
+    const id = transaction.payment_id;
+    setRowAction(null);
+    downloadReceiptMutation.mutate(id);
   }, [rowAction]);
 
   if (isLoading) {

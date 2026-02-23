@@ -14,6 +14,8 @@ import {
 } from "./_lib/actions";
 import { PermissionDebug } from "@/components/permission/PermissionDebug";
 import { PageLoader } from "@/components/ui/page-loader";
+import { LocationIndicator } from "@/components/location-indicator";
+import { PermissionRoute } from "@/components/permission";
 
 interface PageProps {
   searchParams: Record<string, string | string[] | undefined>;
@@ -33,11 +35,17 @@ export default async function Page(props: PageProps) {
     fetchAdminDashboardBestSales(10),
   ]);
   return (
-    <>
+    <PermissionRoute
+      permissionKey="read-dashboard"
+      fallbackPath="/unauthorized"
+    >
       <Suspense fallback={<PageLoader />}>
         <PermissionDebug />
         <section className="w-full relative flex flex-col space-y-8">
-          {/* Payment Setup Alert */}
+          <div className="flex items-center justify-between">
+            <LocationIndicator variant="default" />
+          </div>
+          
           <PaymentSetupAlert />
           
           <section className="w-full relative">
@@ -62,6 +70,6 @@ export default async function Page(props: PageProps) {
           </section>
         </section>
       </Suspense>
-    </>
+    </PermissionRoute>
   );
 }

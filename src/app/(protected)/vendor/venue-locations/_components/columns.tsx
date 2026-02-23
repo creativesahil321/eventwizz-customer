@@ -22,6 +22,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { DataTableColumnHeader } from "@/components/data-table/data-table-column-header";
+import { PermissionGuard } from "@/components/permission/PermissionGuard";
 
 interface GetColumnsOptions {
   setRowAction: React.Dispatch<React.SetStateAction<LocationRowAction | null>>;
@@ -207,49 +208,56 @@ export const getColumns = ({
             >
               View details
             </DropdownMenuItem>
-            <DropdownMenuItem
-              onClick={() => setRowAction({ type: "update", row })}
-            >
-              Edit location
-            </DropdownMenuItem>
-            {toggleStatusMutation &&
-              (row.original.status === false ? (
-                <DropdownMenuItem
-                  className="text-green-600 focus:text-green-600"
-                  disabled={toggleStatusMutation.isPending}
-                  onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    toggleStatusMutation.mutate({
-                      location_id: row.original.id,
-                      status: "active",
-                    });
-                  }}
-                >
-                  Active
-                </DropdownMenuItem>
-              ) : (
-                <DropdownMenuItem
-                  className="text-amber-600 focus:text-amber-600"
-                  disabled={toggleStatusMutation.isPending}
-                  onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    toggleStatusMutation.mutate({
-                      location_id: row.original.id,
-                      status: "inactive",
-                    });
-                  }}
-                >
-                  Inactive
-                </DropdownMenuItem>
-              ))}
-            {!row.original.is_default && row.original.status !== false && (
+            <PermissionGuard permissionKey="update-event-location">
               <DropdownMenuItem
-                onClick={() => setRowAction({ type: "setDefault", row })}
+                onClick={() => setRowAction({ type: "update", row })}
               >
-                Set as default
+                Edit location
               </DropdownMenuItem>
+            </PermissionGuard>
+            {toggleStatusMutation && (
+              <PermissionGuard permissionKey="update-event-location">
+                {row.original.status === false ? (
+                  <DropdownMenuItem
+                    className="text-green-600 focus:text-green-600"
+                    disabled={toggleStatusMutation.isPending}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      toggleStatusMutation.mutate({
+                        location_id: row.original.id,
+                        status: "active",
+                      });
+                    }}
+                  >
+                    Active
+                  </DropdownMenuItem>
+                ) : (
+                  <DropdownMenuItem
+                    className="text-amber-600 focus:text-amber-600"
+                    disabled={toggleStatusMutation.isPending}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      toggleStatusMutation.mutate({
+                        location_id: row.original.id,
+                        status: "inactive",
+                      });
+                    }}
+                  >
+                    Inactive
+                  </DropdownMenuItem>
+                )}
+              </PermissionGuard>
+            )}
+            {!row.original.is_default && row.original.status !== false && (
+              <PermissionGuard permissionKey="update-event-location">
+                <DropdownMenuItem
+                  onClick={() => setRowAction({ type: "setDefault", row })}
+                >
+                  Set as default
+                </DropdownMenuItem>
+              </PermissionGuard>
             )}
           </DropdownMenuContent>
         </DropdownMenu>

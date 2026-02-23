@@ -26,6 +26,7 @@ export interface Role {
   id: number;
   slug: string;
   label: string;
+  is_default?: boolean;
   permissions: Permission[];
 }
 
@@ -50,10 +51,9 @@ export interface RolesResponse {
 }
 
 /**
- * Create role request payload
+ * Create role request payload (slug is optional; backend auto-generates if omitted)
  */
 export interface CreateRolePayload {
-  slug: string;
   label: string;
   permissions: number[] | string[];
 }

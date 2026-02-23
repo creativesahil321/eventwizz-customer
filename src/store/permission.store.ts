@@ -42,27 +42,32 @@ const createIsomorphicStorage = () => {
               });
             }
 
-            // Security check: If auth token exists but permissions don't, redirect to login
+            // Security check: If auth token exists but permissions don't, redirect to login (skip for customers – they don't use permissions)
             const authStorage = localStorage.getItem("auth-storage");
             if (authStorage) {
               try {
                 const authData = JSON.parse(authStorage);
+                const isCustomer =
+                  authData?.state?.account_type === "customer" ||
+                  authData?.state?.active_role === "customer";
+                if (isCustomer) {
+                  return JSON.stringify({
+                    state: { permissions: [], isLoaded: true },
+                    version: 0,
+                  });
+                }
                 if (
                   authData?.state?.isAuthenticated &&
                   authData?.state?.token
                 ) {
-                  // Force a clean auth state by clearing storage
                   localStorage.clear();
                   sessionStorage.clear();
-
-                  // Refresh the page to force re-authentication
                   if (typeof window !== "undefined") {
                     window.location.href = "/auth/login";
                   }
                 }
               } catch (e) {
                 console.log(e);
-                // Silent error for parsing issues
               }
             }
           }
@@ -294,16 +299,24 @@ export async function hydratePermissionsSync(): Promise<void> {
 
     // Verify auth data integrity
     let isAuthenticated = false;
+    let isCustomer = false;
     try {
       const parsedAuth = JSON.parse(authData);
       if (!parsedAuth?.state?.isAuthenticated || !parsedAuth?.state?.token) {
-        // User not authenticated, don't try to hydrate permissions
         return;
       }
       isAuthenticated = true;
+      isCustomer =
+        parsedAuth?.state?.account_type === "customer" ||
+        parsedAuth?.state?.active_role === "customer";
     } catch (error) {
       console.error("[Permission Store] Error parsing auth data:", error);
-      // Error parsing auth data, don't continue
+      return;
+    }
+
+    // Customers do not use permissions; mark as loaded and skip rest
+    if (isCustomer) {
+      usePermissionStore.setState({ permissions: [], isLoaded: true });
       return;
     }
 
@@ -352,12 +365,11 @@ export async function hydratePermissionsSync(): Promise<void> {
           error
         );
         // Error parsing permission data - security issue if authenticated
-        if (isAuthenticated) {
+        if (isAuthenticated && !isCustomer) {
           await secureLogout();
         }
       }
-    } else if (isAuthenticated) {
-      // Security issue: Auth data exists but no permissions found
+    } else if (isAuthenticated && !isCustomer) {
       console.warn(
         "[Permission Store] Auth data exists but no permission data found"
       );

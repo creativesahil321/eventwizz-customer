@@ -4,6 +4,7 @@ import { Suspense } from "react";
 import { useParams } from "next/navigation";
 import { PageLoader } from "@/components/ui/page-loader";
 import AdjustBookingContent from "./_components/adjust-booking-content";
+import { PermissionRoute } from "@/components/permission";
 
 function AdjustBookingPage() {
   const params = useParams();
@@ -14,8 +15,13 @@ function AdjustBookingPage() {
 
 export default function Page() {
   return (
-    <Suspense fallback={<PageLoader />}>
-      <AdjustBookingPage />
-    </Suspense>
+    <PermissionRoute
+      permissionKey="read-booking"
+      fallbackPath="/vendor/booking-history"
+    >
+      <Suspense fallback={<PageLoader />}>
+        <AdjustBookingPage />
+      </Suspense>
+    </PermissionRoute>
   );
 }

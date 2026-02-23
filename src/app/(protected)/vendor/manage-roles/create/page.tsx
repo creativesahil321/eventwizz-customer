@@ -7,6 +7,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { usePermissions } from "@/app/(protected)/_shared/manage-roles/_lib/queries";
 import CreateRoleForm from "../../../_shared/manage-roles/_component/create-role-form";
 import { BackButton } from "@/components/ui/back-button";
+import { PermissionRoute } from "@/components/permission";
 
 export default function CreateRolePage() {
   // Get all permissions
@@ -74,23 +75,28 @@ export default function CreateRolePage() {
   }
 
   return (
-    <section className="page bg-[var(--color-background,#f3f4f6)]">
-      <Shell>
-        {/* Page Header with Back Button */}
-        <BackButton href="/vendor/manage-roles" label="Back to Roles" />
+    <PermissionRoute
+      permissionKey="create-role-permission"
+      fallbackPath="/vendor/manage-roles"
+    >
+      <section className="page bg-[var(--color-background,#f3f4f6)]">
+        <Shell>
+          {/* Page Header with Back Button */}
+          <BackButton href="/vendor/manage-roles" label="Back to Roles" />
 
-        <div className="bg-white rounded-lg border border-[var(--color-border)] shadow-md p-6 mb-6 text-black">
-          <h1 className="text-2xl title-header font-bold">Create New Role</h1>
-          <p className="text-muted-foreground mt-2">
-            Define a new role with custom permissions for your staff members.
-          </p>
-        </div>
+          <div className="bg-white rounded-lg border border-[var(--color-border)] shadow-md p-6 mb-6 text-black">
+            <h1 className="text-2xl title-header font-bold">Create New Role</h1>
+            <p className="text-muted-foreground mt-2">
+              Define a new role with custom permissions for your staff members.
+            </p>
+          </div>
 
-        {/* Form Card */}
-        <div className="bg-white rounded-lg border border-[var(--color-border)] shadow-md p-6">
-          <CreateRoleForm permissions={permissions} />
-        </div>
-      </Shell>
-    </section>
+          {/* Form Card */}
+          <div className="bg-white rounded-lg border border-[var(--color-border)] shadow-md p-6">
+            <CreateRoleForm permissions={permissions} />
+          </div>
+        </Shell>
+      </section>
+    </PermissionRoute>
   );
 }

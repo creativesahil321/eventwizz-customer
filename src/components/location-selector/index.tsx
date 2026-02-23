@@ -63,13 +63,8 @@ export function LocationSelector() {
           <MapPin className="h-4 w-4 text-black flex-shrink-0" />
           <div className="flex flex-col items-start min-w-0 flex-1">
             <span className="text-sm font-medium truncate w-full">
-              {selectedLocation.name}
+              {selectedLocation.city || selectedLocation.name}
             </span>
-            {selectedLocation.city && (
-              <span className="text-xs text-muted-foreground leading-tight truncate w-full">
-                {selectedLocation.city}
-              </span>
-            )}
           </div>
           <ChevronDown className="h-4 w-4 ml-1 flex-shrink-0" />
         </Button>
@@ -94,7 +89,7 @@ export function LocationSelector() {
               <div className="flex items-center gap-2.5 min-w-0 flex-1">
                 <MapPin className="h-3.5 w-3.5 text-[var(--color-secondary,#009ead)] flex-shrink-0" />
                 <span className="font-medium text-sm truncate">
-                  {location.city && location.city}
+                  {location.city || location.name}
                 </span>
               </div>
               <div className="flex items-center gap-2 flex-shrink-0">

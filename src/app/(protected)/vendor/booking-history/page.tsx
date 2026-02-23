@@ -31,6 +31,8 @@ import { cn } from "@/lib/utils";
 import { useDebounce } from "@/hooks/data-table/use-debounce";
 import { useQueryState, parseAsInteger } from "nuqs";
 import { TableToolbarActions } from "./_components/table-toolbar-actions";
+import { LocationIndicator } from "@/components/location-indicator";
+import { PermissionRoute } from "@/components/permission";
 
 export default function BookingHistoryPage() {
   const [globalFilterValue, setGlobalFilterValue] = useState("");
@@ -139,20 +141,25 @@ export default function BookingHistoryPage() {
   }, [historyData?.summary, historyData?.data]);
 
   return (
-    <section className="page text-black min-w-0">
-      <Shell className="gap-2">
-        <div className="flex flex-col gap-4 min-w-0">
-          <div className="bg-white rounded-lg border border-[var(--color-border)] shadow-md p-6 mb-4 min-w-0">
-            <div className="flex flex-col gap-4">
+    <PermissionRoute
+      permissionKey="read-booking"
+      fallbackPath="/vendor/dashboard"
+    >
+      <section className="page text-black min-w-0">
+        <Shell className="gap-2">
+          <div className="flex flex-col gap-4 min-w-0">
+            <div className="bg-white rounded-lg border border-[var(--color-border)] shadow-md p-6 mb-4 min-w-0">
+              <div className="flex flex-col gap-4">
               <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center flex-wrap gap-4">
-                <div>
+                <div className="flex flex-col gap-3">
                   <h1 className="text-2xl title-header font-bold text-black flex items-center gap-2">
                     Booking History
                     {isFetching && (
                       <Loader2 className="h-5 w-5 animate-spin text-primary" />
                     )}
                   </h1>
-                  <p className="text-muted-foreground mt-2">
+                  <LocationIndicator variant="card" context="Bookings" />
+                  <p className="text-muted-foreground">
                     View and manage all booking transactions. Filter by status
                     and track booking details.
                   </p>
@@ -348,5 +355,6 @@ export default function BookingHistoryPage() {
         </div>
       </Shell>
     </section>
+    </PermissionRoute>
   );
 }

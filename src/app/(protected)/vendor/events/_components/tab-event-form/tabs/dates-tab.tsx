@@ -141,7 +141,7 @@ const getDefaultDate = (
 
 export default function DatesTab() {
   const [isLoading, setIsLoading] = useState(false);
-  const { form: globalForm, save } = useEventFormContext();
+  const { form: globalForm, save, readOnly } = useEventFormContext();
 
   // Get event_id from global form
   const getEventId = (): number => {
@@ -1565,11 +1565,11 @@ export default function DatesTab() {
           <div className="flex flex-col sm:flex-row justify-end gap-3 sm:gap-4 pt-4">
             <Button
               type="submit"
-              disabled={isLoading}
+              disabled={isLoading || readOnly}
               variant="event-primary"
               className="w-full sm:w-auto"
             >
-              {isLoading ? "Saving..." : "Save & Next"}
+              {readOnly ? "View only" : isLoading ? "Saving..." : "Save & Next"}
             </Button>
           </div>
         </form>

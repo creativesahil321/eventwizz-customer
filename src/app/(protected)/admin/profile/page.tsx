@@ -45,13 +45,15 @@ export default function ProfilePage() {
     },
   });
 
-  // Password form
+  // Password form (admin always has password set → is_password_set: true)
   const passwordForm = useForm<PasswordUpdateFormValues>({
     resolver: zodResolver(passwordUpdateSchema),
     defaultValues: {
       username: "",
       currentPassword: "",
       password: "",
+      password_confirmation: "",
+      is_password_set: true,
     },
   });
 
@@ -74,9 +76,14 @@ export default function ProfilePage() {
         postcode: profileData.post_code || "",
       });
 
-      // Set username in password form from profile data _key
+      // Set username and is_password_set in password form from profile data
       if (profileData._key) {
         passwordForm.setValue("username", profileData._key);
+      }
+      if (profileData.is_password_set !== undefined) {
+        passwordForm.setValue("is_password_set", profileData.is_password_set);
+      } else {
+        passwordForm.setValue("is_password_set", true);
       }
 
       // Set avatar preview if available
@@ -147,11 +154,13 @@ export default function ProfilePage() {
       const response = await updatePasswordMutation.mutateAsync(data);
 
       if (response.status) {
-        // Reset password fields
+        const username = passwordForm.getValues("username");
         passwordForm.reset({
-          ...data,
+          username,
           currentPassword: "",
           password: "",
+          password_confirmation: "",
+          is_password_set: true,
         });
       }
     } catch (error) {
@@ -164,9 +173,11 @@ export default function ProfilePage() {
   const isProfileLoading = updateProfileMutation.isPending;
   const isPasswordLoading = updatePasswordMutation.isPending;
   const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
-  // Handle password visibility toggle
   const togglePasswordVisibility = () => setShowPassword((prev) => !prev);
+  const toggleConfirmPasswordVisibility = () =>
+    setShowConfirmPassword((prev) => !prev);
 
   // Show loading state while fetching profile data
   if (profileDataLoading) {
@@ -456,6 +467,39 @@ export default function ProfilePage() {
                   {passwordForm.formState.errors.password && (
                     <p className="text-sm text-red-500 mt-1">
                       {passwordForm.formState.errors.password.message}
+                    </p>
+                  )}
+                </div>
+
+                <div>
+                  <div className="flex justify-between items-center">
+                    <FormLabel
+                      htmlFor="password_confirmation"
+                      className="block mb-2"
+                    >
+                      Confirm New Password
+                    </FormLabel>
+                    <Button
+                      type="button"
+                      variant="event-ghost"
+                      onClick={toggleConfirmPasswordVisibility}
+                      className="h-8 px-2 text-xs"
+                    >
+                      {showConfirmPassword ? "Hide" : "Show"}
+                    </Button>
+                  </div>
+                  <Input
+                    id="password_confirmation"
+                    type={showConfirmPassword ? "text" : "password"}
+                    {...passwordForm.register("password_confirmation")}
+                    className="bg-gray-50 h-11 w-full"
+                  />
+                  {passwordForm.formState.errors.password_confirmation && (
+                    <p className="text-sm text-red-500 mt-1">
+                      {
+                        passwordForm.formState.errors.password_confirmation
+                          .message
+                      }
                     </p>
                   )}
                 </div>

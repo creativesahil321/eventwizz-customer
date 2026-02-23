@@ -41,6 +41,7 @@ import {
 import { useVendorBookingById } from "@/services/vendor/bookings/hooks/useVendorBookingById";
 import { MenuTable } from "@/services/customer/bookings/type";
 import { vendorBookingsService } from "@/services/vendor/bookings/bookings.service";
+import { PermissionRoute } from "@/components/permission";
 
 interface MenuChoicesPageProps {
   readonly params: Promise<{
@@ -747,8 +748,13 @@ export default function MenuChoicesPage({
   params,
 }: Readonly<MenuChoicesPageProps>) {
   return (
-    <Suspense fallback={<MenuChoicesPageSkeleton />}>
-      <MenuChoicesContent params={params} />
-    </Suspense>
+    <PermissionRoute
+      permissionKey="read-event-menu"
+      fallbackPath="/vendor/menu-choices"
+    >
+      <Suspense fallback={<MenuChoicesPageSkeleton />}>
+        <MenuChoicesContent params={params} />
+      </Suspense>
+    </PermissionRoute>
   );
 }

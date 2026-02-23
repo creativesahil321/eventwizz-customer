@@ -1,8 +1,10 @@
+import { useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { SearchParams } from "./types";
 import { LocationFormValues } from "./validations";
 import { VenueLocation as ApiVenueLocation } from "@/types/api.types";
 import { locationService } from "@/services/vendor/locations/locations.service";
+import { useSitePreviewStore } from "@/store/site-preview.store";
 import {
   LocationCreatePayload,
   LocationUpdatePayload,
@@ -11,6 +13,16 @@ import { useSession } from "next-auth/react";
 
 // Constants
 const LOCATIONS_STALE_TIME = 10 * 60 * 1000; // 10 minutes
+
+/** Query key prefixes to invalidate when default location changes (APIs use location from session/header) */
+export const LOCATION_DEPENDENT_QUERY_KEYS = [
+  ["vendor-booking-history"],
+  ["vendor-transactions"],
+  ["menu-choices"],
+  ["vendor", "email-logs"],
+  ["site-essentials"],
+  ["events"],
+] as const;
 
 // Helper: Get current location ID from session (no localStorage)
 export const useCurrentLocationId = (): number | null => {
@@ -124,6 +136,22 @@ export const useLocations = (
 export const useLocationsQuery = (enabled: boolean = true) => {
   return useLocations({}, { enabled });
 };
+
+/** Hook for vendor-only UIs (e.g. staff forms, dropdowns). Returns locations list and loading state. Shares cache with header/location page. */
+export function useVendorLocationsList(): {
+  locations: ApiVenueLocation[];
+  isLoading: boolean;
+} {
+  const { data: session } = useSession();
+  const isVendor = session?.user?.account_type === "vendor";
+  const { data: locationsResult, isLoading } = useLocationsQuery(isVendor);
+  const locations = useMemo(() => {
+    if (!locationsResult) return [];
+    if (Array.isArray(locationsResult)) return locationsResult;
+    return locationsResult.data ?? [];
+  }, [locationsResult]);
+  return { locations, isLoading };
+}
 
 // Function to get a single location by ID
 export const useLocation = (id: number | string) => {
@@ -266,6 +294,10 @@ export const useToggleLocationStatus = () => {
               await updateSession({
                 vendor_location_id: String(newDefaultLocation.id),
               });
+              LOCATION_DEPENDENT_QUERY_KEYS.forEach((queryKey) => {
+                queryClient.invalidateQueries({ queryKey, refetchType: "active" });
+              });
+              useSitePreviewStore.getState().clearPreviewData();
             } catch (error) {
               console.error("Failed to update session with new default location:", error);
             }

@@ -9,7 +9,6 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import {
-  SquarePen,
   Shield,
   ShieldAlert,
   ShieldCheck,
@@ -39,6 +38,12 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { AxiosError } from "axios";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { PermissionGuard } from "@/components/permission/PermissionGuard";
 
 interface ManageRolesProps {
   roles: Record<string, Role>;
@@ -99,12 +104,13 @@ export default function ManageRoles({
     const transformedRoles: Record<string, Role> = {};
 
     rolesData.forEach((role) => {
-      if (!role) return; // Skip if role is undefined
+      if (!role) return;
 
       transformedRoles[role.slug] = {
         id: role.id,
         name: role.slug,
         title: role.label,
+        is_default: role.is_default,
         permissions: Array.isArray(role.permissions)
           ? role.permissions.map((perm) => ({
               title: perm.label,
@@ -122,7 +128,7 @@ export default function ManageRoles({
   const handleUpdatePermissions = (
     roleId: string | number,
     permissionState: { [key: string]: boolean },
-    roleData: { slug: string; label: string }
+    roleData: { label: string }
   ) => {
     try {
       // Get the current role data from our transformed roles
@@ -145,16 +151,12 @@ export default function ManageRoles({
         })
         .filter((id) => typeof id === "number"); // Only keep numeric IDs
 
-      // Use the updated role data from form
-      const roleSlug = roleData.slug;
       const roleLabel = roleData.label;
 
-      // Call the update mutation with the complete payload
       updateRoleMutation.mutate(
         {
           id: Number(roleId),
           permissions: enabledPermissionIds,
-          slug: roleSlug,
           label: roleLabel,
         },
         {
@@ -247,12 +249,16 @@ export default function ManageRoles({
                   {RoleIcons[role.name] || (
                     <Shield className="h-6 w-6 text-[var(--color-primary)] flex-shrink-0" />
                   )}
-                  <span
-                    className="text-lg font-semibold truncate min-w-0"
-                    title={role.title}
-                  >
-                    {role.title}
-                  </span>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span className="text-lg font-semibold truncate min-w-0 cursor-default">
+                        {role.title}
+                      </span>
+                    </TooltipTrigger>
+                    <TooltipContent side="top" className="max-w-[min(320px,90vw)]">
+                      {role.title}
+                    </TooltipContent>
+                  </Tooltip>
                 </CardTitle>
                 <Badge
                   variant="outline"
@@ -270,15 +276,24 @@ export default function ManageRoles({
             </CardHeader>
             <CardContent className="pt-2">
               <div className="flex flex-wrap gap-2 mb-4">
-                {role.permissions.slice(0, 3).map((permission) => (
-                  <Badge
-                    key={permission.id || permission.slug}
-                    variant="secondary"
-                    className="bg-[var(--color-background)] text-[var(--color-text-dimmed)] text-xs text-white"
-                  >
-                    {permission.title || "Permission"}
-                  </Badge>
-                ))}
+                {role.permissions.slice(0, 3).map((permission) => {
+                  const permTitle = permission.title || "Permission";
+                  return (
+                    <Tooltip key={permission.id || permission.slug}>
+                      <TooltipTrigger asChild>
+                        <Badge
+                          variant="secondary"
+                          className="bg-[var(--color-background)] text-[var(--color-text-dimmed)] text-xs text-white max-w-[160px] truncate cursor-default"
+                        >
+                          {permTitle}
+                        </Badge>
+                      </TooltipTrigger>
+                      <TooltipContent side="top" className="max-w-[min(320px,90vw)]">
+                        {permTitle}
+                      </TooltipContent>
+                    </Tooltip>
+                  );
+                })}
                 {role.permissions.length > 3 && (
                   <Badge
                     variant="secondary"
@@ -291,38 +306,46 @@ export default function ManageRoles({
 
               <div className="flex gap-2 items-center">
                 <div className="flex-1">
-                  <PermissionsDialog
-                    title={role.title}
-                    roleId={role.id}
-                    permissions={[
-                      {
-                        title: "Role Permissions",
-                        slug: "role-permissions",
-                        permission: role.permissions.map((perm) => ({
-                          id: perm.id,
-                          slug: perm.slug,
-                          label:
-                            perm.title ||
-                            perm.slug.split(".").pop() ||
-                            perm.slug,
-                          title: perm.title,
-                          key: perm.key || perm.slug,
-                          permission: [],
-                        })),
-                      },
-                    ]}
-                    onSave={handleUpdatePermissions}
-                  />
+                  <PermissionGuard permissionKey="update-role-permission">
+                    <PermissionsDialog
+                      title={role.title}
+                      roleId={role.id}
+                      isDefault={role.is_default}
+                      permissions={[
+                        {
+                          title: "Role Permissions",
+                          slug: "role-permissions",
+                          permission: role.permissions.map((perm) => ({
+                            id: perm.id,
+                            slug: perm.slug,
+                            label:
+                              perm.title ||
+                              perm.slug.split(".").pop() ||
+                              perm.slug,
+                            title: perm.title,
+                            key: perm.key || perm.slug,
+                            permission: [],
+                          })),
+                        },
+                      ]}
+                      onSave={handleUpdatePermissions}
+                    />
+                  </PermissionGuard>
                 </div>
 
-                <Button
-                  variant="outline"
-                  size="icon"
-                  className="h-10 w-10 text-red-500 hover:text-red-700 hover:bg-red-50 border-[var(--color-border)]"
-                  onClick={() => handleDeleteRole(role)}
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
+                {!role.is_default && (
+                  <PermissionGuard permissionKey="delete-role-permission">
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      className="h-10 w-10 text-red-500 hover:text-red-700 hover:bg-red-50 border-[var(--color-border)]"
+                      onClick={() => handleDeleteRole(role)}
+                      aria-label="Delete role"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </PermissionGuard>
+                )}
               </div>
             </CardContent>
           </Card>

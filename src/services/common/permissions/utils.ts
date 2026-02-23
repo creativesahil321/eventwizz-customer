@@ -48,12 +48,12 @@ export const hasMenuPermission = (
   if (!menuPermission) return true; // No permission required
   if (!permissions || !Array.isArray(permissions)) return false;
 
-  // Direct match check first (in case menu permission is already in API format)
+  // Exact match only – backend and frontend use the same keys (see docs/CLEAN_PERMISSIONS_SPEC_FOR_BACKEND.md)
   if (permissions.includes(menuPermission)) {
     return true;
   }
 
-  // Handle resource.action format
+  // Handle resource.action format (legacy menu format e.g. "events.read" → "read-event")
   if (menuPermission.includes(".")) {
     const [resource, action] = menuPermission.split(".");
 
@@ -151,9 +151,8 @@ export const debugPermissionMapping = (
   const apiFormat = mapMenuPermissionToAPI(menuPermission);
   const hasPermission = hasMenuPermission(menuPermission, permissions);
 
-  return `Menu format: "${menuPermission}" → API format: "${apiFormat}" → ${
-    hasPermission ? "✅ Granted" : "❌ Denied"
-  }`;
+  return `Menu format: "${menuPermission}" → API format: "${apiFormat}" → ${hasPermission ? "✅ Granted" : "❌ Denied"
+    }`;
 };
 
 // Define a more specific return type for generatePermissionDebugInfo

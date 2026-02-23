@@ -43,6 +43,7 @@ export default function EventNameTab() {
     save,
     isLoading: globalLoading,
     setActiveField,
+    readOnly,
   } = useEventFormContext();
 
   // Get event categories
@@ -1485,10 +1486,10 @@ export default function EventNameTab() {
                     form.handleSubmit(handleSubmit)();
                   }
                 }}
-                disabled={isLoading || globalLoading}
+                disabled={isLoading || globalLoading || readOnly}
                 variant="event-primary"
               >
-                {isLoading || globalLoading ? "Saving..." : "Save & Next"}
+                {readOnly ? "View only" : isLoading || globalLoading ? "Saving..." : "Save & Next"}
               </Button>
             </div>
           </div>

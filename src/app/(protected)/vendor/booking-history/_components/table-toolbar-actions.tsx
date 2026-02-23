@@ -32,6 +32,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { PermissionGuard } from "@/components/permission/PermissionGuard";
 
 interface TableToolbarActionsProps {
   table: Table<History>;
@@ -162,32 +163,38 @@ export function TableToolbarActions({ table }: TableToolbarActionsProps) {
         {/* Bulk Actions (only show when items are selected) */}
         {hasSelection && (
           <>
-            <Button
-              onClick={() => setEmailDialogOpen(true)}
-              variant="event-outline"
-              disabled={bulkEmailMutation.isPending}
-            >
-              <Mail className="mr-2 h-4 w-4" />
-              Email ({selectedRows.length})
-            </Button>
+            <PermissionGuard permissionKey="update-booking">
+              <Button
+                onClick={() => setEmailDialogOpen(true)}
+                variant="event-outline"
+                disabled={bulkEmailMutation.isPending}
+              >
+                <Mail className="mr-2 h-4 w-4" />
+                Email ({selectedRows.length})
+              </Button>
+            </PermissionGuard>
 
-            <Button
-              onClick={() => setExportDialogOpen(true)}
-              variant="event-outline"
-              disabled={bulkExportMutation.isPending}
-            >
-              <Download className="mr-2 h-4 w-4" />
-              Export ({selectedRows.length})
-            </Button>
+            <PermissionGuard permissionKey="read-booking">
+              <Button
+                onClick={() => setExportDialogOpen(true)}
+                variant="event-outline"
+                disabled={bulkExportMutation.isPending}
+              >
+                <Download className="mr-2 h-4 w-4" />
+                Export ({selectedRows.length})
+              </Button>
+            </PermissionGuard>
 
-            <Button
-              onClick={() => setDeleteDialogOpen(true)}
-              variant="destructive"
-              disabled={bulkDeleteMutation.isPending}
-            >
-              <Trash2 className="mr-2 h-4 w-4" />
-              Delete ({selectedRows.length})
-            </Button>
+            <PermissionGuard permissionKey="delete-booking">
+              <Button
+                onClick={() => setDeleteDialogOpen(true)}
+                variant="destructive"
+                disabled={bulkDeleteMutation.isPending}
+              >
+                <Trash2 className="mr-2 h-4 w-4" />
+                Delete ({selectedRows.length})
+              </Button>
+            </PermissionGuard>
           </>
         )}
       </nav>

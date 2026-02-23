@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Mail, Pencil, Trash2, RotateCcw } from "lucide-react";
 import { formatDate } from "@/lib/utils";
 import { createSelectColumn } from "@/components/data-table/data-table-column-select";
+import { PermissionGuard } from "@/components/permission/PermissionGuard";
 
 // Map of status to CSS color variables
 const STATUS_COLORS = {
@@ -201,14 +202,16 @@ export function getColumns({
           return (
             <>
               <nav className="flex space-x-3">
-                <Button
-                  onClick={() => setRowAction({ row, type: "restore" })}
-                  variant="default"
-                  className="bg-green-600 hover:bg-green-700 text-white border-green-600 hover:border-green-700 dark:bg-green-500 dark:hover:bg-green-600 dark:text-white dark:border-green-500"
-                  title="Restore Customer"
-                >
-                  <RotateCcw size={16} />
-                </Button>
+                <PermissionGuard permissionKey="update-customer">
+                  <Button
+                    onClick={() => setRowAction({ row, type: "restore" })}
+                    variant="default"
+                    className="bg-green-600 hover:bg-green-700 text-white border-green-600 hover:border-green-700 dark:bg-green-500 dark:hover:bg-green-600 dark:text-white dark:border-green-500"
+                    title="Restore Customer"
+                  >
+                    <RotateCcw size={16} />
+                  </Button>
+                </PermissionGuard>
               </nav>
             </>
           );
@@ -218,27 +221,33 @@ export function getColumns({
         return (
           <>
             <nav className="flex space-x-3">
-              <Button
-                onClick={() => setRowAction({ row, type: "edit" })}
-                variant="event-outline"
-                title="Edit Customer"
-              >
-                <Pencil size={16} />
-              </Button>
-              <Button
-                onClick={() => setRowAction({ row, type: "mail" })}
-                variant="event-outline"
-                title="Send Mail"
-              >
-                <Mail size={16} />
-              </Button>
-              <Button
-                onClick={() => setRowAction({ row, type: "delete" })}
-                variant="destructive"
-                title="Delete Customer"
-              >
-                <Trash2 size={16} />
-              </Button>
+              <PermissionGuard permissionKey="update-customer">
+                <Button
+                  onClick={() => setRowAction({ row, type: "edit" })}
+                  variant="event-outline"
+                  title="Edit Customer"
+                >
+                  <Pencil size={16} />
+                </Button>
+              </PermissionGuard>
+              <PermissionGuard permissionKey="send-mail-to-customer">
+                <Button
+                  onClick={() => setRowAction({ row, type: "mail" })}
+                  variant="event-outline"
+                  title="Send Mail"
+                >
+                  <Mail size={16} />
+                </Button>
+              </PermissionGuard>
+              <PermissionGuard permissionKey="delete-customer">
+                <Button
+                  onClick={() => setRowAction({ row, type: "delete" })}
+                  variant="destructive"
+                  title="Delete Customer"
+                >
+                  <Trash2 size={16} />
+                </Button>
+              </PermissionGuard>
             </nav>
           </>
         );

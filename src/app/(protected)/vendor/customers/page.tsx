@@ -49,6 +49,8 @@ import { useQueryState, parseAsInteger } from "nuqs";
 import { toast } from "sonner";
 import type { Table } from "@tanstack/react-table";
 import { Customer } from "./_lib/types";
+import { PermissionGuard } from "@/components/permission/PermissionGuard";
+import { PermissionRoute } from "@/components/permission";
 
 // Dynamic import of the customer create dialog
 const CreateCustomerDialog = dynamic(
@@ -282,8 +284,12 @@ export default function CustomersPage() {
   const hasSelectedRows = selectedRowCount > 0;
 
   return (
-    <section className="page text-black min-w-0">
-      <Shell className="gap-2">
+    <PermissionRoute
+      permissionKey="read-customer"
+      fallbackPath="/vendor/dashboard"
+    >
+      <section className="page text-black min-w-0">
+        <Shell className="gap-2">
         <div className="flex flex-col gap-4 min-w-0">
           <div className="bg-white rounded-lg border border-[var(--color-border)] shadow-md p-6 mb-4 min-w-0">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center flex-wrap gap-4">
@@ -364,21 +370,26 @@ export default function CustomersPage() {
                         <FileDown className="h-4 w-4" />
                         Export CSV
                       </DropdownMenuItem>
-                      <DropdownMenuItem asChild>
-                        <Link
-                          href="/vendor/send-email-to-all"
-                          className="flex items-center gap-2 cursor-pointer"
-                        >
-                          <Mail className="h-4 w-4" />
-                          Bulk Mail
-                        </Link>
-                      </DropdownMenuItem>
+                      <PermissionGuard permissionKey="send-mail-to-all-customers">
+                        <DropdownMenuItem asChild>
+                          <Link
+                            href="/vendor/send-email-to-all"
+                            className="flex items-center gap-2 cursor-pointer"
+                          >
+                            <Mail className="h-4 w-4" />
+                            Bulk Mail
+                          </Link>
+                        </DropdownMenuItem>
+                      </PermissionGuard>
                     </DropdownMenuContent>
                   </DropdownMenu>
 
                   {/* Bulk Actions - only when rows are selected */}
                   {hasSelectedRows && (
-                    <DropdownMenu>
+                    <PermissionGuard
+                      anyPermission={["update-customer", "delete-customer"]}
+                    >
+                      <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <Button
                           variant="outline"
@@ -504,9 +515,12 @@ export default function CustomersPage() {
                         )}
                       </DropdownMenuContent>
                     </DropdownMenu>
+                    </PermissionGuard>
                   )}
 
-                  <CreateCustomerButton />
+                  <PermissionGuard permissionKey="create-customer">
+                    <CreateCustomerButton />
+                  </PermissionGuard>
                 </div>
               </div>
             </div>
@@ -537,5 +551,6 @@ export default function CustomersPage() {
         </div>
       </Shell>
     </section>
+    </PermissionRoute>
   );
 }

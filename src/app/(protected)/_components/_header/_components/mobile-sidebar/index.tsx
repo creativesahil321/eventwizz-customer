@@ -16,6 +16,8 @@ import MobileMenuItem from "./mobile-menu-item";
 import { useSession } from "next-auth/react";
 import { useLocationsQuery } from "@/app/(protected)/vendor/venue-locations/_lib/queries";
 import { LocationSelector } from "@/components/location-selector";
+import { PermissionMenu } from "@/components/permission/permission-menu";
+import { Skeleton } from "@/components/ui/skeleton";
 
 interface MobileSidebarProps {
   menus?: MenuItemProps[];
@@ -65,15 +67,29 @@ const MobileSidebar: React.FC<MobileSidebarProps> = memo(({ menus = [] }) => {
         )}
 
         <nav className="w-full p-4 max-h-[calc(100vh-80px)] overflow-y-auto text-black">
-          <ul className="flex flex-col space-y-0">
-            {menus.map((menu) => (
-              <MobileMenuItem
-                key={menu.id || menu.title}
-                menu={menu}
-                onClose={handleClose}
-              />
-            ))}
-          </ul>
+          <PermissionMenu
+            menus={menus}
+            loadingFallback={
+              <div className="flex flex-col space-y-2">
+                {Array(6)
+                  .fill(0)
+                  .map((_, i) => (
+                    <Skeleton key={i} className="h-12 w-full" />
+                  ))}
+              </div>
+            }
+            render={(filteredMenus) => (
+              <ul className="flex flex-col space-y-0">
+                {filteredMenus.map((menu) => (
+                  <MobileMenuItem
+                    key={menu.id || menu.title}
+                    menu={menu}
+                    onClose={handleClose}
+                  />
+                ))}
+              </ul>
+            )}
+          />
         </nav>
       </SheetContent>
     </Sheet>

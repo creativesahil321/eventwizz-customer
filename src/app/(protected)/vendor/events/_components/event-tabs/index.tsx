@@ -10,7 +10,11 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Card, CardContent } from "@/components/ui/card";
 import EventCard from "./event-card";
 import EventsTabSkeleton from "./events-skeleton";
-import { useEvents, useBulkUpdateEventStatus, eventKeys } from "../../_lib/queries";
+import {
+  useEvents,
+  useBulkUpdateEventStatus,
+  eventKeys,
+} from "../../_lib/queries";
 import { useQueryClient } from "@tanstack/react-query";
 import EventPagination from "./event-pagination";
 import { Button } from "@/components/ui/button";
@@ -29,6 +33,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { LocationIndicator } from "@/components/location-indicator";
+import { PermissionGuard } from "@/components/permission/PermissionGuard";
 
 const tabs = ["all", "active", "old", "draft", "cancelled"];
 
@@ -52,17 +58,17 @@ export default function EventTabs({ search }: EventsProps) {
   // Query state for filters and pagination
   const [status, setStatus] = useQueryState(
     "status",
-    parseAsString.withDefault(search?.status ? String(search.status) : "all")
+    parseAsString.withDefault(search?.status ? String(search.status) : "all"),
   );
 
   const [page, setPage] = useQueryState(
     "page",
-    parseAsInteger.withDefault(search?.page ? Number(search.page) : 1)
+    parseAsInteger.withDefault(search?.page ? Number(search.page) : 1),
   );
 
   const [perPage] = useQueryState(
     "per_page",
-    parseAsInteger.withDefault(search?.per_page ? Number(search.per_page) : 30)
+    parseAsInteger.withDefault(search?.per_page ? Number(search.per_page) : 30),
   );
 
   // Format API query params
@@ -103,7 +109,7 @@ export default function EventTabs({ search }: EventsProps) {
     setSelectedEvents((prev) =>
       prev.includes(id)
         ? prev.filter((eventId) => eventId !== id)
-        : [...prev, id]
+        : [...prev, id],
     );
   };
 
@@ -153,7 +159,7 @@ export default function EventTabs({ search }: EventsProps) {
         selectedEvents.length
       } event${selectedEvents.length > 1 ? "s" : ""}? ${
         actionDescriptions[action]
-      }`
+      }`,
     );
     setShowConfirmModal(true);
   };
@@ -185,7 +191,7 @@ export default function EventTabs({ search }: EventsProps) {
           setShowConfirmModal(false);
           setPendingAction(null);
         },
-      }
+      },
     );
   };
 
@@ -213,23 +219,28 @@ export default function EventTabs({ search }: EventsProps) {
   return (
     <section className="w-full bg-background flex flex-col relative rounded-md text-black">
       <header className="bg-background p-4 sm:p-6 rounded-md flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <h2 className="text-xl sm:text-2xl title-header text-black font-bold">
-          All Events
-        </h2>
+        <div className="flex flex-col gap-3 w-full sm:w-auto">
+          <h2 className="text-xl sm:text-2xl title-header text-black font-bold">
+            All Events
+          </h2>
+          <LocationIndicator variant="card" />
+        </div>
         <div className="flex flex-wrap gap-2 w-full sm:w-auto">
-          <Button
-            size="sm"
-            onClick={toggleSelectionMode}
-            variant={selectionMode ? "event-outline" : "event-secondary"}
-            className="flex-1 sm:flex-none"
-          >
-            <span className="hidden sm:inline">
-              {selectionMode ? "Exit Selection" : "Select Events"}
-            </span>
-            <span className="sm:hidden">
-              {selectionMode ? "Exit" : "Select"}
-            </span>
-          </Button>
+          <PermissionGuard permissionKey="update-event">
+            <Button
+              size="sm"
+              onClick={toggleSelectionMode}
+              variant={selectionMode ? "event-outline" : "event-secondary"}
+              className="flex-1 sm:flex-none"
+            >
+              <span className="hidden sm:inline">
+                {selectionMode ? "Exit Selection" : "Select Events"}
+              </span>
+              <span className="sm:hidden">
+                {selectionMode ? "Exit" : "Select"}
+              </span>
+            </Button>
+          </PermissionGuard>
 
           <Button
             className="text-black flex items-center gap-1 flex-1 sm:flex-none"
@@ -245,77 +256,85 @@ export default function EventTabs({ search }: EventsProps) {
 
       {/* Bulk Actions Bar - visible only in selection mode */}
       {selectionMode && (
-        <div className="bg-muted/20 p-2 sm:p-3 mb-4 rounded-md mx-2 sm:mx-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-          <div className="flex flex-col gap-2 w-full sm:w-auto">
-            <div className="flex items-center">
-              <Checkbox
-                id="select-all"
-                checked={
-                  selectedEvents.length > 0 &&
-                  selectedEvents.length === events.length
-                }
-                onCheckedChange={toggleSelectAll}
-                className="mr-2"
-              />
-              <label htmlFor="select-all" className="text-sm font-medium">
-                {selectedEvents.length > 0
-                  ? `${selectedEvents.length} of ${events.length} selected`
-                  : "Select All"}
-              </label>
-            </div>
-            {hasCancelledEvents && (
-              <div className="text-xs text-amber-600 bg-amber-50 px-2 py-1 rounded border border-amber-200">
-                ⚠️ Cancelled events cannot be reactivated or drafted
+        <PermissionGuard permissionKey="update-event">
+          <div className="bg-muted/20 p-2 sm:p-3 mb-4 rounded-md mx-2 sm:mx-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+            <div className="flex flex-col gap-2 w-full sm:w-auto">
+              <div className="flex items-center">
+                <Checkbox
+                  id="select-all"
+                  checked={
+                    selectedEvents.length > 0 &&
+                    selectedEvents.length === events.length
+                  }
+                  onCheckedChange={toggleSelectAll}
+                  className="mr-2"
+                />
+                <label htmlFor="select-all" className="text-sm font-medium">
+                  {selectedEvents.length > 0
+                    ? `${selectedEvents.length} of ${events.length} selected`
+                    : "Select All"}
+                </label>
               </div>
-            )}
+              {hasCancelledEvents && (
+                <div className="text-xs text-amber-600 bg-amber-50 px-2 py-1 rounded border border-amber-200">
+                  ⚠️ Cancelled events cannot be reactivated or drafted
+                </div>
+              )}
+            </div>
+
+            <div className="flex flex-wrap gap-2 w-full sm:w-auto">
+              <Button
+                className="flex items-center gap-1 flex-1 sm:flex-none"
+                variant="event-primary"
+                size="sm"
+                disabled={
+                  selectedEvents.length === 0 ||
+                  isUpdating ||
+                  hasCancelledEvents
+                }
+                onClick={() => handleBulkStatusUpdate("active")}
+                title={
+                  hasCancelledEvents ? "Cannot reactivate cancelled events" : ""
+                }
+              >
+                <Check className="h-4 w-4" />
+                <span className="hidden sm:inline">Set Active</span>
+                <span className="sm:hidden">Active</span>
+              </Button>
+
+              <Button
+                className="flex items-center gap-1 flex-1 sm:flex-none"
+                variant="event-secondary"
+                size="sm"
+                disabled={
+                  selectedEvents.length === 0 ||
+                  isUpdating ||
+                  hasCancelledEvents
+                }
+                onClick={() => handleBulkStatusUpdate("draft")}
+                title={
+                  hasCancelledEvents ? "Cannot draft cancelled events" : ""
+                }
+              >
+                <FileEdit className="h-4 w-4" />
+                <span className="hidden sm:inline">Set Draft</span>
+                <span className="sm:hidden">Draft</span>
+              </Button>
+
+              <Button
+                className="flex items-center gap-1 flex-1 sm:flex-none"
+                variant="destructive"
+                size="sm"
+                disabled={selectedEvents.length === 0 || isUpdating}
+                onClick={() => handleBulkStatusUpdate("cancelled")}
+              >
+                <X className="h-4 w-4" />
+                <span className="hidden sm:inline">Set Cancelled</span>
+                <span className="sm:hidden">Cancel</span>
+              </Button>
+            </div>
           </div>
-
-          <div className="flex flex-wrap gap-2 w-full sm:w-auto">
-            <Button
-              className="flex items-center gap-1 flex-1 sm:flex-none"
-              variant="event-primary"
-              size="sm"
-              disabled={
-                selectedEvents.length === 0 || isUpdating || hasCancelledEvents
-              }
-              onClick={() => handleBulkStatusUpdate("active")}
-              title={
-                hasCancelledEvents ? "Cannot reactivate cancelled events" : ""
-              }
-            >
-              <Check className="h-4 w-4" />
-              <span className="hidden sm:inline">Set Active</span>
-              <span className="sm:hidden">Active</span>
-            </Button>
-
-            <Button
-              className="flex items-center gap-1 flex-1 sm:flex-none"
-              variant="event-secondary"
-              size="sm"
-              disabled={
-                selectedEvents.length === 0 || isUpdating || hasCancelledEvents
-              }
-              onClick={() => handleBulkStatusUpdate("draft")}
-              title={hasCancelledEvents ? "Cannot draft cancelled events" : ""}
-            >
-              <FileEdit className="h-4 w-4" />
-              <span className="hidden sm:inline">Set Draft</span>
-              <span className="sm:hidden">Draft</span>
-            </Button>
-
-            <Button
-              className="flex items-center gap-1 flex-1 sm:flex-none"
-              variant="destructive"
-              size="sm"
-              disabled={selectedEvents.length === 0 || isUpdating}
-              onClick={() => handleBulkStatusUpdate("cancelled")}
-            >
-              <X className="h-4 w-4" />
-              <span className="hidden sm:inline">Set Cancelled</span>
-              <span className="sm:hidden">Cancel</span>
-            </Button>
-          </div>
-        </div>
+        </PermissionGuard>
       )}
 
       <main className="bg-background p-2 sm:p-4 md:p-6 rounded-md">

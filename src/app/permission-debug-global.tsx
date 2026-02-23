@@ -14,21 +14,12 @@ export default function PermissionDebugGlobal() {
   if (status !== "authenticated") return null;
 
   return (
-    <div
-      className="fixed bottom-4 z-40 flex items-center"
-      style={{
-        insetInlineStart: "max(1rem, env(safe-area-inset-left, 1rem))",
-        maxWidth: "calc(100vw - 2rem)",
-      }}
-    >
+    <div className="fixed bottom-4 left-4 z-100">
       <button
         onClick={() => setExpanded(!expanded)}
-        className="rounded bg-amber-600 px-3 py-1.5 text-xs font-bold text-black shadow-lg hover:bg-amber-700 sm:px-4 sm:py-2 min-w-0 max-w-full overflow-hidden text-inherit"
-        title={`${permissions.length} Permissions`}
+        className="rounded bg-amber-600 px-3 py-1.5 text-xs font-bold text-black shadow-lg hover:bg-amber-700 sm:px-4 sm:py-2"
       >
-        <span className="block truncate">
-          {permissions.length} Permissions {expanded ? "▲" : "▼"}
-        </span>
+        {permissions.length} Permissions {expanded ? "▲" : "▼"}
       </button>
 
       {expanded && (

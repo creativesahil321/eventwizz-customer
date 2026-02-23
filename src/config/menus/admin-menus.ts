@@ -10,7 +10,7 @@ export const adminMenus: MenuItemProps[] = [
     href: createAdminUrl("/admin/dashboard"),
     url: createAdminUrl("/admin/dashboard"),
     type: "item",
-    permissions: "",
+    permissions: "read-dashboard",
     menu: [],
   },
 
@@ -21,7 +21,7 @@ export const adminMenus: MenuItemProps[] = [
     href: createAdminUrl("/admin/vendors"),
     url: createAdminUrl("/admin/vendors"),
     type: "item",
-    permissions: "",
+    permissions: "read-vendor",
     menu: [
       {
         id: 3,
@@ -30,7 +30,7 @@ export const adminMenus: MenuItemProps[] = [
         href: createAdminUrl("/admin/vendors?status=active"),
         url: createAdminUrl("/admin/vendors?status=active"),
         type: "title",
-        permissions: "",
+        permissions: "read-vendor",
         menu: [],
       },
       {
@@ -40,7 +40,7 @@ export const adminMenus: MenuItemProps[] = [
         href: createAdminUrl("/admin/vendors?status=disable"),
         url: createAdminUrl("/admin/vendors?status=disable"),
         type: "title",
-        permissions: "",
+        permissions: "read-vendor",
         menu: [],
       },
       {
@@ -50,7 +50,7 @@ export const adminMenus: MenuItemProps[] = [
         href: createAdminUrl("/admin/send-email-to-all"),
         url: createAdminUrl("/admin/send-email-to-all"),
         type: "title",
-        permissions: "",
+        permissions: "read-vendor",
         menu: [],
       },
     ],
@@ -63,7 +63,7 @@ export const adminMenus: MenuItemProps[] = [
     href: createAdminUrl("/admin/transactions"),
     url: createAdminUrl("/admin/transactions"),
     type: "item",
-    permissions: "",
+    permissions: "read-transaction",
     menu: [],
   },
   {
@@ -73,7 +73,7 @@ export const adminMenus: MenuItemProps[] = [
     href: createAdminUrl("/admin/payments"),
     url: createAdminUrl("/admin/payments"),
     type: "item",
-    permissions: "",
+    permissions: "read-payment",
     menu: [],
   },
   {
@@ -83,7 +83,7 @@ export const adminMenus: MenuItemProps[] = [
     href: createAdminUrl("/admin/notifications"),
     url: createAdminUrl("/admin/notifications"),
     type: "item",
-    permissions: "",
+    permissions: "read-notification",
     menu: [],
   },
   {
@@ -93,7 +93,7 @@ export const adminMenus: MenuItemProps[] = [
     href: createAdminUrl("/admin/commission-overview"),
     url: createAdminUrl("/admin/commission-overview"),
     type: "item",
-    permissions: "",
+    permissions: "read-commission",
     menu: [],
   },
   {
@@ -103,7 +103,7 @@ export const adminMenus: MenuItemProps[] = [
     href: createAdminUrl("/admin/manage-roles"),
     url: createAdminUrl("/admin/manage-roles"),
     type: "item",
-    permissions: "",
+    permissions: "read-role-permission",
     menu: [],
   },
   {
@@ -113,7 +113,7 @@ export const adminMenus: MenuItemProps[] = [
     href: createAdminUrl("/admin/staff-management"),
     url: createAdminUrl("/admin/staff-management"),
     type: "item",
-    permissions: "",
+    permissions: "read-staff",
     menu: [],
   },
   {
@@ -123,7 +123,7 @@ export const adminMenus: MenuItemProps[] = [
     href: createAdminUrl("/admin/email-templates"),
     url: createAdminUrl("/admin/email-templates"),
     type: "item",
-    permissions: "",
+    permissions: "read-email-template",
     menu: [],
   },
   {
@@ -133,7 +133,7 @@ export const adminMenus: MenuItemProps[] = [
     href: createAdminUrl("/admin/sites-essentials"),
     url: createAdminUrl("/admin/sites-essentials"),
     type: "item",
-    permissions: "",
+    permissions: "read-site-essential",
     menu: [],
   },
   {
@@ -143,7 +143,7 @@ export const adminMenus: MenuItemProps[] = [
     href: createAdminUrl("/admin/marketing-analytics"),
     url: createAdminUrl("/admin/marketing-analytics"),
     type: "item",
-    permissions: "",
+    permissions: "read-marketing",
     menu: [],
   },
   {
@@ -153,7 +153,7 @@ export const adminMenus: MenuItemProps[] = [
     href: createAdminUrl("/admin/system-logs"),
     url: createAdminUrl("/admin/system-logs"),
     type: "item",
-    permissions: "",
+    permissions: "read-system-log",
     menu: [],
   },
   {
@@ -163,7 +163,7 @@ export const adminMenus: MenuItemProps[] = [
     href: createAdminUrl("/admin/support"),
     url: createAdminUrl("/admin/support"),
     type: "item",
-    permissions: "",
+    permissions: "read-ticket",
     menu: [],
   },
   {
@@ -173,7 +173,7 @@ export const adminMenus: MenuItemProps[] = [
     href: createAdminUrl("/admin/referrals"),
     url: createAdminUrl("/admin/referrals"),
     type: "item",
-    permissions: "",
+    permissions: "read-referral",
     menu: [],
   },
   {
@@ -183,7 +183,7 @@ export const adminMenus: MenuItemProps[] = [
     href: createAdminUrl("/admin/sales-marketing"),
     url: createAdminUrl("/admin/sales-marketing"),
     type: "item",
-    permissions: "",
+    permissions: "read-marketing",
     menu: [],
   },
   {
@@ -193,7 +193,7 @@ export const adminMenus: MenuItemProps[] = [
     href: createAdminUrl("/admin/seo-tools"),
     url: createAdminUrl("/admin/seo-tools"),
     type: "item",
-    permissions: "",
+    permissions: "read-seo-tool",
     menu: [],
   },
   {
@@ -203,7 +203,7 @@ export const adminMenus: MenuItemProps[] = [
     href: createAdminUrl("/admin/dispute-resolution-centre"),
     url: createAdminUrl("/admin/dispute-resolution-centre"),
     type: "item",
-    permissions: "",
+    permissions: "read-dispute",
     menu: [],
   },
 ];

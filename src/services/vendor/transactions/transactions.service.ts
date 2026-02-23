@@ -55,6 +55,13 @@ export interface FetchTransactionsParams {
   search?: string;
   status?: string;
   booking_date?: string;
+  from?: string;
+  to?: string;
+}
+
+export interface ExportReceiptsPayload {
+  from: string;
+  to: string;
 }
 
 /**
@@ -69,6 +76,8 @@ export const fetchVendorTransactions = async (
     search = "",
     status = "",
     booking_date = "",
+    from = "",
+    to = "",
   } = params;
 
   const endpoint = API_ENDPOINTS.VENDOR.TRANSACTIONS.GET_ALL.replace(
@@ -78,7 +87,9 @@ export const fetchVendorTransactions = async (
     .replace("{per_page}", String(per_page))
     .replace("{search}", search)
     .replace("{status}", status)
-    .replace("{booking_date}", booking_date);
+    .replace("{booking_date}", booking_date)
+    .replace("{from}", from)
+    .replace("{to}", to);
 
   return api.get<VendorTransactionsResponse>(endpoint, {
     returnFullResponse: true,
@@ -86,35 +97,36 @@ export const fetchVendorTransactions = async (
 };
 
 /**
- * Export transactions to CSV
+ * Get single transaction receipt (PDF/file) by transaction id
  */
-export const exportTransactionsCSV = async (
-  params: FetchTransactionsParams = {}
+export const getSingleReceipt = async (
+  id: number | string
 ): Promise<Blob> => {
-  const {
-    page = 1,
-    per_page = 30,
-    search = "",
-    status = "",
-    booking_date = "",
-  } = params;
-
-  // Assuming there's an export endpoint
-  const endpoint = API_ENDPOINTS.VENDOR.TRANSACTIONS.GET_ALL.replace(
-    "{page}",
-    String(page)
-  )
-    .replace("{per_page}", String(per_page))
-    .replace("{search}", search)
-    .replace("{status}", status)
-    .replace("{booking_date}", booking_date);
-
-  const response = await api.get<Blob>(endpoint, {
-    headers: {
-      Accept: "text/csv",
-    },
+  const url = API_ENDPOINTS.VENDOR.TRANSACTIONS.GET_SINGLE_RECEIPT.replace(
+    "{id}",
+    String(id)
+  );
+  const blob = await api.get<Blob>(url, {
     responseType: "blob",
   });
+  return blob;
+};
 
+/**
+ * Export all receipts as CSV for the given date range (payload: from, to)
+ */
+export const exportAllReceiptsCSV = async (
+  payload: ExportReceiptsPayload
+): Promise<Blob> => {
+  const { from, to } = payload;
+  const response = await api.get<Blob>(
+    API_ENDPOINTS.VENDOR.TRANSACTIONS.EXPORT_ALL_RECEIPTS_CSV,
+    {
+      params: { from, to },
+      responseType: "blob",
+      headers: { Accept: "text/csv" },
+    }
+  );
   return response;
 };
+

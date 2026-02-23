@@ -90,8 +90,7 @@ const TabContentLoader = () => (
 );
 
 export default function TabEventForm() {
-  // Get the global form context
-  const { form: formContext, currentStep } = useEventFormContext();
+  const { form: formContext, currentStep, readOnly } = useEventFormContext();
 
   const [activeTab, setActiveTab] = useState("event-name");
 
@@ -138,6 +137,11 @@ export default function TabEventForm() {
   return (
     <>
       <div className="flex flex-col space-y-6 w-full max-w-full px-2 sm:px-4 md:px-6 relative mx-auto pb-24 overflow-x-hidden">
+        {readOnly && (
+          <div className="rounded-lg border border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/50 px-4 py-2 text-sm text-amber-800 dark:text-amber-200">
+            View only — you can review all event details but cannot save changes.
+          </div>
+        )}
         {/* Wrap all tabs in the FormProvider from react-hook-form */}
         <RHFFormProvider {...formContext}>
           <Tabs

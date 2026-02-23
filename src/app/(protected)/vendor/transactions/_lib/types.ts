@@ -23,6 +23,8 @@ export type SearchParams = {
   status?: string;
   from?: string;
   to?: string;
+  from_date?: string;
+  to_date?: string;
   filters?: string;
   [key: string]: string | string[] | undefined;
 };
@@ -33,6 +35,8 @@ export type TransactionsParams = {
   per_page?: number | string;
   status?: string;
   booking_date?: string;
+  from_date?: string;
+  to_date?: string;
   options?: unknown;
 };
 

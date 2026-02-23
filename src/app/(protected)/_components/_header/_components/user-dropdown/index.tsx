@@ -12,6 +12,7 @@ import { useRouter } from "next/navigation";
 import { useAuthStore } from "@/store/auth.store";
 import { logout } from "@/lib/auth/logout";
 import { addCacheBusting } from "@/lib/image-utils";
+import { PermissionGuard } from "@/components/permission/PermissionGuard";
 
 // Helper function to check if a URL is valid
 const isValidUrl = (url: string | null | undefined): boolean => {
@@ -143,12 +144,14 @@ const UserDropdown = memo(() => {
             <UserIcon size={16} className="mr-2" /> Profile
           </DropdownMenuItem>
           {showSettings && (
-            <DropdownMenuItem
-              className="cursor-pointer"
-              onClick={() => router.push(settingsUrl)}
-            >
-              <Settings size={16} className="mr-2" /> {settingsLabel}
-            </DropdownMenuItem>
+            <PermissionGuard permissionKey="read-account" fallback={null}>
+              <DropdownMenuItem
+                className="cursor-pointer"
+                onClick={() => router.push(settingsUrl)}
+              >
+                <Settings size={16} className="mr-2" /> {settingsLabel}
+              </DropdownMenuItem>
+            </PermissionGuard>
           )}
           <DropdownMenuItem className="cursor-pointer" onClick={() => logout()}>
             <LogOut size={16} className="mr-2" /> Log Out

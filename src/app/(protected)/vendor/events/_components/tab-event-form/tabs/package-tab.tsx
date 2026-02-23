@@ -41,6 +41,7 @@ export default function PackageTab() {
     save,
     isLoading: globalLoading,
     setActiveField,
+    readOnly,
   } = useEventFormContext();
 
   // Get event_id from stepOne safely
@@ -788,10 +789,10 @@ export default function PackageTab() {
                   form.handleSubmit(handleSubmit)();
                 }
               }}
-              disabled={isLoading || globalLoading}
+              disabled={isLoading || globalLoading || readOnly}
               variant="event-primary"
             >
-              {isLoading || globalLoading ? "Saving..." : "Save & Next"}
+              {readOnly ? "View only" : isLoading || globalLoading ? "Saving..." : "Save & Next"}
             </Button>
           </div>
         </form>

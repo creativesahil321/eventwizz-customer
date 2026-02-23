@@ -19,6 +19,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { createSelectColumn } from "@/components/data-table/data-table-column-select";
+import { PermissionGuard } from "@/components/permission/PermissionGuard";
 
 interface GetEmailLogColumnsProps {
   setRowAction: React.Dispatch<
@@ -228,19 +229,23 @@ export function getColumns({
             >
               <Eye size={16} />
             </Button>
-            <Button
-              variant="destructive"
-              onClick={() => setRowAction({ row, type: "delete" })}
-            >
-              <Trash size={16} />
-            </Button>
-            <Button
-              variant="event-primary"
-              onClick={() => setRowAction({ row, type: "resend" })}
-              title="Resend email"
-            >
-              <RotateCw size={16} />
-            </Button>
+            <PermissionGuard permissionKey="delete-email-log">
+              <Button
+                variant="destructive"
+                onClick={() => setRowAction({ row, type: "delete" })}
+              >
+                <Trash size={16} />
+              </Button>
+            </PermissionGuard>
+            <PermissionGuard permissionKey="update-email-log">
+              <Button
+                variant="event-primary"
+                onClick={() => setRowAction({ row, type: "resend" })}
+                title="Resend email"
+              >
+                <RotateCw size={16} />
+              </Button>
+            </PermissionGuard>
           </nav>
         );
       },

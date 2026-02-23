@@ -30,6 +30,9 @@ export const editStaffSchema = z
     role_id: z.coerce.number({
       required_error: "Please select a role.",
     }),
+    vendor_location_ids: z
+      .array(z.number())
+      .min(1, { message: "Select at least one location or All." }),
     password: z
       .string()
       .refine(
@@ -93,6 +96,9 @@ export const createStaffSchema = z
     role_id: z.coerce.number({
       required_error: "Please select a role.",
     }),
+    vendor_location_ids: z
+      .array(z.number())
+      .min(1, { message: "Select at least one location or All." }),
     password: z.string().min(8, {
       message: "Password must be at least 8 characters.",
     }),

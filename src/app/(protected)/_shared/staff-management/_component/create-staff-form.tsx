@@ -20,7 +20,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Save, X, Loader2, Shield } from "lucide-react";
+import { LocationMultiSelect } from "./location-multi-select";
+import { Save, X, Loader2 } from "lucide-react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import * as z from "zod";
@@ -28,24 +29,21 @@ import { useCreateStaff } from "../_lib/queries";
 import { useRoles } from "@/app/(protected)/_shared/manage-roles/_lib/queries";
 import { CreateStaffPayload } from "@/services/common/staff-management/type";
 import { Role } from "@/services/common/manage-roles/type";
-import StaffPermissionsDialog from "./permissions-dialog";
 import { useState } from "react";
-import { Badge } from "@/components/ui/badge";
 import { createStaffSchema, CreateStaffFormValues } from "../_lib/schemas";
+import { useVendorLocationsList } from "@/app/(protected)/vendor/venue-locations/_lib/queries";
 
 export default function CreateStaffForm() {
   const router = useRouter();
-  const [selectedRoleId, setSelectedRoleId] = useState<number | null>(null);
-  const [customPermissions, setCustomPermissions] = useState<{
-    [key: string]: boolean;
-  }>({});
-  const [hasCustomizedPermissions, setHasCustomizedPermissions] =
-    useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   // Fetch roles from the API
   const { data: rolesData, isLoading: isLoadingRoles } = useRoles();
+
+  // Locations: same API/cache as header dropdown and venue-locations page
+  const { locations, isLoading: isLoadingLocations } =
+    useVendorLocationsList();
 
   // Get the create staff mutation
   const { mutate: createStaff, isPending: isSubmitting } = useCreateStaff();
@@ -59,16 +57,11 @@ export default function CreateStaffForm() {
       email: "",
       phone: "",
       role_id: 0,
+      vendor_location_ids: [],
       password: "",
       confirmPassword: "",
     },
   });
-
-  // Handle permission changes from the dialog
-  const handlePermissionsChange = (permissions: { [key: string]: boolean }) => {
-    setCustomPermissions(permissions);
-    setHasCustomizedPermissions(true);
-  };
 
   // Form submission handler
   async function onSubmit(values: z.infer<typeof createStaffSchema>) {
@@ -78,51 +71,25 @@ export default function CreateStaffForm() {
     const apiPayload: CreateStaffPayload = {
       ...staffData,
       password_confirmation: confirmPassword,
+      vendor_location_ids: staffData.vendor_location_ids,
     };
-
-    // Add custom permissions if they exist
-    if (hasCustomizedPermissions && Object.keys(customPermissions).length > 0) {
-      // Extract enabled permission slugs/IDs
-      const enabledPermissions = Object.entries(customPermissions)
-        .filter(([, isEnabled]) => isEnabled)
-        .map(([key]) => {
-          // Try to parse as integer first for ID-based permissions
-          const numericId = parseInt(key);
-          return !isNaN(numericId) ? numericId : key;
-        });
-
-      // Add to payload based on whether we have numeric IDs or string slugs
-      if (
-        enabledPermissions.length > 0 &&
-        typeof enabledPermissions[0] === "number"
-      ) {
-        // If we have numeric IDs, use the permissions field
-        apiPayload.permissions = enabledPermissions as string[];
-      } else {
-        // If we have string slugs, use the permissions field
-        apiPayload.permissions = enabledPermissions as string[];
-      }
-    }
 
     createStaff(apiPayload, {
       onSuccess: () => {
-        // Redirect back to staff management on success
         router.push("/vendor/staff-management");
       },
       onError: (error: unknown) => {
-        // Error handling is already done in the mutation hook,
-        // but we can add additional custom handling here if needed
-
-        // Check for validation errors from the API and update the form
         if (error && typeof error === "object" && "errors" in error) {
-          Object.entries(error.errors as Record<string, string>).forEach(([key, value]) => {
-            if (key in form.getValues()) {
-              form.setError(key as keyof z.infer<typeof createStaffSchema>, {
-                type: "server",
-                message: Array.isArray(value) ? value[0] : (value as string),
-              });
-            }
-          });
+          Object.entries(error.errors as Record<string, string>).forEach(
+            ([key, value]) => {
+              if (key in form.getValues()) {
+                form.setError(key as keyof z.infer<typeof createStaffSchema>, {
+                  type: "server",
+                  message: Array.isArray(value) ? value[0] : (value as string),
+                });
+              }
+            },
+          );
         }
       },
     });
@@ -131,17 +98,12 @@ export default function CreateStaffForm() {
   // Get roles for the dropdown
   const roles = rolesData || [];
 
-  // Get count of enabled permissions
-  const getEnabledPermissionsCount = () => {
-    return Object.values(customPermissions).filter(Boolean).length;
-  };
-
   return (
     <Card>
       <CardHeader>
         <CardTitle>Staff Information</CardTitle>
       </CardHeader>
-      <CardContent>
+      <CardContent className="px-4 sm:px-6">
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -260,7 +222,7 @@ export default function CreateStaffForm() {
                           // Only allow numbers, spaces, dashes, plus signs, and parentheses
                           const value = e.target.value.replace(
                             /[^\d\s\-+()]/g,
-                            ""
+                            "",
                           );
                           // Limit to 20 characters
                           const limitedValue = value.slice(0, 20);
@@ -349,7 +311,7 @@ export default function CreateStaffForm() {
               />
             </div>
 
-            <div className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <FormField
                 control={form.control}
                 name="role_id"
@@ -360,9 +322,6 @@ export default function CreateStaffForm() {
                       onValueChange={(value) => {
                         const roleId = parseInt(value);
                         field.onChange(roleId);
-                        setSelectedRoleId(roleId);
-                        setCustomPermissions({});
-                        setHasCustomizedPermissions(false);
                       }}
                       defaultValue={
                         field.value ? field.value.toString() : undefined
@@ -411,50 +370,59 @@ export default function CreateStaffForm() {
                 )}
               />
 
-              {selectedRoleId ? (
-                <div className="border p-4 rounded-md bg-gray-50">
-                  <div className="flex justify-between items-center mb-3">
-                    <div>
-                      <h3 className="text-sm font-medium">Permissions</h3>
-                      <p className="text-xs text-gray-500">
-                        {hasCustomizedPermissions
-                          ? "Using customized permissions for this staff member"
-                          : "Using default role permissions"}
+              <FormField
+                control={form.control}
+                name="vendor_location_ids"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Locations</FormLabel>
+                    <FormControl>
+                      <LocationMultiSelect
+                        locations={locations}
+                        value={field.value}
+                        onChange={field.onChange}
+                        disabled={isLoadingLocations}
+                        loading={isLoadingLocations}
+                        placeholder="Select locations…"
+                      />
+                    </FormControl>
+                    {!isLoadingLocations && field.value.length > 0 && (
+                      <p className="text-sm text-muted-foreground mt-2 flex items-center gap-1.5">
+                        <span className="inline-block h-1.5 w-1.5 rounded-full bg-emerald-500 shrink-0" aria-hidden />
+                        {locations.length > 0 &&
+                        field.value.length === locations.length
+                          ? "This staff has access to all locations."
+                          : (() => {
+                              const names = field.value
+                                .map((id) => {
+                                  const loc = locations.find((l) => l.id === id);
+                                  return loc ? (loc.city || loc.name) : null;
+                                })
+                                .filter(Boolean) as string[];
+                              const count = names.length;
+                              const list =
+                                count <= 3
+                                  ? names.join(", ")
+                                  : `${names.slice(0, 2).join(", ")} and ${count - 2} more`;
+                              return `This staff has access to ${count} location${count === 1 ? "" : "s"}: ${list}.`;
+                            })()}
                       </p>
-                    </div>
-                    {hasCustomizedPermissions && (
-                      <Badge className="bg-[var(--color-primary)]">
-                        {getEnabledPermissionsCount()} permissions enabled
-                      </Badge>
                     )}
-                  </div>
-
-                  <StaffPermissionsDialog
-                    roleId={selectedRoleId}
-                    initialPermissions={customPermissions}
-                    onPermissionsChange={handlePermissionsChange}
-                    triggerComponent={
-                      <Button
-                        variant="outline"
-                        className="w-full"
-                        type="button"
-                      >
-                        <Shield className="h-4 w-4 mr-2" />
-                        {hasCustomizedPermissions
-                          ? "Edit Custom Permissions"
-                          : "Customize Permissions"}
-                      </Button>
-                    }
-                  />
-                </div>
-              ) : null}
+                    <FormDescription>
+                      Select one or more locations, or &quot;All&quot; for every location. Required.
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
             </div>
-            <div className="flex justify-end gap-4 pt-4 border-t border-gray-200">
+            <div className="flex flex-col-reverse sm:flex-row justify-end gap-3 sm:gap-4 pt-4 border-t border-gray-200">
               <Button
                 type="button"
                 variant="outline"
                 onClick={() => router.push("/vendor/staff-management")}
                 disabled={isSubmitting}
+                className="w-full sm:w-auto"
               >
                 <X className="h-4 w-4 mr-2" />
                 Cancel
@@ -463,6 +431,7 @@ export default function CreateStaffForm() {
                 variant="event-primary"
                 type="submit"
                 disabled={isSubmitting}
+                className="w-full sm:w-auto"
               >
                 {isSubmitting ? (
                   <>

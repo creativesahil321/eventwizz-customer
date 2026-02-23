@@ -1,8 +1,8 @@
 "use client";
 
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { Search, Download, Loader2, RotateCcw, Calendar } from "lucide-react";
+import { Search, Download, Loader2, RotateCcw } from "lucide-react";
 import { Shell } from "@/components/shell";
 import { SearchParams } from "./_lib/types";
 import { Input } from "@/components/ui/input";
@@ -14,77 +14,103 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { TransactionsDataTable } from "./_components/transactions-data-table";
-import { toast } from "sonner";
-import { useVendorTransactions } from "./_lib/queries";
+import { useVendorTransactions, useExportAllReceiptsCSV } from "./_lib/queries";
 import { cn } from "@/lib/utils";
 import { TransactionsTableSkeleton } from "./_components/skeleton-loader";
 import { useDebounce } from "@/hooks/data-table/use-debounce";
+import { LocationIndicator } from "@/components/location-indicator";
+import { PermissionRoute } from "@/components/permission";
+import { DateRangePicker } from "@/components/ui/date-range-picker";
+import { DateRange } from "react-day-picker";
+import { format, startOfYear, endOfDay } from "date-fns";
+import { useQueryState, parseAsInteger } from "nuqs";
 
 export default function TransactionsPage() {
   const [globalFilterValue, setGlobalFilterValue] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
-  const [bookingDate, setBookingDate] = useState("");
+  const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
   const [earnings, setEarnings] = useState("0.00");
+  const [, setPage] = useQueryState("page", parseAsInteger.withDefault(1));
 
-  // Debounce search input using existing hook
   const debouncedSearch = useDebounce(globalFilterValue, 500);
 
+  const fromDate = dateRange?.from
+    ? format(dateRange.from, "yyyy-MM-dd")
+    : undefined;
+  const toDate = dateRange?.to
+    ? format(dateRange.to, "yyyy-MM-dd")
+    : undefined;
+
+  useEffect(() => {
+    setPage(1);
+  }, [debouncedSearch, fromDate, toDate, statusFilter, setPage]);
+
   const hasActiveFilters =
-    !!debouncedSearch || statusFilter !== "all" || !!bookingDate;
+    !!debouncedSearch ||
+    statusFilter !== "all" ||
+    !!dateRange?.from ||
+    !!dateRange?.to;
 
   const handleResetAllFilters = () => {
     setGlobalFilterValue("");
     setStatusFilter("all");
-    setBookingDate("");
+    setDateRange(undefined);
+    setPage(1);
   };
 
-  // Build search params based on current filters
   const searchParams: SearchParams = {
     page: "1",
     per_page: "30",
     search: debouncedSearch,
     status: statusFilter === "all" ? "" : statusFilter,
-    from: bookingDate,
+    from_date: fromDate,
+    to_date: toDate,
   };
 
-  // Fetch data to track loading state
   const { isLoading, isFetching } = useVendorTransactions({
     search: debouncedSearch,
     status: statusFilter === "all" ? "" : statusFilter,
-    booking_date: bookingDate,
+    from_date: fromDate,
+    to_date: toDate,
     page: 1,
     per_page: 30,
   });
 
-  // Handle earnings update from data table
+  const exportCSVMutation = useExportAllReceiptsCSV();
+
   const handleEarningsUpdate = useCallback((earningsValue: string) => {
     setEarnings(earningsValue);
   }, []);
 
-  // Handle CSV export
   const handleCSVExport = () => {
-    toast.success("Exporting transaction history to CSV...");
-    // In production, implement actual CSV export logic
+    const from = fromDate ?? format(startOfYear(new Date()), "yyyy-MM-dd");
+    const to = toDate ?? format(endOfDay(new Date()), "yyyy-MM-dd");
+    exportCSVMutation.mutate({ from, to });
   };
 
   return (
-    <section className="page text-black min-w-0 max-w-full overflow-x-hidden">
-      <Shell className="gap-2 overflow-x-hidden">
+    <PermissionRoute
+      permissionKey="read-transaction"
+      fallbackPath="/vendor/dashboard"
+    >
+      <section className="page text-black min-w-0 max-w-full overflow-x-hidden">
+        <Shell className="gap-2 overflow-x-hidden">
         <div className="flex flex-col gap-4 min-w-0 max-w-full">
           {/* Header Section */}
           <div className="bg-white rounded-lg border border-[var(--color-border)] shadow-md p-4 sm:p-6 mb-4 min-w-0 max-w-full overflow-hidden">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center flex-wrap gap-4 min-w-0">
               {/* Title and Earnings */}
-              <div className="min-w-0">
+              <div className="min-w-0 flex flex-col gap-3">
                 <h1 className="text-xl sm:text-2xl title-header font-bold text-black flex items-center gap-2 break-words">
                   Transaction History
                   {isFetching && (
                     <Loader2 className="h-5 w-5 animate-spin text-primary" />
                   )}
                 </h1>
+                <LocationIndicator variant="card" context="Transactions" />
                 <div
                   className={cn(
-                    "mt-2 flex items-center gap-2 transition-opacity duration-200",
+                    "flex items-center gap-2 transition-opacity duration-200",
                     isFetching && "opacity-50"
                   )}
                 >
@@ -100,28 +126,20 @@ export default function TransactionsPage() {
               {/* Filters Section */}
               <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center w-full min-w-0 sm:w-auto max-w-full">
                 <div className="flex flex-col sm:flex-row flex-1 gap-3 items-stretch sm:items-center w-full min-w-0 sm:w-auto flex-wrap">
-                  {/* Booking Date */}
-                  <div className="flex flex-col gap-1.5 min-w-0 max-w-full">
-                    <div className="relative w-full max-w-full min-w-0 sm:w-[180px]">
-                      <Calendar className="absolute left-3 top-1/2 z-10 h-4 w-4 -translate-y-1/2 shrink-0 text-muted-foreground pointer-events-none" />
-                      <Input
-                        type="date"
-                        value={bookingDate}
-                        onChange={(e) => setBookingDate(e.target.value)}
-                        className="w-full max-w-full min-w-0 sm:w-[180px] pl-9 pr-9 box-border"
-                        style={{ maxWidth: "100%" }}
-                        disabled={isFetching}
-                        aria-label="Filter by booking date (dd-mm-yyyy)"
-                      />
-                      {!bookingDate && (
-                        <span
-                          className="pointer-events-none absolute left-9 right-9 top-1/2 -translate-y-1/2 text-sm text-gray-500 truncate sm:hidden"
-                          aria-hidden
-                        >
-                          dd-mm-yyyy
-                        </span>
-                      )}
-                    </div>
+                  {/* Date Range */}
+                  <div className="w-full min-w-0 sm:w-auto sm:min-w-[280px] relative">
+                    <DateRangePicker
+                      date={dateRange}
+                      onDateChange={setDateRange}
+                      placeholder="Filter by date range"
+                      disabled={isFetching}
+                      showClear={true}
+                    />
+                    {isFetching && !dateRange?.from && (
+                      <div className="absolute right-10 top-1/2 -translate-y-1/2 pointer-events-none">
+                        <Loader2 className="h-4 w-4 animate-spin text-[var(--color-primary)]" />
+                      </div>
+                    )}
                   </div>
 
                   {/* Status Filter */}
@@ -177,9 +195,13 @@ export default function TransactionsPage() {
                     variant="event-primary"
                     onClick={handleCSVExport}
                     className="w-full sm:w-auto"
-                    disabled={isFetching}
+                    disabled={isFetching || exportCSVMutation.isPending}
                   >
-                    <Download className="mr-2 h-4 w-4" />
+                    {exportCSVMutation.isPending ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : (
+                      <Download className="mr-2 h-4 w-4" />
+                    )}
                     Export CSV
                   </Button>
                 </div>
@@ -210,5 +232,6 @@ export default function TransactionsPage() {
         </div>
       </Shell>
     </section>
+    </PermissionRoute>
   );
 }

@@ -22,17 +22,17 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
-import { AlertCircle, Save, X, Loader2, Shield, ArrowLeft } from "lucide-react";
+import { AlertCircle, Save, X, Loader2, ArrowLeft } from "lucide-react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { useRoles } from "@/app/(protected)/_shared/manage-roles/_lib/queries";
 import { useStaffById, useUpdateStaff } from "../_lib/queries";
 import { UpdateStaffPayload } from "@/services/common/staff-management/type";
 import { Role } from "@/services/common/manage-roles/type";
-import StaffPermissionsDialog from "./permissions-dialog";
-import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { editStaffSchema, EditStaffFormValues } from "../_lib/schemas";
+import { LocationMultiSelect } from "./location-multi-select";
+import { useVendorLocationsList } from "@/app/(protected)/vendor/venue-locations/_lib/queries";
 
 interface EditStaffFormProps {
   readonly staffId: number;
@@ -40,16 +40,15 @@ interface EditStaffFormProps {
 
 export default function EditStaffForm({ staffId }: EditStaffFormProps) {
   const router = useRouter();
-  const [customPermissions, setCustomPermissions] = useState<{
-    [key: string]: boolean;
-  }>({});
-  const [hasCustomizedPermissions, setHasCustomizedPermissions] =
-    useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   // Fetch roles from the API
   const { data: rolesData, isLoading: isLoadingRoles } = useRoles();
+
+  // Locations: same API/cache as header dropdown and venue-locations page
+  const { locations, isLoading: isLoadingLocations } =
+    useVendorLocationsList();
 
   // Fetch staff data
   const {
@@ -71,6 +70,7 @@ export default function EditStaffForm({ staffId }: EditStaffFormProps) {
       email: "",
       phone: "",
       role_id: 0,
+      vendor_location_ids: [],
       password: "",
       confirmPassword: "",
       status: "active" as const,
@@ -82,85 +82,54 @@ export default function EditStaffForm({ staffId }: EditStaffFormProps) {
     if (staffData?.data) {
       const staff = staffData.data;
 
-      // Set form values directly from API response
+      // Prefer vendor_location_ids; else derive from locations (single-staff API returns locations as { id, city }[])
+      let locationIds: number[] = [];
+      if (staff.vendor_location_ids?.length) {
+        locationIds = staff.vendor_location_ids.filter((id: number) => id !== 0);
+      } else if (Array.isArray(staff.locations) && staff.locations.length > 0) {
+        const first = staff.locations[0];
+        if (typeof first === "object" && first !== null && "id" in first) {
+          locationIds = (staff.locations as { id: number }[]).map((l) => l.id);
+        }
+      }
+      if (locationIds.length === 0 && staff.vendor_location_id != null && staff.vendor_location_id !== 0) {
+        locationIds = [staff.vendor_location_id];
+      }
+
       form.reset({
         first_name: staff.first_name,
         last_name: staff.last_name,
         email: staff.email,
         phone: staff.phone || "",
-        role_id: staff.role_id, // This is a number value
+        role_id: staff.role_id,
+        vendor_location_ids: locationIds,
         status: staff.status,
         password: "",
         confirmPassword: "",
       });
 
-      // Force immediate role_id update
       form.setValue("role_id", staff.role_id);
-
-      // If staff has permissions, load them
-      if (staff.permissions && staff.permissions.length > 0) {
-        const permissionsMap: { [key: string]: boolean } = {};
-        staff.permissions.forEach((perm: { key: string }) => {
-          permissionsMap[perm.key] = true;
-        });
-        setCustomPermissions(permissionsMap);
-        setHasCustomizedPermissions(true);
-      }
+      form.setValue("vendor_location_ids", locationIds);
     }
   }, [staffData, form]);
 
-  // Handle permission changes from the dialog
-  const handlePermissionsChange = (permissions: { [key: string]: boolean }) => {
-    setCustomPermissions(permissions);
-    setHasCustomizedPermissions(true);
-  };
-
   // Form submission handler
   function onSubmit(values: EditStaffFormValues) {
-    // Create payload for API
     const payload: UpdateStaffPayload = {
       first_name: values.first_name,
       last_name: values.last_name,
       email: values.email,
       phone: values.phone,
       role_id: values.role_id,
+      vendor_location_ids: values.vendor_location_ids,
       status: values.status,
     };
 
-    // Only include password fields if they're provided and not empty
     if (values.password && values.password.trim() !== "") {
       payload.password = values.password;
       payload.password_confirmation = values.confirmPassword;
     }
 
-    // Add custom permissions if they exist
-    if (hasCustomizedPermissions && Object.keys(customPermissions).length > 0) {
-      // Extract enabled permission keys
-      const enabledPermissions = Object.entries(customPermissions)
-        .filter(([, isEnabled]) => isEnabled)
-        .map(([key]) => key);
-
-      // Add to payload as permissions
-      if (enabledPermissions.length > 0) {
-        payload.permissions = enabledPermissions;
-      } else {
-        // No permissions are selected, show error
-        form.setError("role_id", {
-          type: "custom",
-          message: "At least one permission must be selected",
-        });
-        return;
-      }
-    } else {
-      // No permissions have been customized, show error
-      form.setError("role_id", {
-        type: "custom",
-        message: "At least one permission must be selected",
-      });
-      return;
-    }
-
-    // Prevent duplicate submissions
     if (isSubmitting) return;
 
     updateStaff(
@@ -170,11 +139,9 @@ export default function EditStaffForm({ staffId }: EditStaffFormProps) {
       },
       {
         onSuccess: () => {
-          // Redirect back to staff management
           router.push("/vendor/staff-management");
         },
         onError: (error: unknown) => {
-          // Check for validation errors from the API
           if (error && typeof error === "object" && "errors" in error) {
             const errorObj = error as {
               errors: Record<string, string | string[]>;
@@ -195,11 +162,6 @@ export default function EditStaffForm({ staffId }: EditStaffFormProps) {
 
   // Get roles for the dropdown
   const roles = rolesData || [];
-
-  // Get count of enabled permissions
-  const getEnabledPermissionsCount = () => {
-    return Object.values(customPermissions).filter(Boolean).length;
-  };
 
   // Show loading state
   if (isLoadingStaff) {
@@ -261,7 +223,7 @@ export default function EditStaffForm({ staffId }: EditStaffFormProps) {
       <CardHeader>
         <CardTitle>Edit Staff Member</CardTitle>
       </CardHeader>
-      <CardContent>
+      <CardContent className="px-4 sm:px-6">
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -427,16 +389,10 @@ export default function EditStaffForm({ staffId }: EditStaffFormProps) {
                       <FormLabel>Role</FormLabel>
                       <Select
                         onValueChange={(value) => {
-                          // Only update if we have a non-empty value
                           if (value) {
                             const roleId = Number.parseInt(value, 10);
                             if (!Number.isNaN(roleId)) {
                               field.onChange(roleId);
-                              // Reset permissions when role changes
-                              if (roleId !== field.value) {
-                                setCustomPermissions({});
-                                setHasCustomizedPermissions(false);
-                              }
                             }
                           }
                         }}
@@ -485,42 +441,53 @@ export default function EditStaffForm({ staffId }: EditStaffFormProps) {
                   );
                 }}
               />
+
+              <FormField
+                control={form.control}
+                name="vendor_location_ids"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Locations</FormLabel>
+                    <FormControl>
+                      <LocationMultiSelect
+                        locations={locations}
+                        value={field.value}
+                        onChange={field.onChange}
+                        disabled={isLoadingLocations}
+                        loading={isLoadingLocations}
+                        placeholder="Select locations…"
+                      />
+                    </FormControl>
+                    {!isLoadingLocations && field.value.length > 0 && (
+                      <p className="text-sm text-muted-foreground mt-2 flex items-center gap-1.5">
+                        <span className="inline-block h-1.5 w-1.5 rounded-full bg-emerald-500 shrink-0" aria-hidden />
+                        {locations.length > 0 &&
+                        field.value.length === locations.length
+                          ? "This staff has access to all locations."
+                          : (() => {
+                              const names = field.value
+                                .map((id) => {
+                                  const loc = locations.find((l) => l.id === id);
+                                  return loc ? (loc.city || loc.name) : null;
+                                })
+                                .filter(Boolean) as string[];
+                              const count = names.length;
+                              const list =
+                                count <= 3
+                                  ? names.join(", ")
+                                  : `${names.slice(0, 2).join(", ")} and ${count - 2} more`;
+                              return `This staff has access to ${count} location${count === 1 ? "" : "s"}: ${list}.`;
+                            })()}
+                      </p>
+                    )}
+                    <FormDescription>
+                      Select one or more locations, or &quot;All&quot; for every location. Required.
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
             </div>
-
-            {/* Permissions section */}
-            {form.watch("role_id") ? (
-              <div className="border p-4 rounded-md bg-gray-50">
-                <div className="flex justify-between items-center mb-3">
-                  <div>
-                    <h3 className="text-sm font-medium">Role Permissions</h3>
-                    <p className="text-xs text-gray-500">
-                      {hasCustomizedPermissions
-                        ? "Using customized permissions for this staff member"
-                        : "Using default role permissions"}
-                    </p>
-                  </div>
-                  {hasCustomizedPermissions && (
-                    <Badge className="bg-[var(--color-primary)]">
-                      {getEnabledPermissionsCount()} permissions enabled
-                    </Badge>
-                  )}
-                </div>
-
-                <StaffPermissionsDialog
-                  roleId={form.watch("role_id")}
-                  initialPermissions={customPermissions}
-                  onPermissionsChange={handlePermissionsChange}
-                  triggerComponent={
-                    <Button variant="outline" className="w-full" type="button">
-                      <Shield className="h-4 w-4 mr-2" />
-                      {hasCustomizedPermissions
-                        ? "Edit Custom Permissions"
-                        : "Customize Permissions"}
-                    </Button>
-                  }
-                />
-              </div>
-            ) : null}
 
             <div className="border-t border-b py-4 my-4">
               <h3 className="text-lg font-medium mb-2">Change Password</h3>
@@ -595,12 +562,13 @@ export default function EditStaffForm({ staffId }: EditStaffFormProps) {
               </div>
             </div>
 
-            <div className="flex justify-end gap-4 pt-4">
+            <div className="flex flex-col-reverse sm:flex-row justify-end gap-3 sm:gap-4 pt-4">
               <Button
                 type="button"
                 variant="outline"
                 onClick={() => router.push("/vendor/staff-management")}
                 disabled={isSubmitting}
+                className="w-full sm:w-auto"
               >
                 <X className="h-4 w-4 mr-2" />
                 Cancel
@@ -609,6 +577,7 @@ export default function EditStaffForm({ staffId }: EditStaffFormProps) {
                 variant="event-primary"
                 type="submit"
                 disabled={isSubmitting}
+                className="w-full sm:w-auto"
               >
                 {isSubmitting ? (
                   <>

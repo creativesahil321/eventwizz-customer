@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
-import { useSession } from "next-auth/react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useSession, signOut } from "next-auth/react";
 import { useContext, useEffect, useState } from "react";
 import { useDomain } from "@/providers/domain-provider/domain-provider";
 import { AuthContent } from "./_components/auth-content";
@@ -17,10 +17,14 @@ export default function AuthLayout({
 }) {
   const pathname = usePathname();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { data: session, status } = useSession();
   const { website_role } = useDomain();
   const [isRedirecting, setIsRedirecting] = useState(false);
+  const [isSigningOutSecurity, setIsSigningOutSecurity] = useState(false);
   const { theme } = useContext(ServerContext);
+
+  const isSecurityViolation = searchParams.get("error") === "security_violation";
   const logoPath =
     theme?.logo?.startsWith("/") ||
     theme?.logo?.startsWith("data:") ||
@@ -46,9 +50,23 @@ export default function AuthLayout({
     );
   };
 
-  // Redirect authenticated users away from auth pages
+  // When login page has security_violation, clear any stale session so user must re-login (no redirect to welcome)
   useEffect(() => {
-    if (status === "authenticated" && session?.user) {
+    if (!isSecurityViolation || status !== "authenticated") return;
+    setIsSigningOutSecurity(true);
+    signOut({ redirect: false }).finally(() => {
+      setIsSigningOutSecurity(false);
+    });
+  }, [isSecurityViolation, status]);
+
+  // Redirect authenticated users away from auth pages (skip when security_violation — we sign out above)
+  useEffect(() => {
+    if (
+      status === "authenticated" &&
+      session?.user &&
+      !isSecurityViolation &&
+      !isSigningOutSecurity
+    ) {
       setIsRedirecting(true);
 
       const account_type = session.user.account_type;
@@ -57,17 +75,15 @@ export default function AuthLayout({
       if (account_type === "vendor" && !isOnboarded) {
         router.push("/on-boarding");
       } else if (account_type === "vendor") {
-        // For vendors, always go to welcome page first
         router.replace("/welcome/select-location");
       } else {
-        // For non-vendors, go directly to their dashboard
         router.replace(`/${account_type}/dashboard`);
       }
     }
-  }, [session, status, router]);
+  }, [session, status, router, isSecurityViolation, isSigningOutSecurity]);
 
-  // Show a fullscreen loader when redirecting after authentication
-  if (status === "authenticated" || isRedirecting) {
+  // Show fullscreen loader when redirecting after auth or when signing out due to security_violation
+  if (status === "authenticated" || isRedirecting || isSigningOutSecurity) {
     return <AuthSkeleton />;
   }
 

@@ -166,7 +166,7 @@ export function getSupportTicketColumns({
             </Button>
           </PermissionGuard>
 
-          <PermissionGuard permissionKey="edit-ticket">
+          <PermissionGuard permissionKey="update-ticket">
             <Button
               className="rounded-full"
               variant="outline"

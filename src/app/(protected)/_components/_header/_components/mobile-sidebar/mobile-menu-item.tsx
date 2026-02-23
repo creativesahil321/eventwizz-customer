@@ -6,7 +6,9 @@ import { cn } from "@/lib/utils";
 import { ChevronDown } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import React, { memo } from "react";
+import React, { memo, useMemo } from "react";
+import { useMenuPermission } from "@/components/permission/use-menu-permission";
+import { useAuthStore } from "@/store/auth.store";
 
 const isMenuActive = (menu: MenuItemProps, pathname: string): boolean => {
   const fullUrl = `${env.NEXT_PUBLIC_APP_URL}${pathname}`;
@@ -23,6 +25,15 @@ const MobileMenuItem: React.FC<MobileMenuItemProps> = memo(
   ({ menu, onClose }) => {
     const [isOpen, setIsOpen] = React.useState(false);
     const pathname = usePathname();
+    const { checkMenuPermission } = useMenuPermission();
+    const { isAuthenticated, account_type } = useAuthStore();
+    const isCustomer = account_type === "customer";
+
+    const hasPermission = useMemo(
+      () =>
+        !isAuthenticated || isCustomer || checkMenuPermission(menu.permissions),
+      [isAuthenticated, isCustomer, checkMenuPermission, menu.permissions],
+    );
 
     const hasChildren = Boolean(menu.menu && menu.menu.length > 0);
     const Icon = menu.icon ? Icons[menu.icon as keyof typeof Icons] : null;
@@ -30,6 +41,8 @@ const MobileMenuItem: React.FC<MobileMenuItemProps> = memo(
     const isActive = isMenuActive(menu, pathname);
     const capitalizedTitle =
       menu.title.charAt(0).toUpperCase() + menu.title.slice(1);
+
+    if (!hasPermission) return null;
 
     return (
       <li className={cn("w-full", isActive && "active")}>
@@ -39,7 +52,7 @@ const MobileMenuItem: React.FC<MobileMenuItemProps> = memo(
             "w-full dark:bg-transparent border-0 shadow-none bg-transparent relative cursor-pointer flex justify-between items-center h-12",
             isActive
               ? "bg-[var(--color-primary)] rounded-1 !text-background hover:bg-[var(--color-primary)]"
-              : "hover:bg-muted"
+              : "hover:bg-muted",
           )}
           variant="outline"
           onClick={hasChildren ? () => setIsOpen(!isOpen) : undefined}
@@ -55,7 +68,7 @@ const MobileMenuItem: React.FC<MobileMenuItemProps> = memo(
                 size={16}
                 className={cn(
                   "transition-transform",
-                  isOpen ? "rotate-180" : ""
+                  isOpen ? "rotate-180" : "",
                 )}
               />
             </div>
@@ -84,7 +97,7 @@ const MobileMenuItem: React.FC<MobileMenuItemProps> = memo(
         )}
       </li>
     );
-  }
+  },
 );
 
 MobileMenuItem.displayName = "MobileMenuItem";

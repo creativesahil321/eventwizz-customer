@@ -28,6 +28,8 @@ import { useCustomerMenuChoicesList } from "./_lib/queries";
 import { useDebounce } from "@/hooks/data-table/use-debounce";
 import { menuChoicesService } from "@/services/vendor/menu_choices";
 import type { EventWithDates } from "@/services/vendor/menu_choices/type";
+import { LocationIndicator } from "@/components/location-indicator";
+import { PermissionRoute } from "@/components/permission";
 
 /** Event option for filter dropdown (from events_with_dates) */
 interface FilterEvent {
@@ -184,18 +186,23 @@ export default function Page() {
   };
 
   return (
-    <section className="page text-black min-w-0">
-      <Shell className="gap-2">
-        <div className="flex flex-col gap-4 min-w-0">
-          {/* Header Card */}
+    <PermissionRoute
+      permissionKey="read-event-menu"
+      fallbackPath="/vendor/dashboard"
+    >
+      <section className="page text-black min-w-0">
+        <Shell className="gap-2">
+          <div className="flex flex-col gap-4 min-w-0">
+            {/* Header Card */}
           <div className="bg-white rounded-lg border border-[var(--color-border)] shadow-md p-6 mb-4 min-w-0">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center flex-wrap gap-4">
               {/* Title */}
-              <div>
+              <div className="flex flex-col gap-3">
                 <h1 className="text-2xl title-header font-bold text-black">
                   Customer Menu Choices
                 </h1>
-                <p className="text-muted-foreground mt-2">
+                <LocationIndicator variant="card" context="Menu choices" />
+                <p className="text-muted-foreground">
                   View and manage all customer menu choices.
                 </p>
               </div>
@@ -362,5 +369,6 @@ export default function Page() {
         </div>
       </Shell>
     </section>
+    </PermissionRoute>
   );
 }

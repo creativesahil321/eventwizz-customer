@@ -147,8 +147,10 @@ const Header: React.FC<HeaderProps> = memo(({ menus }) => {
           </PermissionGuard>
         )}
 
-        {/* Notification Bell */}
-        <NotificationBell />
+        {/* Notification Bell - only when user can read notifications */}
+        <PermissionGuard permissionKey="read-notification" fallback={null}>
+          <NotificationBell />
+        </PermissionGuard>
 
         {/* User Dropdown */}
         <UserDropdown />

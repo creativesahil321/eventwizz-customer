@@ -14,6 +14,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 
 import { toast } from "sonner";
 import { useSession } from "next-auth/react";
+import { usePermission } from "@/hooks/usePermission";
 import { EventApiResponse } from "@/services/vendor/events/type";
 import { useEventData } from "../../_lib/hooks/useEventData";
 import { EventSchemaType, eventSchema } from "../tab-event-form/schema";
@@ -30,6 +31,8 @@ interface EventFormContextType {
   next: () => Promise<void>;
   back: () => Promise<void>;
   isLoading: boolean;
+  /** When true, user can only view (read-event); Save/Submit and edits are disabled */
+  readOnly: boolean;
 }
 
 const FormContext = createContext<EventFormContextType | undefined>(undefined);
@@ -50,8 +53,9 @@ export function FormProvider({
 }) {
   console.log("serverData", serverData);
 
-  // Get session data and update function
   const { data: session, update: updateSession } = useSession();
+  const canUpdateEvent = usePermission("update-event");
+  const readOnly = !canUpdateEvent;
 
   // Get the invalidateCache function from useEventData
   // Get eventId from URL if available
@@ -377,6 +381,7 @@ export function FormProvider({
       next,
       back,
       isLoading,
+      readOnly,
     }),
     [
       form,
@@ -389,6 +394,7 @@ export function FormProvider({
       save,
       next,
       back,
+      readOnly,
     ]
   );
 
