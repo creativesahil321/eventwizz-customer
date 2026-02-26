@@ -1,15 +1,7 @@
 import { ColumnDef } from "@tanstack/react-table";
 import { DataTableColumnHeader } from "@/components/data-table/data-table-column-header";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import {
-  Trash,
-  Eye,
-  RotateCw,
-  AlertCircle,
-  CheckCircle2,
-  Clock,
-} from "lucide-react";
+import { Trash, Eye, RotateCw, AlertCircle } from "lucide-react";
 import React from "react";
 import { DataTableRowAction, EmailLog } from "../_lib/types";
 import {
@@ -20,57 +12,23 @@ import {
 } from "@/components/ui/tooltip";
 import { createSelectColumn } from "@/components/data-table/data-table-column-select";
 import { PermissionGuard } from "@/components/permission/PermissionGuard";
+import { StatusBadge } from "@/components/ui/status-badge";
+
+const getEmailLogStatusLabel = (status: EmailLog["status"]) => {
+  const map: Record<EmailLog["status"], string> = {
+    Success: "Success",
+    Pending: "Pending",
+    Processing: "Processing",
+    Failed: "Failed",
+  };
+  return map[status] ?? status;
+};
 
 interface GetEmailLogColumnsProps {
   setRowAction: React.Dispatch<
     React.SetStateAction<DataTableRowAction<EmailLog> | null>
   >;
 }
-
-/**
- * Get status badge component
- */
-const getStatusBadge = (status: EmailLog["status"]) => {
-  const statusConfig = {
-    Success: {
-      label: "Success",
-      variant: "default" as const,
-      className: "bg-green-100 text-green-800 border-green-200",
-      icon: CheckCircle2,
-    },
-    Pending: {
-      label: "Pending",
-      variant: "secondary" as const,
-      className: "bg-amber-100 text-amber-800 border-amber-200",
-      icon: Clock,
-    },
-    Processing: {
-      label: "Processing",
-      variant: "secondary" as const,
-      className: "bg-blue-100 text-blue-800 border-blue-200",
-      icon: RotateCw,
-    },
-    Failed: {
-      label: "Failed",
-      variant: "destructive" as const,
-      className: "bg-red-100 text-red-800 border-red-200",
-      icon: AlertCircle,
-    },
-  };
-
-  const config = statusConfig[status] || statusConfig.Failed;
-  const Icon = config.icon;
-
-  return (
-    <Badge
-      variant={config.variant}
-      className={`flex items-center gap-1.5 ${config.className}`}
-    >
-      <Icon className="h-3 w-3" />
-      {config.label}
-    </Badge>
-  );
-};
 
 export function getColumns({
   setRowAction,
@@ -134,7 +92,12 @@ export function getColumns({
       ),
       cell: ({ row }) => {
         const status = row.getValue("status") as EmailLog["status"];
-        return getStatusBadge(status);
+        return (
+          <StatusBadge
+            status={status}
+            label={getEmailLogStatusLabel(status)}
+          />
+        );
       },
       enableSorting: true,
       enableHiding: false,

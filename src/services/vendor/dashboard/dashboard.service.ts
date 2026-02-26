@@ -1,47 +1,37 @@
 /**
  * Vendor Dashboard Service
  * Fetches dashboard statistics from GET /vendor/dashboard
- * - Bookings: ?booking_period=today|weekly|monthly|yearly
- * - Commissions: ?comission_period=today|weekly|monthly|yearly
+ * - Bookings: ?booking_from_date=yyyy-MM-dd&booking_to_date=yyyy-MM-dd (date range)
+ * - Commissions: ?comission_from_date=yyyy-MM-dd&comission_to_date=yyyy-MM-dd (date range)
+ * Sort for last_event_performing_overview is handled client-side; no sort params sent to API.
  */
 
 import { api } from "@/services/core/api-client";
 import { API_ENDPOINTS } from "@/services/core/endpoints";
 import type {
   VendorDashboardResponse,
-  VendorDashboardPeriod,
-  VendorDashboardLastEventSortBy,
-  VendorDashboardLastEventSortOrder,
+  DashboardDateRangeParams,
 } from "./type";
 
+export type { DashboardDateRangeParams } from "./type";
+
 export interface GetBookingsStatisticsParams {
-  period: VendorDashboardPeriod;
-  /** Optional: backend can sort last_event_performing_overview by name or amount */
-  last_event_sort_by?: VendorDashboardLastEventSortBy;
-  /** Optional: asc or desc */
-  last_event_sort_order?: VendorDashboardLastEventSortOrder;
+  dateRange: DashboardDateRangeParams;
 }
 
 export const vendorDashboardService = {
   /**
    * Get dashboard data for the Bookings tab.
-   * Request: GET /vendor/dashboard?booking_period=<period>&last_event_sort_by=&last_event_sort_order=
+   * Request: GET /vendor/dashboard?booking_from_date=&booking_to_date=
    */
   getBookingsStatistics: async (
-    params: GetBookingsStatisticsParams | VendorDashboardPeriod
+    params: GetBookingsStatisticsParams
   ): Promise<VendorDashboardResponse> => {
-    const resolved =
-      typeof params === "string"
-        ? { period: params }
-        : params;
-    const { period, last_event_sort_by, last_event_sort_order } = resolved;
+    const { dateRange } = params;
     const queryParams: Record<string, string> = {
-      booking_period: period,
+      booking_from_date: dateRange.from_date,
+      booking_to_date: dateRange.to_date,
     };
-    if (last_event_sort_by)
-      queryParams.last_event_sort_by = last_event_sort_by;
-    if (last_event_sort_order)
-      queryParams.last_event_sort_order = last_event_sort_order;
     return api.get<VendorDashboardResponse>(
       API_ENDPOINTS.VENDOR.DASHBOARD.STATISTICS,
       { params: queryParams, returnFullResponse: true }
@@ -50,14 +40,20 @@ export const vendorDashboardService = {
 
   /**
    * Get dashboard data for the Commissions tab.
-   * Request: GET /vendor/dashboard?comission_period=<period>
+   * Request: GET /vendor/dashboard?comission_from_date=&comission_to_date=
    */
   getCommissionsStatistics: async (
-    period: VendorDashboardPeriod = "today"
+    dateRange: DashboardDateRangeParams
   ): Promise<VendorDashboardResponse> => {
     return api.get<VendorDashboardResponse>(
       API_ENDPOINTS.VENDOR.DASHBOARD.STATISTICS,
-      { params: { comission_period: period }, returnFullResponse: true }
+      {
+        params: {
+          comission_from_date: dateRange.from_date,
+          comission_to_date: dateRange.to_date,
+        },
+        returnFullResponse: true,
+      }
     );
   },
 };

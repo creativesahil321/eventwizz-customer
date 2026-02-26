@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { StatusBadge } from "@/components/ui/status-badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import {
@@ -359,80 +360,12 @@ export default function AdjustBookingContent({
   const getPaymentStatusBadge = (
     status: string,
     badgeClassName?: string,
-  ) => {
-    const base = (className: string) =>
-      [className, badgeClassName].filter(Boolean).join(" ");
-    const statusLower = status.toLowerCase();
-    if (statusLower.includes("paid") || statusLower.includes("full")) {
-      return (
-        <Badge
-          className={base(
-            "bg-green-100 text-green-700 hover:bg-green-100",
-          )}
-        >
-          <CheckCircle2 className="h-3 w-3 mr-1 shrink-0" />
-          {status}
-        </Badge>
-      );
-    }
-    if (statusLower.includes("pending")) {
-      return (
-        <Badge variant="secondary" className={badgeClassName}>
-          <Clock className="h-3 w-3 mr-1 shrink-0" />
-          {status}
-        </Badge>
-      );
-    }
-    if (statusLower.includes("partial")) {
-      return (
-        <Badge
-          className={base(
-            "bg-amber-100 text-amber-700 hover:bg-amber-100",
-          )}
-        >
-          <Clock className="h-3 w-3 mr-1 shrink-0" />
-          {status}
-        </Badge>
-      );
-    }
-    if (statusLower.includes("failed")) {
-      return (
-        <Badge
-          className={base("bg-red-100 text-red-700 hover:bg-red-100")}
-        >
-          <AlertCircle className="h-3 w-3 mr-1 shrink-0" />
-          {status}
-        </Badge>
-      );
-    }
-    if (statusLower.includes("cancel")) {
-      return (
-        <Badge
-          className={base("bg-gray-100 text-gray-700 hover:bg-gray-100")}
-        >
-          <AlertCircle className="h-3 w-3 mr-1 shrink-0" />
-          {status}
-        </Badge>
-      );
-    }
-    if (statusLower.includes("refund")) {
-      return (
-        <Badge
-          className={base(
-            "bg-orange-100 text-orange-700 hover:bg-orange-100",
-          )}
-        >
-          <RotateCcw className="h-3 w-3 mr-1 shrink-0" />
-          {status}
-        </Badge>
-      );
-    }
-    return (
-      <Badge variant="secondary" className={badgeClassName}>
-        {status}
-      </Badge>
-    );
-  };
+  ) => (
+    <StatusBadge
+      status={status}
+      className={badgeClassName}
+    />
+  );
 
   const formatNoteDate = (iso: string) => {
     try {

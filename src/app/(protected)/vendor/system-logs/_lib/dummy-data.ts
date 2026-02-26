@@ -1,0 +1,68 @@
+import { SystemLogEntry } from "./types";
+
+/** Dummy system logs for vendor; replace with API when backend is ready */
+export const SYSTEM_LOGS_DUMMY_DATA: SystemLogEntry[] = [
+  {
+    id: "1",
+    timestamp: "2026-02-17T10:30:00Z",
+    level: "info",
+    action: "user.login",
+    user: "sahil@so-creative.co.uk",
+    message: "User logged in successfully",
+    ip_address: "192.168.1.1",
+  },
+  {
+    id: "2",
+    timestamp: "2026-02-17T10:25:00Z",
+    level: "info",
+    action: "booking.created",
+    user: "sahil@so-creative.co.uk",
+    message: "Booking #BK-1024 created for Event: Summer Gala",
+    ip_address: "192.168.1.1",
+  },
+  {
+    id: "3",
+    timestamp: "2026-02-17T09:15:00Z",
+    level: "warning",
+    action: "payment.pending",
+    user: "sahil@so-creative.co.uk",
+    message: "Payment for booking #BK-1023 is still pending",
+    ip_address: "192.168.1.1",
+  },
+  {
+    id: "4",
+    timestamp: "2026-02-16T16:45:00Z",
+    level: "info",
+    action: "event.updated",
+    user: "sahil@so-creative.co.uk",
+    message: "Event 'Summer Gala' details updated",
+    ip_address: "192.168.1.1",
+  },
+  {
+    id: "5",
+    timestamp: "2026-02-16T14:20:00Z",
+    level: "error",
+    action: "email.send_failed",
+    user: "system",
+    message: "Failed to send confirmation email for booking #BK-1020",
+    ip_address: undefined,
+  },
+  {
+    id: "6",
+    timestamp: "2026-02-16T11:00:00Z",
+    level: "info",
+    action: "location.switched",
+    user: "sahil@so-creative.co.uk",
+    message: "Vendor location switched to Sheffield",
+    ip_address: "192.168.1.1",
+  },
+  {
+    id: "7",
+    timestamp: "2026-02-15T17:30:00Z",
+    level: "info",
+    action: "site_essential.updated",
+    user: "sahil@so-creative.co.uk",
+    message: "Site essentials (branding) updated for current location",
+    ip_address: "192.168.1.1",
+  },
+];

@@ -1,61 +1,38 @@
 /**
  * Vendor Dashboard Query Hooks
- * - Bookings: GET /vendor/dashboard?booking_period=<period>
- * - Commissions: GET /vendor/dashboard?comission_period=<period>
+ * - Bookings: GET /vendor/dashboard?booking_from_date=&booking_to_date=
+ * - Commissions: GET /vendor/dashboard?comission_from_date=&comission_to_date=
  */
 
 import { useQuery } from "@tanstack/react-query";
 import { vendorDashboardService } from "./dashboard.service";
-import type {
-  VendorDashboardResponse,
-  VendorDashboardPeriod,
-  VendorDashboardLastEventSortBy,
-  VendorDashboardLastEventSortOrder,
-} from "./type";
+import type { VendorDashboardResponse } from "./type";
+import type { DashboardDateRangeParams } from "./type";
 
 export const vendorDashboardKeys = {
   all: ["vendor", "dashboard"] as const,
-  bookings: (
-    period: VendorDashboardPeriod,
-    lastEventSort?: {
-      sortBy: VendorDashboardLastEventSortBy;
-      sortOrder: VendorDashboardLastEventSortOrder;
-    }
-  ) =>
+  bookings: (dateRange: DashboardDateRangeParams) =>
     [
       ...vendorDashboardKeys.all,
       "bookings",
-      period,
-      ...(lastEventSort ? [lastEventSort.sortBy, lastEventSort.sortOrder] : []),
+      dateRange.from_date,
+      dateRange.to_date,
     ] as const,
-  commissions: (period: VendorDashboardPeriod) =>
-    [...vendorDashboardKeys.all, "commissions", period] as const,
+  commissions: (dateRange: DashboardDateRangeParams) =>
+    [
+      ...vendorDashboardKeys.all,
+      "commissions",
+      dateRange.from_date,
+      dateRange.to_date,
+    ] as const,
 };
 
-export interface UseVendorDashboardBookingsOptions {
-  last_event_sort_by?: VendorDashboardLastEventSortBy;
-  last_event_sort_order?: VendorDashboardLastEventSortOrder;
-}
-
-export function useVendorDashboardBookings(
-  period: VendorDashboardPeriod = "today",
-  options?: UseVendorDashboardBookingsOptions
-) {
-  const lastEventSort =
-    options?.last_event_sort_by && options?.last_event_sort_order
-      ? {
-          sortBy: options.last_event_sort_by,
-          sortOrder: options.last_event_sort_order,
-        }
-      : undefined;
-
+export function useVendorDashboardBookings(dateRange: DashboardDateRangeParams) {
   return useQuery<VendorDashboardResponse>({
-    queryKey: vendorDashboardKeys.bookings(period, lastEventSort),
+    queryKey: vendorDashboardKeys.bookings(dateRange),
     queryFn: () =>
       vendorDashboardService.getBookingsStatistics({
-        period,
-        last_event_sort_by: options?.last_event_sort_by,
-        last_event_sort_order: options?.last_event_sort_order,
+        dateRange,
       }),
     staleTime: 2 * 60 * 1000,
     gcTime: 10 * 60 * 1000,
@@ -64,13 +41,13 @@ export function useVendorDashboardBookings(
 }
 
 export function useVendorDashboardCommissions(
-  period: VendorDashboardPeriod = "today",
+  dateRange: DashboardDateRangeParams,
   options?: { enabled?: boolean }
 ) {
   const enabled = options?.enabled !== false;
   return useQuery<VendorDashboardResponse>({
-    queryKey: vendorDashboardKeys.commissions(period),
-    queryFn: () => vendorDashboardService.getCommissionsStatistics(period),
+    queryKey: vendorDashboardKeys.commissions(dateRange),
+    queryFn: () => vendorDashboardService.getCommissionsStatistics(dateRange),
     enabled,
     staleTime: 2 * 60 * 1000,
     gcTime: 10 * 60 * 1000,

@@ -2,6 +2,7 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { getStatusColorClass } from "@/lib/status-theme";
 import { Calendar, DollarSign, ArrowRight } from "lucide-react";
 import Link from "next/link";
 import type { CustomerDashboardRecentBooking } from "@/services/customer/dashboard";
@@ -13,34 +14,6 @@ interface DashboardRecentBookingsProps {
 export default function DashboardRecentBookings({
   bookings,
 }: DashboardRecentBookingsProps) {
-  const getStatusColor = (status: string) => {
-    const statusLower = status.toLowerCase();
-    if (statusLower === "confirmed" || statusLower === "completed") {
-      return "bg-green-100 text-green-700 border-green-200";
-    }
-    if (statusLower === "pending") {
-      return "bg-amber-100 text-amber-700 border-amber-200";
-    }
-    if (statusLower === "cancelled") {
-      return "bg-red-100 text-red-700 border-red-200";
-    }
-    return "bg-gray-100 text-gray-700 border-gray-200";
-  };
-
-  const getPaymentStatusColor = (status: string) => {
-    const statusLower = status.toLowerCase();
-    if (statusLower === "paid" || statusLower === "completed") {
-      return "bg-green-100 text-green-700 border-green-200";
-    }
-    if (statusLower === "partial") {
-      return "bg-blue-100 text-blue-700 border-blue-200";
-    }
-    if (statusLower === "unpaid") {
-      return "bg-amber-100 text-amber-700 border-amber-200";
-    }
-    return "bg-amber-100 text-amber-700 border-amber-200";
-  };
-
   return (
     <section className="w-full flex items-center justify-between relative text-black">
       <section className="w-full relative bg-background dark:border p-4 sm:p-6 rounded-md">
@@ -80,7 +53,7 @@ export default function DashboardRecentBookings({
                             <div className="flex flex-wrap items-center gap-2 mb-2">
                               <Badge
                                 variant="outline"
-                                className={`text-xs ${getStatusColor(
+                                className={`text-xs border ${getStatusColorClass(
                                   booking.status
                                 )}`}
                               >
@@ -88,7 +61,7 @@ export default function DashboardRecentBookings({
                               </Badge>
                               <Badge
                                 variant="outline"
-                                className={`text-xs ${getPaymentStatusColor(
+                                className={`text-xs border ${getStatusColorClass(
                                   booking.payment_status
                                 )}`}
                               >

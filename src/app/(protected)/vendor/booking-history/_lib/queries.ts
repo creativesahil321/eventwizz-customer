@@ -135,6 +135,8 @@ export const useHistory = (
     per_page = 30,
     status = "",
     event_date = "",
+    from_date,
+    to_date,
   } = params;
 
   return useQuery({
@@ -144,6 +146,8 @@ export const useHistory = (
       per_page,
       status,
       event_date,
+      from_date,
+      to_date,
     }),
     queryFn: async () => {
       const response = await vendorBookingsService.getBookings({
@@ -152,6 +156,8 @@ export const useHistory = (
         status: status || undefined,
         search: search || undefined,
         event_date: event_date || undefined,
+        from_date: from_date || undefined,
+        to_date: to_date || undefined,
       });
 
       // Transform API response to History format

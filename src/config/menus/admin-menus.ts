@@ -153,7 +153,7 @@ export const adminMenus: MenuItemProps[] = [
     href: createAdminUrl("/admin/system-logs"),
     url: createAdminUrl("/admin/system-logs"),
     type: "item",
-    permissions: "read-system-log",
+    permissions: "read-system-logs",
     menu: [],
   },
   {

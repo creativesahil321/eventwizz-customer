@@ -3,6 +3,7 @@
  */
 
 import { parseAsString } from "@/types";
+import { getStatusColorClass } from "@/lib/status-theme";
 
 /**
  * Safely converts search param value to string
@@ -36,8 +37,6 @@ export function formatBookingStatus(status: string): {
   return {
     label,
     isConfirmed,
-    className: isConfirmed
-      ? "bg-green-500 text-white border-green-600"
-      : "bg-yellow-500 text-white border-yellow-600",
+    className: getStatusColorClass(statusLower),
   };
 }

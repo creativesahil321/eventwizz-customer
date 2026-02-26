@@ -129,6 +129,22 @@ export function FormProvider({
             ? rawGallery.slice(0, 8)
             : rawGallery;
 
+        // Normalize stepThree dates: the API may return "has_bookings " with a
+        // trailing space in the key — strip it so the form field resolves correctly.
+        const rawStepThree = eventDataAny.stepThree;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const normalizedStepThree = rawStepThree
+          ? {
+              ...rawStepThree,
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              dates: rawStepThree.dates?.map((date: any) => ({
+                ...date,
+                has_bookings:
+                  date["has_bookings"] ?? date["has_bookings "] ?? false,
+              })),
+            }
+          : initialData.stepThree;
+
         const mappedData: Partial<EventSchemaType> = {
           // Map all steps from the server data
           stepOne: eventDataAny.stepOne || initialData.stepOne,
@@ -136,7 +152,7 @@ export function FormProvider({
             ...stepTwoData,
             gallery: cappedGallery ?? initialData.stepTwo?.gallery ?? [],
           } as EventSchemaType["stepTwo"],
-          stepThree: eventDataAny.stepThree || initialData.stepThree,
+          stepThree: normalizedStepThree || initialData.stepThree,
           stepFour: eventDataAny.stepFour || initialData.stepFour,
           stepFive: eventDataAny.stepFive || initialData.stepFive,
           stepSix: transformedStepSix,

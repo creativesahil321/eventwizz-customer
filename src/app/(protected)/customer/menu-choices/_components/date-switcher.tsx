@@ -10,6 +10,7 @@ import {
 import { Calendar, CheckCircle2, Clock } from "lucide-react";
 import { MenuBookingDate } from "../_lib/types";
 import { Badge } from "@/components/ui/badge";
+import { getStatusColorClass } from "@/lib/status-theme";
 import { cn } from "@/lib/utils";
 
 interface DateSwitcherProps {
@@ -27,27 +28,27 @@ const getStatusBadgeProps = (status: string) => {
     statusLower.includes("paid")
   ) {
     return {
-      className: "bg-green-100 text-green-700 hover:bg-green-100",
+      className: cn("hover:opacity-90", getStatusColorClass("paid")),
       icon: CheckCircle2,
     };
   }
 
   if (statusLower.includes("partial")) {
     return {
-      className: "bg-amber-100 text-amber-700 hover:bg-amber-100",
+      className: cn("hover:opacity-90", getStatusColorClass("partial")),
       icon: Clock,
     };
   }
 
   if (statusLower.includes("pending")) {
     return {
-      className: "bg-orange-100 text-orange-700 hover:bg-orange-100",
+      className: cn("hover:opacity-90", getStatusColorClass("pending")),
       icon: Clock,
     };
   }
 
   return {
-    className: "bg-gray-100 text-gray-700 hover:bg-gray-100",
+    className: cn("hover:opacity-90", getStatusColorClass("neutral")),
     icon: Clock,
   };
 };

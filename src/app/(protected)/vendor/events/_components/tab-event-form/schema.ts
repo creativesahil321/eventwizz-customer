@@ -235,6 +235,8 @@ const normalizeDepositType = (value: unknown) => {
 const baseDateSchema = z.object({
   event_date: z.string().min(1, "Date is required"),
   booking_type: z.enum(["tickets", "tables", "both"]),
+  has_bookings: z.boolean().optional(),
+  cancelled: z.boolean().optional(),
   payment_type: z.enum(["deposit", "full"]).optional(),
   is_deposit_enabled: z.preprocess(normalizeBoolean, z.boolean().optional()),
   deposit_type: z.preprocess(

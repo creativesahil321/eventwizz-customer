@@ -182,6 +182,8 @@ export interface VendorBookingsQueryParams {
   status?: string;
   search?: string;
   event_date?: string;
+  from_date?: string;
+  to_date?: string;
 }
 
 /**

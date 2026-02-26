@@ -4,38 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Download } from "lucide-react";
 import React from "react";
 import { DataTableRowAction, Transaction } from "../_lib/types";
-
-// Color configurations for payment status
-const PAYMENT_STATUS_COLORS: Record<string, { bg: string; text: string }> = {
-  success: {
-    bg: "#10b981", // green
-    text: "#ffffff",
-  },
-  paid: {
-    bg: "#10b981", // green
-    text: "#ffffff",
-  },
-  pending: {
-    bg: "#f59e0b", // amber
-    text: "#ffffff",
-  },
-  Pending: {
-    bg: "#f59e0b", // amber
-    text: "#ffffff",
-  },
-  failed: {
-    bg: "#ef4444", // red
-    text: "#ffffff",
-  },
-  Failed: {
-    bg: "#ef4444", // red
-    text: "#ffffff",
-  },
-  refunded: {
-    bg: "#6b7280", // gray
-    text: "#ffffff",
-  },
-};
+import { StatusBadge } from "@/components/ui/status-badge";
 
 interface GetTransactionColumnsProps {
   setRowAction: React.Dispatch<
@@ -205,26 +174,7 @@ export function getTransactionColumns({
       cell: ({ row }) => {
         const status = row.getValue("status") as string;
         if (!status) return null;
-
-        // Normalize status to lowercase for lookup, but keep original for display
-        const statusKey = status.toLowerCase();
-        const colorConfig = PAYMENT_STATUS_COLORS[status] ||
-          PAYMENT_STATUS_COLORS[statusKey] || {
-            bg: "#6b7280",
-            text: "#ffffff",
-          };
-
-        return (
-          <div
-            className="inline-flex items-center justify-center px-3 py-1.5 rounded-full text-xs font-semibold capitalize"
-            style={{
-              backgroundColor: colorConfig.bg,
-              color: colorConfig.text,
-            }}
-          >
-            {status}
-          </div>
-        );
+        return <StatusBadge status={status} showIcon={false} />;
       },
       enableSorting: false,
       enableHiding: false,

@@ -2,6 +2,7 @@
 
 import { useCustomerDashboard } from "@/services/customer/dashboard";
 import type { CustomerDashboardUpcomingEvent } from "@/services/customer/dashboard";
+import { useDomain } from "@/providers/domain-provider/domain-provider";
 import { PageLoader } from "@/components/ui/page-loader";
 import DashboardEvents from "./dashboard-events";
 import DashboardRecentBookings from "./dashboard-recent-bookings";
@@ -15,23 +16,29 @@ interface DashboardEventItem {
   time: string;
   location: string;
   ticketType: string;
+  eventSlug?: string;
+  locationSlug?: string;
 }
 
 function mapUpcomingEvents(
-  raw: CustomerDashboardUpcomingEvent[]
+  raw: CustomerDashboardUpcomingEvent[],
+  defaultLocationSlug: string | null
 ): DashboardEventItem[] {
   return raw.map((e, i) => ({
-    id: String(e.id ?? e.event_slug ?? i),
+    id: String(e.booking_date_id ?? e.id ?? e.event_slug ?? i),
     title: e.title ?? e.event_name ?? "Event",
     date: e.date ?? new Date().toISOString().slice(0, 10),
     time: e.time ?? "—",
     location: e.location ?? "—",
     ticketType: e.ticketType ?? e.ticket_type ?? "—",
+    eventSlug: e.event_slug,
+    locationSlug: e.location_slug ?? defaultLocationSlug ?? undefined,
   }));
 }
 
 export default function CustomerDashboardContent() {
   const { data, isLoading, isError, error } = useCustomerDashboard();
+  const { settings } = useDomain();
 
   if (isLoading && !data) {
     return <PageLoader />;
@@ -51,12 +58,17 @@ export default function CustomerDashboardContent() {
   const upcomingEvents = dashboardData?.upcoming_events ?? [];
   const recentBookings = dashboardData?.recent_bookings ?? [];
 
+  const defaultLocationSlug =
+    settings?.locations?.find((l) => l.is_default)?.slug ??
+    settings?.locations?.[0]?.slug ??
+    null;
+
   return (
     <>
       <section className="w-full relative">
         <DashboardEvents
           title="My Upcoming Events"
-          events={mapUpcomingEvents(upcomingEvents)}
+          events={mapUpcomingEvents(upcomingEvents, defaultLocationSlug)}
         />
       </section>
 

@@ -5,6 +5,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { StatusBadge } from "@/components/ui/status-badge";
 import { Alert } from "@/components/ui/alert";
 import {
   Accordion,
@@ -429,33 +430,9 @@ export default function BookingInfoTab({ bookingData }: BookingInfoTabProps) {
     });
   };
 
-  const getPaymentStatusBadge = (status: string) => {
-    switch (status) {
-      case "paid":
-        return (
-          <Badge className="bg-green-100 text-green-700 hover:bg-green-100">
-            <CheckCircle2 className="h-3 w-3 mr-1" />
-            Paid
-          </Badge>
-        );
-      case "pending":
-        return (
-          <Badge variant="secondary">
-            <Clock className="h-3 w-3 mr-1" />
-            Pending
-          </Badge>
-        );
-      case "partial":
-        return (
-          <Badge className="bg-amber-100 text-amber-700 hover:bg-amber-100">
-            <Clock className="h-3 w-3 mr-1" />
-            Partial
-          </Badge>
-        );
-      default:
-        return null;
-    }
-  };
+  const getPaymentStatusBadge = (status: string) => (
+    <StatusBadge status={status} label={status === "paid" ? "Paid" : status === "pending" ? "Pending" : status === "partial" ? "Partial" : status} />
+  );
 
   return (
     <div className="space-y-6">

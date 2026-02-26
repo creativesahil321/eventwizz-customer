@@ -24,7 +24,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
-import { PlusCircle, Trash2 } from "lucide-react";
+import { PlusCircle, Trash2, XCircle } from "lucide-react";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
@@ -989,22 +989,58 @@ export default function DatesTab() {
           className="border-2 border-gray-200 rounded-lg p-4 sm:p-5 mb-6 bg-white shadow-sm hover:shadow-md transition-all"
         >
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-0 mb-4">
-            <h3 className="text-lg font-semibold truncate flex-1 min-w-0">
+            <h3 className="text-lg font-semibold truncate flex-1 min-w-0 flex items-center gap-2">
               {formatDateDisplay(watch(`dates.${dateIndex}.event_date`))}
+              {watch(`dates.${dateIndex}.cancelled`) && (
+                <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-700 border border-red-200">
+                  Cancelled
+                </span>
+              )}
             </h3>
-            {dateFields.length > 1 && (
-              <Button
-                type="button"
-                variant="destructive"
-                className="text-destructive hover:text-white bg-destructive/10 w-full sm:w-auto"
-                size="sm"
-                onClick={() => remove(dateIndex)}
-              >
-                <Trash2 className="h-4 w-4 mr-2" />
-                <span className="hidden sm:inline">Remove Date</span>
-                <span className="sm:hidden">Remove</span>
-              </Button>
-            )}
+            <div className="flex items-center gap-2 w-full sm:w-auto">
+              {watch(`dates.${dateIndex}.has_bookings`) ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  className={
+                    watch(`dates.${dateIndex}.cancelled`)
+                      ? "border-gray-400 text-gray-500 hover:bg-gray-50 w-full sm:w-auto"
+                      : "border-red-500 text-red-600 hover:bg-red-50 w-full sm:w-auto"
+                  }
+                  size="sm"
+                  onClick={() => {
+                    const isCancelled = watch(`dates.${dateIndex}.cancelled`);
+                    setValue(`dates.${dateIndex}.cancelled`, !isCancelled);
+                    toast.info(
+                      !isCancelled
+                        ? "Date marked as cancelled. Save the form to apply."
+                        : "Date cancellation undone."
+                    );
+                  }}
+                >
+                  <XCircle className="h-4 w-4 mr-2" />
+                  <span>
+                    {watch(`dates.${dateIndex}.cancelled`)
+                      ? "Undo Cancel"
+                      : "Cancel Date"}
+                  </span>
+                </Button>
+              ) : (
+                dateFields.length > 1 && (
+                  <Button
+                    type="button"
+                    variant="destructive"
+                    className="text-destructive hover:text-white bg-destructive/10 w-full sm:w-auto"
+                    size="sm"
+                    onClick={() => remove(dateIndex)}
+                  >
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    <span className="hidden sm:inline">Remove Date</span>
+                    <span className="sm:hidden">Remove</span>
+                  </Button>
+                )
+              )}
+            </div>
           </div>
 
           <div className="grid grid-cols-1 gap-4 sm:gap-5 mb-4">

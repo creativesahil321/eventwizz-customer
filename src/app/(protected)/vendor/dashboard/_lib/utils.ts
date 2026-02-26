@@ -1,17 +1,6 @@
-export const statusClass = (status: string) => {
-  const s = status?.toLowerCase();
-  switch (s) {
-    case "pending":
-      return "bg-[#f2f2e4] text-[#988458]";
-    case "completed":
-    case "paid":
-      return "bg-[#e5f5f2] text-[#50a08e]";
-    case "cancelled":
-      return "bg-[#ffd4e3] text-[#8e4d63]";
-    default:
-      return "bg-slate-600 text-white";
-  }
-};
+import { getStatusClassName } from "@/lib/status-theme";
+
+export const statusClass = (status: string) => getStatusClassName(status);
 export const timeAgo = (date: Date): string => {
   const seconds = Math.floor((new Date().getTime() - date.getTime()) / 1000);
 

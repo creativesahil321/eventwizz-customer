@@ -17,6 +17,9 @@ import { SearchParams } from "./_lib/types";
 import { History } from "./_lib/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { DateRangePicker } from "@/components/ui/date-range-picker";
+import { DateRange } from "react-day-picker";
+import { format } from "date-fns";
 import {
   Select,
   SelectContent,
@@ -37,12 +40,18 @@ import { PermissionRoute } from "@/components/permission";
 export default function BookingHistoryPage() {
   const [globalFilterValue, setGlobalFilterValue] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
-  const [eventDate, setEventDate] = useState("");
+  const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
   const [, setSelectedRowCount] = useState(0);
   const tableRef = React.useRef<Table<History> | null>(null);
   const [, setPage] = useQueryState("page", parseAsInteger.withDefault(1));
 
-  // Poll table selection so header re-renders and shows bulk actions (same pattern as customers page)
+  const fromDate = dateRange?.from
+    ? format(dateRange.from, "yyyy-MM-dd")
+    : undefined;
+  const toDate = dateRange?.to
+    ? format(dateRange.to, "yyyy-MM-dd")
+    : undefined;
+
   useEffect(() => {
     const updateSelectedCount = () => {
       if (tableRef.current) {
@@ -56,34 +65,31 @@ export default function BookingHistoryPage() {
     return () => clearInterval(interval);
   }, []);
 
-  // Debounce search input using existing hook
   const debouncedSearch = useDebounce(globalFilterValue, 500);
 
-  // Reset page to 1 when search, status, or date filters change
   useEffect(() => {
     setPage(1);
-  }, [debouncedSearch, statusFilter, eventDate, setPage]);
+  }, [debouncedSearch, statusFilter, fromDate, toDate, setPage]);
 
   const hasActiveFilters =
-    !!debouncedSearch || statusFilter !== "all" || !!eventDate;
+    !!debouncedSearch || statusFilter !== "all" || !!dateRange?.from || !!dateRange?.to;
 
   const handleResetAllFilters = () => {
     setGlobalFilterValue("");
     setStatusFilter("all");
-    setEventDate("");
+    setDateRange(undefined);
     setPage(1);
   };
 
-  // Build search params based on current filters
   const searchParams: SearchParams = {
     page: "1",
     per_page: "30",
     search: debouncedSearch,
     status: statusFilter === "all" ? "" : statusFilter,
-    event_date: eventDate,
+    from_date: fromDate,
+    to_date: toDate,
   };
 
-  // Fetch data for summary (use the same query as the table)
   const {
     data: historyData,
     isLoading,
@@ -93,7 +99,8 @@ export default function BookingHistoryPage() {
     page: 1,
     per_page: 30,
     status: statusFilter === "all" ? "" : statusFilter,
-    event_date: eventDate,
+    from_date: fromDate,
+    to_date: toDate,
   });
 
   // Get summary from API response
@@ -166,26 +173,15 @@ export default function BookingHistoryPage() {
                 </div>
                 <div className="flex flex-col sm:flex-row flex-wrap gap-3 items-center w-full sm:w-auto min-w-0">
                   <div className="flex flex-wrap gap-3 items-center w-full sm:min-w-0 sm:max-w-full min-w-0">
-                    {/* Event Date Filter - visible format hint when empty (fixes invisible placeholder on mobile) */}
-                    <div className="flex flex-col gap-1 shrink-0 w-full sm:w-[180px]">
-                      <div className="relative w-full">
-                        <Input
-                          type="date"
-                          value={eventDate}
-                          onChange={(e) => setEventDate(e.target.value)}
-                          className="w-full min-w-0 sm:w-[180px]"
-                          disabled={isFetching}
-                          aria-label="Filter by event date (dd-mm-yyyy)"
-                        />
-                        {!eventDate && (
-                          <span
-                            className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-500 sm:hidden"
-                            aria-hidden
-                          >
-                            dd-mm-yyyy
-                          </span>
-                        )}
-                      </div>
+                    {/* Date range filter - same as Email Logs */}
+                    <div className="w-full min-w-0 sm:w-auto sm:min-w-[280px]">
+                      <DateRangePicker
+                        date={dateRange}
+                        onDateChange={setDateRange}
+                        placeholder="Filter by date range"
+                        disabled={isFetching}
+                        showClear={true}
+                      />
                     </div>
                     {/* Search */}
                     <div className="relative flex-1 min-w-[200px] sm:min-w-[180px] max-w-full">

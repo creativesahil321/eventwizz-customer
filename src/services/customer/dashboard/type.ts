@@ -20,14 +20,19 @@ export interface CustomerDashboardRecentBooking {
 /** Upcoming event item when API returns non-empty upcoming_events */
 export interface CustomerDashboardUpcomingEvent {
   id?: string | number;
+  booking_id?: number;
+  booking_date_id?: number;
   title?: string;
   event_name?: string;
   date?: string;
+  date_key?: string;
   time?: string;
   location?: string;
   ticket_type?: string;
   ticketType?: string;
   event_slug?: string;
+  /** Location slug for building event URL e.g. bristol-1 */
+  location_slug?: string;
   [key: string]: unknown;
 }
 

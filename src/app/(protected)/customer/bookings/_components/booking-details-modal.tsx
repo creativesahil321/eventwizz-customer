@@ -7,6 +7,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
+import { StatusBadge } from "@/components/ui/status-badge";
 import { Separator } from "@/components/ui/separator";
 import {
   Calendar,
@@ -34,20 +35,6 @@ export default function BookingDetailsModal({
 }: BookingDetailsModalProps) {
   if (!booking) return null;
 
-  const getPaymentStatusVariant = (status: string) => {
-    const lowerStatus = status.toLowerCase();
-    if (lowerStatus.includes("success") || lowerStatus.includes("paid")) {
-      return "default";
-    } else if (lowerStatus.includes("pending")) {
-      return "secondary";
-    } else if (lowerStatus.includes("refund")) {
-      return "outline";
-    } else if (lowerStatus.includes("cancel")) {
-      return "destructive";
-    }
-    return "secondary";
-  };
-
   const DetailRow = ({
     icon: Icon,
     label,
@@ -74,9 +61,10 @@ export default function BookingDetailsModal({
         <DialogHeader>
           <DialogTitle className="text-2xl flex items-center justify-between gap-4">
             <span>Booking Details</span>
-            <Badge variant={getPaymentStatusVariant(booking.payment_status)}>
-              {booking.payment_status}
-            </Badge>
+            <StatusBadge
+              status={booking.payment_status}
+              label={booking.payment_status}
+            />
           </DialogTitle>
         </DialogHeader>
 

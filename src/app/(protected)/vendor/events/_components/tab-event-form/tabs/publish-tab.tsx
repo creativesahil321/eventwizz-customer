@@ -25,13 +25,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Progress } from "@/components/ui/progress";
-import { Eye, LoaderCircle } from "lucide-react";
+import { Eye } from "lucide-react";
 import { env } from "@/env";
 import GoogleLocationSearch from "@/app/(on-boarding)/on-boarding/_components/steps/step-11/google-location-search";
 import { fetchLocationDetails } from "@/app/(on-boarding)/on-boarding/_components/steps/step-11/_lib/actions";
 import { useParams, useRouter } from "next/navigation";
 import { useEventData } from "../../../_lib/hooks/useEventData";
+import { SavingState } from "../_components/saving-state";
 
 // Days options for reminder emails
 const days = Array.from({ length: 31 }, (_, i) => i + 1);
@@ -226,15 +226,10 @@ export default function PublishTab() {
       )}
 
       {isLoading ? (
-        <div className="flex flex-col items-center justify-center py-12 space-y-8">
-          <div className="flex items-center space-x-2">
-            <LoaderCircle className="animate-spin text-primary h-8 w-8" />
-            <span className="text-lg font-medium">
-              {isLoading ? "Saving..." : "Submit Event"}
-            </span>
-          </div>
-          <Progress value={100} className="w-full" />
-        </div>
+        <SavingState
+          title="Saving your event..."
+          description="Please wait while we save your publish settings. You'll be notified when it's done."
+        />
       ) : (
         <Form {...form}>
           <form

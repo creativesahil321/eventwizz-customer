@@ -1,12 +1,13 @@
 "use client";
 
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState, useCallback } from "react";
+import { format } from "date-fns";
 import {
   useVendorDashboardBookings,
   useVendorDashboardCommissions,
 } from "@/services/vendor/dashboard";
 import type {
-  VendorDashboardPeriod,
+  DashboardDateRangeParams,
   VendorDashboardLastEventSortBy,
   VendorDashboardLastEventSortOrder,
 } from "@/services/vendor/dashboard";
@@ -17,7 +18,6 @@ import {
   mapRecentBookingsToTableRows,
   mapLastEventOverviewToBestSales,
 } from "../_lib/dashboard-mappers";
-import { EMPTY_COMMISSIONS_STATS } from "../_lib/constants";
 import DashboardSummary from "./dashboard-summary";
 import DashboardBookingsCommissions, {
   type BookingsCommissionsTab,
@@ -25,20 +25,21 @@ import DashboardBookingsCommissions, {
 import DashboardBookingsTable from "./_bookings-table";
 import BestSales from "./_best-sales";
 import VendorDashboardSkeleton from "./dashboard-skeleton";
-import type { Orders } from "../_lib/types";
+import type { OrderCardItem } from "../_lib/dashboard-mappers";
 
-const emptyOrdersByPeriod: Orders = {
-  today: [],
-  weekly: [],
-  monthly: [],
-  yearly: [],
-};
+function defaultDateRange(): DashboardDateRangeParams {
+  const today = format(new Date(), "yyyy-MM-dd");
+  return {
+    from_date: today,
+    to_date: today,
+  };
+}
 
 export default function VendorDashboardContent() {
-  const [bookingsPeriod, setBookingsPeriod] =
-    useState<VendorDashboardPeriod>("today");
-  const [commissionsPeriod, setCommissionsPeriod] =
-    useState<VendorDashboardPeriod>("today");
+  const [bookingsDateRange, setBookingsDateRange] =
+    useState<DashboardDateRangeParams>(defaultDateRange);
+  const [commissionsDateRange, setCommissionsDateRange] =
+    useState<DashboardDateRangeParams>(defaultDateRange);
   const [sectionTab, setSectionTab] =
     useState<BookingsCommissionsTab>("bookings");
   const [lastEventSortBy, setLastEventSortBy] =
@@ -46,11 +47,8 @@ export default function VendorDashboardContent() {
   const [lastEventSortOrder, setLastEventSortOrder] =
     useState<VendorDashboardLastEventSortOrder>("desc");
 
-  const bookingsQuery = useVendorDashboardBookings(bookingsPeriod, {
-    last_event_sort_by: lastEventSortBy,
-    last_event_sort_order: lastEventSortOrder,
-  });
-  const commissionsQuery = useVendorDashboardCommissions(commissionsPeriod, {
+  const bookingsQuery = useVendorDashboardBookings(bookingsDateRange);
+  const commissionsQuery = useVendorDashboardCommissions(commissionsDateRange, {
     enabled: sectionTab === "commissions",
   });
 
@@ -62,17 +60,15 @@ export default function VendorDashboardContent() {
     return mapSummaryToItems(bookingsData.data.summary);
   }, [bookingsData?.data?.summary]);
 
-  const bookingsStats = useMemo((): Orders => {
-    if (!bookingsData?.data?.bookings_stats) return emptyOrdersByPeriod;
-    const cards = mapBookingsStatsToOrders(bookingsData.data.bookings_stats);
-    return { ...emptyOrdersByPeriod, [bookingsPeriod]: cards };
-  }, [bookingsData?.data?.bookings_stats, bookingsPeriod]);
+  const bookingsCards = useMemo((): OrderCardItem[] => {
+    if (!bookingsData?.data?.bookings_stats) return [];
+    return mapBookingsStatsToOrders(bookingsData.data.bookings_stats);
+  }, [bookingsData?.data?.bookings_stats]);
 
-  const commissionsStats = useMemo((): Orders => {
+  const commissionsCards = useMemo((): OrderCardItem[] => {
     const raw = commissionsData?.data?.commissions_stats;
-    const cards = mapCommissionsStatsToOrders(raw);
-    return { ...EMPTY_COMMISSIONS_STATS, [commissionsPeriod]: cards };
-  }, [commissionsData?.data?.commissions_stats, commissionsPeriod]);
+    return mapCommissionsStatsToOrders(raw);
+  }, [commissionsData?.data?.commissions_stats]);
 
   const recentBookings = useMemo(() => {
     if (!bookingsData?.data?.recent_bookings) return [];
@@ -85,6 +81,28 @@ export default function VendorDashboardContent() {
       bookingsData.data.last_event_performing_overview,
     );
   }, [bookingsData?.data?.last_event_performing_overview]);
+
+  const handleBookingsDateRangeChange = useCallback(
+    (from_date: string | undefined, to_date: string | undefined) => {
+      if (from_date && to_date) {
+        setBookingsDateRange({ from_date, to_date });
+      } else {
+        setBookingsDateRange(defaultDateRange());
+      }
+    },
+    []
+  );
+
+  const handleCommissionsDateRangeChange = useCallback(
+    (from_date: string | undefined, to_date: string | undefined) => {
+      if (from_date && to_date) {
+        setCommissionsDateRange({ from_date, to_date });
+      } else {
+        setCommissionsDateRange(defaultDateRange());
+      }
+    },
+    []
+  );
 
   if (bookingsLoading && !bookingsData) {
     return <VendorDashboardSkeleton />;
@@ -108,16 +126,12 @@ export default function VendorDashboardContent() {
 
       <section className="w-full relative">
         <DashboardBookingsCommissions
-          bookingsStats={bookingsStats}
-          commissionsStats={commissionsStats}
-          bookingsPeriod={bookingsPeriod}
-          onBookingsPeriodChange={(p) =>
-            setBookingsPeriod(p as VendorDashboardPeriod)
-          }
-          commissionsPeriod={commissionsPeriod}
-          onCommissionsPeriodChange={(p) =>
-            setCommissionsPeriod(p as VendorDashboardPeriod)
-          }
+          bookingsCards={bookingsCards}
+          commissionsCards={commissionsCards}
+          bookingsDateRange={bookingsDateRange}
+          onBookingsDateRangeChange={handleBookingsDateRangeChange}
+          commissionsDateRange={commissionsDateRange}
+          onCommissionsDateRangeChange={handleCommissionsDateRangeChange}
           activeTab={sectionTab}
           onTabChange={setSectionTab}
         />

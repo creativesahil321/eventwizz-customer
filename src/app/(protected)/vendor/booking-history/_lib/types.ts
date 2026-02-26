@@ -41,6 +41,8 @@ export interface AdminHistoryParams {
   per_page?: number | string;
   status?: string;
   event_date?: string;
+  from_date?: string;
+  to_date?: string;
 }
 
 export interface DataTableRowAction<TData> {
@@ -54,8 +56,8 @@ export type SearchParams = {
   status?: string;
   search?: string;
   event_date?: string;
-  from?: string;
-  to?: string;
+  from_date?: string;
+  to_date?: string;
   filters?: string | unknown;
   [key: string]: string | string[] | undefined | unknown;
 };

@@ -1,4 +1,5 @@
 "use client";
+import Link from "next/link";
 import { Badge as BadgeComponent } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -11,6 +12,8 @@ interface Event {
   time: string;
   location: string;
   ticketType: string;
+  eventSlug?: string;
+  locationSlug?: string;
 }
 
 interface DashboardEventsProps {
@@ -43,73 +46,78 @@ export default function DashboardEvents({
             </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {events.map((event) => (
-                <Card
-                  key={event.id}
-                  className="hover:shadow-lg transition-all hover:scale-[1.02] cursor-pointer"
-                >
-                  <CardContent className="p-4">
-                    <div className="space-y-3">
-                      {/* Event Title */}
-                      <h3 className="font-semibold text-base line-clamp-2">
-                        {event.title}
-                      </h3>
+              {events.map((event) => {
+                const eventHref =
+                  event.locationSlug && event.eventSlug
+                    ? `/${event.locationSlug}/events/${event.eventSlug}`
+                    : null;
+                const showTicketType =
+                  event.ticketType && event.ticketType !== "Day Pass";
 
-                      {/* Event Details */}
-                      <div className="space-y-2">
-                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                          <Calendar className="h-3.5 w-3.5 text-[var(--color-primary)] flex-shrink-0" />
-                          <span className="text-xs">
-                            {new Date(event.date).toLocaleDateString("en-US", {
-                              weekday: "short",
-                              month: "short",
-                              day: "numeric",
-                            })}
-                          </span>
+                const cardContent = (
+                  <Card
+                    key={event.id}
+                    className="hover:shadow-lg transition-all hover:scale-[1.02] cursor-pointer h-full"
+                  >
+                    <CardContent className="p-4 h-full flex flex-col">
+                      <div className="space-y-3 flex-1">
+                        <h3 className="font-semibold text-base line-clamp-2">
+                          {event.title}
+                        </h3>
+                        <div className="space-y-2">
+                          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                            <Calendar className="h-3.5 w-3.5 text-[var(--color-primary)] flex-shrink-0" />
+                            <span className="text-xs">{event.date}</span>
+                          </div>
+                          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                            <Clock className="h-3.5 w-3.5 text-[var(--color-primary)] flex-shrink-0" />
+                            <span className="text-xs">{event.time}</span>
+                          </div>
+                          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                            <MapPin className="h-3.5 w-3.5 text-[var(--color-primary)] flex-shrink-0" />
+                            <span className="text-xs line-clamp-1">
+                              {event.location}
+                            </span>
+                          </div>
                         </div>
-                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                          <Clock className="h-3.5 w-3.5 text-[var(--color-primary)] flex-shrink-0" />
-                          <span className="text-xs">{event.time}</span>
-                        </div>
-                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                          <MapPin className="h-3.5 w-3.5 text-[var(--color-primary)] flex-shrink-0" />
-                          <span className="text-xs line-clamp-1">
-                            {event.location}
-                          </span>
-                        </div>
-                      </div>
-
-                      {/* Ticket Type & Button */}
-                      <div className="flex items-center justify-between pt-2 border-t">
-                        <div className="flex items-center gap-1.5">
-                          <Ticket className="h-3.5 w-3.5 text-[var(--color-primary)]" />
-                          <BadgeComponent
+                        <div className="flex items-center justify-between pt-2 border-t mt-auto">
+                          {showTicketType ? (
+                            <div className="flex items-center gap-1.5">
+                              <Ticket className="h-3.5 w-3.5 text-[var(--color-primary)]" />
+                              <BadgeComponent
+                                variant="outline"
+                                className="text-xs h-5 bg-slate-50 text-slate-700 border-slate-200 font-medium text-[var(--color-primary)]"
+                              >
+                                {event.ticketType}
+                              </BadgeComponent>
+                            </div>
+                          ) : (
+                            <span />
+                          )}
+                          <Button
                             variant="outline"
-                            className="text-xs h-5 bg-slate-50 text-slate-700 border-slate-200 font-medium text-[var(--color-primary)]"
+                            size="sm"
+                            className="h-7 text-xs px-2"
                           >
-                            {event.ticketType}
-                          </BadgeComponent>
+                            Details
+                          </Button>
                         </div>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="h-7 text-xs px-2"
-                        >
-                          Details
-                        </Button>
                       </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
+                    </CardContent>
+                  </Card>
+                );
+
+                return eventHref ? (
+                  <Link key={event.id} href={eventHref} className="block h-full">
+                    {cardContent}
+                  </Link>
+                ) : (
+                  cardContent
+                );
+              })}
             </div>
           )}
 
-          {events.length > 0 && (
-            <Button variant="outline" size="sm" className="mt-4 sm:mt-6">
-              View All Events
-            </Button>
-          )}
         </main>
       </section>
     </section>

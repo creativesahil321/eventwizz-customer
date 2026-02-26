@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
+import { StatusBadge } from "@/components/ui/status-badge";
 import { Card } from "@/components/ui/card";
 import {
   ArrowLeft,
@@ -153,17 +153,6 @@ export default function AdjustBookingContent({
     }
   };
 
-  const getStatusVariant = (status: string) => {
-    const lower = status.toLowerCase();
-    if (lower.includes("paid") || lower.includes("success"))
-      return "default" as const;
-    if (lower.includes("pending")) return "secondary" as const;
-    if (lower.includes("refund")) return "outline" as const;
-    if (lower.includes("cancel")) return "destructive" as const;
-    return "secondary" as const;
-  };
-
-  // Loading state
   if (isLoading) {
     return (
       <section className="w-full relative flex flex-col space-y-6">
@@ -363,12 +352,10 @@ export default function AdjustBookingContent({
               </div>
             </div>
 
-            <Badge
-              variant={getStatusVariant(transformedData.payment_status)}
-              className="text-sm px-3 py-1.5 shrink-0"
-            >
-              {transformedData.payment_status}
-            </Badge>
+              <StatusBadge
+                status={transformedData.payment_status}
+                className="text-sm px-3 py-1.5 shrink-0"
+              />
           </div>
         </div>
       </div>

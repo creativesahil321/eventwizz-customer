@@ -122,6 +122,16 @@ export const vendorMenus: MenuItemProps[] = [
     menu: [],
   },
   {
+    id: 20,
+    title: "System Logs",
+    icon: "fileText",
+    href: createVendorUrl("/vendor/system-logs"),
+    url: createVendorUrl("/vendor/system-logs"),
+    type: "title",
+    permissions: "read-system-logs",
+    menu: [],
+  },
+  {
     id: 13,
     title: "Manage Roles",
     icon: "manageRoles",

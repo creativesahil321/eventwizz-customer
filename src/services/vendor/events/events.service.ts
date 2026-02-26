@@ -518,7 +518,8 @@ export const eventsService = {
         // Now using date.booking_type instead of data.booking_type
         const baseDate = {
           event_date: date.event_date,
-          booking_type: date.booking_type, // Include booking_type for each date
+          booking_type: date.booking_type,
+          ...(date.cancelled === true && { cancelled: true }),
           total_table_types:
             date.booking_type !== "tickets" ? date.total_table_types : 0,
           tables: date.booking_type !== "tickets" ? date.tables : [],

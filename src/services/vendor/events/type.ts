@@ -75,6 +75,8 @@ export interface EventDetailStepThree {
   dates?: Array<{
     event_date: string;
     booking_type: "tickets" | "tables" | "both";
+    has_bookings?: boolean;
+    cancelled?: boolean;
     total_table_types?: number;
     tables?: Array<{
       id: number;

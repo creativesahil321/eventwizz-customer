@@ -2,20 +2,20 @@
  * Vendor Dashboard API types for GET /vendor/dashboard
  *
  * BACKEND CONTRACT (for backend devs):
- * - Bookings: GET /vendor/dashboard?booking_period=today|weekly|monthly|yearly
- *   Optional for Last Event Performing Overview sort:
- *   - last_event_sort_by=name|amount
- *   - last_event_sort_order=asc|desc
- *   Returns: summary, bookings_stats, recent_bookings, last_event_performing_overview.
- * - Commissions: GET /vendor/dashboard?comission_period=today|weekly|monthly|yearly
- *   Returns: data.commissions_stats (optional). If missing, frontend shows zeros.
+ * - Bookings: GET /vendor/dashboard?booking_from_date=yyyy-MM-dd&booking_to_date=yyyy-MM-dd
+ * - Commissions: GET /vendor/dashboard?comission_from_date=yyyy-MM-dd&comission_to_date=yyyy-MM-dd
+ * last_event_performing_overview is sorted client-side; no sort params are sent.
  */
 
-/** Sort options for last_event_performing_overview (optional API params) */
+/** Date range for dashboard filters (yyyy-MM-dd strings) */
+export interface DashboardDateRangeParams {
+  from_date: string;
+  to_date: string;
+}
+
+/** Client-side sort options for last_event_performing_overview (not sent to API) */
 export type VendorDashboardLastEventSortBy = "name" | "amount";
 export type VendorDashboardLastEventSortOrder = "asc" | "desc";
-
-export type VendorDashboardPeriod = "today" | "weekly" | "monthly" | "yearly";
 
 export interface VendorDashboardSummary {
   total_events: number;

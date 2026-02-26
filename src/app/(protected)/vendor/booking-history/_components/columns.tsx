@@ -12,30 +12,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { createSelectColumn } from "@/components/data-table/data-table-column-select";
-
-// Color configurations for order status
-const ORDER_STATUS_COLORS = {
-  confirmed: {
-    bg: "#10b981", // green
-    text: "#ffffff",
-  },
-  cancelled: {
-    bg: "#ef4444", // red
-    text: "#ffffff",
-  },
-  pending: {
-    bg: "#f59e0b", // amber/orange
-    text: "#ffffff",
-  },
-  draft: {
-    bg: "#f59e0b", // amber/orange (same as pending)
-    text: "#ffffff",
-  },
-  partially_paid: {
-    bg: "#3b82f6", // blue
-    text: "#ffffff",
-  },
-};
+import { StatusBadge } from "@/components/ui/status-badge";
 
 interface GetHistoryColumnsProps {
   setRowAction: React.Dispatch<
@@ -426,25 +403,8 @@ export function getHistoryColumns({
       cell: ({ row }) => {
         const status = row.getValue("status") as string;
         if (!status) return null;
-
-        // Get color configuration for this order status or use default
-        const colorConfig = ORDER_STATUS_COLORS[
-          status.toLowerCase() as keyof typeof ORDER_STATUS_COLORS
-        ] || {
-          bg: "#6b7280", // gray
-          text: "#ffffff",
-        };
-
         return (
-          <div
-            className="inline-flex items-center justify-center px-3 py-1.5 rounded-full text-xs font-semibold capitalize"
-            style={{
-              backgroundColor: colorConfig.bg,
-              color: colorConfig.text,
-            }}
-          >
-            {status}
-          </div>
+          <StatusBadge status={status} showIcon={false} />
         );
       },
       enableSorting: false,

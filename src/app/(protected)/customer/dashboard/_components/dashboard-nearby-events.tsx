@@ -105,6 +105,13 @@ export default function DashboardNearbyEvents() {
   const isLoading = locationLoading || (lat !== null && eventsLoading && !data);
   const events = data?.data ?? [];
 
+  // Hide whole section when no events found (and not loading, no errors)
+  const showNoEventsState =
+    !isLoading && !locationError && !isError && events.length === 0 && lat !== null;
+  if (showNoEventsState) {
+    return null;
+  }
+
   return (
     <section className="w-full relative bg-background dark:border p-4 sm:p-6 rounded-md">
       <header className="w-full mb-4 sm:mb-6">
@@ -163,9 +170,6 @@ export default function DashboardNearbyEvents() {
             <p className="text-sm text-destructive">
               Failed to load nearby events. Please try again later.
             </p>
-          </div>
-        )}
-
         {/* No events found */}
         {!isLoading && !locationError && !isError && events.length === 0 && lat !== null && (
           <div className="text-center py-12">
@@ -173,6 +177,9 @@ export default function DashboardNearbyEvents() {
             <p className="text-sm text-muted-foreground">
               No events found near your location at the moment.
             </p>
+          </div>
+        )}
+
           </div>
         )}
 
