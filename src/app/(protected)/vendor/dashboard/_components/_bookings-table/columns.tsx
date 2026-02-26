@@ -3,8 +3,8 @@ import { Button } from "@/components/ui/button";
 import { Eye, SquarePlus } from "lucide-react";
 import React from "react";
 import { DataTableColumnHeader } from "@/components/data-table/data-table-column-header";
-import { Booking, DataTableRowAction } from "../../_lib/types";
-import { statusClass, timeAgo } from "../../_lib/utils";
+import { Booking } from "../../_lib/types";
+import { statusClass } from "../../_lib/utils";
 import {
   Tooltip,
   TooltipContent,
@@ -13,17 +13,19 @@ import {
 } from "@/components/ui/tooltip";
 
 interface GetColumnsProps {
-  setRowAction: React.Dispatch<
-    React.SetStateAction<DataTableRowAction<Booking> | null>
-  >;
+  /** Navigate to booking history detail page; row.original.id is booking_id from API */
+  onViewBooking: (booking: Booking) => void;
 }
 
 export function getColumns({
-  setRowAction,
+  onViewBooking,
 }: GetColumnsProps): ColumnDef<Booking>[] {
   return [
     {
-      accessorKey: "id",
+      accessorKey: "transaction_id",
+      id: "transaction_id",
+      size: 200,
+      minSize: 200,
       header: ({ column }) => (
         <DataTableColumnHeader
           className="text-foreground"
@@ -32,23 +34,37 @@ export function getColumns({
         />
       ),
       cell: ({ row }) => {
+        const txId = row.original.transaction_id ?? row.original.id;
+        const id = String(txId ?? "");
+        const showTooltip = id.length > 24;
+        const displayId = showTooltip ? `${id.slice(0, 12)}…${id.slice(-8)}` : id;
         return (
-          <>
-            <Button
-              variant={"outline"}
-              className="border-0 cursor-pointer shadow-none item-center flex"
-            >
-              <SquarePlus size={14} />
-              <span className="">{row.getValue("id")}</span>
-            </Button>
-          </>
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="outline"
+                  className="border-0 cursor-pointer shadow-none h-auto py-2 px-2 w-full justify-start text-left min-w-0"
+                >
+                  <SquarePlus size={14} className="shrink-0" />
+                  <span className="truncate">{displayId}</span>
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="top" className="max-w-[320px] break-all text-xs">
+                {id}
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
         );
       },
       enableSorting: false,
       enableHiding: false,
+      meta: { className: "align-middle text-left" },
     },
     {
       accessorKey: "user_name",
+      size: 180,
+      minSize: 180,
       header: ({ column }) => (
         <DataTableColumnHeader
           className="text-foreground"
@@ -58,32 +74,43 @@ export function getColumns({
       ),
       cell: ({ row }) => {
         const user = row.original?.user;
-
-        return (
-          <div className="flex items-center space-x-3 min-w-80">
-            {user?.avatar && (
-              <img
-                src={user.avatar}
-                alt={user.user_name}
-                className="h-8 w-8 rounded-full object-cover"
-              />
-            )}
-            <div className="flex flex-col">
-              <span className="font-medium">{user?.user_name}</span>
-              {user?.email && (
-                <span className="text-sm lowercase text-muted-foreground">
-                  {user.email}
-                </span>
-              )}
-            </div>
-          </div>
+        const name = user?.user_name ?? "";
+        const email = user?.email ?? "";
+        const needsTooltip = name.length > 20 || email.length > 30;
+        const content = (
+          <span className="font-medium truncate block text-left w-full">
+            {name}
+          </span>
         );
+        if (needsTooltip) {
+          return (
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <div className="min-w-0 w-full text-left cursor-default">
+                    {content}
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent side="top" className="max-w-[280px]">
+                  <div className="font-medium">{name}</div>
+                  {email ? (
+                    <div className="text-muted-foreground text-xs">{email}</div>
+                  ) : null}
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          );
+        }
+        return content;
       },
       enableSorting: true,
       enableHiding: false,
+      meta: { className: "align-middle text-left" },
     },
     {
       accessorKey: "event_name",
+      size: 200,
+      minSize: 200,
       header: ({ column }) => (
         <DataTableColumnHeader
           className="text-foreground"
@@ -91,56 +118,55 @@ export function getColumns({
           title="Event"
         />
       ),
-      cell: ({ row }) => (
-        <span className="font-medium">{row.getValue("event_name")}</span>
-      ),
-      enableSorting: true,
-      enableHiding: false,
-    },
-    {
-      accessorKey: "created_at",
-      header: ({ column }) => (
-        <DataTableColumnHeader
-          className="text-foreground"
-          column={column}
-          title="Order Date"
-        />
-      ),
       cell: ({ row }) => {
-        const orderDate = row.getValue("created_at");
-        if (typeof orderDate !== "string" && typeof orderDate !== "number") {
-          return <span className="text-foreground">Invalid Date</span>;
+        const eventName = String(row.getValue("event_name") ?? "");
+        const truncated = eventName.length > 28;
+        const content = (
+          <span className="font-medium truncate block text-left w-full">
+            {eventName}
+          </span>
+        );
+        if (truncated) {
+          return (
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <div className="min-w-0 w-full text-left cursor-default">
+                    {content}
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent side="top" className="max-w-[280px]">
+                  {eventName}
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          );
         }
-        const date = new Date(orderDate);
-        if (isNaN(date.getTime())) {
-          return <span className="text-foreground">Invalid Date</span>;
-        }
-        const formattedTimeAgo = timeAgo(date);
-        return <span className="text-foreground">{formattedTimeAgo}</span>;
+        return content;
       },
-
       enableSorting: true,
       enableHiding: false,
-      sortingFn: (rowA, rowB) => {
-        const dateA = new Date(rowA.getValue("created_at") as string).getTime();
-        const dateB = new Date(rowB.getValue("created_at") as string).getTime();
-        return dateA - dateB;
-      },
+      meta: { className: "align-middle text-left" },
     },
     {
       accessorKey: "total_amount",
+      size: 100,
+      minSize: 100,
       header: ({ column }) => (
         <DataTableColumnHeader
-          className="text-foreground"
+          className="text-foreground text-right w-full justify-end"
           column={column}
           title="Total"
         />
       ),
       cell: ({ row }) => (
-        <span className="font-medium">{row.getValue("total_amount")}</span>
+        <span className="font-medium text-right tabular-nums block">
+          {row.getValue("total_amount")}
+        </span>
       ),
       enableSorting: true,
       enableHiding: false,
+      meta: { className: "text-right align-middle" },
       sortingFn: (rowA, rowB) => {
         const amountA = Number(rowA.getValue("total_amount"));
         const amountB = Number(rowB.getValue("total_amount"));
@@ -149,18 +175,23 @@ export function getColumns({
     },
     {
       accessorKey: "balance_amount",
+      size: 110,
+      minSize: 110,
       header: ({ column }) => (
         <DataTableColumnHeader
-          className="text-foreground"
+          className="text-foreground text-right w-full justify-end"
           column={column}
           title="Balance Due"
         />
       ),
       cell: ({ row }) => (
-        <span className="font-medium">{row.getValue("balance_amount")}</span>
+        <span className="font-medium text-right tabular-nums block">
+          {row.getValue("balance_amount")}
+        </span>
       ),
       enableSorting: true,
       enableHiding: false,
+      meta: { className: "text-right align-middle" },
       sortingFn: (rowA, rowB) => {
         const amountA = Number(rowA.getValue("balance_amount"));
         const amountB = Number(rowB.getValue("balance_amount"));
@@ -169,9 +200,11 @@ export function getColumns({
     },
     {
       accessorKey: "status",
+      size: 100,
+      minSize: 100,
       header: ({ column }) => (
         <DataTableColumnHeader
-          className="text-foreground"
+          className="text-foreground w-full justify-center"
           column={column}
           title="Status"
         />
@@ -180,34 +213,35 @@ export function getColumns({
         const status = row.getValue("status") as string;
         const statusClassName = statusClass(status);
         return (
-          <>
-            <div
-              className={`flex items-center justify-center  capitalize p-2 rounded-md items-center ${statusClassName} }`}
-            >
-              <span className={` `}>{status}</span>
-            </div>
-          </>
+          <div
+            className={`flex items-center justify-center capitalize px-3 py-1.5 rounded-md whitespace-nowrap ${statusClassName}`}
+          >
+            <span>{status}</span>
+          </div>
         );
       },
       enableSorting: false,
       enableHiding: false,
+      meta: { className: "text-center align-middle" },
     },
     {
       id: "actions",
+      size: 90,
+      minSize: 90,
       header: ({ column }) => (
         <DataTableColumnHeader
-          className="text-foreground"
+          className="text-foreground w-full justify-center"
           column={column}
           title="Actions"
         />
       ),
       cell: ({ row }) => (
-        <nav className="flex items-center justify-between space-x-3">
+        <nav className="flex items-center justify-center">
           <TooltipProvider>
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button
-                  onClick={() => setRowAction({ row, type: "show" })}
+                  onClick={() => onViewBooking(row.original)}
                   className="btn bg-transparent cursor-pointer text-foreground hover:text-background shadow-none"
                   variant="event-primary"
                 >
@@ -223,6 +257,7 @@ export function getColumns({
       ),
       enableSorting: false,
       enableHiding: false,
+      meta: { className: "text-center align-middle" },
     },
   ];
 }

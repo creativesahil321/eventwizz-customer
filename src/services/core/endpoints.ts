@@ -35,6 +35,9 @@ export const API_ENDPOINTS = {
 
   // Vendor Endpoints
   VENDOR: {
+    DASHBOARD: {
+      STATISTICS: "/vendor/dashboard",
+    },
     ONBOARDING: {
       STEPS: "/vendor/onboarding/store",
       GET_ALL_STEPS: "/vendor/onboarding/steps/{location_id}",
@@ -164,6 +167,9 @@ export const API_ENDPOINTS = {
         SAVE: "/vendor/bookings/reschedule/store",
       },
 
+      NOTES: {
+        CREATE: "/vendor/bookings/show/{id}/comments",
+      },
       MULTIPLE_ACTIONS: {
         BULK_EMAIL_SEND: "/vendor/bookings/bulk-email",
         BULK_EXPORT: "/vendor/bookings/bulk-export",
@@ -187,8 +193,8 @@ export const API_ENDPOINTS = {
   // Customer EndpointsD
   CUSTOMER: {
     DASHBOARD: {
-      PAGINATE: "",
       STATISTICS: "/customer/dashboard",
+      NEARBY_EVENTS: "/customer/events/nearby",
     },
     BOOKINGS: {
       BOOKINGS: "/customer/bookings",
@@ -204,6 +210,9 @@ export const API_ENDPOINTS = {
         "/customer/bookings/delete-add-ons/{id}/{date}/{keyword}/{type}", // TABLES case = keyword will be tables size and type will be tables , DRINKS case = keyword will be id and type will be drinks , TICKETS case = keyword will be id and type will be tickets
       BOOKING_PAYMENT: "/customer/bookings/pay",
       BOOKING_INVOICE: "/customer/bookings/invoice/{id}",
+    },
+    PAYMENT: {
+      STRIPE_SUCCESS: "/customer/payment/stripe/success",
     },
     MENU_CHOICES: {
       ADD_MENU: "/customer/bookings/menu-items/{id}/{date}/{table_id}",

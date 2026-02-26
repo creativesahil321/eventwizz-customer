@@ -145,6 +145,10 @@ export default function LoginForm() {
         // Location data is now handled by TanStack Query and Zustand store
         // No need to serialize location data for NextAuth
 
+        const hasPaymentProvider = Boolean(
+          response.data.has_payment_provider
+        );
+
         const result = await signIn("credentials", {
           redirect: false,
           email: data.email,
@@ -168,6 +172,7 @@ export default function LoginForm() {
             : undefined,
           status: userData.status,
           permissions,
+          has_payment_provider: String(hasPaymentProvider),
         });
 
         if (result?.error) {

@@ -30,6 +30,8 @@ import {
   Trash2,
   Eye,
   Loader2,
+  MessageSquare,
+  Send,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -38,7 +40,7 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
-import { useVendorBookingDetails } from "../../_lib/queries";
+import { useVendorBookingDetails, useAddBookingNote } from "../../_lib/queries";
 import { Skeleton } from "@/components/ui/skeleton";
 import AddOnsTab from "./add-ons-tab";
 import { useDeleteVendorAddOns } from "@/services/vendor/bookings/hooks/useDeleteVendorAddOns";
@@ -53,7 +55,6 @@ import {
   SelectContent,
   SelectItem,
   SelectTrigger,
-  SelectValue,
 } from "@/components/ui/select";
 import {
   AlertDialog,
@@ -71,6 +72,8 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { Textarea } from "@/components/ui/textarea";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 interface AdjustBookingContentProps {
   bookingId: string;
@@ -85,7 +88,7 @@ export default function AdjustBookingContent({
     Record<string, boolean>
   >({});
   const [expandedAddOns, setExpandedAddOns] = useState<Record<string, boolean>>(
-    {}
+    {},
   );
   const [rescheduleModalOpen, setRescheduleModalOpen] = useState(false);
   const [selectedDateForReschedule, setSelectedDateForReschedule] = useState<{
@@ -115,6 +118,13 @@ export default function AdjustBookingContent({
     dateLabel: null,
   });
 
+  // Track which event date is currently being updated (so only that row shows loading)
+  const [updatingBookingDateId, setUpdatingBookingDateId] = useState<
+    number | null
+  >(null);
+
+  const [newNote, setNewNote] = useState("");
+
   // Fetch booking details from API
   const {
     data: bookingResponse,
@@ -133,6 +143,11 @@ export default function AdjustBookingContent({
   // Update booking status mutation
   const updateStatusMutation = useUpdateVendorBookingStatus();
 
+  // Add booking note mutation
+  const addNoteMutation = useAddBookingNote();
+
+  const notes = bookingData?.comments ?? [];
+
   // Helper function to safely format amounts (handles null/undefined)
   const formatAmount = (value: number | null | undefined): string => {
     if (value === null || value === undefined) {
@@ -145,7 +160,7 @@ export default function AdjustBookingContent({
   const handleDeleteAddOn = (
     dateId: string,
     keyword: string | number,
-    type: "table" | "drink" | "ticket"
+    type: "table" | "drink" | "ticket",
   ) => {
     const apiType =
       type === "table" ? "tables" : type === "drink" ? "drinks" : "tickets";
@@ -160,26 +175,26 @@ export default function AdjustBookingContent({
 
   // Handler for reschedule button click
   const handleRescheduleClick = (
-    dateInfo: NonNullable<typeof bookingData>["event_dates"][0]
+    dateInfo: NonNullable<typeof bookingData>["event_dates"][0],
   ) => {
     const totalPeople =
       (dateInfo.tables?.reduce((sum, table) => sum + (table.people ?? 0), 0) ??
         0) +
       (dateInfo.tickets?.reduce(
         (sum, ticket) => sum + (ticket.quantity ?? 0),
-        0
+        0,
       ) ?? 0);
 
     const totalTables =
       dateInfo.tables?.reduce(
         (sum, table) => sum + (table.no_tables ?? 0),
-        0
+        0,
       ) ?? 0;
 
     const totalTickets =
       dateInfo.tickets?.reduce(
         (sum, ticket) => sum + (ticket.quantity ?? 0),
-        0
+        0,
       ) ?? 0;
 
     const totalDrinks =
@@ -223,7 +238,7 @@ export default function AdjustBookingContent({
     bookingDateId: number,
     currentStatus: string,
     newStatus: number,
-    dateLabel: string
+    dateLabel: string,
   ) => {
     setStatusUpdateDialog({
       open: true,
@@ -243,16 +258,18 @@ export default function AdjustBookingContent({
       return;
     }
 
+    const bookingDateId = statusUpdateDialog.bookingDateId;
+    setUpdatingBookingDateId(bookingDateId);
+
     updateStatusMutation.mutate(
       {
         booking_id: parseInt(bookingId),
-        booking_date_id: statusUpdateDialog.bookingDateId,
+        booking_date_id: bookingDateId,
         payment_status: statusUpdateDialog.newStatus,
       },
       {
         onSuccess: (response) => {
           if (response.status) {
-            // Close dialog
             setStatusUpdateDialog({
               open: false,
               bookingDateId: null,
@@ -260,15 +277,14 @@ export default function AdjustBookingContent({
               newStatus: null,
               dateLabel: null,
             });
-            // Success toast is handled by API interceptor
-            // Data will be automatically refetched via query invalidation
           }
+          setUpdatingBookingDateId(null);
         },
         onError: (error) => {
-          // Error toast is handled by API interceptor
           console.error("Error updating payment status:", error);
+          setUpdatingBookingDateId(null);
         },
-      }
+      },
     );
   };
 
@@ -288,6 +304,9 @@ export default function AdjustBookingContent({
     if (statusLower.includes("refund")) {
       return 4; // Refunded
     }
+    if (statusLower.includes("partial")) {
+      return 5; // Partial payment
+    }
     return 0; // Pending (default)
   };
 
@@ -304,67 +323,150 @@ export default function AdjustBookingContent({
         return "Cancelled";
       case 4:
         return "Refunded";
+      case 5:
+        return "Partial Payment";
       default:
         return "Unknown";
     }
   };
 
-  const getPaymentStatusBadge = (status: string) => {
+  // Allowed status options based on current status (only options to change TO; current status is excluded).
+  const getAllowedStatusOptions = (currentStatusNum: number): number[] => {
+    let options: number[];
+    switch (currentStatusNum) {
+      case 1: // Paid → only Cancelled, Refunded
+        options = [3, 4];
+        break;
+      case 5: // Partial payment → Paid, Cancelled, Refunded
+        options = [1, 3, 4];
+        break;
+      case 0: // Pending → all other options
+      case 2: // Failed → all other options
+        options = [0, 1, 2, 3, 4];
+        break;
+      case 3: // Cancelled → only Refunded
+        options = [4];
+        break;
+      case 4: // Refunded → no other options
+        options = [];
+        break;
+      default:
+        options = [0, 1, 2, 3, 4];
+    }
+    return options.filter((num) => num !== currentStatusNum);
+  };
+
+  const getPaymentStatusBadge = (
+    status: string,
+    badgeClassName?: string,
+  ) => {
+    const base = (className: string) =>
+      [className, badgeClassName].filter(Boolean).join(" ");
     const statusLower = status.toLowerCase();
     if (statusLower.includes("paid") || statusLower.includes("full")) {
       return (
-        <Badge className="bg-green-100 text-green-700 hover:bg-green-100">
-          <CheckCircle2 className="h-3 w-3 mr-1" />
+        <Badge
+          className={base(
+            "bg-green-100 text-green-700 hover:bg-green-100",
+          )}
+        >
+          <CheckCircle2 className="h-3 w-3 mr-1 shrink-0" />
           {status}
         </Badge>
       );
     }
     if (statusLower.includes("pending")) {
       return (
-        <Badge variant="secondary">
-          <Clock className="h-3 w-3 mr-1" />
+        <Badge variant="secondary" className={badgeClassName}>
+          <Clock className="h-3 w-3 mr-1 shrink-0" />
           {status}
         </Badge>
       );
     }
     if (statusLower.includes("partial")) {
       return (
-        <Badge className="bg-amber-100 text-amber-700 hover:bg-amber-100">
-          <Clock className="h-3 w-3 mr-1" />
+        <Badge
+          className={base(
+            "bg-amber-100 text-amber-700 hover:bg-amber-100",
+          )}
+        >
+          <Clock className="h-3 w-3 mr-1 shrink-0" />
           {status}
         </Badge>
       );
     }
     if (statusLower.includes("failed")) {
       return (
-        <Badge className="bg-red-100 text-red-700 hover:bg-red-100">
-          <AlertCircle className="h-3 w-3 mr-1" />
+        <Badge
+          className={base("bg-red-100 text-red-700 hover:bg-red-100")}
+        >
+          <AlertCircle className="h-3 w-3 mr-1 shrink-0" />
           {status}
         </Badge>
       );
     }
     if (statusLower.includes("cancel")) {
       return (
-        <Badge className="bg-gray-100 text-gray-700 hover:bg-gray-100">
-          <AlertCircle className="h-3 w-3 mr-1" />
+        <Badge
+          className={base("bg-gray-100 text-gray-700 hover:bg-gray-100")}
+        >
+          <AlertCircle className="h-3 w-3 mr-1 shrink-0" />
           {status}
         </Badge>
       );
     }
     if (statusLower.includes("refund")) {
       return (
-        <Badge className="bg-orange-100 text-orange-700 hover:bg-orange-100">
-          <RotateCcw className="h-3 w-3 mr-1" />
+        <Badge
+          className={base(
+            "bg-orange-100 text-orange-700 hover:bg-orange-100",
+          )}
+        >
+          <RotateCcw className="h-3 w-3 mr-1 shrink-0" />
           {status}
         </Badge>
       );
     }
-    return <Badge variant="secondary">{status}</Badge>;
+    return (
+      <Badge variant="secondary" className={badgeClassName}>
+        {status}
+      </Badge>
+    );
+  };
+
+  const formatNoteDate = (iso: string) => {
+    try {
+      const d = new Date(iso);
+      return d.toLocaleDateString("en-GB", {
+        day: "numeric",
+        month: "short",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      });
+    } catch {
+      return iso;
+    }
+  };
+
+  const handleAddNote = () => {
+    const trimmed = newNote.trim();
+    if (!trimmed || addNoteMutation.isPending) return;
+    addNoteMutation.mutate(
+      { bookingId, content: trimmed },
+      {
+        onSuccess: (response) => {
+          if (response?.status) {
+            setNewNote("");
+          }
+        },
+      },
+    );
   };
 
   const getPendingAmount = (
     totalAmount: number | null | undefined,
-    paidAmount: number | null | undefined
+    paidAmount: number | null | undefined,
   ): string | null => {
     const total = totalAmount ?? 0;
     const paid = paidAmount ?? 0;
@@ -666,27 +768,27 @@ export default function AdjustBookingContent({
                     {bookingData.event_dates.map((dateInfo, index) => {
                       const pendingAmount = getPendingAmount(
                         dateInfo.total_amount,
-                        dateInfo.paid_amount
+                        dateInfo.paid_amount,
                       );
                       const totalDateTables =
                         dateInfo.tables?.reduce(
                           (sum, table) => sum + (table.no_tables ?? 0),
-                          0
+                          0,
                         ) ?? 0;
                       const totalDateGuests =
                         dateInfo.tables?.reduce(
                           (sum, table) => sum + (table.people ?? 0),
-                          0
+                          0,
                         ) ?? 0;
                       const totalDateTickets =
                         dateInfo.tickets?.reduce(
                           (sum, ticket) => sum + (ticket.quantity ?? 0),
-                          0
+                          0,
                         ) ?? 0;
                       const totalDateDrinks =
                         dateInfo.drinks?.reduce(
                           (sum, drink) => sum + (drink.quantity ?? 0),
-                          0
+                          0,
                         ) ?? 0;
 
                       const hasAddons =
@@ -790,51 +892,77 @@ export default function AdjustBookingContent({
                                   </div>
                                 </div>
                               </div>
-                              <div className="flex w-full flex-shrink-0 flex-col gap-2 sm:w-auto sm:flex-row sm:items-center sm:gap-2">
-                                {getPaymentStatusBadge(dateInfo.payment_status)}
+                              <div className="flex w-full flex-shrink-0 flex-col gap-2 sm:w-auto sm:flex-row sm:items-center sm:gap-2 sm:min-h-7">
+                                {getPaymentStatusBadge(
+                                  dateInfo.payment_status,
+                                  "h-7 inline-flex items-center shrink-0",
+                                )}
                                 <Select
                                   value={String(
                                     getPaymentStatusNumber(
-                                      dateInfo.payment_status
-                                    )
+                                      dateInfo.payment_status,
+                                    ),
                                   )}
                                   onValueChange={(value) => {
                                     const newStatusNum = parseInt(value);
                                     const currentStatusNum =
                                       getPaymentStatusNumber(
-                                        dateInfo.payment_status
+                                        dateInfo.payment_status,
                                       );
                                     if (newStatusNum !== currentStatusNum) {
                                       handleStatusChangeRequest(
                                         dateInfo.booking_date_id,
                                         dateInfo.payment_status,
                                         newStatusNum,
-                                        dateInfo.date
+                                        dateInfo.date,
                                       );
                                     }
                                   }}
-                                  disabled={updateStatusMutation.isPending}
+                                  disabled={
+                                    updateStatusMutation.isPending ||
+                                    getAllowedStatusOptions(
+                                      getPaymentStatusNumber(
+                                        dateInfo.payment_status,
+                                      ),
+                                    ).length === 0
+                                  }
                                 >
-                                  <SelectTrigger className="h-7 w-full min-w-0 text-xs border-2 sm:w-[120px]">
+                                  <SelectTrigger className="h-7 w-full min-w-0 text-xs border-2 sm:w-[120px] text-muted-foreground shrink-0">
                                     <div className="flex items-center gap-2">
-                                      {updateStatusMutation.isPending && (
-                                        <Loader2 className="h-3 w-3 animate-spin shrink-0" />
+                                      {updateStatusMutation.isPending &&
+                                      updatingBookingDateId ===
+                                        dateInfo.booking_date_id ? (
+                                        <>
+                                          <Loader2 className="h-3 w-3 animate-spin shrink-0" />
+                                          <span>Updating...</span>
+                                        </>
+                                      ) : (
+                                        <span>Change status</span>
                                       )}
-                                      <SelectValue
-                                        placeholder={
-                                          updateStatusMutation.isPending
-                                            ? "Updating..."
-                                            : "Update Status"
-                                        }
-                                      />
                                     </div>
                                   </SelectTrigger>
                                   <SelectContent>
-                                    <SelectItem value="0">Pending</SelectItem>
-                                    <SelectItem value="1">Paid</SelectItem>
-                                    <SelectItem value="2">Failed</SelectItem>
-                                    <SelectItem value="3">Cancelled</SelectItem>
-                                    <SelectItem value="4">Refunded</SelectItem>
+                                    {getAllowedStatusOptions(
+                                      getPaymentStatusNumber(
+                                        dateInfo.payment_status,
+                                      ),
+                                    ).map((statusNum) => (
+                                      <SelectItem
+                                        key={statusNum}
+                                        value={String(statusNum)}
+                                      >
+                                        {getPaymentStatusLabel(statusNum)}
+                                      </SelectItem>
+                                    ))}
+                                    {getAllowedStatusOptions(
+                                      getPaymentStatusNumber(
+                                        dateInfo.payment_status,
+                                      ),
+                                    ).length === 0 && (
+                                      <SelectItem value="4">
+                                        Refunded
+                                      </SelectItem>
+                                    )}
                                   </SelectContent>
                                 </Select>
                               </div>
@@ -943,7 +1071,7 @@ export default function AdjustBookingContent({
                                                           // Convert allocation object to array of entries
                                                           const allocationEntries =
                                                             Object.entries(
-                                                              table.allocation
+                                                              table.allocation,
                                                             );
 
                                                           const visible =
@@ -951,7 +1079,7 @@ export default function AdjustBookingContent({
                                                               ? allocationEntries
                                                               : allocationEntries.slice(
                                                                   0,
-                                                                  MAX_VISIBLE
+                                                                  MAX_VISIBLE,
                                                                 );
 
                                                           const hasMore =
@@ -982,7 +1110,7 @@ export default function AdjustBookingContent({
                                                                         : "People"}
                                                                     </span>
                                                                   </div>
-                                                                )
+                                                                ),
                                                               )}
                                                               {hasMore && (
                                                                 <Button
@@ -992,7 +1120,7 @@ export default function AdjustBookingContent({
                                                                   onClick={() =>
                                                                     toggleAllocationExpansion(
                                                                       dateInfo.booking_date_id.toString(),
-                                                                      idx
+                                                                      idx,
                                                                     )
                                                                   }
                                                                 >
@@ -1036,7 +1164,7 @@ export default function AdjustBookingContent({
                                             <Button
                                               onClick={() =>
                                                 router.push(
-                                                  `/vendor/menu-choices/${bookingId}`
+                                                  `/vendor/menu-choices/${bookingId}`,
                                                 )
                                               }
                                               size="sm"
@@ -1105,7 +1233,7 @@ export default function AdjustBookingContent({
                                             <p className="text-sm font-semibold text-foreground shrink-0">
                                               {formatAmount(
                                                 ticket.price_per_ticket *
-                                                  ticket.quantity
+                                                  ticket.quantity,
                                               )}
                                             </p>
                                           </div>
@@ -1141,7 +1269,7 @@ export default function AdjustBookingContent({
                                             </div>
                                             <p className="text-sm font-semibold text-foreground shrink-0">
                                               {formatAmount(
-                                                drink.price * drink.quantity
+                                                drink.price * drink.quantity,
                                               )}
                                             </p>
                                           </div>
@@ -1158,7 +1286,7 @@ export default function AdjustBookingContent({
                                         id={`addons-trigger-${dateInfo.booking_date_id}`}
                                         onClick={() =>
                                           toggleAddOnsExpansion(
-                                            dateInfo.booking_date_id.toString()
+                                            dateInfo.booking_date_id.toString(),
                                           )
                                         }
                                         aria-expanded={
@@ -1195,19 +1323,19 @@ export default function AdjustBookingContent({
                                                   (sum, table) =>
                                                     sum +
                                                     (table.no_tables || 0),
-                                                  0
+                                                  0,
                                                 ) || 0;
                                               const ticketsCount =
                                                 dateInfo.addons.tickets?.reduce(
                                                   (sum, ticket) =>
                                                     sum + ticket.quantity,
-                                                  0
+                                                  0,
                                                 ) || 0;
                                               const drinksCount =
                                                 dateInfo.addons.drinks?.reduce(
                                                   (sum, drink) =>
                                                     sum + drink.quantity,
-                                                  0
+                                                  0,
                                                 ) || 0;
 
                                               return (
@@ -1296,7 +1424,7 @@ export default function AdjustBookingContent({
                                                             </span>
                                                           ) : table.allocation &&
                                                             Object.values(
-                                                              table.allocation
+                                                              table.allocation,
                                                             ).some(
                                                               (val) =>
                                                                 typeof val ===
@@ -1304,8 +1432,8 @@ export default function AdjustBookingContent({
                                                                 (
                                                                   val as string
                                                                 ).startsWith(
-                                                                  "+"
-                                                                )
+                                                                  "+",
+                                                                ),
                                                             ) ? (
                                                             <span className="text-xs text-muted-foreground bg-purple-100 text-purple-700 px-2 py-0.5 rounded">
                                                               Added to existing
@@ -1315,7 +1443,7 @@ export default function AdjustBookingContent({
                                                         {/* Table Allocation Breakdown */}
                                                         {table.allocation &&
                                                           Object.keys(
-                                                            table.allocation
+                                                            table.allocation,
                                                           ).length > 0 && (
                                                             <div className="mt-1.5 space-y-1">
                                                               <p className="text-xs text-muted-foreground mb-1">
@@ -1324,14 +1452,14 @@ export default function AdjustBookingContent({
                                                               </p>
                                                               <div className="flex flex-wrap gap-2">
                                                                 {Object.entries(
-                                                                  table.allocation
+                                                                  table.allocation,
                                                                 ).map(
                                                                   (
                                                                     [
                                                                       tableId,
                                                                       people,
                                                                     ],
-                                                                    tableIdx
+                                                                    tableIdx,
                                                                   ) => {
                                                                     // Check if this is a new table (integer value) or existing (string with "+")
                                                                     const isNewTable =
@@ -1350,8 +1478,8 @@ export default function AdjustBookingContent({
                                                                               people as string
                                                                             ).replace(
                                                                               "+",
-                                                                              ""
-                                                                            )
+                                                                              "",
+                                                                            ),
                                                                           )
                                                                         : people;
 
@@ -1400,7 +1528,7 @@ export default function AdjustBookingContent({
                                                                         )}
                                                                       </div>
                                                                     );
-                                                                  }
+                                                                  },
                                                                 )}
                                                               </div>
                                                             </div>
@@ -1420,7 +1548,7 @@ export default function AdjustBookingContent({
                                                         <p className="text-sm font-semibold text-foreground shrink-0">
                                                           £
                                                           {table.total.toFixed(
-                                                            2
+                                                            2,
                                                           )}
                                                         </p>
                                                         <Button
@@ -1430,7 +1558,7 @@ export default function AdjustBookingContent({
                                                             handleDeleteAddOn(
                                                               dateInfo.date_key,
                                                               table.table_size,
-                                                              "table"
+                                                              "table",
                                                             )
                                                           }
                                                           disabled={
@@ -1443,7 +1571,7 @@ export default function AdjustBookingContent({
                                                         </Button>
                                                       </div>
                                                     </div>
-                                                  )
+                                                  ),
                                                 )}
                                               </div>
                                             )}
@@ -1486,14 +1614,14 @@ export default function AdjustBookingContent({
                                                             onClick={() => {
                                                               if (!drink.id) {
                                                                 toast.error(
-                                                                  "Unable to delete: Drink ID not available. Please refresh the page."
+                                                                  "Unable to delete: Drink ID not available. Please refresh the page.",
                                                                 );
                                                                 return;
                                                               }
                                                               handleDeleteAddOn(
                                                                 dateInfo.date_key,
                                                                 drink.id,
-                                                                "drink"
+                                                                "drink",
                                                               );
                                                             }}
                                                             disabled={
@@ -1506,7 +1634,7 @@ export default function AdjustBookingContent({
                                                           </Button>
                                                         </div>
                                                       </div>
-                                                    )
+                                                    ),
                                                   )}
                                                 </div>
                                               </div>
@@ -1560,14 +1688,14 @@ export default function AdjustBookingContent({
                                                             onClick={() => {
                                                               if (!ticket.id) {
                                                                 toast.error(
-                                                                  "Unable to delete: Ticket ID not available. Please refresh the page."
+                                                                  "Unable to delete: Ticket ID not available. Please refresh the page.",
                                                                 );
                                                                 return;
                                                               }
                                                               handleDeleteAddOn(
                                                                 dateInfo.date_key,
                                                                 ticket.id,
-                                                                "ticket"
+                                                                "ticket",
                                                               );
                                                             }}
                                                             disabled={
@@ -1580,7 +1708,7 @@ export default function AdjustBookingContent({
                                                           </Button>
                                                         </div>
                                                       </div>
-                                                    )
+                                                    ),
                                                   )}
                                                 </div>
                                               </div>
@@ -1613,7 +1741,7 @@ export default function AdjustBookingContent({
                                               <p className="font-semibold text-amber-900">
                                                 {formatAmount(
                                                   dateInfo.parent_booking_date
-                                                    .total_amount
+                                                    .total_amount,
                                                 )}
                                               </p>
                                             </div>
@@ -1624,7 +1752,7 @@ export default function AdjustBookingContent({
                                               <p className="font-semibold text-green-600">
                                                 {formatAmount(
                                                   dateInfo.parent_booking_date
-                                                    .paid_amount
+                                                    .paid_amount,
                                                 )}
                                               </p>
                                             </div>
@@ -1635,7 +1763,7 @@ export default function AdjustBookingContent({
                                               <p className="font-semibold text-red-600">
                                                 {formatAmount(
                                                   dateInfo.parent_booking_date
-                                                    .pending_payment
+                                                    .pending_payment,
                                                 )}
                                               </p>
                                             </div>
@@ -1652,6 +1780,110 @@ export default function AdjustBookingContent({
                     })}
                   </Accordion>
                 </div>
+
+                {/* Booking Notes */}
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between gap-2">
+                    <div>
+                      <h3 className="text-lg font-semibold text-foreground flex items-center gap-2">
+                        <MessageSquare className="h-5 w-5 text-primary" />
+                        Booking notes
+                      </h3>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Staff and vendors can add notes for this booking
+                      </p>
+                    </div>
+                  </div>
+
+                  <Card className="border-2 border-[var(--color-border)] bg-white shadow-sm overflow-hidden">
+                    <CardContent className="p-0">
+                      {/* Add note form */}
+                      <div className="p-4 border-b bg-muted/30">
+                        <Textarea
+                          placeholder="Add a note (e.g. dietary requirements, setup time, special requests…)"
+                          value={newNote}
+                          onChange={(e) => setNewNote(e.target.value)}
+                          className="min-h-[88px] resize-none bg-white border border-input rounded-lg focus-visible:ring-2"
+                          disabled={addNoteMutation.isPending}
+                        />
+                        <div className="flex justify-end mt-3">
+                          <Button
+                            type="button"
+                            size="sm"
+                            onClick={handleAddNote}
+                            disabled={!newNote.trim() || addNoteMutation.isPending}
+                            className="gap-2 bg-[var(--color-primary)] hover:bg-[var(--color-primary-hover)]"
+                          >
+                            {addNoteMutation.isPending ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <Send className="h-4 w-4" />
+                            )}
+                            Add note
+                          </Button>
+                        </div>
+                      </div>
+
+                      {/* Notes list */}
+                      <ScrollArea className="h-[280px]">
+                        <div className="divide-y divide-border">
+                          {notes.length === 0 ? (
+                            <div className="flex flex-col items-center justify-center py-12 px-4 text-center">
+                              <MessageSquare className="h-10 w-10 text-muted-foreground/50 mb-3" />
+                              <p className="text-sm font-medium text-muted-foreground">
+                                No notes yet
+                              </p>
+                              <p className="text-xs text-muted-foreground mt-1">
+                                Add the first note above
+                              </p>
+                            </div>
+                          ) : (
+                            notes.map((note, index) => (
+                              <div
+                                key={`${note.createdAt}-${index}`}
+                                className="flex gap-3 p-4 hover:bg-muted/20 transition-colors"
+                              >
+                                <div
+                                  className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-xs font-semibold text-white ${
+                                    note.role === "vendor"
+                                      ? "bg-[var(--color-primary)]"
+                                      : "bg-slate-600"
+                                  }`}
+                                >
+                                  {note.authorName
+                                    .split(" ")
+                                    .map((n) => n[0])
+                                    .join("")
+                                    .slice(0, 2)
+                                    .toUpperCase()}
+                                </div>
+                                <div className="min-w-0 flex-1 space-y-1">
+                                  <div className="flex flex-wrap items-center gap-2">
+                                    <span className="text-sm font-semibold text-foreground">
+                                      {note.authorName}
+                                    </span>
+                                    <Badge
+                                      variant="secondary"
+                                      className="text-[10px] px-1.5 py-0 h-4 font-medium capitalize"
+                                    >
+                                      {note.role}
+                                    </Badge>
+                                    <span className="text-xs text-muted-foreground">
+                                      {formatNoteDate(note.createdAt)}
+                                    </span>
+                                  </div>
+                                  <p className="text-sm text-foreground/90 leading-relaxed whitespace-pre-wrap break-words">
+                                    {note.content}
+                                  </p>
+                                </div>
+                              </div>
+                            ))
+                          )}
+                        </div>
+                      </ScrollArea>
+                    </CardContent>
+                  </Card>
+                </div>
               </div>
             </CardContent>
           </TabsContent>
@@ -1666,12 +1898,12 @@ export default function AdjustBookingContent({
                   const tablePeople =
                     date.tables?.reduce(
                       (sum, table) => sum + (table.people ?? 0),
-                      0
+                      0,
                     ) ?? 0;
                   const ticketPeople =
                     date.tickets?.reduce(
                       (sum, ticket) => sum + (ticket.quantity ?? 0),
-                      0
+                      0,
                     ) ?? 0;
                   const totalPeople = tablePeople + ticketPeople;
 
@@ -1765,12 +1997,12 @@ export default function AdjustBookingContent({
                           statusUpdateDialog.newStatus === 1
                             ? "bg-green-100 text-green-700 hover:bg-green-100"
                             : statusUpdateDialog.newStatus === 2
-                            ? "bg-red-100 text-red-700 hover:bg-red-100"
-                            : statusUpdateDialog.newStatus === 3
-                            ? "bg-gray-100 text-gray-700 hover:bg-gray-100"
-                            : statusUpdateDialog.newStatus === 4
-                            ? "bg-orange-100 text-orange-700 hover:bg-orange-100"
-                            : ""
+                              ? "bg-red-100 text-red-700 hover:bg-red-100"
+                              : statusUpdateDialog.newStatus === 3
+                                ? "bg-gray-100 text-gray-700 hover:bg-gray-100"
+                                : statusUpdateDialog.newStatus === 4
+                                  ? "bg-orange-100 text-orange-700 hover:bg-orange-100"
+                                  : ""
                         }
                       >
                         {statusUpdateDialog.newStatus !== null

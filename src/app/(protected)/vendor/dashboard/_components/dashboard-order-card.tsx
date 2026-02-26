@@ -11,14 +11,17 @@ interface OrderItem {
  */
 interface OrderCardProps {
   orders: OrderItem[];
+  /** Number of columns on large screens. Use 2 for fewer cards (e.g. Commissions). @default 4 */
+  columns?: 2 | 4;
 }
 
 /**
  * Component to display order statistics in cards
  */
-export default function OrderCard({ orders }: OrderCardProps) {
+export default function OrderCard({ orders, columns = 4 }: OrderCardProps) {
+  const gridCols = columns === 2 ? "lg:grid-cols-2" : "lg:grid-cols-4";
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
+    <div className={`grid grid-cols-1 ${gridCols} gap-4`}>
       {orders.map((order: OrderItem, index: number) => {
         return (
           <div className="w-full bg-background items-center" key={index}>

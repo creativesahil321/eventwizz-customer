@@ -88,18 +88,13 @@ export function PermissionProvider({ children }: PermissionProviderProps) {
         const backupPermissions = sessionStorage.getItem("permissions-backup");
         if (backupPermissions) {
           const parsedPermissions = JSON.parse(backupPermissions);
-          if (
-            Array.isArray(parsedPermissions) &&
-            parsedPermissions.length > 0
-          ) {
+          if (Array.isArray(parsedPermissions) && parsedPermissions.length > 0) {
             setPermissions(parsedPermissions);
             setHandled(true);
             return;
           }
         }
-      } catch {
-        /* silent */
-      }
+      } catch { /* silent */ }
 
       try {
         const storedPermissions = localStorage.getItem("permission-storage");
@@ -115,9 +110,7 @@ export function PermissionProvider({ children }: PermissionProviderProps) {
             return;
           }
         }
-      } catch {
-        /* silent */
-      }
+      } catch { /* silent */ }
 
       // API fallback – vendor/admin only
       if (sessionStatus === "authenticated" && !handled) {
@@ -128,9 +121,7 @@ export function PermissionProvider({ children }: PermissionProviderProps) {
               setHandled(true);
             }
           })
-          .catch(() => {
-            /* silent */
-          });
+          .catch(() => { /* silent */ });
         return;
       }
     }

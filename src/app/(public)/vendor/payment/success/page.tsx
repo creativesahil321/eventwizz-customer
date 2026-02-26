@@ -4,8 +4,6 @@ import React, { useEffect, useState, useCallback, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import {
   CheckCircle,
-  Download,
-  Mail,
   Calendar,
   MapPin,
   Users,
@@ -15,6 +13,8 @@ import {
   Loader2,
 } from "lucide-react";
 import { toast } from "sonner";
+import { api } from "@/services/core/api-client";
+import { API_ENDPOINTS } from "@/services/core/endpoints";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -44,23 +44,13 @@ function PaymentSuccessContent() {
   const handleStripeSession = useCallback(
     async (sessionId: string) => {
       try {
-        // Call backend API to process Stripe session and get payment details
-        const response = await fetch(
-          `/api/v1/customer/payment/stripe/success`,
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({ session_id: sessionId }),
-          }
+        const data = await api.post<
+          { status: boolean; message: string; data: PaymentSuccessData }
+        >(
+          API_ENDPOINTS.CUSTOMER.PAYMENT.STRIPE_SUCCESS,
+          { session_id: sessionId },
+          { returnFullResponse: true }
         );
-
-        if (!response.ok) {
-          throw new Error("Failed to process payment");
-        }
-
-        const data = await response.json();
 
         if (data.status && data.data) {
           setPaymentData({
@@ -140,16 +130,6 @@ function PaymentSuccessContent() {
       }, 2000);
     }
   }, [searchParams, router, handleStripeSession]);
-
-  const handleDownloadReceipt = () => {
-    toast.success("Receipt download started");
-    // TODO: Implement actual PDF generation
-  };
-
-  const handleEmailReceipt = () => {
-    toast.success("Receipt will be sent to your email shortly");
-    // TODO: Implement email sending
-  };
 
   const handleViewBookings = () => {
     router.push("/customer/bookings");
@@ -399,29 +379,12 @@ function PaymentSuccessContent() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.9 }}
-          className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8"
+          className="mb-8"
         >
           <Button
-            onClick={handleDownloadReceipt}
-            variant="outline"
-            className="w-full"
-          >
-            <Download className="h-4 w-4 mr-2" />
-            Download Receipt
-          </Button>
-
-          <Button
-            onClick={handleEmailReceipt}
-            variant="outline"
-            className="w-full"
-          >
-            <Mail className="h-4 w-4 mr-2" />
-            Email Receipt
-          </Button>
-
-          <Button
+            variant="event-primary"
             onClick={handleViewBookings}
-            className="w-full bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700"
+            className="w-full sm:w-auto"
           >
             View My Bookings
             <ArrowRight className="h-4 w-4 ml-2" />

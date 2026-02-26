@@ -186,6 +186,7 @@ export const authOptions: NextAuthOptions = {
         event_id: { label: "Event ID", type: "text" },
         status: { label: "Status", type: "text" },
         permissions: { label: "Permissions", type: "text" },
+        has_payment_provider: { label: "Has Payment Provider", type: "text" },
       },
       // NextAuth types with our custom fields
       async authorize(credentials) {
@@ -210,28 +211,24 @@ export const authOptions: NextAuthOptions = {
           event_id?: string;
           status?: string;
           permissions?: string;
+          has_payment_provider?: string;
         };
 
         // Handle direct token-based login (from registration or manual API login)
         if (typedCredentials?.token && typedCredentials?.email) {
-          // Convert the string "true"/"false" to boolean with explicit comparison
           const isOnboarded = typedCredentials.isOnboarded === "true";
+          const has_payment_provider =
+            typedCredentials.has_payment_provider === "true";
 
-          // Use standardized field names with fallbacks for backward compatibility
           const active_role = typedCredentials.active_role;
           const account_type = typedCredentials.account_type;
 
-          // Handle event_id - parse it to a number if it's a numeric string
           const eventId = typedCredentials.event_id
             ? isNaN(Number(typedCredentials.event_id))
               ? typedCredentials.event_id
               : Number(typedCredentials.event_id)
             : undefined;
 
-          // Location data is now handled by Zustand store and TanStack Query
-          // No need to parse location data in session
-
-          // Construct the user object with standardized field names
           return {
             id: typedCredentials.userId || String(Date.now()),
             email: typedCredentials.email,
@@ -252,6 +249,7 @@ export const authOptions: NextAuthOptions = {
             permissions: typedCredentials.permissions
               ? JSON.parse(typedCredentials.permissions)
               : [],
+            has_payment_provider,
           } as unknown as import("next-auth").User;
         }
 

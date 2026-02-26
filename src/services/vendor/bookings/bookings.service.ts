@@ -140,6 +140,13 @@ export interface VendorBookingEventDate {
   parent_booking_date?: string | VendorBookingParentDate | null;
 }
 
+export interface VendorBookingComment {
+  authorName: string;
+  role: string;
+  content: string;
+  createdAt: string;
+}
+
 export interface VendorBookingDetail {
   booking_id: number;
   booking_number: string;
@@ -150,13 +157,15 @@ export interface VendorBookingDetail {
   location: string;
   drink_title: string;
   payment_status: string;
-  payment_gateways: string[];
+  payment_gateways: string[] | { id: number; slug: string }[];
   sub_total: number;
   addons_amount: number | null;
   deposit_paid: number | null;
   paid_amount: number;
-  pending_payment: number;
+  pending_payment: number | null;
   total: number;
+  reschedule_status?: boolean;
+  comments?: VendorBookingComment[];
   event_dates: VendorBookingEventDate[];
 }
 
@@ -207,6 +216,27 @@ export const vendorBookingsService = {
     return api.get<VendorBookingDetailResponse>(url, {
       returnFullResponse: true,
     });
+  },
+
+  /**
+   * Add a note/comment to a booking
+   * @param bookingId - The booking ID
+   * @param content - Note content
+   * @returns Promise with response
+   */
+  addBookingNote: async (
+    bookingId: number | string,
+    content: string
+  ): Promise<{ status: boolean; message: string; data?: unknown }> => {
+    const url = API_ENDPOINTS.VENDOR.BOOKING_HISTORY.NOTES.CREATE.replace(
+      "{id}",
+      String(bookingId)
+    );
+    return api.post<{ status: boolean; message: string; data?: unknown }>(
+      url,
+      { content: content.trim() },
+      { returnFullResponse: true }
+    );
   },
 
   /**

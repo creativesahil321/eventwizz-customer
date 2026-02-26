@@ -193,6 +193,30 @@ export const useVendorBookingDetails = (
 };
 
 /**
+ * Hook to add a note/comment to a booking
+ */
+export const useAddBookingNote = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation<
+    { status: boolean; message: string; data?: unknown },
+    Error,
+    { bookingId: number | string; content: string }
+  >({
+    mutationFn: ({ bookingId, content }) =>
+      vendorBookingsService.addBookingNote(bookingId, content),
+    onSuccess: (_, { bookingId }) => {
+      const id = Number(bookingId);
+      queryClient.invalidateQueries({ queryKey: bookingHistoryKeys.detail(id) });
+      queryClient.refetchQueries({ queryKey: bookingHistoryKeys.detail(id) });
+    },
+    onError: (error: Error) => {
+      console.error("Error adding booking note:", error);
+    },
+  });
+};
+
+/**
  * Hook to bulk delete bookings
  */
 export const useBulkDeleteBookings = () => {

@@ -1,15 +1,13 @@
 "use client";
+
 import React from "react";
-import { DataTableFilterItem } from "@/types";
+import { useRouter } from "next/navigation";
 import { getColumns } from "./columns";
-import { useDashboardBookings } from "../../_lib/queries";
-import { Booking, DataTableRowAction, SearchParams } from "../../_lib/types";
+import { Booking, SearchParams } from "../../_lib/types";
 import { DataTableSkeleton } from "@/components/data-table/data-table-skeleton";
-import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { DataTable } from "@/components/data-table/data-table";
 import { useDataTable } from "@/hooks/data-table/use-data-table";
 import { DataTableToolbar } from "./data-table-toolbar";
-import ShowBookingDialog from "./_show-booking";
 
 type DashboardBookingsTableProps = {
   initialData: Booking[];
@@ -20,61 +18,33 @@ export default function DashboardBookingsTable({
   initialData,
   search,
 }: DashboardBookingsTableProps) {
-  const [rowAction, setRowAction] =
-    React.useState<DataTableRowAction<Booking> | null>(null);
-  const columns = React.useMemo(
-    () => getColumns({ setRowAction }),
-    [setRowAction]
-  );
-
-  const {
-    data: orders,
-    isError,
-    error,
-  } = useDashboardBookings({
-    ...search,
-    options: {
-      initialData: {
-        status: 200,
-        data: { data: initialData },
-        error: [],
-        message: "Orders loaded from server",
-      },
+  const router = useRouter();
+  const onViewBooking = React.useCallback(
+    (booking: Booking) => {
+      router.push(`/vendor/booking-history/${booking.id}`);
     },
-  });
-  const getRowId = React.useCallback(
-    (originalRow: Booking) => String(originalRow?.id || ""),
-    []
+    [router]
+  );
+  const columns = React.useMemo(
+    () => getColumns({ onViewBooking }),
+    [onViewBooking],
   );
 
-  const bookingsHistory = React.useMemo(
-    () => orders?.data?.data ?? [],
-    [orders?.data]
-  );
+  const getRowId = React.useCallback((originalRow: Booking) => {
+    return String(originalRow?.transaction_id ?? originalRow?.id ?? "");
+  }, []);
 
-  const filterFields = React.useMemo<DataTableFilterItem[]>(
-    () => [
-      {
-        id: "event_name",
-        label: "Search by Event",
-        placeholder: "Search by Event",
-        options: [],
-        column: "event_name",
-        value: [],
-      },
-    ],
-    []
-  );
+  const bookingsHistory = initialData;
 
   const { table } = useDataTable({
     data: bookingsHistory,
     columns,
-    pageCount: search.per_page ? Number(search.per_page) : 30,
-    filterFields,
+    pageCount: search.per_page ? Number(search.per_page) : 10,
+    filterFields: [],
     enableAdvancedFilter: false,
     enableClientSideSorting: true,
     initialState: {
-      sorting: [{ id: "created_at", desc: true }],
+      sorting: [{ id: "total_amount", desc: true }],
       columnPinning: { right: ["actions"] },
     },
     getRowId,
@@ -82,15 +52,11 @@ export default function DashboardBookingsTable({
     clearOnDefault: true,
   });
 
-  const title = "Recent Orders";
+  const title = "Recent Bookings";
 
   return (
     <section className="w-full relative">
-      {isError ? (
-        <div className="p-4 text-red-500">
-          Error loading orders: {error?.message || "Unknown error"}
-        </div>
-      ) : bookingsHistory.length === 0 ? (
+      {bookingsHistory.length === 0 ? (
         <DataTableSkeleton
           columnCount={6}
           cellWidths={["10rem", "40rem", "12rem", "12rem", "8rem", "8rem"]}
@@ -98,28 +64,13 @@ export default function DashboardBookingsTable({
         />
       ) : (
         <>
-          <ScrollArea className="w-full">
-            <ScrollBar orientation="horizontal" />
-            <DataTable table={table}>
-              <DataTableToolbar
-                className="bg-background p-6 border rounded-lg"
-                table={table}
-                filterFields={filterFields}
-                title={title}
-              />
-            </DataTable>
-          </ScrollArea>
-          {rowAction?.type === "show" && (
-            <ShowBookingDialog
-              open={rowAction?.type === "show"}
-              onOpenChange={() => setRowAction(null)}
-              booking={
-                rowAction?.row?.original ? rowAction?.row.original : null
-              }
-              showTrigger={false}
-              onSuccess={() => rowAction?.row?.toggleSelected(false)}
+          <DataTable table={table} showPagination={false} stickyHeader>
+            <DataTableToolbar
+              className="bg-background p-6 border rounded-lg"
+              table={table}
+              title={title}
             />
-          )}
+          </DataTable>
         </>
       )}
     </section>

@@ -95,6 +95,7 @@ export interface LoginResponse {
     vendor_location_id?: number;
     isOnboarded?: boolean;
     event_id?: number;
+    has_payment_provider?: boolean;
     default_venue_location?: VenueLocation;
     venue_locations?: VenueLocation[];
     permissions?: string[];

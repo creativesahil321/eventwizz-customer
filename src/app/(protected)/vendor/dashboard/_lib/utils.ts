@@ -1,8 +1,10 @@
 export const statusClass = (status: string) => {
-  switch (status) {
+  const s = status?.toLowerCase();
+  switch (s) {
     case "pending":
       return "bg-[#f2f2e4] text-[#988458]";
     case "completed":
+    case "paid":
       return "bg-[#e5f5f2] text-[#50a08e]";
     case "cancelled":
       return "bg-[#ffd4e3] text-[#8e4d63]";

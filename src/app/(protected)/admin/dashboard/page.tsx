@@ -4,7 +4,7 @@ import {
   fetchAdminDashboardBestSales,
   fetchAdminDashboardSalesHistory,
   fetchDashboardData,
-} from "../../vendor/dashboard/_lib/actions";
+} from "./_lib/actions";
 import DashboardSummary from "./_components/dashboard-summary";
 import CustomerOverview from "./_components/customer-overview";
 import PerformanceOverview from "./_components/performance-overview";

@@ -16,6 +16,11 @@ export type OrderProps = {
 };
 export type tabType = keyof Orders;
 
+/** Bookings stats per period (for Bookings tab) */
+export type BookingsStats = Orders;
+/** Commission stats per period (for Commissions tab) — same shape as Bookings */
+export type CommissionsStats = Orders;
+
 export type TransactionHistory = {
   id: string;
   date: string;
@@ -30,8 +35,12 @@ export type User = {
 };
 export type Booking = {
   id: string;
+  /** From API recent_bookings; used for Transaction ID column. id is booking_id for navigation. */
+  transaction_id?: string;
   event_name: string;
   user: User;
+  /** Optional for table accessor/sorting when row is built from API (e.g. dashboard recent_bookings) */
+  user_name?: string;
   booking_date: string;
   tickets: number;
   total_table: number;

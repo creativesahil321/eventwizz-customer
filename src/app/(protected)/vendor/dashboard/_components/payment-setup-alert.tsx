@@ -10,26 +10,19 @@ import { useSession } from "next-auth/react";
 export function PaymentSetupAlert() {
   const { data: session } = useSession();
   const [dismissed, setDismissed] = useState(false);
-  const [hasPaymentProvider, setHasPaymentProvider] = useState(false);
 
   useEffect(() => {
-    // Check if alert was dismissed
     const isDismissed = localStorage.getItem("payment_setup_alert_dismissed");
-    if (isDismissed === "true") {
-      setDismissed(true);
-    }
-
-    // Check if vendor has payment provider
-    const hasProvider = session?.user?.has_payment_provider;
-    setHasPaymentProvider(!!hasProvider);
-  }, [session]);
+    if (isDismissed === "true") setDismissed(true);
+  }, []);
 
   const handleDismiss = () => {
     setDismissed(true);
     localStorage.setItem("payment_setup_alert_dismissed", "true");
   };
 
-  // Don't show if dismissed or if payment provider is already set up
+  // Show banner only when session key has_payment_provider is not true
+  const hasPaymentProvider = session?.user?.has_payment_provider === true;
   if (dismissed || hasPaymentProvider) {
     return null;
   }
