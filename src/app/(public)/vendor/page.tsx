@@ -61,7 +61,7 @@ export default function VendorSiteHomePage() {
 
   return (
     <div className="min-h-screen flex flex-col relative overflow-hidden bg-gradient-to-b from-gray-50 to-white">
-      {/* Background image with light overlay so it stays visible; overlay keeps text readable */}
+      {/* Background image with dark overlay for text readability */}
       <div className="absolute inset-0">
         <Image
           src="/assets/images/Homepage/Homepage-Banner.png"
@@ -70,7 +70,10 @@ export default function VendorSiteHomePage() {
           className="object-cover"
           priority
         />
-        <div className="absolute inset-0 bg-gradient-to-b" />
+        <div
+          className="absolute inset-0 bg-gradient-to-b from-black/75 via-black/55 to-black/70"
+          aria-hidden
+        />
       </div>
 
       <LocationSelectionHeader
@@ -91,32 +94,32 @@ export default function VendorSiteHomePage() {
             animate={{ y: 0, opacity: 1 }}
             transition={{ duration: 0.5, delay: 0.1 }}
           >
-            <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-gray-900 mb-6 leading-tight">
+            <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-white mb-6 leading-tight drop-shadow-lg">
               Find Events Near You
             </h1>
 
-            <p className="text-lg md:text-xl text-gray-600 max-w-2xl mx-auto mb-8 leading-relaxed">
+            <p className="text-lg md:text-xl text-gray-200 max-w-2xl mx-auto mb-8 leading-relaxed drop-shadow-md">
               Discover verified venues and curated events in your area. Browse
               by location to find the perfect experience.
             </p>
 
             {/* Trust indicators */}
             <motion.div
-              className="flex flex-wrap items-center justify-center gap-6 md:gap-8 text-sm text-gray-700"
+              className="flex flex-wrap items-center justify-center gap-6 md:gap-8 text-sm text-gray-300"
               initial={{ y: 20, opacity: 0 }}
               animate={{ y: 0, opacity: 1 }}
               transition={{ duration: 0.5, delay: 0.3 }}
             >
               <div className="flex items-center gap-2">
-                <CheckCircle2 size={18} className="text-green-600" />
+                <CheckCircle2 size={18} className="text-green-400" />
                 <span className="font-medium">Verified Venues</span>
               </div>
               <div className="flex items-center gap-2">
-                <CheckCircle2 size={18} className="text-green-600" />
+                <CheckCircle2 size={18} className="text-green-400" />
                 <span className="font-medium">Secure Bookings</span>
               </div>
               <div className="flex items-center gap-2">
-                <CheckCircle2 size={18} className="text-green-600" />
+                <CheckCircle2 size={18} className="text-green-400" />
                 <span className="font-medium">1,200+ Happy Customers</span>
               </div>
             </motion.div>
