@@ -31,6 +31,8 @@ export interface VendorBookingHistoryResponse {
     deposit_amount: string;
     pending_amount: string;
     total_platform_fee?: string;
+    refunded_amount?: string;
+    platform_fee_due?: string;
   };
   links: {
     first: string | null;

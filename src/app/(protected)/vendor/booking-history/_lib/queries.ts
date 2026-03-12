@@ -102,6 +102,8 @@ export interface BookingHistoryResponse {
     deposit_amount: string;
     pending_amount: string;
     total_platform_fee?: string;
+    refunded_amount?: string;
+    platform_fee_due?: string;
   };
   links: VendorBookingHistoryResponse["links"];
   meta: VendorBookingHistoryResponse["meta"];

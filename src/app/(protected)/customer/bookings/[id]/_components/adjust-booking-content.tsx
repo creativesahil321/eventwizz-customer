@@ -97,7 +97,8 @@ export default function AdjustBookingContent({
             paymentStatus: eventDate.payment_status.toLowerCase() as
               | "paid"
               | "pending"
-              | "partial",
+              | "partial"
+              | "refunded",
             total: `£${eventDate.total_amount.toFixed(2)}`,
             partialPayment: eventDate.paid_amount
               ? `£${eventDate.paid_amount.toFixed(2)}`
@@ -127,13 +128,13 @@ export default function AdjustBookingContent({
               sum +
               date.tables.reduce((tSum, table) => tSum + table.people, 0) +
               date.tickets.reduce((tSum, ticket) => tSum + ticket.quantity, 0),
-            0
+            0,
           ),
           total_tables: bookingData.event_dates.reduce(
             (sum, date) =>
               sum +
               date.tables.reduce((tSum, table) => tSum + table.no_tables, 0),
-            0
+            0,
           ),
         };
       })()
@@ -352,10 +353,10 @@ export default function AdjustBookingContent({
               </div>
             </div>
 
-              <StatusBadge
-                status={transformedData.payment_status}
-                className="text-sm px-3 py-1.5 shrink-0"
-              />
+            <StatusBadge
+              status={transformedData.payment_status}
+              className="text-sm px-3 py-1.5 shrink-0"
+            />
           </div>
         </div>
       </div>
@@ -401,7 +402,7 @@ export default function AdjustBookingContent({
                     date: d.date,
                     people: d.items.reduce(
                       (sum, item) => sum + item.people_added,
-                      0
+                      0,
                     ),
                     tables: d.items
                       .filter((item) => item.type === "table")
@@ -419,7 +420,7 @@ export default function AdjustBookingContent({
                                   ? parseInt(val.replace("+", ""))
                                   : val;
                               allocationArray.push(numericValue);
-                            }
+                            },
                           );
                         }
 

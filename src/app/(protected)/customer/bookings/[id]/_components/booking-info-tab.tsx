@@ -131,7 +131,7 @@ interface BookingDate {
   items: BookingItem[]; // Breakdown of tables and tickets
   total: string;
   transactionId?: string;
-  paymentStatus: "paid" | "pending" | "partial";
+  paymentStatus: "paid" | "pending" | "partial" | "refunded";
   partialPayment?: string; // Show if customer made partial payment
   tickets?: BookingTicket[]; // Full ticket details
   drinks?: BookingDrink[]; // Full drink details
@@ -255,9 +255,13 @@ export default function BookingInfoTab({ bookingData }: BookingInfoTabProps) {
     }));
   };
 
-  // Calculate pending amount for a date
+  // Calculate pending amount for a date (null for paid or refunded)
   const getPendingAmount = (dateInfo: BookingDate): string | null => {
-    if (dateInfo.paymentStatus === "paid") return null;
+    if (
+      dateInfo.paymentStatus === "paid" ||
+      dateInfo.paymentStatus === "refunded"
+    )
+      return null;
     if (!dateInfo.partialPayment) return null;
 
     // Extract numeric values from strings (e.g., "£60" -> 60)
@@ -431,7 +435,20 @@ export default function BookingInfoTab({ bookingData }: BookingInfoTabProps) {
   };
 
   const getPaymentStatusBadge = (status: string) => (
-    <StatusBadge status={status} label={status === "paid" ? "Paid" : status === "pending" ? "Pending" : status === "partial" ? "Partial" : status} />
+    <StatusBadge
+      status={status}
+      label={
+        status === "paid"
+          ? "Paid"
+          : status === "pending"
+            ? "Pending"
+            : status === "partial"
+              ? "Partial"
+              : status === "refunded"
+                ? "Refunded"
+                : status
+      }
+    />
   );
 
   return (
@@ -458,10 +475,13 @@ export default function BookingInfoTab({ bookingData }: BookingInfoTabProps) {
               </h3>
             </div>
 
-            {/* Pay All Button - Only show if there are multiple dates with pending payments (2+ unpaid dates) */}
+            {/* Pay All Button - Only show if there are multiple dates with pending payments (2+ unpaid dates); exclude refunded */}
             {bookingData.dates.length > 1 &&
-              bookingData.dates.filter((d) => d.paymentStatus !== "paid")
-                .length > 1 && (
+              bookingData.dates.filter(
+                (d) =>
+                  d.paymentStatus === "pending" ||
+                  d.paymentStatus === "partial",
+              ).length > 1 && (
                 <Button
                   onClick={handlePayAll}
                   size="sm"
@@ -608,7 +628,8 @@ export default function BookingInfoTab({ bookingData }: BookingInfoTabProps) {
                       </div>
                     </AccordionTrigger>
                     <div className="flex flex-col gap-2 items-end shrink-0 sm:ml-3 sm:flex-row sm:items-center sm:gap-2">
-                      {dateInfo.paymentStatus !== "paid" ? (
+                      {dateInfo.paymentStatus === "pending" ||
+                      dateInfo.paymentStatus === "partial" ? (
                         <>
                           {(() => {
                             const pendingAmount = getPendingAmount(dateInfo);
@@ -1267,7 +1288,8 @@ export default function BookingInfoTab({ bookingData }: BookingInfoTabProps) {
                                         </div>
                                       </div>
                                       <div className="shrink-0">
-                                        {expandedAddOns[dateInfo.id] === true ? (
+                                        {expandedAddOns[dateInfo.id] ===
+                                        true ? (
                                           <ChevronUp className="h-4 w-4 text-purple-600 transition-colors group-hover:text-purple-700" />
                                         ) : (
                                           <ChevronDown className="h-4 w-4 text-purple-600 transition-colors group-hover:text-purple-700" />
