@@ -22,7 +22,7 @@ export default function VendorSiteHomePage() {
   // Get locations from domain settings
   const allLocations = useMemo(
     () => settings?.locations || [],
-    [settings?.locations]
+    [settings?.locations],
   );
 
   // Detect mobile devices
@@ -70,7 +70,7 @@ export default function VendorSiteHomePage() {
           className="object-cover"
           priority
         />
-        <div className="absolute inset-0 bg-gradient-to-b from-white/40 via-white/20 to-white/70" />
+        <div className="absolute inset-0 bg-gradient-to-b" />
       </div>
 
       <LocationSelectionHeader
