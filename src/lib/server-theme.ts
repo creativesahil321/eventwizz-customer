@@ -95,9 +95,8 @@ export async function fetchServerTheme(
 
   try {
     const apiUrl = env.NEXT_PUBLIC_API_URL;
-    const endpoint = `${apiUrl}${
-      API_ENDPOINTS.COMMON.THEME.SETTINGS
-    }?domain_name=${encodeURIComponent(cleanDomain)}`;
+    const endpoint = `${apiUrl}${API_ENDPOINTS.COMMON.THEME.SETTINGS
+      }?domain_name=${encodeURIComponent(cleanDomain)}`;
 
     const response = await fetch(endpoint, {
       method: "GET",

@@ -15,24 +15,99 @@ import PermissionPreloader from "./permission-preloader";
 import { ServerContextProvider } from "@/lib/server-context";
 import { appConfig } from "@/config/app";
 
-// Dynamically generate metadata (title, description, favicon) from the vendor's
-// saved site essentials so every domain gets its own favicon.
+/**
+ * Root metadata — two branches:
+ *  - Vendor subdomain (theme exists): use vendor brand name/favicon as defaults.
+ *    Child pages on the vendor site only need to set their own page title; the
+ *    template automatically appends the vendor name.
+ *  - Main EventWizz site (no theme): use the doc-specified EventWizz defaults.
+ */
 export async function generateMetadata(): Promise<Metadata> {
   const host = await getRequestHost();
   const theme = await fetchServerThemeCached(host);
 
-  return {
-    title: theme?.name
-      ? `${theme.name} | Event Management`
-      : appConfig.seo.title,
-    description: appConfig.seo.description,
-    ...(theme?.favicon && {
+  // ── Vendor / customer-facing subdomain ──────────────────────────────────
+  if (theme) {
+    return {
+      metadataBase: new URL(appConfig.url),
+      title: {
+        default: `${theme.name} | Event Management`,
+        template: `%s | ${theme.name}`,
+      },
+      description: `${theme.name} – event management and online ticketing.`,
+      openGraph: {
+        type: "website",
+        locale: "en_US",
+        siteName: theme.name,
+        title: `${theme.name} | Event Management`,
+        description: `${theme.name} – event management and online ticketing.`,
+      },
+      twitter: {
+        card: "summary_large_image",
+        title: `${theme.name} | Event Management`,
+        description: `${theme.name} – event management and online ticketing.`,
+      },
+      robots: {
+        index: true,
+        follow: true,
+        googleBot: {
+          index: true,
+          follow: true,
+          "max-video-preview": -1,
+          "max-image-preview": "large",
+          "max-snippet": -1,
+        },
+      },
       icons: {
         icon: theme.favicon,
         shortcut: theme.favicon,
         apple: theme.favicon,
       },
-    }),
+    };
+  }
+
+  // ── Main EventWizz site (eventwizz.co.uk) ───────────────────────────────
+  return {
+    metadataBase: new URL(appConfig.url),
+    title: {
+      default: appConfig.seo.title,
+      template: `%s | EventWizz`,
+    },
+    description: appConfig.seo.description,
+    keywords: appConfig.seo.keywords,
+    authors: [{ name: appConfig.author.name, url: appConfig.url }],
+    creator: appConfig.author.name,
+    publisher: appConfig.author.name,
+    openGraph: {
+      type: "website",
+      locale: "en_US",
+      url: "/",
+      siteName: appConfig.name,
+      title: appConfig.seo.title,
+      description: appConfig.seo.description,
+      images: appConfig.seo.openGraph.images,
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: appConfig.seo.title,
+      description: appConfig.seo.description,
+      images: appConfig.seo.twitter.images,
+      creator: "@eventwizz",
+    },
+    robots: {
+      index: true,
+      follow: true,
+      googleBot: {
+        index: true,
+        follow: true,
+        "max-video-preview": -1,
+        "max-image-preview": "large",
+        "max-snippet": -1,
+      },
+    },
+    alternates: {
+      canonical: "/",
+    },
   };
 }
 

@@ -1,41 +1,40 @@
 import { Metadata } from "next";
-import { fetchServerTheme, getRequestHost } from "@/lib/server-theme";
 import { appConfig } from "@/config/app";
 
-// Define the extended theme data structure that includes SEO
-interface ExtendedThemeData {
-  seo?: {
-    title: string;
-    description: string;
-    keywords: string;
-  };
-  // Use a more specific index signature
-  [key: string]: unknown;
-}
+export const metadata: Metadata = {
+  title: "Event Management Software for Venues",
+  description:
+    "Event management and booking platform for UK venues. Create branded event sites, sell tickets and tables, collect menu choices—ready in 15 minutes. Built for Christmas, New Year & seasonal events.",
+  keywords: [
+    "event management software",
+    "event management for venues",
+    "UK event booking",
+    "event ticketing for venues",
+    "Christmas event tickets",
+    "New Year event booking",
+    "venue event website",
+    "event booking platform",
+  ],
+  openGraph: {
+    title: "Event Management Software for Venues | EventWizz",
+    description:
+      "Vendor-first event management for UK venues. Create your own branded site, sell tickets and tables—ready in 15 minutes.",
+    url: "/",
+    siteName: appConfig.name,
+    images: appConfig.seo.openGraph.images,
+    locale: "en_US",
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Event Management Software for Venues | EventWizz",
+    description:
+      "Vendor-first event management for UK venues. Create your own branded site, sell tickets and tables—ready in 15 minutes.",
+    images: appConfig.seo.twitter.images,
+  },
+  alternates: {
+    canonical: "/",
+  },
+};
 
-export async function generateMetadata(): Promise<Metadata> {
-  const host = await getRequestHost();
-  const themeData = await fetchServerTheme(host);
-
-  // Cast themeData to our extended interface to fix TypeScript errors
-  const extendedTheme = themeData as unknown as ExtendedThemeData;
-
-  // Now we can safely access the seo property
-  if (extendedTheme && extendedTheme.seo) {
-    return {
-      title: extendedTheme.seo.title,
-      description: extendedTheme.seo.description,
-      keywords: extendedTheme.seo.keywords,
-    };
-  }
-
-  // Fallback metadata if theme API fails
-  return {
-    title: appConfig.seo.title,
-    description: appConfig.seo.description,
-    keywords: appConfig.seo.keywords,
-  };
-}
-
-// Client component that determines which homepage to render
 export { HomeContent as default } from "./home-content";

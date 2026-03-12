@@ -2,7 +2,7 @@
 
 import { useContext } from "react";
 import { ServerContext } from "@/lib/server-context";
-import AdminHomePage from "./admin/page";
+import AdminHomeContent from "./admin/_components/admin-home-content";
 import VendorSiteHomePage from "./vendor/page";
 
 /**
@@ -26,7 +26,7 @@ export function HomeContent() {
   // Default to admin homepage
   return (
     <main className="min-h-screen bg-[color:var(--color-background)] text-[color:var(--color-text)]">
-      <AdminHomePage />
+      <AdminHomeContent />
     </main>
   );
 }

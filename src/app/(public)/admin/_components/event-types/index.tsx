@@ -1,76 +1,86 @@
-"use client";
+import {
+  PartyPopper,
+  Sparkles,
+  UtensilsCrossed,
+  GraduationCap,
+  Building2,
+  Music,
+} from "lucide-react";
 
-import React, { useContext } from "react";
-import { ServerContext } from "@/lib/server-context";
-
-const eventTypes = [
+const EVENT_TYPES = [
   {
-    id: "pubs",
-    title: "Pubs",
-    imageUrl: "/placeholder-pubs.jpg",
+    title: "Christmas & Seasonal Events",
+    description:
+      "Sell Christmas event tickets and tables with menu choices and guest seating plans.",
+    icon: PartyPopper,
   },
   {
-    id: "christmas",
-    title: "Christmas",
-    imageUrl: "/placeholder-christmas.jpg",
+    title: "NYE Parties",
+    description:
+      "Offer standing tickets, table bookings, and add-ons for New Year celebrations.",
+    icon: Sparkles,
   },
   {
-    id: "brunches",
-    title: "Brunches",
-    imageUrl: "/placeholder-brunches.jpg",
+    title: "Dining Events",
+    description:
+      "Run dinners, special menus, and tasting events with online booking and guest options.",
+    icon: UtensilsCrossed,
   },
   {
-    id: "restaurants",
-    title: "Restaurants",
-    imageUrl: "/placeholder-restaurants.jpg",
+    title: "University Balls & Parties",
+    description:
+      "Create ticketed student events with easy online booking and guest lists.",
+    icon: GraduationCap,
   },
   {
-    id: "conference-planning",
-    title: "Conference planning",
-    imageUrl: "/placeholder-conferences.jpg",
+    title: "Corporate Events",
+    description:
+      "Manage registrations, bookings, and payments for corporate or private hire events.",
+    icon: Building2,
   },
   {
-    id: "university-events",
-    title: "University Proms & Events",
-    imageUrl: "/placeholder-university.jpg",
+    title: "Nightlife Events",
+    description:
+      "Sell tickets for pub nights, live entertainment, and seasonal nightlife bookings.",
+    icon: Music,
   },
 ];
 
 export default function EventTypes() {
-  const { theme } = useContext(ServerContext);
-
   return (
-    <section className="py-16 bg-[color:var(--color-surface)]/70">
+    <section className="py-20 bg-[color:var(--color-surface)]/70">
       <div className="container mx-auto px-4">
-        <div className="text-center mb-10">
-          <h2 className="text-3xl md:text-4xl font-bold text-[color:var(--color-text)] mb-4 font-heading">
-            What Does Our System Work With?
+        <div className="text-center mb-12">
+          <h2 className="text-3xl md:text-4xl font-bold text-[color:var(--color-text)] mb-3">
+            Who Is Event Wizz For?
           </h2>
+          <p className="text-[color:var(--color-text-dimmed)] max-w-2xl mx-auto">
+            Any business that runs events will benefit from Event Wizz. Create
+            ticketed events, accept payment, and allow menu choices, all from your
+            venue&apos;s own branded site.
+          </p>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {eventTypes.map((eventType) => (
-            <div
-              key={eventType.id}
-              className="relative overflow-hidden rounded-lg h-[180px] bg-[color:var(--color-primary)]/20 group"
-            >
-              {/* Dark overlay to make text readable */}
-              <div className="absolute inset-0 bg-black/50 z-10"></div>
-
-              {/* Text centered on image */}
-              <div className="absolute inset-0 z-20 flex items-center justify-center">
-                <h3 className="text-white text-xl font-medium font-heading">
-                  {eventType.title}
+          {EVENT_TYPES.map((event) => {
+            const Icon = event.icon;
+            return (
+              <div
+                key={event.title}
+                className="bg-[color:var(--color-surface)] border border-gray-100 rounded-xl p-6 hover:shadow-lg transition-shadow group"
+              >
+                <div className="w-12 h-12 rounded-lg bg-[color:var(--color-primary)]/10 flex items-center justify-center mb-4 group-hover:bg-[color:var(--color-primary)]/20 transition-colors">
+                  <Icon className="h-6 w-6 text-[color:var(--color-primary)]" />
+                </div>
+                <h3 className="text-lg font-semibold text-[color:var(--color-text)] mb-2">
+                  {event.title}
                 </h3>
+                <p className="text-sm text-[color:var(--color-text-dimmed)] leading-relaxed">
+                  {event.description}
+                </p>
               </div>
-
-              {/* Image background - would be replaced with actual images */}
-              <div className="absolute inset-0 bg-[color:var(--color-primary)]/10 z-0 transition-transform duration-300 group-hover:scale-110">
-                {/* This would be replaced with an actual image */}
-                {/* <Image src={eventType.imageUrl} alt={eventType.title} fill className="object-cover" /> */}
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
     </section>

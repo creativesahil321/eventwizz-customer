@@ -1,53 +1,57 @@
-// Client-safe app configuration
-// Note: This is a fallback config, actual branding comes from theme API
 export const appConfig = {
-  name: "Event Wizz", // Will be overridden by theme API data
+  name: "EventWizz",
   description:
-    "Event Wizz is your ultimate companion for planning the wedding of your dreams. Discover venues, dresses, planning tools, and expert ideas to make your day unforgettable.",
-  url: "https://event-wizz.com", // Static fallback, will be overridden by theme API
+    "EventWizz is a comprehensive event management platform for creating, managing and selling tickets for your events. Professional event planning software for all your event needs.",
+  url: "https://eventwizz.co.uk",
   links: {
     github: "https://github.com/event-wizz",
   },
   author: {
-    name: "event-wizz",
-    url: "https://event-wizz.com",
+    name: "EventWizz",
+    url: "https://eventwizz.co.uk",
   },
   logo: "/assets/images/logos/eventwizz-logo.png",
   mini_logo: "/assets/images/logos/eventwizz-mini-logo.png",
   seo: {
-    title: "Event Wizz - Plan the event of Your Dreams", // Will be overridden by theme API data
+    title:
+      "EventWizz - Event Management Platform | Create, Manage & Sell Event Tickets",
     description:
-      "Your ultimate companion for planning the wedding of your dreams. Discover venues, dresses, planning tools, and expert ideas to make your day unforgettable.",
+      "EventWizz is a comprehensive event management platform for creating, managing and selling tickets for your events. Professional event planning software for all your event needs.",
     keywords: [
-      "wedding",
-      "event wizz",
-      "wedding planning",
-      "venues",
-      "wedding dresses",
-      "planning tools",
-      "wedding ideas",
+      "event management",
+      "event planning software",
+      "event ticketing",
+      "event platform",
+      "event management system",
+      "online event management",
+      "event registration",
+      "event booking",
+      "corporate events",
+      "event planning",
     ],
     openGraph: {
       type: "website",
-      url: "https://event-wizz.com", // Static fallback, will be overridden by theme API
-      title: "Event Wizz - Plan the Venues of Your Dreams", // Will be overridden by theme API data
+      url: "https://eventwizz.co.uk",
+      title:
+        "EventWizz - Event Management Platform | Create, Manage & Sell Event Tickets",
       description:
-        "Your ultimate companion for planning the wedding of your dreams. Discover venues, dresses, planning tools, and expert ideas to make your day unforgettable.",
+        "EventWizz is a comprehensive event management platform for creating, managing and selling tickets for your events. Professional event planning software for all your event needs.",
       images: [
         {
-          url: "/images/og-image.jpg",
+          url: "/assets/images/logos/eventwizz-logo.png",
           width: 1200,
           height: 630,
-          alt: "Event Management Platform",
+          alt: "EventWizz Event Management Platform",
         },
       ],
     },
     twitter: {
       card: "summary_large_image",
-      title: "Event Wizz - Plan the Wedding of Your Dreams", // Will be overridden by theme API data
+      title:
+        "EventWizz - Event Management Platform | Create, Manage & Sell Event Tickets",
       description:
-        "Your ultimate companion for planning the wedding of your dreams. Discover venues, dresses, planning tools, and expert ideas to make your day unforgettable.",
-      images: ["/images/twitter-image.jpg"],
+        "EventWizz is a comprehensive event management platform for creating, managing and selling tickets for your events. Professional event planning software for all your event needs.",
+      images: ["/assets/images/logos/eventwizz-logo.png"],
       creator: "@eventwizz",
     },
   },

@@ -4,34 +4,32 @@ import { QueryClient, dehydrate } from "@tanstack/react-query";
 import LocationPageClient from "./_components/location-page-client";
 import { Hydrate } from "./_components/hydration-provider";
 import { themeService } from "@/services/common/theme/theme.service";
-import { getRequestHost, getSubdomainFromDomain } from "@/lib/server-theme";
+import {
+  getRequestHost,
+  getSubdomainFromDomain,
+} from "@/lib/server-theme";
 import {
   eventsService,
   eventKeys,
 } from "@/services/common/events/events.service";
 
-// Generate metadata for SEO
 export async function generateMetadata(props: {
   params: { locationSlug: string };
 }): Promise<Metadata> {
-  // ✅ Wait for the params object to be resolved
   const params = await props.params;
   const locationSlug = params.locationSlug;
-
   const { locationData } = await fetchLocationData(locationSlug);
 
   if (!locationData) return { title: "Location Not Found" };
 
+  const cityName = locationData.city || locationSlug;
+
   return {
-    title: `${locationData.city || locationSlug} Events | EventWizz`,
-    description: `Discover amazing events in ${
-      locationData.city || locationSlug
-    }`,
+    title: `${cityName} Events`,
+    description: `Discover amazing events in ${cityName}`,
     openGraph: {
-      title: `${locationData.city || locationSlug} Events | EventWizz`,
-      description: `Find exciting events in ${
-        locationData.city || locationSlug
-      } that match your interests.`,
+      title: `${cityName} Events`,
+      description: `Find exciting events in ${cityName} that match your interests.`,
       images: locationData.cover_image
         ? [{ url: locationData.cover_image }]
         : undefined,

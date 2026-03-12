@@ -1,169 +1,69 @@
 "use client";
 
-import Link from "next/link";
-import { useContext } from "react";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { ServerContext } from "@/lib/server-context";
+import BookACallModal from "../book-a-call-modal";
 
 export default function HeroSection() {
-  const { theme } = useContext(ServerContext);
+  const [bookCallOpen, setBookCallOpen] = useState(false);
 
   return (
-    <section className="relative py-24 md:py-32 bg-[color:var(--color-background)] overflow-hidden">
-      {/* Particle/Light Effects Background */}
-      <div className="absolute inset-0 z-0 opacity-30">
-        <div className="absolute top-20 left-1/4 w-2 h-2 rounded-full bg-[color:var(--color-primary)] animate-pulse"></div>
-        <div className="absolute top-40 left-3/4 w-3 h-3 rounded-full bg-[color:var(--color-primary)] animate-pulse"></div>
-        <div className="absolute top-80 left-1/2 w-2 h-2 rounded-full bg-[color:var(--color-accent)] animate-pulse"></div>
-        <div className="absolute bottom-20 left-1/3 w-2 h-2 rounded-full bg-[color:var(--color-info)] animate-pulse"></div>
-        <div className="absolute bottom-40 left-1/4 w-3 h-3 rounded-full bg-[color:var(--color-primary)] animate-pulse"></div>
-      </div>
+    <>
+      <section className="relative pt-32 pb-20 md:pt-40 md:pb-28 bg-[color:var(--color-background)] overflow-hidden">
+        <div className="absolute inset-0 z-0 opacity-20">
+          <div className="absolute top-20 left-1/4 w-2 h-2 rounded-full bg-[color:var(--color-primary)] animate-pulse" />
+          <div className="absolute top-40 left-3/4 w-3 h-3 rounded-full bg-[color:var(--color-primary)] animate-pulse" />
+          <div className="absolute bottom-20 left-1/3 w-2 h-2 rounded-full bg-[color:var(--color-secondary)] animate-pulse" />
+        </div>
 
-      <div className="container mx-auto px-4 relative z-10">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
-          {/* Left Column - Content */}
-          <div className="flex flex-col space-y-6 text-[color:var(--color-text)]">
-            <h1 className="text-4xl md:text-5xl font-bold leading-tight">
-              {theme?.seo?.title || "Event Management Software"}
-            </h1>
-            <p className="text-xl text-[color:var(--color-text-dimmed)] leading-relaxed">
-              {theme?.seo?.description ||
-                "An event tech platform for face-to-face, online, and hybrid experiences"}
-            </p>
-            <p className="text-[color:var(--color-text-dimmed)]">
-              Maecenas non mauris arcu. Donec risus felis, laoreet quis ante
-              quis, feugiat mollis orci. Integer sit amet interdum dolor. Aenean
-              sagittis libero nisi, in tristique metus faucibus nec. Donec
-              convallis congue lectus eu pretium.
-            </p>
-            <div className="pt-6">
-              <Link href="/auth/register">
+        <div className="container mx-auto px-4 relative z-10">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+            <div className="flex flex-col space-y-6 text-[color:var(--color-text)]">
+              <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold leading-tight">
+                Event Management Software for Venues
+              </h1>
+              <p className="text-lg md:text-xl text-[color:var(--color-text-dimmed)] leading-relaxed max-w-lg">
+                Manage your venue, your way, with an event management platform
+                that allows you to sell tickets online at the touch of a button.
+              </p>
+              <div className="pt-4">
                 <Button
                   variant="event-primary"
                   size="lg"
-                  className="rounded-md px-8 shadow-lg"
+                  className="rounded-md px-8 shadow-lg text-base"
+                  onClick={() => setBookCallOpen(true)}
                 >
-                  Try {theme?.name || "EventWizz"} Management For Free
+                  Book a demo
                 </Button>
-              </Link>
+              </div>
             </div>
-          </div>
 
-          {/* Right Column - CSS-based Laptop Mockup */}
-          <div className="relative hidden md:block">
-            {/* CSS Laptop Mockup */}
-            <div className="laptop-mockup">
-              <div className="laptop-screen">
-                {/* Event Content Preview */}
-                <div className="screen-content">
-                  <div className="event-header">
-                    <div className="event-title">Christmas Party</div>
-                    <div className="event-price">PRICES FROM £79</div>
+            <div className="relative hidden lg:block">
+              <div className="relative rounded-2xl overflow-hidden shadow-2xl border border-gray-800">
+                <div className="bg-gray-900 px-4 py-3 flex items-center gap-2">
+                  <div className="flex gap-1.5">
+                    <div className="w-3 h-3 rounded-full bg-red-500" />
+                    <div className="w-3 h-3 rounded-full bg-yellow-500" />
+                    <div className="w-3 h-3 rounded-full bg-green-500" />
                   </div>
-                  <div className="event-image"></div>
-                  <div className="event-details">
-                    <div className="event-venue">Stock Brook&apos;s Spectacular</div>
-                    <div className="event-description">Christmas Party</div>
+                  <div className="flex-1 text-center">
+                    <span className="text-xs text-gray-400">eventwizz.co.uk</span>
                   </div>
                 </div>
+                <div className="bg-gradient-to-br from-[color:var(--color-primary)] to-[color:var(--color-secondary)] p-8 min-h-[280px] flex flex-col items-center justify-center text-white text-center">
+                  <p className="text-sm font-medium mb-2 opacity-80">Christmas Party</p>
+                  <p className="text-2xl font-bold mb-4">PRICES FROM £79</p>
+                  <p className="text-lg font-semibold">JOIN US FOR OUR CHRISTMAS</p>
+                </div>
               </div>
-              <div className="laptop-base"></div>
+              <div className="absolute -bottom-8 -right-8 w-36 h-36 bg-[color:var(--color-primary)]/20 rounded-full blur-2xl z-0" />
+              <div className="absolute -top-8 -left-8 w-36 h-36 bg-[color:var(--color-secondary)]/20 rounded-full blur-2xl z-0" />
             </div>
-
-            {/* Light glow effects */}
-            <div className="absolute -bottom-10 -right-10 w-40 h-40 bg-[color:var(--color-primary)]/20 rounded-full blur-xl z-0"></div>
-            <div className="absolute -top-10 -left-10 w-40 h-40 bg-[color:var(--color-secondary)]/20 rounded-full blur-xl z-0"></div>
           </div>
         </div>
-      </div>
+      </section>
 
-      {/* CSS for the laptop mockup */}
-      <style jsx>{`
-        .laptop-mockup {
-          position: relative;
-          width: 100%;
-          max-width: 600px;
-          margin: 0 auto;
-        }
-
-        .laptop-screen {
-          position: relative;
-          background: #252525;
-          border: 16px solid #252525;
-          border-radius: 15px 15px 0 0;
-          box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
-          width: 100%;
-          height: 0;
-          padding-bottom: 60%;
-          overflow: hidden;
-        }
-
-        .laptop-base {
-          background: #1e1e1e;
-          height: 20px;
-          margin: 0 -20px;
-          border-radius: 0 0 10px 10px;
-          box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
-        }
-
-        .screen-content {
-          position: absolute;
-          top: 0;
-          left: 0;
-          width: 100%;
-          height: 100%;
-          background: white;
-          display: flex;
-          flex-direction: column;
-        }
-
-        .event-header {
-          padding: 15px;
-          display: flex;
-          justify-content: space-between;
-          background: var(--color-primary);
-          color: white;
-          font-weight: bold;
-        }
-
-        .event-image {
-          height: 60%;
-          background: linear-gradient(
-            45deg,
-            var(--color-primary),
-            var(--color-secondary)
-          );
-          position: relative;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-        }
-
-        .event-image::after {
-          content: "JOIN US FOR OUR CHRISTMAS";
-          position: absolute;
-          font-size: 24px;
-          font-weight: bold;
-          color: white;
-          text-align: center;
-        }
-
-        .event-details {
-          padding: 15px;
-          background: white;
-          color: var(--color-text);
-          text-align: center;
-        }
-
-        .event-venue {
-          font-size: 16px;
-          font-weight: bold;
-        }
-
-        .event-description {
-          font-size: 14px;
-        }
-      `}</style>
-    </section>
+      <BookACallModal isOpen={bookCallOpen} onClose={() => setBookCallOpen(false)} />
+    </>
   );
 }

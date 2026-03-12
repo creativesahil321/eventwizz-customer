@@ -1,82 +1,59 @@
-"use client";
-
-import React, { useContext } from "react";
-import Image from "next/image";
-import Link from "next/link";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardFooter } from "@/components/ui/card";
-import { ServerContext } from "@/lib/server-context";
-
-const newsArticles = [
+const NEWS_ARTICLES = [
   {
-    id: "article1",
-    title: "Vivamus Pulvinar Ut Nunc Eu Gravida Suspendisse Quis Diam Felis",
+    title: "How to Plan a Perfect Corporate Christmas Party",
     excerpt:
-      "Cras interdum urna sollicitudin nulla edipscing. A porttitor accusan eget felis semper integer mattis pretium.",
-    date: "23 Nov, 2023",
-    imageUrl: "/placeholder-article1.jpg",
+      "Planning a corporate Christmas party can be stressful — but with the right tools and checklist, it doesn't have to be.",
+    date: "23 Nov, 2024",
   },
   {
-    id: "article2",
-    title: "Vivamus Pulvinar Ut Nunc Eu Gravida Suspendisse Quis Diam Felis",
+    title: "Top Tips for Running Unforgettable Venue Events",
     excerpt:
-      "Cras interdum urna sollicitudin nulla edipscing. A porttitor accusan eget felis semper integer mattis pretium.",
-    date: "23 Nov, 2023",
-    imageUrl: "/placeholder-article2.jpg",
+      "From guest management to menu planning, discover how leading venues keep their guests coming back year after year.",
+    date: "15 Oct, 2024",
   },
   {
-    id: "article3",
-    title: "Vivamus Pulvinar Ut Nunc Eu Gravida Suspendisse Quis Diam Felis",
+    title: "Why Automated Ticketing Transforms Event Revenue",
     excerpt:
-      "Cras interdum urna sollicitudin nulla edipscing. A porttitor accusan eget felis semper integer mattis pretium.",
-    date: "23 Nov, 2023",
-    imageUrl: "/placeholder-article3.jpg",
+      "Manual ticketing is costing venues time and money. See how automation changes the game for event profitability.",
+    date: "02 Sep, 2024",
   },
 ];
 
 export default function NewsSection() {
-  const { theme } = useContext(ServerContext);
-
   return (
-    <section className="py-16 bg-[color:var(--color-surface)]">
+    <section className="py-20 bg-[color:var(--color-background)]">
       <div className="container mx-auto px-4">
         <div className="text-center mb-12">
-          <h2 className="text-3xl md:text-4xl font-bold text-[color:var(--color-text)] mb-4 font-heading">
+          <h2 className="text-3xl md:text-4xl font-bold text-[color:var(--color-text)] mb-3">
             Latest News & Articles
           </h2>
+          <p className="text-[color:var(--color-text-dimmed)]">
+            Insights, tips, and best practices from the EventWizz team
+          </p>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-          {newsArticles.map((article) => (
-            <div
-              key={article.id}
-              className="flex flex-col bg-[color:var(--color-surface)] overflow-hidden"
+          {NEWS_ARTICLES.map((article) => (
+            <article
+              key={article.title}
+              className="bg-[color:var(--color-surface)] rounded-xl overflow-hidden shadow-sm hover:shadow-lg transition-shadow group"
             >
-              {/* Article Image */}
-              <div className="relative h-48 bg-[color:var(--color-primary)]/10 overflow-hidden">
-                {/* This would be replaced with actual article image */}
-                <div className="absolute inset-0 bg-[color:var(--color-primary)]/10"></div>
-              </div>
-
-              <div className="p-4">
-                <h3 className="text-base font-semibold mb-2 line-clamp-2 font-heading text-[color:var(--color-text)]">
+              <div className="h-48 bg-gradient-to-br from-[color:var(--color-primary)]/20 to-[color:var(--color-secondary)]/20" />
+              <div className="p-6">
+                <p className="text-xs text-[color:var(--color-text-dimmed)] mb-2">
+                  {article.date}
+                </p>
+                <h3 className="font-semibold text-[color:var(--color-text)] mb-2 group-hover:text-[color:var(--color-primary)] transition-colors">
                   {article.title}
                 </h3>
-                <p className="text-sm text-[color:var(--color-text-dimmed)] mb-4 line-clamp-3 font-body">
+                <p className="text-sm text-[color:var(--color-text-dimmed)] mb-4 leading-relaxed">
                   {article.excerpt}
                 </p>
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-[color:var(--color-text-dimmed)]">
-                    {article.date}
-                  </span>
-                  <Link href={`/blog/${article.id}`}>
-                    <span className="text-sm font-medium text-[color:var(--color-primary)] hover:underline">
-                      Read Article
-                    </span>
-                  </Link>
-                </div>
+                <span className="text-sm font-medium text-[color:var(--color-primary)]">
+                  Read Article &rarr;
+                </span>
               </div>
-            </div>
+            </article>
           ))}
         </div>
       </div>

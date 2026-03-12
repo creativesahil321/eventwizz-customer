@@ -180,11 +180,21 @@ const applyThemeToDOM = (settings: ThemeSchema): void => {
     }
   }
 
-  // Title: use same format as SSR generateMetadata so no flash when both have theme.
-  // When SSR doesn't get theme (e.g. wrong host), client still applies vendor name.
+  // Replace the brand suffix in the current title to match the theme name.
+  // SSR sets titles like "Event Management | Wang Deleon" or "Sheffield Events | Wang Deleon"
+  // via Next.js title.template. If the client theme differs (e.g. SSR missed the theme),
+  // we swap the brand portion while keeping the page-specific prefix intact.
   if (settings.name) {
-    const title = `${settings.name} | Event Management`;
-    if (document.title !== title) document.title = title;
+    const current = document.title;
+    const pipeIdx = current.lastIndexOf(" | ");
+    if (pipeIdx !== -1) {
+      const pageSpecific = current.slice(0, pipeIdx);
+      const newTitle = `${pageSpecific} | ${settings.name}`;
+      if (current !== newTitle) document.title = newTitle;
+    } else {
+      const newTitle = `${settings.name} | Event Management`;
+      if (current !== newTitle) document.title = newTitle;
+    }
   }
 };
 

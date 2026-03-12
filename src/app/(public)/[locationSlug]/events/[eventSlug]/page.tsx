@@ -11,7 +11,6 @@ import { Hydrate } from "./_components/hydration-provider";
 import EventDetailClient from "./_components/event-detail-client";
 import { getRequestHost, getSubdomainFromDomain } from "@/lib/server-theme";
 
-// Generate metadata for SEO
 export async function generateMetadata(props: {
   params: { locationSlug: string; eventSlug: string };
 }): Promise<Metadata> {
@@ -20,15 +19,16 @@ export async function generateMetadata(props: {
   const eventSlug = params.eventSlug;
 
   const { eventData } = await fetchEventData(locationSlug, eventSlug);
+
   if (!eventData) return { title: "Event Not Found" };
 
   return {
-    title: `${eventData.event_name} | EventWizz`,
+    title: eventData.event_name,
     description:
       eventData.about_event_sub_heading ||
       `Details about ${eventData.event_name}`,
     openGraph: {
-      title: `${eventData.event_name} | EventWizz`,
+      title: eventData.event_name,
       description:
         eventData.about_event_sub_heading ||
         `Details about ${eventData.event_name}`,
