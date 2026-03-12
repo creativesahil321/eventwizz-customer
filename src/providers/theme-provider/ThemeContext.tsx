@@ -107,7 +107,7 @@ const createDefaultSEO = (title: string = "EventWizz"): SEO => ({
  * @returns Properly formatted ThemeSettings object
  */
 const mapSchemaToSettings = (
-  schema: ThemeSchema | null
+  schema: ThemeSchema | null,
 ): ThemeSettings | null => {
   if (!schema) return null;
 
@@ -167,9 +167,24 @@ const applyThemeToDOM = (settings: ThemeSchema): void => {
     }
   });
 
-  // Set document title if name is available
+  // Update favicon dynamically so it stays in sync with the theme
+  if (settings.favicon) {
+    let link = document.querySelector<HTMLLinkElement>("link[rel='icon']");
+    if (!link) {
+      link = document.createElement("link");
+      link.rel = "icon";
+      document.head.appendChild(link);
+    }
+    if (link.href !== settings.favicon) {
+      link.href = settings.favicon;
+    }
+  }
+
+  // Title: use same format as SSR generateMetadata so no flash when both have theme.
+  // When SSR doesn't get theme (e.g. wrong host), client still applies vendor name.
   if (settings.name) {
-    document.title = settings.name;
+    const title = `${settings.name} | Event Management`;
+    if (document.title !== title) document.title = title;
   }
 };
 
@@ -183,7 +198,7 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({
   initialTheme = null,
 }) => {
   const [theme, setTheme] = useState<ThemeSettings | null>(
-    initialTheme ? mapSchemaToSettings(initialTheme) : null
+    initialTheme ? mapSchemaToSettings(initialTheme) : null,
   );
   const [loading, setLoading] = useState<boolean>(initialTheme ? false : true);
   const [error, setError] = useState<string | null>(null);

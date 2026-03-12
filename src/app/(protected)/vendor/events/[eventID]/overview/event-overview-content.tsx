@@ -566,28 +566,26 @@ className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm 
                                                 </div>
 
                                                 {/* Progress info */}
-                                                <div className="flex items-center justify-between text-xs text-muted-foreground">
+                                                <div className="flex items-center justify-between text-xs text-muted-foreground mb-1">
                                                   <span>
                                                     {tableConfig.sold}/
                                                     {tableConfig.total} booked
                                                   </span>
-                                                  <span className="font-medium">
+                                                  <span className="font-medium tabular-nums">
                                                     {percentBooked}%
                                                   </span>
                                                 </div>
 
-                                                {/* Mini progress bar */}
-                                                <div className="w-full bg-white/50 rounded-full h-1.5 overflow-hidden">
+                                                {/* Mini progress bar - same track/color as main Booking Progress */}
+                                                <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
                                                   <div
                                                     className={`h-full transition-all ${
                                                       isFullyBooked
-                                                        ? "bg-red-500"
-                                                        : isLowAvailability
-                                                          ? "bg-amber-500"
-                                                          : "bg-green-500"
+                                                        ? "bg-destructive"
+                                                        : "bg-[var(--color-primary)]"
                                                     }`}
                                                     style={{
-                                                      width: `${percentBooked}%`,
+                                                      width: `${Math.min(percentBooked, 100)}%`,
                                                     }}
                                                   />
                                                 </div>
@@ -710,12 +708,12 @@ className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm 
                           </div>
                         ) : null}
 
-                        {/* Progress Bar - Only show if there are tables */}
+                        {/* Progress Bar - Only show if there are tables. Progress = (booked / total) * 100. */}
                         {table.totalTables > 0 && (
                           <div className="mt-4">
-                            <div className="flex justify-between text-xs text-muted-foreground mb-1">
+                            <div className="flex justify-between items-center text-xs text-muted-foreground mb-1">
                               <span>Booking Progress</span>
-                              <span>
+                              <span className="font-medium tabular-nums">
                                 {Math.round(
                                   (table.tablesBooked /
                                     (table.tablesBooked + table.tablesLeft)) *
@@ -724,14 +722,12 @@ className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm 
                                 %
                               </span>
                             </div>
-                            <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
+                            <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
                               <div
                                 className={`h-full transition-all ${
                                   table.soldOut
-                                    ? "bg-red-500"
-                                    : table.tablesLeft < 5
-                                      ? "bg-amber-500"
-                                      : "bg-green-500"
+                                    ? "bg-destructive"
+                                    : "bg-[var(--color-primary)]"
                                 }`}
                                 style={{
                                   width: `${Math.min(

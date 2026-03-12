@@ -191,7 +191,7 @@ Site Essentials is a comprehensive configuration module that allows vendors and 
 - Domain Management: Your domain is automatically created during onboarding based on venue name
 - Domain Verification: Complete verification within 72 hours to maintain full account access
 - Custom Domain: Option to update your subdomain name during the verification period
-- Business Verification: Upload GST documents to verify your business credentials
+- Business Verification: Upload VAT number and business document to verify your business credentials
 
 All settings are saved in real-time and can be previewed before publishing. The Site Essentials module uses TanStack Query for efficient data fetching and caching, with React Hook Form for form management and validation.
 

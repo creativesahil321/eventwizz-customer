@@ -1,10 +1,14 @@
 import React, { memo, useMemo } from "react";
-import { ChevronDown, LogOut, Settings, User as UserIcon } from "lucide-react";
+import { ChevronDown, CreditCard, Globe, LogOut, Settings, User as UserIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useSession } from "next-auth/react";
@@ -59,26 +63,23 @@ const UserDropdown = memo(() => {
   }, [user, session]);
 
   const settingsUrl = useMemo(() => {
-    // Default settings URL
     let url = "/account/settings";
 
-    // Try to determine settings URL from user/session data
     if (user) {
       if (user.account_type === "admin") {
-        url = "/admin/settings";
+        url = "/admin/payment-settings";
       } else if (user.account_type === "vendor") {
-        url = "/vendor/settings";
+        url = "/vendor/payment-settings";
       } else if (user.account_type === "customer") {
         url = "/customer/settings";
       }
     } else if (session?.user) {
-      // Extract from session as fallback
       const accountType = session.user.account_type;
 
       if (accountType === "admin") {
-        url = "/admin/settings";
+        url = "/admin/payment-settings";
       } else if (accountType === "vendor") {
-        url = "/vendor/settings";
+        url = "/vendor/payment-settings";
       } else if (accountType === "customer") {
         url = "/customer/settings";
       }
@@ -96,10 +97,9 @@ const UserDropdown = memo(() => {
   const userEmail = user?.email || session?.user?.email || "";
   const accountType = user?.account_type || session?.user?.account_type;
 
-  // Hide Settings for customers; label "Payment Settings" for vendor, "Settings" for admin
   const showSettings = accountType !== "customer";
-  const settingsLabel =
-    accountType === "vendor" ? "Payment Settings" : "Settings";
+  const isVendor = accountType === "vendor";
+  const isAdmin = accountType === "admin";
 
   return (
     <div className="relative">
@@ -145,12 +145,41 @@ const UserDropdown = memo(() => {
           </DropdownMenuItem>
           {showSettings && (
             <PermissionGuard permissionKey="read-account" fallback={null}>
-              <DropdownMenuItem
-                className="cursor-pointer"
-                onClick={() => router.push(settingsUrl)}
-              >
-                <Settings size={16} className="mr-2" /> {settingsLabel}
-              </DropdownMenuItem>
+              {isVendor || isAdmin ? (
+                <DropdownMenuSub>
+                  <DropdownMenuSubTrigger className="cursor-pointer">
+                    <Settings size={16} className="mr-2" /> Settings
+                  </DropdownMenuSubTrigger>
+                  <DropdownMenuSubContent className="w-48">
+                    {isVendor && (
+                      <>
+                        <DropdownMenuItem
+                          className="cursor-pointer"
+                          onClick={() => router.push("/vendor/domain-settings")}
+                        >
+                          <Globe size={15} className="mr-2 text-muted-foreground" />
+                          Domain Settings
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                      </>
+                    )}
+                    <DropdownMenuItem
+                      className="cursor-pointer"
+                      onClick={() => router.push(settingsUrl)}
+                    >
+                      <CreditCard size={15} className="mr-2 text-muted-foreground" />
+                      Payment Settings
+                    </DropdownMenuItem>
+                  </DropdownMenuSubContent>
+                </DropdownMenuSub>
+              ) : (
+                <DropdownMenuItem
+                  className="cursor-pointer"
+                  onClick={() => router.push(settingsUrl)}
+                >
+                  <Settings size={16} className="mr-2" /> Settings
+                </DropdownMenuItem>
+              )}
             </PermissionGuard>
           )}
           <DropdownMenuItem className="cursor-pointer" onClick={() => logout()}>

@@ -60,7 +60,9 @@ export function DomainTab() {
   // Calculate time remaining (in hours)
   const hoursRemaining = Math.max(
     0,
-    Math.floor((domainData.expiresAt.getTime() - Date.now()) / (1000 * 60 * 60))
+    Math.floor(
+      (domainData.expiresAt.getTime() - Date.now()) / (1000 * 60 * 60),
+    ),
   );
 
   // Calculate progress percentage (hours passed out of 72)
@@ -96,9 +98,8 @@ export function DomainTab() {
 
   const handleRemoveFile = () => {
     setUploadedFile(null);
-    // Reset file input by recreating it
     const fileInput = document.getElementById(
-      "gst-document"
+      "business-document",
     ) as HTMLInputElement;
     if (fileInput) {
       fileInput.value = "";
@@ -107,7 +108,7 @@ export function DomainTab() {
 
   const handleVerifyBusiness = () => {
     if (!businessNumber || !uploadedFile) {
-      alert("Please provide both GST number and document");
+      alert("Please provide both VAT number and business document");
       return;
     }
 
@@ -117,7 +118,7 @@ export function DomainTab() {
       setBusinessVerifying(false);
       // In a real implementation, you would update the business verification status in your backend
       alert(
-        "Business verification submitted successfully. We'll review your documents and update your status."
+        "Business verification submitted successfully. We'll review your documents and update your status.",
       );
     }, 1500);
   };
@@ -127,75 +128,70 @@ export function DomainTab() {
   };
 
   return (
-    <div className="space-y-6 w-full max-w-full px-2 sm:px-4">
-      <div>
-        <h3 className="text-lg font-semibold mb-2">Domain Settings</h3>
-        <p className="text-sm text-muted-foreground mb-2">
-          Your domain was automatically created during onboarding based on your
-          venue name.
-        </p>
-
-        {/* Time remaining alert */}
-        {domainData.canEdit && (
-          <Alert className="mb-6 border-yellow-200 bg-yellow-50">
-            <div className="flex flex-col sm:flex-row sm:items-center gap-2">
-              <AlertTriangle className="h-4 w-4 text-yellow-600 shrink-0" />
-              <div className="flex-1">
-                <AlertTitle className="text-yellow-800">
-                  Domain Verification Required
-                </AlertTitle>
-                <AlertDescription className="text-yellow-700">
-                  You have{" "}
-                  <span className="font-bold">{hoursRemaining} hours</span>{" "}
-                  remaining to verify or update your domain. After this period,
-                  your account access will be restricted until domain
-                  verification is complete.
-                </AlertDescription>
-              </div>
+    <div className="space-y-6 w-full max-w-full">
+      {/* Time remaining / locked alerts */}
+      {domainData.canEdit && (
+        <Alert className="border-yellow-200 bg-yellow-50">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+            <AlertTriangle className="h-4 w-4 text-yellow-600 shrink-0" />
+            <div className="flex-1">
+              <AlertTitle className="text-yellow-800">
+                Domain Verification Required
+              </AlertTitle>
+              <AlertDescription className="text-yellow-700">
+                You have{" "}
+                <span className="font-bold">{hoursRemaining} hours</span>{" "}
+                remaining to verify or update your domain. After this period,
+                your account access will be restricted until domain verification
+                is complete.
+              </AlertDescription>
             </div>
-            <div className="mt-2">
-              <Progress value={progressPercentage} className="h-2" />
-              <div className="flex justify-between text-xs mt-1">
-                <span>Created</span>
-                <span>{hoursRemaining} hours remaining</span>
-              </div>
+          </div>
+          <div className="mt-2">
+            <Progress value={progressPercentage} className="h-2" />
+            <div className="flex justify-between text-xs mt-1">
+              <span>Created</span>
+              <span>{hoursRemaining} hours remaining</span>
             </div>
-          </Alert>
-        )}
+          </div>
+        </Alert>
+      )}
 
-        {!domainData.canEdit && (
-          <Alert className="mb-6">
-            <div className="flex flex-col sm:flex-row sm:items-center gap-2">
-              <InfoIcon className="h-4 w-4 shrink-0" />
-              <div className="flex-1">
-                <AlertTitle>Domain Already Updated</AlertTitle>
-                <AlertDescription>
-                  You have already updated your domain name. If you need to make
-                  changes, please contact support.
-                </AlertDescription>
-              </div>
+      {!domainData.canEdit && (
+        <Alert>
+          <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+            <InfoIcon className="h-4 w-4 shrink-0" />
+            <div className="flex-1">
+              <AlertTitle>Domain Already Updated</AlertTitle>
+              <AlertDescription>
+                You have already updated your domain name. If you need to make
+                changes, please contact support.
+              </AlertDescription>
             </div>
-          </Alert>
-        )}
-      </div>
+          </div>
+        </Alert>
+      )}
 
-      <div className="flex w-full mb-4">
+      {/* Tab switcher */}
+      <div className="flex w-full">
         <button
+          type="button"
           onClick={() => handleTabChange("domain")}
-          className={`flex-1 py-2 sm:py-3 px-2 sm:px-4 text-center font-medium text-sm sm:text-base ${
+          className={`flex-1 py-2.5 sm:py-3 px-3 sm:px-4 text-center font-medium text-sm transition-colors rounded-l-md ${
             activeTab === "domain"
-              ? "bg-red-600 text-white rounded-l-md"
-              : "bg-gray-100 text-gray-700 rounded-l-md"
+              ? "bg-[var(--color-primary)] text-primary-foreground"
+              : "bg-muted text-muted-foreground hover:bg-muted/80"
           }`}
         >
           Domain Settings
         </button>
         <button
+          type="button"
           onClick={() => handleTabChange("business")}
-          className={`flex-1 py-2 sm:py-3 px-2 sm:px-4 text-center font-medium text-sm sm:text-base ${
+          className={`flex-1 py-2.5 sm:py-3 px-3 sm:px-4 text-center font-medium text-sm transition-colors rounded-r-md ${
             activeTab === "business"
-              ? "bg-red-600 text-white rounded-r-md"
-              : "bg-gray-100 text-gray-700 rounded-r-md"
+              ? "bg-[var(--color-primary)]  text-primary-foreground"
+              : "bg-muted text-muted-foreground hover:bg-muted/80"
           }`}
         >
           Business Verification
@@ -257,8 +253,8 @@ export function DomainTab() {
                         {domainData.status === "pending_verification"
                           ? "Your domain is pending verification"
                           : domainData.status === "verified"
-                          ? "Your domain is verified and active"
-                          : "Your domain verification period has expired"}
+                            ? "Your domain is verified and active"
+                            : "Your domain verification period has expired"}
                       </TooltipContent>
                     </Tooltip>
                   </TooltipProvider>
@@ -442,17 +438,18 @@ export function DomainTab() {
                     htmlFor="business-number"
                     className="text-base font-medium"
                   >
-                    GST Number
+                    VAT Number
                   </Label>
                   <p className="text-sm text-muted-foreground mb-2">
-                    Enter your valid GST identification number
+                    Enter your valid VAT registration number (e.g. GB or EU
+                    format)
                   </p>
                   <Input
                     id="business-number"
-                    placeholder="e.g. 29ABCDE1234F1Z5"
+                    placeholder="e.g. GB123456789 or 22AABBCC1234K1Z2"
                     value={businessNumber}
                     onChange={(e) => setBusinessNumber(e.target.value)}
-                    className="w-full sm:max-w-md"
+                    className="w-full"
                   />
                 </div>
 
@@ -460,17 +457,18 @@ export function DomainTab() {
 
                 <div>
                   <Label
-                    htmlFor="gst-document"
+                    htmlFor="business-document"
                     className="text-base font-medium"
                   >
-                    GST Certificate
+                    Business document
                   </Label>
                   <p className="text-sm text-muted-foreground mb-2">
-                    Upload a scanned copy or clear photo of your GST certificate
+                    Upload a scanned copy or clear photo of your VAT certificate
+                    or business registration document
                   </p>
 
                   {!uploadedFile ? (
-                    <div className="border-2 border-dashed rounded-md p-4 sm:p-6 w-full sm:max-w-md">
+                    <div className="border-2 border-dashed rounded-md p-4 sm:p-6 w-full">
                       <div className="flex flex-col items-center justify-center gap-2">
                         <Upload className="h-8 w-8 text-muted-foreground" />
                         <p className="text-sm font-medium text-center">
@@ -480,7 +478,7 @@ export function DomainTab() {
                           PDF, JPG or PNG (Max 5MB)
                         </p>
                         <Input
-                          id="gst-document"
+                          id="business-document"
                           type="file"
                           className="hidden"
                           accept=".pdf,.jpg,.jpeg,.png"
@@ -489,7 +487,9 @@ export function DomainTab() {
                         <Button
                           variant="outline"
                           onClick={() =>
-                            document.getElementById("gst-document")?.click()
+                            document
+                              .getElementById("business-document")
+                              ?.click()
                           }
                           className="mt-2 w-full sm:w-auto"
                         >
@@ -498,7 +498,7 @@ export function DomainTab() {
                       </div>
                     </div>
                   ) : (
-                    <div className="border rounded-md p-4 flex items-center justify-between w-full sm:max-w-md">
+                    <div className="border rounded-md p-4 flex items-center justify-between w-full">
                       <div className="flex items-center gap-2 overflow-hidden">
                         <FileCheck className="h-5 w-5 text-green-600 shrink-0" />
                         <div className="overflow-hidden">
@@ -526,7 +526,7 @@ export function DomainTab() {
 
                 <div>
                   <h4 className="text-base font-medium mb-2">
-                    Additional Information
+                    Additional information
                   </h4>
                   <div className="bg-muted p-4 rounded-md">
                     <div className="flex flex-col sm:flex-row items-start gap-3">
@@ -537,7 +537,8 @@ export function DomainTab() {
                           We require business verification to ensure all vendors
                           on our platform are legitimate businesses. This helps
                           us maintain a trusted marketplace and comply with
-                          regulations.
+                          regulations. The same VAT and document information is
+                          visible to admin for venue management.
                         </p>
                         <ul className="list-disc pl-5 mt-2 space-y-1 text-muted-foreground">
                           <li>

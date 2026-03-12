@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import "@/assets/css/tailwind.css";
 import {
-  fetchServerTheme,
+  fetchServerThemeCached,
   generateCriticalThemeCSS,
   getRequestHost,
   getSubdomainFromDomain,
@@ -15,10 +15,26 @@ import PermissionPreloader from "./permission-preloader";
 import { ServerContextProvider } from "@/lib/server-context";
 import { appConfig } from "@/config/app";
 
-export const metadata: Metadata = {
-  title: appConfig.seo.title,
-  description: appConfig.seo.description,
-};
+// Dynamically generate metadata (title, description, favicon) from the vendor's
+// saved site essentials so every domain gets its own favicon.
+export async function generateMetadata(): Promise<Metadata> {
+  const host = await getRequestHost();
+  const theme = await fetchServerThemeCached(host);
+
+  return {
+    title: theme?.name
+      ? `${theme.name} | Event Management`
+      : appConfig.seo.title,
+    description: appConfig.seo.description,
+    ...(theme?.favicon && {
+      icons: {
+        icon: theme.favicon,
+        shortcut: theme.favicon,
+        apple: theme.favicon,
+      },
+    }),
+  };
+}
 
 export default async function RootLayout({
   children,
@@ -29,13 +45,12 @@ export default async function RootLayout({
   const host = await getRequestHost();
   const subdomain = getSubdomainFromDomain(host);
 
-  // Fetch server-side theme data
+  // Reuses the React-cache'd fetch — no second network call.
   let initialTheme = null;
   try {
-    initialTheme = await fetchServerTheme(host);
+    initialTheme = await fetchServerThemeCached(host);
 
-    // If theme fetching fails, we'll use null and let the client-side
-    // theme fetching handle it instead
+    // Falls back to null; client-side theme fetching takes over
     if (!initialTheme) {
       console.warn("SSR theme fetching failed, falling back to CSR fetching");
     }
@@ -55,6 +70,15 @@ export default async function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning={true}>
       <head suppressHydrationWarning={true}>
+        {/* Preload dynamic favicon so it shows immediately instead of after load */}
+        {initialTheme?.favicon && (
+          <link
+            rel="preload"
+            href={initialTheme.favicon}
+            as="image"
+            fetchPriority="high"
+          />
+        )}
         {/* Inject critical theme CSS to prevent flickering */}
         <style
           id="critical-theme-css"

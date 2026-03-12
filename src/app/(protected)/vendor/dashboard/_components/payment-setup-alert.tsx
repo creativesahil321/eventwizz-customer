@@ -59,7 +59,7 @@ export function PaymentSetupAlert() {
           </AlertDescription>
           
           <div className="flex flex-wrap gap-3">
-            <Link href="/vendor/settings?tab=payment-gateways">
+            <Link href="/vendor/payment-settings?tab=payment-gateways">
               <Button
                 variant="default"
                 className="bg-amber-600 hover:bg-amber-700 text-white"

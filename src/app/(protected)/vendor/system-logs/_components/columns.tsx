@@ -3,6 +3,7 @@
 import { ColumnDef } from "@tanstack/react-table";
 import { DataTableColumnHeader } from "@/components/data-table/data-table-column-header";
 import { Badge } from "@/components/ui/badge";
+import { cn } from "@/lib/utils";
 import { SystemLogEntry } from "../_lib/types";
 import { format } from "date-fns";
 
@@ -13,6 +14,12 @@ const levelVariant: Record<
   info: "secondary",
   warning: "outline",
   error: "destructive",
+};
+
+const levelClassName: Record<SystemLogEntry["level"], string | undefined> = {
+  info: undefined,
+  warning: "bg-amber-100 text-amber-800 border-amber-200 capitalize",
+  error: undefined,
 };
 
 export function getSystemLogColumns(): ColumnDef<SystemLogEntry>[] {
@@ -46,7 +53,10 @@ export function getSystemLogColumns(): ColumnDef<SystemLogEntry>[] {
       cell: ({ row }) => {
         const level = row.getValue("level") as SystemLogEntry["level"];
         return (
-          <Badge variant={levelVariant[level]} className="capitalize">
+          <Badge
+            variant={levelVariant[level]}
+            className={cn("capitalize", levelClassName[level])}
+          >
             {level}
           </Badge>
         );

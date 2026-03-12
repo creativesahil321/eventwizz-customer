@@ -1,11 +1,12 @@
 "use client";
 
-import { DollarSign, PieChart, UserPlus, Users } from "lucide-react";
+import { DollarSign, PieChart, UserPlus, Users, Wallet } from "lucide-react";
 import { Card, CardTitle } from "@/components/ui/card";
 
 interface PerformanceData {
   totalRevenue: string;
   commissionEarned: string;
+  commissionPending: string;
   newCustomers: number;
   visitors: number;
 }
@@ -31,16 +32,24 @@ export default function PerformanceOverview({
     },
     {
       id: "commission_earned",
-      label: "Commission Earned",
-      displayLabel: "Commission Earned",
+      label: "Admin Commission",
+      displayLabel: "Admin Commission",
       value: data.commissionEarned,
       icon: <PieChart className="size-6 text-white" />,
       bgColor: "bg-green-800",
     },
     {
+      id: "commission_pending",
+      label: "Commission Pending",
+      displayLabel: "Commission Pending",
+      value: data.commissionPending,
+      icon: <Wallet className="size-6 text-white" />,
+      bgColor: "bg-teal-600",
+    },
+    {
       id: "new_customers",
       label: "New Customers",
-      displayLabel: "New Customer",
+      displayLabel: "New Customers",
       value: data.newCustomers,
       icon: <UserPlus className="size-6 text-white" />,
       bgColor: "bg-orange-500",
@@ -86,7 +95,7 @@ export default function PerformanceOverview({
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
         {metrics.map((metric) => (
           <Card
             key={metric.id}

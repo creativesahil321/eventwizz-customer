@@ -138,6 +138,7 @@ async function fetchPerformanceData() {
   return {
     totalRevenue: "£9000",
     commissionEarned: "£900",
+    commissionPending: "£500",
     newCustomers: 2,
     visitors: 4,
   };

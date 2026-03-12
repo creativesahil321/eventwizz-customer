@@ -9,6 +9,8 @@ import { EventDetailData } from "@/services/vendor/events/type";
 import { useEventData } from "@/app/(protected)/vendor/events/_lib/hooks/useEventData";
 import { useSitePreviewStore } from "@/store/site-preview.store";
 import { PreviewProvider } from "@/contexts/preview-context";
+import { useSiteEssentialsQuery } from "@/app/(protected)/_shared/sites-essentials/_lib/queries";
+import { SiteEssentialsFormValues } from "@/app/(protected)/_shared/sites-essentials/_lib/schema";
 
 export default function EventPreviewPage() {
   const router = useRouter();
@@ -18,11 +20,17 @@ export default function EventPreviewPage() {
   // Use the existing hook to fetch event data
   const { eventData, isLoading } = useEventData(eventId || undefined);
 
-  // Get site essentials data from Zustand store or extract from event data
+  // Get site essentials from Zustand store (populated after save or preview click)
   const { previewData: storeSiteEssentials } = useSitePreviewStore();
 
-  // Extract site essentials from event data if available
-  const siteEssentials = storeSiteEssentials;
+  // Fetch from API as a fallback for vendors who haven't interacted with the
+  // site essentials form in the current session (store would be empty)
+  const { data: apiSiteEssentials } = useSiteEssentialsQuery();
+
+  // Prefer the store (reflects unsaved in-progress edits); fall back to the
+  // API response so that already-saved colors always show in the preview
+  const siteEssentials: SiteEssentialsFormValues | null =
+    storeSiteEssentials ?? (apiSiteEssentials as SiteEssentialsFormValues | null) ?? null;
 
   const handleGoBack = () => {
     router.back();

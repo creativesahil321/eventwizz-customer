@@ -1,12 +1,22 @@
+import { SystemLogsTable } from "./system-logs-table";
+
 export default function SystemLogs() {
   const title = "System Logs";
-  const description = "Track and analyze system logs and user interactions.";
+  const description =
+    "Track and analyze system logs and user interactions.";
   return (
-    <header className="flex w-full items-center justify-between gap-2 overflow-auto bg-background p-6 mb-4 border rounded-lg">
-      <nav className="flex flex-col justify-start items-start gap-2 relative">
-        <h2 className="text-2xl mb-0 title-header font-bold">{title}</h2>
-        <p className="text-muted-foreground">{description}</p>
-      </nav>
-    </header>
+    <div className="flex flex-col gap-4 min-w-0 max-w-full">
+      <header className="flex w-full items-center justify-between gap-2 overflow-auto bg-white rounded-lg border border-[var(--color-border)] shadow-md p-4 sm:p-6">
+        <nav className="flex flex-col justify-start items-start gap-2 relative">
+          <h1 className="text-xl sm:text-2xl mb-0 title-header font-bold text-black">
+            {title}
+          </h1>
+          <p className="text-muted-foreground">{description}</p>
+        </nav>
+      </header>
+      <div className="relative min-w-0">
+        <SystemLogsTable />
+      </div>
+    </div>
   );
 }

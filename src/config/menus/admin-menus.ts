@@ -16,44 +16,13 @@ export const adminMenus: MenuItemProps[] = [
 
   {
     id: 2,
-    title: "All Vendors",
+    title: "All Venues",
     icon: "users", // <Users /> from lucide-react
     href: createAdminUrl("/admin/vendors"),
     url: createAdminUrl("/admin/vendors"),
     type: "item",
     permissions: "read-vendor",
-    menu: [
-      {
-        id: 3,
-        title: "Active Vendors ",
-        icon: "activeCustomers",
-        href: createAdminUrl("/admin/vendors?status=active"),
-        url: createAdminUrl("/admin/vendors?status=active"),
-        type: "title",
-        permissions: "read-vendor",
-        menu: [],
-      },
-      {
-        id: 4,
-        title: "Disable Vendors",
-        icon: "disableCustomers",
-        href: createAdminUrl("/admin/vendors?status=disable"),
-        url: createAdminUrl("/admin/vendors?status=disable"),
-        type: "title",
-        permissions: "read-vendor",
-        menu: [],
-      },
-      {
-        id: 5,
-        title: "Send Email to All",
-        icon: "sendEmailToAll",
-        href: createAdminUrl("/admin/send-email-to-all"),
-        url: createAdminUrl("/admin/send-email-to-all"),
-        type: "title",
-        permissions: "read-vendor",
-        menu: [],
-      },
-    ],
+    menu: [],
   },
 
   {
@@ -64,16 +33,6 @@ export const adminMenus: MenuItemProps[] = [
     url: createAdminUrl("/admin/transactions"),
     type: "item",
     permissions: "read-transaction",
-    menu: [],
-  },
-  {
-    id: 7,
-    title: "Payments",
-    icon: "creditCard", // <CreditCard />
-    href: createAdminUrl("/admin/payments"),
-    url: createAdminUrl("/admin/payments"),
-    type: "item",
-    permissions: "read-payment",
     menu: [],
   },
   {

@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { ThemeSchema } from "@/types/theme.types";
 import { API_ENDPOINTS } from "@/services/core/endpoints";
 import { env } from "@/env";
@@ -129,6 +130,13 @@ export async function fetchServerTheme(
     clearTimeout(timeoutId);
   }
 }
+
+/**
+ * Per-request memoized version of fetchServerTheme.
+ * React's cache() deduplicates calls within the same render pass so that
+ * generateMetadata() and the layout body share a single fetch.
+ */
+export const fetchServerThemeCached = cache(fetchServerTheme);
 
 /**
  * Generate theme CSS to avoid FOUC

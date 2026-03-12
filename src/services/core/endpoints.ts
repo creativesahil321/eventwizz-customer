@@ -249,53 +249,18 @@ export const API_ENDPOINTS = {
       GET: "/admin/site-essentials",
       UPDATE: "/admin/site-essentials/update",
     },
-    CUSTOMERS: {
-      ALL: "/admin/customers",
-      ACTIVE: "/admin/customers/active",
-      DISABLED: "/admin/customers/disabled",
-      NOTIFICATION: "/admin/customers/notification",
-      EXPORT: "/admin/customers/export",
-
-      EARNINGS: "/admin/customers/{id}/earnings", //api/v1/admin/customers/{id}/earnings
-      TOTAL_EARNINGS: "/admin/customers/{id}/total-earnings",
-      KYC_DETAILS: "/admin/customers/{id}/kyc-information",
-      PROFILE: "/admin/customers/{id}/edit",
-
-      TRANSACTIONS: "/admin/customers/{id}/transactions",
-      CRYPTO_WALLETS: "/admin/customers/{id}/customer-crypto-wallets",
-      SUPPORT_TICKETS: "/admin/customers/{id}/support-tickets",
-
-      REFERRAL_TREE: "/admin/customers/{id}/referral-tree",
-      REFERRAL_TREE_NODE: "/admin/customers/{id}/referral-tree-nodes",
-
-      SEND_MAIL: "/admin/customers/send-mail",
-      DELETE: "/admin/customers/delete",
-      STATISTICS: "/admin/customers/statics",
-      CATEGORIES: "/admin/categories/list",
-
-      ATTACH_CATEGORY: "/admin/categories/update-user-category",
-      ATTACH_CLIENT: "/admin/clients/update-user-client",
-      ACCOUNT_STATUS: "/admin/customers/{id}/account-status",
-      BASIC_INFORMATION: "/admin/customers/{id}/edit",
-      UPDATE_CUSTOMER: "/admin/customers/{id}/update",
-      UPDATE_CUSTOMER_PASSWORD: "/admin/customers/{id}/update-password",
-      UPDATE_ACCOUNT_STATUS: "/admin/customers/{id}/account-status",
-      UPDATE_WALLET_STATUS: "/admin/customers/{id}/wallet-status",
-
-      UPDATE_CRYPTO_WALLET_STATUS:
-        "/admin/customers/{key}/customer-crypto-wallets/make-default",
-
-      APPROVE_KYC: "/admin/customers/{id}/approve-or-reject-kyc",
-
-      UPDATE_CUSTOMER_AVATAR: "/admin/customers/{id}/update-avatar",
-      DELETE_CUSTOMER_AVATAR: "/admin/customers/{id}/delete-avatar",
-      RANKINGS: "/admin/customers/{id}/rankings",
-
-      MANUALLY_ADD_COMMISSION: "/admin/customers/{id}/manual-add-commission",
-      ADD_OR_SUBSTRACT_MONEY: "/admin/customers/{key}/add-or-subtract-amount",
-      EMAIL_TO_ALL_CUSTOMER: "/admin/customers/send-mail-to-all",
-
-      UPDATE_CUSTOMER_KYC: "/admin/kyc/update",
+    VENUES: {
+      ALL: "/admin/venues?status={status}&search={search}",
+      GET_BY_ID: "/admin/venues/{id}",
+      CREATE: "/admin/venues/store",
+      UPDATE: "/admin/venues/{id}",
+      DELETE: "/admin/venues/delete/{id}",
+      RESTORE: "/admin/venues/restore/{id}",
+      PERMANENT_DELETE: "/admin/venues/permanent-delete/{id}",
+      APPROVE_DOMAIN: "/admin/venues/{id}/domain/approve",
+      DISAPPROVE_DOMAIN: "/admin/venues/{id}/domain/disapprove",
+      COMMENTS: "/admin/venues/{id}/comments",
+      COMMENT: "/admin/venues/{id}/comments/{commentId}",
     },
     USER: {
       ALL: "/admin/users/all",
@@ -336,7 +301,7 @@ export const API_ENDPOINTS = {
       UPDATE: "/admin/trading-pnl/update", //{id}
       DELETE: "/admin/trading-pnl/delete",
     },
-    HISTORY_CALANDER: {
+    HISTORY_CALENDAR: {
       GET_ALL: "/admin/transaction-history-calendars",
     },
     INTERNAL_TRANSFER: {

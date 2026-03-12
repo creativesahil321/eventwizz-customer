@@ -14,7 +14,6 @@ import { BrandingTab } from "./tabs/branding-tab";
 import { ColorsTab } from "./tabs/colors-tab";
 import { TypographyTab } from "./tabs/typography-tab";
 import { SeoTab } from "./tabs/seo-tab";
-import { DomainTab } from "./tabs/domain-tab";
 import { useAuthStore } from "@/store/auth.store";
 import { UserRole } from "@/services/common/notification/type";
 import { Badge } from "@/components/ui/badge";
@@ -35,7 +34,6 @@ export function SiteEssentialsForm() {
   // Get the current user role
   const { account_type } = useAuthStore();
   const userRole = account_type as UserRole;
-  const isVendor = userRole === "vendor";
 
   // Track validation errors by tab
   const [tabsWithErrors, setTabsWithErrors] = useState<Record<string, boolean>>(
@@ -128,13 +126,8 @@ export function SiteEssentialsForm() {
       errorsByTab.seo = true;
     }
 
-    // Check for errors in Domain tab fields (vendor only)
-    if (isVendor && errors.domain) {
-      errorsByTab.domain = true;
-    }
-
     setTabsWithErrors(errorsByTab);
-  }, [form.formState.errors, isVendor]);
+  }, [form.formState.errors]);
 
   // Function to handle preview button click
   const handlePreviewClick = (e: React.MouseEvent) => {
@@ -354,19 +347,6 @@ export function SiteEssentialsForm() {
                     </span>
                   )}
                 </TabsTrigger>
-                {isVendor && (
-                  <TabsTrigger
-                    value="domain"
-                    className="px-3 sm:px-4 py-1 h-8 text-xs font-medium whitespace-nowrap relative rounded-md data-[state=active]:bg-[var(--color-primary)] data-[state=active]:text-white data-[state=active]:shadow-sm mx-0.5"
-                  >
-                    Domain
-                    {tabsWithErrors.domain && (
-                      <span className="absolute -right-1 -top-1 flex h-2 w-2">
-                        <span className="relative inline-flex h-2 w-2 rounded-full bg-red-500"></span>
-                      </span>
-                    )}
-                  </TabsTrigger>
-                )}
               </TabsList>
             </div>
           </div>
@@ -438,19 +418,6 @@ export function SiteEssentialsForm() {
                   <SeoTab />
                 </div>
               </TabsContent>
-
-              {isVendor && (
-                <TabsContent value="domain" className="mt-0 w-full">
-                  {tabsWithErrors.domain && (
-                    <Badge variant="destructive" className="mb-3">
-                      Required fields missing
-                    </Badge>
-                  )}
-                  <div className="bg-white rounded-lg p-3 sm:p-6">
-                    <DomainTab />
-                  </div>
-                </TabsContent>
-              )}
             </div>
           </Card>
         </Tabs>
