@@ -1,14 +1,18 @@
 import { Metadata } from "next";
 import AdminHeader from "@/app/(public)/admin/_components/header";
 import AdminFooter from "@/app/(public)/admin/_components/footer";
+import { appConfig } from "@/config/app";
 
 export const metadata: Metadata = {
   title: "Terms and Conditions - EventWizz",
   description:
     "Read EventWizz's terms and conditions. Understand the terms of service for using our event management platform.",
-  robots: { index: true, follow: true },
+  robots: {
+    index: true,
+    follow: true,
+  },
   alternates: {
-    canonical: "/terms",
+    canonical: `${appConfig.url}/terms`,
   },
 };
 

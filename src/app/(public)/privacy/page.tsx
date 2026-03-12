@@ -1,14 +1,18 @@
 import { Metadata } from "next";
 import AdminHeader from "@/app/(public)/admin/_components/header";
 import AdminFooter from "@/app/(public)/admin/_components/footer";
+import { appConfig } from "@/config/app";
 
 export const metadata: Metadata = {
   title: "Privacy Policy - EventWizz",
   description:
     "Read EventWizz's privacy policy. Learn how we collect, use, and protect your personal information when you use our event management platform.",
-  robots: { index: true, follow: true },
+  robots: {
+    index: true,
+    follow: true,
+  },
   alternates: {
-    canonical: "/privacy",
+    canonical: `${appConfig.url}/privacy`,
   },
 };
 

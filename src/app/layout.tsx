@@ -16,98 +16,43 @@ import { ServerContextProvider } from "@/lib/server-context";
 import { appConfig } from "@/config/app";
 
 /**
- * Root metadata — two branches:
- *  - Vendor subdomain (theme exists): use vendor brand name/favicon as defaults.
- *    Child pages on the vendor site only need to set their own page title; the
- *    template automatically appends the vendor name.
- *  - Main EventWizz site (no theme): use the doc-specified EventWizz defaults.
+ * Dynamic metadata — single source of truth for brand name, favicon, and title template.
+ * Both admin and vendor/customer tenants get theme from the settings API; dynamic
+ * theme.seo has priority. appConfig is fallback only when API fails or seo is missing.
+ *
+ * How Next.js title template works:
+ *   - `title.default` → used when a child page does NOT set its own title.
+ *   - `title.template` → wraps child-page titles, e.g. child sets "Sheffield Events"
+ *     and the rendered <title> becomes "Sheffield Events | Wang Deleon".
  */
 export async function generateMetadata(): Promise<Metadata> {
   const host = await getRequestHost();
   const theme = await fetchServerThemeCached(host);
 
-  // ── Vendor / customer-facing subdomain ──────────────────────────────────
-  if (theme) {
-    return {
-      metadataBase: new URL(appConfig.url),
-      title: {
-        default: `${theme.name} | Event Management`,
-        template: `%s | ${theme.name}`,
-      },
-      description: `${theme.name} – event management and online ticketing.`,
-      openGraph: {
-        type: "website",
-        locale: "en_US",
-        siteName: theme.name,
-        title: `${theme.name} | Event Management`,
-        description: `${theme.name} – event management and online ticketing.`,
-      },
-      twitter: {
-        card: "summary_large_image",
-        title: `${theme.name} | Event Management`,
-        description: `${theme.name} – event management and online ticketing.`,
-      },
-      robots: {
-        index: true,
-        follow: true,
-        googleBot: {
-          index: true,
-          follow: true,
-          "max-video-preview": -1,
-          "max-image-preview": "large",
-          "max-snippet": -1,
-        },
-      },
+  const brandName = theme?.name || appConfig.name;
+
+  // Dynamic SEO from API takes priority; fall back to appConfig only when missing
+  const titleDefault = theme?.seo?.title || `${brandName} | Event Management`;
+  const description =
+    theme?.seo?.description || appConfig.seo.description;
+  const keywords = theme?.seo?.keywords
+    ? (theme.seo.keywords as string).split(",").map((k) => k.trim()).filter(Boolean)
+    : appConfig.seo.keywords;
+
+  return {
+    title: {
+      default: titleDefault,
+      template: `%s | ${brandName}`,
+    },
+    description,
+    keywords: keywords.length ? keywords : undefined,
+    ...(theme?.favicon && {
       icons: {
         icon: theme.favicon,
         shortcut: theme.favicon,
         apple: theme.favicon,
       },
-    };
-  }
-
-  // ── Main EventWizz site (eventwizz.co.uk) ───────────────────────────────
-  return {
-    metadataBase: new URL(appConfig.url),
-    title: {
-      default: appConfig.seo.title,
-      template: `%s | EventWizz`,
-    },
-    description: appConfig.seo.description,
-    keywords: appConfig.seo.keywords,
-    authors: [{ name: appConfig.author.name, url: appConfig.url }],
-    creator: appConfig.author.name,
-    publisher: appConfig.author.name,
-    openGraph: {
-      type: "website",
-      locale: "en_US",
-      url: "/",
-      siteName: appConfig.name,
-      title: appConfig.seo.title,
-      description: appConfig.seo.description,
-      images: appConfig.seo.openGraph.images,
-    },
-    twitter: {
-      card: "summary_large_image",
-      title: appConfig.seo.title,
-      description: appConfig.seo.description,
-      images: appConfig.seo.twitter.images,
-      creator: "@eventwizz",
-    },
-    robots: {
-      index: true,
-      follow: true,
-      googleBot: {
-        index: true,
-        follow: true,
-        "max-video-preview": -1,
-        "max-image-preview": "large",
-        "max-snippet": -1,
-      },
-    },
-    alternates: {
-      canonical: "/",
-    },
+    }),
   };
 }
 

@@ -57,8 +57,7 @@ export function SeoTab() {
                 Meta Description
               </FormLabel>
               <FormDescription className="text-xs sm:text-sm mt-0.5 mb-1.5">
-                A brief description of your site (150-160 characters
-                recommended)
+                A brief description of your site
               </FormDescription>
               <FormControl>
                 <Textarea

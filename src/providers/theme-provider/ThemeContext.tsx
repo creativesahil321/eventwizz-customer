@@ -131,18 +131,24 @@ const mapSchemaToSettings = (
     ...(schema.contactDetails || {}),
   };
 
+  const seo: SEO = schema.seo
+    ? { ...createDefaultSEO(schema.name), ...schema.seo }
+    : createDefaultSEO(schema.name);
+
   return {
     colors,
     typography,
     contactDetails,
-    socialLinks: createDefaultSocialLinks(),
-    seo: createDefaultSEO(schema.name),
+    socialLinks: schema.socialLinks
+      ? { ...createDefaultSocialLinks(), ...schema.socialLinks }
+      : createDefaultSocialLinks(),
+    seo,
     logo: schema.logo || "",
     favicon: schema.favicon || "",
     name: schema.name || "EventWizz",
-    copyright: "",
-    domain: "",
-    website_role: "",
+    copyright: schema.copyright || "",
+    domain: schema.domain || "",
+    website_role: schema.website_role || "",
   };
 };
 
@@ -180,22 +186,8 @@ const applyThemeToDOM = (settings: ThemeSchema): void => {
     }
   }
 
-  // Replace the brand suffix in the current title to match the theme name.
-  // SSR sets titles like "Event Management | Wang Deleon" or "Sheffield Events | Wang Deleon"
-  // via Next.js title.template. If the client theme differs (e.g. SSR missed the theme),
-  // we swap the brand portion while keeping the page-specific prefix intact.
-  if (settings.name) {
-    const current = document.title;
-    const pipeIdx = current.lastIndexOf(" | ");
-    if (pipeIdx !== -1) {
-      const pageSpecific = current.slice(0, pipeIdx);
-      const newTitle = `${pageSpecific} | ${settings.name}`;
-      if (current !== newTitle) document.title = newTitle;
-    } else {
-      const newTitle = `${settings.name} | Event Management`;
-      if (current !== newTitle) document.title = newTitle;
-    }
-  }
+  // Title is set by SSR via generateMetadata() in root layout using theme.seo.title.
+  // Do NOT manipulate document.title here — it causes flash and overwrites the correct SSR value.
 };
 
 interface ThemeProviderProps {

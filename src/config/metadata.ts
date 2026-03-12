@@ -20,15 +20,15 @@ export const metadata: Metadata = {
   openGraph: {
     type: "website",
     locale: "en_US",
-    url: "/",
-    siteName: appConfig.name,
-    title: appConfig.seo.title,
+    url: appConfig.url,
+    title: appConfig.name,
     description: appConfig.description,
+    siteName: appConfig.name,
     images: appConfig.seo.openGraph.images,
   },
   twitter: {
     card: "summary_large_image",
-    title: appConfig.seo.title,
+    title: appConfig.name,
     description: appConfig.description,
     images: appConfig.seo.twitter.images,
     creator: "@eventwizz",
@@ -43,9 +43,6 @@ export const metadata: Metadata = {
       "max-image-preview": "large",
       "max-snippet": -1,
     },
-  },
-  alternates: {
-    canonical: "/",
   },
   icons: {
     icon: "/assets/images/logos/eventwizz-logo.png",

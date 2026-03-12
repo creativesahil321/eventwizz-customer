@@ -19,14 +19,10 @@ export const metadata: Metadata = {
     title: "How It Works - EventWizz",
     description:
       "Learn how EventWizz works. Get started in 15 minutes with our streamlined event management process.",
-    url: "/how-it-works",
-    siteName: appConfig.name,
-    images: appConfig.seo.openGraph.images,
-    locale: "en_US",
-    type: "website",
+    url: `${appConfig.url}/how-it-works`,
   },
   alternates: {
-    canonical: "/how-it-works",
+    canonical: `${appConfig.url}/how-it-works`,
   },
 };
 

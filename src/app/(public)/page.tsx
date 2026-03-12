@@ -1,40 +1,23 @@
 import { Metadata } from "next";
 import { appConfig } from "@/config/app";
+import { getRequestHost, fetchServerThemeCached } from "@/lib/server-theme";
 
-export const metadata: Metadata = {
-  title: "Event Management Software for Venues",
-  description:
-    "Event management and booking platform for UK venues. Create branded event sites, sell tickets and tables, collect menu choices—ready in 15 minutes. Built for Christmas, New Year & seasonal events.",
-  keywords: [
-    "event management software",
-    "event management for venues",
-    "UK event booking",
-    "event ticketing for venues",
-    "Christmas event tickets",
-    "New Year event booking",
-    "venue event website",
-    "event booking platform",
-  ],
-  openGraph: {
-    title: "Event Management Software for Venues | EventWizz",
-    description:
-      "Vendor-first event management for UK venues. Create your own branded site, sell tickets and tables—ready in 15 minutes.",
-    url: "/",
-    siteName: appConfig.name,
-    images: appConfig.seo.openGraph.images,
-    locale: "en_US",
-    type: "website",
-  },
-  twitter: {
-    card: "summary_large_image",
-    title: "Event Management Software for Venues | EventWizz",
-    description:
-      "Vendor-first event management for UK venues. Create your own branded site, sell tickets and tables—ready in 15 minutes.",
-    images: appConfig.seo.twitter.images,
-  },
-  alternates: {
-    canonical: "/",
-  },
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const host = await getRequestHost();
+  const theme = await fetchServerThemeCached(host);
 
+  // Both admin and vendor/customer tenants get theme from API; use layout's dynamic metadata.
+  if (theme) {
+    return {};
+  }
+
+  // Fallback only when API returns no theme (e.g. offline or unknown host).
+  return {
+    title: "Event Management",
+    description: appConfig.seo.description,
+    keywords: appConfig.seo.keywords,
+  };
+}
+
+// Client component that determines which homepage to render
 export { HomeContent as default } from "./home-content";

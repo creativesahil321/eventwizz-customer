@@ -141,7 +141,10 @@ export interface ThemeSchema {
 
   // Additional fields
   copyright?: string;
+  domain?: string;
+  contactDetails?: ContactDetails;
   socialLinks?: SocialLinks;
+  seo?: SEO;
 }
 
 /**

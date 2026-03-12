@@ -2,6 +2,7 @@ import { Metadata } from "next";
 import AdminHeader from "@/app/(public)/admin/_components/header";
 import AdminFooter from "@/app/(public)/admin/_components/footer";
 import { Check } from "lucide-react";
+import { appConfig } from "@/config/app";
 
 export const metadata: Metadata = {
   title: "About Us - EventWizz Event Management Platform",
@@ -17,10 +18,10 @@ export const metadata: Metadata = {
     title: "About Us - EventWizz",
     description:
       "EventWizz helps UK venues manage events, sell tickets online, and keep customers happy from one simple dashboard.",
-    url: "/about",
+    url: `${appConfig.url}/about`,
   },
   alternates: {
-    canonical: "/about",
+    canonical: `${appConfig.url}/about`,
   },
 };
 

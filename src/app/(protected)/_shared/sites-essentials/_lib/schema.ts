@@ -111,18 +111,9 @@ export const siteEssentialsFormSchema = z.object({
       .or(z.literal("")),
   }),
   seo: z.object({
-    title: z
-      .string()
-      .min(1, "SEO title is required")
-      .max(60, "SEO title must not exceed 60 characters"),
-    description: z
-      .string()
-      .min(1, "SEO description is required")
-      .max(160, "SEO description must not exceed 160 characters"),
-    keywords: z
-      .string()
-      .min(1, "SEO keywords are required")
-      .max(255, "SEO keywords must not exceed 255 characters"),
+    title: z.string().min(1, "SEO title is required"),
+    description: z.string().min(1, "SEO description is required"),
+    keywords: z.string().min(1, "SEO keywords are required"),
   }),
   name: z
     .string()
