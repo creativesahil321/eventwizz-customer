@@ -61,8 +61,8 @@ export default function VendorSiteHomePage() {
 
   return (
     <div className="min-h-screen flex flex-col relative overflow-hidden bg-gradient-to-b from-gray-50 to-white">
-      {/* Background image with subtle overlay */}
-      <div className="absolute inset-0 opacity-30">
+      {/* Background image with light overlay so it stays visible; overlay keeps text readable */}
+      <div className="absolute inset-0">
         <Image
           src="/assets/images/Homepage/Homepage-Banner.png"
           alt="Event background"
@@ -70,7 +70,7 @@ export default function VendorSiteHomePage() {
           className="object-cover"
           priority
         />
-        <div className="absolute inset-0 bg-gradient-to-b from-white/90 via-white/80 to-white/95" />
+        <div className="absolute inset-0 bg-gradient-to-b from-white/40 via-white/20 to-white/70" />
       </div>
 
       <LocationSelectionHeader
