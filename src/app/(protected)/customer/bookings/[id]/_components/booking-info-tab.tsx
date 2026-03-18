@@ -889,15 +889,14 @@ export default function BookingInfoTab({ bookingData }: BookingInfoTabProps) {
                                       <span className="text-sm font-medium text-foreground">
                                         {`Table of ${item.capacity}`}
                                       </span>
-                                      {item.table_count &&
-                                        item.table_count > 0 && (
-                                          <span className="rounded bg-gray-100 px-2 py-0.5 text-xs text-muted-foreground">
-                                            {item.table_count}{" "}
-                                            {item.table_count === 1
-                                              ? "Table"
-                                              : "Tables"}
-                                          </span>
-                                        )}
+                                      {(item.table_count ?? 0) > 0 && (
+                                        <span className="rounded bg-gray-100 px-2 py-0.5 text-xs text-muted-foreground">
+                                          {item.table_count}{" "}
+                                          {item.table_count === 1
+                                            ? "Table"
+                                            : "Tables"}
+                                        </span>
+                                      )}
                                     </div>
                                     {/* Table Allocation Breakdown */}
                                     {item.allocation &&
