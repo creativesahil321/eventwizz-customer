@@ -23,6 +23,7 @@ import { Separator } from "@/components/ui/separator";
 
 interface PaymentSuccessData {
   booking_id: number;
+  booking_number?: string;
   amount: string;
   gateway: string;
   transaction_id?: string;
@@ -45,7 +46,11 @@ function PaymentSuccessContent() {
     async (sessionId: string) => {
       try {
         const data = await api.post<
-          { status: boolean; message: string; data: PaymentSuccessData }
+          {
+            status: boolean;
+            message: string;
+            data: PaymentSuccessData;
+          }
         >(
           API_ENDPOINTS.CUSTOMER.PAYMENT.STRIPE_SUCCESS,
           { session_id: sessionId },
@@ -55,6 +60,7 @@ function PaymentSuccessContent() {
         if (data.status && data.data) {
           setPaymentData({
             booking_id: data.data.booking_id,
+            booking_number: data.data.booking_number,
             amount: data.data.amount,
             gateway: "Stripe",
             transaction_id: data.data.transaction_id,
@@ -84,12 +90,14 @@ function PaymentSuccessContent() {
     const bookingId = searchParams.get("booking_id");
     const amount = searchParams.get("amount");
     const gateway = searchParams.get("gateway");
+    const bookingNumber = searchParams.get("booking_number");
 
     // If we have a Stripe session_id, we need to process it
     if (sessionId && bookingId) {
       // Direct Stripe session with booking ID
       setPaymentData({
         booking_id: parseInt(bookingId),
+        booking_number: bookingNumber || undefined,
         amount: amount || "0",
         gateway: "Stripe",
         transaction_id: sessionId,
@@ -113,6 +121,7 @@ function PaymentSuccessContent() {
 
       setPaymentData({
         booking_id: parseInt(bookingId),
+        booking_number: bookingNumber || undefined,
         amount,
         gateway,
         transaction_id: transactionId || undefined,
@@ -218,10 +227,11 @@ function PaymentSuccessContent() {
                 <div className="space-y-1">
                   <div className="flex items-center gap-2 text-gray-600 text-sm">
                     <Calendar className="h-4 w-4" />
-                    <span>Booking ID</span>
+                    <span>Booking Number</span>
                   </div>
                   <p className="font-bold text-xl text-gray-900">
-                    #{paymentData.booking_id}
+                    {paymentData.booking_number ??
+                      `#${paymentData.booking_id}`}
                   </p>
                 </div>
 

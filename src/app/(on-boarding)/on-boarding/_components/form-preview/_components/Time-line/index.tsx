@@ -238,10 +238,10 @@ export default function Timeline({
               </div>
             </div>
 
-            {/* Scrollable Timeline Items */}
+            {/* Scrollable Timeline Items - center when content doesn't overflow */}
             <div
               ref={scrollContainerRef}
-              className="flex items-start gap-4 sm:gap-6 md:gap-8 overflow-x-auto scroll-smooth px-4 sm:px-8 md:px-14 py-2 no-scrollbar relative z-20 overflow-y-visible cursor-grab select-none"
+              className={`flex items-start gap-4 sm:gap-6 md:gap-8 overflow-x-auto scroll-smooth px-4 sm:px-8 md:px-14 py-2 no-scrollbar relative z-20 overflow-y-visible cursor-grab select-none ${!showArrows ? "justify-center" : ""}`}
               onMouseDown={handleMouseDown}
               onMouseLeave={handleMouseLeave}
               onMouseUp={handleMouseUp}

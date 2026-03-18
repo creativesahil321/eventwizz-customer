@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useMemo, useState, useCallback } from "react";
+import React, { useMemo, useState } from "react";
 import Image from "next/image";
 import {
   useReactTable,
@@ -15,13 +15,12 @@ import {
 import { TableCell, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Eye, Pencil, Trash2 } from "lucide-react";
+import { Eye, Pencil } from "lucide-react";
 import Link from "next/link";
 import { DataTable } from "@/components/data-table/data-table";
 import { DataTablePagination } from "@/components/data-table/data-table-pagination";
 import { DataTableColumnHeader } from "@/components/data-table/data-table-column-header";
 import { cn } from "@/lib/utils";
-import { DeleteVendorModal } from "./delete-vendor-modal";
 
 export interface Vendor {
   id: number;
@@ -56,9 +55,7 @@ function formatCurrency(value: number): string {
   })}`;
 }
 
-function getVendorColumns(
-  onDelete: (vendor: Vendor) => void,
-): ColumnDef<Vendor>[] {
+function getVendorColumns(): ColumnDef<Vendor>[] {
   return [
     {
       id: "index",
@@ -255,15 +252,6 @@ function getVendorColumns(
                 <Pencil className="h-4 w-4" />
               </Link>
             </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8 text-muted-foreground hover:text-red-600 hover:bg-red-50"
-              title="Delete venue"
-              onClick={() => onDelete(vendor)}
-            >
-              <Trash2 className="h-4 w-4" />
-            </Button>
           </div>
         );
       },
@@ -291,12 +279,6 @@ export function VendorsTable({
     pageIndex: 0,
     pageSize: 30,
   });
-  const [deletingVendor, setDeletingVendor] = useState<Vendor | null>(null);
-
-  const handleDelete = useCallback(
-    (vendor: Vendor) => setDeletingVendor(vendor),
-    [],
-  );
 
   const pagination: PaginationState = isServerPaginated
     ? {
@@ -322,7 +304,7 @@ export function VendorsTable({
     return data;
   }, [vendors, statusFilter, searchQuery, isServerPaginated]);
 
-  const columns = useMemo(() => getVendorColumns(handleDelete), [handleDelete]);
+  const columns = useMemo(() => getVendorColumns(), []);
 
   const table = useReactTable({
     data: filteredData,
@@ -369,12 +351,6 @@ export function VendorsTable({
           <DataTablePagination table={table} />
         </div>
       </footer>
-
-      <DeleteVendorModal
-        open={!!deletingVendor}
-        onOpenChange={(open) => !open && setDeletingVendor(null)}
-        vendor={deletingVendor}
-      />
     </div>
   );
 }

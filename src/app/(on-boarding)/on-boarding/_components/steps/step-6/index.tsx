@@ -521,7 +521,7 @@ export default function StepSix() {
                               <Input
                                 {...field}
                                 placeholder="e.g., The Menus"
-                                className="h-10 bg-[#F9FAFB] border-[#E5E7EB]"
+                                className="h-10 bg-white/5 border-white/10"
                                 maxLength={maxLength}
                                 onChange={(e) => {
                                   field.onChange(e);
@@ -565,7 +565,7 @@ export default function StepSix() {
                               <Input
                                 {...field}
                                 placeholder="e.g., Select The Menus"
-                                className="h-10 bg-[#F9FAFB] border-[#E5E7EB]"
+                                className="h-10 bg-white/5 border-white/10"
                                 maxLength={maxLength}
                                 onChange={(e) => {
                                   field.onChange(e);
@@ -665,10 +665,10 @@ export default function StepSix() {
                         {menuFields.map((menu, menuIndex) => (
                           <div
                             key={menu.id}
-                            className="space-y-4 border border-[#E5E7EB] p-4 rounded-md bg-white"
+                            className="space-y-4 border border-white/10 p-4 rounded-md bg-white"
                           >
                             <div className="flex justify-between items-center">
-                              <h3 className="text-md font-semibold text-[#2D2D2D]">
+                              <h3 className="text-md font-semibold text-slate-100">
                                 {menu.name}
                               </h3>
                               <Button
@@ -707,7 +707,7 @@ export default function StepSix() {
                                                 <Input
                                                   {...field}
                                                   placeholder="e.g., Chicken Curry"
-                                                  className="h-10 bg-[#F9FAFB] border-[#E5E7EB]"
+                                                  className="h-10 bg-white/5 border-white/10"
                                                   maxLength={maxLength}
                                                   onChange={(e) => {
                                                     field.onChange(e);
@@ -790,7 +790,7 @@ export default function StepSix() {
                                             <Input
                                               {...field}
                                               placeholder="e.g., Spicy chicken with basmati rice"
-                                              className="h-10 bg-[#F9FAFB] border-[#E5E7EB]"
+                                              className="h-10 bg-white/5 border-white/10"
                                               maxLength={160}
                                               onChange={(e) => {
                                                 field.onChange(e);
@@ -831,6 +831,7 @@ export default function StepSix() {
                                   (form.watch(`menus.${menuIndex}.items`)
                                     ?.length || 0) >= 10
                                 }
+                                className="text-white"
                               >
                                 <PlusCircle className="h-4 w-4 mr-2" />
                                 Add Menu Item
@@ -847,7 +848,7 @@ export default function StepSix() {
                   <Button
                     variant="event-primary"
                     type="submit"
-                    className="rounded-full px-8 py-2"
+                    className="rounded-full px-8 py-2 text-white"
                     disabled={loading}
                   >
                     {loading ? "Saving..." : "Save & Next"}
@@ -856,7 +857,7 @@ export default function StepSix() {
                     variant="event-secondary"
                     type="button"
                     onClick={() => setActiveStep(7)}
-                    className="rounded-full px-8 py-2"
+                    className="rounded-full px-8 py-2 text-white"
                   >
                     Skip
                   </Button>

@@ -156,7 +156,7 @@ const EventScheduler: React.FC<EventSchedulerProps> = ({
                             e.target.value
                           );
                         }}
-                        className="h-11 bg-[#F9FAFB] border-[#E5E7EB]"
+                        className="h-11 bg-white/5 border-white/10"
                       />
                       <div className="text-xs text-muted-foreground mt-1">
                         <span
@@ -188,7 +188,7 @@ const EventScheduler: React.FC<EventSchedulerProps> = ({
                       field.onChange(e.target.value);
                       updateGlobalFormScheduler(index, "time", e.target.value);
                     }}
-                    className="h-11 bg-[#F9FAFB] border-[#E5E7EB]"
+                    className="h-11 bg-white/5 border-white/10"
                   />
                 </FormControl>
                 <FormMessage />
@@ -219,7 +219,7 @@ const EventScheduler: React.FC<EventSchedulerProps> = ({
               setValidationErrors(errors);
             }}
             disabled={fields.length === 1}
-            className="h-11 w-11 p-0 text-red-500 hover:bg-red-50"
+            className="h-11 w-11 p-0 text-red-500 hover:bg-red-500/10"
           >
             <X size={16} />
           </Button>

@@ -44,12 +44,12 @@ export default function SellingPoints() {
             return (
               <div
                 key={point.title}
-                className="bg-[color:var(--color-surface)] rounded-xl border border-gray-100 p-5 flex flex-col items-center text-center hover:shadow-md transition-shadow"
+                className="bg-white rounded-xl border border-gray-100 shadow-sm p-5 flex flex-col items-center text-center hover:shadow-md hover:-translate-y-0.5 transition-all duration-200"
               >
                 <div className="rounded-full bg-[color:var(--color-primary)]/10 w-12 h-12 flex items-center justify-center mb-4">
                   <Icon className="h-5 w-5 text-[color:var(--color-primary)]" />
                 </div>
-                <h3 className="text-sm font-medium text-[color:var(--color-text)]">
+                <h3 className="text-sm font-semibold text-gray-800">
                   {point.title}
                 </h3>
               </div>

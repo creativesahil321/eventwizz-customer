@@ -1827,6 +1827,33 @@ export default function BookingInfoTab({ bookingData }: BookingInfoTabProps) {
                 {bookingData.payment_status || "Pending"}
               </span>
             </div>
+
+            {/* Pay Now CTA when there is an outstanding balance */}
+            {summary.outstanding > 0 &&
+              bookingData.dates?.length > 0 && (() => {
+                const firstUnpaidDate = bookingData.dates.find(
+                  (d) =>
+                    d.paymentStatus === "partial" ||
+                    d.paymentStatus === "pending",
+                );
+                return firstUnpaidDate ? (
+                  <div className="pt-4 flex justify-end">
+                    <Button
+                      onClick={() =>
+                        handleSingleDatePaymentClick(firstUnpaidDate)
+                      }
+                      size="sm"
+                      className="gap-1.5 h-9 px-4 font-medium cursor-pointer shadow-sm border border-[var(--color-primary)] bg-[var(--color-primary)] text-[var(--color-primary-foreground)] hover:bg-[var(--color-primary)]/90"
+                    >
+                      <Banknote className="h-3.5 w-3.5" />
+                      <span className="hidden sm:inline">
+                        Pay outstanding balance
+                      </span>
+                      <span className="sm:hidden">Pay now</span>
+                    </Button>
+                  </div>
+                ) : null;
+              })()}
           </div>
         </CardContent>
       </Card>
@@ -1913,6 +1940,7 @@ export default function BookingInfoTab({ bookingData }: BookingInfoTabProps) {
               summary.depositSelected > 0 ? summary.depositSelected : undefined,
           }}
           rescheduleRequest={selectedRescheduleRequest}
+          isProcessing={paymentMutation.isPending}
           onConfirm={handleSingleDatePaymentConfirm}
         />
       )}

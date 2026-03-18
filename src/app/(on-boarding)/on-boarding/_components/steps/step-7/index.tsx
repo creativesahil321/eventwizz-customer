@@ -193,7 +193,7 @@ export default function StepSeven() {
                               <Input
                                 {...field}
                                 placeholder="e.g. VIP Packages, Premium Access, etc."
-                                className="h-10 bg-[#F9FAFB] border-[#E5E7EB]"
+                                className="h-10 bg-white/5 border-white/10"
                                 maxLength={maxLength}
                                 onChange={(e) => {
                                   field.onChange(e);
@@ -239,7 +239,7 @@ export default function StepSeven() {
                               <Input
                                 {...field}
                                 placeholder="e.g. Please note: Special terms and conditions apply..."
-                                className="h-10 bg-[#F9FAFB] border-[#E5E7EB]"
+                                className="h-10 bg-white/5 border-white/10"
                                 maxLength={maxLength}
                                 onChange={(e) => {
                                   field.onChange(e);
@@ -280,7 +280,7 @@ export default function StepSeven() {
                       {fields.map((field, index) => (
                         <div
                           key={field.id}
-                          className="space-y-4 border border-[#E5E7EB] p-6 rounded-md bg-white"
+                          className="space-y-4 border border-white/10 p-6 rounded-md bg-white"
                         >
                           <FormField
                             control={form.control}
@@ -297,7 +297,7 @@ export default function StepSeven() {
                                     <Input
                                       {...field}
                                       placeholder="e.g. Premium Package A"
-                                      className="h-10 bg-[#F9FAFB] border-[#E5E7EB]"
+                                      className="h-10 bg-white/5 border-white/10"
                                       maxLength={maxLength}
                                       onChange={(e) => {
                                         field.onChange(e);
@@ -354,7 +354,7 @@ export default function StepSeven() {
                                   <Input
                                     {...field}
                                     placeholder="e.g. Includes premium access, special amenities..."
-                                    className="h-10 bg-[#F9FAFB] border-[#E5E7EB]"
+                                    className="h-10 bg-white/5 border-white/10"
                                     maxLength={160}
                                     onChange={(e) => {
                                       field.onChange(e);
@@ -390,7 +390,7 @@ export default function StepSeven() {
                                 <FormControl>
                                   <Input
                                     type="number"
-                                    className="h-10 bg-[#F9FAFB] border-[#E5E7EB]"
+                                    className="h-10 bg-white/5 border-white/10"
                                     min="0"
                                     max="999999"
                                     maxLength={10}
@@ -468,7 +468,7 @@ export default function StepSeven() {
                                     type="number"
                                     {...field}
                                     value={field.value as number}
-                                    className="h-10 bg-[#F9FAFB] border-[#E5E7EB]"
+                                    className="h-10 bg-white/5 border-white/10"
                                     min={1}
                                     max={500}
                                     placeholder="e.g. 100"
@@ -516,7 +516,7 @@ export default function StepSeven() {
                           <Button
                             type="button"
                             variant="outline"
-                            className="border-red-400 text-red-500 hover:bg-red-50"
+                            className="border-red-400/50 text-red-400 hover:bg-red-500/10"
                             onClick={() => {
                               if (fields.length <= 1) {
                                 toast.error("At least one package is required");
@@ -556,7 +556,7 @@ export default function StepSeven() {
                   <Button
                     variant="event-primary"
                     type="submit"
-                    className="rounded-full px-8 py-2"
+                    className="rounded-full px-8 py-2 text-white"
                     disabled={loading}
                   >
                     {loading ? "Saving..." : "Save & Next"}
@@ -565,7 +565,7 @@ export default function StepSeven() {
                     variant="event-secondary"
                     type="button"
                     onClick={() => setActiveStep(8)}
-                    className="rounded-full px-8 py-2"
+                    className="rounded-full px-8 py-2 text-white"
                   >
                     Skip
                   </Button>

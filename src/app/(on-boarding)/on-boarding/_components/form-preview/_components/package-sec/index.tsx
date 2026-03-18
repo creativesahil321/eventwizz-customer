@@ -109,20 +109,34 @@ export default function PackageSection({
             ))}
           </ul>
 
-          {/* Button */}
+          {/* Button: smooth scroll for in-page anchors, normal link for external URLs */}
           <div className="mt-6">
-            <Button
-              asChild
-              className="px-6 py-2 bg-black hover:bg-gray-800 transition rounded-lg "
-            >
-              <a
-                href={buttonLink || "#"}
-                target="_blank"
-                rel="noopener noreferrer"
+            {buttonLink?.startsWith("#") ? (
+              <Button
+                type="button"
+                className="px-6 py-2 bg-black hover:bg-gray-800 transition rounded-lg"
+                onClick={() => {
+                  const id = buttonLink.slice(1);
+                  const el = id ? document.getElementById(id) : null;
+                  el?.scrollIntoView({ behavior: "smooth", block: "start" });
+                }}
               >
                 {buttonName || "Book Your Event Now"}
-              </a>
-            </Button>
+              </Button>
+            ) : (
+              <Button
+                asChild
+                className="px-6 py-2 bg-black hover:bg-gray-800 transition rounded-lg"
+              >
+                <a
+                  href={buttonLink || "#"}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  {buttonName || "Book Your Event Now"}
+                </a>
+              </Button>
+            )}
           </div>
         </div>
       </div>

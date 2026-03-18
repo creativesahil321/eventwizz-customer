@@ -19,12 +19,10 @@ import {
 import {
   ArrowLeft,
   Loader2,
-  Paperclip,
-  MessageCircle,
-  Bell,
   ExternalLink,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { toast } from "sonner";
 import type { VenueDetail, VenueLocation } from "../_lib/types";
 import { adminVenuesService } from "@/services/admin/venues/venues.service";
 
@@ -62,12 +60,13 @@ export function EditVenueForm({ venue }: EditVenueFormProps) {
   const [businessDocuments, setBusinessDocuments] = useState({
     vatNumber: venue.businessDocuments.vatNumber,
     kycStatus: venue.businessDocuments.kycStatus,
-    documentUrl: venue.businessDocuments.documentUrl ?? "",
     /** "active" = domain approved/enabled, "inactive" = not yet active */
     domainStatus: (
       venue.domainApprovalRequest?.status === "approved" ? "active" : "inactive"
     ) as "active" | "inactive",
   });
+  /** Selected PDF file for upload (replaces URL input). */
+  const [documentFile, setDocumentFile] = useState<File | null>(null);
 
   const selectedLocation: VenueLocation | undefined =
     venue.locations.find((loc) => loc.id === selectedLocationId) ??
@@ -76,17 +75,22 @@ export function EditVenueForm({ venue }: EditVenueFormProps) {
     selectedLocation?.financialSummary ?? venue.financialSummary;
 
   const updateMutation = useMutation({
-    mutationFn: () =>
-      adminVenuesService.updateVenue(venue.id, {
+    mutationFn: () => {
+      const payload = {
         phone: contact.phone || undefined,
         address: contact.registeredAddress || undefined,
         vat_number: businessDocuments.vatNumber || undefined,
         kyc_status: businessDocuments.kycStatus,
-        business_documents: businessDocuments.documentUrl
-          ? { document_url: businessDocuments.documentUrl }
-          : undefined,
         domain_status: businessDocuments.domainStatus,
-      }),
+      };
+      if (documentFile) {
+        return adminVenuesService.updateVenueWithDocument(venue.id, {
+          ...payload,
+          document: documentFile,
+        });
+      }
+      return adminVenuesService.updateVenue(venue.id, payload);
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({
         queryKey: ["admin", "venue", String(venue.id)],
@@ -137,26 +141,6 @@ export function EditVenueForm({ venue }: EditVenueFormProps) {
                   </a>
                 </Button>
               )}
-              <span
-                className="hidden sm:inline-block w-px h-4 bg-slate-200 mx-0.5"
-                aria-hidden
-              />
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-7 w-7 text-muted-foreground hover:text-foreground"
-                aria-label="Messages"
-              >
-                <MessageCircle className="h-3.5 w-3.5" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-7 w-7 text-muted-foreground hover:text-foreground"
-                aria-label="Notifications"
-              >
-                <Bell className="h-3.5 w-3.5" />
-              </Button>
             </div>
           </div>
         </CardHeader>
@@ -360,35 +344,73 @@ export function EditVenueForm({ venue }: EditVenueFormProps) {
                         </Select>
                       </div>
                       <div className="space-y-1.5">
-                        <Label htmlFor="document-url" className="text-sm">
-                          Document URL (optional)
+                        <Label htmlFor="document-file" className="text-sm">
+                          Document (optional)
                         </Label>
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 flex-wrap">
                           <Input
-                            id="document-url"
-                            value={businessDocuments.documentUrl}
-                            onChange={(e) =>
-                              setBusinessDocuments((prev) => ({
-                                ...prev,
-                                documentUrl: e.target.value,
-                              }))
-                            }
-                            placeholder="vendor/documents/file.pdf"
+                            id="document-file"
+                            type="file"
+                            accept=".pdf,application/pdf"
                             disabled={updateMutation.isPending}
-                            className="text-sm"
+                            className="text-sm cursor-pointer file:mr-2 file:rounded-md file:border-0 file:bg-primary/10 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-primary hover:file:bg-primary/20"
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (file) {
+                                if (file.type !== "application/pdf") {
+                                  toast.error("Please select a PDF file.");
+                                  e.target.value = "";
+                                  return;
+                                }
+                                const fiveMB = 5 * 1024 * 1024;
+                                if (file.size > fiveMB) {
+                                  toast.error("Document must be 5 MB or less.");
+                                  e.target.value = "";
+                                  return;
+                                }
+                                setDocumentFile(file);
+                              } else {
+                                setDocumentFile(null);
+                              }
+                            }}
                           />
-                          <Button
-                            type="button"
-                            variant="event-outline"
-                            size="icon"
-                            aria-label="Attach document"
-                            disabled={updateMutation.isPending}
-                          >
-                            <Paperclip className="h-4 w-4" />
-                          </Button>
+                          {documentFile && (
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              className="text-muted-foreground hover:text-destructive"
+                              disabled={updateMutation.isPending}
+                              onClick={() => {
+                                setDocumentFile(null);
+                                const input = document.getElementById("document-file") as HTMLInputElement;
+                                if (input) input.value = "";
+                              }}
+                            >
+                              Clear file
+                            </Button>
+                          )}
                         </div>
+                        {documentFile && (
+                          <p className="text-xs text-muted-foreground">
+                            {documentFile.name} ({(documentFile.size / 1024).toFixed(1)} KB)
+                          </p>
+                        )}
+                        {venue.businessDocuments.documentUrl && !documentFile && (
+                          <p className="text-xs text-muted-foreground">
+                            Current document:{" "}
+                            <Link
+                              href={venue.businessDocuments.documentUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="underline underline-offset-2 text-primary hover:text-primary/80 break-all"
+                            >
+                              {venue.businessDocuments.documentUrl.split("/").pop()}
+                            </Link>
+                          </p>
+                        )}
                         <p className="text-xs text-muted-foreground">
-                          Must end in .pdf — max 500 chars.
+                          PDF only — max 5 MB.
                         </p>
                       </div>
                     </div>

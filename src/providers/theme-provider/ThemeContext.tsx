@@ -253,8 +253,9 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({
     if (initialTheme && typeof window !== "undefined") {
       applyThemeToDOM(initialTheme);
 
-      // Pre-populate the query cache with initial theme to avoid duplicate requests
-      queryClient.setQueryData(themeKeys.all, initialTheme);
+      // Pre-populate the query cache with a mutable copy so TanStack Query
+      // never mutates a read-only (frozen) server object (avoids "Cannot assign to read only property 'primary'").
+      queryClient.setQueryData(themeKeys.all, structuredClone(initialTheme));
     }
   }, [initialTheme, queryClient]);
 

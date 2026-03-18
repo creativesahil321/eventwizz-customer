@@ -10,6 +10,7 @@ export function getVenueDetailDummy(id: string): VenueDetail | null {
 
   return {
     id: numId,
+    vendorId: numId,
     venueId: "VEN12345",
     name: "One Great George Street",
     image: "https://images.unsplash.com/photo-1519167758481-83f550bb49b3?w=200&h=200&fit=crop",

@@ -10,7 +10,6 @@ import {
   Youtube,
 } from "lucide-react";
 import Link from "next/link";
-import { useOnboarding } from "@/hooks/use-onboarding";
 import { addCacheBusting } from "@/lib/image-utils";
 
 // Social media icon mapping
@@ -41,7 +40,6 @@ export default function FooterSection({
     youtube?: string;
   };
 }) {
-  const { textColorClass } = useOnboarding();
   const contact_info = [
     {
       icon: <Phone size={16} />,
@@ -97,7 +95,10 @@ export default function FooterSection({
 
   return (
     <>
-      <section className={`w-full ${textColorClass} bg-[color:var(--color-footer)]`}>
+      <section
+        className="w-full bg-[color:var(--color-footer)]"
+        style={{ color: "var(--color-text)" }}
+      >
         <div className="container mx-auto px-5 py-5">
           <div
             className="w-full border-b py-5"
@@ -117,7 +118,7 @@ export default function FooterSection({
                 </div>
               )}
             </div>
-            <div className="flex flex-row justify-center pt-5 gap-3">
+            <div className="flex flex-row justify-center pt-5 gap-3 [&_a]:text-[color:var(--color-text)] [&_svg]:text-[color:var(--color-text)]">
               {displaySocialLinks.map((social, index) => (
                 <Link key={index} href={social.src}>
                   {social.icon}
@@ -131,15 +132,24 @@ export default function FooterSection({
                 className="w-full flex flex-row justify-start sm:justify-center gap-3"
                 key={index}
               >
-                <div className="mt-1 flex-shrink-0">{info.icon}</div>
+                <div className="mt-1 flex-shrink-0 [&_svg]:text-[color:var(--color-text)]">
+                  {info.icon}
+                </div>
                 <div className="flex-1">
-                  <h6 className="font-bold">{info.label}</h6>
+                  <h6 className="font-bold text-[color:var(--color-text)]">
+                    {info.label}
+                  </h6>
                   {info.type === "link" ? (
-                    <Link href={info.src || ""} className="break-all">
+                    <Link
+                      href={info.src || ""}
+                      className="break-all text-[color:var(--color-text)] hover:opacity-90"
+                    >
                       {info.text}
                     </Link>
                   ) : (
-                    <p className="break-all">{info.text}</p>
+                    <p className="break-all text-[color:var(--color-text)]">
+                      {info.text}
+                    </p>
                   )}
                 </div>
               </div>

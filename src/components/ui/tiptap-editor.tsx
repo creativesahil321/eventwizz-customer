@@ -249,7 +249,7 @@ export function TiptapEditor({
           <Dialog open={isLinkDialogOpen} onOpenChange={setIsLinkDialogOpen}>
             <DialogTrigger asChild>
               <Toggle size="sm" pressed={editor.isActive("link")}>
-                <LinkIcon className="h-4 w-4 text-black" />
+                <LinkIcon className="h-4 w-4" />
               </Toggle>
             </DialogTrigger>
             <DialogContent>

@@ -3,20 +3,9 @@
 import { ColumnDef } from "@tanstack/react-table";
 import { DataTableColumnHeader } from "@/components/data-table/data-table-column-header";
 import { Button } from "@/components/ui/button";
-import { Trash2, CheckCircle2, Clock, Download } from "lucide-react";
+import { CheckCircle2, Clock, Download } from "lucide-react";
 import { CustomerMenuChoice } from "../_lib/customer-menu-types";
 import { Badge } from "@/components/ui/badge";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
 import {
   Tooltip,
@@ -26,15 +15,7 @@ import {
 } from "@/components/ui/tooltip";
 import { menuChoicesService } from "@/services/vendor/menu_choices";
 
-interface GetColumnsProps {
-  onDelete?: (id: string) => void;
-  isDeleting?: (id: string) => boolean;
-}
-
-export function getCustomerMenuColumns({
-  onDelete,
-  isDeleting,
-}: GetColumnsProps): ColumnDef<CustomerMenuChoice>[] {
+export function getCustomerMenuColumns(): ColumnDef<CustomerMenuChoice>[] {
   return [
     {
       id: "sno",
@@ -200,20 +181,8 @@ export function getCustomerMenuColumns({
       header: () => <span className="text-foreground">Actions</span>,
       cell: ({ row }) => {
         const menuChoice = row.original;
-        const deleting = isDeleting?.(menuChoice.id) || false;
         const status = String(menuChoice.status ?? "").toLowerCase();
         const isPending = status === "pending";
-
-        const handleDelete = async () => {
-          try {
-            // TODO: Replace with actual API call
-            await new Promise((resolve) => setTimeout(resolve, 500));
-            onDelete?.(menuChoice.id);
-            toast.success("Menu choice deleted successfully");
-          } catch {
-            toast.error("Failed to delete menu choice");
-          }
-        };
 
         const handleDownload = async () => {
           try {
@@ -245,46 +214,6 @@ export function getCustomerMenuColumns({
                   </TooltipContent>
                 </Tooltip>
               )}
-              <AlertDialog>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <AlertDialogTrigger asChild>
-                      <Button
-                        variant="outline"
-                        size="icon"
-                        className="h-8 w-8 shrink-0 border-destructive/30 text-destructive/90 hover:bg-destructive/10 hover:text-destructive hover:border-destructive/50"
-                        disabled={deleting}
-                        aria-label="Delete"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </AlertDialogTrigger>
-                  </TooltipTrigger>
-                  <TooltipContent side="top" className="text-xs">
-                    Delete
-                  </TooltipContent>
-                </Tooltip>
-                <AlertDialogContent>
-                  <AlertDialogHeader>
-                    <AlertDialogTitle>Delete Menu Choice</AlertDialogTitle>
-                    <AlertDialogDescription>
-                      Are you sure you want to delete the menu choice for{" "}
-                      <strong>{menuChoice.event_name}</strong>? This action
-                      cannot be undone.
-                    </AlertDialogDescription>
-                  </AlertDialogHeader>
-                  <AlertDialogFooter>
-                    <AlertDialogCancel>Cancel</AlertDialogCancel>
-                    <AlertDialogAction
-                      onClick={handleDelete}
-                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                      disabled={deleting}
-                    >
-                      {deleting ? "Deleting..." : "Delete"}
-                    </AlertDialogAction>
-                  </AlertDialogFooter>
-                </AlertDialogContent>
-              </AlertDialog>
             </div>
           </TooltipProvider>
         );

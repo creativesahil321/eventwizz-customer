@@ -14,6 +14,7 @@ import { getDefaultThemeCSS } from "@/services/common/theme/constants/theme";
 import PermissionPreloader from "./permission-preloader";
 import { ServerContextProvider } from "@/lib/server-context";
 import { appConfig } from "@/config/app";
+import { GoogleTagManager } from "@next/third-parties/google";
 
 /**
  * Dynamic metadata — single source of truth for brand name, favicon, and title template.
@@ -87,6 +88,18 @@ export default async function RootLayout({
     ? generateCriticalThemeCSS(initialTheme)
     : getDefaultThemeCSS();
 
+  /**
+   * GTM is injected only on the main admin marketing site (website_role === "admin").
+   * Vendor and customer tenant sites are intentionally excluded — they have
+   * separate analytics needs and should not pollute the EventWizz GTM container.
+   *
+   * GoogleTagManager from @next/third-parties handles:
+   *  - Async script injection (non-blocking, no hydration warnings)
+   *  - The <noscript> iframe fallback in <body>
+   *  - Proper script strategy for Next.js App Router
+   */
+  const isAdminSite = initialTheme?.website_role === "admin";
+
   return (
     <html lang="en" suppressHydrationWarning={true}>
       <head suppressHydrationWarning={true}>
@@ -113,6 +126,9 @@ export default async function RootLayout({
             <NuqsAdapter>{children}</NuqsAdapter>
           </Providers>
         </ServerContextProvider>
+
+        {/* GTM: loaded after app shell — admin site only */}
+        {isAdminSite && <GoogleTagManager gtmId="GTM-MJS3VPCZ" />}
       </body>
     </html>
   );

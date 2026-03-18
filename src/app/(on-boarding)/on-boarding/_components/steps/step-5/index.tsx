@@ -178,7 +178,7 @@ export default function StepFive() {
         // Make sure we have at least one ticket
         if (!currentDate.tickets || currentDate.tickets.length === 0) {
           form.setValue(`dates.${dateIndex}.tickets`, [
-            { title: "", description: "", total_capacity: "", price: "" },
+            { title: "", description: "", total_capacity: "", price: "", discount_type: "none", discount_value: "" },
           ]);
         }
 
@@ -199,7 +199,7 @@ export default function StepFive() {
         // Make sure we have at least one table
         if (!currentDate.tables || currentDate.tables.length === 0) {
           form.setValue(`dates.${dateIndex}.tables`, [
-            { min_persons: "", max_persons: "", price: "", total_tables: "" },
+            { min_persons: "", max_persons: "", price: "", total_tables: "", discount_type: "none", discount_value: "" },
           ]);
         }
 
@@ -224,14 +224,14 @@ export default function StepFive() {
         // Make sure we have at least one ticket
         if (!currentDate.tickets || currentDate.tickets.length === 0) {
           form.setValue(`dates.${dateIndex}.tickets`, [
-            { title: "", description: "", total_capacity: "", price: "" },
+            { title: "", description: "", total_capacity: "", price: "", discount_type: "none", discount_value: "" },
           ]);
         }
 
         // Make sure we have at least one table
         if (!currentDate.tables || currentDate.tables.length === 0) {
           form.setValue(`dates.${dateIndex}.tables`, [
-            { min_persons: "", max_persons: "", price: "", total_tables: "" },
+            { min_persons: "", max_persons: "", price: "", total_tables: "", discount_type: "none", discount_value: "" },
           ]);
         }
 
@@ -316,7 +316,7 @@ export default function StepFive() {
                     },
                   ]);
                 }}
-                className="bg-white hover:bg-gray-100"
+                className="bg-white hover:bg-white/10"
               >
                 <PlusCircle className="h-4 w-4 mr-2" />
                 Add Ticket
@@ -346,7 +346,7 @@ export default function StepFive() {
                               <Input
                                 placeholder="e.g., Standard Ticket"
                                 {...field}
-                                className="w-full h-11 bg-[#F9FAFB] border-[#E5E7EB]"
+                                className="w-full h-11 bg-white/5 border-white/10"
                                 maxLength={maxLength}
                                 onFocus={() =>
                                   handleFieldFocus(
@@ -386,7 +386,7 @@ export default function StepFive() {
                               <Input
                                 placeholder="e.g., Access to all areas"
                                 {...field}
-                                className="w-full h-11 bg-[#F9FAFB] border-[#E5E7EB]"
+                                className="w-full h-11 bg-white/5 border-white/10"
                                 maxLength={maxLength}
                                 onFocus={() =>
                                   handleFieldFocus(
@@ -428,7 +428,7 @@ export default function StepFive() {
                               {...field}
                               placeholder="Enter number of tickets (max 100,000)"
                               value={field.value ?? ""}
-                              className="w-full h-11 bg-[#F9FAFB] border-[#E5E7EB] [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                              className="w-full h-11 bg-white/5 border-white/10 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                               onChange={(e) => {
                                 const value = e.target.value;
                                 if (value === "") {
@@ -473,7 +473,7 @@ export default function StepFive() {
                               {...field}
                               placeholder="Enter price (max 9,999)"
                               value={field.value ?? ""}
-                              className="w-full h-11 bg-[#F9FAFB] border-[#E5E7EB] [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                              className="w-full h-11 bg-white/5 border-white/10 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                               onChange={(e) => {
                                 const value = e.target.value;
                                 if (value === "") {
@@ -507,7 +507,7 @@ export default function StepFive() {
                         type="button"
                         variant="ghost"
                         size="sm"
-                        className="text-red-500 hover:text-red-700 hover:bg-red-50"
+                        className="text-red-400 hover:text-red-300 hover:bg-red-500/20"
                         onClick={() => {
                           const tickets =
                             form.getValues(`dates.${dateIndex}.tickets`) || [];
@@ -879,7 +879,7 @@ export default function StepFive() {
       return (
         <div
           key={`date-${dateIndex}`}
-          className="border-2 border-gray-200 rounded-lg mb-6 bg-white shadow-sm hover:shadow-md transition-all"
+          className="border border-gray-200 rounded-lg mb-6 bg-white shadow-sm hover:shadow-md transition-all"
         >
           <div className="flex justify-between items-center p-5 border-b border-gray-100">
             <div className="flex items-center gap-3">
@@ -936,7 +936,7 @@ export default function StepFive() {
                             placeholder="Select date"
                             {...field}
                             min={getTodayDateString()} // Add min attribute to prevent past dates
-                            className="w-full h-11 bg-[#F9FAFB] border-[#E5E7EB] focus:ring-2 focus:ring-blue-500"
+                            className="w-full h-11 bg-white/5 border-white/10 focus:ring-2 focus:ring-blue-500"
                             onFocus={() =>
                               handleFieldFocus(`dates.${dateIndex}.event_date`)
                             }
@@ -990,7 +990,7 @@ export default function StepFive() {
                             handleFieldFocus(`dates.${dateIndex}.booking_type`)
                           }
                         >
-                          <SelectTrigger className="w-full h-12 bg-[#F9FAFB] border-[#E5E7EB]">
+                          <SelectTrigger className="w-full h-12 bg-white/5 border-white/10">
                             <SelectValue placeholder="Select booking type" />
                           </SelectTrigger>
                           <SelectContent className="w-full">
@@ -1317,7 +1317,7 @@ export default function StepFive() {
               type="button"
               variant="outline"
               size="sm"
-              className="text-blue-600 border-blue-600 hover:bg-blue-50 "
+              className="text-[color:var(--color-primary)] border-[color:var(--color-primary)] hover:bg-white/10"
               onClick={() => {
                 const currentDate = form.getValues(`dates.${dateIndex}`);
                 const newDate = {
@@ -1505,7 +1505,7 @@ export default function StepFive() {
                   variant="event-primary"
                   onClick={handleSubmit}
                   disabled={loading}
-                  className="rounded-full px-8 py-2"
+                  className="text-white rounded-full px-8 py-2"
                 >
                   {loading ? "Saving..." : "Save & Next"}
                 </Button>
@@ -1513,7 +1513,7 @@ export default function StepFive() {
                   variant="event-secondary"
                   type="button"
                   onClick={() => setActiveStep(6)}
-                  className="rounded-full px-8 py-2"
+                  className="text-white rounded-full px-8 py-2"
                 >
                   Skip
                 </Button>

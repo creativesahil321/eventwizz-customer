@@ -128,7 +128,7 @@ const GoogleBusinessSearch: React.FC<Props> = ({
     <div className="relative w-full">
       <Input
         className={`w-full border p-2 rounded ${
-          isSelected ? "bg-green-50 cursor-not-allowed" : "bg-white"
+          isSelected ? "bg-emerald-500/10 cursor-not-allowed" : "bg-white/5"
         }`}
         value={isSelected ? value : searchQuery}
         onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
@@ -145,16 +145,16 @@ const GoogleBusinessSearch: React.FC<Props> = ({
         </div>
       )}
       {suggestions.length > 0 && !isSelected && searchQuery && (
-        <ul className="absolute z-50 bg-white border border-gray-300 rounded-md w-full mt-1 max-h-60 overflow-auto shadow-lg">
+        <ul className="absolute z-50 bg-slate-900 border border-white/10 rounded-md w-full mt-1 max-h-60 overflow-auto shadow-2xl">
           {suggestions.map((sug, i) => (
             <li
               key={i}
               onClick={() => handleSuggestionSelect(sug)}
-              className="p-3 hover:bg-blue-50 cursor-pointer border-b last:border-b-0 transition-colors"
+              className="p-3 hover:bg-white/10 cursor-pointer border-b last:border-b-0 transition-colors"
             >
-              <div className="flex items-start gap-2">
+              <div className="flex items-start gap-2 text-slate-300">
                 <span className="text-blue-600 mt-1">📍</span>
-                <span className="text-sm">{sug.description}</span>
+                <span className="text-sm text-white">{sug.description}</span>
               </div>
             </li>
           ))}
@@ -164,8 +164,8 @@ const GoogleBusinessSearch: React.FC<Props> = ({
         suggestions.length === 0 &&
         !isSearching &&
         !isSelected && (
-          <div className="absolute z-50 bg-white border border-gray-300 rounded-md w-full mt-1 p-3 shadow-lg">
-            <p className="text-sm text-gray-500 text-center">
+          <div className="absolute z-50 bg-slate-900 border border-white/10 rounded-md w-full mt-1 p-3 shadow-2xl">
+            <p className="text-sm text-slate-400 text-center">
               No venues found. Try a different search term.
             </p>
           </div>
@@ -175,7 +175,7 @@ const GoogleBusinessSearch: React.FC<Props> = ({
           <button
             type="button"
             onClick={handleClear}
-            className="text-gray-400 hover:text-red-600 transition-colors font-bold"
+            className="text-slate-500 hover:text-red-400 transition-colors font-bold"
             title="Clear selection"
           >
             ✕

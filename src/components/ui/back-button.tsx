@@ -14,7 +14,7 @@ export function BackButton({ href, label, className = "" }: BackButtonProps) {
       <Link href={href}>
         <Button
           variant="ghost"
-          className={`pl-0 text-[var(--color-primary)] ${className}`}
+          className={`pl-0 text-[var(--color-text)] ${className}`}
         >
           <ArrowLeft className="mr-2 h-4 w-4" />
           {label}

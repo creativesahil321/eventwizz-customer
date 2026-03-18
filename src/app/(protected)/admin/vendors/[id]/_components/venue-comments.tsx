@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Pencil, Trash2, MessageSquare, Send, X, Check } from "lucide-react";
+import { Trash2, MessageSquare, Send } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { adminVenuesService } from "@/services/admin/venues/venues.service";
 import type { AdminVenueComment } from "@/services/admin/venues/type";
@@ -34,34 +34,19 @@ function CommentItem({
 }: {
   comment: AdminVenueComment;
   venueId: number;
-  onDeleted: (id: number) => void;
+  onDeleted: () => void;
 }) {
   const queryClient = useQueryClient();
-  const [editing, setEditing] = useState(false);
-  const [editBody, setEditBody] = useState(comment.body);
-
-  const updateMutation = useMutation({
-    mutationFn: (body: string) =>
-      adminVenuesService.updateComment(venueId, comment.id, body),
-    onSuccess: () => {
-      queryClient.invalidateQueries({
-        queryKey: ["admin", "venue", String(venueId), "comments"],
-      });
-      setEditing(false);
-    },
-  });
 
   const deleteMutation = useMutation({
     mutationFn: () => adminVenuesService.deleteComment(venueId, comment.id),
     onSuccess: () => {
-      onDeleted(comment.id);
+      onDeleted();
       queryClient.invalidateQueries({
         queryKey: ["admin", "venue", String(venueId), "comments"],
       });
     },
   });
-
-  const isPending = updateMutation.isPending || deleteMutation.isPending;
 
   return (
     <div className="group flex gap-3 py-3 border-b border-slate-100 last:border-0">
@@ -80,74 +65,24 @@ function CommentItem({
             {formatDate(comment.created_at)}
           </span>
         </div>
-
-        {editing ? (
-          <div className="space-y-2">
-            <Textarea
-              value={editBody}
-              onChange={(e) => setEditBody(e.target.value)}
-              className="text-sm min-h-[72px] resize-none"
-              disabled={isPending}
-              autoFocus
-            />
-            <div className="flex gap-2">
-              <Button
-                size="sm"
-                variant="event-primary"
-                className="gap-1.5 h-7 text-xs"
-                disabled={!editBody.trim() || isPending}
-                onClick={() => updateMutation.mutate(editBody.trim())}
-              >
-                <Check className="h-3.5 w-3.5" />
-                Save
-              </Button>
-              <Button
-                size="sm"
-                variant="ghost"
-                className="gap-1.5 h-7 text-xs"
-                disabled={isPending}
-                onClick={() => {
-                  setEditing(false);
-                  setEditBody(comment.body);
-                }}
-              >
-                <X className="h-3.5 w-3.5" />
-                Cancel
-              </Button>
-            </div>
-          </div>
-        ) : (
-          <p className="text-sm text-foreground whitespace-pre-wrap break-words">
-            {comment.body}
-          </p>
-        )}
+        <p className="text-sm text-foreground whitespace-pre-wrap break-words">
+          {comment.body}
+        </p>
       </div>
 
-      {/* Actions — visible on hover */}
-      {!editing && (
-        <div className="shrink-0 flex items-start gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-          <Button
-            size="icon"
-            variant="ghost"
-            className="h-7 w-7 text-muted-foreground hover:text-foreground"
-            aria-label="Edit comment"
-            disabled={isPending}
-            onClick={() => setEditing(true)}
-          >
-            <Pencil className="h-3.5 w-3.5" />
-          </Button>
-          <Button
-            size="icon"
-            variant="ghost"
-            className="h-7 w-7 text-muted-foreground hover:text-destructive"
-            aria-label="Delete comment"
-            disabled={isPending}
-            onClick={() => deleteMutation.mutate()}
-          >
-            <Trash2 className="h-3.5 w-3.5" />
-          </Button>
-        </div>
-      )}
+      {/* Delete only — visible on hover */}
+      <div className="shrink-0 flex items-start gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+        <Button
+          size="icon"
+          variant="ghost"
+          className="h-7 w-7 text-muted-foreground hover:text-destructive"
+          aria-label="Delete comment"
+          disabled={deleteMutation.isPending}
+          onClick={() => deleteMutation.mutate()}
+        >
+          <Trash2 className="h-3.5 w-3.5" />
+        </Button>
+      </div>
     </div>
   );
 }
@@ -180,7 +115,7 @@ export function VenueComments({ venueId }: VenueCommentsProps) {
     addMutation.mutate(trimmed);
   };
 
-  const handleDeleted = (_id: number) => {
+  const handleDeleted = () => {
     queryClient.invalidateQueries({
       queryKey: ["admin", "venue", String(venueId), "comments"],
     });

@@ -57,23 +57,24 @@ export default function FAQSection() {
             return (
               <div
                 key={idx}
-                className="border border-gray-200 rounded-xl overflow-hidden"
+                className="border border-gray-200 rounded-xl overflow-hidden bg-white"
               >
                 <button
-                  className="w-full flex items-center justify-between p-5 text-left hover:bg-gray-50 transition-colors"
+                  type="button"
+                  className="w-full flex items-center justify-between p-5 text-left hover:bg-gray-50 transition-colors text-gray-900"
                   onClick={() => setOpenIndex(isOpen ? null : idx)}
                 >
-                  <span className="font-medium text-[color:var(--color-text)] pr-4">
+                  <span className="font-medium pr-4">
                     {faq.question}
                   </span>
                   <ChevronDown
-                    className={`h-5 w-5 text-[color:var(--color-text-dimmed)] shrink-0 transition-transform duration-200 ${
+                    className={`h-5 w-5 text-gray-500 shrink-0 transition-transform duration-200 ${
                       isOpen ? "rotate-180" : ""
                     }`}
                   />
                 </button>
                 {isOpen && (
-                  <div className="px-5 pb-5 text-[color:var(--color-text-dimmed)] leading-relaxed">
+                  <div className="px-5 pb-5 text-gray-600 leading-relaxed">
                     {faq.answer}
                   </div>
                 )}

@@ -1,5 +1,6 @@
 "use client";
 
+import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { ThemeSchema } from "@/types/theme.types";
 import { themeService } from "@/services/common/theme/theme.service";
@@ -22,6 +23,12 @@ export const useThemeQuery = (
   domain: string | undefined | null,
   initialData: ThemeSchema | null = null
 ) => {
+  // Use a mutable clone so TanStack Query never mutates a read-only (frozen) server object
+  const mutableInitialData = useMemo(
+    () => (initialData ? structuredClone(initialData) : undefined),
+    [initialData]
+  );
+
   return useQuery({
     // Use a single query key for all theme data
     queryKey: themeKeys.all,
@@ -39,7 +46,7 @@ export const useThemeQuery = (
       return response.data;
     },
     enabled: !!domain,
-    initialData: initialData,
+    initialData: mutableInitialData,
     staleTime: 1000 * 60 * 5, // Consider data fresh for 5 minutes
     gcTime: 1000 * 60 * 10, // Keep unused data in cache for 10 minutes
     refetchOnWindowFocus: false, // Don't refetch on window focus to reduce API calls

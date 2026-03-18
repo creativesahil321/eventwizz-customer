@@ -16,6 +16,7 @@ const LOCATIONS_STALE_TIME = 10 * 60 * 1000; // 10 minutes
 
 /** Query key prefixes to invalidate when default location changes (APIs use location from session/header) */
 export const LOCATION_DEPENDENT_QUERY_KEYS = [
+  ["vendor", "dashboard"],
   ["vendor-booking-history"],
   ["vendor-transactions"],
   ["menu-choices"],

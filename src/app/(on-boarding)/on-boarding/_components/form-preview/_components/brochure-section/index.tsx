@@ -70,7 +70,7 @@ export default function BrochureSection({
 
   // Filter out downloads with invalid links
   const validDownloads = downloads.filter(
-    (item) => item.download_link && item.download_link.length > 0
+    (item) => item.download_link && item.download_link.length > 0,
   );
 
   return (
@@ -143,8 +143,26 @@ export default function BrochureSection({
           >
             {defaultPrice.description}
           </p>
-          <Button variant="event-outline" type="button" className="mt-3">
-            <Link href={defaultPrice.link}>{defaultPrice.price_title}</Link>
+          <Button
+            variant="event-outline"
+            type="button"
+            className="mt-3"
+            asChild
+          >
+            {defaultPrice.link?.startsWith("#") ? (
+              <button
+                type="button"
+                onClick={() => {
+                  const id = defaultPrice.link!.slice(1);
+                  const el = id ? document.getElementById(id) : null;
+                  el?.scrollIntoView({ behavior: "smooth", block: "start" });
+                }}
+              >
+                {defaultPrice.price_title}
+              </button>
+            ) : (
+              <Link href={defaultPrice.link}>{defaultPrice.price_title}</Link>
+            )}
           </Button>
         </section>
       </section>

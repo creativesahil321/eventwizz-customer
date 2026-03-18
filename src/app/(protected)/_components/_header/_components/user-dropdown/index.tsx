@@ -14,6 +14,8 @@ import {
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { useAuthStore } from "@/store/auth.store";
+import { useImpersonationStore } from "@/store/impersonation.store";
+import { useExitImpersonation } from "@/hooks/useImpersonation";
 import { logout } from "@/lib/auth/logout";
 import { addCacheBusting } from "@/lib/image-utils";
 import { PermissionGuard } from "@/components/permission/PermissionGuard";
@@ -33,6 +35,8 @@ const UserDropdown = memo(() => {
   const router = useRouter();
   const { data: session } = useSession();
   const user = useAuthStore((state) => state.user);
+  const isImpersonating = useImpersonationStore((s) => s.isImpersonating);
+  const exitImpersonation = useExitImpersonation();
   const profileUrl = useMemo(() => {
     // Default profile URL
     let url = "/account/profile";
@@ -182,9 +186,19 @@ const UserDropdown = memo(() => {
               )}
             </PermissionGuard>
           )}
-          <DropdownMenuItem className="cursor-pointer" onClick={() => logout()}>
-            <LogOut size={16} className="mr-2" /> Log Out
-          </DropdownMenuItem>
+          {isImpersonating ? (
+            <DropdownMenuItem
+              className="cursor-pointer text-amber-700 focus:text-amber-700"
+              onClick={() => exitImpersonation.mutate()}
+              disabled={exitImpersonation.isPending}
+            >
+              <LogOut size={16} className="mr-2" /> Back to my account
+            </DropdownMenuItem>
+          ) : (
+            <DropdownMenuItem className="cursor-pointer" onClick={() => logout()}>
+              <LogOut size={16} className="mr-2" /> Log Out
+            </DropdownMenuItem>
+          )}
         </DropdownMenuContent>
       </DropdownMenu>
     </div>

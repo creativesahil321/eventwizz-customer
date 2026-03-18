@@ -262,7 +262,7 @@ export default function ManageRoles({
                 </CardTitle>
                 <Badge
                   variant="outline"
-                  className="bg-[var(--color-background)] border-[var(--color-primary)] text-xs text-white flex-shrink-0 whitespace-nowrap"
+                  className="border border-input bg-gray-100 text-gray-800 text-xs flex-shrink-0 whitespace-nowrap dark:bg-gray-700 dark:text-gray-100 dark:border-gray-600"
                 >
                   {role.permissions.length} permissions
                 </Badge>
@@ -283,7 +283,7 @@ export default function ManageRoles({
                       <TooltipTrigger asChild>
                         <Badge
                           variant="secondary"
-                          className="bg-[var(--color-background)] text-[var(--color-text-dimmed)] text-xs text-white max-w-[160px] truncate cursor-default"
+                          className="bg-gray-100 text-gray-800 text-xs max-w-[160px] truncate cursor-default dark:bg-gray-700 dark:text-gray-100"
                         >
                           {permTitle}
                         </Badge>
@@ -297,7 +297,7 @@ export default function ManageRoles({
                 {role.permissions.length > 3 && (
                   <Badge
                     variant="secondary"
-                    className="bg-[var(--color-background)] text-[var(--color-text-dimmed)] text-xs text-white"
+                    className="bg-gray-100 text-gray-800 text-xs dark:bg-gray-700 dark:text-gray-100"
                   >
                     +{role.permissions.length - 3} more
                   </Badge>

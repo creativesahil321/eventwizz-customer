@@ -324,7 +324,7 @@ const StepFour = () => {
                               <Input
                                 {...field}
                                 placeholder="e.g., The Package"
-                                className="h-11 bg-[#F9FAFB] border-[#E5E7EB]"
+                                className="h-11 bg-white/5 border-white/10"
                                 maxLength={maxLength}
                                 onFocus={() =>
                                   handleFieldFocus("package_title")
@@ -370,7 +370,7 @@ const StepFour = () => {
                               <Input
                                 {...field}
                                 placeholder="e.g., Prices From £65 Plus VAT Include:"
-                                className="h-11 bg-[#F9FAFB] border-[#E5E7EB]"
+                                className="h-11 bg-white/5 border-white/10"
                                 maxLength={maxLength}
                                 onFocus={() =>
                                   handleFieldFocus("package_description")
@@ -489,7 +489,7 @@ const StepFour = () => {
                             <Input
                               {...field}
                               placeholder="e.g., Choose Now"
-                              className="h-11 bg-[#F9FAFB] border-[#E5E7EB]"
+                              className="h-11 bg-white/5 border-white/10"
                               maxLength={maxLength}
                               onFocus={() =>
                                 handleFieldFocus("package_button_name")
@@ -570,7 +570,7 @@ const StepFour = () => {
                                     <Input
                                       {...field}
                                       placeholder="e.g.- VIP entrance with photo opportunities"
-                                      className="h-11 bg-[#F9FAFB] border-[#E5E7EB]"
+                                      className="h-11 bg-white/5 border-white/10"
                                       maxLength={maxLength}
                                       onFocus={() =>
                                         handleFieldFocus("package_details")
@@ -632,7 +632,7 @@ const StepFour = () => {
                             );
                           }}
                           disabled={fields.length <= 1}
-                          className="text-red-500 h-11 w-11 disabled:opacity-50 disabled:cursor-not-allowed"
+                          className="text-red-400 h-11 w-11 disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                           <Trash className="h-4 w-4" />
                         </Button>
@@ -659,7 +659,7 @@ const StepFour = () => {
                       handleSubmit(form.getValues());
                     }}
                     disabled={loading}
-                    className="rounded-full px-8 py-2"
+                    className="text-white rounded-full px-8 py-2"
                   >
                     {loading ? "Saving..." : "Save & Next"}
                   </Button>
@@ -667,7 +667,7 @@ const StepFour = () => {
                     variant="event-secondary"
                     type="button"
                     onClick={() => setActiveStep(5)}
-                    className="rounded-full px-8 py-2"
+                    className="text-white rounded-full px-8 py-2"
                   >
                     Skip
                   </Button>

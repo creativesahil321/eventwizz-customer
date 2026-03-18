@@ -20,7 +20,7 @@ function OnboardingCard({ className, ...props }: React.ComponentProps<"div">) {
     <div
       data-slot="card"
       className={cn(
-        "bg-white text-card-foreground flex flex-col gap-6 rounded-xl border-0 py-6 shadow-md w-[100%] mx-auto",
+        "flex flex-col gap-6 rounded-2xl py-6 w-[100%] mx-auto",
         className
       )}
       {...props}

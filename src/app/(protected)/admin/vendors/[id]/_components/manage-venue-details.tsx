@@ -15,8 +15,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
-  MessageCircle,
-  Bell,
   ExternalLink,
   Paperclip,
   Pencil,
@@ -34,6 +32,21 @@ import { ResetPasswordModal } from "./reset-password-modal";
 import { ForceLogoutModal } from "./force-logout-modal";
 import { adminVenuesService } from "@/services/admin/venues/venues.service";
 import { VenueComments } from "./venue-comments";
+import { usePermission } from "@/hooks/usePermission";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Input } from "@/components/ui/input";
+
+/** Permission key for impersonation — must match backend (e.g. impersonate-vendor). */
+const IMPERSONATE_VENDOR_PERMISSION = "impersonate-vendor";
 
 interface ManageVenueDetailsProps {
   venue: VenueDetail;
@@ -138,6 +151,7 @@ function DomainApprovalActions({
 }
 
 export function ManageVenueDetails({ venue }: ManageVenueDetailsProps) {
+  const canImpersonateVendor = usePermission(IMPERSONATE_VENDOR_PERMISSION);
   const defaultLocation = venue.locations[0];
   const [selectedLocationId, setSelectedLocationId] = useState<number>(
     defaultLocation?.id ?? 0,
@@ -146,6 +160,28 @@ export function ManageVenueDetails({ venue }: ManageVenueDetailsProps) {
   const [loginToVenueOpen, setLoginToVenueOpen] = useState(false);
   const [resetPasswordOpen, setResetPasswordOpen] = useState(false);
   const [forceLogoutOpen, setForceLogoutOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [confirmVenueName, setConfirmVenueName] = useState("");
+  const [confirmPhrase, setConfirmPhrase] = useState("");
+
+  const queryClient = useQueryClient();
+
+  const deleteVenueMutation = useMutation({
+    mutationFn: () => adminVenuesService.deleteVenue(venue.id),
+    onSuccess: () => {
+      // Invalidate venue lists so this disappears from tables
+      queryClient.invalidateQueries({ queryKey: ["admin", "venues"] });
+      queryClient.invalidateQueries({
+        queryKey: ["admin", "venue", String(venue.id)],
+      });
+      setDeleteOpen(false);
+    },
+  });
+
+  const deleteDisabled =
+    confirmVenueName.trim() !== venue.name.trim() ||
+    confirmPhrase.trim().toLowerCase() !== "delete this venue" ||
+    deleteVenueMutation.isPending;
 
   const selectedLocation: VenueLocation | undefined =
     venue.locations.find((loc) => loc.id === selectedLocationId) ??
@@ -199,26 +235,6 @@ export function ManageVenueDetails({ venue }: ManageVenueDetailsProps) {
                   </a>
                 </Button>
               )}
-              <span
-                className="hidden sm:inline-block w-px h-4 bg-slate-200 mx-0.5"
-                aria-hidden
-              />
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-7 w-7 text-muted-foreground hover:text-foreground"
-                aria-label="Messages"
-              >
-                <MessageCircle className="h-3.5 w-3.5" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-7 w-7 text-muted-foreground hover:text-foreground"
-                aria-label="Notifications"
-              >
-                <Bell className="h-3.5 w-3.5" />
-              </Button>
             </div>
           </div>
         </CardHeader>
@@ -307,6 +323,11 @@ export function ManageVenueDetails({ venue }: ManageVenueDetailsProps) {
                   size="sm"
                   className="gap-2"
                   aria-label="Delete venue"
+                  onClick={() => {
+                    setConfirmVenueName("");
+                    setConfirmPhrase("");
+                    setDeleteOpen(true);
+                  }}
                 >
                   <Trash2 className="h-4 w-4" />
                   Delete Venue
@@ -391,6 +412,13 @@ export function ManageVenueDetails({ venue }: ManageVenueDetailsProps) {
                       variant="event-outline"
                       size="sm"
                       className="gap-2 mt-1"
+                      onClick={() => {
+                        const url = venue.businessDocuments.documentUrl;
+                        if (!url) return;
+                        if (typeof window !== "undefined") {
+                          window.open(url, "_blank", "noopener,noreferrer");
+                        }
+                      }}
                     >
                       <Paperclip className="h-4 w-4" />
                       {venue.businessDocuments.documentLabel ?? "View document"}
@@ -429,15 +457,17 @@ export function ManageVenueDetails({ venue }: ManageVenueDetailsProps) {
                     No events added yet.
                   </p>
                 )}
-                <Button
-                  variant="event-primary"
-                  size="sm"
-                  className="mt-3 gap-2"
-                  onClick={() => setLoginToVenueOpen(true)}
-                >
-                  <LogIn className="h-4 w-4" />
-                  Login as Vendor
-                </Button>
+                {canImpersonateVendor && (
+                  <Button
+                    variant="event-primary"
+                    size="sm"
+                    className="mt-3 gap-2"
+                    onClick={() => setLoginToVenueOpen(true)}
+                  >
+                    <LogIn className="h-4 w-4" />
+                    Login as Vendor
+                  </Button>
+                )}
               </div>
               <div className="border-t border-slate-100 pt-5">
                 <VenueComments venueId={venue.id} />
@@ -561,17 +591,12 @@ export function ManageVenueDetails({ venue }: ManageVenueDetailsProps) {
         </div>
       </div>
 
-      {/* ── Bottom actions ── */}
-      <div className="flex justify-end gap-3">
-        <Button variant="event-outline">Cancel</Button>
-        <Button variant="event-primary">Save Changes</Button>
-      </div>
-
       {/* Modals */}
       <LoginToVenueModal
         open={loginToVenueOpen}
         onOpenChange={setLoginToVenueOpen}
         venueName={venue.name}
+        vendorId={venue.vendorId}
         contactEmail={venue.contact.email}
       />
       <ResetPasswordModal
@@ -579,12 +604,83 @@ export function ManageVenueDetails({ venue }: ManageVenueDetailsProps) {
         onOpenChange={setResetPasswordOpen}
         venueName={venue.name}
         contactEmail={venue.contact.email}
+        vendorId={venue.vendorId}
       />
       <ForceLogoutModal
         open={forceLogoutOpen}
         onOpenChange={setForceLogoutOpen}
         venueName={venue.name}
+        vendorId={venue.vendorId}
       />
+      <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-lg font-semibold">
+              Delete venue
+            </AlertDialogTitle>
+            <AlertDialogDescription className="space-y-3 text-sm">
+              <p>
+                This will permanently disable bookings and access for{" "}
+                <span className="font-semibold">{venue.name}</span>. Some data
+                may be retained for reporting and auditing.
+              </p>
+              <p className="font-semibold text-red-600">
+                This action cannot be undone.
+              </p>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-1.5">
+              <Label className="text-xs font-medium text-muted-foreground">
+                To confirm, type the venue name exactly:
+              </Label>
+              <Input
+                autoFocus
+                value={confirmVenueName}
+                onChange={(e) => setConfirmVenueName(e.target.value)}
+                placeholder={venue.name}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs font-medium text-muted-foreground">
+                To confirm, type{" "}
+                <span className="font-mono font-semibold">
+                  delete this venue
+                </span>
+              </Label>
+              <Input
+                value={confirmPhrase}
+                onChange={(e) => setConfirmPhrase(e.target.value)}
+                placeholder="delete this venue"
+              />
+            </div>
+            <p className="flex items-center gap-2 text-xs text-red-600 bg-red-50 border border-red-200 rounded-md px-3 py-2">
+              <XCircle className="h-4 w-4 shrink-0" />
+              Deleting {venue.name} cannot be undone.
+            </p>
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel
+              disabled={deleteVenueMutation.isPending}
+              className="min-w-[96px]"
+            >
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              disabled={deleteDisabled}
+              className="bg-red-600 hover:bg-red-700 text-white min-w-[130px]"
+              onClick={(e) => {
+                e.preventDefault();
+                if (!deleteDisabled) {
+                  deleteVenueMutation.mutate();
+                }
+              }}
+            >
+              {deleteVenueMutation.isPending ? "Deleting..." : "Delete Venue"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

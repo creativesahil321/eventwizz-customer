@@ -152,7 +152,7 @@ export function WorldPayConfig({
             id="worldpay-client-key"
             {...form.register("payment_providers.worldpay_client_key")}
             placeholder="Enter your WorldPay client key"
-            className="h-12 bg-[#F9FAFB] border-[#E5E7EB]"
+            className="h-12 bg-white/5 border-white/10"
           />
           {form.formState.errors.payment_providers?.worldpay_client_key && (
             <p className="text-xs text-red-500">
@@ -175,7 +175,7 @@ export function WorldPayConfig({
               {...form.register("payment_providers.worldpay_service_key")}
               type={showServiceKey ? "text" : "password"}
               placeholder="Enter your WorldPay service key"
-              className="h-12 bg-[#F9FAFB] border-[#E5E7EB] pr-12"
+              className="h-12 bg-white/5 border-white/10 pr-12"
             />
             <Button
               type="button"
@@ -214,7 +214,7 @@ export function WorldPayConfig({
             id="worldpay-merchant-code"
             {...form.register("payment_providers.worldpay_merchant_code")}
             placeholder="Enter your WorldPay merchant code"
-            className="h-12 bg-[#F9FAFB] border-[#E5E7EB]"
+            className="h-12 bg-white/5 border-white/10"
           />
         </div>
       </div>

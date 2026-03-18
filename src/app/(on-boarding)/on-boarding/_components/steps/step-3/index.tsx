@@ -600,7 +600,7 @@ export default function StepThree() {
                       return (
                         <FormItem>
                           <FormLabel className="text-md font-medium">
-                            Event Name <span className="text-red-500">*</span>
+                            Event Name <span className="text-red-400">*</span>
                           </FormLabel>
                           <FormControl>
                             <Input
@@ -691,11 +691,11 @@ export default function StepThree() {
                       <FormItem>
                         <OnboardingSectionTitle>
                           Add a Cover Photo
-                          <span className="text-red-500">*</span>
+                          <span className="text-red-400">*</span>
                         </OnboardingSectionTitle>
                         <FormControl>
                           <div
-                            className="flex flex-col justify-center items-center h-full space-y-2 bg-[#F3F4F6] p-4 rounded-md"
+                            className="flex flex-col justify-center items-center h-full space-y-2 bg-white/5 p-4 rounded-lg border border-white/10"
                             onClick={() =>
                               handleFieldFocus("event_banner_image")
                             }
@@ -771,11 +771,11 @@ export default function StepThree() {
                       <FormItem>
                         <OnboardingSectionTitle>
                           Add a Cover Video
-                          <span className="text-red-500">*</span>
+                          <span className="text-red-400">*</span>
                         </OnboardingSectionTitle>
                         <FormControl>
                           <div
-                            className="flex flex-col justify-center items-center h-full space-y-2 bg-[#F3F4F6] p-4 rounded-md"
+                            className="flex flex-col justify-center items-center h-full space-y-2 bg-white/5 p-4 rounded-lg border border-white/10"
                             onClick={() =>
                               handleFieldFocus("event_banner_video")
                             }
@@ -859,7 +859,7 @@ export default function StepThree() {
                   return (
                     <FormItem>
                       <FormLabel className="text-sm font-medium">
-                        Banner Heading <span className="text-red-500">*</span>
+                        Banner Heading <span className="text-red-400">*</span>
                       </FormLabel>
                       <FormControl>
                         <Input
@@ -906,7 +906,7 @@ export default function StepThree() {
                     <FormItem>
                       <FormLabel className="text-sm font-medium">
                         Write banner Sub-heading{" "}
-                        <span className="text-red-500">*</span>
+                        <span className="text-red-400">*</span>
                       </FormLabel>
                       <FormControl>
                         <Input
@@ -959,7 +959,7 @@ export default function StepThree() {
                     return (
                       <FormItem>
                         <FormLabel className="text-sm font-medium">
-                          Title <span className="text-red-500">*</span>
+                          Title <span className="text-red-400">*</span>
                         </FormLabel>
                         <FormControl>
                           <Input
@@ -1155,7 +1155,7 @@ export default function StepThree() {
                     handleSubmit();
                   }}
                   disabled={loading}
-                  className="rounded-full px-8 py-2"
+                  className="text-white rounded-full px-8 py-2"
                 >
                   {loading ? "Saving..." : "Save & Next"}
                 </Button>

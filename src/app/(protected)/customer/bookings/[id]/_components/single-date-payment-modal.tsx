@@ -13,7 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
-import { CheckCircle2, Clock, Calendar, X } from "lucide-react";
+import { CheckCircle2, Clock, Calendar, X, Loader2 } from "lucide-react";
 
 interface SingleDatePaymentModalProps {
   isOpen: boolean;
@@ -36,6 +36,7 @@ interface SingleDatePaymentModalProps {
     event_date: string;
     unpaid_amount: number;
   } | null;
+  isProcessing?: boolean;
 }
 
 export function SingleDatePaymentModal({
@@ -44,6 +45,7 @@ export function SingleDatePaymentModal({
   dateInfo,
   onConfirm,
   rescheduleRequest,
+  isProcessing = false,
 }: SingleDatePaymentModalProps) {
   const [selectedPaymentPlan, setSelectedPaymentPlan] = useState<
     "full" | "deposit" | null
@@ -102,11 +104,12 @@ export function SingleDatePaymentModal({
   };
 
   const handleClose = () => {
+    if (isProcessing) return;
     setSelectedPaymentPlan(null);
     onClose();
   };
 
-  const isConfirmDisabled = !effectivePaymentPlan;
+  const isConfirmDisabled = !effectivePaymentPlan || !!isProcessing;
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
@@ -345,6 +348,7 @@ export function SingleDatePaymentModal({
           <Button
             variant="event-outline"
             onClick={handleClose}
+            disabled={isProcessing}
             className="flex-1 sm:flex-none"
           >
             Cancel
@@ -353,7 +357,7 @@ export function SingleDatePaymentModal({
             variant="event-primary"
             onClick={handleConfirm}
             disabled={isConfirmDisabled}
-            className="flex-1 sm:flex-none"
+            className="flex-1 sm:flex-none gap-2"
             style={{
               backgroundColor: isConfirmDisabled
                 ? undefined
@@ -361,9 +365,14 @@ export function SingleDatePaymentModal({
               color: isConfirmDisabled ? undefined : "white",
             }}
           >
-            {isConfirmDisabled
+            {isProcessing && (
+              <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+            )}
+            {isConfirmDisabled && !isProcessing
               ? "Complete selections above"
-              : `Confirm & Pay ${formatCurrency(payTodayAmount)}`}
+              : isProcessing
+                ? "Processing payment..."
+                : `Confirm & Pay ${formatCurrency(payTodayAmount)}`}
           </Button>
         </div>
       </DialogContent>

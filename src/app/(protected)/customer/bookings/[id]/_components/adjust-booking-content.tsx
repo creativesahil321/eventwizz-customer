@@ -54,6 +54,16 @@ export default function AdjustBookingContent({
 
   const formatCurrency = (amount: number) => `£${amount.toFixed(2)}`;
 
+  const normalizePaymentStatus = (
+    status: string,
+  ): "paid" | "pending" | "partial" | "refunded" => {
+    const s = status?.toLowerCase().trim() ?? "";
+    if (s === "paid") return "paid";
+    if (s === "refunded") return "refunded";
+    if (s === "partial payment" || s === "partial") return "partial";
+    return "pending";
+  };
+
   const transformedData = bookingData
     ? (() => {
         const subTotalAmount = parseAmount(bookingData.sub_total);
@@ -94,11 +104,7 @@ export default function AdjustBookingContent({
             date: eventDate.date,
             parentBookingDate: eventDate.parent_booking_date || null,
             hasUnbookedEventDates: eventDate.has_unbooked_event_dates,
-            paymentStatus: eventDate.payment_status.toLowerCase() as
-              | "paid"
-              | "pending"
-              | "partial"
-              | "refunded",
+            paymentStatus: normalizePaymentStatus(eventDate.payment_status),
             total: `£${eventDate.total_amount.toFixed(2)}`,
             partialPayment: eventDate.paid_amount
               ? `£${eventDate.paid_amount.toFixed(2)}`

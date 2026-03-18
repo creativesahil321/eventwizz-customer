@@ -17,8 +17,15 @@ function getCondensedKnowledgeBase(): string {
     "About EventWizz",
     "System Overview",
     "Partner White-Label Deployments",
+    "Vendor Onboarding",
+    "Vendor Registration Process",
+    "Vendor Welcome",
+    "Vendor Dashboard",
+    "Admin Dashboard",
+    "Customer Flow",
     "User Types & Access",
     "Checkout & Booking System",
+    "Onboarding Process",
     "Common User Questions & Solutions",
   ];
 
@@ -39,9 +46,12 @@ function getCondensedKnowledgeBase(): string {
 ## Quick Reference
 - Roles: admin (platform management), vendor (venue/event management), customer (booking)
 - Partner: White-label deployment (same code, custom branding via 4 env vars)
-- Onboarding: 11-step vendor setup process
-- Booking: Multi-date, table/ticket selection, guest allocation, payment options
-- Site Essentials: Branding, colors, typography, SEO customization
+- Admin after login: Straight to Dashboard (no welcome step). Sidebar: Dashboard, All Venues, Transaction History, Notifications, Commission Overview, Manage Roles, Staff Management, Email Template, Site Essentials, Marketing Analytics, System Logs, Support, Referrals, Sales & Marketing, Seo Tools, Dispute Resolution Centre. Payment Settings = profile (top right) → Settings → Payment Settings. Manage a venue: All Venues → click venue → venue detail (domain approval, login as venue, reset password, edit, comments).
+- Onboarding: 11 steps — Venue, Site, Event, Package, Dates, Catering, Other Packages, Brochure info, FAQs, Payment, Publish. AI option generates steps 2–9; vendor reviews then does Payment (Stripe etc.) and Publish (domain).
+- Deposit: Per event date, for tables (or both); set in Step 5 (Dates). Payment (Step 10): Stripe, PayPal, TrueLayer, WorldPay, Klarna. Domain: Step 11 (Publish).
+- Vendor after login: Welcome — Select Location (/welcome/select-location); pick venue → Continue to Dashboard. Dashboard sidebar: Dashboard, Events, Customers, Bookings, Email Templates, Menu Choice, Transactions, Sites Essentials, Event Locations, Marketing, Newsletter, Email Logs, System Logs, Manage Roles, Staff Management, Seo Tools, Notifications, Support, Dispute Resolution, Payment Settings. Create Event = header button. Domain Settings = profile dropdown → Settings → Domain Settings (72h verify). Bookings = booking history; Transactions = payment history; Payment Settings = connect Stripe/PayPal.
+- Site Essentials: Branding, colors, typography, social, SEO (per location). Event location & brochure: Step 8.
+- Customer: Book on vendor subdomain: event page → pick a date (adds date to cart) → /vendor/checkout. Ticket/table/drink selection is on checkout (per date: ticket types + quantity, table types + quantity + guest allocation if multiple tables, drink packages + quantity). Login required at checkout. If payment fails at checkout, same booking appears in Bookings → open it → pay balance on booking detail. From booking detail: pay balance, Reschedule (pick new date; add-ons for that date may be removed), Add-ons tab (add tables/tickets/drinks per date). After login → /customer/dashboard. Sidebar: Dashboard, Profile, Bookings, Notifications, Transactions.
 `;
 
   return condensed.length < KNOWLEDGE_BASE.length ? condensed : KNOWLEDGE_BASE; // Fallback to full if condensed is larger
@@ -96,6 +106,8 @@ export async function POST(req: NextRequest) {
       
       When giving answers based on the knowledge base, don't explicitly reference the knowledge base itself.
       Just incorporate the information naturally into your responses.
+      
+      When helping vendors, customers, or admins: use only plain, everyday language. Do not use URLs, paths, routes, or any technical or coding terms. Give directions by page names, menu names, and button names (e.g. "Go to Bookings in the left menu", "All Venues → click the venue", "Click View Details", "Open the Add-ons tab").
       `,
     };
 

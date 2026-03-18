@@ -598,7 +598,7 @@ export default function StepTen() {
                   <Button
                     variant="event-primary"
                     type="submit"
-                    className="rounded-full px-8 py-2"
+                    className="rounded-full px-8 py-2 text-white"
                     disabled={loading}
                   >
                     {loading ? "Saving..." : "Save & Continue"}
@@ -607,7 +607,7 @@ export default function StepTen() {
                     variant="event-secondary"
                     type="button"
                     onClick={handleSkip}
-                    className="rounded-full px-8 py-2"
+                    className="rounded-full px-8 py-2 text-white"
                     disabled={loading}
                   >
                     Skip for Now

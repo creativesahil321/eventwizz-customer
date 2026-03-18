@@ -4,6 +4,8 @@ import React, { ReactNode, useEffect } from "react";
 import { usePermission, useAnyPermission } from "@/hooks/usePermission";
 import { useRouter } from "next/navigation";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useAuthStore } from "@/store/auth.store";
+import { getLogoutInProgress } from "@/services/core/api-client";
 
 type PermissionRouteProps = {
   children: ReactNode;
@@ -25,6 +27,7 @@ export function PermissionRoute({
   showLoader = true,
 }: PermissionRouteProps) {
   const router = useRouter();
+  const { isAuthenticated } = useAuthStore();
 
   // Handle different permission check types
   // Always call hooks to follow Rules of Hooks
@@ -47,16 +50,23 @@ export function PermissionRoute({
   useEffect(() => {
     // Small delay to allow for hydration to complete
     const timer = setTimeout(() => {
-      if (!hasPermission) {
+      // Only redirect to the fallback when the user is authenticated but truly
+      // lacks permission. If they are logging out (isAuthenticated just became
+      // false OR logout is actively in progress), the auth guard / PageWrapper
+      // will handle the redirect to /auth/login — we must NOT race it with a
+      // redirect to /unauthorized, which causes the flash screen.
+      if (!hasPermission && isAuthenticated && !getLogoutInProgress()) {
         router.replace(fallbackPath);
       }
     }, 100);
 
     return () => clearTimeout(timer);
-  }, [hasPermission, router, fallbackPath]);
+  }, [hasPermission, isAuthenticated, router, fallbackPath]);
 
-  // Show loader while checking permissions
-  if (showLoader && !hasPermission) {
+  // Show loader only when the user is authenticated but permissions are still
+  // being resolved. Skip during logout to avoid a skeleton flash before the
+  // login redirect takes over.
+  if (showLoader && !hasPermission && isAuthenticated && !getLogoutInProgress()) {
     return (
       <div className="p-6 space-y-4">
         <Skeleton className="h-8 w-64" />

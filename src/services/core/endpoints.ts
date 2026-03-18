@@ -261,6 +261,12 @@ export const API_ENDPOINTS = {
       DISAPPROVE_DOMAIN: "/admin/venues/{id}/domain/disapprove",
       COMMENTS: "/admin/venues/{id}/comments",
       COMMENT: "/admin/venues/{id}/comments/{commentId}",
+      RESET_PASSWORD: "/admin/venues/{id}/reset-password",
+      FORCE_LOGOUT: "/admin/venues/{id}/force-logout",
+    },
+    IMPERSONATION: {
+      START: "/admin/impersonate/vendor",
+      EXIT: "/admin/impersonate/exit",
     },
     USER: {
       ALL: "/admin/users/all",

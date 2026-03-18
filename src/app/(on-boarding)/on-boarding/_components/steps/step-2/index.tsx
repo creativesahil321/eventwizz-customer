@@ -169,7 +169,7 @@ export default function StepTwo() {
                     </OnboardingSectionTitle>
                     <FormControl>
                       <div
-                        className="flex flex-col justify-center items-center h-full space-y-2 bg-[#F3F4F6] p-4 rounded-md"
+                        className="flex flex-col justify-center items-center h-full space-y-2 bg-white/5 p-4 rounded-lg border border-white/10"
                         onClick={() => handleFieldFocus("logo")}
                       >
                         {logoUrl ? (
@@ -219,7 +219,7 @@ export default function StepTwo() {
                     </OnboardingSectionTitle>
                     <FormControl>
                       <div
-                        className="flex flex-col justify-center items-center h-full space-y-2 bg-[#F3F4F6] p-4 rounded-md"
+                        className="flex flex-col justify-center items-center h-full space-y-2 bg-white/5 p-4 rounded-lg border border-white/10"
                         onClick={() => handleFieldFocus("cover_image")}
                       >
                         {coverUrl ? (
@@ -471,6 +471,7 @@ export default function StepTwo() {
                 <Button
                   variant="event-primary"
                   type="button"
+                  className="text-white rounded-full px-8 py-2"
                   onClick={async () => {
                     setLoading(true);
                     try {
@@ -596,7 +597,6 @@ export default function StepTwo() {
                     }
                   }}
                   disabled={loading}
-                  className=" rounded-full px-8 py-2"
                 >
                   {loading ? "Saving..." : "Save & Next"}
                 </Button>

@@ -402,7 +402,7 @@ export default function StepEight() {
                     Add More Information
                   </OnboardingSectionTitle>
 
-                  <div className="space-y-6 border border-[#E5E7EB] p-6 rounded-md bg-white mt-4">
+                  <div className="space-y-6 border border-white/10 p-6 rounded-md bg-white mt-4">
                     <FormField
                       control={form.control}
                       name="brochure_pdf"
@@ -688,7 +688,7 @@ export default function StepEight() {
                     Event Location
                   </OnboardingSectionTitle>
 
-                  <div className="space-y-4 border border-[#E5E7EB] p-6 rounded-md bg-white">
+                  <div className="space-y-4 border border-white/10 p-6 rounded-md bg-white">
                     <FormField
                       control={form.control}
                       name="event_address"
@@ -791,7 +791,7 @@ export default function StepEight() {
                     Price Information
                   </OnboardingSectionTitle>
 
-                  <div className="space-y-4 border border-[#E5E7EB] p-6 rounded-md bg-white mt-4">
+                  <div className="space-y-4 border border-white/10 p-6 rounded-md bg-white mt-4">
                     <FormField
                       control={form.control}
                       name="price_start_from"
@@ -806,7 +806,7 @@ export default function StepEight() {
                               {...field}
                               placeholder="e.g. 50"
                               type="number"
-                              className="h-10 bg-[#F9FAFB] border-[#E5E7EB]"
+                              className="h-10 bg-white/5 border-white/10"
                               min="0"
                               max="999999"
                               maxLength={10}
@@ -858,7 +858,7 @@ export default function StepEight() {
                               <Input
                                 {...field}
                                 placeholder="e.g. Book Now"
-                                className="h-10 bg-[#F9FAFB] border-[#E5E7EB]"
+                                className="h-10 bg-white/5 border-white/10"
                                 maxLength={maxLength}
                                 onChange={(e) => {
                                   field.onChange(e);
@@ -906,7 +906,7 @@ export default function StepEight() {
                   <Button
                     variant="event-primary"
                     type="submit"
-                    className="rounded-full px-8 py-2"
+                    className="rounded-full px-8 py-2 text-white"
                     disabled={loading}
                   >
                     {loading ? "Saving..." : "Save & Next"}
@@ -915,7 +915,7 @@ export default function StepEight() {
                     variant="event-secondary"
                     type="button"
                     onClick={() => setActiveStep(9)}
-                    className="rounded-full px-8 py-2"
+                    className="rounded-full px-8 py-2 text-white"
                   >
                     Skip
                   </Button>

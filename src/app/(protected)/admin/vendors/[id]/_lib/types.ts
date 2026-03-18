@@ -29,6 +29,8 @@ export interface VenueLocation {
 
 export interface VenueDetail {
   id: number;
+  /** Backend user/vendor id — use this for impersonation API, not id (venue pk) */
+  vendorId: number;
   venueId: string;
   name: string;
   image: string;

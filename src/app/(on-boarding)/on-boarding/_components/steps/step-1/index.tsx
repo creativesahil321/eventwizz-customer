@@ -113,7 +113,7 @@ export default function StepOne() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel className="text-sm font-medium">
-                        Venue Name <span className="text-red-500">*</span>
+                        Venue Name <span className="text-red-400">*</span>
                       </FormLabel>
                       <FormControl>
                         <GoogleBusinessSearch
@@ -125,7 +125,7 @@ export default function StepOne() {
                           }
                         />
                       </FormControl>
-                      <p className="text-xs text-blue-600 mt-1 font-medium">
+                      <p className="text-xs text-[color:var(--color-primary)] mt-1 font-medium">
                         ⓘ Only verified venues from Google Places can be
                         selected
                       </p>
@@ -149,7 +149,7 @@ export default function StepOne() {
                         <Input
                           type="tel"
                           placeholder="123 456 7890"
-                          className="bg-gray-50"
+                          className="bg-white/5"
                           maxLength={20}
                           {...field}
                           onChange={(e) => {
@@ -177,7 +177,7 @@ export default function StepOne() {
                       <FormControl>
                         <Input
                           placeholder="e.g Stock Brook Country Club,..."
-                          className="bg-gray-50"
+                          className="bg-white/5"
                           {...field}
                         />
                       </FormControl>
@@ -196,7 +196,7 @@ export default function StepOne() {
                       <FormControl>
                         <Input
                           placeholder="Please enter venue email manually"
-                          className="bg-gray-50"
+                          className="bg-white/5"
                           {...field}
                         />
                       </FormControl>
@@ -217,20 +217,21 @@ export default function StepOne() {
                     return (
                       <FormItem>
                         <FormLabel className="text-sm font-medium">
-                          City <span className="text-red-500">*</span>
+                          City <span className="text-red-400">*</span>
                         </FormLabel>
                         <FormControl>
                           <Input
-                            placeholder="e.g. London"
-                            className="bg-gray-50"
+                            placeholder="Select a venue to auto-fill"
+                            className="bg-white/5 cursor-not-allowed"
                             maxLength={maxLength}
+                            readOnly
                             {...field}
                           />
                         </FormControl>
                         <div className="flex items-center justify-between">
                           <p className="text-xs text-muted-foreground mt-1">
-                            Auto-filled based on venue selection, but can be
-                            edited manually
+                            Auto-filled from Google Places when you select a
+                            venue
                           </p>
                           <div className="text-xs text-muted-foreground mt-1">
                             <span
@@ -255,7 +256,7 @@ export default function StepOne() {
                   variant="event-primary"
                   disabled={loading}
                   type="submit"
-                  className="rounded-full px-8 py-2"
+                  className="rounded-full px-8 py-2 text-white"
                 >
                   {loading ? "Saving..." : "Save & Next"}
                 </Button>

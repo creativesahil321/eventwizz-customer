@@ -10,6 +10,7 @@ import { env } from "@/env";
 import { useAuthStore } from "@/store/auth.store";
 import { getSession } from "next-auth/react";
 import { useDomainStore } from "@/store/domain.store";
+import { getImpersonationStatus } from "@/store/impersonation.store";
 import {
   getCorrectRedirectUrl,
   validateDomainAccess,
@@ -68,6 +69,9 @@ let isLogoutInProgress = false;
 export const setLogoutInProgress = (status: boolean): void => {
   isLogoutInProgress = status;
 };
+
+// Function to check if logout is in progress
+export const getLogoutInProgress = (): boolean => isLogoutInProgress;
 
 // Security violation tracking functions
 const recordSecurityViolation = (): number => {
@@ -228,17 +232,22 @@ apiClient.interceptors.request.use(
           console.warn(`[API Client] No domain available in domain store`);
         }
 
-        // Get location ID from Zustand location store (more reliable)
         // Get location ID from NextAuth session (secure method)
         const session = await getSession();
         if (session?.user?.vendor_location_id) {
           config.headers["X-Venue-Location-Id"] = String(
             session.user.vendor_location_id
           );
-        } else if (session?.user?.vendor_location_id) {
-          config.headers["X-Venue-Location-Id"] = String(
-            session.user.vendor_location_id
-          );
+        }
+
+        // Attach impersonation header so backend can tag audit logs
+        try {
+          const impersonation = getImpersonationStatus();
+          if (impersonation.isImpersonating) {
+            config.headers["X-Impersonating"] = "true";
+          }
+        } catch {
+          // Non-critical — impersonation store may not be hydrated yet
         }
       } catch (e) {
         console.error("Error accessing session location data:", e);
@@ -259,6 +268,63 @@ const handleUnauthorizedAccess = async (
   isSecurityViolation: boolean = false
 ): Promise<void> => {
   if (isBrowser && !isLogoutInProgress) {
+    // During impersonation, a 401 on the vendor token means the impersonation
+    // token expired. Restore admin session instead of a full destructive logout.
+    try {
+      const impersonation = getImpersonationStatus();
+      if (impersonation.isImpersonating) {
+        safeToast.warning(
+          "Impersonation session expired. Restoring admin session…"
+        );
+        // Dynamic import to avoid circular deps
+        const { useImpersonationStore } = await import(
+          "@/store/impersonation.store"
+        );
+        const store = useImpersonationStore.getState();
+        const admin = store.originalAdmin;
+        if (admin) {
+          const { signIn } = await import("next-auth/react");
+          await signIn("credentials", {
+            redirect: false,
+            email: admin.email,
+            token: admin.token,
+            account_type: admin.account_type,
+            active_role: admin.active_role ?? "",
+            uuid: admin.uuid ?? "",
+            first_name: admin.first_name ?? "",
+            last_name: admin.last_name ?? "",
+            avatar: admin.avatar ?? "",
+            status: admin.status ?? "active",
+            permissions: JSON.stringify(admin.permissions),
+          });
+          const authStore =
+            useAuthStore.getState() as unknown as AuthStoreState;
+          authStore.login(admin.token, {
+            uuid: admin.uuid,
+            email: admin.email,
+            first_name: admin.first_name,
+            last_name: admin.last_name,
+            avatar: admin.avatar,
+            status: admin.status ?? "active",
+            account_type: admin.account_type,
+            active_role: admin.active_role,
+          } as Record<string, unknown>);
+
+          const { usePermissionStore } = await import(
+            "@/store/permission.store"
+          );
+          usePermissionStore.getState().setPermissions(admin.permissions);
+          store.endImpersonation();
+          window.location.href = "/admin/dashboard";
+          return;
+        }
+        // If no admin backup, fall through to standard logout
+        store.endImpersonation();
+      }
+    } catch {
+      // Fall through to standard logout
+    }
+
     // Set logout in progress to prevent further 401 toasts
     setLogoutInProgress(true);
 
@@ -372,7 +438,7 @@ apiClient.interceptors.response.use(
             message.toLowerCase().includes("token manipulation"))) ||
         (responseData?.status === false &&
           responseData?.message ===
-            "You are not authorized to perform this action.");
+          "You are not authorized to perform this action.");
 
       // Handle specific status codes
       switch (error.response.status) {

@@ -195,7 +195,7 @@ export default function StepNine() {
                     {fields.map((field, index) => (
                       <div
                         key={field.id}
-                        className="border border-[#E5E7EB] p-6 rounded-md bg-white relative"
+                        className="border border-white/10 p-6 rounded-md bg-white relative"
                       >
                         <div className="absolute top-3 right-3">
                           <Button
@@ -204,7 +204,7 @@ export default function StepNine() {
                             size="sm"
                             onClick={() => handleRemove(index)}
                             disabled={fields.length === 1}
-                            className="h-8 w-8 p-0 rounded-full hover:bg-red-50 text-red-500"
+                            className="h-8 w-8 p-0 rounded-full text-red-400 hover:bg-red-500/10"
                           >
                             <Trash2 className="h-4 w-4" />
                           </Button>
@@ -230,7 +230,7 @@ export default function StepNine() {
                                     <Input
                                       {...field}
                                       placeholder="e.g. Is the venue heated?"
-                                      className="h-10 bg-[#F9FAFB] border-[#E5E7EB]"
+                                      className="h-10 bg-white/5 border-white/10"
                                       maxLength={maxLength}
                                       onChange={(e) => {
                                         field.onChange(e);
@@ -282,7 +282,7 @@ export default function StepNine() {
                                     <Textarea
                                       {...field}
                                       placeholder="e.g. Yes, we have multi-thermostatic heaters throughout all of our marquee venues."
-                                      className="min-h-[100px] bg-[#F9FAFB] border-[#E5E7EB]"
+                                      className="min-h-[100px] bg-white/5 border-white/10"
                                       maxLength={maxLength}
                                       onChange={(e) => {
                                         field.onChange(e);
@@ -324,7 +324,7 @@ export default function StepNine() {
                       <Button
                         type="button"
                         onClick={handleAppend}
-                        className="bg-[#F9FAFB] hover:bg-gray-100 text-gray-700 border border-[#E5E7EB]"
+                        className="bg-white/5 hover:bg-white/10 text-gray-700 border border-white/10"
                       >
                         <span className="mr-1">+</span> Add Another FAQ
                       </Button>
@@ -336,7 +336,7 @@ export default function StepNine() {
                   <Button
                     variant="event-primary"
                     type="button"
-                    className="rounded-full px-8 py-2"
+                    className="rounded-full px-8 py-2 text-white"
                     disabled={loading}
                     onClick={() => {
                       const data = form.getValues();
@@ -349,7 +349,7 @@ export default function StepNine() {
                     variant="event-secondary"
                     type="button"
                     onClick={() => setActiveStep(10)}
-                    className="rounded-full px-8 py-2"
+                    className="rounded-full px-8 py-2 text-white"
                   >
                     Skip
                   </Button>

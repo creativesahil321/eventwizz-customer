@@ -140,6 +140,7 @@ export default function VendorDashboardContent() {
       <section className="w-full relative">
         <DashboardBookingsTable
           initialData={recentBookings}
+          isLoading={bookingsLoading}
           search={{ page: 1, per_page: 10, search: "" }}
         />
       </section>

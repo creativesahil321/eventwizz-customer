@@ -280,6 +280,14 @@ export async function resetAllStores(): Promise<void> {
     locationStore.useLocationStore.getState().reset();
     domainStore.useDomainStore.getState().reset();
 
+    // Reset impersonation store (sessionStorage-backed)
+    try {
+      const impersonationStore = await import("@/store/impersonation.store");
+      impersonationStore.useImpersonationStore.getState().endImpersonation();
+    } catch {
+      // Silent — impersonation store may not be loaded
+    }
+
     // Clear persisted storage
     if (typeof window !== "undefined") {
       const storageKeys = [
@@ -297,6 +305,13 @@ export async function resetAllStores(): Promise<void> {
         }
       });
 
+      // Clear impersonation sessionStorage key
+      try {
+        sessionStorage.removeItem("impersonation-session");
+      } catch {
+        // Silent
+      }
+
       // Clear additional legacy storage items
       const legacyKeys = [
         "onboarding_data",
@@ -312,7 +327,6 @@ export async function resetAllStores(): Promise<void> {
           sessionStorage.removeItem(key);
         } catch (error) {
           console.error(`Failed to remove ${key} from localStorage:`, error);
-          // Silent error for legacy keys
         }
       });
     }

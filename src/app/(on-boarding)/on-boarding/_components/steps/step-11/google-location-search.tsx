@@ -166,10 +166,10 @@ const GoogleLocationSearch: React.FC<Props> = ({
     <div className={`relative w-full ${className}`.trim()}>
       <Input
         ref={inputRef}
-        className={`w-full h-10 border-[#E5E7EB] ${
+        className={`w-full h-10 border-white/10 ${
           isSelected
             ? "bg-green-50 dark:bg-green-950/30 cursor-default"
-            : "bg-[#F9FAFB]"
+            : "bg-white/5"
         }`}
         value={isSelected ? value : searchQuery}
         onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
@@ -225,12 +225,12 @@ const GoogleLocationSearch: React.FC<Props> = ({
       )}
 
       {suggestions.length > 0 && !isSelected && (
-        <ul className="absolute z-50 mt-1 w-full max-h-60 overflow-auto rounded-md border border-[#E5E7EB] bg-background shadow-lg">
+        <ul className="absolute z-50 mt-1 w-full max-h-60 overflow-auto rounded-md border border-white/10 bg-background shadow-lg">
           {suggestions.map((sug) => (
             <li
               key={sug.place_id}
               onClick={() => handleSuggestionSelect(sug)}
-              className="flex cursor-pointer items-center gap-2 border-b border-[#E5E7EB] px-4 py-3 last:border-b-0 hover:bg-muted/50"
+              className="flex cursor-pointer items-center gap-2 border-b border-white/10 px-4 py-3 last:border-b-0 hover:bg-muted/50"
             >
               <span className="text-muted-foreground">📍</span>
               <span className="text-sm text-foreground">{sug.description}</span>

@@ -149,7 +149,7 @@ export function KlarnaConfig({
             id="klarna-api-username"
             {...form.register("payment_providers.klarna_api_username")}
             placeholder="Enter your Klarna API username"
-            className="h-12 bg-[#F9FAFB] border-[#E5E7EB]"
+            className="h-12 bg-white/5 border-white/10"
           />
           {form.formState.errors.payment_providers?.klarna_api_username && (
             <p className="text-xs text-red-500">
@@ -172,7 +172,7 @@ export function KlarnaConfig({
               {...form.register("payment_providers.klarna_api_password")}
               type={showPassword ? "text" : "password"}
               placeholder="Enter your Klarna API password"
-              className="h-12 bg-[#F9FAFB] border-[#E5E7EB] pr-12"
+              className="h-12 bg-white/5 border-white/10 pr-12"
             />
             <Button
               type="button"
@@ -208,7 +208,7 @@ export function KlarnaConfig({
             id="klarna-merchant-id"
             {...form.register("payment_providers.klarna_merchant_id")}
             placeholder="Enter your Klarna merchant ID"
-            className="h-12 bg-[#F9FAFB] border-[#E5E7EB]"
+            className="h-12 bg-white/5 border-white/10"
           />
         </div>
       </div>

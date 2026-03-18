@@ -186,7 +186,7 @@ export default function MenuCategoryDropdown({
             onValueChange={handleSelectChange}
             disabled={isLoading || disabled}
           >
-            <SelectTrigger className="w-full h-10 bg-[#F9FAFB] border-[#E5E7EB]">
+            <SelectTrigger className="w-full h-10 bg-white/5 border-white/10">
               <SelectValue placeholder="Select an option" />
             </SelectTrigger>
             <SelectContent
@@ -258,7 +258,7 @@ export default function MenuCategoryDropdown({
                         </FormControl>
                         <div className="flex justify-end mt-1">
                           <span
-                            className={`text-xs ${
+                            className={`text-xs text-black ${
                               currentLength > maxLength
                                 ? "text-destructive"
                                 : ""

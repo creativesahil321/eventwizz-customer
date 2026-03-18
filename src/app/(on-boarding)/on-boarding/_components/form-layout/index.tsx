@@ -25,9 +25,9 @@ const StepEleven = lazy(() => import("../steps/step-11"));
 
 const StepLoader = () => (
   <div className="w-full max-w-md animate-fadeIn">
-    <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-xl p-8 border border-gray-200 dark:border-gray-800">
+    <div className="bg-slate-900/60 backdrop-blur-xl rounded-2xl p-8 border border-white/10">
       <div className="mb-6">
-        <Skeleton className="h-7 w-2/3 rounded-lg" />
+        <Skeleton className="h-7 w-2/3 rounded-lg bg-white/10" />
       </div>
       {[1, 2, 3].map((field, index) => (
         <div
@@ -35,12 +35,12 @@ const StepLoader = () => (
           className="space-y-2 mb-6"
           style={{ animationDelay: `${index * 100}ms` }}
         >
-          <Skeleton className="h-4 w-1/4 rounded-md" />
-          <Skeleton className="h-10 w-full rounded-lg" />
+          <Skeleton className="h-4 w-1/4 rounded-md bg-white/10" />
+          <Skeleton className="h-10 w-full rounded-lg bg-white/5" />
         </div>
       ))}
       <div className="flex justify-center mt-8">
-        <Skeleton className="h-11 w-40 rounded-full" />
+        <Skeleton className="h-11 w-40 rounded-full bg-white/10" />
       </div>
     </div>
   </div>
@@ -74,18 +74,16 @@ const SplitLayout = React.memo(
     };
 
     return (
-      <div className="w-full">
-        {/* Conditional Stepper - Only show when sidebar is not collapsed */}
+      <div className="w-full bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950">
         {!isSidebarCollapsed && <Stepper activeStep={activeStep} />}
 
         <section className="flex w-full h-screen overflow-hidden relative">
-          {/* Sidebar Toggle Button - Click only, no hover */}
           <div className="absolute top-1/2 left-0 z-50 transform -translate-y-1/2">
             <Button
-              variant="event-outline"
+              variant="ghost"
               size="icon"
               onClick={toggleSidebar}
-              className="bg-white hover:bg-gray-50 shadow-xl border-gray-300 rounded-full w-10 h-10 p-0 transition-colors duration-200"
+              className="bg-white/10 hover:bg-white/20 backdrop-blur-sm border border-white/10 text-white rounded-full w-10 h-10 p-0 transition-colors duration-200"
               title={isSidebarCollapsed ? "Show Form" : "Hide Form"}
               aria-label={isSidebarCollapsed ? "Show Form" : "Hide Form"}
             >
@@ -97,9 +95,8 @@ const SplitLayout = React.memo(
             </Button>
           </div>
 
-          {/* Sidebar - Smooth professional transition */}
           <aside
-            className={`transition-all duration-500 ease-in-out overflow-hidden ${
+            className={`onboarding-dark transition-all duration-500 ease-in-out overflow-hidden ${
               isSidebarCollapsed
                 ? "w-0 min-w-0 max-w-0 mx-0 opacity-0 pointer-events-none"
                 : "w-2/5 min-w-[320px] max-w-[400px] mx-2 opacity-100 pr-3"
@@ -112,9 +109,8 @@ const SplitLayout = React.memo(
             </ScrollArea>
           </aside>
 
-          {/* Main Preview Area - Smooth transition */}
           <main
-            className={`flex-1 overflow-hidden transition-all duration-500 ease-in-out`}
+            className="flex-1 overflow-hidden transition-all duration-500 ease-in-out"
           >
             <div className="h-full">
               <PreviewContainer />
@@ -155,18 +151,17 @@ const FullLayout = React.memo(
 
     return (
       <section
-        className={`w-full ${
+        className={`w-full bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 ${
           activeStep === 5 || activeStep === 1 ? "overflow-visible" : ""
         }`}
       >
-        {/* Show stepper for centered steps */}
         {centered && <Stepper activeStep={activeStep} />}
 
         <ScrollArea
           className={`w-full ${scrollAreaClasses}`}
           type={activeStep === 5 || activeStep === 1 ? "always" : "auto"}
         >
-          <div data-step={activeStep} className={containerClasses}>
+          <div data-step={activeStep} className={`onboarding-dark ${containerClasses}`}>
             <Suspense fallback={<StepLoader />}>
               <Step />
             </Suspense>
@@ -215,7 +210,7 @@ const FormLayoutProvider = () => {
     );
   }
 
-  return <div className="w-full">{renderedStep}</div>;
+  return <div className="w-full min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950">{renderedStep}</div>;
 };
 FormLayoutProvider.displayName = "FormLayoutProvider";
 

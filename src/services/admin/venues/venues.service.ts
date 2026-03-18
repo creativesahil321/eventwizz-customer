@@ -84,6 +84,45 @@ export const adminVenuesService = {
     return api.put<AdminVenueUpdateResponse>(url, payload, { returnFullResponse: true });
   },
 
+  /**
+   * Update venue with a document file (multipart/form-data).
+   * Same pattern as onboarding/vendor brochure upload: FormData with key business_documents (file) + other fields.
+   * PUT /admin/venues/{id} — backend expects file under key business_documents.
+   */
+  updateVenueWithDocument: async (
+    id: number | string,
+    payload: Omit<AdminVenueUpdatePayload, "business_documents"> & {
+      document: File;
+    }
+  ): Promise<AdminVenueUpdateResponse> => {
+    const url = API_ENDPOINTS.ADMIN.VENUES.UPDATE.replace("{id}", String(id));
+    const formData = new FormData();
+    // Backend expects the file in payload key business_documents (not document)
+    formData.append("business_documents", payload.document);
+    formData.append("phone", payload.phone ?? "");
+    formData.append("address", payload.address ?? "");
+    formData.append("vat_number", payload.vat_number ?? "");
+    formData.append("kyc_status", payload.kyc_status ?? "");
+    formData.append("domain_status", payload.domain_status ?? "");
+    // Unset Content-Type for this request so axios sends multipart/form-data with boundary
+    // (api client defaults to application/json, which would serialize the file as {})
+    return api.put<AdminVenueUpdateResponse>(url, formData, {
+      returnFullResponse: true,
+      headers: { "Content-Type": false } as unknown as Record<string, string>,
+    });
+  },
+
+  /**
+   * Soft delete a venue (moves it to trash but can be restored).
+   * DELETE /admin/venues/delete/{id}
+   */
+  deleteVenue: async (id: number | string) => {
+    const url = API_ENDPOINTS.ADMIN.VENUES.DELETE.replace("{id}", String(id));
+    return api.delete<{ status: boolean; message: string }>(url, {
+      returnFullResponse: true,
+    });
+  },
+
   // ── Comment system ────────────────────────────────────────────────────────
 
   /** GET /admin/venues/{id}/comments */
@@ -103,18 +142,6 @@ export const adminVenuesService = {
     return api.post<AdminVenueCommentResponse>(url, { body }, { returnFullResponse: true });
   },
 
-  /** PUT /admin/venues/{id}/comments/{commentId} */
-  updateComment: async (
-    id: number | string,
-    commentId: number | string,
-    body: string
-  ): Promise<AdminVenueCommentResponse> => {
-    const url = API_ENDPOINTS.ADMIN.VENUES.COMMENT
-      .replace("{id}", String(id))
-      .replace("{commentId}", String(commentId));
-    return api.put<AdminVenueCommentResponse>(url, { body }, { returnFullResponse: true });
-  },
-
   /** DELETE /admin/venues/{id}/comments/{commentId} */
   deleteComment: async (
     id: number | string,
@@ -124,5 +151,31 @@ export const adminVenuesService = {
       .replace("{id}", String(id))
       .replace("{commentId}", String(commentId));
     return api.delete<AdminVenueCommentDeleteResponse>(url, { returnFullResponse: true });
+  },
+
+  /**
+   * Generate a new random password for the vendor account and email it to the contact email.
+   * POST /admin/venues/{id}/reset-password — {id} is vendor_id (user id), not venue id.
+   */
+  resetVendorPassword: async (vendorId: number | string) => {
+    const url = API_ENDPOINTS.ADMIN.VENUES.RESET_PASSWORD.replace("{id}", String(vendorId));
+    return api.post<{ status: boolean; message: string; data?: unknown; errors: unknown[] }>(
+      url,
+      {},
+      { returnFullResponse: true }
+    );
+  },
+
+  /**
+   * Force logout the vendor from all sessions.
+   * POST /admin/venues/{id}/force-logout — {id} is vendor_id (user id), not venue id.
+   */
+  forceVendorLogout: async (vendorId: number | string) => {
+    const url = API_ENDPOINTS.ADMIN.VENUES.FORCE_LOGOUT.replace("{id}", String(vendorId));
+    return api.post<{ status: boolean; message: string; data?: unknown; errors: unknown[] }>(
+      url,
+      {},
+      { returnFullResponse: true }
+    );
   },
 };

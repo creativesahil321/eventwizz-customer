@@ -81,14 +81,7 @@ const CustomerMenuDataTable = forwardRef<
     []
   );
 
-  const columns = useMemo(
-    () =>
-      getCustomerMenuColumns({
-        onDelete: () => {},
-        isDeleting: () => false,
-      }),
-    []
-  );
+  const columns = useMemo(() => getCustomerMenuColumns(), []);
 
   const { table } = useDataTable({
     data: rows,

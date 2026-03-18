@@ -99,6 +99,12 @@ export default function PublishTab() {
   // const showReminderDays = watch("reminder_email_before_days") !== undefined;
   const isDuplicate = watch("is_duplicate") || false;
 
+  const params = useParams<{ eventID: string }>();
+  const eventId = Array.isArray(params?.eventID)
+    ? params?.eventID[0]
+    : params?.eventID;
+  const { invalidateCache, eventData } = useEventData(eventId);
+
   // Handle form submission
   const handleSubmit = useCallback(
     async (data: StepEightType) => {
@@ -161,8 +167,9 @@ export default function PublishTab() {
 
         if (response && response.status) {
           // Success message is handled by axios interceptor
-          // Move to the next step
           await save();
+          await invalidateCache?.();
+          router.push("/vendor/events");
         } else {
           const errorMessage =
             response?.message ||
@@ -178,13 +185,8 @@ export default function PublishTab() {
         setIsLoading(false);
       }
     },
-    [form, globalForm, save, setActiveField]
+    [form, globalForm, save, setActiveField, invalidateCache, router]
   );
-  const params = useParams<{ eventID: string }>();
-  const eventId = Array.isArray(params?.eventID)
-    ? params?.eventID[0]
-    : params?.eventID;
-  const { invalidateCache, eventData } = useEventData(eventId);
 
   // Check if event is cancelled
   const isEventCancelled =

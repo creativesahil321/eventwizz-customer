@@ -47,9 +47,14 @@ export default function Stepper({ activeStep }: { activeStep: number }) {
       : "/assets/images/logos/eventwizz-logo.png";
 
   return (
-    <div className="bg-[#12023e] backdrop-blur-md bg-opacity-90 border-b border-white/10 py-5">
+    <div className="relative bg-slate-950/80 backdrop-blur-xl border-b border-white/[0.06] py-5">
+      <div
+        className="absolute inset-0 opacity-[0.04]"
+        style={{
+          backgroundImage: `linear-gradient(90deg, var(--color-primary, #3b82f6) 0%, var(--color-secondary, #8b5cf6) 100%)`,
+        }}
+      />
       <div className="relative">
-        {/* Main Site Logo - Left Side - Responsive sizing for all screens */}
         <div className="absolute left-0 top-1/2 transform -translate-y-1/2 pl-4 md:pl-6 z-10 pr-4 md:pr-6">
           <Link href="/" aria-label="Home">
             <img
@@ -62,26 +67,24 @@ export default function Stepper({ activeStep }: { activeStep: number }) {
           </Link>
         </div>
 
-        {/* Main container for stepper and right side */}
         <div className="flex items-center justify-between max-w-7xl mx-auto pl-28 md:pl-32 lg:pl-36 xl:pl-40 pr-4">
-          {/* Stepper - Scrollable on medium screens, centered on large */}
           <div className="relative flex-1 overflow-x-auto overflow-y-visible no-scrollbar">
             <div className="relative flex justify-center items-start space-x-2 md:space-x-3 lg:space-x-4 min-w-max px-4 md:px-6">
-              {/* Background base line */}
-              <div className="absolute top-[22px] left-4 md:left-6 right-4 md:right-6 h-[3px] bg-gray-600 z-0" />
+              <div className="absolute top-[22px] left-4 md:left-6 right-4 md:right-6 h-[2px] bg-white/[0.08] z-0 rounded-full" />
 
-              {/* Progress filled line */}
               <div
-                className="absolute top-[22px] left-4 md:left-6 h-[3px] bg-green-500 z-10 transition-all duration-500"
+                className="absolute top-[22px] left-4 md:left-6 h-[2px] z-10 transition-all duration-700 ease-out rounded-full"
                 style={{
                   width: `calc(${
                     ((activeStep - 1) / (steps.length - 1)) * 100
                   }% + ${100 / steps.length / 2}%)`,
+                  background: `linear-gradient(90deg, var(--color-primary, #3b82f6), var(--color-secondary, #8b5cf6))`,
+                  boxShadow: `0 0 12px color-mix(in srgb, var(--color-primary, #3b82f6) 40%, transparent)`,
                 }}
               />
 
               {steps.map((step) => {
-                const isCompleted = step.id <= lastCompletedStep; // Use lastCompletedStep here
+                const isCompleted = step.id <= lastCompletedStep;
                 const isCurrent = step.id === activeStep;
 
                 const handleClick = async () => {
@@ -103,21 +106,36 @@ export default function Stepper({ activeStep }: { activeStep: number }) {
                       className={cn(
                         "flex items-center justify-center w-10 h-10 rounded-full border-2 transition-all duration-300 ease-in-out transform",
                         isCompleted
-                          ? "bg-green-500 text-white border-green-500 hover:brightness-110 hover:scale-110 cursor-pointer"
+                          ? "text-white hover:brightness-110 hover:scale-110 cursor-pointer"
                           : isCurrent
-                          ? "bg-white text-green-600 border-green-500 shadow hover:scale-110 cursor-pointer"
-                          : "bg-[#1c1c4d] text-gray-400 border-gray-600 cursor-not-allowed"
+                          ? "bg-white shadow-lg hover:scale-110 cursor-pointer"
+                          : "bg-slate-900/80 text-slate-500 border-slate-700/50 cursor-not-allowed"
                       )}
+                      style={
+                        isCompleted
+                          ? {
+                              background: `linear-gradient(135deg, var(--color-primary, #3b82f6), var(--color-secondary, #8b5cf6))`,
+                              borderColor: `var(--color-primary, #3b82f6)`,
+                              boxShadow: `0 0 15px color-mix(in srgb, var(--color-primary, #3b82f6) 25%, transparent)`,
+                            }
+                          : isCurrent
+                          ? {
+                              borderColor: `var(--color-primary, #3b82f6)`,
+                              color: `var(--color-primary, #3b82f6)`,
+                              boxShadow: `0 0 20px color-mix(in srgb, var(--color-primary, #3b82f6) 20%, transparent)`,
+                            }
+                          : undefined
+                      }
                     >
                       {step.icon}
                     </div>
                     <div className="text-center mt-2 w-20">
                       <p
                         className={cn(
-                          "text-xs font-medium leading-snug",
+                          "text-xs font-medium leading-snug transition-colors",
                           isCurrent || isCompleted
                             ? "text-white"
-                            : "text-gray-400"
+                            : "text-slate-500"
                         )}
                       >
                         {step.label}

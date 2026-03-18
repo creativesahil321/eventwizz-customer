@@ -64,6 +64,7 @@ function mapApiToVenueDetail(data: AdminVenueByIdData): VenueDetail {
 
   return {
     id: venue.id,
+    vendorId: venue.vendor_id,
     venueId: venue.venue_id,
     name: venue.venue_name,
     image: venue.logo,

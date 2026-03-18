@@ -1,7 +1,9 @@
 "use client";
 
 import { useState } from "react";
+import Image from "next/image";
 import { Button } from "@/components/ui/button";
+import { CheckCircle2, Star } from "lucide-react";
 import BookACallModal from "../book-a-call-modal";
 
 export default function HeroSection() {
@@ -9,24 +11,60 @@ export default function HeroSection() {
 
   return (
     <>
-      <section className="relative pt-32 pb-20 md:pt-40 md:pb-28 bg-[color:var(--color-background)] overflow-hidden">
-        <div className="absolute inset-0 z-0 opacity-20">
-          <div className="absolute top-20 left-1/4 w-2 h-2 rounded-full bg-[color:var(--color-primary)] animate-pulse" />
-          <div className="absolute top-40 left-3/4 w-3 h-3 rounded-full bg-[color:var(--color-primary)] animate-pulse" />
-          <div className="absolute bottom-20 left-1/3 w-2 h-2 rounded-full bg-[color:var(--color-secondary)] animate-pulse" />
+      {/*
+        Hero always uses a real image background + dark overlay.
+        ALL text is forced white — never theme vars — so it works
+        regardless of what theme color the tenant has set.
+        Theme vars (--color-primary) are only used for small accents.
+      */}
+      <section className="relative min-h-[92vh] flex items-center overflow-hidden">
+        {/* ── Full-bleed background image ── */}
+        <div className="absolute inset-0 z-0">
+          <Image
+            src="/assets/images/admin/hero-venue.jpg"
+            alt="Event venue background"
+            fill
+            className="object-cover object-center"
+            priority
+          />
+          {/* Dark gradient overlay so text is always readable */}
+          <div className="absolute inset-0 bg-gradient-to-r from-black/80 via-black/60 to-black/30" />
+          {/* Subtle primary-colour tint on the left for brand personality */}
+          <div className="absolute inset-0 bg-gradient-to-br from-[color:var(--color-primary)]/20 via-transparent to-transparent" />
         </div>
 
-        <div className="container mx-auto px-4 relative z-10">
+        {/* ── Content ── */}
+        <div className="relative z-10 container mx-auto px-4 pt-32 pb-20 md:pt-40 md:pb-28">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
-            <div className="flex flex-col space-y-6 text-[color:var(--color-text)]">
-              <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold leading-tight">
+
+            {/* Left: Text & CTA — all white, no theme vars for colour */}
+            <div className="flex flex-col space-y-6">
+              {/* Trust chip — white/translucent so it works on any BG */}
+              <div className="inline-flex items-center gap-2 bg-white/15 backdrop-blur-sm border border-white/25 text-white rounded-full px-4 py-1.5 text-sm font-medium w-fit">
+                <Star className="h-3.5 w-3.5 fill-current text-yellow-400" />
+                Trusted by 100+ UK venues
+              </div>
+
+              <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold leading-tight text-white">
                 Event Management Software for Venues
               </h1>
-              <p className="text-lg md:text-xl text-[color:var(--color-text-dimmed)] leading-relaxed max-w-lg">
+
+              <p className="text-lg md:text-xl text-white/80 leading-relaxed max-w-lg">
                 Manage your venue, your way, with an event management platform
                 that allows you to sell tickets online at the touch of a button.
               </p>
-              <div className="pt-4">
+
+              {/* Feature checkmarks — white so always visible on dark bg */}
+              <div className="flex flex-wrap gap-4 text-sm text-white/90">
+                {["Ready in 15 minutes", "No technical skills needed", "Fully branded website"].map((item) => (
+                  <div key={item} className="flex items-center gap-1.5">
+                    <CheckCircle2 className="h-4 w-4 text-[color:var(--color-primary)] shrink-0" />
+                    <span>{item}</span>
+                  </div>
+                ))}
+              </div>
+
+              <div className="pt-2 flex flex-wrap gap-3">
                 <Button
                   variant="event-primary"
                   size="lg"
@@ -35,29 +73,58 @@ export default function HeroSection() {
                 >
                   Book a demo
                 </Button>
+                <Button
+                  variant="outline"
+                  size="lg"
+                  className="rounded-md px-8 text-base bg-white/10 border-white/30 text-white hover:bg-white/20 hover:text-white backdrop-blur-sm"
+                  onClick={() => setBookCallOpen(true)}
+                >
+                  Learn More
+                </Button>
               </div>
             </div>
 
+            {/* Right: Venue dashboard preview card — vendor-facing context */}
             <div className="relative hidden lg:block">
-              <div className="relative rounded-2xl overflow-hidden shadow-2xl border border-gray-800">
-                <div className="bg-gray-900 px-4 py-3 flex items-center gap-2">
+              <div className="relative rounded-2xl overflow-hidden shadow-2xl ring-2 ring-white/20 bg-white">
+                {/* Mock browser chrome */}
+                <div className="bg-gray-900 px-4 py-2.5 flex items-center gap-2">
                   <div className="flex gap-1.5">
                     <div className="w-3 h-3 rounded-full bg-red-500" />
                     <div className="w-3 h-3 rounded-full bg-yellow-500" />
                     <div className="w-3 h-3 rounded-full bg-green-500" />
                   </div>
-                  <div className="flex-1 text-center">
-                    <span className="text-xs text-gray-400">eventwizz.co.uk</span>
+                  <div className="flex-1 bg-gray-700 rounded text-center py-0.5 px-3 mx-4">
+                    <span className="text-xs text-gray-300">yourvenue.eventwizz.co.uk</span>
                   </div>
                 </div>
-                <div className="bg-gradient-to-br from-[color:var(--color-primary)] to-[color:var(--color-secondary)] p-8 min-h-[280px] flex flex-col items-center justify-center text-white text-center">
-                  <p className="text-sm font-medium mb-2 opacity-80">Christmas Party</p>
-                  <p className="text-2xl font-bold mb-4">PRICES FROM £79</p>
-                  <p className="text-lg font-semibold">JOIN US FOR OUR CHRISTMAS</p>
+
+                {/* Dashboard preview image */}
+                <div className="relative">
+                  <Image
+                    src="/assets/images/admin/dashboard-mockup.jpg"
+                    alt="EventWizz venue dashboard"
+                    width={680}
+                    height={380}
+                    className="w-full h-[340px] object-cover object-top"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/30 via-transparent to-transparent" />
                 </div>
               </div>
-              <div className="absolute -bottom-8 -right-8 w-36 h-36 bg-[color:var(--color-primary)]/20 rounded-full blur-2xl z-0" />
-              <div className="absolute -top-8 -left-8 w-36 h-36 bg-[color:var(--color-secondary)]/20 rounded-full blur-2xl z-0" />
+
+              {/* Stats floating card — vendor value props */}
+              <div className="absolute -bottom-5 -left-4 bg-white/95 backdrop-blur-sm rounded-xl px-4 py-3 shadow-xl border border-white/40">
+                <p className="text-[10px] font-semibold text-gray-400 mb-1.5 uppercase tracking-widest">Your venue, live in</p>
+                <p className="text-2xl font-extrabold text-gray-900">15 minutes</p>
+                <div className="flex items-center gap-1.5 mt-1.5">
+                  <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+                  <p className="text-xs text-gray-500 font-medium">Guided setup · No tech skills needed</p>
+                </div>
+              </div>
+
+              {/* Glow behind card */}
+              <div className="absolute -bottom-8 -right-8 w-48 h-48 bg-[color:var(--color-primary)]/30 rounded-full blur-3xl -z-10" />
+              <div className="absolute -top-8 -left-8 w-48 h-48 bg-white/10 rounded-full blur-3xl -z-10" />
             </div>
           </div>
         </div>

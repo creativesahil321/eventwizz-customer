@@ -12,11 +12,13 @@ import { DataTableToolbar } from "./data-table-toolbar";
 type DashboardBookingsTableProps = {
   initialData: Booking[];
   search: SearchParams;
+  isLoading?: boolean;
 };
 
 export default function DashboardBookingsTable({
   initialData,
   search,
+  isLoading = false,
 }: DashboardBookingsTableProps) {
   const router = useRouter();
   const onViewBooking = React.useCallback(
@@ -56,22 +58,20 @@ export default function DashboardBookingsTable({
 
   return (
     <section className="w-full relative">
-      {bookingsHistory.length === 0 ? (
+      {isLoading ? (
         <DataTableSkeleton
           columnCount={6}
           cellWidths={["10rem", "40rem", "12rem", "12rem", "8rem", "8rem"]}
           shrinkZero
         />
       ) : (
-        <>
-          <DataTable table={table} showPagination={false} stickyHeader>
-            <DataTableToolbar
-              className="bg-background p-6 border rounded-lg"
-              table={table}
-              title={title}
-            />
-          </DataTable>
-        </>
+        <DataTable table={table} showPagination={false} stickyHeader>
+          <DataTableToolbar
+            className="bg-background p-6 border rounded-lg"
+            table={table}
+            title={title}
+          />
+        </DataTable>
       )}
     </section>
   );

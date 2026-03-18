@@ -52,9 +52,12 @@ export function OnboardingTitle({ children, className }: TypographyProps) {
   return (
     <h1
       className={cn(
-        "font-Tiempos text-center text-3xl text-[#2D2D2D] tracking-tight",
+        "font-Tiempos text-center text-3xl tracking-tight bg-clip-text text-transparent",
         className
       )}
+      style={{
+        backgroundImage: `linear-gradient(135deg, #ffffff 0%, rgba(255,255,255,0.7) 100%)`,
+      }}
     >
       {children}
     </h1>
@@ -66,8 +69,14 @@ export function OnboardingSectionTitle({
   className,
 }: TypographyProps) {
   return (
-    <div className="flex items-center">
-      <h3 className={cn("text-xl font-medium title-header", className)}>
+    <div className="flex items-center gap-3">
+      <div
+        className="w-1 h-6 rounded-full"
+        style={{
+          background: `linear-gradient(to bottom, var(--color-primary, #3b82f6), var(--color-secondary, #8b5cf6))`,
+        }}
+      />
+      <h3 className={cn("text-xl font-medium text-slate-100", className)}>
         {children}
       </h3>
     </div>

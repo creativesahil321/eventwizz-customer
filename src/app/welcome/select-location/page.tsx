@@ -6,23 +6,50 @@ import { useLocationsQuery } from "@/app/(protected)/vendor/venue-locations/_lib
 import { VenueLocation } from "@/types/api.types";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
-import { InfoCircledIcon, PlusIcon } from "@radix-ui/react-icons";
+import { PlusIcon } from "@radix-ui/react-icons";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
-import Image from "next/image";
 import CreateLocationDialog from "@/app/(protected)/vendor/venue-locations/_components/_location-create";
 import { appConfig } from "@/config/app";
 import { Badge } from "@/components/ui/badge";
-import { XCircle } from "lucide-react";
+import {
+  MapPin,
+  ArrowRight,
+  CheckCircle2,
+  Loader2,
+  XCircle,
+  Sparkles,
+  Building2,
+  LogOut,
+} from "lucide-react";
+import { addCacheBusting } from "@/lib/image-utils";
+import { Skeleton } from "@/components/ui/skeleton";
+import { useTheme } from "@/providers/theme-provider/ThemeContext";
+import { logout } from "@/lib/auth/logout";
 
 export default function WelcomeLocationSelectionPage() {
   const [selectedLocationId, setSelectedLocationId] = useState<number | null>(null);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const { data: session, status: sessionStatus } = useSession();
   const { mutate: switchLocation, isPending } = useSwitchLocation();
-  const { data: session } = useSession();
   const router = useRouter();
 
-  // Use TanStack Query to fetch locations (support { data, meta } or array)
+  const { theme } = useTheme();
+  const logoSrc = theme?.logo
+    ? addCacheBusting(theme.logo)
+    : addCacheBusting(appConfig.logo);
+
+  // Resolve greeting only when session is ready — prevents flash
+  const sessionReady = sessionStatus === "authenticated" && session?.user != null;
+  const welcomeLine =
+    sessionReady && session.user.isOnboarded === true ? "Welcome back," : "Welcome,";
+
+  const handleLogout = async () => {
+    setIsLoggingOut(true);
+    await logout();
+  };
+
   const { data: locationsData, isLoading } = useLocationsQuery();
   const locationsList = React.useMemo(() => {
     if (!locationsData) return [];
@@ -30,7 +57,6 @@ export default function WelcomeLocationSelectionPage() {
     return locationsData.data || [];
   }, [locationsData]);
 
-  // Auto-select default location on mount
   useEffect(() => {
     if (locationsList.length > 0 && !selectedLocationId) {
       const defaultLocation =
@@ -39,15 +65,12 @@ export default function WelcomeLocationSelectionPage() {
     }
   }, [locationsList, selectedLocationId]);
 
-  // Handler for selecting a location
   const handleLocationSelect = (location: VenueLocation) => {
     setSelectedLocationId(location.id);
   };
 
-  // Handler for confirming selection
   const handleConfirm = () => {
     if (!selectedLocationId) return;
-
     switchLocation(selectedLocationId, {
       onSuccess: () => {
         router.push("/vendor/dashboard");
@@ -57,283 +80,410 @@ export default function WelcomeLocationSelectionPage() {
 
   const firstName =
     session?.user?.first_name || session?.user?.name?.split(" ")[0] || "User";
+  const fullName = session?.user?.name || firstName;
+  const userEmail = session?.user?.email || "";
+  const userAvatar = (session?.user as Record<string, unknown>)?.avatar as string || "";
+  // Initials fallback when no avatar
+  const initials = fullName
+    .split(" ")
+    .map((w) => w[0])
+    .slice(0, 2)
+    .join("")
+    .toUpperCase();
+
+  const selectedLocation = locationsList.find(
+    (l) => l.id === selectedLocationId,
+  );
 
   return (
-    <div className="flex flex-col min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
-      {/* Logo at the top */}
-      <div className="w-full bg-white/80 backdrop-blur-sm border-b border-gray-200/60 shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 py-4 flex justify-center">
-          <Link href="/" className="flex items-center gap-2">
-            <Image
-              src="/assets/images/logos/eventwizz-logo.png"
+    <div className="h-screen overflow-hidden flex flex-col lg:flex-row">
+      {/* ── Left panel (desktop only) — gradient uses dynamic theme primary ── */}
+      <div
+        className="hidden lg:flex flex-col w-[400px] xl:w-[460px] shrink-0 relative overflow-hidden"
+        style={{
+          background:
+            "linear-gradient(to bottom right, var(--color-primary) 0%, color-mix(in srgb, var(--color-primary) 65%, black) 100%)",
+        }}
+      >
+        {/* Decorative circles */}
+        <div className="absolute -top-20 -left-20 w-72 h-72 rounded-full bg-white/5" />
+        <div className="absolute top-1/2 -right-16 w-56 h-56 rounded-full bg-white/5" />
+        <div className="absolute -bottom-12 -left-12 w-64 h-64 rounded-full bg-white/5" />
+
+        <div className="relative z-10 flex flex-col h-full px-8 pt-8 pb-6">
+          {/* Logo — bare on the gradient; white text logo reads naturally */}
+          <Link href="/" className="self-start mb-auto">
+            <img
+              src={logoSrc}
               alt={appConfig.name}
-              width={140}
-              height={40}
-              priority
-              className="h-10 w-auto"
+              className="h-8 w-auto object-contain max-w-[140px] drop-shadow-sm"
             />
           </Link>
+
+          {/* Welcome copy */}
+          <div className="my-auto py-6">
+            <div className="inline-flex items-center gap-2 bg-white/15 rounded-full px-3 py-1.5 mb-5">
+              <Sparkles className="h-3.5 w-3.5 text-white" />
+              <span className="text-xs font-medium text-white/90 tracking-wide">
+                Venue Management
+              </span>
+            </div>
+            <h1 className="text-4xl xl:text-5xl font-bold text-white leading-tight mb-3 min-h-[4.5rem]">
+              {sessionReady ? (
+                <>
+                  {welcomeLine}
+                  <br />
+                  <span className="text-white/80">{firstName}!</span>
+                </>
+              ) : (
+                <>
+                  <Skeleton className="mb-2 h-9 w-48 max-w-full bg-white/20" />
+                  <Skeleton className="h-9 w-36 bg-white/20" />
+                </>
+              )}
+            </h1>
+            <p className="text-white/65 text-sm leading-relaxed mb-6 max-w-[260px]">
+              Pick a venue below and jump straight into your dashboard.
+            </p>
+
+            {/* Stats pills */}
+            <div className="flex flex-col gap-2.5">
+              <div className="flex items-center gap-3 bg-white/10 rounded-xl p-3">
+                <div className="h-8 w-8 rounded-lg bg-white/20 flex items-center justify-center shrink-0">
+                  <Building2 className="h-4 w-4 text-white" />
+                </div>
+                <div>
+                  <p className="text-white text-sm font-medium leading-tight">
+                    {locationsList.length} venue{locationsList.length !== 1 ? "s" : ""} available
+                  </p>
+                  <p className="text-white/50 text-xs">on your account</p>
+                </div>
+              </div>
+              {selectedLocation && (
+                <div className="flex items-center gap-3 bg-white/10 rounded-xl p-3">
+                  <div className="h-8 w-8 rounded-lg bg-white/20 flex items-center justify-center shrink-0">
+                    <CheckCircle2 className="h-4 w-4 text-white" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-white text-sm font-medium truncate leading-tight">
+                      {selectedLocation.city || selectedLocation.name}
+                    </p>
+                    <p className="text-white/50 text-xs">currently selected</p>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* User card + logout */}
+          <div className="border-t border-white/10 pt-4">
+            <div className="flex items-center gap-3 bg-white/10 hover:bg-white/15 transition-colors rounded-2xl p-3">
+              {/* Avatar */}
+              <div className="shrink-0">
+                {userAvatar ? (
+                  <img
+                    src={addCacheBusting(userAvatar)}
+                    alt={fullName}
+                    className="h-10 w-10 rounded-full object-cover ring-2 ring-white/30"
+                  />
+                ) : (
+                  <div className="h-10 w-10 rounded-full bg-white/25 flex items-center justify-center text-white text-sm font-bold ring-2 ring-white/30">
+                    {initials}
+                  </div>
+                )}
+              </div>
+
+              {/* Name + email */}
+              <div className="flex-1 min-w-0">
+                <p className="text-white text-sm font-semibold truncate leading-tight">
+                  {fullName}
+                </p>
+                {userEmail && (
+                  <p className="text-white/55 text-xs truncate mt-0.5">
+                    {userEmail}
+                  </p>
+                )}
+              </div>
+
+              {/* Logout button */}
+              <button
+                type="button"
+                onClick={handleLogout}
+                disabled={isLoggingOut}
+                title="Sign out"
+                className="shrink-0 h-8 w-8 rounded-lg bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors disabled:opacity-50"
+              >
+                {isLoggingOut ? (
+                  <Loader2 className="h-4 w-4 text-white animate-spin" />
+                ) : (
+                  <LogOut className="h-4 w-4 text-white" />
+                )}
+              </button>
+            </div>
+
+            <p className="text-white/30 text-xs mt-3 text-center">
+              &copy; {new Date().getFullYear()} {appConfig.name}
+            </p>
+          </div>
+          {/* end user card wrapper */}
         </div>
       </div>
 
-      {/* Main content centered */}
-      <div className="flex-1 flex items-center justify-center px-4 py-8">
-        <div className="w-full max-w-2xl mx-auto">
-          {/* Welcome message with improved styling */}
-          <div className="text-center mb-8 animate-fade-in">
-            <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-gradient-to-br from-[color:var(--color-primary)] to-blue-600 mb-4 shadow-lg">
-              <svg
-                className="w-8 h-8 text-white"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"
-                />
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"
-                />
-              </svg>
+      {/* ── Right panel ────────────────────────────────────── */}
+      <div className="flex-1 flex flex-col h-screen overflow-hidden bg-gradient-to-br from-slate-50 to-slate-100/70">
+        {/* Mobile header */}
+        <header className="lg:hidden shrink-0 bg-white border-b border-gray-100 px-4 py-3 flex items-center justify-between gap-3">
+          <Link href="/">
+            <img
+              src={logoSrc}
+              alt={appConfig.name}
+              className="h-8 w-auto object-contain max-w-[100px]"
+            />
+          </Link>
+
+          {/* Mobile: user identity + logout */}
+          <div className="flex items-center gap-2.5 min-w-0">
+            {userAvatar ? (
+              <img
+                src={addCacheBusting(userAvatar)}
+                alt={fullName}
+                className="h-8 w-8 rounded-full object-cover shrink-0"
+              />
+            ) : (
+              <div className="h-8 w-8 rounded-full bg-[color:var(--color-primary)]/10 text-[color:var(--color-primary)] flex items-center justify-center text-xs font-bold shrink-0">
+                {initials}
+              </div>
+            )}
+            <div className="min-w-0 hidden xs:block">
+              <p className="text-xs font-semibold text-gray-800 truncate leading-tight">
+                {fullName}
+              </p>
+              {userEmail && (
+                <p className="text-[10px] text-muted-foreground truncate">
+                  {userEmail}
+                </p>
+              )}
             </div>
-            <h1 className="text-3xl md:text-4xl font-bold text-gray-900 mb-2">
-              Welcome, {firstName}! 👋
+            <button
+              type="button"
+              onClick={handleLogout}
+              disabled={isLoggingOut}
+              title="Sign out"
+              className="shrink-0 h-8 w-8 rounded-lg border border-gray-200 hover:bg-gray-50 flex items-center justify-center transition-colors disabled:opacity-50 ml-1"
+            >
+              {isLoggingOut ? (
+                <Loader2 className="h-3.5 w-3.5 text-gray-500 animate-spin" />
+              ) : (
+                <LogOut className="h-3.5 w-3.5 text-gray-500" />
+              )}
+            </button>
+          </div>
+        </header>
+
+        {/* Scrollable body — centers the card */}
+        <div className="flex-1 overflow-hidden flex flex-col items-center justify-center p-4 sm:p-6">
+          {/* Mobile welcome headline */}
+          <div className="lg:hidden text-center mb-5 shrink-0">
+            <h1 className="text-2xl font-bold text-gray-900 mb-1">
+              Choose a Location
             </h1>
-            <p className="text-base md:text-lg text-gray-600 max-w-md mx-auto">
-              Please select a location to continue to your dashboard
+            <p className="text-sm text-muted-foreground">
+              Select the venue to manage today
             </p>
           </div>
 
-          {/* Locations section with enhanced design */}
-          <div className="bg-white rounded-xl border border-gray-200 shadow-xl p-6 md:p-8 mb-6">
-            <div className="flex items-center justify-between mb-6">
+          {/*
+            Card: flex column, max height = viewport minus fixed chrome.
+            The list scrolls INSIDE — button stays pinned at the bottom.
+          */}
+          <div
+            className={cn(
+              "w-full max-w-md bg-white rounded-2xl border border-gray-100/80",
+              "flex flex-col overflow-hidden animate-slide-up-fade",
+              "max-h-[calc(100vh-80px)] lg:max-h-[600px]",
+            )}
+            style={{
+              boxShadow:
+                "0 0 0 1px rgba(0,0,0,0.04), 0 8px 32px -8px rgba(0,0,0,0.14), inset 0 2px 0 0 var(--color-primary)",
+            }}
+          >
+            {/* Card header */}
+            <div className="shrink-0 flex items-center justify-between px-5 pt-5 pb-4 border-b border-gray-100">
               <div>
-                <h2 className="text-xl md:text-2xl font-bold text-gray-900 mb-2">
-                  Choose a Location
-                </h2>
-                <div className="flex items-center gap-2 text-sm text-gray-600">
-                  <InfoCircledIcon className="h-4 w-4 text-[color:var(--color-primary)] flex-shrink-0" />
-                  <p>Locations are venues where your events are hosted</p>
-                </div>
+                <h2 className="text-lg font-bold text-gray-900">Your Venues</h2>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Tap a venue to select it
+                </p>
               </div>
               <CreateLocationDialog />
             </div>
 
-            {isLoading || isPending ? (
-              <div className="flex flex-col items-center justify-center py-12">
-                <div className="animate-spin rounded-full h-10 w-10 border-3 border-[color:var(--color-primary)] border-t-transparent mb-4"></div>
-                <p className="text-sm text-gray-600">Loading locations...</p>
-              </div>
-            ) : (
-              <>
-                {locationsList && locationsList.length > 0 ? (
-                  <div className="space-y-3 overflow-y-auto max-h-[400px] pr-2 custom-scrollbar">
-                    {locationsList.map((location) => (
-                      <div
-                        key={location.id}
-                        className={cn(
-                          "border-2 rounded-lg p-4 cursor-pointer transition-all duration-200 group",
-                          selectedLocationId === location.id
-                            ? "border-[color:var(--color-primary)] bg-gradient-to-br from-[color:var(--color-primary-light,#f0f9fa)] to-blue-50 shadow-md ring-2 ring-[color:var(--color-primary)] ring-opacity-20"
-                            : "border-gray-200 hover:border-gray-300 hover:shadow-md bg-white",
-                        )}
-                        onClick={() => handleLocationSelect(location)}
-                      >
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2 mb-2">
-                              <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-gradient-to-br from-[color:var(--color-primary)] to-blue-600 flex items-center justify-center">
-                                <svg
-                                  className="w-5 h-5 text-white"
-                                  fill="none"
-                                  stroke="currentColor"
-                                  viewBox="0 0 24 24"
-                                >
-                                  <path
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    strokeWidth={2}
-                                    d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"
-                                  />
-                                  <path
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    strokeWidth={2}
-                                    d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"
-                                  />
-                                </svg>
-                              </div>
-                              <div className="flex-1 min-w-0">
-                                <div className="font-semibold text-lg text-gray-900 truncate">
-                                  {location.city || "Unknown Location"}
-                                </div>
-                              </div>
-                              <div className="flex items-center gap-2 flex-shrink-0">
-                                {location.is_default && (
-                                  <div className="text-xs bg-gradient-to-r from-[color:var(--color-primary)] to-blue-600 text-white px-3 py-1 rounded-full font-semibold shadow-sm whitespace-nowrap">
-                                    Default
-                                  </div>
-                                )}
-                                {location.status === false && (
-                                  <Badge
-                                    variant="outline"
-                                    className="border-red-500 text-red-600 flex items-center gap-1 h-5 px-2 text-[10px] whitespace-nowrap"
-                                  >
-                                    <XCircle className="h-3 w-3" />
-                                    Inactive
-                                  </Badge>
-                                )}
-                              </div>
-                            </div>
-
-                            <div className="text-sm text-gray-600 mb-3 ml-12 line-clamp-2">
-                              {location.address || location.name}
-                            </div>
-
-                            <div className="flex items-center gap-3 ml-12 pt-3 border-t border-gray-100">
-                              <div className="inline-flex items-center gap-1.5 text-xs text-gray-500">
-                                <div className="w-1.5 h-1.5 rounded-full bg-gray-400"></div>
-                                <span className="font-mono">
-                                  {location.slug}
-                                </span>
-                              </div>
-                              {selectedLocationId === location.id && (
-                                <div className="ml-auto inline-flex items-center gap-1.5 text-xs font-semibold text-[color:var(--color-primary)]">
-                                  <svg
-                                    className="w-4 h-4"
-                                    fill="currentColor"
-                                    viewBox="0 0 20 20"
-                                  >
-                                    <path
-                                      fillRule="evenodd"
-                                      d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
-                                      clipRule="evenodd"
-                                    />
-                                  </svg>
-                                  Selected
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        </div>
+            {/* Scrollable location list */}
+            <div className="flex-1 overflow-y-auto min-h-0 p-4 space-y-2.5 select-location-scroll">
+              {isLoading ? (
+                <div className="space-y-2.5">
+                  {[1, 2, 3, 4].map((i) => (
+                    <div
+                      key={i}
+                      className="rounded-xl border-2 border-gray-100 p-4 flex items-start gap-3"
+                    >
+                      <Skeleton className="h-10 w-10 rounded-xl shrink-0" />
+                      <div className="flex-1 space-y-2 min-w-0">
+                        <Skeleton className="h-4 w-32" />
+                        <Skeleton className="h-3 w-full max-w-[200px]" />
+                        <Skeleton className="h-3 w-20" />
                       </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="text-center py-12 bg-gradient-to-br from-gray-50 to-gray-100 rounded-lg border-2 border-dashed border-gray-300">
-                    <div className="mb-4 inline-flex items-center justify-center w-16 h-16 rounded-full bg-gray-200">
-                      <PlusIcon className="h-8 w-8 text-gray-500" />
                     </div>
-                    <h3 className="text-xl font-semibold text-gray-900 mb-2">
-                      No Locations Found
-                    </h3>
-                    <p className="text-gray-600 mb-6 max-w-md mx-auto text-sm">
-                      You haven&apos;t created any locations yet. Locations are
-                      venues where you host your events.
+                  ))}
+                </div>
+              ) : locationsList.length === 0 ? (
+                <div className="flex flex-col items-center justify-center h-40 gap-3 text-center px-4">
+                  <div className="h-14 w-14 rounded-2xl bg-slate-100 flex items-center justify-center">
+                    <PlusIcon className="h-7 w-7 text-slate-400" />
+                  </div>
+                  <div>
+                    <p className="font-semibold text-gray-800 mb-1">
+                      No venues yet
+                    </p>
+                    <p className="text-xs text-muted-foreground mb-4">
+                      Create your first venue to get started
                     </p>
                     <CreateLocationDialog />
                   </div>
-                )}
-              </>
-            )}
+                </div>
+              ) : (
+                locationsList.map((location) => {
+                  const isSelected = selectedLocationId === location.id;
+                  return (
+                    <button
+                      key={location.id}
+                      type="button"
+                      onClick={() => handleLocationSelect(location)}
+                      className={cn(
+                        "w-full text-left rounded-xl border-2 p-4 transition-all duration-150",
+                        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--color-primary)] focus-visible:ring-offset-2",
+                        isSelected
+                          ? "border-[color:var(--color-primary)] bg-[color:var(--color-primary)]/5 shadow-sm"
+                          : "border-gray-100 bg-white hover:border-gray-200 hover:shadow-sm",
+                      )}
+                    >
+                      <div className="flex items-start gap-3">
+                        {/* Icon */}
+                        <div
+                          className={cn(
+                            "h-10 w-10 rounded-xl flex items-center justify-center shrink-0 mt-0.5 transition-colors",
+                            isSelected
+                              ? "bg-[color:var(--color-primary)] text-white"
+                              : "bg-slate-100 text-slate-500",
+                          )}
+                        >
+                          <MapPin className="h-5 w-5" />
+                        </div>
 
-            {/* Action buttons */}
-            {locationsList && locationsList.length > 0 && (
-              <div className="flex justify-end mt-6 pt-6 border-t border-gray-200">
+                        {/* Info */}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap mb-0.5">
+                            <span className="font-semibold text-sm text-gray-900 truncate">
+                              {location.city || "Unknown Location"}
+                            </span>
+                            {location.is_default && (
+                              <span className="shrink-0 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-[color:var(--color-primary)] text-white">
+                                Default
+                              </span>
+                            )}
+                            {location.status === false && (
+                              <Badge
+                                variant="outline"
+                                className="shrink-0 border-red-300 text-red-600 text-[10px] h-4 px-1.5 gap-0.5"
+                              >
+                                <XCircle className="h-2.5 w-2.5" />
+                                Inactive
+                              </Badge>
+                            )}
+                          </div>
+                          <p className="text-xs text-muted-foreground truncate mb-2">
+                            {location.address || location.name || "—"}
+                          </p>
+                          <div className="flex items-center justify-between">
+                            <span className="text-[11px] text-slate-400 font-mono">
+                              # {location.slug}
+                            </span>
+                            {isSelected && (
+                              <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-[color:var(--color-primary)]">
+                                <CheckCircle2 className="h-3.5 w-3.5" />
+                                Selected
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </button>
+                  );
+                })
+              )}
+            </div>
+
+            {/* Pinned footer — always visible, never pushed off screen */}
+            {locationsList.length > 0 && (
+              <div className="shrink-0 px-4 py-4 border-t border-gray-100 bg-white">
+                {selectedLocation && (
+                  <p className="text-xs text-muted-foreground text-center mb-3">
+                    Continuing as{" "}
+                    <span className="font-semibold text-gray-700">
+                      {selectedLocation.city || selectedLocation.name}
+                    </span>
+                  </p>
+                )}
                 <Button
                   onClick={handleConfirm}
                   disabled={!selectedLocationId || isPending}
                   variant="event-primary"
-                  size="lg"
-                  className="px-8 py-6 text-base font-semibold shadow-lg hover:shadow-xl transition-all duration-200 min-w-[200px]"
+                  className="w-full h-11 text-sm font-semibold gap-2"
                 >
                   {isPending ? (
-                    <span className="flex items-center justify-center">
-                      <span className="animate-spin h-5 w-5 mr-2 border-2 border-white border-t-transparent rounded-full"></span>
-                      Processing...
-                    </span>
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Switching…
+                    </>
                   ) : (
-                    <span className="flex items-center justify-center gap-2">
+                    <>
                       Continue to Dashboard
-                      <svg
-                        className="w-5 h-5"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M13 7l5 5m0 0l-5 5m5-5H6"
-                        />
-                      </svg>
-                    </span>
+                      <ArrowRight className="h-4 w-4" />
+                    </>
                   )}
                 </Button>
               </div>
             )}
           </div>
 
-          {/* Help text */}
-          <div className="text-center mb-6">
-            <p className="text-sm text-gray-600 flex items-center justify-center gap-2">
-              <InfoCircledIcon className="h-4 w-4 text-gray-400" />
-              Need help with locations?{" "}
-              <Link
-                href="/help/locations"
-                className="text-[color:var(--color-primary)] hover:underline font-medium transition-colors"
-              >
-                Learn more
-              </Link>
-            </p>
-          </div>
+          {/* Desktop footer */}
+          <p className="lg:hidden mt-4 text-xs text-muted-foreground shrink-0">
+            &copy; {new Date().getFullYear()} {appConfig.name}. All rights
+            reserved.
+          </p>
         </div>
       </div>
 
-      {/* Footer at the bottom */}
-      <footer className="w-full bg-white/60 backdrop-blur-sm border-t border-gray-200/60">
-        <div className="max-w-7xl mx-auto px-4 py-4 text-center">
-          <div className="text-xs text-gray-500">
-            &copy; {new Date().getFullYear()} {appConfig.name}. All rights
-            reserved.
-          </div>
-        </div>
-      </footer>
-
       <style jsx global>{`
-        @keyframes fade-in {
-          from {
-            opacity: 0;
-            transform: translateY(10px);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
+        .select-location-scroll::-webkit-scrollbar {
+          width: 4px;
         }
-        .animate-fade-in {
-          animation: fade-in 0.6s ease-out;
+        .select-location-scroll::-webkit-scrollbar-track {
+          background: transparent;
         }
-        .custom-scrollbar::-webkit-scrollbar {
-          width: 6px;
+        .select-location-scroll::-webkit-scrollbar-thumb {
+          background: #e2e8f0;
+          border-radius: 99px;
         }
-        .custom-scrollbar::-webkit-scrollbar-track {
-          background: #f1f1f1;
-          border-radius: 10px;
-        }
-        .custom-scrollbar::-webkit-scrollbar-thumb {
+        .select-location-scroll::-webkit-scrollbar-thumb:hover {
           background: #cbd5e1;
-          border-radius: 10px;
         }
-        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-          background: #94a3b8;
+        @keyframes slide-up-fade {
+          from { opacity: 0; transform: translateY(12px); }
+          to   { opacity: 1; transform: translateY(0); }
+        }
+        .animate-slide-up-fade {
+          animation: slide-up-fade 0.35s cubic-bezier(0.22, 1, 0.36, 1) both;
         }
       `}</style>
     </div>

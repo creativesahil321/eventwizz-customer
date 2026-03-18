@@ -292,6 +292,8 @@ const dateSchema = baseDateSchema
             const num = typeof val === "string" ? parseInt(val, 10) : val;
             return !isNaN(num) && num >= 1 && num <= 9999;
           }, "Price must be between 1 and 9,999 (4 digits max)"),
+          discount_type: z.enum(["none", "percentage", "fixed"]).optional(),
+          discount_value: z.union([z.string(), z.number()]).optional(),
         })
       )
       .optional(),
@@ -315,6 +317,8 @@ const dateSchema = baseDateSchema
             const num = typeof val === "string" ? parseInt(val, 10) : val;
             return !isNaN(num) && num >= 1 && num <= 5000;
           }, "Total tables must be between 1 and 5,000"),
+          discount_type: z.enum(["none", "percentage", "fixed"]).optional(),
+          discount_value: z.union([z.string(), z.number()]).optional(),
         })
       )
       .optional(),
@@ -505,7 +509,7 @@ export const getDefaultDate = (
         ...baseDate,
         total_ticket_types: 1,
         tickets: [
-          { title: "", description: "", total_capacity: "", price: "" },
+          { title: "", description: "", total_capacity: "", price: "", discount_type: "none", discount_value: "" },
         ],
         total_table_types: 0,
         tables: [],
@@ -520,7 +524,7 @@ export const getDefaultDate = (
         deposit_due_date: "",
         total_table_types: 1,
         tables: [
-          { min_persons: "", max_persons: "", price: "", total_tables: "" },
+          { min_persons: "", max_persons: "", price: "", total_tables: "", discount_type: "none", discount_value: "" },
         ],
         total_ticket_types: 0,
         tickets: [],
@@ -535,11 +539,11 @@ export const getDefaultDate = (
         deposit_due_date: "",
         total_table_types: 1,
         tables: [
-          { min_persons: "", max_persons: "", price: "", total_tables: "" },
+          { min_persons: "", max_persons: "", price: "", total_tables: "", discount_type: "none", discount_value: "" },
         ],
         total_ticket_types: 1,
         tickets: [
-          { title: "", description: "", total_capacity: "", price: "" },
+          { title: "", description: "", total_capacity: "", price: "", discount_type: "none", discount_value: "" },
         ],
       };
   }

@@ -17,6 +17,12 @@ interface AddressAutocompleteProps {
   placeholder?: string;
   className?: string;
   autoFocus?: boolean;
+  /** Optional: override input styles (e.g. dark theme) */
+  inputClassName?: string;
+  /** Optional: override suggestions dropdown styles (e.g. dark theme) */
+  suggestionsClassName?: string;
+  /** Use "dark" for dark backgrounds (e.g. review card) */
+  variant?: "default" | "dark";
 }
 
 export default function AddressAutocomplete({
@@ -27,7 +33,29 @@ export default function AddressAutocomplete({
   placeholder = "Type to search for a UK address or location...",
   className = "",
   autoFocus = false,
+  inputClassName,
+  suggestionsClassName,
+  variant = "default",
 }: AddressAutocompleteProps) {
+  const isDark = variant === "dark";
+  const resolvedInputClassName =
+    inputClassName ??
+    (isDark
+      ? "w-full px-3 py-2.5 rounded-lg bg-white/5 border border-white/10 text-white placeholder:text-slate-500 focus:outline-none focus:border-blue-500/50"
+      : undefined);
+  const resolvedSuggestionsClassName =
+    suggestionsClassName ??
+    (isDark
+      ? "absolute z-50 w-full mt-1 bg-slate-800 border border-white/10 rounded-lg shadow-xl max-h-60 overflow-y-auto"
+      : "absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-y-auto");
+  const suggestionItemTextClass = isDark ? "text-slate-200" : "text-gray-800";
+  const clearButtonClass = isDark ? "text-slate-400 hover:text-red-400" : "text-gray-400 hover:text-red-600";
+  const noResultsClass = isDark
+    ? "absolute z-50 w-full mt-1 bg-slate-800 border border-white/10 rounded-lg shadow-xl p-4 text-slate-400 text-sm"
+    : "absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg p-4 text-gray-500 text-sm";
+  const unavailableClass = isDark
+    ? "absolute z-50 w-full mt-1 bg-amber-900/30 border border-amber-500/30 rounded-lg shadow-xl p-4 text-amber-200 text-sm"
+    : "absolute z-50 w-full mt-1 bg-yellow-50 border border-yellow-300 rounded-md shadow-lg p-4 text-yellow-700 text-sm";
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -253,9 +281,10 @@ export default function AddressAutocomplete({
     <div className={`relative w-full ${className}`}>
       <Input
         ref={inputRef}
-        className={`w-full border p-2 rounded ${
-          isSelected ? "bg-green-50 cursor-not-allowed" : "bg-white"
-        }`}
+        className={
+          resolvedInputClassName ??
+          `w-full border p-2 rounded ${isSelected ? "bg-green-50 cursor-not-allowed" : "bg-white"}`
+        }
         value={isSelected ? value : searchQuery}
         onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
           handleInputChange(e.target.value)
@@ -278,7 +307,7 @@ export default function AddressAutocomplete({
           <button
             type="button"
             onClick={handleClear}
-            className="text-gray-400 hover:text-red-600 transition-colors font-bold"
+            className={`${clearButtonClass} transition-colors font-bold`}
             title="Clear selection"
           >
             ✕
@@ -288,16 +317,16 @@ export default function AddressAutocomplete({
 
       {/* Suggestions dropdown */}
       {suggestions.length > 0 && !isSelected && searchQuery && (
-        <div className="absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-y-auto">
+        <div className={resolvedSuggestionsClassName}>
           {suggestions.map((suggestion) => (
             <div
               key={suggestion.place_id}
-              className="px-4 py-3 cursor-pointer hover:bg-gray-50 border-b border-gray-100 last:border-b-0"
+              className={`px-4 py-3 cursor-pointer border-b last:border-b-0 hover:bg-white/10 ${isDark ? "border-white/5" : "border-gray-100"}`}
               onClick={() => handleSuggestionSelect(suggestion)}
             >
               <div className="flex items-center space-x-2">
-                <span className="text-gray-400">📍</span>
-                <span className="text-sm text-gray-800">
+                <span className={isDark ? "text-slate-500" : "text-gray-400"}>📍</span>
+                <span className={`text-sm ${suggestionItemTextClass}`}>
                   {suggestion.description}
                 </span>
               </div>
@@ -312,8 +341,8 @@ export default function AddressAutocomplete({
         !isSearching &&
         !isSelected &&
         searchQuery.length >= 2 && (
-          <div className="absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg p-4">
-            <div className="flex items-center space-x-2 text-gray-500">
+          <div className={noResultsClass}>
+            <div className="flex items-center space-x-2">
               <span>🔍</span>
               <span className="text-sm">
                 No UK addresses found. Try a different search term or use the
@@ -328,8 +357,8 @@ export default function AddressAutocomplete({
         searchQuery.length >= 2 &&
         !isSearching &&
         !autocompleteService.current && (
-          <div className="absolute z-50 w-full mt-1 bg-yellow-50 border border-yellow-300 rounded-md shadow-lg p-4">
-            <div className="flex items-center space-x-2 text-yellow-700">
+          <div className={unavailableClass}>
+            <div className="flex items-center space-x-2">
               <span>⚠️</span>
               <span className="text-sm">
                 Address search is temporarily unavailable. Please use the map

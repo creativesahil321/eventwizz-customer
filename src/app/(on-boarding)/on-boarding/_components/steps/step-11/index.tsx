@@ -328,7 +328,7 @@ export default function StepEleven() {
                       <CollapsibleTrigger asChild>
                         <Button
                           variant="ghost"
-                          className="flex w-full justify-between items-center p-4 border border-gray-200 rounded-lg hover:bg-gray-50"
+                          className="flex w-full justify-between items-center p-4 border border-gray-200 rounded-lg hover:bg-white/10"
                         >
                           <div className="flex items-center gap-2">
                             <span className="text-blue-600">🌐</span>
@@ -343,7 +343,7 @@ export default function StepEleven() {
                           />
                         </Button>
                       </CollapsibleTrigger>
-                      <CollapsibleContent className="px-4 pb-4 border border-gray-200 rounded-lg bg-gray-50/50">
+                      <CollapsibleContent className="px-4 pb-4 border border-gray-200 rounded-lg bg-white/[0.03]">
                         <div className="space-y-4 mt-4">
                           <OnboardingSectionTitle>
                             Choose Your Website Domain
@@ -398,7 +398,7 @@ export default function StepEleven() {
                                       setSelectedDomain("");
                                       form.setValue("domain", "");
                                     }}
-                                    className="absolute right-16 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                                    className="absolute right-16 top-1/2 transform -translate-y-1/2 text-slate-500 hover:text-slate-300"
                                     title="Clear domain"
                                   >
                                     ✕
@@ -447,7 +447,7 @@ export default function StepEleven() {
                                               setSelectedDomain(alt);
                                               form.setValue("domain", alt);
                                             }}
-                                            className="px-3 py-1.5 text-sm rounded-full border bg-gray-50 border-gray-200 text-gray-700 hover:bg-gray-100 hover:border-gray-300 transition-all duration-200"
+                                            className="px-3 py-1.5 text-sm rounded-full border bg-gray-50 border-gray-200 text-gray-700 hover:bg-white/10 hover:border-gray-300 transition-all duration-200"
                                           >
                                             {alt}
                                           </button>
@@ -476,7 +476,7 @@ export default function StepEleven() {
                                       className={`px-3 py-1.5 text-sm rounded-full border transition-all duration-200 hover:shadow-sm ${
                                         selectedDomain === suggestion.domain
                                           ? "bg-blue-100 border-blue-300 text-blue-700 shadow-sm"
-                                          : "bg-gray-50 border-gray-200 text-gray-700 hover:bg-gray-100 hover:border-gray-300"
+                                          : "bg-gray-50 border-gray-200 text-gray-700 hover:bg-white/10 hover:border-gray-300"
                                       }`}
                                     >
                                       {suggestion.domain.replace(
@@ -551,7 +551,7 @@ export default function StepEleven() {
                       <CollapsibleTrigger asChild>
                         <Button
                           variant="ghost"
-                          className="flex w-full justify-between items-center p-4 border border-gray-200 rounded-lg hover:bg-gray-50"
+                          className="flex w-full justify-between items-center p-4 border border-gray-200 rounded-lg hover:bg-white/10"
                         >
                           <div className="flex items-center gap-2">
                             <span className="text-orange-600">📧</span>
@@ -566,7 +566,7 @@ export default function StepEleven() {
                           />
                         </Button>
                       </CollapsibleTrigger>
-                      <CollapsibleContent className="px-4 pb-4 border border-gray-200 rounded-lg bg-gray-50/50">
+                      <CollapsibleContent className="px-4 pb-4 border border-gray-200 rounded-lg bg-white/[0.03]">
                         <div className="space-y-4 mt-4">
                           <FormField
                             control={form.control}
@@ -644,7 +644,7 @@ export default function StepEleven() {
                                       value={defaultValue}
                                     >
                                       <FormControl>
-                                        <SelectTrigger className="w-full h-10 bg-[#F9FAFB] border-[#E5E7EB] mt-4">
+                                        <SelectTrigger className="w-full h-10 bg-white/5 border-white/10 mt-4">
                                           <SelectValue placeholder="Days" />
                                         </SelectTrigger>
                                       </FormControl>
@@ -690,7 +690,7 @@ export default function StepEleven() {
                       <CollapsibleTrigger asChild>
                         <Button
                           variant="ghost"
-                          className="flex w-full justify-between items-center p-4 border border-gray-200 rounded-lg hover:bg-gray-50"
+                          className="flex w-full justify-between items-center p-4 border border-gray-200 rounded-lg hover:bg-white/10"
                         >
                           <div className="flex items-center gap-2">
                             <span className="text-purple-600">📋</span>
@@ -705,7 +705,7 @@ export default function StepEleven() {
                           />
                         </Button>
                       </CollapsibleTrigger>
-                      <CollapsibleContent className="px-4 pb-4 border border-gray-200 rounded-lg bg-gray-50/50">
+                      <CollapsibleContent className="px-4 pb-4 border border-gray-200 rounded-lg bg-white/[0.03]">
                         <div className="space-y-4 mt-4">
                           <FormField
                             control={form.control}
@@ -773,7 +773,7 @@ export default function StepEleven() {
                         <CollapsibleTrigger asChild>
                           <Button
                             variant="ghost"
-                            className="flex w-full justify-between items-center p-4 border border-gray-200 rounded-lg hover:bg-gray-50"
+                            className="flex w-full justify-between items-center p-4 border border-gray-200 rounded-lg hover:bg-white/10"
                           >
                             <div className="flex items-center gap-2">
                               <span className="text-green-600">📍</span>
@@ -788,7 +788,7 @@ export default function StepEleven() {
                             />
                           </Button>
                         </CollapsibleTrigger>
-                        <CollapsibleContent className="px-4 pb-4 border border-gray-200 rounded-lg bg-gray-50/50">
+                        <CollapsibleContent className="px-4 pb-4 border border-gray-200 rounded-lg bg-white/[0.03]">
                           <div className="space-y-4 mt-4">
                             <FormField
                               control={form.control}
@@ -831,7 +831,7 @@ export default function StepEleven() {
                                     <Input
                                       {...field}
                                       placeholder="Enter city"
-                                      className="h-10 bg-[#F9FAFB] border-[#E5E7EB]"
+                                      className="h-10 bg-white/5 border-white/10"
                                     />
                                   </FormControl>
                                   <FormMessage />
@@ -854,7 +854,7 @@ export default function StepEleven() {
                                       type="tel"
                                       inputMode="numeric"
                                       placeholder="Enter contact number"
-                                      className="h-10 bg-[#F9FAFB] border-[#E5E7EB]"
+                                      className="h-10 bg-white/5 border-white/10"
                                       onChange={(e) => {
                                         // Only allow numbers, spaces, +, -, and parentheses
                                         const value = e.target.value.replace(
@@ -881,7 +881,7 @@ export default function StepEleven() {
                       <Button
                         type="submit"
                         variant="event-primary"
-                        className="rounded-full px-10 py-2 h-12"
+                        className="rounded-full px-10 py-2 h-12 text-white"
                         disabled={
                           publishing ||
                           !selectedDomain ||
