@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import {
   Table,
   TableBody,
@@ -12,7 +13,6 @@ import { Card, CardContent, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Eye } from "lucide-react";
-import { useState } from "react";
 import {
   Pagination,
   PaginationContent,
@@ -21,30 +21,65 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from "@/components/ui/pagination";
+import type { CustomerOverviewRow } from "@/services/admin/dashboard/types";
 
-interface CustomerData {
-  id: number;
-  name: string;
-  totalEvents: number;
-  totalCommission: string;
-  totalEarning: string;
-  commissionEarned: string;
-  commissionPending: string;
+interface PaginationMeta {
+  current_page: number;
+  per_page: number;
+  total: number;
+  last_page: number;
+}
+
+type DashboardSearch = {
+  period: string;
+  from_date?: string;
+  to_date?: string;
+  sales_period?: string;
+  customer_page: number;
+  customer_per_page: number;
+  customer_search: string;
+  newly_added_page: number;
+  newly_added_per_page: number;
+  newly_added_search: string;
+  venues_limit?: number;
+  [key: string]: string | number | undefined;
+};
+
+function buildCustomerOverviewParams(
+  search: DashboardSearch,
+  page: number,
+): string {
+  const params = new URLSearchParams();
+  params.set("period", String(search.period));
+  params.set("from_date", String(search.from_date ?? ""));
+  params.set("to_date", String(search.to_date ?? ""));
+  params.set("sales_period", String(search.sales_period ?? "monthly"));
+  params.set("customer_page", String(page));
+  params.set("customer_per_page", String(search.customer_per_page));
+  params.set("newly_added_page", String(search.newly_added_page));
+  params.set("newly_added_per_page", String(search.newly_added_per_page));
+  params.set("venues_limit", String(search.venues_limit ?? 5));
+  if (search.customer_search)
+    params.set("customer_search", String(search.customer_search));
+  if (search.newly_added_search)
+    params.set("newly_added_search", String(search.newly_added_search));
+  return params.toString();
 }
 
 interface CustomerOverviewProps {
   title: string;
-  data: CustomerData[];
+  data: CustomerOverviewRow[];
+  pagination: PaginationMeta;
+  search: DashboardSearch;
 }
 
 export default function CustomerOverview({
   title,
   data,
+  pagination,
+  search,
 }: CustomerOverviewProps) {
-  const [searchTerm, setSearchTerm] = useState("");
-  const filteredData = data.filter((customer) =>
-    customer.name.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const basePath = "/admin/dashboard";
 
   return (
     <Card className="border shadow-sm">
@@ -54,14 +89,50 @@ export default function CustomerOverview({
             {title}
           </CardTitle>
 
-          <div className="w-full sm:w-auto">
+          <form
+            method="GET"
+            action={basePath}
+            className="w-full sm:w-auto flex gap-2"
+          >
+            <input type="hidden" name="period" value={search.period} />
+            <input type="hidden" name="customer_page" value="1" />
+            <input
+              type="hidden"
+              name="customer_per_page"
+              value={String(search.customer_per_page)}
+            />
+            <input
+              type="hidden"
+              name="newly_added_page"
+              value={String(search.newly_added_page)}
+            />
+            <input
+              type="hidden"
+              name="newly_added_per_page"
+              value={String(search.newly_added_per_page)}
+            />
+            <input
+              type="hidden"
+              name="venues_limit"
+              value={String(search.venues_limit ?? 5)}
+            />
+            {search.sales_period != null && (
+              <input
+                type="hidden"
+                name="sales_period"
+                value={String(search.sales_period)}
+              />
+            )}
             <Input
+              name="customer_search"
               placeholder="Search for Customer Name"
               className="max-w-sm"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
+              defaultValue={search.customer_search}
             />
-          </div>
+            <Button type="submit" variant="event-primary">
+              Search
+            </Button>
+          </form>
         </div>
 
         <div className="rounded-md border">
@@ -78,18 +149,28 @@ export default function CustomerOverview({
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredData.length > 0 ? (
-                filteredData.map((customer, index) => (
-                  <TableRow key={customer.id}>
-                    <TableCell className="font-medium">{index + 1}</TableCell>
-                    <TableCell>{customer.name}</TableCell>
-                    <TableCell>{customer.totalEvents}</TableCell>
-                    <TableCell>{customer.totalEarning}</TableCell>
-                    <TableCell>{customer.commissionEarned}</TableCell>
-                    <TableCell>{customer.commissionPending}</TableCell>
+              {data.length > 0 ? (
+                data.map((row) => (
+                  <TableRow key={`${row.vendor_id}-${row.s_no}`}>
+                    <TableCell className="font-medium">{row.s_no}</TableCell>
+                    <TableCell>{row.customer_name}</TableCell>
+                    <TableCell>{row.total_events}</TableCell>
+                    <TableCell>
+                      {row.total_earning_formatted ?? String(row.total_earning)}
+                    </TableCell>
+                    <TableCell>
+                      {row.commission_earned_formatted ??
+                        String(row.commission_earned)}
+                    </TableCell>
+                    <TableCell>
+                      {row.commission_pending_formatted ??
+                        String(row.commission_pending)}
+                    </TableCell>
                     <TableCell className="text-right">
-                      <Button variant="ghost" size="icon">
-                        <Eye className="h-4 w-4" />
+                      <Button variant="ghost" size="icon" asChild>
+                        <Link href={`/admin/vendors/${row.vendor_id}`}>
+                          <Eye className="h-4 w-4" />
+                        </Link>
                       </Button>
                     </TableCell>
                   </TableRow>
@@ -105,27 +186,47 @@ export default function CustomerOverview({
           </Table>
         </div>
 
-        <Pagination>
-          <PaginationContent>
-            <PaginationItem>
-              <PaginationPrevious href="#" />
-            </PaginationItem>
-            <PaginationItem>
-              <PaginationLink href="#">1</PaginationLink>
-            </PaginationItem>
-            <PaginationItem>
-              <PaginationLink href="#" isActive>
-                2
-              </PaginationLink>
-            </PaginationItem>
-            <PaginationItem>
-              <PaginationLink href="#">3</PaginationLink>
-            </PaginationItem>
-            <PaginationItem>
-              <PaginationNext href="#" />
-            </PaginationItem>
-          </PaginationContent>
-        </Pagination>
+        {pagination.last_page > 1 && (
+          <Pagination>
+            <PaginationContent>
+              <PaginationItem>
+                <PaginationPrevious
+                  href={
+                    pagination.current_page > 1
+                      ? `${basePath}?${buildCustomerOverviewParams(search, pagination.current_page - 1)}`
+                      : "#"
+                  }
+                  aria-disabled={pagination.current_page <= 1}
+                />
+              </PaginationItem>
+              {Array.from(
+                { length: pagination.last_page },
+                (_, i) => i + 1,
+              ).map((page) => (
+                <PaginationItem key={page}>
+                  <PaginationLink
+                    href={`${basePath}?${buildCustomerOverviewParams(search, page)}`}
+                    isActive={page === pagination.current_page}
+                  >
+                    {page}
+                  </PaginationLink>
+                </PaginationItem>
+              ))}
+              <PaginationItem>
+                <PaginationNext
+                  href={
+                    pagination.current_page < pagination.last_page
+                      ? `${basePath}?${buildCustomerOverviewParams(search, pagination.current_page + 1)}`
+                      : "#"
+                  }
+                  aria-disabled={
+                    pagination.current_page >= pagination.last_page
+                  }
+                />
+              </PaginationItem>
+            </PaginationContent>
+          </Pagination>
+        )}
       </CardContent>
     </Card>
   );

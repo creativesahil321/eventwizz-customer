@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from "recharts";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -8,7 +9,6 @@ import {
   ChartTooltip,
   ChartTooltipContent,
 } from "@/components/ui/chart";
-import { useState, useMemo } from "react";
 
 const chartConfig = {
   sales: {
@@ -17,81 +17,47 @@ const chartConfig = {
   },
 } satisfies ChartConfig;
 
-// Mock data - would be replaced with real data from API
-const mockData = {
-  monthly: [
-    { month: "January", sales: 100 },
-    { month: "February", sales: 150 },
-    { month: "March", sales: 200 },
-    { month: "April", sales: 180 },
-    { month: "May", sales: 240 },
-    { month: "June", sales: 220 },
-    { month: "July", sales: 180 },
-    { month: "August", sales: 190 },
-    { month: "September", sales: 220 },
-    { month: "October", sales: 240 },
-    { month: "November", sales: 270 },
-    { month: "December", sales: 290 },
-  ],
-  weekly: [
-    { month: "Monday", sales: 50 },
-    { month: "Tuesday", sales: 80 },
-    { month: "Wednesday", sales: 120 },
-    { month: "Thursday", sales: 90 },
-    { month: "Friday", sales: 110 },
-    { month: "Saturday", sales: 140 },
-    { month: "Sunday", sales: 70 },
-  ],
-  daily: [
-    { month: "Morning", sales: 40 },
-    { month: "Noon", sales: 60 },
-    { month: "Afternoon", sales: 80 },
-    { month: "Evening", sales: 60 },
-    { month: "Night", sales: 30 },
-  ],
-};
+export interface SalesHistoryItem {
+  month: string;
+  sales: number;
+}
 
-export default function SalesHistory() {
-  const [period, setPeriod] = useState("monthly");
+interface SalesHistoryProps {
+  sales: SalesHistoryItem[];
+  period: string;
+}
 
-  // Use the appropriate data based on selected period
-  const chartData = useMemo(
-    () => mockData[period as keyof typeof mockData],
-    [period]
-  );
+const PERIODS = ["daily", "weekly", "monthly"] as const;
+
+function buildDashboardUrl(period: string) {
+  const params = new URLSearchParams();
+  params.set("period", period);
+  params.set("sales_period", period);
+  return `/admin/dashboard?${params.toString()}`;
+}
+
+export default function SalesHistory({ sales, period }: SalesHistoryProps) {
+  const chartData = sales.length ? sales : [{ month: "—", sales: 0 }];
 
   return (
     <Card className="shadow-none border-none bg-white">
       <CardHeader className="relative">
-        <div className="flex justify-between items-center">
+        <div className="flex justify-between items-center flex-wrap gap-2">
           <CardTitle className="text-2xl mb-0 title-header font-bold">
             Sales History
           </CardTitle>
           <div className="flex space-x-2">
-            <button
-              onClick={() => setPeriod("daily")}
-              className={`px-3 py-1 text-sm rounded-md ${
-                period === "daily" ? "bg-red-500 text-white" : "bg-gray-100"
-              }`}
-            >
-              Daily
-            </button>
-            <button
-              onClick={() => setPeriod("weekly")}
-              className={`px-3 py-1 text-sm rounded-md ${
-                period === "weekly" ? "bg-red-500 text-white" : "bg-gray-100"
-              }`}
-            >
-              Weekly
-            </button>
-            <button
-              onClick={() => setPeriod("monthly")}
-              className={`px-3 py-1 text-sm rounded-md ${
-                period === "monthly" ? "bg-red-500 text-white" : "bg-gray-100"
-              }`}
-            >
-              Monthly
-            </button>
+            {PERIODS.map((p) => (
+              <Link
+                key={p}
+                href={buildDashboardUrl(p)}
+                className={`px-3 py-1 text-sm rounded-md ${
+                  period === p ? "bg-red-500 text-white" : "bg-gray-100 hover:bg-gray-200"
+                }`}
+              >
+                {p.charAt(0).toUpperCase() + p.slice(1)}
+              </Link>
+            ))}
           </div>
         </div>
       </CardHeader>
@@ -104,15 +70,15 @@ export default function SalesHistory() {
               tickLine={false}
               tickMargin={10}
               axisLine={false}
-              tickFormatter={(value) => value.slice(0, 3)}
+              tickFormatter={(value) => (value ? String(value).slice(0, 3) : "")}
             />
             <YAxis
               tickLine={false}
               axisLine={false}
-              tickFormatter={(value) => `$${value}`}
+              tickFormatter={(value) => `£${value}`}
             />
             <ChartTooltip content={<ChartTooltipContent hideLabel />} />
-            <Bar dataKey="sales" fill="#000000" radius={[4, 4, 0, 0]} />
+            <Bar dataKey="sales" fill="var(--color-primary)" radius={[4, 4, 0, 0]} />
           </BarChart>
         </ChartContainer>
       </CardContent>

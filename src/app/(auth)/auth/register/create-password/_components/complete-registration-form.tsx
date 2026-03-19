@@ -29,6 +29,7 @@ export function CompleteRegistrationForm() {
   const searchParams = useSearchParams();
   const [loading, setLoading] = useState(false);
   const [redirecting, setRedirecting] = useState(false);
+  const [redirectAccountType, setRedirectAccountType] = useState<"vendor" | "customer" | "admin" | null>(null);
   const [showPassword, setShowPassword] = useState(false);
 
   const email = searchParams?.get("email") || "";
@@ -180,7 +181,8 @@ export function CompleteRegistrationForm() {
           ? String(response.data.vendor_location_id)
           : null;
 
-        // Show redirecting state before NextAuth call
+        // Show redirecting state before NextAuth call (vendor → onboarding, others → dashboard)
+        setRedirectAccountType((account_type || active_role || "vendor") as "vendor" | "customer" | "admin");
         setRedirecting(true);
 
         // Log in the user with NextAuth using the returned token and full user data
@@ -228,13 +230,32 @@ export function CompleteRegistrationForm() {
     }
   };
 
-  // Show same dark full-screen loader as auth layout — one continuous transition, no white flash
+  // Tenant-aware redirect screen: vendor → dark (onboarding), customer/admin → light (dashboard)
   if (redirecting) {
+    const isVendor = redirectAccountType === "vendor";
     return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950">
+      <div
+        className="fixed inset-0 z-50 flex items-center justify-center"
+        style={
+          isVendor
+            ? { background: "linear-gradient(to bottom right, #0f172a 0%, #0f172a 50%, #1e293b 100%)" }
+            : { background: "var(--color-background, #f8fafc)" }
+        }
+      >
         <div className="flex flex-col items-center gap-4 text-center">
-          <Loader2 className="h-10 w-10 animate-spin text-slate-400" aria-hidden />
-          <p className="text-sm text-slate-500">Taking you to your dashboard…</p>
+          <Loader2
+            className="h-10 w-10 animate-spin"
+            style={{ color: isVendor ? "#94a3b8" : "var(--color-primary, #3b82f6)" }}
+            aria-hidden
+          />
+          <p
+            className="text-sm"
+            style={{ color: isVendor ? "#94a3b8" : "var(--color-text-dimmed, #64748b)" }}
+          >
+            {isVendor
+              ? "Taking you to complete your setup…"
+              : "Taking you to your dashboard…"}
+          </p>
         </div>
       </div>
     );

@@ -8,18 +8,21 @@ interface PerformanceData {
   commissionEarned: string;
   commissionPending: string;
   newCustomers: number;
-  visitors: number;
+  visitors?: number;
 }
 
 interface PerformanceOverviewProps {
   title: string;
   data: PerformanceData;
+  period?: string;
 }
 
 export default function PerformanceOverview({
   title,
   data,
+  period,
 }: PerformanceOverviewProps) {
+  const visitors = data.visitors ?? 0;
   // Mapping metric IDs to icons and colors
   const metrics = [
     {
@@ -71,28 +74,13 @@ export default function PerformanceOverview({
           {title}
         </CardTitle>
 
-        <div className="flex items-center gap-4">
+        {period && (
           <div className="flex items-center gap-2">
-            <span className="h-2 w-2 rounded-full bg-gray-300"></span>
-            <span className="text-sm">Today</span>
+            <span className="text-sm text-muted-foreground capitalize">
+              Period: {period}
+            </span>
           </div>
-          <div className="flex items-center gap-2">
-            <span className="h-2 w-2 rounded-full bg-gray-300"></span>
-            <span className="text-sm">Weekly</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="h-2 w-2 rounded-full bg-gray-300"></span>
-            <span className="text-sm">Monthly</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="h-2 w-2 rounded-full bg-gray-300"></span>
-            <span className="text-sm">Yearly</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="h-2 w-2 rounded-full bg-gray-300"></span>
-            <span className="text-sm">Custom</span>
-          </div>
-        </div>
+        )}
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">

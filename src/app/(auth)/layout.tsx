@@ -84,7 +84,12 @@ export default function AuthLayout({
 
   // Show fullscreen loader when redirecting after auth or when signing out due to security_violation
   if (status === "authenticated" || isRedirecting || isSigningOutSecurity) {
-    return <AuthSkeleton />;
+    return (
+      <AuthSkeleton
+        accountType={session?.user?.account_type}
+        isOnboarded={session?.user?.isOnboarded}
+      />
+    );
   }
 
   return (
