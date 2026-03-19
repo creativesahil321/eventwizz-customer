@@ -120,8 +120,9 @@ CRITICAL RULES:
 8. Do NOT include any HTML tags in text fields
 9. IMPORTANT: If the vendor provides specific details about tickets, tables, pricing, seating, food, or capacity in the description, use those EXACT numbers and specifications.
 10. For dates with booking_type "tables" or "both": include payment_type ("full" or "deposit"). If deposit, set is_deposit_enabled true and include deposit_type, deposit_value, and deposit_due_date (YYYY-MM-DD, before event_date).
-11. stepFour (menu) is OPTIONAL: If the event type suggests no food/catering, set catering_option to 0 and menus to an empty array.
-12. stepFive (drinks) is OPTIONAL: If the event type suggests no drinks, set packages to an empty array.`;
+11. stepThree.dates: event_date must be YYYY-MM-DD. List dates in chronological ascending order (earliest first). No duplicate event_dates. Each event_date should be today or in the future.
+12. stepFour (menu) is OPTIONAL: If the event type suggests no food/catering, set catering_option to 0 and menus to an empty array.
+13. stepFive (drinks) is OPTIONAL: If the event type suggests no drinks, set packages to an empty array.`;
 
     const userPrompt = `Generate complete event content for:
 
@@ -168,7 +169,7 @@ Generate this EXACT JSON structure:
   "stepThree": {
     "dates": [
       {
-        "event_date": "YYYY-MM-DD (2 months from now)",
+        "event_date": "YYYY-MM-DD (chronological order, no duplicates; today or future)",
         "booking_type": "both",
         "tickets": [
           {"title": "string (max 25 chars)", "description": "string (max 160 chars)", "total_capacity": "string (number)", "price": "string"},
@@ -341,6 +342,19 @@ Make times chronologically ascending. Make prices realistic for the event type. 
             deposit_due_date: isTablesOrBoth && isDepositEnabled && date.deposit_due_date ? String(date.deposit_due_date) : "",
           };
         });
+        // Sort by event_date ascending and remove duplicates
+        const seen = new Set<string>();
+        content.stepThree.dates = content.stepThree.dates
+          .sort(
+            (a, b) =>
+              new Date(a.event_date + "T00:00:00").getTime() -
+              new Date(b.event_date + "T00:00:00").getTime()
+          )
+          .filter((d) => {
+            if (!d.event_date || seen.has(d.event_date)) return false;
+            seen.add(d.event_date);
+            return true;
+          });
       } else {
         const d1 = new Date();
         d1.setMonth(d1.getMonth() + 2);

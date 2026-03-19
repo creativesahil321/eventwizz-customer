@@ -207,7 +207,21 @@ export default function AIEventReviewContent({
       // Step 2 — Dates / Tickets / Tables
       setApplyStep(2);
       if (!removedSections.has("stepThree")) {
-        const dates = s.stepThree.dates.map((d) => {
+        const rawDates = s.stepThree.dates || [];
+        const sortedUniqueDates = (() => {
+          const sorted = [...rawDates].sort(
+            (a, b) =>
+              new Date(a.event_date + "T00:00:00").getTime() -
+              new Date(b.event_date + "T00:00:00").getTime()
+          );
+          const seen = new Set<string>();
+          return sorted.filter((d) => {
+            if (!d.event_date || seen.has(d.event_date)) return false;
+            seen.add(d.event_date);
+            return true;
+          });
+        })();
+        const dates = sortedUniqueDates.map((d) => {
           const tickets =
             d.booking_type !== "tables"
               ? (d.tickets || []).map((t) => ({

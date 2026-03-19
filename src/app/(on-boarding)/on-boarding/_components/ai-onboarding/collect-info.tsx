@@ -23,7 +23,7 @@ import {
 } from "lucide-react";
 import { env } from "@/env";
 import type { AIOnboardingInput } from "@/app/api/ai/generate-onboarding/route";
-
+import { useEventCategories } from "@/services/vendor/events/query";
 import { useVoiceInput } from "@/hooks/useVoiceInput";
 
 const themeAccent = {
@@ -48,7 +48,7 @@ const collectInfoSchema = z
   .object({
     venueName: z.string().min(2, "Venue name is required"),
     selectedPlaceId: z.string().optional(),
-    venueType: z.string().min(1, "Please select a venue type"),
+    venueType: z.string().min(1, "Please select an event category"),
     city: z.string().min(1, "City is required"),
     address: z.string().min(1, "Address is required"),
     contactNumber: z
@@ -75,16 +75,39 @@ const collectInfoSchema = z
 
 type CollectInfoForm = z.infer<typeof collectInfoSchema>;
 
-const VENUE_TYPES = [
-  { value: "wedding", label: "Wedding Venue", icon: "💒" },
-  { value: "corporate", label: "Corporate Events", icon: "🏢" },
-  { value: "party", label: "Party & Celebration", icon: "🎉" },
-  { value: "conference", label: "Conference & Seminar", icon: "🎤" },
-  { value: "concert", label: "Concert & Music", icon: "🎵" },
-  { value: "restaurant", label: "Restaurant & Dining", icon: "🍽️" },
-  { value: "sports", label: "Sports & Recreation", icon: "⚽" },
-  { value: "other", label: "Other", icon: "✨" },
-];
+const INITIAL_CATEGORY_VISIBLE = 8; // 2 rows × 4 columns
+
+/** Icons for static backend categories (match by name, case-insensitive). */
+const CATEGORY_ICONS: Record<string, string> = {
+  "christmas events": "🎄",
+  "new year parties": "🎆",
+  "halloween events": "🎃",
+  "valentine's day specials": "💝",
+  "easter events": "🐣",
+  "bottomless brunch": "🥂",
+  "lipstick powder & paint": "💄",
+  "live music & gigs": "🎵",
+  "dj nights & club events": "🎧",
+  "comedy shows": "🎤",
+  "drag shows & brunches": "👠",
+  "themed parties (90s, 00s, ibiza, etc.)": "🪩",
+  "themed parties": "🪩",
+  "food & drink festivals": "🍔",
+  "street food markets": "🥡",
+  "pride events": "🌈",
+  "afrobeats / bashment nights": "🎶",
+  "day raves / outdoor parties": "☀️",
+  "open mic & spoken word": "🎙️",
+  "networking & business events": "🤝",
+  "workshops & masterclasses": "📚",
+  "diwali": "🪔",
+  "eid": "🌙",
+};
+
+function getCategoryIcon(categoryName: string): string {
+  const key = categoryName.toLowerCase().trim();
+  return CATEGORY_ICONS[key] ?? "📌";
+}
 
 interface AICollectInfoProps {
   onSubmit: (data: AIOnboardingInput) => void;
@@ -106,7 +129,10 @@ export default function AICollectInfo({
     defaultValues: {
       venueName: initialData?.venueName || "",
       selectedPlaceId: "",
-      venueType: initialData?.venueType || "",
+      venueType:
+        initialData?.event_category_id != null
+          ? String(initialData.event_category_id)
+          : initialData?.venueType || "",
       city: initialData?.city || "",
       address: initialData?.address || "",
       contactNumber: initialData?.contactNumber || "",
@@ -120,6 +146,26 @@ export default function AICollectInfo({
   });
 
   const selectedVenueType = form.watch("venueType");
+  const [showAllCategories, setShowAllCategories] = useState(false);
+  const { data: categoriesResponse, isLoading: isCategoriesLoading } = useEventCategories();
+  const eventCategories = React.useMemo(
+    () => categoriesResponse?.data ?? [],
+    [categoriesResponse?.data]
+  );
+  const firstPageCategories = eventCategories.slice(0, INITIAL_CATEGORY_VISIBLE);
+  const restCategories = eventCategories.slice(INITIAL_CATEGORY_VISIBLE);
+  const hasMoreCategories = restCategories.length > 0;
+
+  // When categories load, sync venueType from name to id if needed (e.g. after "Back" with old data)
+  useEffect(() => {
+    if (eventCategories.length === 0 || !selectedVenueType) return;
+    const isNumericId = /^\d+$/.test(selectedVenueType);
+    if (isNumericId && eventCategories.some((c) => String(c.id) === selectedVenueType)) return;
+    const byName = eventCategories.find(
+      (c) => c.name.toLowerCase() === selectedVenueType.toLowerCase()
+    );
+    if (byName) form.setValue("venueType", String(byName.id), { shouldValidate: true });
+  }, [eventCategories, selectedVenueType, form]);
 
   // --- Google Places Autocomplete ---
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
@@ -276,9 +322,15 @@ export default function AICollectInfo({
   };
 
   const handleFormSubmit = (data: CollectInfoForm) => {
-    const payload = { ...data };
-    delete (payload as Record<string, unknown>).selectedPlaceId;
-    onSubmit(payload as AIOnboardingInput);
+    const { selectedPlaceId: _, ...rest } = data;
+    const categoryId = data.venueType ? Number(data.venueType) : undefined;
+    const category = eventCategories.find((c) => c.id === categoryId);
+    const payload: AIOnboardingInput = {
+      ...rest,
+      venueType: category?.name ?? data.venueType,
+      event_category_id: categoryId,
+    };
+    onSubmit(payload);
   };
 
   // ─── Voice input for description ────────────────────────────────────────
@@ -416,41 +468,101 @@ export default function AICollectInfo({
               )}
             </div>
 
-            {/* Venue Type */}
+            {/* Event Category: 2×4 initially, "More" to expand (same list as manual step 3) */}
             <div>
               <label className="flex items-center gap-2 text-sm font-medium text-slate-300 mb-3">
                 <Globe className="w-4 h-4" style={themeAccent.text} />
-                Venue Type <span className="text-red-400">*</span>
+                Event Category <span className="text-red-400">*</span>
               </label>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                {VENUE_TYPES.map((type) => (
-                  <button
-                    key={type.value}
-                    type="button"
-                    onClick={() =>
-                      form.setValue("venueType", type.value, {
-                        shouldValidate: true,
-                      })
-                    }
-                    className={`flex flex-col items-center gap-1.5 px-3 py-3 rounded-xl border text-xs font-medium transition-all duration-200 ${
-                      selectedVenueType === type.value
-                        ? ""
-                        : "bg-white/5 border-white/10 text-slate-400 hover:border-white/20 hover:text-slate-300"
-                    }`}
-                    style={
-                      selectedVenueType === type.value
-                        ? {
-                            ...themeAccent.selectedCard,
-                            color: `var(--color-primary, #93c5fd)`,
-                          }
-                        : undefined
-                    }
-                  >
-                    <span className="text-lg">{type.icon}</span>
-                    <span>{type.label}</span>
-                  </button>
-                ))}
-              </div>
+              {isCategoriesLoading ? (
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  {Array.from({ length: 8 }, (_, i) => (
+                    <div
+                      key={i}
+                      className="h-12 rounded-lg bg-white/5 border border-white/10 animate-pulse"
+                    />
+                  ))}
+                </div>
+              ) : eventCategories.length > 0 ? (
+                <div className="space-y-2">
+                  {/* First 2 rows × 4 columns (2 cols on mobile) */}
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                    {firstPageCategories.map((cat) => (
+                      <button
+                        key={cat.id}
+                        type="button"
+                        onClick={() =>
+                          form.setValue("venueType", String(cat.id), {
+                            shouldValidate: true,
+                          })
+                        }
+                        className={`flex flex-col items-center justify-center gap-1 px-2 py-2.5 rounded-lg border text-[11px] font-medium transition-all duration-200 min-h-[52px] ${
+                          selectedVenueType === String(cat.id)
+                            ? ""
+                            : "bg-white/5 border-white/10 text-slate-400 hover:border-white/20 hover:text-slate-300"
+                        }`}
+                        style={
+                          selectedVenueType === String(cat.id)
+                            ? {
+                                ...themeAccent.selectedCard,
+                                color: `var(--color-primary, #93c5fd)`,
+                              }
+                            : undefined
+                        }
+                      >
+                        <span className="text-base leading-none">{getCategoryIcon(cat.name)}</span>
+                        <span className="text-center leading-tight line-clamp-2">{cat.name}</span>
+                      </button>
+                    ))}
+                  </div>
+                  {hasMoreCategories && (
+                    <button
+                      type="button"
+                      onClick={() => setShowAllCategories((v) => !v)}
+                      className="w-full py-2 rounded-lg border border-dashed border-white/20 text-xs font-medium text-slate-400 hover:bg-white/5 hover:text-slate-300 hover:border-white/30 transition-colors"
+                    >
+                      {showAllCategories ? "Show less" : `More categories (${restCategories.length} more)`}
+                    </button>
+                  )}
+                  {showAllCategories && hasMoreCategories && (
+                    <div className="max-h-44 overflow-y-auto rounded-lg border border-white/10 bg-white/[0.02] p-2">
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                        {restCategories.map((cat) => (
+                          <button
+                            key={cat.id}
+                            type="button"
+                            onClick={() =>
+                              form.setValue("venueType", String(cat.id), {
+                                shouldValidate: true,
+                              })
+                            }
+                            className={`flex flex-col items-center justify-center gap-1 px-2 py-2 rounded-lg border text-[11px] font-medium transition-all duration-200 min-h-[48px] ${
+                              selectedVenueType === String(cat.id)
+                                ? ""
+                                : "bg-white/5 border-white/10 text-slate-400 hover:border-white/20 hover:text-slate-300"
+                            }`}
+                            style={
+                              selectedVenueType === String(cat.id)
+                                ? {
+                                    ...themeAccent.selectedCard,
+                                    color: `var(--color-primary, #93c5fd)`,
+                                  }
+                                : undefined
+                            }
+                          >
+                            <span className="text-base leading-none">{getCategoryIcon(cat.name)}</span>
+                            <span className="text-center leading-tight line-clamp-2">{cat.name}</span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <p className="text-sm text-slate-500">
+                  No categories available. Please try again or switch to Manual setup.
+                </p>
+              )}
               {form.formState.errors.venueType && (
                 <p className="text-red-400 text-xs mt-1.5">
                   {form.formState.errors.venueType.message}

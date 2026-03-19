@@ -11,9 +11,9 @@ export interface AdminDashboardParams {
   from_date?: string; // Y-m-d
   to_date?: string; // Y-m-d
   sales_period?: SalesPeriod;
-  customer_page?: number;
-  customer_per_page?: number;
-  customer_search?: string;
+  vendor_page?: number;
+  vendor_per_page?: number;
+  vendor_search?: string;
   newly_added_page?: number;
   newly_added_per_page?: number;
   newly_added_search?: string;
@@ -21,21 +21,21 @@ export interface AdminDashboardParams {
 }
 
 export interface AdminDashboardSummary {
-  total_customers: number;
-  active_customers: number;
-  disabled_customers: number;
+  total_vendors: number;
+  active_vendors: number;
+  disabled_vendors: number;
 }
 
 export interface AdminDashboardPerformanceOverview {
-  period_start: string;
-  period_end: string;
+  period_start?: string;
+  period_end?: string;
   total_revenue: number;
-  total_revenue_formatted: string;
+  total_revenue_formatted?: string;
   admin_commission: number;
-  admin_commission_formatted: string;
+  admin_commission_formatted?: string;
   commission_pending: number;
-  commission_pending_formatted: string;
-  new_customers: number;
+  commission_pending_formatted?: string;
+  new_vendors: number;
 }
 
 export interface AdminDashboardSalesHistory {
@@ -45,6 +45,7 @@ export interface AdminDashboardSalesHistory {
 }
 
 export interface VenueCommissionItem {
+  vendor_id?: number;
   venue_name: string;
   total_commission: number;
   total_commission_formatted: string;
@@ -66,39 +67,41 @@ export interface PaginationMeta {
   last_page: number;
 }
 
-export interface CustomerOverviewRow {
+export interface VendorOverviewRow {
   s_no: number;
   vendor_id: number;
-  customer_name: string;
+  vendor_name: string;
   total_events: number;
   total_earning: number;
-  total_earning_formatted: string;
+  total_earning_formatted?: string;
   commission_earned: number;
-  commission_earned_formatted: string;
+  commission_earned_formatted?: string;
   commission_pending: number;
-  commission_pending_formatted: string;
+  commission_pending_formatted?: string;
   action?: { view?: boolean };
 }
 
-export interface AdminDashboardCustomerOverview {
-  data: CustomerOverviewRow[];
+export interface AdminDashboardVendorOverview {
+  data: VendorOverviewRow[];
   pagination: PaginationMeta;
 }
 
-export interface NewlyAddedCustomerRow {
+export interface NewlyAddedVenueRow {
   s_no: number;
-  id: number;
-  customer_name: string;
+  venue_id: number;
+  venue_name: string;
+  vendor_name: string;
+  vendor_id: number | null;
   register_on: string;
-  register_on_iso?: string;
+  register_on_iso?: string | null;
   account_status: string;
   total_events: number;
   email: string;
   action?: { view?: boolean };
 }
 
-export interface AdminDashboardNewlyAddedCustomers {
-  data: NewlyAddedCustomerRow[];
+export interface AdminDashboardNewlyAddedVenues {
+  data: NewlyAddedVenueRow[];
   pagination: PaginationMeta;
 }
 
@@ -107,8 +110,8 @@ export interface AdminDashboardData {
   performance_overview: AdminDashboardPerformanceOverview;
   sales_history: AdminDashboardSalesHistory;
   venues_highest_commission: AdminDashboardVenuesHighestCommission;
-  customer_overview: AdminDashboardCustomerOverview;
-  newly_added_customers: AdminDashboardNewlyAddedCustomers;
+  vendor_overview: AdminDashboardVendorOverview;
+  newly_added_venues: AdminDashboardNewlyAddedVenues;
 }
 
 export interface AdminDashboardResponse {

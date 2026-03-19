@@ -468,7 +468,7 @@ export default function AIReviewContent({
       const stepThreeData = {
         step: 3 as const,
         vendor_location_id: vendorLocationId || 0,
-        event_category_id: 1,
+        event_category_id: venueInput.event_category_id ?? 1,
         event_name: editedContent.stepThree.event_name,
         event_banner_image: bannerFile || (undefined as unknown as File),
         event_banner_video: undefined as unknown as File,
@@ -530,7 +530,20 @@ export default function AIReviewContent({
 
       // --- Step 5: Dates, Tickets & Tables ---
       setApplyStep(4);
-      const aiDates = editedContent.stepFive?.dates || [];
+      const rawAiDates = editedContent.stepFive?.dates || [];
+      const aiDates = (() => {
+        const sorted = [...rawAiDates].sort(
+          (a, b) =>
+            new Date(a.event_date + "T00:00:00").getTime() -
+            new Date(b.event_date + "T00:00:00").getTime()
+        );
+        const seen = new Set<string>();
+        return sorted.filter((d) => {
+          if (!d.event_date || seen.has(d.event_date)) return false;
+          seen.add(d.event_date);
+          return true;
+        });
+      })();
       const formattedDates = aiDates.map((d) => {
         const bookingType = d.booking_type || "tickets";
         const tickets = (bookingType !== "tables" ? d.tickets || [] : []).map(

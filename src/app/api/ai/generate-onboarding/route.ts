@@ -5,6 +5,7 @@ import { env } from "@/env";
 export interface AIOnboardingInput {
   venueName: string;
   venueType: string;
+  event_category_id?: number;
   city: string;
   address: string;
   contactNumber: string;
@@ -129,6 +130,7 @@ CRITICAL RULES:
 8. Do NOT include any HTML tags in text fields unless specifically stated
 9. IMPORTANT: If the vendor provides specific details about tickets, tables, pricing, seating, food, or capacity in the "Additional Info", use those EXACT numbers and specifications in stepFive (dates/tickets/tables), stepSix (menu), and stepSeven (drinks). Always honor the vendor's stated preferences over defaults.
 10. For dates with booking_type "tables" or "both": include payment_type ("full" or "deposit"). If deposit is used, set is_deposit_enabled true and include deposit_type ("amount" or "percentage"), deposit_value (e.g. "50" for £50 or "25" for 25%), and deposit_due_date (YYYY-MM-DD, before event_date).
+11. stepFive.dates: event_date must be YYYY-MM-DD. List dates in chronological ascending order (earliest first). No duplicate event_dates. Each event_date should be today or in the future.
 11. stepSix (menu) is OPTIONAL: some venues have no catering. If the venue type or vendor info suggests no food/catering, set menus to an empty array [] and keep menu_title/menu_description short; the vendor can also remove the menu section in review.
 12. stepSeven (drinks) is OPTIONAL: some venues have no drink packages. If the venue type or vendor info suggests no drinks/beverage packages, set packages to an empty array [] and keep drink_title/drink_description short; the vendor can also remove the drinks section in review.`;
 
@@ -201,7 +203,7 @@ Generate this EXACT JSON structure:
         "deposit_due_date": "YYYY-MM-DD (before event_date, only when deposit enabled)"
       },
       {
-        "event_date": "YYYY-MM-DD (a date 3 months from now)",
+        "event_date": "YYYY-MM-DD (later than first date; no duplicates)",
         "booking_type": "tickets",
         "tickets": [
           {"title": "string (e.g. 'Early Bird')", "description": "string", "total_capacity": "string", "price": "string"},
@@ -392,6 +394,19 @@ Make times chronologically ascending. Make prices realistic for the venue type a
             deposit_due_date: isTablesOrBoth && isDepositEnabled && date.deposit_due_date ? String(date.deposit_due_date) : "",
           };
         });
+        // Sort by event_date ascending and remove duplicates
+        const seen = new Set<string>();
+        content.stepFive.dates = content.stepFive.dates
+          .sort(
+            (a, b) =>
+              new Date(a.event_date + "T00:00:00").getTime() -
+              new Date(b.event_date + "T00:00:00").getTime()
+          )
+          .filter((d) => {
+            if (!d.event_date || seen.has(d.event_date)) return false;
+            seen.add(d.event_date);
+            return true;
+          });
       } else {
         // Fallback: generate default dates if AI missed stepFive
         const d1 = new Date();

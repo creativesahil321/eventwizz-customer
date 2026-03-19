@@ -35,9 +35,9 @@ function toParsedSearch(
     from_date: params.from_date ?? "",
     to_date: params.to_date ?? "",
     sales_period: params.sales_period ?? "monthly",
-    customer_page: params.customer_page ?? 1,
-    customer_per_page: params.customer_per_page ?? 10,
-    customer_search: params.customer_search ?? "",
+    vendor_page: params.vendor_page ?? 1,
+    vendor_per_page: params.vendor_per_page ?? 10,
+    vendor_search: params.vendor_search ?? "",
     newly_added_page: params.newly_added_page ?? 1,
     newly_added_per_page: params.newly_added_per_page ?? 10,
     newly_added_search: params.newly_added_search ?? "",
@@ -53,7 +53,7 @@ export default function AdminDashboardContent() {
   );
   const parsedSearch = useMemo(() => toParsedSearch(searchRecord), [searchRecord]);
 
-  const { data: response, isLoading, isError, error } = useAdminDashboard(searchRecord);
+  const { data: response, isLoading, isFetching, isError, error } = useAdminDashboard(searchRecord);
 
   const {
     summaryItems,
@@ -61,64 +61,69 @@ export default function AdminDashboardContent() {
     venueCommissions,
     salesChartData,
     salesPeriod,
-    customerOverview,
-    newlyAdded,
+    vendorOverview,
+    newlyAddedVenues,
   } = useMemo(() => {
+    const formatCurrency = (value: number | undefined): string => {
+      if (value == null || Number.isNaN(value)) return "£0.00";
+      return new Intl.NumberFormat("en-GB", {
+        style: "currency",
+        currency: "GBP",
+        minimumFractionDigits: 2,
+      }).format(value);
+    };
+
     const empty = {
       summaryItems: [
-        { id: "total_customers", label: "Total Customers", value: 0 },
-        { id: "active_customers", label: "Active Customers", value: 0 },
-        { id: "disabled_customers", label: "Disabled Customers", value: 0 },
-        { id: "support_tickets", label: "Support Tickets", value: 0 },
+        { id: "total_vendors", label: "Total Vendors", value: 0 },
+        { id: "active_vendors", label: "Active Vendors", value: 0 },
+        { id: "disabled_vendors", label: "Disabled Vendors", value: 0 },
       ],
       performanceData: {
         totalRevenue: "£0.00",
         commissionEarned: "£0.00",
         commissionPending: "£0.00",
-        newCustomers: 0,
-        visitors: 0,
+        newVendors: 0,
       },
       venueCommissions: [] as { id: number; name: string; commission: string; value: number; lastUpdated?: string }[],
       salesChartData: [] as { month: string; sales: number }[],
       salesPeriod: "monthly",
-      customerOverview: { data: [], pagination: { current_page: 1, per_page: 10, total: 0, last_page: 1 } },
-      newlyAdded: { data: [], pagination: { current_page: 1, per_page: 10, total: 0, last_page: 1 } },
+      vendorOverview: { data: [], pagination: { current_page: 1, per_page: 10, total: 0, last_page: 1 } },
+      newlyAddedVenues: { data: [], pagination: { current_page: 1, per_page: 10, total: 0, last_page: 1 } },
     };
 
     if (!response?.status || !response?.data) return empty;
 
     const d = response.data;
-    const summary = d.summary ?? { total_customers: 0, active_customers: 0, disabled_customers: 0 };
+    const summary = d.summary ?? { total_vendors: 0, active_vendors: 0, disabled_vendors: 0 };
     const performance = d.performance_overview ?? {
-      total_revenue_formatted: "£0.00",
-      admin_commission_formatted: "£0.00",
-      commission_pending_formatted: "£0.00",
-      new_customers: 0,
+      total_revenue: 0,
+      admin_commission: 0,
+      commission_pending: 0,
+      new_vendors: 0,
     };
     const salesHistory = d.sales_history ?? { period: "monthly", labels: [], data: [] };
-    const venuesCommission = d.venues_highest_commission ?? { venues: [], last_updated_formatted: "" };
-    const co = d.customer_overview ?? { data: [], pagination: { current_page: 1, per_page: 10, total: 0, last_page: 1 } };
-    const na = d.newly_added_customers ?? { data: [], pagination: { current_page: 1, per_page: 10, total: 0, last_page: 1 } };
+    const venuesCommission = d.venues_highest_commission ?? { venues: [] };
+    const vo = d.vendor_overview ?? { data: [], pagination: { current_page: 1, per_page: 10, total: 0, last_page: 1 } };
+    const nav = d.newly_added_venues ?? { data: [], pagination: { current_page: 1, per_page: 10, total: 0, last_page: 1 } };
 
     return {
       summaryItems: [
-        { id: "total_customers", label: "Total Customers", value: summary.total_customers },
-        { id: "active_customers", label: "Active Customers", value: summary.active_customers },
-        { id: "disabled_customers", label: "Disabled Customers", value: summary.disabled_customers },
-        { id: "support_tickets", label: "Support Tickets", value: 0 },
+        { id: "total_vendors", label: "Total Vendors", value: summary.total_vendors },
+        { id: "active_vendors", label: "Active Vendors", value: summary.active_vendors },
+        { id: "disabled_vendors", label: "Disabled Vendors", value: summary.disabled_vendors },
       ],
       performanceData: {
-        totalRevenue: performance.total_revenue_formatted,
-        commissionEarned: performance.admin_commission_formatted,
-        commissionPending: performance.commission_pending_formatted,
-        newCustomers: performance.new_customers,
-        visitors: 0,
+        totalRevenue: performance.total_revenue_formatted ?? formatCurrency(performance.total_revenue),
+        commissionEarned: performance.admin_commission_formatted ?? formatCurrency(performance.admin_commission),
+        commissionPending: performance.commission_pending_formatted ?? formatCurrency(performance.commission_pending),
+        newVendors: performance.new_vendors,
       },
       venueCommissions: (venuesCommission.venues ?? []).map((venue, index) => ({
-        id: index + 1,
+        id: venue.vendor_id ?? index + 1,
         name: venue.venue_name,
-        commission: venue.total_commission_formatted,
-        value: venue.percentage,
+        commission: venue.total_commission_formatted ?? formatCurrency(venue.total_commission),
+        value: venue.percentage ?? 0,
         lastUpdated: venuesCommission.last_updated_formatted,
       })),
       salesChartData: (salesHistory.labels ?? []).map((label, i) => ({
@@ -126,8 +131,8 @@ export default function AdminDashboardContent() {
         sales: (salesHistory.data ?? [])[i] ?? 0,
       })),
       salesPeriod: salesHistory.period,
-      customerOverview: co,
-      newlyAdded: na,
+      vendorOverview: vo,
+      newlyAddedVenues: nav,
     };
   }, [response]);
 
@@ -161,16 +166,20 @@ export default function AdminDashboardContent() {
 
       <section className="w-full relative">
         <CustomerOverview
-          title="Customer Overview"
-          data={customerOverview.data}
-          pagination={customerOverview.pagination}
+          title="Vendor Overview"
+          data={vendorOverview.data}
+          pagination={vendorOverview.pagination}
           search={parsedSearch}
         />
       </section>
 
       <section className="w-full gap-6 relative flex flex-col lg:flex-row">
         <section className="w-full lg:w-8/12">
-          <SalesHistory sales={salesChartData} period={salesPeriod} />
+          <SalesHistory
+            sales={salesChartData}
+            period={salesPeriod}
+            isFetching={isFetching}
+          />
         </section>
         <section className="w-full lg:w-4/12">
           <VenuesCommission venues={venueCommissions} />
@@ -179,8 +188,8 @@ export default function AdminDashboardContent() {
 
       <section className="w-full relative">
         <NewCustomers
-          customers={newlyAdded.data}
-          pagination={newlyAdded.pagination}
+          venues={newlyAddedVenues.data}
+          pagination={newlyAddedVenues.pagination}
           search={parsedSearch}
         />
       </section>

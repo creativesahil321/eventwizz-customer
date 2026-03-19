@@ -1,6 +1,6 @@
 "use client";
 
-import { Users, UserCog, UserX, Headphones } from "lucide-react";
+import { Users, UserCog, UserX } from "lucide-react";
 import { Card, CardTitle } from "@/components/ui/card";
 
 interface SummaryItem {
@@ -23,55 +23,45 @@ export default function DashboardSummary({
   const summaryItems = items.length
     ? items
     : [
-        { id: "total_customers", label: "Total Customers", value: "0" },
-        { id: "active_customers", label: "Active Customers", value: "0" },
-        { id: "disabled_customers", label: "Disabled Customers", value: "0" },
-        { id: "support_tickets", label: "Support Tickets", value: "0" },
+        { id: "total_vendors", label: "Total Vendors", value: "0" },
+        { id: "active_vendors", label: "Active Vendors", value: "0" },
+        { id: "disabled_vendors", label: "Disabled Vendors", value: "0" },
       ];
 
-  // Map icons to item IDs
   const getIconByItemId = (id: string) => {
     switch (id) {
-      case "total_customers":
+      case "total_vendors":
         return <Users className="size-6 text-white" />;
-      case "active_customers":
+      case "active_vendors":
         return <UserCog className="size-6 text-white" />;
-      case "disabled_customers":
+      case "disabled_vendors":
         return <UserX className="size-6 text-white" />;
-      case "support_tickets":
-        return <Headphones className="size-6 text-white" />;
       default:
         return <Users className="size-6 text-white" />;
     }
   };
 
-  // Map background colors to item IDs
   const getBgColorByItemId = (id: string) => {
     switch (id) {
-      case "total_customers":
+      case "total_vendors":
         return "bg-pink-500";
-      case "active_customers":
+      case "active_vendors":
         return "bg-purple-500";
-      case "disabled_customers":
+      case "disabled_vendors":
         return "bg-teal-500";
-      case "support_tickets":
-        return "bg-blue-500";
       default:
         return "bg-gray-500";
     }
   };
 
-  // Map labels to cleaner versions
   const getCleanLabel = (id: string) => {
     switch (id) {
-      case "total_customers":
-        return "Total Customer";
-      case "active_customers":
-        return "Active Customer";
-      case "disabled_customers":
-        return "Disabled Customers";
-      case "support_tickets":
-        return "Support Ticket";
+      case "total_vendors":
+        return "Total Vendors";
+      case "active_vendors":
+        return "Active Vendors";
+      case "disabled_vendors":
+        return "Disabled Vendors";
       default:
         return "";
     }
@@ -84,7 +74,7 @@ export default function DashboardSummary({
           {title}
         </CardTitle>
       </div>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {summaryItems.map((item) => (
           <Card
             key={item.id}

@@ -1,14 +1,17 @@
 "use client";
 
-import { DollarSign, PieChart, UserPlus, Users, Wallet } from "lucide-react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useCallback } from "react";
+import { DollarSign, PieChart, UserPlus, Wallet } from "lucide-react";
 import { Card, CardTitle } from "@/components/ui/card";
+
+const PERIODS = ["daily", "weekly", "monthly"] as const;
 
 interface PerformanceData {
   totalRevenue: string;
   commissionEarned: string;
   commissionPending: string;
-  newCustomers: number;
-  visitors?: number;
+  newVendors: number;
 }
 
 interface PerformanceOverviewProps {
@@ -22,8 +25,22 @@ export default function PerformanceOverview({
   data,
   period,
 }: PerformanceOverviewProps) {
-  const visitors = data.visitors ?? 0;
-  // Mapping metric IDs to icons and colors
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+
+  const applyPeriod = useCallback(
+    (p: string) => {
+      const params = new URLSearchParams(searchParams?.toString() ?? "");
+      params.set("period", p);
+      params.set("sales_period", p);
+      params.set("vendor_page", "1");
+      params.set("newly_added_page", "1");
+      router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+    },
+    [pathname, router, searchParams],
+  );
+
   const metrics = [
     {
       id: "total_revenue",
@@ -50,20 +67,12 @@ export default function PerformanceOverview({
       bgColor: "bg-teal-600",
     },
     {
-      id: "new_customers",
-      label: "New Customers",
-      displayLabel: "New Customers",
-      value: data.newCustomers,
+      id: "new_vendors",
+      label: "New Vendors",
+      displayLabel: "New Vendors",
+      value: data.newVendors,
       icon: <UserPlus className="size-6 text-white" />,
       bgColor: "bg-orange-500",
-    },
-    {
-      id: "visitors",
-      label: "Visitors",
-      displayLabel: "Visitors",
-      value: data.visitors,
-      icon: <Users className="size-6 text-white" />,
-      bgColor: "bg-purple-700",
     },
   ];
 
@@ -74,16 +83,25 @@ export default function PerformanceOverview({
           {title}
         </CardTitle>
 
-        {period && (
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-muted-foreground capitalize">
-              Period: {period}
-            </span>
-          </div>
-        )}
+        <div className="flex gap-2">
+          {PERIODS.map((p) => (
+            <button
+              key={p}
+              type="button"
+              onClick={() => applyPeriod(p)}
+              className={`px-4 py-2 text-sm font-medium rounded-md transition-all duration-200 cursor-pointer ${
+                period === p
+                  ? "bg-[var(--color-primary)] text-[var(--color-primary-foreground,white)] hover:bg-[var(--color-primary-hover)] shadow-sm"
+                  : "border border-[var(--color-primary)] bg-white text-[var(--color-primary)] hover:bg-[#f0fafa] hover:border-[var(--color-primary-hover)]"
+              }`}
+            >
+              {p.charAt(0).toUpperCase() + p.slice(1)}
+            </button>
+          ))}
+        </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         {metrics.map((metric) => (
           <Card
             key={metric.id}

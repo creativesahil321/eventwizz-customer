@@ -486,11 +486,41 @@ const dateSchema = baseDateSchema
   );
 
 // Updated stepFiveSchema - simpler now with per-date booking_type
-export const stepFiveSchema = z.object({
-  step: z.literal(5),
-  event_id: z.number().min(1, "Event ID is required"),
-  dates: z.array(dateSchema).min(1, "At least one date is required"),
-});
+export const stepFiveSchema = z
+  .object({
+    step: z.literal(5),
+    event_id: z.number().min(1, "Event ID is required"),
+    dates: z.array(dateSchema).min(1, "At least one date is required"),
+  })
+  .superRefine((data, ctx) => {
+    const dates = data.dates;
+    if (!dates || dates.length === 0) return;
+    const eventDates = dates.map((d) => d.event_date).filter(Boolean);
+    const seen = new Set<string>();
+    for (let i = 0; i < eventDates.length; i++) {
+      if (seen.has(eventDates[i])) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Duplicate event dates are not allowed. Each date must be unique.",
+          path: ["dates", i, "event_date"],
+        });
+        return;
+      }
+      seen.add(eventDates[i]);
+    }
+    for (let i = 0; i < eventDates.length - 1; i++) {
+      const a = new Date(eventDates[i] + "T00:00:00").getTime();
+      const b = new Date(eventDates[i + 1] + "T00:00:00").getTime();
+      if (!Number.isNaN(a) && !Number.isNaN(b) && b <= a) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Dates must be in chronological ascending order.",
+          path: ["dates"],
+        });
+        return;
+      }
+    }
+  });
 
 export type StepFiveType = z.infer<typeof stepFiveSchema>;
 

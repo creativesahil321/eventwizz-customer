@@ -9,15 +9,20 @@ import type {
   AdminDashboardResponse,
 } from "./types";
 
+/** Backend expects "today" for day-level range; UI uses "daily". */
+function normalizePeriod(value: string): string {
+  return value === "daily" ? "today" : value;
+}
+
 function buildDashboardParams(params: AdminDashboardParams): Record<string, string | number> {
   const out: Record<string, string | number> = {};
-  if (params.period != null) out.period = params.period;
+  if (params.period != null) out.period = normalizePeriod(params.period);
   if (params.from_date != null) out.from_date = params.from_date;
   if (params.to_date != null) out.to_date = params.to_date;
-  if (params.sales_period != null) out.sales_period = params.sales_period;
-  if (params.customer_page != null) out.customer_page = params.customer_page;
-  if (params.customer_per_page != null) out.customer_per_page = params.customer_per_page;
-  if (params.customer_search != null) out.customer_search = params.customer_search;
+  if (params.sales_period != null) out.sales_period = normalizePeriod(params.sales_period);
+  if (params.vendor_page != null) out.vendor_page = params.vendor_page;
+  if (params.vendor_per_page != null) out.vendor_per_page = params.vendor_per_page;
+  if (params.vendor_search != null) out.vendor_search = params.vendor_search;
   if (params.newly_added_page != null) out.newly_added_page = params.newly_added_page;
   if (params.newly_added_per_page != null) out.newly_added_per_page = params.newly_added_per_page;
   if (params.newly_added_search != null) out.newly_added_search = params.newly_added_search;
@@ -28,7 +33,7 @@ function buildDashboardParams(params: AdminDashboardParams): Record<string, stri
 export const adminDashboardService = {
   /**
    * Fetch admin dashboard data with optional filters.
-   * GET /admin/dashboard?period=monthly&customer_page=1&...
+   * GET /admin/dashboard?period=monthly&vendor_page=1&...
    */
   getDashboard: async (
     params: AdminDashboardParams = {}
