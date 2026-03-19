@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import {
   Dialog,
   DialogContent,
@@ -14,7 +15,7 @@ import { formatDistanceToNow, format } from "date-fns";
 import { Badge } from "@/components/ui/badge";
 import { CATEGORY_CONFIG } from "../_lib/constants";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Bell, Clock, User } from "lucide-react";
+import { Bell, Clock, Loader2, User } from "lucide-react";
 import { env } from "@/env";
 import { cn } from "@/lib/utils";
 
@@ -22,8 +23,8 @@ interface NotificationDetailsProps {
   notification: Notification | null;
   isOpen: boolean;
   onClose: () => void;
-  onMarkAsRead: (id: number) => void;
-  onMarkAsUnread: (id: number) => void;
+  onMarkAsRead: (id: number, options?: { onSettled?: () => void }) => void;
+  onMarkAsUnread: (id: number, options?: { onSettled?: () => void }) => void;
 }
 
 export function NotificationDetailsComponent({
@@ -33,6 +34,7 @@ export function NotificationDetailsComponent({
   onMarkAsRead,
   onMarkAsUnread,
 }: NotificationDetailsProps) {
+  const [isUpdating, setIsUpdating] = useState(false);
   if (!notification) return null;
 
   const { id, user, icon, title, notice, is_read, created_at, action_url } =
@@ -157,13 +159,38 @@ export function NotificationDetailsComponent({
             {status === "read" ? (
               <Button
                 variant="event-outline"
-                onClick={() => onMarkAsUnread(id)}
+                disabled={isUpdating}
+                onClick={() => {
+                  setIsUpdating(true);
+                  onMarkAsUnread(id, { onSettled: () => setIsUpdating(false) });
+                }}
               >
-                Mark as Unread
+                {isUpdating ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Updating...
+                  </>
+                ) : (
+                  "Mark as Unread"
+                )}
               </Button>
             ) : (
-              <Button variant="event-primary" onClick={() => onMarkAsRead(id)}>
-                Mark as Read
+              <Button
+                variant="event-primary"
+                disabled={isUpdating}
+                onClick={() => {
+                  setIsUpdating(true);
+                  onMarkAsRead(id, { onSettled: () => setIsUpdating(false) });
+                }}
+              >
+                {isUpdating ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Updating...
+                  </>
+                ) : (
+                  "Mark as Read"
+                )}
               </Button>
             )}
 

@@ -88,7 +88,7 @@ export default function DrinkSection({
     <section className="bg-foreground dark:bg-background py-6 sm:py-10 px-4 sm:px-6 w-full overflow-hidden">
       <section className="w-full text-center max-w-5xl mx-auto">
         <h2 className="text-background dark:text-foreground text-2xl sm:text-3xl md:text-4xl font-bold px-2 break-words">
-          {title || "Drinks"}
+          {title || "Other Packages"}
         </h2>
         <p
           className="text-background dark:text-foreground py-4 sm:py-5 text-sm sm:text-base px-2 break-words whitespace-normal overflow-hidden max-w-full"

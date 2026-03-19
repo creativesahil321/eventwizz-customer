@@ -71,12 +71,26 @@ export const useNotificationSystem = () => {
     setSelectedNotification(null);
   };
 
-  const handleMarkAsRead = (id: number) => {
-    markAsRead(id);
+  const handleMarkAsRead = (
+    id: number,
+    options?: { onSettled?: () => void },
+  ) => {
+    markAsRead(id, {
+      onSettled: () => {
+        options?.onSettled?.();
+      },
+    });
   };
 
-  const handleMarkAsUnread = (id: number) => {
-    markAsUnread(id);
+  const handleMarkAsUnread = (
+    id: number,
+    options?: { onSettled?: () => void },
+  ) => {
+    markAsUnread(id, {
+      onSettled: () => {
+        options?.onSettled?.();
+      },
+    });
   };
 
   const handleMarkAllAsRead = () => {

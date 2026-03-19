@@ -37,6 +37,13 @@ import { LocationIndicator } from "@/components/location-indicator";
 import { PermissionGuard } from "@/components/permission/PermissionGuard";
 
 const tabs = ["all", "active", "old", "draft", "cancelled"];
+const tabLabels: Record<string, string> = {
+  all: "All",
+  active: "Active",
+  old: "Past",
+  draft: "Draft",
+  cancelled: "Cancelled",
+};
 
 type EventsProps = {
   search: SearchParams;
@@ -230,7 +237,7 @@ export default function EventTabs({ search }: EventsProps) {
             <Button
               size="sm"
               onClick={toggleSelectionMode}
-              variant={selectionMode ? "event-outline" : "event-secondary"}
+              variant={selectionMode ? "event-outline" : "event-primary"}
               className="flex-1 sm:flex-none"
             >
               <span className="hidden sm:inline">
@@ -283,55 +290,65 @@ export default function EventTabs({ search }: EventsProps) {
             </div>
 
             <div className="flex flex-wrap gap-2 w-full sm:w-auto">
-              <Button
-                className="flex items-center gap-1 flex-1 sm:flex-none"
-                variant="event-primary"
-                size="sm"
-                disabled={
-                  selectedEvents.length === 0 ||
-                  isUpdating ||
-                  hasCancelledEvents
-                }
-                onClick={() => handleBulkStatusUpdate("active")}
-                title={
-                  hasCancelledEvents ? "Cannot reactivate cancelled events" : ""
-                }
-              >
-                <Check className="h-4 w-4" />
-                <span className="hidden sm:inline">Set Active</span>
-                <span className="sm:hidden">Active</span>
-              </Button>
+              {status !== "active" && (
+                <Button
+                  className="flex items-center gap-1 flex-1 sm:flex-none"
+                  variant="event-primary"
+                  size="sm"
+                  disabled={
+                    selectedEvents.length === 0 ||
+                    isUpdating ||
+                    hasCancelledEvents
+                  }
+                  onClick={() => handleBulkStatusUpdate("active")}
+                  title={
+                    hasCancelledEvents
+                      ? "Cannot reactivate cancelled events"
+                      : ""
+                  }
+                >
+                  <Check className="h-4 w-4" />
+                  <span className="hidden sm:inline">Set Active</span>
+                  <span className="sm:hidden">Active</span>
+                </Button>
+              )}
 
-              <Button
-                className="flex items-center gap-1 flex-1 sm:flex-none"
-                variant="event-secondary"
-                size="sm"
-                disabled={
-                  selectedEvents.length === 0 ||
-                  isUpdating ||
-                  hasCancelledEvents
-                }
-                onClick={() => handleBulkStatusUpdate("draft")}
-                title={
-                  hasCancelledEvents ? "Cannot draft cancelled events" : ""
-                }
-              >
-                <FileEdit className="h-4 w-4" />
-                <span className="hidden sm:inline">Set Draft</span>
-                <span className="sm:hidden">Draft</span>
-              </Button>
+              {status !== "draft" && (
+                <Button
+                  className="flex items-center gap-1 flex-1 sm:flex-none"
+                  variant="event-secondary"
+                  size="sm"
+                  disabled={
+                    selectedEvents.length === 0 ||
+                    isUpdating ||
+                    hasCancelledEvents
+                  }
+                  onClick={() => handleBulkStatusUpdate("draft")}
+                  title={
+                    hasCancelledEvents
+                      ? "Cannot draft cancelled events"
+                      : ""
+                  }
+                >
+                  <FileEdit className="h-4 w-4" />
+                  <span className="hidden sm:inline">Set Draft</span>
+                  <span className="sm:hidden">Draft</span>
+                </Button>
+              )}
 
-              <Button
-                className="flex items-center gap-1 flex-1 sm:flex-none"
-                variant="destructive"
-                size="sm"
-                disabled={selectedEvents.length === 0 || isUpdating}
-                onClick={() => handleBulkStatusUpdate("cancelled")}
-              >
-                <X className="h-4 w-4" />
-                <span className="hidden sm:inline">Set Cancelled</span>
-                <span className="sm:hidden">Cancel</span>
-              </Button>
+              {status !== "cancelled" && (
+                <Button
+                  className="flex items-center gap-1 flex-1 sm:flex-none"
+                  variant="destructive"
+                  size="sm"
+                  disabled={selectedEvents.length === 0 || isUpdating}
+                  onClick={() => handleBulkStatusUpdate("cancelled")}
+                >
+                  <X className="h-4 w-4" />
+                  <span className="hidden sm:inline">Set Cancelled</span>
+                  <span className="sm:hidden">Cancel</span>
+                </Button>
+              )}
             </div>
           </div>
         </PermissionGuard>
@@ -351,10 +368,10 @@ export default function EventTabs({ search }: EventsProps) {
                 className="p-2 border-0 cursor-pointer text-black text-xs sm:text-sm whitespace-nowrap"
               >
                 <span className="hidden sm:inline">
-                  {key.charAt(0).toUpperCase() + key.slice(1)} Events
+                  {tabLabels[key] ?? key} Events
                 </span>
                 <span className="sm:hidden">
-                  {key.charAt(0).toUpperCase() + key.slice(1)}
+                  {tabLabels[key] ?? key}
                 </span>
               </TabsTrigger>
             ))}

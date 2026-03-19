@@ -36,9 +36,14 @@ import { useVendorLocationsList } from "@/app/(protected)/vendor/venue-locations
 
 interface EditStaffFormProps {
   readonly staffId: number;
+  /** When true (admin dashboard), hide vendor location selection. */
+  hideLocationSelection?: boolean;
 }
 
-export default function EditStaffForm({ staffId }: EditStaffFormProps) {
+export default function EditStaffForm({
+  staffId,
+  hideLocationSelection = false,
+}: EditStaffFormProps) {
   const router = useRouter();
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
@@ -46,9 +51,8 @@ export default function EditStaffForm({ staffId }: EditStaffFormProps) {
   // Fetch roles from the API
   const { data: rolesData, isLoading: isLoadingRoles } = useRoles();
 
-  // Locations: same API/cache as header dropdown and venue-locations page
-  const { locations, isLoading: isLoadingLocations } =
-    useVendorLocationsList();
+  // Locations: same API/cache as header dropdown and venue-locations page (vendor only)
+  const { locations, isLoading: isLoadingLocations } = useVendorLocationsList();
 
   // Fetch staff data
   const {
@@ -63,7 +67,7 @@ export default function EditStaffForm({ staffId }: EditStaffFormProps) {
 
   // Define the form
   const form = useForm<EditStaffFormValues>({
-    resolver: zodResolver(editStaffSchema),
+    resolver: zodResolver(editStaffSchema) as never,
     defaultValues: {
       first_name: "",
       last_name: "",
@@ -84,16 +88,26 @@ export default function EditStaffForm({ staffId }: EditStaffFormProps) {
 
       // Prefer vendor_location_ids; else derive from locations (single-staff API returns locations as { id, city }[])
       let locationIds: number[] = [];
-      if (staff.vendor_location_ids?.length) {
-        locationIds = staff.vendor_location_ids.filter((id: number) => id !== 0);
-      } else if (Array.isArray(staff.locations) && staff.locations.length > 0) {
-        const first = staff.locations[0];
-        if (typeof first === "object" && first !== null && "id" in first) {
-          locationIds = (staff.locations as { id: number }[]).map((l) => l.id);
+      if (!hideLocationSelection) {
+        if (staff.vendor_location_ids?.length) {
+          locationIds = staff.vendor_location_ids.filter(
+            (id: number) => id !== 0,
+          );
+        } else if (Array.isArray(staff.locations) && staff.locations.length > 0) {
+          const first = staff.locations[0];
+          if (typeof first === "object" && first !== null && "id" in first) {
+            locationIds = (staff.locations as { id: number }[]).map(
+              (l) => l.id,
+            );
+          }
         }
-      }
-      if (locationIds.length === 0 && staff.vendor_location_id != null && staff.vendor_location_id !== 0) {
-        locationIds = [staff.vendor_location_id];
+        if (
+          locationIds.length === 0 &&
+          staff.vendor_location_id != null &&
+          staff.vendor_location_id !== 0
+        ) {
+          locationIds = [staff.vendor_location_id];
+        }
       }
 
       form.reset({
@@ -109,7 +123,9 @@ export default function EditStaffForm({ staffId }: EditStaffFormProps) {
       });
 
       form.setValue("role_id", staff.role_id);
-      form.setValue("vendor_location_ids", locationIds);
+      if (!hideLocationSelection) {
+        form.setValue("vendor_location_ids", locationIds);
+      }
     }
   }, [staffData, form]);
 
@@ -121,7 +137,9 @@ export default function EditStaffForm({ staffId }: EditStaffFormProps) {
       email: values.email,
       phone: values.phone,
       role_id: values.role_id,
-      vendor_location_ids: values.vendor_location_ids,
+      vendor_location_ids: hideLocationSelection
+        ? []
+        : values.vendor_location_ids ?? [],
       status: values.status,
     };
 
@@ -442,51 +460,61 @@ export default function EditStaffForm({ staffId }: EditStaffFormProps) {
                 }}
               />
 
-              <FormField
-                control={form.control}
-                name="vendor_location_ids"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Locations</FormLabel>
-                    <FormControl>
-                      <LocationMultiSelect
-                        locations={locations}
-                        value={field.value}
-                        onChange={field.onChange}
-                        disabled={isLoadingLocations}
-                        loading={isLoadingLocations}
-                        placeholder="Select locations…"
-                      />
-                    </FormControl>
-                    {!isLoadingLocations && field.value.length > 0 && (
-                      <p className="text-sm text-muted-foreground mt-2 flex items-center gap-1.5">
-                        <span className="inline-block h-1.5 w-1.5 rounded-full bg-emerald-500 shrink-0" aria-hidden />
-                        {locations.length > 0 &&
-                        field.value.length === locations.length
-                          ? "This staff has access to all locations."
-                          : (() => {
-                              const names = field.value
-                                .map((id) => {
-                                  const loc = locations.find((l) => l.id === id);
-                                  return loc ? (loc.city || loc.name) : null;
-                                })
-                                .filter(Boolean) as string[];
-                              const count = names.length;
-                              const list =
-                                count <= 3
-                                  ? names.join(", ")
-                                  : `${names.slice(0, 2).join(", ")} and ${count - 2} more`;
-                              return `This staff has access to ${count} location${count === 1 ? "" : "s"}: ${list}.`;
-                            })()}
-                      </p>
-                    )}
-                    <FormDescription>
-                      Select one or more locations, or &quot;All&quot; for every location. Required.
-                    </FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+              {!hideLocationSelection && (
+                <FormField
+                  control={form.control}
+                  name="vendor_location_ids"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Locations</FormLabel>
+                      <FormControl>
+                        <LocationMultiSelect
+                          locations={locations}
+                          value={field.value}
+                          onChange={field.onChange}
+                          disabled={isLoadingLocations}
+                          loading={isLoadingLocations}
+                          placeholder="Select locations…"
+                        />
+                      </FormControl>
+                      {!isLoadingLocations && field.value.length > 0 && (
+                        <p className="text-sm text-muted-foreground mt-2 flex items-center gap-1.5">
+                          <span
+                            className="inline-block h-1.5 w-1.5 rounded-full bg-emerald-500 shrink-0"
+                            aria-hidden
+                          />
+                          {locations.length > 0 &&
+                          field.value.length === locations.length
+                            ? "This staff has access to all locations."
+                            : (() => {
+                                const names = field.value
+                                  .map((id) => {
+                                    const loc = locations.find((l) => l.id === id);
+                                    return loc ? (loc.city || loc.name) : null;
+                                  })
+                                  .filter(Boolean) as string[];
+                                const count = names.length;
+                                const list =
+                                  count <= 3
+                                    ? names.join(", ")
+                                    : `${names
+                                        .slice(0, 2)
+                                        .join(", ")} and ${count - 2} more`;
+                                return `This staff has access to ${count} location${
+                                  count === 1 ? "" : "s"
+                                }: ${list}.`;
+                              })()}
+                        </p>
+                      )}
+                      <FormDescription>
+                        Select one or more locations, or &quot;All&quot; for every
+                        location.
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              )}
             </div>
 
             <div className="border-t border-b py-4 my-4">

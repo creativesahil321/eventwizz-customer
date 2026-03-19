@@ -262,6 +262,30 @@ export const customersService = {
   },
 
   /**
+   * Export customers as CSV (optionally filtered by search/status)
+   */
+  exportCustomersCSV: (params?: {
+    search?: string;
+    status?: string;
+  }): Promise<Blob> => {
+    const role = getCurrentUserRole();
+    const endpoints = getEndpointsByRole<typeof API_ENDPOINTS.VENDOR.CUSTOMERS>(
+      "CUSTOMERS",
+      role
+    );
+
+    if (!endpoints.EXPORT_CSV) {
+      throw new Error("EXPORT_CSV endpoint not configured for customers");
+    }
+
+    return api.get<Blob>(endpoints.EXPORT_CSV, {
+      params,
+      responseType: "blob",
+      headers: { Accept: "text/csv" },
+    });
+  },
+
+  /**
    * Restore a soft-deleted customer
    * @param id Customer ID to restore
    * @returns Promise with restore operation result

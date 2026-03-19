@@ -26,7 +26,7 @@ export default function CreateStaffPage() {
             </p>
           </div>
 
-          <CreateStaffForm />
+          <CreateStaffForm hideLocationSelection />
         </Shell>
       </section>
     </PermissionRoute>

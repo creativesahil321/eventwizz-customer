@@ -1829,7 +1829,8 @@ export default function BookingInfoTab({ bookingData }: BookingInfoTabProps) {
 
             {/* Pay Now CTA when there is an outstanding balance */}
             {summary.outstanding > 0 &&
-              bookingData.dates?.length > 0 && (() => {
+              bookingData.dates?.length > 0 &&
+              (() => {
                 const firstUnpaidDate = bookingData.dates.find(
                   (d) =>
                     d.paymentStatus === "partial" ||

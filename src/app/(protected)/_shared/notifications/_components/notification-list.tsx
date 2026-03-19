@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { NotificationItemComponent } from "./notification-item";
 import { Notification } from "@/services/common/notification/type";
 import { EmptyPlaceholder } from "@/components/empty-placeholder";
@@ -24,10 +25,11 @@ interface NotificationListProps {
     lastPage: number;
   };
   onViewDetails: (notification: Notification) => void;
-  onMarkAsRead: (id: number) => void;
-  onMarkAsUnread: (id: number) => void;
+  onMarkAsRead: (id: number, options?: { onSettled?: () => void }) => void;
+  onMarkAsUnread: (id: number, options?: { onSettled?: () => void }) => void;
   onPageChange: (page: number) => void;
   isLoading?: boolean;
+  isMutating?: boolean;
 }
 
 export function NotificationListComponent({
@@ -39,6 +41,7 @@ export function NotificationListComponent({
   onPageChange,
   isLoading,
 }: NotificationListProps) {
+  const [updatingId, setUpdatingId] = useState<number | null>(null);
   // If loading, show a skeleton
   if (isLoading) {
     return <NotificationsListSkeleton />;
@@ -67,8 +70,15 @@ export function NotificationListComponent({
             key={notification.id}
             notification={notification}
             onViewDetails={onViewDetails}
-            onMarkAsRead={onMarkAsRead}
-            onMarkAsUnread={onMarkAsUnread}
+            onMarkAsRead={(id) => {
+              setUpdatingId(id);
+              onMarkAsRead(id, { onSettled: () => setUpdatingId(null) });
+            }}
+            onMarkAsUnread={(id) => {
+              setUpdatingId(id);
+              onMarkAsUnread(id, { onSettled: () => setUpdatingId(null) });
+            }}
+            isUpdating={updatingId === notification.id}
           />
         ))}
       </div>

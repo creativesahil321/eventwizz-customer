@@ -414,10 +414,11 @@ export default function StepEight() {
                           </FormLabel>
                           <FormControl>
                             {brochurePdfUrl ? (
-                              <div className="w-full">
-                                <div className="flex items-center justify-between bg-gray-100 p-4 rounded-md mb-2">
-                                  <div className="flex items-center">
+                              <div className="w-full min-w-0">
+                                <div className="flex items-center justify-between gap-3 bg-gray-100 p-4 rounded-md mb-2 min-w-0">
+                                  <div className="flex items-center min-w-0 flex-1 overflow-hidden">
                                     <svg
+                                      className="shrink-0"
                                       width="24"
                                       height="24"
                                       viewBox="0 0 32 32"
@@ -441,11 +442,12 @@ export default function StepEight() {
                                         fill="white"
                                       />
                                     </svg>
-                                    <span className="ml-2 text-sm">
+                                    <span className="ml-2 text-sm truncate" title={brochurePdfUrl.split("/").pop() ?? undefined}>
                                       {brochurePdfUrl.split("/").pop()}
                                     </span>
                                   </div>
                                   <Button
+                                    className="shrink-0"
                                     type="button"
                                     variant="ghost"
                                     size="sm"
@@ -506,10 +508,11 @@ export default function StepEight() {
                           </FormLabel>
                           <FormControl>
                             {brochurePdfUrl2 ? (
-                              <div className="w-full">
-                                <div className="flex items-center justify-between bg-gray-100 p-4 rounded-md mb-2">
-                                  <div className="flex items-center">
+                              <div className="w-full min-w-0">
+                                <div className="flex items-center justify-between gap-3 bg-gray-100 p-4 rounded-md mb-2 min-w-0">
+                                  <div className="flex items-center min-w-0 flex-1 overflow-hidden">
                                     <svg
+                                      className="shrink-0"
                                       width="24"
                                       height="24"
                                       viewBox="0 0 32 32"
@@ -533,11 +536,12 @@ export default function StepEight() {
                                         fill="white"
                                       />
                                     </svg>
-                                    <span className="ml-2 text-sm">
+                                    <span className="ml-2 text-sm truncate" title={brochurePdfUrl2.split("/").pop() ?? undefined}>
                                       {brochurePdfUrl2.split("/").pop()}
                                     </span>
                                   </div>
                                   <Button
+                                    className="shrink-0"
                                     type="button"
                                     variant="ghost"
                                     size="sm"
@@ -599,10 +603,11 @@ export default function StepEight() {
                           </FormLabel>
                           <FormControl>
                             {faqPdfUrl ? (
-                              <div className="w-full">
-                                <div className="flex items-center justify-between bg-gray-100 p-4 rounded-md mb-2">
-                                  <div className="flex items-center">
+                              <div className="w-full min-w-0">
+                                <div className="flex items-center justify-between gap-3 bg-gray-100 p-4 rounded-md mb-2 min-w-0">
+                                  <div className="flex items-center min-w-0 flex-1 overflow-hidden">
                                     <svg
+                                      className="shrink-0"
                                       width="24"
                                       height="24"
                                       viewBox="0 0 32 32"
@@ -630,11 +635,12 @@ export default function StepEight() {
                                         fill="white"
                                       />
                                     </svg>
-                                    <span className="ml-2 text-sm">
+                                    <span className="ml-2 text-sm truncate" title={faqPdfUrl.split("/").pop() ?? undefined}>
                                       {faqPdfUrl.split("/").pop()}
                                     </span>
                                   </div>
                                   <Button
+                                    className="shrink-0"
                                     type="button"
                                     variant="ghost"
                                     size="sm"

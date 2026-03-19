@@ -487,17 +487,26 @@ export default function StepTwo() {
                         "about_link_title",
                         "logo",
                         "cover_image",
-                      ];
+                      ] as const;
+                      const fieldLabels: Record<(typeof requiredFields)[number], string> = {
+                        banner_heading: "Banner Heading",
+                        banner_sub_heading: "Banner Sub-Heading",
+                        about_title: "Title for Your Page",
+                        about_description: "Short Description",
+                        about_link_title: "Button Text",
+                        logo: "Logo",
+                        cover_image: "Landing Page Image",
+                      };
                       const missingFields = requiredFields.filter(
                         (field) => !formValues[field as keyof typeof formValues]
                       );
 
                       if (missingFields.length > 0) {
-                        // Show toast with specific missing fields
+                        const missingLabels = missingFields.map(
+                          (f) => fieldLabels[f]
+                        );
                         toast.error(
-                          `Please fill in the following required fields: ${missingFields.join(
-                            ", "
-                          )}`
+                          `Please fill in the following required fields: ${missingLabels.join(", ")}`
                         );
                         // Trigger validation to show error messages on the form
                         await form.trigger(

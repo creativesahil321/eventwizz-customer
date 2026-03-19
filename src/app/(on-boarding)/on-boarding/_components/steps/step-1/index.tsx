@@ -72,9 +72,9 @@ export default function StepOne() {
 
         // Then handle async operations in background
         Promise.all([
-          response.data.on_boarding_step
-            ? updateSession({ on_boarding_step: response.data.on_boarding_step })
-            : Promise.resolve(),
+          response.data?.on_boarding_step
+            ? update({ on_boarding_step: response.data.on_boarding_step })
+            : update({ on_boarding_step: 2 }),
           save(),
         ]).catch((error) => {
           console.error("Background save error:", error);
@@ -211,44 +211,25 @@ export default function StepOne() {
                 <FormField
                   control={form.control}
                   name="city"
-                  render={({ field }) => {
-                    const currentLength = field.value?.length || 0;
-                    const maxLength = 30;
-                    return (
-                      <FormItem>
-                        <FormLabel className="text-sm font-medium">
-                          City <span className="text-red-400">*</span>
-                        </FormLabel>
-                        <FormControl>
-                          <Input
-                            placeholder="Select a venue to auto-fill"
-                            className="bg-white/5 cursor-not-allowed"
-                            maxLength={maxLength}
-                            readOnly
-                            {...field}
-                          />
-                        </FormControl>
-                        <div className="flex items-center justify-between">
-                          <p className="text-xs text-muted-foreground mt-1">
-                            Auto-filled from Google Places when you select a
-                            venue
-                          </p>
-                          <div className="text-xs text-muted-foreground mt-1">
-                            <span
-                              className={
-                                currentLength > maxLength
-                                  ? "text-destructive"
-                                  : ""
-                              }
-                            >
-                              {currentLength}/{maxLength} characters
-                            </span>
-                          </div>
-                        </div>
-                        <FormMessage />
-                      </FormItem>
-                    );
-                  }}
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-sm font-medium">
+                        City <span className="text-red-400">*</span>
+                      </FormLabel>
+                      <FormControl>
+                        <Input
+                          placeholder="Select a venue to auto-fill"
+                          className="bg-white/5 cursor-not-allowed"
+                          readOnly
+                          {...field}
+                        />
+                      </FormControl>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Auto-filled from Google Places when you select a venue
+                      </p>
+                      <FormMessage />
+                    </FormItem>
+                  )}
                 />
               </div>
               <div className="flex items-center justify-center gap-4 pt-4">

@@ -10,10 +10,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { CheckCheck } from "lucide-react";
 import { NotificationFilters } from "@/services/common/notification/type";
-import {
-  NOTIFICATION_CATEGORIES,
-  NOTIFICATION_STATUSES,
-} from "../_lib/constants";
+import { NOTIFICATION_STATUSES } from "../_lib/constants";
 
 interface NotificationFiltersProps {
   filters: NotificationFilters;
@@ -33,27 +30,6 @@ export function NotificationFiltersComponent({
   return (
     <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
       <div className="flex flex-col sm:flex-row gap-4 w-full sm:w-auto">
-        <div className="flex items-center gap-2">
-          <span className="text-sm whitespace-nowrap">Filter By</span>
-          <Select
-            value={filters.category || "all"}
-            onValueChange={(value) =>
-              onChange({ category: value === "all" ? undefined : value })
-            }
-          >
-            <SelectTrigger className="w-40">
-              <SelectValue placeholder="Category" />
-            </SelectTrigger>
-            <SelectContent>
-              {NOTIFICATION_CATEGORIES.map((category) => (
-                <SelectItem key={category.value} value={category.value}>
-                  {category.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-
         <div className="flex items-center gap-2">
           <span className="text-sm whitespace-nowrap">Filter By</span>
           <Select

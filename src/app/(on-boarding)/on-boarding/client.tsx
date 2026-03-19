@@ -77,7 +77,7 @@ export default function OnboardingClientWrapper() {
   const safeData: ApiResponse | null = onboardingData || null;
 
   return (
-    <FormProvider serverData={safeData}>
+    <FormProvider serverData={safeData} mode={mode === "selecting" ? undefined : mode}>
       {mode === "ai" ? (
         <AIOnboardingFlow
           onComplete={handleAIComplete}

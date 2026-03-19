@@ -301,3 +301,23 @@ export const useBulkRestoreCustomers = () => {
     },
   });
 };
+
+export const useExportCustomersCSV = () => {
+  return useMutation<Blob, Error, { search?: string; status?: string }>({
+    mutationFn: async (params) => {
+      const blob = await customersService.exportCustomersCSV(params);
+      return blob;
+    },
+    onSuccess: (blob) => {
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "customers.csv";
+      a.click();
+      URL.revokeObjectURL(url);
+    },
+    onError: (error: Error) => {
+      console.error("Error exporting customers CSV:", error);
+    },
+  });
+};

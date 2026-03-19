@@ -242,7 +242,7 @@ export function EventPreview({ data, siteEssentials }: EventPreviewProps) {
         }}
       />
 
-      {/* Drinks */}
+      {/* Other Packages */}
       <DrinkSection
         title={data.stepFive?.drink_title || ""}
         description={data.stepFive?.drink_description || ""}

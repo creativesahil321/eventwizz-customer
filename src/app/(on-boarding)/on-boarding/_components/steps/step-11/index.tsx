@@ -21,8 +21,6 @@ import {
   OnboardingSectionTitle,
   RadioButtonLabel,
 } from "@/components/ui/typography";
-import { LoaderCircle } from "lucide-react";
-import { Progress } from "@/components/ui/progress";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import {
   Select,
@@ -37,13 +35,23 @@ import GoogleLocationSearch from "./google-location-search";
 import { fetchLocationDetails } from "./_lib/actions";
 import { env } from "@/env";
 import { useDomainSuggestions } from "./_lib/hooks/useDomainSuggestions";
-import { Loader2, ChevronDown } from "lucide-react";
+import { Loader2, ChevronDown, Check, CheckCircle2 } from "lucide-react";
 import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 import { useEventId } from "../../../_lib/hooks/useEventId";
+import { motion, AnimatePresence } from "framer-motion";
+import { useRouter } from "next/navigation";
+
+const PUBLISH_STEPS = [
+  { label: "Saving your settings", icon: "💾" },
+  { label: "Configuring your domain", icon: "🌐" },
+  { label: "Setting up your event page", icon: "📅" },
+  { label: "Publishing your site", icon: "🚀" },
+  { label: "Finalising & going to dashboard", icon: "✅" },
+] as const;
 
 // Days options for reminder emails
 const days = Array.from({ length: 31 }, (_, i) => i + 1);
@@ -56,11 +64,12 @@ const extraOptions = [
 ];
 
 export default function StepEleven() {
-  const { form: globalForm, save } = useFormContext();
+  const { form: globalForm } = useFormContext();
   const { update } = useSession();
+  const router = useRouter();
   const [publishing, setPublishing] = useState(false);
-  const [progress, setProgress] = useState(0);
-  const [progressMessage, setProgressMessage] = useState("");
+  const [publishStep, setPublishStep] = useState(-1);
+  const [publishDone, setPublishDone] = useState(false);
 
   // Domain suggestions
   const {
@@ -123,17 +132,18 @@ export default function StepEleven() {
   const showReminderDays =
     form.watch("reminder_email_before_days") !== undefined;
 
-  // Submit handler for the form
+  const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+  const stepDelays = [900, 800, 1000, 900, 700];
+
+  // Single clean submit flow — no double API call
   const onSubmit = async (values: StepElevenType) => {
-    const data = values as StepElevenType;
     try {
-      // Update global form with Step data
-      globalForm.setValue("stepEleven", data);
+      globalForm.setValue("stepEleven", values);
+      setPublishing(true);
+      setPublishStep(-1);
+      setPublishDone(false);
 
-      // Save form data
-      await save();
-
-      // Define the type for our payload
       type StepElevenPayload = {
         step: 11;
         event_id: number;
@@ -146,144 +156,247 @@ export default function StepEleven() {
         confirm_domain: boolean;
       };
 
-      // Prepare payload - only include what's needed
       const payload: StepElevenPayload = {
         step: 11,
-        event_id: data.event_id,
-        submit_type: data.submit_type,
-        domain: data.domain,
-        confirm_domain: data.confirm_domain,
+        event_id: values.event_id,
+        submit_type: values.submit_type,
+        domain: values.domain,
+        confirm_domain: values.confirm_domain,
       };
 
-      // Only add address, city, and contact_number for duplicate
-      if (data.submit_type === "duplicate") {
-        payload.address = data.address;
-        payload.city = data.city;
-        payload.contact_number = data.contact_number;
+      if (values.submit_type === "duplicate") {
+        payload.address = values.address;
+        payload.city = values.city;
+        payload.contact_number = values.contact_number;
       }
 
-      // Add reminder days if configured
       if (showReminderDays) {
         payload.reminder_email_before_days =
-          data.reminder_email_before_days || 10;
+          values.reminder_email_before_days || 10;
       }
 
-      // Store Step data with API - backend now only returns success message
+      // Step 0 — saving settings (sync to global form only; do not call save() — it triggers cache invalidation and can unmount the overlay)
+      setPublishStep(0);
+      await sleep(stepDelays[0]);
+
+      // Step 1 — configuring domain
+      setPublishStep(1);
+      await sleep(stepDelays[1]);
+
+      // Step 2 — setting up event page (actual API call happens here)
+      setPublishStep(2);
       const response = await onboardingService.storeStepElevenData(payload);
+      if (!response?.status) throw new Error("Failed to publish");
 
-      // Update session if the API response is successful
-      if (response.status) {
-        // Update session with step completion
-        await update({
-          on_boarding_step: 11,
-        });
+      // Step 3 — publishing site
+      setPublishStep(3);
+      await sleep(stepDelays[2]);
 
-        // Redirect to welcome page
-        setTimeout(() => {
-          window.location.href = "/welcome/select-location?onboarded=true";
-        }, 1500);
-      }
+      await update({ on_boarding_step: 11 });
 
-      // Handle publishing or just saving
-      if (data.submit_type === "submit") {
-        await handlePublish(
-          showReminderDays ? data.reminder_email_before_days || 10 : undefined
-        );
-      }
-    } catch (error) {
-      console.error("Error during form submission:", error);
-      // Error toast is handled by axios interceptor
-    }
-  };
+      // Step 4 — finalising
+      setPublishStep(4);
+      await sleep(stepDelays[3]);
 
-  // Publishing process simulation
-  const handlePublish = async (reminderDays?: number) => {
-    try {
-      setPublishing(true);
-      setProgress(0);
-      setProgressMessage("Preparing your event for publishing...");
+      // Done — show success screen then redirect
+      setPublishStep(PUBLISH_STEPS.length);
+      await sleep(300);
+      setPublishDone(true);
 
-      // Simulate publishing process
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-      setProgress(20);
-      setProgressMessage("Validating event details...");
-
-      await new Promise((resolve) => setTimeout(resolve, 800));
-      setProgress(40);
-      setProgressMessage("Setting up your event page...");
-
-      await new Promise((resolve) => setTimeout(resolve, 1200));
-      setProgress(60);
-      setProgressMessage("Uploading images and media...");
-
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-      setProgress(80);
-      setProgressMessage("Almost done...");
-
-      await new Promise((resolve) => setTimeout(resolve, 800));
-      setProgress(100);
-
-      // Define the type for our payload
-      type StepElevenPayload = {
-        step: 11;
-        event_id: number;
-        submit_type: "duplicate" | "submit";
-        address?: string;
-        city?: string;
-        contact_number?: string;
-        reminder_email_before_days?: number;
-        domain: string;
-        confirm_domain: boolean;
-      };
-
-      // Prepare payload - only include what's needed
-      const payload: StepElevenPayload = {
-        step: 11,
-        event_id: eventId,
-        submit_type: "submit",
-        domain: form.getValues().domain,
-        confirm_domain: form.getValues().confirm_domain,
-      };
-
-      // Only add address, city, and contact_number for duplicate
-      if (form.getValues().submit_type === "duplicate") {
-        payload.address = form.getValues().address || "";
-        payload.city = form.getValues().city || "";
-        payload.contact_number = form.getValues().contact_number || "";
-      }
-
-      // Only add reminder days if configured
-      if (reminderDays !== undefined) {
-        payload.reminder_email_before_days = reminderDays;
-      }
-
-      // Actually submit the event via API - backend now only returns success message
-      const publishResponse = await onboardingService.storeStepElevenData(
-        payload
-      );
-
-      if (publishResponse && publishResponse.status) {
-        // Update session with step completion
-        await update({
-          on_boarding_step: 11,
-        });
-
-        // Redirect to welcome page
-        setTimeout(() => {
-          window.location.href = "/welcome/select-location?onboarded=true";
-        }, 1500);
-      } else {
-        throw new Error("Failed to submit event");
-      }
+      setTimeout(() => {
+        router.push("/welcome/select-location?onboarded=true");
+      }, 3500);
     } catch (error) {
       console.error("Error during publishing:", error);
-      // Error toast is handled by axios interceptor
       setPublishing(false);
+      setPublishStep(-1);
     }
   };
+
+  const progressPct =
+    publishStep < 0
+      ? 0
+      : Math.min(
+          Math.round(((publishStep + 1) / PUBLISH_STEPS.length) * 100),
+          100
+        );
 
   return (
     <div className="flex flex-col items-center justify-center w-full min-h-screen bg-transparent">
+      {/* Full-screen publishing overlay */}
+      <AnimatePresence>
+        {publishing && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 backdrop-blur-sm"
+          >
+            <div className="w-full max-w-sm mx-auto px-6">
+              <AnimatePresence mode="wait">
+                {publishDone ? (
+                  /* ── Success screen ── */
+                  <motion.div
+                    key="success"
+                    initial={{ opacity: 0, scale: 0.92 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    transition={{ type: "spring", stiffness: 260, damping: 22 }}
+                    className="flex flex-col items-center text-center gap-5"
+                  >
+                    <motion.div
+                      initial={{ scale: 0 }}
+                      animate={{ scale: 1 }}
+                      transition={{
+                        type: "spring",
+                        stiffness: 300,
+                        damping: 18,
+                        delay: 0.1,
+                      }}
+                      className="w-20 h-20 rounded-full flex items-center justify-center"
+                      style={{ backgroundColor: "rgba(34,197,94,0.15)" }}
+                    >
+                      <CheckCircle2 className="w-10 h-10 text-green-500" />
+                    </motion.div>
+
+                    <div>
+                      <h2 className="text-2xl font-bold text-foreground">
+                        Your site is live! 🎉
+                      </h2>
+                      <p className="text-sm text-muted-foreground mt-2">
+                        Taking you to your dashboard now…
+                      </p>
+                    </div>
+
+                    <div className="w-full h-1 rounded-full bg-muted overflow-hidden">
+                      <motion.div
+                        className="h-full rounded-full bg-green-500"
+                        initial={{ width: "0%" }}
+                        animate={{ width: "100%" }}
+                        transition={{ duration: 3.2, ease: "linear" }}
+                      />
+                    </div>
+                  </motion.div>
+                ) : (
+                  /* ── Loading screen ── */
+                  <motion.div
+                    key="loading"
+                    initial={{ opacity: 0, y: 16 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -16 }}
+                    className="w-full"
+                  >
+                    {/* Animated icon */}
+                    <div className="text-center mb-8">
+                      <motion.div
+                        animate={{ rotate: 360 }}
+                        transition={{
+                          duration: 2,
+                          repeat: Infinity,
+                          ease: "linear",
+                        }}
+                        className="w-14 h-14 rounded-2xl border border-blue-500/30 flex items-center justify-center mx-auto mb-4 bg-blue-500/10"
+                      >
+                        <Loader2 className="w-7 h-7 text-blue-400" />
+                      </motion.div>
+                      <h2 className="text-xl font-bold text-white">
+                        Publishing your event…
+                      </h2>
+                      <p className="text-slate-500 text-xs mt-1">
+                        Please don&apos;t close this page
+                      </p>
+                    </div>
+
+                    {/* Progress bar */}
+                    <div className="mb-6">
+                      <div className="flex justify-between items-center mb-1.5">
+                        <span className="text-xs text-slate-500">
+                          Progress
+                        </span>
+                        <span className="text-xs font-semibold text-blue-400">
+                          {progressPct}%
+                        </span>
+                      </div>
+                      <div className="h-1.5 rounded-full bg-white/10 overflow-hidden">
+                        <motion.div
+                          className="h-full rounded-full bg-blue-500"
+                          initial={{ width: "0%" }}
+                          animate={{ width: `${progressPct}%` }}
+                          transition={{ duration: 0.5, ease: "easeOut" }}
+                        />
+                      </div>
+                    </div>
+
+                    {/* Step list */}
+                    <div className="space-y-2">
+                      {PUBLISH_STEPS.map((step, idx) => {
+                        const isDone = idx < publishStep;
+                        const isActive = idx === publishStep;
+                        const isPending = idx > publishStep;
+                        return (
+                          <motion.div
+                            key={idx}
+                            initial={{ opacity: 0, x: -8 }}
+                            animate={{ opacity: isPending ? 0.35 : 1, x: 0 }}
+                            transition={{ delay: idx * 0.06 }}
+                            className={`flex items-center gap-3 px-4 py-2.5 rounded-xl transition-colors ${
+                              isActive
+                                ? "bg-white/10 border border-white/20"
+                                : "bg-transparent"
+                            }`}
+                          >
+                            <div className="w-6 h-6 flex-shrink-0 flex items-center justify-center">
+                              {isDone ? (
+                                <motion.div
+                                  initial={{ scale: 0 }}
+                                  animate={{ scale: 1 }}
+                                  transition={{
+                                    type: "spring",
+                                    stiffness: 300,
+                                    damping: 20,
+                                  }}
+                                  className="w-5 h-5 rounded-full flex items-center justify-center bg-green-500/15"
+                                >
+                                  <Check className="w-3 h-3 text-green-500" />
+                                </motion.div>
+                              ) : isActive ? (
+                                <motion.div
+                                  animate={{ rotate: 360 }}
+                                  transition={{
+                                    duration: 1,
+                                    repeat: Infinity,
+                                    ease: "linear",
+                                  }}
+                                >
+                                  <Loader2 className="w-4 h-4 text-blue-400" />
+                                </motion.div>
+                              ) : (
+                                <div className="w-4 h-4 rounded-full border border-slate-500/30" />
+                              )}
+                            </div>
+                            <span className="text-sm mr-1">{step.icon}</span>
+                            <span
+                              className={`text-sm font-medium ${
+                                isDone
+                                  ? "text-slate-400"
+                                  : isActive
+                                    ? "text-white"
+                                    : "text-slate-500"
+                              }`}
+                            >
+                              {step.label}
+                            </span>
+                          </motion.div>
+                        );
+                      })}
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       <div className="w-full max-w-4xl mx-auto relative">
         <OnboardingCard className="w-full mx-auto shadow-sm">
           <CardHeader className="pb-2 pt-4">
@@ -293,18 +406,7 @@ export default function StepEleven() {
           </CardHeader>
 
           <CardContent className="px-6 py-2 pb-8">
-            {publishing ? (
-              <div className="flex flex-col items-center justify-center py-12 space-y-8">
-                <div className="flex items-center space-x-2">
-                  <LoaderCircle className="animate-spin text-primary h-8 w-8" />
-                  <span className="text-lg font-medium">
-                    {progressMessage || "Publishing your event..."}
-                  </span>
-                </div>
-                <Progress value={progress} className="w-full" />
-              </div>
-            ) : (
-              <Form {...form}>
+            <Form {...form}>
                 <form
                   onSubmit={form.handleSubmit(onSubmit)}
                   className="space-y-6"
@@ -888,18 +990,9 @@ export default function StepEleven() {
                           !form.watch("confirm_domain")
                         }
                       >
-                        {publishing ? (
-                          <>
-                            <LoaderCircle className="animate-spin mr-2 h-4 w-4" />
-                            Publishing...
-                          </>
-                        ) : (
-                          <>
-                            {form.watch("submit_type") === "duplicate"
-                              ? "Duplicate & Submit"
-                              : "Submit"}
-                          </>
-                        )}
+                        {form.watch("submit_type") === "duplicate"
+                          ? "Duplicate & Submit"
+                          : "Submit"}
                       </Button>
                       {!selectedDomain && (
                         <p className="text-sm text-gray-500 whitespace-nowrap">
@@ -914,8 +1007,7 @@ export default function StepEleven() {
                     </div>
                   </div>
                 </form>
-              </Form>
-            )}
+            </Form>
           </CardContent>
         </OnboardingCard>
       </div>

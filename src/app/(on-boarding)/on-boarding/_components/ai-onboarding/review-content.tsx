@@ -331,7 +331,7 @@ export default function AIReviewContent({
     },
     {
       id: "drinks",
-      title: "Drinks & Packages",
+      title: "Other Packages",
       icon: <Wine className="w-4 h-4" />,
       stepLabel: "Step 7",
       fields: [
@@ -343,7 +343,7 @@ export default function AIReviewContent({
         },
         {
           key: "drink_description",
-          label: "Drinks Description",
+          label: "Section Description",
           value: editedContent.stepSeven.drink_description,
           maxLength: 160,
         },
@@ -2080,7 +2080,7 @@ export default function AIReviewContent({
                                 className="w-fit flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-red-500/25 hover:bg-red-500/10 text-red-400 hover:text-red-300 text-xs font-medium transition-colors"
                               >
                                 <Trash2 className="w-3 h-3" />
-                                Remove drinks section (no drink packages)
+                                Remove other packages section
                               </button>
                             </div>
                             <div className="space-y-3">
@@ -2182,7 +2182,7 @@ export default function AIReviewContent({
                 className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/5 hover:bg-white/10 border border-white/10 text-slate-400 hover:text-white text-xs transition-colors"
               >
                 <Plus className="w-3 h-3" />
-                Drinks &amp; Packages
+                Other Packages
               </button>
             )}
           </div>

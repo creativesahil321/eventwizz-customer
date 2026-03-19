@@ -8,7 +8,7 @@ import { addCacheBusting } from "@/lib/image-utils";
 
 interface OnboardingSkeletonProps {
   className?: string;
-  layout?: "split" | "full" | "centered";
+  layout?: "split" | "full" | "centered" | "ai";
 }
 
 export function OnboardingFormSkeleton({
@@ -188,6 +188,51 @@ export function OnboardingFormSkeleton({
         <ProgressSkeleton />
         <section className="w-full min-h-[calc(100vh-120px)] flex justify-center items-center px-6 py-8">
           <FormFieldsSkeleton />
+        </section>
+      </div>
+    );
+  }
+
+  if (layout === "ai") {
+    return (
+      <div className={cn("w-full min-h-screen flex flex-col bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950", className)}>
+        <section className="w-full flex-1 flex items-center justify-center px-4 py-10">
+          <div className="w-full max-w-2xl flex flex-col items-center">
+            <div className="mb-8 flex flex-col items-center gap-3 text-center">
+              <Skeleton className="h-8 w-32 rounded-full bg-white/10" />
+              <Skeleton className="h-9 w-72 max-w-full rounded-lg bg-white/10" />
+              <Skeleton className="h-4 w-96 max-w-full rounded bg-white/5" />
+            </div>
+            <div className="w-full rounded-2xl border border-white/10 bg-slate-900/60 backdrop-blur-xl p-8">
+              <div className="space-y-6">
+                <div className="space-y-2">
+                  <Skeleton className="h-4 w-24 rounded bg-white/10" />
+                  <Skeleton className="h-10 w-full rounded-lg bg-white/5" />
+                </div>
+                <div className="space-y-2">
+                  <Skeleton className="h-4 w-20 rounded bg-white/10" />
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                    {[1, 2, 3, 4, 5, 6, 7, 8].map((i) => (
+                      <Skeleton key={i} className="h-10 rounded-lg bg-white/5" />
+                    ))}
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Skeleton className="h-4 w-16 rounded bg-white/10" />
+                    <Skeleton className="h-10 w-full rounded-lg bg-white/5" />
+                  </div>
+                  <div className="space-y-2">
+                    <Skeleton className="h-4 w-28 rounded bg-white/10" />
+                    <Skeleton className="h-10 w-full rounded-lg bg-white/5" />
+                  </div>
+                </div>
+                <div className="flex justify-center pt-4">
+                  <Skeleton className="h-11 w-40 rounded-xl bg-white/10" />
+                </div>
+              </div>
+            </div>
+          </div>
         </section>
       </div>
     );

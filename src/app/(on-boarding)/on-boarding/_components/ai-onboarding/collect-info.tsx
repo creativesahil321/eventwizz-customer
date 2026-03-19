@@ -24,130 +24,7 @@ import {
 import { env } from "@/env";
 import type { AIOnboardingInput } from "@/app/api/ai/generate-onboarding/route";
 
-// ─── Voice Input Hook ───────────────────────────────────────────────────────
-
-interface SpeechRecognitionCtor {
-  new (): SpeechRecognitionInstance;
-}
-interface SpeechRecognitionInstance {
-  continuous: boolean;
-  interimResults: boolean;
-  lang: string;
-  start(): void;
-  stop(): void;
-  abort(): void;
-  onstart: (() => void) | null;
-  onend: (() => void) | null;
-  onresult: ((event: SpeechResultEvent) => void) | null;
-  onerror: ((event: { error: string }) => void) | null;
-}
-interface SpeechResultEvent {
-  readonly results: {
-    readonly length: number;
-    readonly isFinal: boolean;
-    readonly [index: number]: { readonly transcript: string };
-  }[];
-}
-type ExtendedWindow = Window & {
-  SpeechRecognition?: SpeechRecognitionCtor;
-  webkitSpeechRecognition?: SpeechRecognitionCtor;
-};
-
-type VoiceState = "idle" | "listening" | "unsupported" | "error";
-
-function useVoiceInput(onTranscript: (text: string) => void) {
-  const [voiceState, setVoiceState] = useState<VoiceState>("idle");
-  const [interimText, setInterimText] = useState("");
-  const recognitionRef = useRef<SpeechRecognitionInstance | null>(null);
-
-  // Keep a stable ref to the callback so we never capture a stale closure
-  const onTranscriptRef = useRef(onTranscript);
-  useEffect(() => { onTranscriptRef.current = onTranscript; }, [onTranscript]);
-
-  const isSupported =
-    typeof window !== "undefined" &&
-    !!((window as ExtendedWindow).SpeechRecognition ||
-      (window as ExtendedWindow).webkitSpeechRecognition);
-
-  const start = useCallback(() => {
-    if (!isSupported) { setVoiceState("unsupported"); return; }
-
-    const Ctor =
-      (window as ExtendedWindow).SpeechRecognition ||
-      (window as ExtendedWindow).webkitSpeechRecognition;
-    if (!Ctor) return;
-
-    // Abort any existing session first
-    recognitionRef.current?.abort();
-
-    const rec = new Ctor();
-    rec.continuous = true;
-    rec.interimResults = true;
-    rec.lang = "en-GB";
-
-    rec.onstart = () => {
-      setVoiceState("listening");
-      setInterimText("");
-    };
-
-    rec.onresult = (event: SpeechResultEvent) => {
-      /*
-       * Rebuild the FULL transcript from ALL results on every event.
-       * This is the only safe approach:
-       *  – avoids resultIndex accumulation bugs
-       *  – avoids calling onTranscript twice (once in onresult, once in onend)
-       *  – handles browsers that replay earlier results
-       */
-      let finalText = "";
-      let liveText = "";
-
-      for (let i = 0; i < event.results.length; i++) {
-        const segment = event.results[i][0].transcript;
-        if (event.results[i].isFinal) {
-          finalText += (finalText ? " " : "") + segment.trim();
-        } else {
-          liveText += segment;
-        }
-      }
-
-      setInterimText(liveText);
-      // Show final + live preview to the user in real time
-      const display = liveText
-        ? finalText + (finalText ? " " : "") + liveText
-        : finalText;
-      onTranscriptRef.current(display);
-    };
-
-    rec.onerror = (event: { error: string }) => {
-      // "aborted" fires when we call stop() ourselves — not an error
-      if (event.error !== "aborted") setVoiceState("error");
-    };
-
-    rec.onend = () => {
-      // Only clean up UI state here.
-      // onTranscript was already called with the final text in onresult.
-      setInterimText("");
-      setVoiceState("idle");
-    };
-
-    recognitionRef.current = rec;
-    rec.start();
-  }, [isSupported]);
-
-  const stop = useCallback(() => {
-    recognitionRef.current?.stop();
-  }, []);
-
-  const toggle = useCallback(() => {
-    if (voiceState === "listening") stop();
-    else start();
-  }, [voiceState, start, stop]);
-
-  // Abort on unmount
-  useEffect(() => () => { recognitionRef.current?.abort(); }, []);
-
-  return { voiceState, interimText, toggle, isSupported };
-}
+import { useVoiceInput } from "@/hooks/useVoiceInput";
 
 const themeAccent = {
   badge: {
@@ -167,22 +44,34 @@ const themeAccent = {
 const INPUT_CLASS =
   "w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white placeholder-slate-500 text-sm focus:outline-none focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/25 transition-colors";
 
-const collectInfoSchema = z.object({
-  venueName: z.string().min(2, "Venue name is required"),
-  venueType: z.string().min(1, "Please select a venue type"),
-  city: z.string().min(1, "City is required"),
-  address: z.string().min(1, "Address is required"),
-  contactNumber: z
-    .string()
-    .min(1, "Contact number is required")
-    .max(20, "Max 20 characters")
-    .regex(/^[\d\s\-+()]+$/, "Invalid phone format"),
-  email: z.string().email("Invalid email").min(1, "Email is required"),
-  eventType: z.string().optional(),
-  guestCount: z.string().optional(),
-  priceRange: z.string().optional(),
-  description: z.string().max(800, "Max 800 characters").optional(),
-});
+const collectInfoSchema = z
+  .object({
+    venueName: z.string().min(2, "Venue name is required"),
+    selectedPlaceId: z.string().optional(),
+    venueType: z.string().min(1, "Please select a venue type"),
+    city: z.string().min(1, "City is required"),
+    address: z.string().min(1, "Address is required"),
+    contactNumber: z
+      .string()
+      .min(1, "Contact number is required")
+      .max(20, "Max 20 characters")
+      .regex(/^[\d\s\-+()]+$/, "Invalid phone format"),
+    email: z.string().email("Invalid email").min(1, "Email is required"),
+    eventType: z.string().optional(),
+    guestCount: z.string().optional(),
+    priceRange: z.string().optional(),
+    description: z.string().max(800, "Max 800 characters").optional(),
+  })
+  .refine(
+    (data) =>
+      !data.venueName ||
+      data.venueName.length < 2 ||
+      !!data.selectedPlaceId,
+    {
+      message: "Please select a venue from the Google suggestions",
+      path: ["venueName"],
+    }
+  );
 
 type CollectInfoForm = z.infer<typeof collectInfoSchema>;
 
@@ -216,6 +105,7 @@ export default function AICollectInfo({
     resolver: zodResolver(collectInfoSchema),
     defaultValues: {
       venueName: initialData?.venueName || "",
+      selectedPlaceId: "",
       venueType: initialData?.venueType || "",
       city: initialData?.city || "",
       address: initialData?.address || "",
@@ -235,8 +125,12 @@ export default function AICollectInfo({
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [isSearching, setIsSearching] = useState(false);
-  const [isPlaceSelected, setIsPlaceSelected] = useState(!!initialData?.venueName);
-  const autocompleteRef = useRef<google.maps.places.AutocompleteService | null>(null);
+  const [isPlaceSelected, setIsPlaceSelected] = useState(
+    !!initialData?.venueName,
+  );
+  const autocompleteRef = useRef<google.maps.places.AutocompleteService | null>(
+    null,
+  );
   const debounceRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
@@ -246,84 +140,133 @@ export default function AICollectInfo({
     });
     loader.load().then(() => {
       if (window.google?.maps?.places) {
-        autocompleteRef.current = new window.google.maps.places.AutocompleteService();
+        autocompleteRef.current =
+          new window.google.maps.places.AutocompleteService();
       }
     });
   }, []);
 
-  const handleVenueSearch = useCallback((query: string) => {
-    if (isPlaceSelected) return;
-    setSearchQuery(query);
-    if (!query) {
-      setSuggestions([]);
-      setIsSearching(false);
-      return;
-    }
-    setIsSearching(true);
-    if (debounceRef.current) clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(() => {
-      if (!autocompleteRef.current) {
+  const handleVenueSearch = useCallback(
+    (query: string) => {
+      if (isPlaceSelected) return;
+      setSearchQuery(query);
+      if (!query) {
+        setSuggestions([]);
         setIsSearching(false);
         return;
       }
-      autocompleteRef.current.getPlacePredictions(
-        { input: query, types: ["establishment"] },
-        (predictions, status) => {
-          if (status === google.maps.places.PlacesServiceStatus.OK && predictions) {
-            setSuggestions(predictions.map((p) => ({ description: p.description, place_id: p.place_id })));
-          } else {
-            setSuggestions([]);
-          }
+      setIsSearching(true);
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+      debounceRef.current = setTimeout(() => {
+        if (!autocompleteRef.current) {
           setIsSearching(false);
+          return;
         }
-      );
-    }, 300);
-  }, [isPlaceSelected]);
-
-  const handlePlaceSelect = useCallback((suggestion: Suggestion) => {
-    setSuggestions([]);
-    setSearchQuery("");
-    setIsPlaceSelected(true);
-
-    if (!window.google?.maps?.places?.PlacesService) return;
-
-    const service = new window.google.maps.places.PlacesService(document.createElement("div"));
-    service.getDetails(
-      {
-        placeId: suggestion.place_id,
-        fields: [
-          "name", "formatted_address", "formatted_phone_number",
-          "international_phone_number", "website", "url",
-          "business_status", "address_components",
-        ],
-      },
-      (place, status) => {
-        if (status !== window.google.maps.places.PlacesServiceStatus.OK || !place) return;
-
-        form.setValue("venueName", place.name ?? "", { shouldValidate: true });
-        form.setValue(
-          "contactNumber",
-          place.international_phone_number ?? place.formatted_phone_number ?? "",
-          { shouldValidate: true }
+        autocompleteRef.current.getPlacePredictions(
+          {
+            input: query,
+            types: ["establishment"],
+            componentRestrictions: { country: ["gb"] },
+          },
+          (predictions, status) => {
+            if (
+              status === google.maps.places.PlacesServiceStatus.OK &&
+              predictions
+            ) {
+              setSuggestions(
+                predictions.map((p) => ({
+                  description: p.description,
+                  place_id: p.place_id,
+                })),
+              );
+            } else {
+              setSuggestions([]);
+            }
+            setIsSearching(false);
+          },
         );
-        form.setValue("address", place.formatted_address ?? "", { shouldValidate: true });
+      }, 300);
+    },
+    [isPlaceSelected],
+  );
 
-        if (place.address_components) {
-          const cityComp = place.address_components.find((c) =>
-            c.types.includes("locality") ||
-            c.types.includes("postal_town") ||
-            c.types.includes("administrative_area_level_1")
+  const handlePlaceSelect = useCallback(
+    (suggestion: Suggestion) => {
+      setSuggestions([]);
+      setSearchQuery("");
+      setIsPlaceSelected(true);
+
+      // Set selectedPlaceId and venue name immediately so validation passes
+      // even before getDetails callback runs (avoids "Please select from Google" error)
+      form.setValue("selectedPlaceId", suggestion.place_id, {
+        shouldValidate: true,
+      });
+      form.setValue("venueName", suggestion.description || "", {
+        shouldValidate: true,
+      });
+
+      if (!window.google?.maps?.places?.PlacesService) return;
+
+      const service = new window.google.maps.places.PlacesService(
+        document.createElement("div"),
+      );
+      service.getDetails(
+        {
+          placeId: suggestion.place_id,
+          fields: [
+            "name",
+            "formatted_address",
+            "formatted_phone_number",
+            "international_phone_number",
+            "website",
+            "url",
+            "business_status",
+            "address_components",
+          ],
+        },
+        (place, status) => {
+          if (
+            status !== window.google.maps.places.PlacesServiceStatus.OK ||
+            !place
+          )
+            return;
+
+          form.setValue("venueName", place.name ?? suggestion.description ?? "", {
+            shouldValidate: true,
+          });
+          form.setValue(
+            "contactNumber",
+            place.international_phone_number ??
+              place.formatted_phone_number ??
+              "",
+            { shouldValidate: true },
           );
-          if (cityComp) {
-            form.setValue("city", cityComp.long_name, { shouldValidate: true });
+          form.setValue("address", place.formatted_address ?? "", {
+            shouldValidate: true,
+          });
+
+          if (place.address_components) {
+            const cityComp = place.address_components.find(
+              (c) =>
+                c.types.includes("locality") ||
+                c.types.includes("postal_town") ||
+                c.types.includes("administrative_area_level_1"),
+            );
+            if (cityComp) {
+              form.setValue("city", cityComp.long_name, {
+                shouldValidate: true,
+              });
+            }
           }
-        }
-      }
-    );
-  }, [form]);
+        },
+      );
+    },
+    [form],
+  );
 
   const handleClearPlace = () => {
     form.setValue("venueName", "");
+    form.setValue("selectedPlaceId", "");
     form.setValue("address", "");
     form.setValue("city", "");
     form.setValue("contactNumber", "");
@@ -333,15 +276,20 @@ export default function AICollectInfo({
   };
 
   const handleFormSubmit = (data: CollectInfoForm) => {
-    onSubmit(data as AIOnboardingInput);
+    const payload = { ...data };
+    delete (payload as Record<string, unknown>).selectedPlaceId;
+    onSubmit(payload as AIOnboardingInput);
   };
 
   // ─── Voice input for description ────────────────────────────────────────
-  const { voiceState, interimText, toggle: toggleVoice, isSupported: voiceSupported } = useVoiceInput(
-    (text: string) => {
-      form.setValue("description", text, { shouldValidate: true });
-    }
-  );
+  const {
+    voiceState,
+    interimText,
+    toggle: toggleVoice,
+    isSupported: voiceSupported,
+  } = useVoiceInput((text: string) => {
+    form.setValue("description", text, { shouldValidate: true });
+  });
   const isListening = voiceState === "listening";
 
   return (
@@ -354,7 +302,10 @@ export default function AICollectInfo({
             style={themeAccent.badge}
           >
             <Sparkles className="w-3.5 h-3.5" style={themeAccent.text} />
-            <span className="text-xs font-medium tracking-wide uppercase" style={themeAccent.text}>
+            <span
+              className="text-xs font-medium tracking-wide uppercase"
+              style={themeAccent.text}
+            >
               AI-Powered Setup
             </span>
           </div>
@@ -362,13 +313,18 @@ export default function AICollectInfo({
             Tell us about your venue
           </h1>
           <p className="text-slate-400 text-sm max-w-md mx-auto">
-            Search for your venue on Google to autofill details, or type manually. Our AI will generate your entire website.
+            Search for your venue on Google (UK only) and select it from the
+            suggestions to autofill details (same as manual mode). Our AI will
+            then generate your entire website.
           </p>
         </div>
 
         {/* Form */}
         <div className="rounded-2xl border border-white/10 bg-slate-900/60 backdrop-blur-xl p-8">
-          <form onSubmit={form.handleSubmit(handleFormSubmit)} className="space-y-6">
+          <form
+            onSubmit={form.handleSubmit(handleFormSubmit)}
+            className="space-y-6"
+          >
             {/* Venue Name with Google Places */}
             <div>
               <label className="flex items-center gap-2 text-sm font-medium text-slate-300 mb-2">
@@ -380,11 +336,19 @@ export default function AICollectInfo({
                   <Search className="w-4 h-4 text-slate-500" />
                 </div>
                 <input
-                  value={isPlaceSelected ? form.watch("venueName") : searchQuery}
+                  value={
+                    isPlaceSelected ? form.watch("venueName") : searchQuery
+                  }
                   onChange={(e) => {
                     if (isPlaceSelected) return;
-                    handleVenueSearch(e.target.value);
-                    form.setValue("venueName", e.target.value, { shouldValidate: true });
+                    const value = e.target.value;
+                    handleVenueSearch(value);
+                    form.setValue("venueName", value, {
+                      shouldValidate: true,
+                    });
+                    form.setValue("selectedPlaceId", "", {
+                      shouldValidate: true,
+                    });
                   }}
                   readOnly={isPlaceSelected}
                   placeholder="Search for your venue on Google..."
@@ -417,21 +381,34 @@ export default function AICollectInfo({
                         className="px-4 py-3 hover:bg-white/5 cursor-pointer border-b border-white/5 last:border-0 transition-colors"
                       >
                         <div className="flex items-start gap-2.5">
-                          <MapPin className="w-4 h-4 mt-0.5 flex-shrink-0" style={themeAccent.text} />
-                          <span className="text-sm text-slate-300">{sug.description}</span>
+                          <MapPin
+                            className="w-4 h-4 mt-0.5 flex-shrink-0"
+                            style={themeAccent.text}
+                          />
+                          <span className="text-sm text-slate-300">
+                            {sug.description}
+                          </span>
                         </div>
                       </li>
                     ))}
                   </ul>
                 )}
-                {searchQuery && suggestions.length === 0 && !isSearching && !isPlaceSelected && (
-                  <div className="absolute z-50 bg-slate-800 border border-white/10 rounded-xl w-full mt-1.5 p-3.5 shadow-2xl">
-                    <p className="text-sm text-slate-500 text-center">
-                      No venues found. You can type the name manually.
-                    </p>
-                  </div>
-                )}
+                {searchQuery &&
+                  suggestions.length === 0 &&
+                  !isSearching &&
+                  !isPlaceSelected && (
+                    <div className="absolute z-50 bg-slate-800 border border-white/10 rounded-xl w-full mt-1.5 p-3.5 shadow-2xl">
+                      <p className="text-sm text-slate-500 text-center">
+                        No venues found. Try a different search, or switch to
+                        Manual to enter details manually.
+                      </p>
+                    </div>
+                  )}
               </div>
+              <p className="text-xs text-slate-500 mt-1.5">
+                Only verified venues from Google suggestions can be used — same
+                as manual mode. Select one from the dropdown.
+              </p>
               {form.formState.errors.venueName && (
                 <p className="text-red-400 text-xs mt-1.5">
                   {form.formState.errors.venueName.message}
@@ -450,7 +427,11 @@ export default function AICollectInfo({
                   <button
                     key={type.value}
                     type="button"
-                    onClick={() => form.setValue("venueType", type.value, { shouldValidate: true })}
+                    onClick={() =>
+                      form.setValue("venueType", type.value, {
+                        shouldValidate: true,
+                      })
+                    }
                     className={`flex flex-col items-center gap-1.5 px-3 py-3 rounded-xl border text-xs font-medium transition-all duration-200 ${
                       selectedVenueType === type.value
                         ? ""
@@ -458,7 +439,10 @@ export default function AICollectInfo({
                     }`}
                     style={
                       selectedVenueType === type.value
-                        ? { ...themeAccent.selectedCard, color: `var(--color-primary, #93c5fd)` }
+                        ? {
+                            ...themeAccent.selectedCard,
+                            color: `var(--color-primary, #93c5fd)`,
+                          }
                         : undefined
                     }
                   >
@@ -488,7 +472,9 @@ export default function AICollectInfo({
                   className={INPUT_CLASS}
                 />
                 {form.formState.errors.email && (
-                  <p className="text-red-400 text-xs mt-1.5">{form.formState.errors.email.message}</p>
+                  <p className="text-red-400 text-xs mt-1.5">
+                    {form.formState.errors.email.message}
+                  </p>
                 )}
               </div>
 
@@ -505,7 +491,9 @@ export default function AICollectInfo({
                   className={INPUT_CLASS}
                 />
                 {form.formState.errors.contactNumber && (
-                  <p className="text-red-400 text-xs mt-1.5">{form.formState.errors.contactNumber.message}</p>
+                  <p className="text-red-400 text-xs mt-1.5">
+                    {form.formState.errors.contactNumber.message}
+                  </p>
                 )}
               </div>
 
@@ -520,7 +508,9 @@ export default function AICollectInfo({
                   className={INPUT_CLASS}
                 />
                 {form.formState.errors.address && (
-                  <p className="text-red-400 text-xs mt-1.5">{form.formState.errors.address.message}</p>
+                  <p className="text-red-400 text-xs mt-1.5">
+                    {form.formState.errors.address.message}
+                  </p>
                 )}
               </div>
 
@@ -535,7 +525,9 @@ export default function AICollectInfo({
                   className={INPUT_CLASS}
                 />
                 {form.formState.errors.city && (
-                  <p className="text-red-400 text-xs mt-1.5">{form.formState.errors.city.message}</p>
+                  <p className="text-red-400 text-xs mt-1.5">
+                    {form.formState.errors.city.message}
+                  </p>
                 )}
               </div>
             </div>
@@ -546,7 +538,9 @@ export default function AICollectInfo({
                 <label className="flex items-center gap-2 text-sm font-medium text-slate-300">
                   <Info className="w-4 h-4" style={themeAccent.text} />
                   Describe your event setup{" "}
-                  <span className="text-slate-500 font-normal">(optional but helps AI)</span>
+                  <span className="text-slate-500 font-normal">
+                    (optional but helps AI)
+                  </span>
                 </label>
 
                 {/* Voice button */}
@@ -554,7 +548,9 @@ export default function AICollectInfo({
                   <button
                     type="button"
                     onClick={toggleVoice}
-                    title={isListening ? "Stop recording" : "Speak your requirements"}
+                    title={
+                      isListening ? "Stop recording" : "Speak your requirements"
+                    }
                     className={`relative flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all duration-300 border ${
                       isListening
                         ? "bg-red-500/20 border-red-500/40 text-red-400 hover:bg-red-500/30"
@@ -584,9 +580,17 @@ export default function AICollectInfo({
               </div>
 
               <p className="text-slate-500 text-xs mb-2.5 leading-relaxed">
-                The more detail you give, the better AI generates your site. Include ticket types, table configurations, pricing, food preferences, guest count, etc.
+                The more detail you give, the better AI generates your site.
+                Include ticket types, table configurations, pricing, food
+                preferences, guest count, etc.
                 {voiceSupported && (
-                  <span className="text-slate-600"> — or tap <strong className="text-slate-500">Speak</strong> and just talk.</span>
+                  <span className="text-slate-600">
+                    {" "}
+                    — or tap <strong className="text-slate-500">
+                      Speak
+                    </strong>{" "}
+                    and just talk.
+                  </span>
                 )}
               </p>
 
@@ -606,16 +610,21 @@ export default function AICollectInfo({
                       />
                     ))}
                   </div>
-                  <span className="text-xs text-red-400 font-medium">Listening… speak clearly</span>
+                  <span className="text-xs text-red-400 font-medium">
+                    Listening… speak clearly
+                  </span>
                   {interimText && (
-                    <span className="text-xs text-slate-500 italic truncate max-w-[180px]">{interimText}</span>
+                    <span className="text-xs text-slate-500 italic truncate max-w-[180px]">
+                      {interimText}
+                    </span>
                   )}
                 </div>
               )}
 
               {voiceState === "error" && (
                 <p className="text-xs text-amber-400 mb-2">
-                  ⚠ Microphone access denied or not available. Please allow access in your browser settings.
+                  ⚠ Microphone access denied or not available. Please allow
+                  access in your browser settings.
                 </p>
               )}
 

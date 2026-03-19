@@ -43,6 +43,7 @@ import {
   useBulkDeactivateCustomers,
   useBulkDeleteCustomers,
   useBulkRestoreCustomers,
+  useExportCustomersCSV,
 } from "./_lib/queries";
 import { useDebounce } from "@/hooks/data-table/use-debounce";
 import { useQueryState, parseAsInteger } from "nuqs";
@@ -127,14 +128,14 @@ export default function CustomersPage() {
     return () => clearInterval(interval);
   }, [tableRef]);
 
-  // Handle CSV export
+  const exportCSVMutation = useExportCustomersCSV();
+
+  // Handle CSV export (via backend API)
   const handleCSVExport = () => {
-    if (tableRef.current) {
-      exportTableToCSV(tableRef.current, {
-        filename: "vendor-customers",
-        excludeColumns: ["select", "actions"],
-      });
-    }
+    exportCSVMutation.mutate({
+      search: debouncedSearch || undefined,
+      status: statusFilter === "all" ? undefined : statusFilter,
+    });
   };
 
   // Get selected customer IDs from table
@@ -328,61 +329,45 @@ export default function CustomersPage() {
                       <SelectItem value="all">All Customers</SelectItem>
                       <SelectItem value="active">Active</SelectItem>
                       <SelectItem value="inactive">Inactive</SelectItem>
-                      <SelectItem value="delete">Deleted</SelectItem>
+                      <SelectItem value="delete">Soft Deleted</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
                 <div className="flex items-center gap-2 flex-wrap">
-                  {/* Actions: Export, Bulk Mail, Reset - consolidated to reduce clutter */}
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        disabled={isFetching}
-                        className="gap-2"
-                        aria-label="Table actions"
-                      >
-                        <MoreHorizontal className="h-4 w-4" />
-                        Actions
-                        <ChevronDown className="h-4 w-4 opacity-50" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="w-52">
-                      {hasActiveFilters && (
-                        <>
-                          <DropdownMenuItem
-                            onClick={handleResetAllFilters}
-                            disabled={isFetching}
-                            className="cursor-pointer gap-2"
-                          >
-                            <RotateCcw className="h-4 w-4" />
-                            Reset filters
-                          </DropdownMenuItem>
-                          <DropdownMenuSeparator />
-                        </>
-                      )}
-                      <DropdownMenuItem
-                        onClick={handleCSVExport}
-                        disabled={isFetching}
-                        className="cursor-pointer gap-2"
-                      >
+                  {/* Export CSV button (backend-generated CSV) - hidden while bulk selection is active */}
+                  {!hasSelectedRows && (
+                    <Button
+                      variant="event-primary"
+                      size="sm"
+                      onClick={handleCSVExport}
+                      disabled={isFetching || exportCSVMutation.isPending}
+                      className="gap-2"
+                    >
+                      {exportCSVMutation.isPending ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
                         <FileDown className="h-4 w-4" />
-                        Export CSV
-                      </DropdownMenuItem>
-                      <PermissionGuard permissionKey="send-mail-to-all-customers">
-                        <DropdownMenuItem asChild>
-                          <Link
-                            href="/vendor/send-email-to-all"
-                            className="flex items-center gap-2 cursor-pointer"
-                          >
-                            <Mail className="h-4 w-4" />
-                            Bulk Mail
-                          </Link>
-                        </DropdownMenuItem>
-                      </PermissionGuard>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
+                      )}
+                      Export CSV
+                    </Button>
+                  )}
+
+                  {/* Optional Bulk Mail entry point - hidden while bulk selection is active */}
+                  {!hasSelectedRows && (
+                    <PermissionGuard permissionKey="send-mail-to-all-customers">
+                      <Link href="/vendor/send-email-to-all">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="gap-2"
+                          disabled={isFetching}
+                        >
+                          <Mail className="h-4 w-4" />
+                          Bulk Mail
+                        </Button>
+                      </Link>
+                    </PermissionGuard>
+                  )}
 
                   {/* Bulk Actions - only when rows are selected */}
                   {hasSelectedRows && (

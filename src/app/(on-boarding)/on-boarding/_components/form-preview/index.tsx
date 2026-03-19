@@ -253,7 +253,7 @@ export default function FormPreview() {
         }
         break;
 
-      case 7: // Drinks
+      case 7: // Other Packages
         if (
           activeField.includes("drink_") ||
           activeField.includes("packages")
@@ -514,12 +514,12 @@ export default function FormPreview() {
           </Suspense>
         </div>
 
-        {/* Drinks */}
+        {/* Other Packages */}
         <div
           ref={drinkRef}
           className={`transition-all duration-300 ${getHighlightClass(
             7,
-            "drink"
+            "other-packages"
           )}`}
         >
           <Suspense fallback={<SectionLoader />}>

@@ -78,15 +78,15 @@ export function SingleDatePaymentModal({
     effectivePaymentPlan === "full"
       ? fullAmount
       : effectivePaymentPlan === "deposit"
-      ? depositAmount
-      : 0;
+        ? depositAmount
+        : 0;
 
   const balanceAfterPayment =
     effectivePaymentPlan === "full"
       ? 0
       : effectivePaymentPlan === "deposit"
-      ? fullAmount - depositAmount
-      : fullAmount;
+        ? fullAmount - depositAmount
+        : fullAmount;
 
   const formatCurrency = (amount: number) => `£${amount.toFixed(2)}`;
 

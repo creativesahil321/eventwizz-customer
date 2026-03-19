@@ -757,11 +757,13 @@ export const eventsService = {
       formData = data;
     }
 
+    const eventIdStr =
+      data instanceof FormData
+        ? (data.get("event_id") as string) || ""
+        : data.event_id.toString();
+
     const response = await api.post<ApiResponse<EventItem>>(
-      API_ENDPOINTS.VENDOR.EVENT.UPDATE_EVENT.replace(
-        "{eventId}",
-        (data as StepSixType).event_id.toString()
-      ),
+      API_ENDPOINTS.VENDOR.EVENT.UPDATE_EVENT.replace("{eventId}", eventIdStr),
       formData,
       {
         returnFullResponse: true,

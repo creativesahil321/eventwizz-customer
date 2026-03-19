@@ -78,11 +78,12 @@ export function DeleteCustomerDialog({
         <DialogContent className="bg-background">
           <DialogHeader>
             <DialogTitle className="text-black">
-              Move customer to deleted list?
+              Soft delete — move to deleted list?
             </DialogTitle>
             <DialogDescription>
-              This will move the customer to your deleted list. You can restore
-              them later from the deleted customers section.
+              This is not a permanent delete. The customer will be moved to your
+              deleted list and can be restored anytime from the &quot;Soft Deleted&quot;
+              filter. Your system never permanently deletes customers from here.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter className="gap-2 sm:space-x-0">
@@ -90,14 +91,14 @@ export function DeleteCustomerDialog({
               <Button variant="event-outline">Cancel</Button>
             </DialogClose>
             <Button
-              aria-label="Delete selected customer"
+              aria-label="Soft delete selected customer"
               variant="destructive"
               onClick={onDelete}
               disabled={deleteCustomerMutation.isPending}
             >
               {deleteCustomerMutation.isPending && <PageLoader />}
               {deleteCustomerMutation.isPending
-                ? "Moving to Deleted..."
+                ? "Moving to Deleted…"
                 : "Move to Deleted"}
             </Button>
           </DialogFooter>
@@ -119,11 +120,12 @@ export function DeleteCustomerDialog({
       <DrawerContent>
         <DrawerHeader>
           <DrawerTitle className="text-black">
-            Move customer to deleted list?
+            Soft delete — move to deleted list?
           </DrawerTitle>
           <DrawerDescription>
-            This will move the customer to your deleted list. You can restore
-            them later from the deleted customers section.
+            This is not a permanent delete. The customer will be moved to your
+            deleted list and can be restored anytime from the &quot;Soft Deleted&quot;
+            filter. Your system never permanently deletes customers from here.
           </DrawerDescription>
         </DrawerHeader>
         <DrawerFooter className="gap-2 sm:space-x-0">

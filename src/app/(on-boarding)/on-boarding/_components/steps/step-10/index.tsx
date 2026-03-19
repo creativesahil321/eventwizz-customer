@@ -452,9 +452,9 @@ export default function StepTen() {
                     </OnboardingSectionTitle>
                     <Sparkles className="w-5 h-5 text-green-500" />
                   </div>
-                  <Alert className="border-green-200 bg-green-50">
-                    <Info className="h-4 w-4 text-green-600" />
-                    <AlertDescription className="text-green-900 text-sm">
+                  <Alert className="border-green-300 bg-green-100 text-green-900 dark:!border-green-400 dark:!bg-green-100 dark:!text-green-900">
+                    <Info className="h-4 w-4 text-green-700 dark:text-green-700 shrink-0" />
+                    <AlertDescription className="text-green-900 dark:!text-green-900 text-sm [&_strong]:text-green-900 [&_strong]:dark:!text-green-900">
                       <strong>Direct Bank-to-Bank Payments:</strong> Customers
                       pay directly from their banking app - no card details
                       needed. 40% lower fees than cards. FCA authorised and
@@ -480,9 +480,9 @@ export default function StepTen() {
 
                 {/* Visual Separator */}
                 <div className="flex items-center justify-center my-8">
-                  <div className="flex-1 border-t border-gray-200"></div>
-                  <div className="px-4 text-sm text-gray-500 bg-white">OR</div>
-                  <div className="flex-1 border-t border-gray-200"></div>
+                  <div className="flex-1 border-t border-gray-200 dark:border-gray-600" />
+                  <div className="px-4 text-sm text-gray-600 dark:text-gray-300 bg-background dark:bg-background font-medium">OR</div>
+                  <div className="flex-1 border-t border-gray-200 dark:border-gray-600" />
                 </div>
 
                 {/* Online Payment Providers Section */}
@@ -495,9 +495,18 @@ export default function StepTen() {
                       </OnboardingSectionTitle>
                       <Sparkles className="w-5 h-5 text-yellow-500" />
                     </div>
-                    <Alert className="border-blue-200 bg-blue-50">
-                      <Info className="h-4 w-4 text-blue-600" />
-                      <AlertDescription className="text-blue-900 text-sm">
+                    <Alert
+                      className="border-blue-300 dark:border-blue-400"
+                      style={{
+                        backgroundColor: "rgb(219 234 254)",
+                        color: "rgb(30 58 138)",
+                      }}
+                    >
+                      <Info className="h-4 w-4 shrink-0" style={{ color: "rgb(29 78 216)" }} />
+                      <AlertDescription
+                        className="text-sm"
+                        style={{ color: "rgb(30 58 138)" }}
+                      >
                         <strong>Credit/Debit Card Processing:</strong> Accept
                         Visa, Mastercard, and other major cards. 5-minute setup,
                         automatic payouts, no technical knowledge required. Your
@@ -543,7 +552,7 @@ export default function StepTen() {
                           <span className="font-medium">
                             ⚙️ Advanced Options
                           </span>
-                          <span className="text-xs text-gray-500">
+                          <span className="text-xs text-gray-500 dark:text-gray-400">
                             (WorldPay, Klarna)
                           </span>
                         </div>
@@ -556,9 +565,9 @@ export default function StepTen() {
                     </CollapsibleTrigger>
 
                     <CollapsibleContent className="pt-4 space-y-6">
-                      <Alert className="border-amber-200 bg-amber-50">
-                        <Info className="h-4 w-4 text-amber-600" />
-                        <AlertDescription className="text-amber-900 text-sm">
+                      <Alert className="border-amber-300 bg-amber-100 text-amber-900 dark:!border-amber-400 dark:!bg-amber-100 dark:!text-amber-900">
+                        <Info className="h-4 w-4 text-amber-700 dark:text-amber-700 shrink-0" />
+                        <AlertDescription className="text-amber-900 dark:!text-amber-900 text-sm [&_strong]:text-amber-900 [&_strong]:dark:!text-amber-900">
                           <strong>Advanced users only:</strong> These providers
                           require manual API key entry and manual payout
                           processing. Only use if you already have an account
@@ -568,9 +577,18 @@ export default function StepTen() {
 
                       {/* WorldPay & Klarna Note */}
                       <div className="space-y-4">
-                        <Alert className="border-gray-200 bg-gray-50">
-                          <Info className="h-4 w-4 text-gray-600" />
-                          <AlertDescription className="text-gray-900 text-sm">
+                        <Alert
+                          className="border-gray-300 dark:border-gray-400"
+                          style={{
+                            backgroundColor: "rgb(243 244 246)",
+                            color: "rgb(17 24 39)",
+                          }}
+                        >
+                          <Info className="h-4 w-4 shrink-0" style={{ color: "rgb(55 65 81)" }} />
+                          <AlertDescription
+                            className="text-sm"
+                            style={{ color: "rgb(17 24 39)" }}
+                          >
                             <strong>WorldPay & Klarna:</strong> Advanced payment
                             gateways are currently managed separately. Please
                             contact support if you need to configure these
@@ -583,9 +601,9 @@ export default function StepTen() {
                 </section>
 
                 {/* Skip Information */}
-                <Alert className="border-amber-200 bg-amber-50">
-                  <Info className="h-4 w-4 text-amber-600" />
-                  <AlertDescription className="text-amber-900">
+                <Alert className="border-amber-300 bg-amber-100 text-amber-900 dark:!border-amber-400 dark:!bg-amber-100 dark:!text-amber-900">
+                  <Info className="h-4 w-4 text-amber-700 dark:text-amber-700 shrink-0" />
+                  <AlertDescription className="text-amber-900 dark:!text-amber-900 text-sm [&_strong]:text-amber-900 [&_strong]:dark:!text-amber-900">
                     <strong>Not ready to set up payments?</strong> You can skip
                     this step and configure your payment methods later from your
                     dashboard. However, you won&apos;t be able to accept

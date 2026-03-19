@@ -49,18 +49,22 @@ export default function PageWrapper({
       };
       performSecurityLogout();
     }
-  }, [isAuthenticated, isSessionChecked, permissionsLoaded, isCustomer, router]);
+  }, [
+    isAuthenticated,
+    isSessionChecked,
+    permissionsLoaded,
+    isCustomer,
+    router,
+  ]);
 
   return (
     <main
       className={cn(
         "flex-1 min-w-0 bg-default-100 dark:bg-background transition-all duration-300 overflow-hidden",
-        collapsed ? "lg:ml-[60px]" : "lg:ml-[264px]"
+        collapsed ? "lg:ml-[60px]" : "lg:ml-[264px]",
       )}
     >
-      <div className="p-2 sm:p-4 md:p-6 lg:p-8 mb-24 md:mb-0 text-black min-w-0">
-        {children}
-      </div>
+      <div className="p-3 mb-24 md:mb-0 text-black min-w-0">{children}</div>
     </main>
   );
 }

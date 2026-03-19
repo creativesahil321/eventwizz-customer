@@ -42,26 +42,26 @@ export function StripeConnectButton({
       <div className={cn("space-y-2", className)}>
         <div
           className={cn(
-            "flex items-center justify-between p-4 border-2 border-amber-200 bg-amber-50 rounded-lg"
+            "flex items-center justify-between p-4 border-2 border-amber-300 bg-amber-100 text-amber-900 rounded-lg dark:bg-amber-100 dark:text-amber-900 dark:border-amber-400 [color-scheme:light]"
           )}
         >
           <div className="flex items-center gap-3">
-            <div className="flex items-center justify-center w-10 h-10 rounded-full bg-amber-100">
-              <AlertCircle className="w-6 h-6 text-amber-600" />
+            <div className="flex items-center justify-center w-10 h-10 rounded-full bg-amber-200/80">
+              <AlertCircle className="w-6 h-6 text-amber-700" />
             </div>
             <div>
               <p className="font-semibold text-amber-900">
                 Stripe - Under Review
               </p>
-              <p className="text-sm text-amber-700">
+              <p className="text-sm text-amber-800">
                 Account: {accountId.substring(0, 20)}...
               </p>
-              <p className="text-xs text-amber-600 mt-1">
+              <p className="text-xs text-amber-700 mt-1">
                 Review typically takes 1-2 business days
               </p>
             </div>
           </div>
-          <Badge className="bg-amber-600 hover:bg-amber-700">
+          <Badge className="bg-amber-600 hover:bg-amber-700 text-white">
             Under Review
           </Badge>
         </div>
@@ -76,26 +76,26 @@ export function StripeConnectButton({
       <div className={cn("space-y-2", className)}>
         <div
           className={cn(
-            "flex items-center justify-between p-4 border-2 border-amber-200 bg-amber-50 rounded-lg"
+            "flex items-center justify-between p-4 border-2 border-amber-300 bg-amber-100 text-amber-900 rounded-lg dark:bg-amber-100 dark:text-amber-900 dark:border-amber-400 [color-scheme:light]"
           )}
         >
           <div className="flex items-center gap-3">
-            <div className="flex items-center justify-center w-10 h-10 rounded-full bg-amber-100">
-              <AlertCircle className="w-6 h-6 text-amber-600" />
+            <div className="flex items-center justify-center w-10 h-10 rounded-full bg-amber-200/80">
+              <AlertCircle className="w-6 h-6 text-amber-700" />
             </div>
             <div>
               <p className="font-semibold text-amber-900">
                 Stripe - Pending Setup
               </p>
-              <p className="text-sm text-amber-700">
+              <p className="text-sm text-amber-800">
                 Account: {accountId.substring(0, 20)}...
               </p>
-              <p className="text-xs text-amber-600 mt-1">
+              <p className="text-xs text-amber-700 mt-1">
                 Setup was interrupted - click to continue
               </p>
             </div>
           </div>
-          <Badge className="bg-amber-600 hover:bg-amber-700">Pending</Badge>
+          <Badge className="bg-amber-600 hover:bg-amber-700 text-white">Pending</Badge>
         </div>
         <Button
           type="button"
@@ -103,7 +103,7 @@ export function StripeConnectButton({
           size="sm"
           onClick={handleConnect}
           disabled={disabled || isConnecting}
-          className="w-full text-xs text-amber-700 border-amber-300 hover:bg-amber-50"
+          className="w-full text-xs text-amber-800 border-amber-400 hover:bg-amber-200/50"
         >
           {isConnecting ? (
             <>
@@ -123,20 +123,20 @@ export function StripeConnectButton({
     return (
       <div
         className={cn(
-          "flex items-center justify-between p-4 border-2 border-green-200 bg-green-50 rounded-lg",
+          "flex items-center justify-between p-4 border-2 border-green-300 bg-green-100 text-green-900 rounded-lg dark:bg-green-100 dark:text-green-900 dark:border-green-400 [color-scheme:light]",
           className
         )}
       >
         <div className="flex items-center gap-3">
-          <div className="flex items-center justify-center w-10 h-10 rounded-full bg-green-100">
-            <CheckCircle2 className="w-6 h-6 text-green-600" />
+          <div className="flex items-center justify-center w-10 h-10 rounded-full bg-green-200/80">
+            <CheckCircle2 className="w-6 h-6 text-green-700" />
           </div>
           <div>
             <p className="font-semibold text-green-900">Stripe Connected</p>
-            <p className="text-sm text-green-700">Account: {accountId}</p>
+            <p className="text-sm text-green-800">Account: {accountId}</p>
           </div>
         </div>
-        <Badge className="bg-green-600 hover:bg-green-700">Active</Badge>
+        <Badge className="bg-green-600 hover:bg-green-700 text-white">Active</Badge>
       </div>
     );
   }
@@ -149,11 +149,11 @@ export function StripeConnectButton({
         size="lg"
         onClick={handleConnect}
         disabled={disabled || isConnecting}
-        className="w-full h-auto py-6 px-6 border-2 border-[#635BFF] hover:bg-[#635BFF]/5 hover:border-[#635BFF] transition-all group"
+        className="w-full h-auto py-6 px-6 border-2 border-[#635BFF] hover:bg-[#635BFF]/10 hover:border-[#635BFF] !bg-white dark:!bg-white !text-gray-900 dark:!text-gray-900 transition-all group"
       >
         <div className="flex items-center justify-between w-full">
           <div className="flex items-center gap-4">
-            <div className="flex items-center justify-center w-12 h-12 rounded-lg bg-[#635BFF]/10 group-hover:bg-[#635BFF]/20 transition-colors">
+            <div className="flex items-center justify-center w-12 h-12 rounded-lg bg-[#635BFF]/10 group-hover:bg-[#635BFF]/20 transition-colors shrink-0">
               <svg
                 className="w-7 h-7"
                 viewBox="0 0 24 24"
@@ -163,21 +163,21 @@ export function StripeConnectButton({
                 <path d="M13.976 9.15c-2.172-.806-3.356-1.426-3.356-2.409 0-.831.683-1.305 1.901-1.305 2.227 0 4.515.858 6.09 1.631l.89-5.494C18.252.975 15.697 0 12.165 0 9.667 0 7.589.654 6.104 1.872 4.56 3.147 3.757 4.992 3.757 7.218c0 4.039 2.467 5.76 6.476 7.219 2.585.92 3.445 1.574 3.445 2.583 0 .98-.84 1.545-2.354 1.545-1.875 0-4.965-.921-6.99-2.109l-.9 5.555C5.175 22.99 8.385 24 11.714 24c2.641 0 4.843-.624 6.328-1.813 1.664-1.305 2.525-3.236 2.525-5.732 0-4.128-2.524-5.851-6.594-7.305h.003z" />
               </svg>
             </div>
-            <div className="text-left">
-              <p className="font-semibold text-base text-gray-900 mb-1">
+            <div className="text-left min-w-0">
+              <p className="font-semibold text-base text-gray-900 dark:!text-gray-900 mb-1">
                 {isConnecting ? "Connecting..." : "Connect with Stripe"}
               </p>
-              <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-gray-600">
+              <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-gray-800 dark:!text-gray-800">
                 <span className="flex items-center gap-1">
-                  <CheckCircle2 className="w-3 h-3 text-green-600" />
+                  <CheckCircle2 className="w-3 h-3 text-green-600 shrink-0" />
                   5-minute setup
                 </span>
                 <span className="flex items-center gap-1">
-                  <CheckCircle2 className="w-3 h-3 text-green-600" />
+                  <CheckCircle2 className="w-3 h-3 text-green-600 shrink-0" />
                   Automatic payouts
                 </span>
                 <span className="flex items-center gap-1">
-                  <CheckCircle2 className="w-3 h-3 text-green-600" />
+                  <CheckCircle2 className="w-3 h-3 text-green-600 shrink-0" />
                   99.9% uptime
                 </span>
               </div>

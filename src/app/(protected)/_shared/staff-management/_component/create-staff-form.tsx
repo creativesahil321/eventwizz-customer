@@ -33,7 +33,14 @@ import { useState } from "react";
 import { createStaffSchema, CreateStaffFormValues } from "../_lib/schemas";
 import { useVendorLocationsList } from "@/app/(protected)/vendor/venue-locations/_lib/queries";
 
-export default function CreateStaffForm() {
+interface CreateStaffFormProps {
+  /** When true (admin dashboard), hide vendor location selection. */
+  hideLocationSelection?: boolean;
+}
+
+export default function CreateStaffForm({
+  hideLocationSelection = false,
+}: CreateStaffFormProps) {
   const router = useRouter();
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
@@ -41,9 +48,8 @@ export default function CreateStaffForm() {
   // Fetch roles from the API
   const { data: rolesData, isLoading: isLoadingRoles } = useRoles();
 
-  // Locations: same API/cache as header dropdown and venue-locations page
-  const { locations, isLoading: isLoadingLocations } =
-    useVendorLocationsList();
+  // Locations: same API/cache as header dropdown and venue-locations page (vendor only)
+  const { locations, isLoading: isLoadingLocations } = useVendorLocationsList();
 
   // Get the create staff mutation
   const { mutate: createStaff, isPending: isSubmitting } = useCreateStaff();
@@ -71,7 +77,10 @@ export default function CreateStaffForm() {
     const apiPayload: CreateStaffPayload = {
       ...staffData,
       password_confirmation: confirmPassword,
-      vendor_location_ids: staffData.vendor_location_ids,
+      // For admin staff, location selection is not used; backend will ignore empty array.
+      vendor_location_ids: hideLocationSelection
+        ? []
+        : staffData.vendor_location_ids,
     };
 
     createStaff(apiPayload, {
@@ -370,51 +379,61 @@ export default function CreateStaffForm() {
                 )}
               />
 
-              <FormField
-                control={form.control}
-                name="vendor_location_ids"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Locations</FormLabel>
-                    <FormControl>
-                      <LocationMultiSelect
-                        locations={locations}
-                        value={field.value}
-                        onChange={field.onChange}
-                        disabled={isLoadingLocations}
-                        loading={isLoadingLocations}
-                        placeholder="Select locations…"
-                      />
-                    </FormControl>
-                    {!isLoadingLocations && field.value.length > 0 && (
-                      <p className="text-sm text-muted-foreground mt-2 flex items-center gap-1.5">
-                        <span className="inline-block h-1.5 w-1.5 rounded-full bg-emerald-500 shrink-0" aria-hidden />
-                        {locations.length > 0 &&
-                        field.value.length === locations.length
-                          ? "This staff has access to all locations."
-                          : (() => {
-                              const names = field.value
-                                .map((id) => {
-                                  const loc = locations.find((l) => l.id === id);
-                                  return loc ? (loc.city || loc.name) : null;
-                                })
-                                .filter(Boolean) as string[];
-                              const count = names.length;
-                              const list =
-                                count <= 3
-                                  ? names.join(", ")
-                                  : `${names.slice(0, 2).join(", ")} and ${count - 2} more`;
-                              return `This staff has access to ${count} location${count === 1 ? "" : "s"}: ${list}.`;
-                            })()}
-                      </p>
-                    )}
-                    <FormDescription>
-                      Select one or more locations, or &quot;All&quot; for every location. Required.
-                    </FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+              {!hideLocationSelection && (
+                <FormField
+                  control={form.control}
+                  name="vendor_location_ids"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Locations</FormLabel>
+                      <FormControl>
+                        <LocationMultiSelect
+                          locations={locations}
+                          value={field.value}
+                          onChange={field.onChange}
+                          disabled={isLoadingLocations}
+                          loading={isLoadingLocations}
+                          placeholder="Select locations…"
+                        />
+                      </FormControl>
+                      {!isLoadingLocations && field.value.length > 0 && (
+                        <p className="text-sm text-muted-foreground mt-2 flex items-center gap-1.5">
+                          <span
+                            className="inline-block h-1.5 w-1.5 rounded-full bg-emerald-500 shrink-0"
+                            aria-hidden
+                          />
+                          {locations.length > 0 &&
+                          field.value.length === locations.length
+                            ? "This staff has access to all locations."
+                            : (() => {
+                                const names = field.value
+                                  .map((id) => {
+                                    const loc = locations.find((l) => l.id === id);
+                                    return loc ? (loc.city || loc.name) : null;
+                                  })
+                                  .filter(Boolean) as string[];
+                                const count = names.length;
+                                const list =
+                                  count <= 3
+                                    ? names.join(", ")
+                                    : `${names
+                                        .slice(0, 2)
+                                        .join(", ")} and ${count - 2} more`;
+                                return `This staff has access to ${count} location${
+                                  count === 1 ? "" : "s"
+                                }: ${list}.`;
+                              })()}
+                        </p>
+                      )}
+                      <FormDescription>
+                        Select one or more locations, or &quot;All&quot; for every
+                        location.
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              )}
             </div>
             <div className="flex flex-col-reverse sm:flex-row justify-end gap-3 sm:gap-4 pt-4 border-t border-gray-200">
               <Button

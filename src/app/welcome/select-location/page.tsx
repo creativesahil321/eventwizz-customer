@@ -23,7 +23,13 @@ import {
   Building2,
   LogOut,
 } from "lucide-react";
-import { addCacheBusting } from "@/lib/image-utils";
+/** Stable image URL for hydration: same on server and client (no Date.now()). */
+function stableImageUrl(url: string | null | undefined): string {
+  if (!url || url === "null") return "";
+  if (url.startsWith("data:") || url.startsWith("blob:")) return url;
+  const sep = url.includes("?") ? "&" : "?";
+  return `${url}${sep}v=1`;
+}
 import { Skeleton } from "@/components/ui/skeleton";
 import { useTheme } from "@/providers/theme-provider/ThemeContext";
 import { logout } from "@/lib/auth/logout";
@@ -37,8 +43,8 @@ export default function WelcomeLocationSelectionPage() {
 
   const { theme } = useTheme();
   const logoSrc = theme?.logo
-    ? addCacheBusting(theme.logo)
-    : addCacheBusting(appConfig.logo);
+    ? stableImageUrl(theme.logo)
+    : stableImageUrl(appConfig.logo);
 
   // Resolve greeting only when session is ready — prevents flash
   const sessionReady = sessionStatus === "authenticated" && session?.user != null;
@@ -82,7 +88,9 @@ export default function WelcomeLocationSelectionPage() {
     session?.user?.first_name || session?.user?.name?.split(" ")[0] || "User";
   const fullName = session?.user?.name || firstName;
   const userEmail = session?.user?.email || "";
-  const userAvatar = (session?.user as Record<string, unknown>)?.avatar as string || "";
+  const rawAvatar = (session?.user as Record<string, unknown>)?.avatar as string | undefined;
+  const userAvatar =
+    rawAvatar && rawAvatar !== "null" && rawAvatar.trim() !== "" ? rawAvatar : "";
   // Initials fallback when no avatar
   const initials = fullName
     .split(" ")
@@ -182,7 +190,7 @@ export default function WelcomeLocationSelectionPage() {
               <div className="shrink-0">
                 {userAvatar ? (
                   <img
-                    src={addCacheBusting(userAvatar)}
+                    src={stableImageUrl(userAvatar)}
                     alt={fullName}
                     className="h-10 w-10 rounded-full object-cover ring-2 ring-white/30"
                   />
@@ -245,7 +253,7 @@ export default function WelcomeLocationSelectionPage() {
           <div className="flex items-center gap-2.5 min-w-0">
             {userAvatar ? (
               <img
-                src={addCacheBusting(userAvatar)}
+                src={stableImageUrl(userAvatar)}
                 alt={fullName}
                 className="h-8 w-8 rounded-full object-cover shrink-0"
               />

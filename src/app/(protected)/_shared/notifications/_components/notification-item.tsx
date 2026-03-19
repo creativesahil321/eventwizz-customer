@@ -6,7 +6,7 @@ import { Notification } from "@/services/common/notification/type";
 import { Badge } from "@/components/ui/badge";
 import { formatDistanceToNow } from "date-fns";
 import { CATEGORY_CONFIG } from "../_lib/constants";
-import { User } from "lucide-react";
+import { Loader2, User } from "lucide-react";
 import { env } from "@/env";
 
 interface NotificationItemProps {
@@ -14,6 +14,7 @@ interface NotificationItemProps {
   onViewDetails: (notification: Notification) => void;
   onMarkAsRead: (id: number) => void;
   onMarkAsUnread: (id: number) => void;
+  isUpdating?: boolean;
 }
 
 export function NotificationItemComponent({
@@ -21,6 +22,7 @@ export function NotificationItemComponent({
   onViewDetails,
   onMarkAsRead,
   onMarkAsUnread,
+  isUpdating = false,
 }: NotificationItemProps) {
   const { id, user, title, notice, icon, is_read, created_at } = notification;
 
@@ -106,17 +108,33 @@ export function NotificationItemComponent({
             <Button
               variant="event-outline"
               size="sm"
+              disabled={isUpdating}
               onClick={() => onMarkAsUnread(id)}
             >
-              Mark as Unread
+              {isUpdating ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Updating...
+                </>
+              ) : (
+                "Mark as Unread"
+              )}
             </Button>
           ) : (
             <Button
               variant="event-primary"
               size="sm"
+              disabled={isUpdating}
               onClick={() => onMarkAsRead(id)}
             >
-              Mark as Read
+              {isUpdating ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Updating...
+                </>
+              ) : (
+                "Mark as Read"
+              )}
             </Button>
           )}
         </div>

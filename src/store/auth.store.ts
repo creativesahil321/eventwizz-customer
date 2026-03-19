@@ -48,6 +48,8 @@ interface AuthState {
 
 // Constants
 const AUTH_STORE_NAME = "auth-storage";
+/** Session/local key used by onboarding to persist AI vs manual choice — cleared on logout */
+const ONBOARDING_MODE_STORAGE_KEY = "onboarding_mode";
 const TOKEN_EXPIRY_MS = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
 
 // Check if code is running in browser environment
@@ -244,6 +246,16 @@ export const useAuthStore = create<AuthState>()(
       logout: async (securityViolation = false): Promise<void> => {
         // Set logout in progress to prevent unauthorized toasts
         setLogoutInProgress(true);
+
+        // Clear onboarding mode from storage so next login starts fresh at mode selection
+        if (typeof window !== "undefined") {
+          try {
+            sessionStorage.removeItem(ONBOARDING_MODE_STORAGE_KEY);
+            localStorage.removeItem(ONBOARDING_MODE_STORAGE_KEY);
+          } catch {
+            // ignore
+          }
+        }
 
         // Clear backend auth data through service
         try {

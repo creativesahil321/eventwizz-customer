@@ -31,14 +31,14 @@ export function TrueLayerConnectButton({
   const getStatusIcon = () => {
     switch (status) {
       case "active":
-        return <CheckCircle2 className="w-5 h-5 text-green-600" />;
+        return <CheckCircle2 className="w-5 h-5 text-green-700" />;
       case "under_review":
-        return <AlertCircle className="w-5 h-5 text-amber-600" />;
+        return <AlertCircle className="w-5 h-5 text-amber-700" />;
       case "restricted":
-        return <AlertCircle className="w-5 h-5 text-red-600" />;
+        return <AlertCircle className="w-5 h-5 text-red-700" />;
       case "pending":
       default:
-        return <Building2 className="w-5 h-5 text-gray-600" />;
+        return <Building2 className="w-5 h-5 text-gray-700" />;
     }
   };
 
@@ -59,14 +59,14 @@ export function TrueLayerConnectButton({
   const getStatusColor = () => {
     switch (status) {
       case "active":
-        return "text-green-600";
+        return "text-green-700";
       case "under_review":
-        return "text-amber-600";
+        return "text-amber-700";
       case "restricted":
-        return "text-red-600";
+        return "text-red-700";
       case "pending":
       default:
-        return "text-gray-600";
+        return "text-gray-700";
     }
   };
 
@@ -93,11 +93,11 @@ export function TrueLayerConnectButton({
   };
 
   return (
-    <Card className="border-2 border-green-200 hover:border-green-300 transition-colors">
+    <Card className="border-2 border-green-300 bg-green-50 hover:border-green-400 dark:bg-green-100 dark:border-green-400 dark:hover:border-green-500 transition-colors text-gray-900 dark:text-gray-900 [color-scheme:light]">
       <CardContent className="p-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
+            <div className="w-10 h-10 bg-green-200/80 rounded-lg flex items-center justify-center">
               {getStatusIcon()}
             </div>
             <div className="flex-1">
@@ -111,22 +111,22 @@ export function TrueLayerConnectButton({
               </div>
               
               {status === "under_review" && bankDetails ? (
-                <div className="mt-1 text-sm text-gray-600">
+                <div className="mt-1 text-sm text-gray-700">
                   <p className="font-medium">
                     {bankDetails.bank_name} • {bankDetails.account_masked}
                   </p>
-                  <p className="text-xs text-amber-600 mt-1">
+                  <p className="text-xs text-amber-700 mt-1">
                     Review typically takes 1-2 business days
                   </p>
                 </div>
               ) : status === "active" && bankDetails ? (
-                <div className="mt-1 text-sm text-gray-600">
+                <div className="mt-1 text-sm text-gray-700">
                   <p className="font-medium">
                     {bankDetails.bank_name} • {bankDetails.account_masked}
                   </p>
                 </div>
               ) : (
-                <div className="mt-1 text-sm text-gray-600">
+                <div className="mt-1 text-sm text-gray-700">
                   <p>Bank-to-bank • 40% lower fees • FCA authorised</p>
                 </div>
               )}

@@ -45,7 +45,6 @@ export function mapBookingsStatsToOrders(
   return [
     { title: "Total Bookings", value: stats.total_bookings },
     { title: "Total Payment", value: stats.total_payment },
-    { title: "Partial Payment", value: stats.pending_partial_payment },
     { title: "Received Payment", value: stats.received_payment },
   ];
 }

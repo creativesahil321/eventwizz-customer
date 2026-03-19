@@ -45,9 +45,11 @@ const saveStepData = async (): Promise<{ success: boolean }> => {
 export function FormProvider({
   children,
   serverData,
+  mode,
 }: {
   children: ReactNode;
   serverData: ApiResponse | null;
+  mode?: "ai" | "manual";
 }) {
   // Get session data and update function
   const { data: session, update: updateSession } = useSession();
@@ -336,7 +338,11 @@ export function FormProvider({
   };
 
   if (isLoading) {
-    return <OnboardingFormSkeleton layout={getSkeletonLayout()} />;
+    return (
+      <OnboardingFormSkeleton
+        layout={mode === "ai" ? "ai" : getSkeletonLayout()}
+      />
+    );
   }
 
   return (

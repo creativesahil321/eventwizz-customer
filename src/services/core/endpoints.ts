@@ -133,6 +133,7 @@ export const API_ENDPOINTS = {
       PERMANENT_DELETE: "/vendor/customers/permanent-delete/{id}",
       SEND_MAIL: "/vendor/customers/send-mail-to-customer",
       SEND_BULK_MAIL: "/vendor/customers/send-mail-to-all-customers",
+      EXPORT_CSV: "/vendor/customers/export-csv",
       MULTIPLE_ACTIONS: {
         BULK_ACTIVATE: "/vendor/customers/bulk-activate",
         BULK_DEACTIVATE: "/vendor/customers/bulk-deactivate",
@@ -501,8 +502,8 @@ export const API_ENDPOINTS = {
     NOTIFICATIONS: {
       ALL: "/admin/notifications/paginate",
       STATS: "/admin/notifications/stats",
-      MARK_AS_READ: "/admin/notifications/mark-as-read",
-      MARK_AS_UNREAD: "/admin/notifications/mark-as-unread",
+      MARK_AS_READ: "/admin/notifications/mark-as-read/{id}",
+      MARK_AS_UNREAD: "/admin/notifications/mark-as-unread/{id}",
       MARK_ALL_AS_READ: "/admin/notifications/mark-as-read-all",
     },
     LANGUAGES: {

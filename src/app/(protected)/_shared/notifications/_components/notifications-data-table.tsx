@@ -6,10 +6,7 @@ import {
   NotificationFilters,
   Notification,
 } from "@/services/common/notification/type";
-import {
-  NOTIFICATION_CATEGORIES,
-  NOTIFICATION_STATUSES,
-} from "../_lib/constants";
+import { NOTIFICATION_STATUSES } from "../_lib/constants";
 import { NotificationListComponent } from "./notification-list";
 import {
   Select,
@@ -37,8 +34,8 @@ interface NotificationsDataTableProps {
   onFilterChange: (filters: Partial<NotificationFilters>) => void;
   onPageChange: (page: number) => void;
   onViewDetails: (notification: Notification) => void;
-  onMarkAsRead: (id: number) => void;
-  onMarkAsUnread: (id: number) => void;
+  onMarkAsRead: (id: number, options?: { onSettled?: () => void }) => void;
+  onMarkAsUnread: (id: number, options?: { onSettled?: () => void }) => void;
   onMarkAllAsRead: () => void;
 }
 
@@ -54,9 +51,7 @@ export function NotificationsDataTable({
   onMarkAsUnread,
 }: NotificationsDataTableProps) {
   // Check if any filters are actually applied (not "all" or undefined)
-  const hasFilters =
-    (filters.category && filters.category !== "all") ||
-    (filters.status && filters.status !== "all");
+  const hasFilters = filters.status && filters.status !== "all";
 
   // Ensure notifications is always an array
   const safeNotifications = Array.isArray(notifications) ? notifications : [];
@@ -73,29 +68,6 @@ export function NotificationsDataTable({
         </div>
 
         <div className="flex flex-col sm:flex-row flex-wrap gap-3 sm:gap-4 mb-4 sm:mb-6">
-          <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 w-full sm:w-auto">
-            <span className="text-sm font-medium mb-1 sm:mb-0">Filter By</span>
-            <Select
-              value={filters.category || "all"}
-              onValueChange={(value) =>
-                onFilterChange({
-                  category: value === "all" ? undefined : value,
-                })
-              }
-            >
-              <SelectTrigger className="w-full sm:w-[180px] h-9">
-                <SelectValue placeholder="All Categories" />
-              </SelectTrigger>
-              <SelectContent>
-                {NOTIFICATION_CATEGORIES.map((category) => (
-                  <SelectItem key={category.value} value={category.value}>
-                    {category.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
           <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 w-full sm:w-auto">
             <span className="text-sm font-medium mb-1 sm:mb-0">Filter By</span>
             <Select
@@ -122,9 +94,7 @@ export function NotificationsDataTable({
               variant="event-outline"
               size="sm"
               className="h-9 w-full sm:w-auto mt-1 sm:mt-0 sm:self-end"
-              onClick={() =>
-                onFilterChange({ category: undefined, status: undefined })
-              }
+              onClick={() => onFilterChange({ status: undefined })}
             >
               Reset <X className="ml-2 h-4 w-4" />
             </Button>

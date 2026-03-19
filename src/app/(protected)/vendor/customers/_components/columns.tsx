@@ -26,7 +26,22 @@ const STATUS_COLORS = {
     bg: "var(--color-muted)",
     text: "var(--color-foreground)",
   },
+  delete: {
+    bg: "var(--color-muted)",
+    text: "var(--color-foreground)",
+  },
+  deleted: {
+    bg: "var(--color-muted)",
+    text: "var(--color-foreground)",
+  },
 };
+
+/** Display label for status; soft-deleted shown as "Soft Deleted" */
+function getStatusDisplayLabel(status: string): string {
+  const lower = status?.toLowerCase() ?? "";
+  if (lower === "delete" || lower === "deleted") return "Soft Deleted";
+  return status;
+}
 
 interface GetColumnsProps {
   setRowAction: React.Dispatch<
@@ -139,15 +154,17 @@ export function getColumns({
           text: "var(--color-foreground)",
         };
 
+        const displayLabel = getStatusDisplayLabel(status);
+
         return (
           <div
-            className={`flex items-center justify-center w-[4rem] capitalize p-2 rounded-md`}
+            className={`flex items-center justify-center min-w-[5.5rem] capitalize p-2 rounded-md`}
             style={{
               backgroundColor: colorConfig.bg,
               color: colorConfig.text,
             }}
           >
-            <span>{status}</span>
+            <span>{displayLabel}</span>
           </div>
         );
       },

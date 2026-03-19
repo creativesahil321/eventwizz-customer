@@ -19,7 +19,15 @@ interface OrderCardProps {
  * Component to display order statistics in cards
  */
 export default function OrderCard({ orders, columns = 4 }: OrderCardProps) {
-  const gridCols = columns === 2 ? "lg:grid-cols-2" : "lg:grid-cols-4";
+  const isThreeWideLayout = columns === 4 && orders.length === 3;
+
+  const gridCols =
+    columns === 2
+      ? "sm:grid-cols-2 lg:grid-cols-2"
+      : isThreeWideLayout
+        ? "sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3"
+        : "sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4";
+
   return (
     <div className={`grid grid-cols-1 ${gridCols} gap-4`}>
       {orders.map((order: OrderItem, index: number) => {

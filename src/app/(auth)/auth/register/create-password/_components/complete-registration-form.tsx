@@ -17,7 +17,7 @@ import { getCookie, deleteCookie } from "cookies-next";
 import { useAuthStore } from "@/store/auth.store";
 import { AuthUser, UserType, StaffRole } from "@/types/auth.types";
 import { usePermissionStore } from "@/store/permission.store";
-import { PageLoader } from "@/components/ui/page-loader";
+import { Loader2 } from "lucide-react";
 import { RegistrationResponse } from "@/types/api.types";
 
 type RegisterFormValues = z.infer<typeof registerSchema>;
@@ -228,15 +228,13 @@ export function CompleteRegistrationForm() {
     }
   };
 
-  // Show loader when redirecting
+  // Show same dark full-screen loader as auth layout — one continuous transition, no white flash
   if (redirecting) {
     return (
-      <div className="fixed inset-0 bg-[var(--color-background,#e8f4f6)] flex items-center justify-center z-50">
-        <div className="text-center">
-          <PageLoader className="mx-auto h-8 w-8" />
-          <p className="mt-4 text-[var(--color-text)] font-medium">
-            Setting up your account...
-          </p>
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950">
+        <div className="flex flex-col items-center gap-4 text-center">
+          <Loader2 className="h-10 w-10 animate-spin text-slate-400" aria-hidden />
+          <p className="text-sm text-slate-500">Taking you to your dashboard…</p>
         </div>
       </div>
     );

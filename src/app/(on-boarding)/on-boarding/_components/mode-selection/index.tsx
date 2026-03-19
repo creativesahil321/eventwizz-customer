@@ -1,8 +1,8 @@
 "use client";
 
-import React, { useContext } from "react";
+import React, { useContext, useState } from "react";
 
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   PenTool,
   Clock,
@@ -10,8 +10,10 @@ import {
   CheckCircle2,
   ArrowRight,
   Sparkles,
+  Info,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
-import { addCacheBusting } from "@/lib/image-utils";
 import { ServerContext } from "@/lib/server-context";
 
 interface ModeSelectionProps {
@@ -43,6 +45,7 @@ const accent = {
 
 export default function ModeSelection({ onSelectMode }: ModeSelectionProps) {
   const { theme } = useContext(ServerContext);
+  const [showHowItWorks, setShowHowItWorks] = useState(false);
   const logoPath =
     theme?.logo?.startsWith("/") ||
     theme?.logo?.startsWith("data:") ||
@@ -86,10 +89,10 @@ export default function ModeSelection({ onSelectMode }: ModeSelectionProps) {
           transition={{ duration: 0.6 }}
           className="text-center mb-12"
         >
-          {/* EventWizz Logo */}
+          {/* EventWizz Logo — use logoPath as-is to avoid hydration mismatch (addCacheBusting uses Date.now()) */}
           <div className="flex justify-center mb-6">
             <img
-              src={addCacheBusting(logoPath)}
+              src={logoPath}
               alt="EventWizz"
               className="h-10 w-auto object-contain"
             />
@@ -115,6 +118,73 @@ export default function ModeSelection({ onSelectMode }: ModeSelectionProps) {
             Choose your preferred setup experience. You can always customize
             everything later.
           </p>
+
+          {/* How it works — expandable so vendor knows what AI vs Manual creates */}
+          <div className="mt-8 max-w-2xl mx-auto">
+            <button
+              type="button"
+              onClick={() => setShowHowItWorks((v) => !v)}
+              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white text-sm font-medium transition-colors"
+            >
+              <Info className="w-4 h-4" style={accent.text} />
+              How each option works — what AI creates vs Manual
+              {showHowItWorks ? (
+                <ChevronUp className="w-4 h-4" />
+              ) : (
+                <ChevronDown className="w-4 h-4" />
+              )}
+            </button>
+            <AnimatePresence>
+              {showHowItWorks && (
+                <motion.div
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: "auto", opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  transition={{ duration: 0.25 }}
+                  className="overflow-hidden"
+                >
+                  <div className="mt-4 p-5 rounded-xl border border-white/10 bg-slate-900/80 backdrop-blur-sm space-y-5 text-left">
+                    <div>
+                      <h3 className="flex items-center gap-2 text-sm font-semibold text-white mb-2">
+                        <Sparkles className="w-4 h-4" style={accent.text} />
+                        AI-Powered Setup
+                      </h3>
+                      <p className="text-slate-400 text-sm leading-relaxed">
+                        You tell us your venue (search on Google and select from
+                        suggestions), venue type, contact details, and optional
+                        description. Our AI then generates your full site:
+                        landing page text, event name and schedule, packages,
+                        dates, catering menu, other packages, brochure content,
+                        FAQs, and placeholder images. You review and edit
+                        anything you like, then connect payment (Stripe/PayPal
+                        etc.) and publish. Best if you want a professional site
+                        in about 5 minutes.
+                      </p>
+                    </div>
+                    <div>
+                      <h3 className="flex items-center gap-2 text-sm font-semibold text-white mb-2">
+                        <PenTool className="w-4 h-4 text-slate-400" />
+                        Manual Setup
+                      </h3>
+                      <p className="text-slate-400 text-sm leading-relaxed">
+                        You go through all 11 steps yourself: venue details
+                        (select from Google), site branding (logo, banner image,
+                        colours), event details, packages, dates, catering,
+                        other packages, brochure &amp; PDFs, FAQs, payment, and
+                        publish. You type or upload everything. Best if you want
+                        full control and already have all content and assets
+                        ready (~30 minutes).
+                      </p>
+                    </div>
+                    <p className="text-slate-500 text-xs border-t border-white/5 pt-3">
+                      Both options produce a fully functional event website. You
+                      can edit everything anytime from your dashboard.
+                    </p>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
         </motion.div>
 
         {/* Cards */}

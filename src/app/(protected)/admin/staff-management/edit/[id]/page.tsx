@@ -34,7 +34,7 @@ export default function EditStaffPage() {
               permissions.
             </p>
           </div>
-          <EditStaffForm staffId={staffId} />
+          <EditStaffForm staffId={staffId} hideLocationSelection />
         </div>
       </Shell>
     </PermissionRoute>
