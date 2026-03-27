@@ -13,11 +13,11 @@ import { Button } from "@/components/ui/button";
 import { Notification } from "@/services/common/notification/type";
 import { formatDistanceToNow, format } from "date-fns";
 import { Badge } from "@/components/ui/badge";
-import { CATEGORY_CONFIG } from "../_lib/constants";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Bell, Clock, Loader2, User } from "lucide-react";
-import { env } from "@/env";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Clock, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { resolveNotificationPresentation } from "../_lib/notification-ui";
+import { useRouter } from "next/navigation";
 
 interface NotificationDetailsProps {
   notification: Notification | null;
@@ -35,20 +35,13 @@ export function NotificationDetailsComponent({
   onMarkAsUnread,
 }: NotificationDetailsProps) {
   const [isUpdating, setIsUpdating] = useState(false);
+  const router = useRouter();
   if (!notification) return null;
 
-  const { id, user, icon, title, notice, is_read, created_at, action_url } =
+  const { id, title, notice, is_read, created_at, action_url, action_target } =
     notification;
-
-  // Extract category from icon if available - handle both URL and class name formats
-  const iconParts = icon ? icon.split("/").pop()?.split(" ") : [];
-  const category = iconParts?.length
-    ? iconParts[iconParts.length - 1] || "check"
-    : "system";
-
-  // Get the category config or fallback to system
-  const categoryConfig =
-    CATEGORY_CONFIG[category?.toLowerCase()] || CATEGORY_CONFIG.system;
+  const notificationUi = resolveNotificationPresentation(notification);
+  const NotificationIcon = notificationUi.icon;
 
   // Format dates
   const formattedDate = formatDistanceToNow(new Date(created_at), {
@@ -58,13 +51,33 @@ export function NotificationDetailsComponent({
 
   // API returns 0 for unread, 1 for read
   const status = is_read === 1 ? "read" : "unread";
+  const hasActionLink = Boolean(action_url && action_url.trim().length > 0);
+
+  const handleOpenNotificationLink = () => {
+    if (!hasActionLink) return;
+    const normalizedUrl = action_url!.trim();
+
+    if (action_target === "new_tab") {
+      window.open(normalizedUrl, "_blank", "noopener,noreferrer");
+      return;
+    }
+
+    onClose();
+
+    if (normalizedUrl.startsWith("/")) {
+      router.push(normalizedUrl);
+      return;
+    }
+
+    window.open(normalizedUrl, "_self");
+  };
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-[600px]">
         <DialogHeader>
           <DialogTitle className="text-xl flex items-center gap-2 text-black">
-            <Bell className="h-5 w-5 text-[var(--color-primary)]" />
+            <NotificationIcon className="h-5 w-5 text-[var(--color-primary)]" />
             <span>Notification Details</span>
           </DialogTitle>
           <DialogDescription className="text-black">
@@ -73,36 +86,30 @@ export function NotificationDetailsComponent({
         </DialogHeader>
 
         <div className="py-4 space-y-6 text-black">
-          {/* User information */}
+          {/* Notification summary */}
           <div className="flex items-center gap-4">
             <Avatar className="h-14 w-14">
-              <AvatarImage
-                src={
-                  user.avatar
-                    ? `${env.NEXT_PUBLIC_API_URL}/storage/${user.avatar}`
-                    : undefined
-                }
-                alt={user.full_name}
-              />
               <AvatarFallback>
-                <User className="h-6 w-6" />
+                <NotificationIcon className="h-6 w-6" />
               </AvatarFallback>
             </Avatar>
 
             <div>
               <h3 className="text-lg font-medium text-black">
-                {user.full_name}
+                {title || "Notification"}
               </h3>
               <div className="flex items-center gap-2 mt-1">
                 <Badge
-                  variant="primary"
-                  className="text-xs capitalize"
+                  variant="outline"
+                  className="text-xs capitalize inline-flex items-center gap-1 bg-transparent"
                   style={{
-                    color: categoryConfig.color,
-                    borderColor: categoryConfig.color,
+                    color: notificationUi.color,
+                    borderColor: notificationUi.color,
+                    backgroundColor: "transparent",
                   }}
                 >
-                  {category}
+                  <NotificationIcon className="h-3 w-3" />
+                  {notificationUi.categoryLabel}
                 </Badge>
                 <div className="flex items-center gap-1 text-xs text-muted-foreground">
                   <Clock className="h-3 w-3" />
@@ -121,22 +128,24 @@ export function NotificationDetailsComponent({
 
           {/* Message */}
           <div className="bg-accent/10 p-4 rounded-md">
-            <p className="text-base">{notice}</p>
+            <p className="text-base">
+              {notice || "No additional details provided."}
+            </p>
           </div>
 
           {/* Link */}
-          {action_url && (
+          {hasActionLink && (
             <div className="space-y-2">
-              <h4 className="text-sm font-medium">Link</h4>
+              <h4 className="text-sm font-medium">Action</h4>
               <div className="border rounded-md p-3">
-                <a
-                  href={action_url}
-                  className="text-primary hover:underline"
-                  target="_blank"
-                  rel="noopener noreferrer"
+                <Button
+                  type="button"
+                  variant="event-outline"
+                  size="sm"
+                  onClick={handleOpenNotificationLink}
                 >
-                  {action_url}
-                </a>
+                  {notification.action_label?.trim() || "Open Notification"}
+                </Button>
               </div>
             </div>
           )}
@@ -148,7 +157,7 @@ export function NotificationDetailsComponent({
               variant={status === "read" ? "outline" : "default"}
               className={cn(
                 status === "read" ? "bg-muted/30" : "bg-[var(--color-primary)]",
-                "text-black"
+                "text-black",
               )}
             >
               {status === "read" ? "Read" : "Unread"}

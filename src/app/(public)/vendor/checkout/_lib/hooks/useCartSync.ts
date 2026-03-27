@@ -4,16 +4,18 @@
  * Clears both sides when data doesn't match
  */
 
-import { useCallback } from 'react';
-import { useGetCartData, useClearAllCart } from '@/services/customer/cart/query';
-import { useCartEditStore } from '@/store/cart-edit.store';
-import { CartSyncManager } from '../cart-sync-utils';
+import { useCallback } from "react";
+import { useClearAllCart } from "@/services/customer/cart/query";
+import type { GetCartResponse } from "@/services/customer/cart/type";
+import { useCartEditStore } from "@/store/cart-edit.store";
+import { CartSyncManager } from "../cart-sync-utils";
 
 /**
- * Hook for cart synchronization
+ * Cart sync uses the same GET /customer/event data as the parent (e.g. CartManager).
+ * Do not call useGetCartData() here — a second observer with enabled: true was
+ * fetching for vendors and causing 403 + security logout on checkout/preview.
  */
-export function useCartSync() {
-  const { data: apiCartData } = useGetCartData();
+export function useCartSync(apiCartData: GetCartResponse | undefined) {
   const { editingData, clearAllCarts } = useCartEditStore();
   const clearAllCartMutation = useClearAllCart();
 

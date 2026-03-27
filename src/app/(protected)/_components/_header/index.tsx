@@ -8,7 +8,7 @@ import UserDropdown from "./_components/user-dropdown";
 import MobileSidebar from "./_components/mobile-sidebar";
 import { MenuItemProps } from "@/config/menus/types";
 import { Button } from "@/components/ui/button";
-import { HelpCircle, PlusCircle } from "lucide-react";
+import { Building2, HelpCircle, PlusCircle } from "lucide-react";
 import Link from "next/link";
 import {
   DropdownMenu,
@@ -23,6 +23,7 @@ import NotificationBell from "./_components/notification-bell";
 import { LocationSelector } from "@/components/location-selector";
 import { useSession } from "next-auth/react";
 import { useLocationsQuery } from "@/app/(protected)/vendor/venue-locations/_lib/queries";
+import { useProfileData } from "@/app/(protected)/_shared/profile/_lib";
 
 interface HeaderProps {
   menus?: MenuItemProps[];
@@ -42,6 +43,15 @@ const Header: React.FC<HeaderProps> = memo(({ menus }) => {
     return locationsData.data || [];
   }, [locationsData]);
   const hasMultipleLocations = locationsList.length > 1;
+  const { data: profileData } = useProfileData({}, "vendor");
+  const venueName = useMemo(() => {
+    if (!isVendor) return "";
+    return (
+      profileData?.data?.venue_name?.trim() ||
+      session?.user?.name?.trim() ||
+      ""
+    );
+  }, [isVendor, profileData?.data?.venue_name, session?.user?.name]);
 
   const headerClass = useMemo(
     () =>
@@ -73,6 +83,17 @@ const Header: React.FC<HeaderProps> = memo(({ menus }) => {
         <div className="hidden lg:block">
           <ReferralUrl />
         </div>
+
+        {/* Location Selector - Only show for vendors with multiple locations */}
+        {isVendor && venueName && (
+          <div className="hidden lg:flex items-center gap-1.5 rounded-md border border-[var(--color-border)] bg-background px-2.5 py-1.5 mr-1 max-w-[220px]">
+            <Building2 className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+            <span className="text-xs text-muted-foreground shrink-0">Venue:</span>
+            <span className="text-sm font-semibold text-foreground truncate">
+              {venueName}
+            </span>
+          </div>
+        )}
 
         {/* Location Selector - Only show for vendors with multiple locations */}
         {isVendor && hasMultipleLocations && (

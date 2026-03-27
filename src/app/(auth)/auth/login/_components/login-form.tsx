@@ -223,7 +223,11 @@ export default function LoginForm() {
   return (
     <OAuthErrorBoundary>
       <div className="grid gap-6">
-        <form onSubmit={handleSubmit(handleLoginForm)}>
+        <form
+          method="post"
+          noValidate
+          onSubmit={handleSubmit(handleLoginForm)}
+        >
           <div className="grid gap-4">
             <div className="grid gap-2">
               <div className="grid gap-3">

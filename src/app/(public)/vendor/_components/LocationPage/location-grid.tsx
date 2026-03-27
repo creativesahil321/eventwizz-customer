@@ -2,7 +2,7 @@
 
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { MapPin, ArrowRight, Calendar, Clock } from "lucide-react";
+import { MapPin, ArrowRight, Calendar, Clock, Loader2 } from "lucide-react";
 import { VenueLocation } from "@/types/api.types";
 import { LocationData } from "@/types/theme.types";
 import { motion, AnimatePresence } from "framer-motion";
@@ -21,22 +21,23 @@ export default function LocationGrid({
   onSelect,
 }: LocationGridProps) {
   const [hoveredCard, setHoveredCard] = useState<string | null>(null);
+  const [pendingSlug, setPendingSlug] = useState<string | null>(null);
 
   if (isLoading) {
     return (
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-7 md:gap-8">
         {Array(6)
           .fill(0)
           .map((_, idx) => (
             <Card
               key={idx}
-              className="overflow-hidden border border-gray-200"
+              className="overflow-hidden border-0 p-0 gap-0 py-0 rounded-2xl shadow-lg ring-1 ring-white/50"
             >
-              <div className="h-48 bg-gray-100" />
-              <div className="p-6 space-y-4">
-                <Skeleton className="h-6 w-32" />
-                <Skeleton className="h-4 w-24" />
-                <Skeleton className="h-10 w-full" />
+              <Skeleton className="aspect-[16/10] w-full rounded-none" />
+              <div className="p-5 sm:p-6 space-y-4">
+                <Skeleton className="h-5 w-36" />
+                <Skeleton className="h-[4.5rem] w-full rounded-xl" />
+                <Skeleton className="h-11 w-full rounded-xl" />
               </div>
             </Card>
           ))}
@@ -62,7 +63,7 @@ export default function LocationGrid({
   }
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-7 md:gap-8">
       <AnimatePresence>
         {locations.map((location, idx) => {
           const locationName =
@@ -108,16 +109,24 @@ export default function LocationGrid({
                 duration: 0.3,
                 delay: idx * 0.05,
               }}
+              whileHover={{
+                y: -6,
+                transition: { type: "spring", stiffness: 380, damping: 28 },
+              }}
               onHoverStart={() => setHoveredCard(locationSlug)}
               onHoverEnd={() => setHoveredCard(null)}
             >
               <Card
-                className="overflow-hidden border border-gray-200 cursor-pointer group hover:shadow-lg hover:border-gray-300 transition-all duration-200 flex flex-col h-full"
-                onClick={() => onSelect(locationSlug)}
+                className="overflow-hidden border-0 cursor-pointer group flex flex-col h-full rounded-2xl p-0 gap-0 py-0 bg-white/95 text-card-foreground shadow-[0_4px_6px_-1px_rgba(0,0,0,0.06),0_16px_32px_-12px_rgba(0,0,0,0.22)] ring-1 ring-white/70 hover:shadow-[0_24px_48px_-16px_rgba(0,0,0,0.35)] transition-[box-shadow,transform] duration-300"
+                onClick={() => {
+                  if (!locationSlug || pendingSlug) return;
+                  setPendingSlug(locationSlug);
+                  onSelect(locationSlug);
+                }}
               >
-                {/* Header Image */}
+                {/* Header Image — fixed aspect so grid feels even */}
                 <div
-                  className="relative h-40 overflow-hidden"
+                  className="relative aspect-[16/10] w-full overflow-hidden rounded-t-2xl"
                   style={{ background: "var(--color-background)" }}
                 >
                   {coverImage && typeof coverImage === "string" ? (
@@ -125,24 +134,29 @@ export default function LocationGrid({
                       src={coverImage}
                       alt={locationName}
                       fill
-                      className="object-cover transition-transform duration-300 group-hover:scale-105"
+                      sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                      className="object-cover transition-transform duration-500 ease-out group-hover:scale-[1.04]"
                       onError={(e) => {
                         (e.target as HTMLImageElement).style.display = "none";
                       }}
                     />
                   ) : (
                     <div
-                      className="absolute inset-0"
-                      style={{ background: "var(--color-background)" }}
+                      className="absolute inset-0 bg-gradient-to-br from-neutral-200 to-neutral-400"
+                      aria-hidden
                     />
                   )}
 
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent" />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
 
-                  <div className="absolute bottom-4 left-4 right-4">
-                    <div className="flex items-center gap-2">
-                      <MapPin size={18} className="text-white" />
-                      <h3 className="text-lg font-semibold text-white">
+                  <div className="absolute bottom-3 left-3 max-w-[calc(100%-1.5rem)]">
+                    <div className="inline-flex items-center gap-1.5 rounded-full border border-white/25 bg-black/40 px-3 py-1.5 shadow-lg backdrop-blur-md">
+                      <MapPin
+                        size={14}
+                        className="shrink-0 text-white/95"
+                        aria-hidden
+                      />
+                      <h3 className="text-sm font-semibold tracking-tight text-white drop-shadow-sm">
                         {locationName}
                       </h3>
                     </div>
@@ -150,41 +164,48 @@ export default function LocationGrid({
                 </div>
 
                 {/* Content */}
-                <div className="p-6 flex-1 flex flex-col">
-                  <div className="space-y-4 flex-1">
+                <div className="flex flex-1 flex-col p-5 sm:p-6">
+                  <div className="flex flex-1 flex-col gap-4">
                     {/* Event Count */}
-                    <div className="flex items-center gap-2 text-sm text-gray-600">
-                      <Calendar
-                        size={16}
-                        className="text-[color:var(--color-primary)]"
-                      />
-                      <span className="font-medium text-gray-900">
-                        {totalEvents}
+                    <div className="flex items-baseline gap-2">
+                      <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-[color-mix(in_srgb,var(--color-primary)_12%,transparent)] text-[color:var(--color-primary)]">
+                        <Calendar size={16} strokeWidth={2} aria-hidden />
                       </span>
-                      <span className="text-gray-500">
-                        {totalEvents === 1 ? "Event" : "Events"}
-                      </span>
+                      <div className="leading-tight">
+                        <span className="text-2xl font-bold tabular-nums text-gray-900">
+                          {totalEvents}
+                        </span>
+                        <span className="ml-1.5 text-sm font-medium text-gray-500">
+                          {totalEvents === 1 ? "event" : "events"}
+                        </span>
+                      </div>
                     </div>
 
                     {/* Upcoming Event */}
                     {upcomingEvent ? (
-                      <div className="flex items-start gap-3 p-3 bg-gray-50 rounded-lg border border-gray-100">
-                        <Clock
-                          size={16}
-                          className="text-[color:var(--color-primary)] mt-0.5 flex-shrink-0"
-                        />
-                        <div className="flex-1 min-w-0">
-                          <div className="text-sm font-medium text-gray-900 truncate">
+                      <div className="flex gap-3 rounded-xl border border-gray-200/80 bg-gradient-to-br from-gray-50 to-gray-100/80 p-4 shadow-inner ring-1 ring-black/[0.03]">
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-white shadow-sm ring-1 ring-gray-100">
+                          <Clock
+                            size={18}
+                            className="text-[color:var(--color-primary)]"
+                            aria-hidden
+                          />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-[10px] font-semibold uppercase tracking-wider text-gray-500">
+                            Next up
+                          </p>
+                          <div className="mt-0.5 text-base font-semibold leading-snug text-gray-900 line-clamp-2">
                             {upcomingEvent.name}
                           </div>
-                          <div className="text-xs text-gray-500 mt-1">
+                          <div className="mt-1 text-sm text-gray-600">
                             {upcomingEvent.date}
                           </div>
                         </div>
                       </div>
                     ) : (
-                      <div className="p-3 bg-gray-50 rounded-lg border border-gray-100">
-                        <p className="text-xs text-gray-400">
+                      <div className="rounded-xl border border-dashed border-gray-200 bg-gray-50/80 px-4 py-3 text-center">
+                        <p className="text-sm text-gray-500">
                           {totalEvents > 0
                             ? "No upcoming events scheduled"
                             : "Check back soon for new events"}
@@ -195,19 +216,33 @@ export default function LocationGrid({
 
                   {/* Action Button */}
                   <button
-                    className="w-full mt-6 bg-[color:var(--color-primary)] hover:bg-[color:var(--color-primary)]/90 text-white py-2.5 px-4 rounded-lg text-sm font-medium flex items-center justify-center gap-2 transition-colors duration-200"
+                    type="button"
+                    className="mt-6 flex w-full items-center justify-center gap-2 rounded-xl bg-[color:var(--color-primary)] px-4 py-3 text-sm font-semibold text-[var(--color-primary-foreground)] shadow-lg shadow-black/15 transition-all duration-200 hover:brightness-110 hover:shadow-xl hover:shadow-black/20 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--color-primary)] focus-visible:ring-offset-2"
                     onClick={(e) => {
                       e.stopPropagation();
+                      if (!locationSlug || pendingSlug) return;
+                      setPendingSlug(locationSlug);
                       onSelect(locationSlug);
                     }}
+                    disabled={pendingSlug === locationSlug}
                   >
-                    <span>Explore Events</span>
-                    <motion.div
-                      animate={{ x: isHovered ? 4 : 0 }}
-                      transition={{ duration: 0.2 }}
-                    >
-                      <ArrowRight size={16} />
-                    </motion.div>
+                    {pendingSlug === locationSlug ? (
+                      <>
+                        <Loader2 size={16} className="animate-spin" />
+                        <span>Opening...</span>
+                      </>
+                    ) : (
+                      <>
+                        <span>Explore Events</span>
+                        <motion.span
+                          className="inline-flex"
+                          animate={{ x: isHovered ? 5 : 0 }}
+                          transition={{ duration: 0.2, ease: "easeOut" }}
+                        >
+                          <ArrowRight size={17} strokeWidth={2.25} aria-hidden />
+                        </motion.span>
+                      </>
+                    )}
                   </button>
                 </div>
               </Card>

@@ -10,8 +10,12 @@ export const adminVenuesKeys = {
 };
 
 function mapVenue(item: AdminVenueItem): Vendor {
+  const normalizedDomainStatus = item.domain_status?.toLowerCase();
+  const normalizedVendorStatus = item.status?.toLowerCase();
   const status =
-    item.status?.toLowerCase() === "active" ? "active" : "disabled";
+    normalizedDomainStatus === "active" || normalizedVendorStatus === "active"
+      ? "active"
+      : "disabled";
   return {
     id: item.id,
     image: item.logo || "",

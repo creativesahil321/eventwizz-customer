@@ -36,10 +36,17 @@ export function getHistoryColumns({
       cell: ({ row }) => {
         const bookingNumber = row.getValue("booking_number") as string;
         const fallbackId = row.original.booking_id || row.original.id;
+        const bookingId = String(fallbackId ?? "");
         return (
-          <span className="font-mono text-sm font-semibold text-blue-600">
-            {bookingNumber || `#${fallbackId}`}
-          </span>
+          <Link
+            href={`/vendor/booking-history/${bookingId}`}
+            className="group inline-flex rounded-md px-1.5 py-1 -mx-1.5 -my-1 text-blue-600 transition-colors hover:bg-slate-50 hover:text-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+            title={`View booking ${bookingNumber || `#${fallbackId}`}`}
+          >
+            <span className="font-mono text-sm font-semibold group-hover:underline underline-offset-2">
+              {bookingNumber || `#${fallbackId}`}
+            </span>
+          </Link>
         );
       },
       enableSorting: false,

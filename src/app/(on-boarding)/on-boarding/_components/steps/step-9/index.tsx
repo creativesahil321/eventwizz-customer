@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { CardContent, CardHeader, OnboardingCard } from "@/components/ui/card";
@@ -16,7 +16,11 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useFormContext } from "../../form-provider";
 import { Trash2 } from "lucide-react";
-import { stepNineSchema, StepNineType } from "../../form-provider/schema";
+import {
+  stepNineSchema,
+  StepNineType,
+  STEP_NINE_MAX_FAQS,
+} from "../../form-provider/schema";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import {
@@ -27,6 +31,20 @@ import { onboardingService } from "@/services/vendor/onboarding/onboarding.servi
 import { useSession } from "next-auth/react";
 import { useFieldFocusHandler } from "../../form-preview/field-focus-handler";
 import { useEventId } from "../../../_lib/hooks/useEventId";
+import { WholeStepGuidedShell } from "../../whole-step-guided-shell";
+import { guidedInsetSectionSurfaceClass } from "../../guided-section-surface";
+import {
+  GuidedWholeStepApproveButton,
+  guidedOnboardingSaveNextButtonClass,
+  guidedOnboardingSkipButtonClass,
+} from "../../guided-sticky-approval-bar";
+
+function normalizeStepNineFaqs(
+  faqs: StepNineType["faqs"] | undefined,
+): StepNineType["faqs"] {
+  const base = faqs && faqs.length > 0 ? faqs : [{ question: "", answer: "" }];
+  return base.slice(0, STEP_NINE_MAX_FAQS);
+}
 
 export default function StepNine() {
   const { form: globalForm, save, setActiveStep } = useFormContext();
@@ -41,10 +59,7 @@ export default function StepNine() {
     defaultValues: {
       step: 9,
       event_id: eventId,
-      faqs:
-        globalForm.getValues("stepNine.faqs")?.length > 0
-          ? globalForm.getValues("stepNine.faqs")
-          : [{ question: "", answer: "" }],
+      faqs: normalizeStepNineFaqs(globalForm.getValues("stepNine.faqs")),
     },
 
     mode: "onChange",
@@ -55,19 +70,30 @@ export default function StepNine() {
     name: "faqs",
   });
 
-  // Add a constant for max FAQs allowed
-  const MAX_FAQS = 5;
-
   // Add state to track deleted FAQ IDs
   const [deletedFaqIds, setDeletedFaqIds] = useState<number[]>([]);
 
-  // Update handleAppend to check against MAX_FAQS
+  useEffect(() => {
+    const raw = globalForm.getValues("stepNine.faqs");
+    if (raw && raw.length > STEP_NINE_MAX_FAQS) {
+      const trimmed = raw.slice(0, STEP_NINE_MAX_FAQS);
+      globalForm.setValue("stepNine.faqs", trimmed);
+      form.reset({
+        step: 9,
+        event_id: eventId,
+        faqs: trimmed,
+      });
+      toast.info(
+        `FAQs are limited to ${STEP_NINE_MAX_FAQS}. Extra entries were removed.`,
+      );
+    }
+  }, [globalForm, form, eventId]);
+
   const handleAppend = async () => {
     const currentFaqs = form.getValues("faqs");
 
-    // Check if we've reached the max allowed FAQs
-    if (currentFaqs.length >= MAX_FAQS) {
-      toast.error(`You can add a maximum of ${MAX_FAQS} FAQs`);
+    if (currentFaqs.length >= STEP_NINE_MAX_FAQS) {
+      toast.error(`You can add a maximum of ${STEP_NINE_MAX_FAQS} FAQs`);
       return;
     }
 
@@ -76,13 +102,13 @@ export default function StepNine() {
         !faq.question ||
         faq.question.trim() === "" ||
         !faq.answer ||
-        faq.answer.trim() === ""
+        faq.answer.trim() === "",
     );
 
     if (hasEmptyFields) {
       await form.trigger("faqs");
       toast.error(
-        "Please fill in all existing FAQ fields before adding a new one"
+        "Please fill in all existing FAQ fields before adding a new one",
       );
       return;
     }
@@ -121,7 +147,7 @@ export default function StepNine() {
         // Display errors
         const errorFields = Object.keys(errors);
         toast.error(
-          `Please correct the highlighted fields: ${errorFields.join(", ")}`
+          `Please correct the highlighted fields: ${errorFields.join(", ")}`,
         );
         setLoading(false);
         return;
@@ -146,7 +172,7 @@ export default function StepNine() {
         Promise.all([updateSession({ on_boarding_step: 10 }), save()]).catch(
           (error) => {
             console.error("Background save error:", error);
-          }
+          },
         );
       } else {
         console.error("API Error:", response);
@@ -162,7 +188,7 @@ export default function StepNine() {
 
   return (
     <div className="flex flex-col items-center justify-start w-full min-h-screen bg-transparent">
-      <div className="w-full max-w-4xl mx-auto relative">
+      <div className="w-full min-w-0 max-w-none mx-auto relative">
         <OnboardingCard className="w-full mx-auto shadow-sm mb-16">
           <CardHeader className="pb-2 pt-4">
             <OnboardingTitle>
@@ -176,184 +202,205 @@ export default function StepNine() {
 
           <CardContent className="px-6 py-2 pb-8">
             <Form {...form}>
-              <form
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  form.handleSubmit(onSubmit)(e);
-                }}
-                className="space-y-6"
-              >
+              <form onSubmit={(e) => e.preventDefault()} className="space-y-6">
                 <input type="hidden" {...form.register("step")} />
                 <input type="hidden" {...form.register("event_id")} />
 
-                <section className="w-full mb-4">
-                  <OnboardingSectionTitle className="text-xl font-medium">
-                    FAQ List
-                  </OnboardingSectionTitle>
-
-                  <div className="space-y-8 mt-4">
-                    {fields.map((field, index) => (
-                      <div
-                        key={field.id}
-                        className="border border-white/10 p-6 rounded-md bg-white relative"
+                <WholeStepGuidedShell
+                  form={form}
+                  sectionId="step-nine-faqs"
+                  chipLabel="FAQs"
+                  chipDescription="Questions and answers for your event page."
+                  renderFooter={({ guided, sectionId }) => (
+                    <>
+                      <GuidedWholeStepApproveButton
+                        guided={guided}
+                        sectionId={sectionId}
+                      />
+                      <Button
+                        variant="event-primary"
+                        type="button"
+                        className={guidedOnboardingSaveNextButtonClass}
+                        disabled={loading || !guided.allSectionsApproved}
+                        title={
+                          !guided.allSectionsApproved
+                            ? "Approve this step first"
+                            : undefined
+                        }
+                        onClick={() => {
+                          if (!guided.allSectionsApproved) return;
+                          void form.handleSubmit(onSubmit)();
+                        }}
                       >
-                        <div className="absolute top-3 right-3">
+                        {loading ? "Saving..." : "Save & Next"}
+                      </Button>
+                      <Button
+                        variant="event-outline"
+                        type="button"
+                        onClick={() => setActiveStep(10)}
+                        className={guidedOnboardingSkipButtonClass}
+                      >
+                        Skip
+                      </Button>
+                    </>
+                  )}
+                >
+                  {() => (
+                    <section className={guidedInsetSectionSurfaceClass("w-full mb-4")}>
+                      <OnboardingSectionTitle className="text-xl font-medium">
+                        FAQ List
+                      </OnboardingSectionTitle>
+
+                      <div className="space-y-8 mt-4">
+                        {fields.map((field, index) => (
+                          <div
+                            key={field.id}
+                            className="border border-white/10 p-6 rounded-md bg-white relative"
+                          >
+                            <div className="absolute top-3 right-3">
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleRemove(index)}
+                                disabled={fields.length === 1}
+                                className="h-8 w-8 p-0 rounded-full text-red-400 hover:bg-red-500/10"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
+
+                            <div className="mb-2 text-sm font-medium text-gray-500">
+                              FAQ #{index + 1}
+                            </div>
+
+                            <div className="space-y-4">
+                              <FormField
+                                control={form.control}
+                                name={`faqs.${index}.question`}
+                                render={({ field }) => {
+                                  const currentLength =
+                                    field.value?.length || 0;
+                                  const maxLength = 160;
+                                  return (
+                                    <FormItem>
+                                      <FormLabel className="text-sm font-medium">
+                                        Question
+                                      </FormLabel>
+                                      <FormControl>
+                                        <Input
+                                          {...field}
+                                          placeholder="e.g. Is the venue heated?"
+                                          className="h-10 bg-white/5 border-white/10"
+                                          maxLength={maxLength}
+                                          onChange={(e) => {
+                                            field.onChange(e);
+                                            // Update global form state immediately to update preview
+                                            const currentFaqs = [
+                                              ...form.getValues("faqs"),
+                                            ];
+                                            currentFaqs[index].question =
+                                              e.target.value;
+                                            globalForm.setValue(
+                                              "stepNine.faqs",
+                                              currentFaqs,
+                                            );
+                                          }}
+                                          onFocus={() =>
+                                            handleFieldFocus("question")
+                                          }
+                                        />
+                                      </FormControl>
+                                      <div className="text-xs text-muted-foreground mt-1">
+                                        <span
+                                          className={
+                                            currentLength > maxLength
+                                              ? "text-destructive"
+                                              : ""
+                                          }
+                                        >
+                                          {currentLength}/{maxLength} characters
+                                        </span>
+                                      </div>
+                                      <FormMessage />
+                                    </FormItem>
+                                  );
+                                }}
+                              />
+
+                              <FormField
+                                control={form.control}
+                                name={`faqs.${index}.answer`}
+                                render={({ field }) => {
+                                  const currentLength =
+                                    field.value?.length || 0;
+                                  const maxLength = 500;
+                                  return (
+                                    <FormItem>
+                                      <FormLabel className="text-sm font-medium">
+                                        Answer
+                                      </FormLabel>
+                                      <FormControl>
+                                        <Textarea
+                                          {...field}
+                                          placeholder="e.g. Yes, we have multi-thermostatic heaters throughout all of our marquee venues."
+                                          className="min-h-[100px] bg-white/5 border-white/10"
+                                          maxLength={maxLength}
+                                          onChange={(e) => {
+                                            field.onChange(e);
+                                            // Update global form state immediately to update preview
+                                            const currentFaqs = [
+                                              ...form.getValues("faqs"),
+                                            ];
+                                            currentFaqs[index].answer =
+                                              e.target.value;
+                                            globalForm.setValue(
+                                              "stepNine.faqs",
+                                              currentFaqs,
+                                            );
+                                          }}
+                                          onFocus={() =>
+                                            handleFieldFocus("answer")
+                                          }
+                                        />
+                                      </FormControl>
+                                      <div className="text-xs text-muted-foreground mt-1">
+                                        <span
+                                          className={
+                                            currentLength > maxLength
+                                              ? "text-destructive"
+                                              : ""
+                                          }
+                                        >
+                                          {currentLength}/{maxLength} characters
+                                        </span>
+                                      </div>
+                                      <FormMessage />
+                                    </FormItem>
+                                  );
+                                }}
+                              />
+                            </div>
+                          </div>
+                        ))}
+
+                        <div className="flex flex-col items-center gap-2 pt-4">
                           <Button
                             type="button"
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleRemove(index)}
-                            disabled={fields.length === 1}
-                            className="h-8 w-8 p-0 rounded-full text-red-400 hover:bg-red-500/10"
+                            onClick={handleAppend}
+                            disabled={fields.length >= STEP_NINE_MAX_FAQS}
+                            className="bg-white/5 hover:bg-white/10 text-gray-700 border border-white/10 disabled:opacity-50"
                           >
-                            <Trash2 className="h-4 w-4" />
+                            <span className="mr-1">+</span> Add Another FAQ
                           </Button>
-                        </div>
-
-                        <div className="mb-2 text-sm font-medium text-gray-500">
-                          FAQ #{index + 1}
-                        </div>
-
-                        <div className="space-y-4">
-                          <FormField
-                            control={form.control}
-                            name={`faqs.${index}.question`}
-                            render={({ field }) => {
-                              const currentLength = field.value?.length || 0;
-                              const maxLength = 160;
-                              return (
-                                <FormItem>
-                                  <FormLabel className="text-sm font-medium">
-                                    Question
-                                  </FormLabel>
-                                  <FormControl>
-                                    <Input
-                                      {...field}
-                                      placeholder="e.g. Is the venue heated?"
-                                      className="h-10 bg-white/5 border-white/10"
-                                      maxLength={maxLength}
-                                      onChange={(e) => {
-                                        field.onChange(e);
-                                        // Update global form state immediately to update preview
-                                        const currentFaqs = [
-                                          ...form.getValues("faqs"),
-                                        ];
-                                        currentFaqs[index].question =
-                                          e.target.value;
-                                        globalForm.setValue(
-                                          "stepNine.faqs",
-                                          currentFaqs
-                                        );
-                                      }}
-                                      onFocus={() =>
-                                        handleFieldFocus("question")
-                                      }
-                                    />
-                                  </FormControl>
-                                  <div className="text-xs text-muted-foreground mt-1">
-                                    <span
-                                      className={
-                                        currentLength > maxLength
-                                          ? "text-destructive"
-                                          : ""
-                                      }
-                                    >
-                                      {currentLength}/{maxLength} characters
-                                    </span>
-                                  </div>
-                                  <FormMessage />
-                                </FormItem>
-                              );
-                            }}
-                          />
-
-                          <FormField
-                            control={form.control}
-                            name={`faqs.${index}.answer`}
-                            render={({ field }) => {
-                              const currentLength = field.value?.length || 0;
-                              const maxLength = 500;
-                              return (
-                                <FormItem>
-                                  <FormLabel className="text-sm font-medium">
-                                    Answer
-                                  </FormLabel>
-                                  <FormControl>
-                                    <Textarea
-                                      {...field}
-                                      placeholder="e.g. Yes, we have multi-thermostatic heaters throughout all of our marquee venues."
-                                      className="min-h-[100px] bg-white/5 border-white/10"
-                                      maxLength={maxLength}
-                                      onChange={(e) => {
-                                        field.onChange(e);
-                                        // Update global form state immediately to update preview
-                                        const currentFaqs = [
-                                          ...form.getValues("faqs"),
-                                        ];
-                                        currentFaqs[index].answer =
-                                          e.target.value;
-                                        globalForm.setValue(
-                                          "stepNine.faqs",
-                                          currentFaqs
-                                        );
-                                      }}
-                                      onFocus={() => handleFieldFocus("answer")}
-                                    />
-                                  </FormControl>
-                                  <div className="text-xs text-muted-foreground mt-1">
-                                    <span
-                                      className={
-                                        currentLength > maxLength
-                                          ? "text-destructive"
-                                          : ""
-                                      }
-                                    >
-                                      {currentLength}/{maxLength} characters
-                                    </span>
-                                  </div>
-                                  <FormMessage />
-                                </FormItem>
-                              );
-                            }}
-                          />
+                          <p className="text-xs text-muted-foreground text-center">
+                            Maximum {STEP_NINE_MAX_FAQS} FAQs per event.
+                          </p>
                         </div>
                       </div>
-                    ))}
-
-                    <div className="flex justify-center pt-4">
-                      <Button
-                        type="button"
-                        onClick={handleAppend}
-                        className="bg-white/5 hover:bg-white/10 text-gray-700 border border-white/10"
-                      >
-                        <span className="mr-1">+</span> Add Another FAQ
-                      </Button>
-                    </div>
-                  </div>
-                </section>
-
-                <div className="flex items-center justify-center gap-4 pt-4">
-                  <Button
-                    variant="event-primary"
-                    type="button"
-                    className="rounded-full px-8 py-2 text-white"
-                    disabled={loading}
-                    onClick={() => {
-                      const data = form.getValues();
-                      onSubmit(data);
-                    }}
-                  >
-                    {loading ? "Saving..." : "Save & Next"}
-                  </Button>
-                  <Button
-                    variant="event-secondary"
-                    type="button"
-                    onClick={() => setActiveStep(10)}
-                    className="rounded-full px-8 py-2 text-white"
-                  >
-                    Skip
-                  </Button>
-                </div>
+                    </section>
+                  )}
+                </WholeStepGuidedShell>
               </form>
             </Form>
           </CardContent>

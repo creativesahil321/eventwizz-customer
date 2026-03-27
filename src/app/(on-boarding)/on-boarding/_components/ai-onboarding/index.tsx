@@ -80,7 +80,10 @@ export default function AIOnboardingFlow({
             exit={{ opacity: 0, scale: 0.95 }}
             transition={{ duration: 0.4 }}
           >
-            <AIGenerating venueName={venueInput?.venueName || ""} />
+            <AIGenerating
+              venueName={venueInput?.venueName || ""}
+              hasMultipleLocations={venueInput?.has_multiple_locations === true}
+            />
           </motion.div>
         )}
 

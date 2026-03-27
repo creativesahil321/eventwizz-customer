@@ -149,6 +149,12 @@ export default function RecentEventsGlimpse({
               src={addCacheBusting(images[0])}
               alt="Recent Event"
               className="w-full h-full object-cover transition-transform duration-300 hover:scale-105"
+              onError={(e) => {
+                const target = e.currentTarget;
+                if (target.dataset.fallbackApplied === "true") return;
+                target.dataset.fallbackApplied = "true";
+                target.src = defaultEventImages[0];
+              }}
             />
           </div>
         </div>
@@ -180,6 +186,13 @@ export default function RecentEventsGlimpse({
                       src={addCacheBusting(src)}
                       alt={`Recent Event ${index + 1}`}
                       className="w-full h-full object-cover transition-transform duration-300 hover:scale-105"
+                      onError={(e) => {
+                        const target = e.currentTarget;
+                        if (target.dataset.fallbackApplied === "true") return;
+                        target.dataset.fallbackApplied = "true";
+                        target.src =
+                          defaultEventImages[index % defaultEventImages.length];
+                      }}
                     />
                   </div>
                 </CarouselItem>

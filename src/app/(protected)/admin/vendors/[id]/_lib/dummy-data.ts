@@ -82,9 +82,14 @@ export function getVenueDetailDummy(id: string): VenueDetail | null {
       documentLabel: "document.pdf",
     },
     recentEvents: [
-      { title: "Wedding Reception", date: "03 Apr 2024" },
-      { title: "Corporate Gala", date: "20 Mar 2024" },
-      { title: "Birthday Party", date: "12 Mar 2024" },
+      {
+        id: 1,
+        title: "Wedding Reception",
+        date: "03 Apr 2024",
+        approvalStatus: "pending",
+      },
+      { id: 2, title: "Corporate Gala", date: "20 Mar 2024" },
+      { id: 3, title: "Birthday Party", date: "12 Mar 2024" },
     ],
     adminNotes: ["High Value Client", "Special Commission Rate: 8%"],
     financialSummary: {

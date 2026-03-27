@@ -1,4 +1,8 @@
 import * as z from "zod";
+import {
+  BANNER_HEADING_MAX_WORDS,
+  countWords,
+} from "@/lib/word-count";
 
 // Validation functions for event scheduler
 // Removed future time validation - only keeping sequence validation
@@ -50,7 +54,11 @@ export const stepOneSchema = z
     event_banner_heading: z
       .string()
       .min(1, "Banner heading is required")
-      .max(50, "Banner heading must not exceed 50 characters"),
+      .max(500, "Banner heading is too long")
+      .refine(
+        (s) => countWords(s) <= BANNER_HEADING_MAX_WORDS,
+        `Banner heading must not exceed ${BANNER_HEADING_MAX_WORDS} words`,
+      ),
     event_banner_sub_heading: z
       .string()
       .min(1, "Banner sub heading is required")
@@ -233,10 +241,17 @@ const normalizeDepositType = (value: unknown) => {
 };
 
 const baseDateSchema = z.object({
+  /** Existing `event_dates.id` — send on update */
+  id: z.number().optional(),
   event_date: z.string().min(1, "Date is required"),
   booking_type: z.enum(["tickets", "tables", "both"]),
   has_bookings: z.boolean().optional(),
+  /** From GET show — prefer over has_bookings for cancel vs remove */
+  use_cancel_date_action: z.boolean().optional(),
+  cancellation_request_pending: z.boolean().optional(),
+  has_financial_bookings: z.boolean().optional(),
   cancelled: z.boolean().optional(),
+  cancel_reason: z.string().optional(),
   payment_type: z.enum(["deposit", "full"]).optional(),
   is_deposit_enabled: z.preprocess(normalizeBoolean, z.boolean().optional()),
   deposit_type: z.preprocess(
@@ -513,11 +528,29 @@ export const stepThreeSchema = z
   .object({
     step: z.literal(3),
     event_id: z.number().min(1, "Event ID is required"),
-    dates: z.array(dateSchema).min(1, "At least one date is required"),
+    /** Sent on save; may be filled from step 1 if omitted */
+    vendor_location_id: z.number().min(1).optional(),
+    dates: z.array(dateSchema),
   })
   .superRefine((data, ctx) => {
     const dates = data.dates;
     if (!dates || dates.length === 0) return;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const todayTime = today.getTime();
+    for (let i = 0; i < dates.length; i++) {
+      const d = dates[i].event_date;
+      if (d && /^\d{4}-\d{2}-\d{2}$/.test(d)) {
+        const eventTime = new Date(d + "T00:00:00").getTime();
+        if (eventTime < todayTime) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: "Event date must be today or in the future.",
+            path: ["dates", i, "event_date"],
+          });
+        }
+      }
+    }
     const eventDates = dates.map((d) => d.event_date).filter(Boolean);
     const seen = new Set<string>();
     for (let i = 0; i < eventDates.length; i++) {

@@ -5,6 +5,7 @@ export const defaultValues: OnboardingFormData = {
   last_completed_step: 1,
   stepOne: {
     step: 1,
+    has_multiple_locations: undefined,
     name: "",
     contact_number: "",
     email: "",
@@ -174,6 +175,7 @@ export const defaultValues: OnboardingFormData = {
   stepEleven: {
     step: 11,
     event_id: 0,
+    has_multiple_locations: undefined as boolean | undefined,
     submit_type: "submit" as "duplicate" | "submit",
     address: "",
     city: "",

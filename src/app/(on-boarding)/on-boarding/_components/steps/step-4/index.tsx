@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useCallback, useState, useEffect } from "react";
+import React, { useCallback, useState, useEffect, useMemo } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm, useFieldArray } from "react-hook-form";
 import { Button } from "@/components/ui/button";
@@ -34,6 +34,27 @@ import GalleryUploader from "./gallery-uploader";
 import { useSession } from "next-auth/react";
 import { useEventId } from "../../../_lib/hooks/useEventId";
 import { addCacheBusting } from "@/lib/image-utils";
+import { cn } from "@/lib/utils";
+import { useGuidedOnboardingSections } from "../../../_lib/hooks/use-guided-onboarding-sections";
+import type { GuidedSectionConfig } from "../../../_lib/hooks/use-guided-onboarding-sections";
+import { GuidedMultiSectionBottomActions } from "../../guided-section-chips";
+import {
+  GuidedSectionActionFooter,
+  GuidedSectionCoreActions,
+  guidedOnboardingSaveNextButtonClass,
+  guidedOnboardingSkipButtonClass,
+} from "../../guided-sticky-approval-bar";
+import { guidedSectionSurfaceClass } from "../../guided-section-surface";
+
+function resolveStepFourErrorIndex(keys: string[]) {
+  if (keys.some((k) => k === "__extra_validation__")) return 1;
+  if (keys.some((k) => k === "package_title" || k === "package_description"))
+    return 0;
+  if (keys.some((k) => k === "package_image" || k === "package_button_name"))
+    return 1;
+  if (keys.some((k) => k.startsWith("package_details"))) return 2;
+  return 3;
+}
 
 // Define an interface for files with preview
 interface FileWithPreview extends File {
@@ -109,6 +130,71 @@ const StepFour = () => {
   const handleFieldFocus = (fieldName: string) => {
     setActiveField(fieldName);
   };
+
+  const sectionConfigs = useMemo((): GuidedSectionConfig<StepFourType>[] => {
+    return [
+      {
+        id: "package-copy",
+        label: "Package overview",
+        description: "Main heading and sub-heading for your package block.",
+        fields: ["package_title", "package_description"],
+      },
+      {
+        id: "package-media",
+        label: "Image & button",
+        description: "Hero image and primary call-to-action label.",
+        fields: ["package_image", "package_button_name"],
+        validate: async () => {
+          const img = form.getValues("package_image");
+          const hasImage = Boolean(
+            packageImage.length > 0 ||
+              packageImageUrl ||
+              img instanceof File ||
+              (typeof img === "string" && img.length > 0),
+          );
+          if (!hasImage) {
+            toast.error("Please upload a package image.");
+            return false;
+          }
+          return true;
+        },
+      },
+      {
+        id: "package-details",
+        label: "Package details",
+        description: "Bullet points that appear under your package.",
+        fields: ["package_details"],
+      },
+      {
+        id: "gallery",
+        label: "Gallery",
+        description: "Optional gallery images (up to 8).",
+        fields: ["gallery"],
+      },
+    ];
+  }, [form, packageImage.length, packageImageUrl]);
+
+  const validateFullStepFour = useCallback(async () => {
+    const img = form.getValues("package_image");
+    const hasImage = Boolean(
+      packageImage.length > 0 ||
+        packageImageUrl ||
+        img instanceof File ||
+        (typeof img === "string" && img.length > 0),
+    );
+    if (!hasImage) {
+      toast.error("Please upload a package image.");
+      return false;
+    }
+    return true;
+  }, [form, packageImage.length, packageImageUrl]);
+
+  const guided = useGuidedOnboardingSections({
+    form,
+    sections: sectionConfigs,
+    resolveErrorSectionIndex: resolveStepFourErrorIndex,
+    validateFullStep: validateFullStepFour,
+  });
 
   const handleSubmit = useCallback(
     async (data: StepFourType) => {
@@ -273,7 +359,7 @@ const StepFour = () => {
 
   return (
     <div className="flex flex-col items-center justify-start w-full min-h-screen bg-transparent">
-      <div className="w-full max-w-4xl mx-auto relative">
+      <div className="w-full min-w-0 max-w-none mx-auto relative">
         <OnboardingCard className="w-full mx-auto shadow-sm mb-16">
           <CardHeader className="pb-2 pt-4">
             <OnboardingTitle>
@@ -304,9 +390,24 @@ const StepFour = () => {
                   )}
                 />
 
-                <section className="w-full mb-4">
+                <section
+                  data-guided-section="package-copy"
+                  tabIndex={-1}
+                  className={guidedSectionSurfaceClass(
+                    guided.currentSectionIndex === 0,
+                    "mb-4 w-full space-y-6",
+                  )}
+                >
+                  <fieldset
+                    disabled={guided.currentSectionIndex !== 0}
+                    className={cn(
+                      "min-w-0 border-0 p-0 m-0 space-y-6",
+                      guided.currentSectionIndex !== 0 &&
+                        "pointer-events-none",
+                    )}
+                  >
                   <OnboardingSectionTitle className="text-xl font-medium">
-                    Event Package
+                    Package overview
                   </OnboardingSectionTitle>
                   <div className="mt-4">
                     <FormField
@@ -401,9 +502,31 @@ const StepFour = () => {
                       }}
                     />
                   </div>
+                  <GuidedSectionActionFooter
+                    isActive={guided.currentSectionIndex === 0}
+                    hideSectionMeta
+                  >
+                    <GuidedSectionCoreActions guided={guided} />
+                  </GuidedSectionActionFooter>
+                  </fieldset>
                 </section>
 
-                <section className="w-full mb-4">
+                <section
+                  data-guided-section="package-media"
+                  tabIndex={-1}
+                  className={guidedSectionSurfaceClass(
+                    guided.currentSectionIndex === 1,
+                    "mb-4 w-full space-y-6",
+                  )}
+                >
+                  <fieldset
+                    disabled={guided.currentSectionIndex !== 1}
+                    className={cn(
+                      "min-w-0 border-0 p-0 m-0 space-y-6",
+                      guided.currentSectionIndex !== 1 &&
+                        "pointer-events-none",
+                    )}
+                  >
                   <FormField
                     control={form.control}
                     name="package_image"
@@ -471,9 +594,8 @@ const StepFour = () => {
                       </FormItem>
                     )}
                   />
-                </section>
 
-                <section className="w-full mb-4">
+                <div className="w-full mb-4 pt-2">
                   <FormField
                     control={form.control}
                     name="package_button_name"
@@ -519,9 +641,32 @@ const StepFour = () => {
                       );
                     }}
                   />
+                </div>
+                  <GuidedSectionActionFooter
+                    isActive={guided.currentSectionIndex === 1}
+                    hideSectionMeta
+                  >
+                    <GuidedSectionCoreActions guided={guided} />
+                  </GuidedSectionActionFooter>
+                  </fieldset>
                 </section>
 
-                <section className="w-full mb-4">
+                <section
+                  data-guided-section="package-details"
+                  tabIndex={-1}
+                  className={guidedSectionSurfaceClass(
+                    guided.currentSectionIndex === 2,
+                    "mb-4 w-full space-y-6",
+                  )}
+                >
+                  <fieldset
+                    disabled={guided.currentSectionIndex !== 2}
+                    className={cn(
+                      "min-w-0 border-0 p-0 m-0 space-y-4",
+                      guided.currentSectionIndex !== 2 &&
+                        "pointer-events-none",
+                    )}
+                  >
                   <div className="flex justify-between items-center mb-4">
                     <OnboardingSectionTitle className="text-base font-medium">
                       Package Details
@@ -639,8 +784,31 @@ const StepFour = () => {
                       </CardContent>
                     </Card>
                   ))}
+                  <GuidedSectionActionFooter
+                    isActive={guided.currentSectionIndex === 2}
+                    hideSectionMeta
+                  >
+                    <GuidedSectionCoreActions guided={guided} />
+                  </GuidedSectionActionFooter>
+                  </fieldset>
                 </section>
 
+                <section
+                  data-guided-section="gallery"
+                  tabIndex={-1}
+                  className={guidedSectionSurfaceClass(
+                    guided.currentSectionIndex === 3,
+                    "w-full",
+                  )}
+                >
+                  <fieldset
+                    disabled={guided.currentSectionIndex !== 3}
+                    className={cn(
+                      "min-w-0 border-0 p-0 m-0",
+                      guided.currentSectionIndex !== 3 &&
+                        "pointer-events-none",
+                    )}
+                  >
                 <FormField
                   control={form.control}
                   name="gallery"
@@ -650,28 +818,47 @@ const StepFour = () => {
                     </div>
                   )}
                 />
-                <div className="flex items-center justify-center gap-4 pt-4">
-                  <Button
-                    variant="event-primary"
-                    type="button"
-                    onClick={() => {
-                      setActiveField(null);
-                      handleSubmit(form.getValues());
-                    }}
-                    disabled={loading}
-                    className="text-white rounded-full px-8 py-2"
+                  <GuidedSectionActionFooter
+                    isActive={guided.currentSectionIndex === 3}
+                    hideSectionMeta
                   >
-                    {loading ? "Saving..." : "Save & Next"}
-                  </Button>
-                  <Button
-                    variant="event-secondary"
-                    type="button"
-                    onClick={() => setActiveStep(5)}
-                    className="text-white rounded-full px-8 py-2"
-                  >
-                    Skip
-                  </Button>
-                </div>
+                    <GuidedSectionCoreActions guided={guided} />
+                  </GuidedSectionActionFooter>
+                  </fieldset>
+                </section>
+                <GuidedMultiSectionBottomActions
+                  onApproveAll={guided.handleApproveAllSections}
+                  allSectionsApproved={guided.allSectionsApproved}
+                  saveSlot={
+                    <>
+                      <Button
+                        variant="event-primary"
+                        type="button"
+                        onClick={() => {
+                          setActiveField(null);
+                          handleSubmit(form.getValues());
+                        }}
+                        disabled={loading || !guided.allSectionsApproved}
+                        title={
+                          !guided.allSectionsApproved
+                            ? "Approve all sections first"
+                            : undefined
+                        }
+                        className={guidedOnboardingSaveNextButtonClass}
+                      >
+                        {loading ? "Saving..." : "Save & Next"}
+                      </Button>
+                      <Button
+                        variant="event-outline"
+                        type="button"
+                        onClick={() => setActiveStep(5)}
+                        className={guidedOnboardingSkipButtonClass}
+                      >
+                        Skip
+                      </Button>
+                    </>
+                  }
+                />
               </form>
             </Form>
           </CardContent>

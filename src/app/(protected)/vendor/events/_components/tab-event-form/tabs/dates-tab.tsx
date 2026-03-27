@@ -1,13 +1,20 @@
 "use client";
 
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
 import { useForm, useFieldArray, Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { eventsService } from "@/services/vendor/events/events.service";
+import {
+  eventsService,
+  type StepThreeSavePayload,
+} from "@/services/vendor/events/events.service";
 import { Button } from "@/components/ui/button";
 import { Form } from "@/components/ui/form";
 import { StepThreeType, stepThreeSchema } from "../schema";
 import { useEventFormContext } from "../../events-form-provider";
+import { eventKeys as vendorEventDetailKeys } from "../../../_lib/hooks/useEventData";
+import { eventKeys as vendorEventsListKeys } from "../../../_lib/queries";
 import { toast } from "sonner";
 import {
   FormField,
@@ -24,10 +31,21 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { PlusCircle, Trash2, XCircle } from "lucide-react";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 // Helper function to get today's date in YYYY-MM-DD format
 const getTodayDateString = () => {
@@ -140,7 +158,17 @@ const getDefaultDate = (
 };
 
 export default function DatesTab() {
+  const router = useRouter();
+  const queryClient = useQueryClient();
   const [isLoading, setIsLoading] = useState(false);
+  const [emptyDatesConfirmOpen, setEmptyDatesConfirmOpen] = useState(false);
+  const [cancelReasonDialogOpen, setCancelReasonDialogOpen] = useState(false);
+  const [cancelReasonText, setCancelReasonText] = useState("");
+  const [cancelReasonError, setCancelReasonError] = useState<string | null>(null);
+  const [targetCancelDateIndex, setTargetCancelDateIndex] = useState<number | null>(
+    null
+  );
+  const skipEmptyDatesConfirmRef = useRef(false);
   const { form: globalForm, save, readOnly } = useEventFormContext();
 
   // Get event_id from global form
@@ -156,11 +184,18 @@ export default function DatesTab() {
   const eventId = getEventId();
 
   // Setup form with the new schema structure
+  const stepOneLocationId = globalForm.getValues().stepOne?.vendor_location_id;
+
   const form = useForm<StepThreeType>({
     resolver: zodResolver(stepThreeSchema) as Resolver<StepThreeType>,
     defaultValues: {
       step: 3,
       event_id: eventId,
+      vendor_location_id:
+        stepThreeDefaults?.vendor_location_id ??
+        (stepOneLocationId && stepOneLocationId >= 1
+          ? stepOneLocationId
+          : undefined),
       dates:
         stepThreeDefaults?.dates && stepThreeDefaults.dates.length > 0
           ? stepThreeDefaults.dates
@@ -174,6 +209,13 @@ export default function DatesTab() {
     form.setValue("event_id", eventId);
   }, [eventId, form]);
 
+  const watchedStepOneLocation = globalForm.watch("stepOne.vendor_location_id");
+  useEffect(() => {
+    if (watchedStepOneLocation && watchedStepOneLocation >= 1) {
+      form.setValue("vendor_location_id", watchedStepOneLocation);
+    }
+  }, [watchedStepOneLocation, form]);
+
   const { control, watch, setValue, setError, trigger } = form;
 
   // Setup field array for dates
@@ -185,6 +227,35 @@ export default function DatesTab() {
     control,
     name: "dates",
   });
+
+  const requestCancelDate = useCallback(
+    (dateIndex: number) => {
+      if (readOnly) return;
+      const existingReason = watch(`dates.${dateIndex}.cancel_reason`) || "";
+      setTargetCancelDateIndex(dateIndex);
+      setCancelReasonText(existingReason);
+      setCancelReasonError(null);
+      setCancelReasonDialogOpen(true);
+    },
+    [readOnly, watch]
+  );
+
+  const confirmCancelDate = useCallback(() => {
+    if (targetCancelDateIndex === null) return;
+    const reason = cancelReasonText.trim();
+    if (!reason) {
+      setCancelReasonError("Please provide a reason before cancelling this date.");
+      return;
+    }
+
+    setValue(`dates.${targetCancelDateIndex}.cancelled`, true);
+    setValue(`dates.${targetCancelDateIndex}.cancel_reason`, reason);
+    setCancelReasonDialogOpen(false);
+    setTargetCancelDateIndex(null);
+    setCancelReasonText("");
+    setCancelReasonError(null);
+    toast.info("Date marked as cancelled. Save the form to apply.");
+  }, [targetCancelDateIndex, cancelReasonText, setValue]);
 
   // Update dates when booking type changes for a specific date
   const updateDate = useCallback(
@@ -996,40 +1067,67 @@ export default function DatesTab() {
                   Cancelled
                 </span>
               )}
+              {watch(`dates.${dateIndex}.cancellation_request_pending`) && (
+                <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-amber-100 text-amber-800 border border-amber-200">
+                  Pending admin
+                </span>
+              )}
             </h3>
             <div className="flex items-center gap-2 w-full sm:w-auto">
-              {watch(`dates.${dateIndex}.has_bookings`) ? (
-                <Button
-                  type="button"
-                  variant="outline"
-                  className={
-                    watch(`dates.${dateIndex}.cancelled`)
-                      ? "border-gray-400 text-gray-500 hover:bg-gray-50 w-full sm:w-auto"
-                      : "border-red-500 text-red-600 hover:bg-red-50 w-full sm:w-auto"
-                  }
-                  size="sm"
-                  onClick={() => {
-                    const isCancelled = watch(`dates.${dateIndex}.cancelled`);
-                    setValue(`dates.${dateIndex}.cancelled`, !isCancelled);
-                    toast.info(
-                      !isCancelled
-                        ? "Date marked as cancelled. Save the form to apply."
-                        : "Date cancellation undone."
-                    );
-                  }}
-                >
-                  <XCircle className="h-4 w-4 mr-2" />
-                  <span>
-                    {watch(`dates.${dateIndex}.cancelled`)
-                      ? "Undo Cancel"
-                      : "Cancel Date"}
-                  </span>
-                </Button>
-              ) : (
-                dateFields.length > 1 && (
+              {(() => {
+                const cancellationPending = watch(
+                  `dates.${dateIndex}.cancellation_request_pending`
+                );
+                const useCancelAction =
+                  watch(`dates.${dateIndex}.use_cancel_date_action`) === true;
+                const hasFinancial =
+                  watch(`dates.${dateIndex}.has_financial_bookings`) === true;
+                const hasBookings = watch(`dates.${dateIndex}.has_bookings`) === true;
+                const showCancelDateFlow =
+                  useCancelAction || hasFinancial || hasBookings;
+
+                if (cancellationPending) {
+                  return null;
+                }
+
+                if (showCancelDateFlow) {
+                  return (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      disabled={readOnly}
+                      className={
+                        watch(`dates.${dateIndex}.cancelled`)
+                          ? "border-gray-400 text-gray-500 hover:bg-gray-50 w-full sm:w-auto"
+                          : "border-red-500 text-red-600 hover:bg-red-50 w-full sm:w-auto"
+                      }
+                      size="sm"
+                      onClick={() => {
+                        const isCancelled = watch(`dates.${dateIndex}.cancelled`);
+                        if (!isCancelled) {
+                          requestCancelDate(dateIndex);
+                          return;
+                        }
+                        setValue(`dates.${dateIndex}.cancelled`, false);
+                        setValue(`dates.${dateIndex}.cancel_reason`, "");
+                        toast.info("Date cancellation undone.");
+                      }}
+                    >
+                      <XCircle className="h-4 w-4 mr-2" />
+                      <span>
+                        {watch(`dates.${dateIndex}.cancelled`)
+                          ? "Undo Cancel"
+                          : "Cancel Date"}
+                      </span>
+                    </Button>
+                  );
+                }
+
+                return (
                   <Button
                     type="button"
                     variant="destructive"
+                    disabled={readOnly}
                     className="text-destructive hover:text-white bg-destructive/10 w-full sm:w-auto"
                     size="sm"
                     onClick={() => remove(dateIndex)}
@@ -1038,8 +1136,8 @@ export default function DatesTab() {
                     <span className="hidden sm:inline">Remove Date</span>
                     <span className="sm:hidden">Remove</span>
                   </Button>
-                )
-              )}
+                );
+              })()}
             </div>
           </div>
 
@@ -1408,14 +1506,16 @@ export default function DatesTab() {
               type="button"
               variant="outline"
               size="sm"
+              disabled={readOnly}
               className="text-blue-600 border-blue-600 hover:bg-blue-50 w-full sm:w-auto"
               onClick={() => {
                 const currentDate = watch(`dates.${dateIndex}`);
-                const newDate = {
-                  ...currentDate,
-                  event_date: "", // Reset date for new entry
-                };
-                append(newDate);
+                const duplicable = { ...currentDate };
+                delete (duplicable as { id?: number }).id;
+                append({
+                  ...duplicable,
+                  event_date: "",
+                });
                 toast.success("Date duplicated! Please set a new event date.");
               }}
             >
@@ -1428,7 +1528,6 @@ export default function DatesTab() {
     },
     [
       control,
-      dateFields,
       remove,
       append,
       createTicketFields,
@@ -1437,19 +1536,39 @@ export default function DatesTab() {
       updateDate,
       validateDateUniqueness,
       setValue,
+      requestCancelDate,
+      readOnly,
     ]
   );
 
   // Handle form submission
   const handleSubmit = useCallback(
     async (data: StepThreeType) => {
+      if (data.dates.length === 0 && !skipEmptyDatesConfirmRef.current) {
+        setEmptyDatesConfirmOpen(true);
+        return;
+      }
+      skipEmptyDatesConfirmRef.current = false;
+
+      const vendor_location_id =
+        data.vendor_location_id ??
+        globalForm.getValues().stepOne?.vendor_location_id;
+      if (!vendor_location_id || vendor_location_id < 1) {
+        toast.error(
+          "Select a venue location in event basics (step 1) before saving dates."
+        );
+        return;
+      }
+
       setIsLoading(true);
 
       try {
         // Clean up payment fields for tickets booking type and deposit fields when payment is full
-        const cleanedData = {
+        const latestDates = form.getValues("dates");
+        const cleanedData: StepThreeSavePayload = {
           ...data,
-          dates: data.dates.map((date) => {
+          vendor_location_id,
+          dates: latestDates.map((date) => {
             // Clear payment fields for tickets-only booking type
             if (date.booking_type === "tickets") {
               return {
@@ -1524,29 +1643,115 @@ export default function DatesTab() {
         const response = await eventsService.storeStepThreeData(cleanedData);
 
         if (response && response.status) {
-          // Success message is handled by axios interceptor
-          // Move to the next step
+          const resData = response.data as { event_deleted?: boolean } | undefined;
+          if (resData?.event_deleted) {
+            const removedId = String(cleanedData.event_id);
+            queryClient.removeQueries({
+              queryKey: vendorEventDetailKeys.data(removedId),
+            });
+            void queryClient.invalidateQueries({
+              queryKey: vendorEventsListKeys.lists(),
+            });
+            try {
+              localStorage.removeItem("event_id");
+            } catch {
+              /* ignore */
+            }
+            router.push("/vendor/events");
+            return;
+          }
           await save();
-        } else {
-          const errorMessage =
-            response?.message ||
-            "Failed to save event dates. Please try again.";
-          toast.error("Error saving event dates", {
-            description: errorMessage,
-          });
         }
       } catch (error) {
         console.error("Error saving event dates:", error);
-        toast.error("Failed to save event dates");
       } finally {
         setIsLoading(false);
       }
     },
-    [form, globalForm, save]
+    [form, globalForm, queryClient, router, save]
   );
 
   return (
     <div className="space-y-8">
+      <AlertDialog
+        open={emptyDatesConfirmOpen}
+        onOpenChange={setEmptyDatesConfirmOpen}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Save with no event dates?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This event doesn&apos;t have any dates scheduled. If you save
+              now, the event may be removed from your dashboard. To keep it,
+              add at least one date first, or use Go back to return to the
+              form.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Go back</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                skipEmptyDatesConfirmRef.current = true;
+                setEmptyDatesConfirmOpen(false);
+                void form.handleSubmit(handleSubmit)();
+              }}
+            >
+              Save anyway
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog
+        open={cancelReasonDialogOpen}
+        onOpenChange={(open) => {
+          setCancelReasonDialogOpen(open);
+          if (!open) {
+            setCancelReasonError(null);
+            setTargetCancelDateIndex(null);
+          }
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirm date cancellation</AlertDialogTitle>
+            <AlertDialogDescription>
+              Cancelled dates may impact your bookings and customer communication.
+              Please provide a clear reason before continuing.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="space-y-2">
+            <Label htmlFor="cancel-date-reason">Cancellation reason</Label>
+            <Textarea
+              id="cancel-date-reason"
+              value={cancelReasonText}
+              onChange={(e) => {
+                setCancelReasonText(e.target.value);
+                if (cancelReasonError) {
+                  setCancelReasonError(null);
+                }
+              }}
+              placeholder="Example: Venue maintenance issue, weather advisory, or operational constraint."
+              rows={4}
+              disabled={readOnly}
+            />
+            {cancelReasonError && (
+              <p className="text-sm text-destructive">{cancelReasonError}</p>
+            )}
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Go back</AlertDialogCancel>
+            <Button
+              type="button"
+              variant="event-primary"
+              onClick={() => confirmCancelDate()}
+            >
+              Confirm cancel date
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       <Form {...form}>
         <form
           onSubmit={async (e) => {
@@ -1592,6 +1797,7 @@ export default function DatesTab() {
             type="button"
             variant="outline"
             className="w-full flex items-center gap-2 justify-center"
+            disabled={readOnly}
             onClick={handleAddDate}
           >
             <PlusCircle className="h-4 w-4" />

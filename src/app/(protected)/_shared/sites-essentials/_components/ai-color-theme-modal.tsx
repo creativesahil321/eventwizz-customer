@@ -44,191 +44,171 @@ export function AIColorThemeModal({
   const [selectedTheme, setSelectedTheme] = useState("");
   const [customTheme, setCustomTheme] = useState("");
   const [existingBrand, setExistingBrand] = useState("");
+  const [logoColorTone, setLogoColorTone] = useState<
+    "dark" | "light" | "colorful" | "unsure"
+  >("unsure");
+  const [logoColorHex, setLogoColorHex] = useState("");
 
-  // Popular theme suggestions with icons
+  // Approved event categories with professional theme guidance
   const themeSuggestions = [
     {
-      id: "wedding",
-      label: "Wedding Theme",
-      icon: Heart,
-      description: "Elegant romantic colors",
+      id: "christmas-events",
+      label: "Christmas Events",
+      icon: TreePine,
+      description: "Festive holiday palettes",
     },
     {
-      id: "birthday",
-      label: "Birthday Party",
+      id: "new-year-parties",
+      label: "New Year Parties",
+      icon: Sparkles,
+      description: "Midnight glam and celebratory tones",
+    },
+    {
+      id: "halloween-events",
+      label: "Halloween Events",
+      icon: Star,
+      description: "Dramatic spooky contrasts",
+    },
+    {
+      id: "valentines-day-specials",
+      label: "Valentine's Day Specials",
+      icon: Heart,
+      description: "Romantic, premium warm tones",
+    },
+    {
+      id: "easter-events",
+      label: "Easter Events",
       icon: Cake,
-      description: "Vibrant celebratory colors",
+      description: "Soft spring-inspired palettes",
     },
     {
-      id: "christmas",
-      label: "Christmas Theme",
-      icon: TreePine,
-      description: "Festive holiday colors",
+      id: "bottomless-brunch",
+      label: "Bottomless Brunch",
+      icon: Cake,
+      description: "Bright daytime social colors",
     },
     {
-      id: "spiderman",
-      label: "Spider-Man Theme",
-      icon: Zap,
-      description: "Classic red & blue superhero",
-    },
-    {
-      id: "boys-movie",
-      label: "Boys Movie Theme",
-      icon: Star,
-      description: "Bold masculine colors",
-    },
-    {
-      id: "corporate",
-      label: "Corporate Event",
+      id: "lipstick-powder-and-paint",
+      label: "Lipstick Powder & Paint",
       icon: Palette,
-      description: "Professional business colors",
+      description: "Beauty and lifestyle-inspired colors",
     },
     {
-      id: "music-concert",
-      label: "Music Concert",
-      icon: Sparkles,
-      description: "Dynamic rhythm colors",
-    },
-    {
-      id: "sports",
-      label: "Sports Event",
+      id: "live-music-and-gigs",
+      label: "Live Music & Gigs",
       icon: Wand2,
-      description: "Energetic athletic colors",
+      description: "Energetic stage-ready palette",
     },
     {
-      id: "art-creative",
-      label: "Art & Creative",
+      id: "dj-nights-and-club-events",
+      label: "DJ Nights & Club Events",
+      icon: Zap,
+      description: "Nightlife, neon-ready contrast",
+    },
+    {
+      id: "comedy-shows",
+      label: "Comedy Shows",
+      icon: Star,
+      description: "Friendly and vibrant show colors",
+    },
+    {
+      id: "drag-shows-and-brunches",
+      label: "Drag Shows & Brunches",
+      icon: Sparkles,
+      description: "Bold expressive palettes",
+    },
+    {
+      id: "themed-parties",
+      label: "Themed Parties",
+      icon: Wand2,
+      description: "Flexible party-based combinations",
+    },
+    {
+      id: "food-and-drink-festivals",
+      label: "Food & Drink Festivals",
       icon: Palette,
-      description: "Expressive artistic colors",
+      description: "Fresh, appetizing festival tones",
     },
     {
-      id: "nature-outdoor",
-      label: "Nature Outdoor",
-      icon: TreePine,
-      description: "Earth tones & natural colors",
+      id: "street-food-markets",
+      label: "Street Food Markets",
+      icon: Palette,
+      description: "Urban and warm market colors",
     },
     {
-      id: "vintage-retro",
-      label: "Vintage Retro",
-      icon: Star,
-      description: "Classic nostalgic colors",
-    },
-    {
-      id: "luxury-premium",
-      label: "Luxury Premium",
-      icon: Heart,
-      description: "Sophisticated high-end colors",
-    },
-    {
-      id: "minimalist",
-      label: "Minimalist",
-      icon: Zap,
-      description: "Clean simple colors",
-    },
-    {
-      id: "dark-gothic",
-      label: "Dark Gothic",
-      icon: Star,
-      description: "Mysterious dramatic colors",
-    },
-    {
-      id: "bright-vibrant",
-      label: "Bright Vibrant",
+      id: "pride-events",
+      label: "Pride Events",
       icon: Sparkles,
-      description: "Energetic lively colors",
+      description: "Inclusive and vibrant multicolor style",
     },
     {
-      id: "pastel-soft",
-      label: "Pastel Soft",
-      icon: Heart,
-      description: "Gentle soothing colors",
-    },
-    {
-      id: "neon-electric",
-      label: "Neon Electric",
+      id: "afrobeats-bashment-nights",
+      label: "Afrobeats / Bashment Nights",
       icon: Zap,
-      description: "Bold glowing colors",
+      description: "Rhythmic, bold evening colors",
     },
     {
-      id: "ocean-sea",
-      label: "Ocean Sea",
+      id: "day-raves-outdoor-parties",
+      label: "Day Raves / Outdoor Parties",
       icon: TreePine,
-      description: "Blues & teals",
+      description: "Bright outdoor event palettes",
     },
     {
-      id: "forest-woodland",
-      label: "Forest Woodland",
-      icon: TreePine,
-      description: "Greens & browns",
+      id: "open-mic-spoken-word",
+      label: "Open Mic & Spoken Word",
+      icon: Wand2,
+      description: "Artistic and intimate stage colors",
     },
     {
-      id: "sunset-sunrise",
-      label: "Sunset Sunrise",
-      icon: Star,
-      description: "Warm oranges & pinks",
+      id: "networking-business-events",
+      label: "Networking & Business Events",
+      icon: Palette,
+      description: "Clean professional corporate tones",
     },
     {
-      id: "galaxy-space",
-      label: "Galaxy Space",
+      id: "workshops-masterclasses",
+      label: "Workshops & Masterclasses",
+      icon: Wand2,
+      description: "Focused educational palettes",
+    },
+    {
+      id: "diwali",
+      label: "Diwali",
       icon: Sparkles,
-      description: "Deep purples & cosmic colors",
+      description: "Festive jewel-inspired tones",
     },
     {
-      id: "tropical-island",
-      label: "Tropical Island",
-      icon: TreePine,
-      description: "Bright island colors",
-    },
-    {
-      id: "autumn-fall",
-      label: "Autumn Fall",
-      icon: TreePine,
-      description: "Warm oranges & reds",
-    },
-    {
-      id: "spring-fresh",
-      label: "Spring Fresh",
-      icon: Heart,
-      description: "Fresh greens & pinks",
-    },
-    {
-      id: "winter-snow",
-      label: "Winter Snow",
+      id: "eid",
+      label: "Eid",
       icon: Star,
-      description: "Cool blues & whites",
-    },
-    {
-      id: "summer-beach",
-      label: "Summer Beach",
-      icon: TreePine,
-      description: "Bright yellows & blues",
+      description: "Elegant celebratory color harmony",
     },
   ];
 
   // Popular custom theme examples
   const customExamples = [
-    "Wedding event colors",
-    "Spider-Man theme colors",
-    "Christmas theme colors",
-    "Boys movie theme colors",
-    "Birthday party colors",
-    "Corporate event colors",
-    "Music concert colors",
-    "Art gallery colors",
-    "Sports team colors",
-    "Luxury brand colors",
-    "Minimalist design colors",
-    "Dark mode colors",
-    "Neon party colors",
-    "Ocean theme colors",
-    "Forest theme colors",
-    "Sunset colors",
-    "Galaxy theme colors",
-    "Tropical colors",
-    "Autumn colors",
-    "Spring colors",
-    "Winter colors",
-    "Summer colors",
+    "Christmas Events colors",
+    "New Year Parties colors",
+    "Halloween Events colors",
+    "Valentine's Day Specials colors",
+    "Easter Events colors",
+    "Bottomless Brunch colors",
+    "Lipstick Powder & Paint colors",
+    "Live Music & Gigs colors",
+    "DJ Nights & Club Events colors",
+    "Comedy Shows colors",
+    "Drag Shows & Brunches colors",
+    "Themed Parties colors",
+    "Food & Drink Festivals colors",
+    "Street Food Markets colors",
+    "Pride Events colors",
+    "Afrobeats / Bashment Nights colors",
+    "Day Raves / Outdoor Parties colors",
+    "Open Mic & Spoken Word colors",
+    "Networking & Business Events colors",
+    "Workshops & Masterclasses colors",
+    "Diwali colors",
+    "Eid colors",
   ];
 
   const handleGenerate = async () => {
@@ -246,6 +226,8 @@ export function AIColorThemeModal({
     const colorTheme = await generateColorTheme({
       customTheme: themeToGenerate,
       existingBrand: existingBrand.trim() || undefined,
+      logoColorTone,
+      logoColorHex: logoColorHex.trim() || undefined,
     });
 
     if (colorTheme) {
@@ -286,6 +268,8 @@ export function AIColorThemeModal({
       setSelectedTheme("");
       setCustomTheme("");
       setExistingBrand("");
+      setLogoColorTone("unsure");
+      setLogoColorHex("");
     }
   };
 
@@ -368,13 +352,13 @@ export function AIColorThemeModal({
                 <Label htmlFor="custom-theme">Describe Your Theme</Label>
                 <Input
                   id="custom-theme"
-                  placeholder="e.g., Wedding event colors, Christmas colors , Hero theme..."
+                  placeholder="e.g., Christmas Events colors, DJ Nights & Club Events colors, Eid colors..."
                   value={customTheme}
                   onChange={(e) => setCustomTheme(e.target.value)}
                 />
                 <p className="text-xs text-muted-foreground">
-                  Be creative! Describe any theme you want - seasons, events,
-                  movies, colors, etc.
+                  Use one of your approved event categories to generate
+                  professional, on-brand colors.
                 </p>
               </div>
 
@@ -402,6 +386,46 @@ export function AIColorThemeModal({
           )}
 
           {/* Existing Brand Colors */}
+          <div className="space-y-3 rounded-lg border border-slate-200 p-3">
+            <div className="space-y-1">
+              <Label>What is your site logo color?</Label>
+              <p className="text-xs text-muted-foreground">
+                This helps AI choose a readable header style first.
+              </p>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              {[
+                { id: "dark", label: "Dark Logo" },
+                { id: "light", label: "Light Logo" },
+                { id: "colorful", label: "Colorful Logo" },
+                { id: "unsure", label: "Not Sure" },
+              ].map((tone) => (
+                <Button
+                  key={tone.id}
+                  type="button"
+                  variant={logoColorTone === tone.id ? "event-primary" : "outline"}
+                  className="justify-start"
+                  onClick={() =>
+                    setLogoColorTone(
+                      tone.id as "dark" | "light" | "colorful" | "unsure",
+                    )
+                  }
+                >
+                  {tone.label}
+                </Button>
+              ))}
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="logo-color-hex">Logo color hex (optional)</Label>
+              <Input
+                id="logo-color-hex"
+                placeholder="e.g. #000000"
+                value={logoColorHex}
+                onChange={(e) => setLogoColorHex(e.target.value)}
+              />
+            </div>
+          </div>
+
           <div className="space-y-2">
             <Label htmlFor="existing-brand">
               Existing Brand Colors (Optional)

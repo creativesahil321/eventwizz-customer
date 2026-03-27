@@ -45,7 +45,7 @@ export default function DrinkSection({
 
   const filteredPackages = packages.filter(
     (pkg) =>
-      pkg.title.trim() !== "" || pkg.description.trim() !== "" || pkg.price > 0
+      pkg.title.trim() !== "" || pkg.description.trim() !== "" || pkg.price > 0,
   );
 
   if (
@@ -85,13 +85,13 @@ export default function DrinkSection({
   };
 
   return (
-    <section className="bg-foreground dark:bg-background py-6 sm:py-10 px-4 sm:px-6 w-full overflow-hidden">
+    <section className="bg-[var(--color-secondary)] text-[var(--color-secondary-foreground)] py-6 sm:py-10 px-4 sm:px-6 w-full overflow-hidden">
       <section className="w-full text-center max-w-5xl mx-auto">
-        <h2 className="text-background dark:text-foreground text-2xl sm:text-3xl md:text-4xl font-bold px-2 break-words">
+        <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold px-2 break-words">
           {title || "Other Packages"}
         </h2>
         <p
-          className="text-background dark:text-foreground py-4 sm:py-5 text-sm sm:text-base px-2 break-words whitespace-normal overflow-hidden max-w-full"
+          className="py-4 sm:py-5 text-sm sm:text-base px-2 break-words whitespace-normal overflow-hidden max-w-full"
           style={{
             wordBreak: "break-word",
             overflowWrap: "break-word",
@@ -101,7 +101,7 @@ export default function DrinkSection({
           {description || "*Prices are subject to change"}
         </p>
         {isHydrated && getTotalDrinks() > 0 && (
-          <div className="mt-3 inline-flex items-center gap-2 bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200 px-3 py-1 rounded-full text-xs sm:text-sm font-medium">
+          <div className="mt-3 inline-flex items-center gap-2 bg-[var(--color-surface)] text-[var(--color-text)] px-3 py-1 rounded-full text-xs sm:text-sm font-medium border border-[var(--color-text)]/15">
             <span>🍹</span>
             <span>
               {getTotalDrinks()} item{getTotalDrinks() > 1 ? "s" : ""} selected
@@ -133,7 +133,7 @@ export default function DrinkSection({
                 : 0;
               return (
                 <section
-                  className="text-background dark:text-foreground flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4 p-4 sm:p-6 bg-background/5 dark:bg-foreground/5 rounded-lg border border-background/10 dark:border-foreground/10 w-full"
+                  className="text-[var(--color-text)] bg-[var(--color-surface)] flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4 p-4 sm:p-6  rounded-lg border border-[var(--color-surface)]/10 w-full"
                   key={idx}
                 >
                   {/* Details */}
@@ -142,7 +142,7 @@ export default function DrinkSection({
                       {singlePackage.title}
                     </h3>
                     <div
-                      className="text-xs sm:text-sm md:text-base dark:text-foreground opacity-70 text-start leading-relaxed break-words whitespace-normal overflow-hidden prose prose-sm dark:prose-invert max-w-full w-full"
+                      className="text-xs sm:text-sm md:text-base text-[var(--color-text-dimmed)] text-start leading-relaxed break-words whitespace-normal overflow-hidden prose prose-sm max-w-full w-full"
                       style={{
                         wordBreak: "break-word",
                         overflowWrap: "break-word",
@@ -155,7 +155,7 @@ export default function DrinkSection({
                   </article>
 
                   {/* Divider */}
-                  <div className="hidden sm:block flex-1 border-t border-dashed border-background dark:border-foreground/20 mx-4" />
+                  <div className="hidden sm:block flex-1 border-t border-dashed border-[var(--color-text)]/20 mx-4" />
 
                   {/* Price + Actions */}
                   <article className="flex flex-col sm:flex-row items-center gap-3 sm:gap-4 w-full sm:w-auto mt-2 sm:mt-0">
@@ -174,19 +174,19 @@ export default function DrinkSection({
                         Add to Cart
                       </Button>
                     ) : (
-                      <div className="flex items-center justify-center border border-background dark:border-foreground/20 rounded-lg overflow-hidden w-full sm:w-auto">
+                      <div className="flex items-center justify-center border border-[var(--color-text)]/20 rounded-lg overflow-hidden w-full sm:w-auto">
                         <button
-                          className="px-4 sm:px-3 py-2 sm:py-1 dark:bg-foreground/10 hover:bg-background/80 dark:hover:bg-foreground/20 text-lg sm:text-base font-semibold min-w-[44px] sm:min-w-0 touch-manipulation"
+                          className="px-4 sm:px-3 py-2 sm:py-1 hover:bg-[var(--color-background)]/80 text-lg sm:text-base font-semibold min-w-[44px] sm:min-w-0 touch-manipulation"
                           onClick={() => handleDecrease(singlePackage)}
                           aria-label="Decrease quantity"
                         >
                           −
                         </button>
-                        <span className="px-4 sm:px-4 py-2 sm:py-1 bg-background/50 dark:bg-foreground/5 text-base sm:text-sm font-medium min-w-[44px] sm:min-w-0 text-center">
+                        <span className="px-4 sm:px-4 py-2 sm:py-1 bg-[var(--color-background)]/50 text-base sm:text-sm font-medium min-w-[44px] sm:min-w-0 text-center">
                           {quantity}
                         </span>
                         <button
-                          className="px-4 sm:px-3 py-2 sm:py-1 hover:bg-background/80 dark:hover:bg-foreground/20 text-lg sm:text-base font-semibold min-w-[44px] sm:min-w-0 touch-manipulation"
+                          className="px-4 sm:px-3 py-2 sm:py-1 hover:bg-[var(--color-background)]/80 text-lg sm:text-base font-semibold min-w-[44px] sm:min-w-0 touch-manipulation"
                           onClick={() => handleIncrease(singlePackage)}
                           aria-label="Increase quantity"
                         >

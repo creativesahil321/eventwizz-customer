@@ -43,6 +43,7 @@ export function getColumns({
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button
+                  onClick={() => onViewBooking(row.original)}
                   variant="outline"
                   className="border-0 cursor-pointer shadow-none h-auto py-2 px-2 w-full justify-start text-left min-w-0"
                 >

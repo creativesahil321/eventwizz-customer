@@ -40,6 +40,13 @@ import {
 import { useSession } from "next-auth/react";
 import { useFieldFocusHandler } from "../../form-preview/field-focus-handler";
 import { useEventId } from "../../../_lib/hooks/useEventId";
+import { WholeStepGuidedShell } from "../../whole-step-guided-shell";
+import { guidedInsetSectionSurfaceClass } from "../../guided-section-surface";
+import {
+  GuidedWholeStepApproveButton,
+  guidedOnboardingSaveNextButtonClass,
+  guidedOnboardingSkipButtonClass,
+} from "../../guided-sticky-approval-bar";
 
 // Helper function to get today's date in YYYY-MM-DD format
 const getTodayDateString = () => {
@@ -1477,47 +1484,75 @@ export default function StepFive() {
             <form onSubmit={(e) => e.preventDefault()} className="space-y-4">
               <input type="hidden" {...form.register("event_id")} />
 
-              {/* Event Dates & Pricing Section */}
-              <div className="mt-8">
-                <OnboardingSectionTitle className="text-xl font-bold">
-                  Event Dates & Pricing
-                </OnboardingSectionTitle>
-                <p className="text-sm text-gray-500 mt-1 mb-4">
-                  Set your event dates, payment options, and pricing details
-                </p>
-              </div>
-
-              {dateFields.map((field, index) => renderDateFields(index))}
-
-              <Button
-                type="button"
-                variant="outline"
-                className="w-full flex items-center gap-2 justify-center"
-                onClick={handleAddDate}
+              <WholeStepGuidedShell
+                form={form}
+                sectionId="step-five-booking"
+                chipLabel="Dates, tickets & tables"
+                chipDescription="Confirm dates, booking type, and pricing for each slot."
+                renderFooter={({ guided, sectionId }) => (
+                  <>
+                    <GuidedWholeStepApproveButton
+                      guided={guided}
+                      sectionId={sectionId}
+                    />
+                    <Button
+                      type="button"
+                      variant="event-primary"
+                      onClick={() => {
+                        if (!guided.allSectionsApproved) return;
+                        void handleSubmit();
+                      }}
+                      disabled={loading || !guided.allSectionsApproved}
+                      title={
+                        !guided.allSectionsApproved
+                          ? "Approve this step first"
+                          : undefined
+                      }
+                      className={guidedOnboardingSaveNextButtonClass}
+                    >
+                      {loading ? "Saving..." : "Save & Next"}
+                    </Button>
+                    <Button
+                      variant="event-outline"
+                      type="button"
+                      onClick={() => setActiveStep(6)}
+                      className={guidedOnboardingSkipButtonClass}
+                    >
+                      Skip
+                    </Button>
+                  </>
+                )}
               >
-                <PlusCircle className="h-4 w-4" />
-                Add Another Date
-              </Button>
+                {() => (
+                  <section
+                    className={guidedInsetSectionSurfaceClass(
+                      "w-full space-y-4",
+                    )}
+                  >
+                    <div className="mt-2">
+                      <OnboardingSectionTitle className="text-xl font-bold">
+                        Event Dates & Pricing
+                      </OnboardingSectionTitle>
+                      <p className="text-sm text-muted-foreground mt-1 mb-4">
+                        Set your event dates, payment options, and pricing
+                        details
+                      </p>
+                    </div>
 
-              <div className="flex items-center justify-center gap-4 pt-4">
-                <Button
-                  type="button"
-                  variant="event-primary"
-                  onClick={handleSubmit}
-                  disabled={loading}
-                  className="text-white rounded-full px-8 py-2"
-                >
-                  {loading ? "Saving..." : "Save & Next"}
-                </Button>
-                <Button
-                  variant="event-secondary"
-                  type="button"
-                  onClick={() => setActiveStep(6)}
-                  className="text-white rounded-full px-8 py-2"
-                >
-                  Skip
-                </Button>
-              </div>
+                    {dateFields.map((field, index) => renderDateFields(index))}
+
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="w-full flex items-center gap-2 justify-center border-white/15 bg-transparent"
+                      onClick={handleAddDate}
+                    >
+                      <PlusCircle className="h-4 w-4" />
+                      Add Another Date
+                    </Button>
+                  </section>
+                )}
+              </WholeStepGuidedShell>
             </form>
           </Form>
         </CardContent>

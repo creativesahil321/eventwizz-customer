@@ -33,6 +33,10 @@ import { StepOneType, stepOneSchema } from "../schema";
 import { eventsService } from "@/services/vendor/events/events.service";
 import { useRouter } from "next/navigation";
 import { addCacheBusting } from "@/lib/image-utils";
+import {
+  BANNER_HEADING_MAX_WORDS,
+  countWords,
+} from "@/lib/word-count";
 
 export default function EventNameTab() {
   // No need to use session update as we get data from API
@@ -1025,32 +1029,46 @@ export default function EventNameTab() {
                 <FormField
                   control={form.control}
                   name="event_banner_heading"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="text-sm font-medium">
-                        Banner Heading <span className="text-red-500">*</span>
-                      </FormLabel>
-                      <FormControl>
-                        <Input
-                          {...field}
-                          placeholder="Enter event title"
-                          className="h-11 bg-[#F9FAFB] border-[#E5E7EB]"
-                          onFocus={() =>
-                            handleFieldFocus("event_banner_heading")
-                          }
-                          onChange={(e) => {
-                            field.onChange(e);
-                            globalForm.setValue(
-                              "stepOne.event_banner_heading",
-                              e.target.value
-                            );
-                          }}
-                          onBlur={field.onBlur}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
+                  render={({ field }) => {
+                    const wc = countWords(field.value || "");
+                    return (
+                      <FormItem>
+                        <FormLabel className="text-sm font-medium">
+                          Banner Heading <span className="text-red-500">*</span>
+                        </FormLabel>
+                        <FormControl>
+                          <Input
+                            {...field}
+                            placeholder="Enter event title"
+                            className="h-11 bg-[#F9FAFB] border-[#E5E7EB]"
+                            onFocus={() =>
+                              handleFieldFocus("event_banner_heading")
+                            }
+                            onChange={(e) => {
+                              field.onChange(e);
+                              globalForm.setValue(
+                                "stepOne.event_banner_heading",
+                                e.target.value
+                              );
+                            }}
+                            onBlur={field.onBlur}
+                          />
+                        </FormControl>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          <span
+                            className={
+                              wc > BANNER_HEADING_MAX_WORDS
+                                ? "text-destructive"
+                                : ""
+                            }
+                          >
+                            {wc}/{BANNER_HEADING_MAX_WORDS} words
+                          </span>
+                        </p>
+                        <FormMessage />
+                      </FormItem>
+                    );
+                  }}
                 />
 
                 <FormField

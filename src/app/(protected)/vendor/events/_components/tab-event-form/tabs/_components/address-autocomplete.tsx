@@ -39,6 +39,47 @@ export default function AddressAutocomplete({
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
   const safetyTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
+  const loadGooglePlacesScript = (): Promise<void> => {
+    return new Promise((resolve, reject) => {
+      if (window.google?.maps?.places) {
+        resolve();
+        return;
+      }
+
+      const existingScript = document.getElementById(
+        "google-maps-places-script"
+      ) as HTMLScriptElement | null;
+
+      if (existingScript) {
+        existingScript.addEventListener("load", () => resolve(), {
+          once: true,
+        });
+        existingScript.addEventListener(
+          "error",
+          () => reject(new Error("Google Maps script failed to load")),
+          { once: true }
+        );
+        return;
+      }
+
+      const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
+      if (!apiKey) {
+        reject(new Error("Missing NEXT_PUBLIC_GOOGLE_MAPS_API_KEY"));
+        return;
+      }
+
+      const script = document.createElement("script");
+      script.id = "google-maps-places-script";
+      script.async = true;
+      script.defer = true;
+      script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places`;
+      script.onload = () => resolve();
+      script.onerror = () =>
+        reject(new Error("Google Maps script failed to load"));
+      document.head.appendChild(script);
+    });
+  };
+
   // Handle autofocus
   useEffect(() => {
     if (autoFocus && inputRef.current) {
@@ -52,31 +93,21 @@ export default function AddressAutocomplete({
 
   // Initialize Google Places services
   useEffect(() => {
-    const initializeServices = () => {
-      if (window.google && window.google.maps && window.google.maps.places) {
-        try {
-          autocompleteService.current =
-            new google.maps.places.AutocompleteService();
+    const initializeServices = async () => {
+      try {
+        await loadGooglePlacesScript();
+        autocompleteService.current = new google.maps.places.AutocompleteService();
 
-          // Create a hidden div for PlacesService (required by Google Maps API)
-          const hiddenDiv = document.createElement("div");
-          document.body.appendChild(hiddenDiv);
-          placesService.current = new google.maps.places.PlacesService(
-            hiddenDiv,
-          );
-        } catch (error) {
-          console.error("Error initializing Google Places services:", error);
-        }
+        // Create a hidden div for PlacesService (required by Google Maps API)
+        const hiddenDiv = document.createElement("div");
+        document.body.appendChild(hiddenDiv);
+        placesService.current = new google.maps.places.PlacesService(hiddenDiv);
+      } catch (error) {
+        console.error("Error initializing Google Places services:", error);
       }
     };
 
-    // Try to initialize immediately
-    initializeServices();
-
-    // Also try after a short delay in case Google Maps is still loading
-    const timeout = setTimeout(initializeServices, 1000);
-
-    return () => clearTimeout(timeout);
+    void initializeServices();
   }, []);
 
   // Check if we have a selected value

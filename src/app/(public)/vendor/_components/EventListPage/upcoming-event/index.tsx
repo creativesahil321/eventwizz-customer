@@ -9,9 +9,9 @@ import {
 } from "@/components/ui/carousel";
 
 import Link from "next/link";
-import { ChevronRight } from "lucide-react";
+import { ChevronRight, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useMemo, useContext } from "react";
+import { useMemo, useContext, useState } from "react";
 import { cn } from "@/lib/utils";
 import { ServerContext } from "@/lib/server-context";
 import { ThemeSchema } from "@/types/theme.types";
@@ -33,6 +33,7 @@ export default function UpcomingEvents({
   sectionTitle,
   locationSlug,
 }: EventComponentProps) {
+  const [pendingEventSlug, setPendingEventSlug] = useState<string | null>(null);
   const { theme } = useContext(ServerContext);
   const vendorTheme = theme as ThemeSchema;
 
@@ -242,7 +243,7 @@ export default function UpcomingEvents({
         className={cn(
           "container mx-auto px-4",
           events.length === 2 && "max-w-5xl", // Constrain container width for 2 cards
-          events.length === 3 && "max-w-6xl" // Constrain container width for 3 cards
+          events.length === 3 && "max-w-6xl", // Constrain container width for 3 cards
         )}
       >
         <div className="w-full text-center mb-10">
@@ -253,7 +254,7 @@ export default function UpcomingEvents({
             "w-full relative",
             events.length === 2 ? "max-w-4xl mx-auto px-4" : "",
             events.length === 3 ? "max-w-5xl mx-auto px-2" : "",
-            events.length === 1 && "max-w-lg mx-auto"
+            events.length === 1 && "max-w-lg mx-auto",
           )}
         >
           <Carousel className="relative">
@@ -264,7 +265,7 @@ export default function UpcomingEvents({
                 events.length === 3 ? "-left-3 md:-left-5" : "",
                 events.length >= 4 && "-left-5 md:-left-10",
                 // Always show on mobile, conditionally hide on desktop based on event count
-                !showNavigationDesktop && "md:hidden"
+                !showNavigationDesktop && "md:hidden",
               )}
             />
             <CarouselContent
@@ -273,7 +274,7 @@ export default function UpcomingEvents({
                 events.length === 2 ? "md:pl-2 md:pr-2" : "",
                 events.length === 3
                   ? "md:pl-1 md:pr-1 flex justify-between"
-                  : ""
+                  : "",
               )}
             >
               {events.map((data, index) => (
@@ -282,7 +283,7 @@ export default function UpcomingEvents({
                     "pl-4",
                     itemsPerView,
                     events.length === 2 ? "md:basis-1/2 px-1 md:px-3" : "",
-                    events.length === 3 ? "md:basis-1/3 px-1 md:px-2" : ""
+                    events.length === 3 ? "md:basis-1/3 px-1 md:px-2" : "",
                   )}
                   key={index}
                 >
@@ -293,6 +294,14 @@ export default function UpcomingEvents({
                           src={addCacheBusting(data.image)}
                           alt={data.title}
                           className="w-full h-full object-cover transition-transform duration-300 hover:scale-105"
+                          onError={(e) => {
+                            const target = e.currentTarget;
+                            if (target.dataset.fallbackApplied === "true")
+                              return;
+                            target.dataset.fallbackApplied = "true";
+                            target.src =
+                              eventImages[index % eventImages.length];
+                          }}
                         />
                       </div>
                       <div className="p-4 relative text-black flex-1 flex flex-col">
@@ -306,9 +315,21 @@ export default function UpcomingEvents({
                           <Link
                             href={`/${locationSlug}/events/${data.slug}`}
                             passHref
+                            onClick={() => setPendingEventSlug(data.slug)}
                           >
-                            <Button variant="event-outline" className="w-full">
-                              {data.buttonText}
+                            <Button
+                              variant="event-outline"
+                              className="w-full"
+                              disabled={pendingEventSlug === data.slug}
+                            >
+                              {pendingEventSlug === data.slug ? (
+                                <>
+                                  <Loader2 className="h-4 w-4 animate-spin" />
+                                  Opening...
+                                </>
+                              ) : (
+                                data.buttonText
+                              )}
                             </Button>
                           </Link>
                         </div>
@@ -325,7 +346,7 @@ export default function UpcomingEvents({
                 events.length === 3 ? "-right-3 md:-right-5" : "",
                 events.length >= 4 && "-right-5 md:-right-10",
                 // Always show on mobile, conditionally hide on desktop based on event count
-                !showNavigationDesktop && "md:hidden"
+                !showNavigationDesktop && "md:hidden",
               )}
             />
           </Carousel>

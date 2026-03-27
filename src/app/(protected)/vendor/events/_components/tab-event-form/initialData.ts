@@ -41,6 +41,7 @@ export const initialData: EventSchemaType = {
   stepThree: {
     step: 3,
     event_id: 0,
+    vendor_location_id: undefined,
     dates: [
       {
         event_date: "",

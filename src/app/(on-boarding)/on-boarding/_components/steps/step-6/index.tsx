@@ -27,6 +27,13 @@ import { onboardingService } from "@/services/vendor/onboarding/onboarding.servi
 import { useSession } from "next-auth/react";
 import { useFieldFocusHandler } from "../../form-preview/field-focus-handler";
 import { useEventId } from "../../../_lib/hooks/useEventId";
+import { WholeStepGuidedShell } from "../../whole-step-guided-shell";
+import { guidedInsetSectionSurfaceClass } from "../../guided-section-surface";
+import {
+  GuidedWholeStepApproveButton,
+  guidedOnboardingSaveNextButtonClass,
+  guidedOnboardingSkipButtonClass,
+} from "../../guided-sticky-approval-bar";
 import MenuCategoryDropdown from "./menu-category-dropdown";
 import { useEventMenuCategories } from "@/services/vendor/events/query";
 import { EventMenuCategory } from "@/services/vendor/events/type";
@@ -418,7 +425,7 @@ export default function StepSix() {
 
   return (
     <div className="flex flex-col items-center justify-start w-full min-h-screen bg-transparent">
-      <div className="w-full max-w-4xl mx-auto relative">
+      <div className="w-full min-w-0 max-w-none mx-auto relative">
         <OnboardingCard className="w-full mx-auto shadow-sm mb-16">
           <CardHeader className="pb-2 pt-4">
             <OnboardingTitle>
@@ -429,7 +436,7 @@ export default function StepSix() {
           <CardContent className="px-6 py-2 pb-8">
             <Form {...form}>
               <form
-                onSubmit={form.handleSubmit(onSubmit)}
+                onSubmit={(e) => e.preventDefault()}
                 className="space-y-6"
               >
                 <input type="hidden" {...form.register("step")} />
@@ -440,7 +447,48 @@ export default function StepSix() {
                   })}
                 />
 
-                <section className="w-full mb-4">
+                <WholeStepGuidedShell
+                  form={form}
+                  sectionId="step-six-catering"
+                  chipLabel="Catering & menu"
+                  chipDescription="Food choices and optional menu content."
+                  renderFooter={({ guided, sectionId }) => (
+                    <>
+                      <GuidedWholeStepApproveButton
+                        guided={guided}
+                        sectionId={sectionId}
+                      />
+                      <Button
+                        variant="event-primary"
+                        type="button"
+                        className={guidedOnboardingSaveNextButtonClass}
+                        disabled={loading || !guided.allSectionsApproved}
+                        title={
+                          !guided.allSectionsApproved
+                            ? "Approve this step first"
+                            : undefined
+                        }
+                        onClick={() => {
+                          if (!guided.allSectionsApproved) return;
+                          void form.handleSubmit(onSubmit)();
+                        }}
+                      >
+                        {loading ? "Saving..." : "Save & Next"}
+                      </Button>
+                      <Button
+                        variant="event-outline"
+                        type="button"
+                        onClick={() => setActiveStep(7)}
+                        className={guidedOnboardingSkipButtonClass}
+                      >
+                        Skip
+                      </Button>
+                    </>
+                  )}
+                >
+                  {() => (
+                    <>
+                <section className={guidedInsetSectionSurfaceClass("w-full mb-4")}>
                   <FormField
                     control={form.control}
                     name="catering_option"
@@ -843,25 +891,9 @@ export default function StepSix() {
                     )}
                   </div>
                 )}
-
-                <div className="flex items-center justify-center gap-4 pt-4 mt-6">
-                  <Button
-                    variant="event-primary"
-                    type="submit"
-                    className="rounded-full px-8 py-2 text-white"
-                    disabled={loading}
-                  >
-                    {loading ? "Saving..." : "Save & Next"}
-                  </Button>
-                  <Button
-                    variant="event-secondary"
-                    type="button"
-                    onClick={() => setActiveStep(7)}
-                    className="rounded-full px-8 py-2 text-white"
-                  >
-                    Skip
-                  </Button>
-                </div>
+                    </>
+                  )}
+                </WholeStepGuidedShell>
               </form>
             </Form>
           </CardContent>

@@ -1,5 +1,5 @@
 "use client";
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { CardHeader, CardContent, OnboardingCard } from "@/components/ui/card";
@@ -24,6 +24,28 @@ import { toast } from "sonner";
 import { TiptapEditor } from "@/components/ui/tiptap-editor";
 import { useSession } from "next-auth/react";
 import { addCacheBusting } from "@/lib/image-utils";
+import { cn } from "@/lib/utils";
+import {
+  BANNER_HEADING_MAX_WORDS,
+  countWords,
+} from "@/lib/word-count";
+import { useGuidedOnboardingSections } from "../../../_lib/hooks/use-guided-onboarding-sections";
+import type { GuidedSectionConfig } from "../../../_lib/hooks/use-guided-onboarding-sections";
+import { GuidedMultiSectionBottomActions } from "../../guided-section-chips";
+import {
+  GuidedSectionActionFooter,
+  GuidedSectionCoreActions,
+  guidedOnboardingSaveNextButtonClass,
+} from "../../guided-sticky-approval-bar";
+import { guidedSectionSurfaceClass } from "../../guided-section-surface";
+
+const resolveStepTwoErrorIndex = (keys: string[]) => {
+  if (keys.some((k) => k === "__extra_validation__")) return 0;
+  if (keys.some((k) => k === "logo" || k === "cover_image")) return 0;
+  if (keys.some((k) => k === "banner_heading" || k === "banner_sub_heading"))
+    return 1;
+  return 2;
+};
 
 export default function StepTwo() {
   const {
@@ -81,6 +103,79 @@ export default function StepTwo() {
       setCoverUrl(cover);
     }
   }, [globalForm]);
+
+  const sectionConfigs = useMemo((): GuidedSectionConfig<StepTwoType>[] => {
+    return [
+      {
+        id: "branding",
+        label: "Branding",
+        description: "Logo and landing page cover image.",
+        fields: [],
+        validate: async () => {
+          const lg = form.getValues("logo");
+          const cv = form.getValues("cover_image");
+          const hasLogo = Boolean(
+            logoUrl ||
+              logoFiles.length > 0 ||
+              lg instanceof File ||
+              (typeof lg === "string" && lg.length > 0),
+          );
+          const hasCover = Boolean(
+            coverUrl ||
+              coverFiles.length > 0 ||
+              cv instanceof File ||
+              (typeof cv === "string" && cv.length > 0),
+          );
+          if (!hasLogo || !hasCover) {
+            toast.error("Please upload both a logo and a landing page image.");
+            return false;
+          }
+          return true;
+        },
+      },
+      {
+        id: "banner",
+        label: "Banner text",
+        description: "Main hero heading and sub-heading.",
+        fields: ["banner_heading", "banner_sub_heading"],
+      },
+      {
+        id: "about",
+        label: "About section",
+        description: "Title, description, and CTA button label.",
+        fields: ["about_title", "about_description", "about_link_title"],
+      },
+    ];
+  }, [form, logoUrl, logoFiles.length, coverUrl, coverFiles.length]);
+
+  const validateFullStep = useCallback(async () => {
+    const lg = form.getValues("logo");
+    const cv = form.getValues("cover_image");
+    const hasLogo = Boolean(
+      logoUrl ||
+        logoFiles.length > 0 ||
+        lg instanceof File ||
+        (typeof lg === "string" && lg.length > 0),
+    );
+    const hasCover = Boolean(
+      coverUrl ||
+        coverFiles.length > 0 ||
+        cv instanceof File ||
+        (typeof cv === "string" && cv.length > 0),
+    );
+    if (!hasLogo || !hasCover) {
+      toast.error("Please upload both a logo and a landing page image.");
+      return false;
+    }
+    return true;
+  }, [form, logoUrl, logoFiles.length, coverUrl, coverFiles.length]);
+
+  const guided = useGuidedOnboardingSections({
+    form,
+    sections: sectionConfigs,
+    resolveErrorSectionIndex: resolveStepTwoErrorIndex,
+    validateFullStep,
+  });
 
   const handleLogoFileChange = (
     files: File[],
@@ -150,6 +245,120 @@ export default function StepTwo() {
     setActiveField(fieldName);
   };
 
+  const handleSaveAndNext = useCallback(async () => {
+    if (!guided.allSectionsApproved) return;
+    setLoading(true);
+    try {
+      const formValues = form.getValues();
+
+      const requiredFields = [
+        "banner_heading",
+        "banner_sub_heading",
+        "about_title",
+        "about_description",
+        "about_link_title",
+        "logo",
+        "cover_image",
+      ] as const;
+      const fieldLabels: Record<(typeof requiredFields)[number], string> = {
+        banner_heading: "Banner Heading",
+        banner_sub_heading: "Banner Sub-Heading",
+        about_title: "Title for Your Page",
+        about_description: "Short Description",
+        about_link_title: "Button Text",
+        logo: "Logo",
+        cover_image: "Landing Page Image",
+      };
+      const missingFields = requiredFields.filter(
+        (field) => !formValues[field as keyof typeof formValues],
+      );
+
+      if (missingFields.length > 0) {
+        const missingLabels = missingFields.map((f) => fieldLabels[f]);
+        toast.error(
+          `Please fill in the following required fields: ${missingLabels.join(", ")}`,
+        );
+        await form.trigger(missingFields as (keyof StepTwoType)[]);
+        setLoading(false);
+        return;
+      }
+
+      const isValid = await form.trigger();
+
+      if (!isValid) {
+        const errors = form.formState.errors;
+        const errorFields = Object.keys(errors);
+        toast.error(
+          `Please correct the highlighted fields:${errorFields.join(", ")}`,
+        );
+        setLoading(false);
+        return;
+      }
+
+      const data = form.getValues();
+
+      if (logoFiles.length > 0 && !data.logo) {
+        data.logo = logoFiles[0];
+      }
+
+      if (coverFiles.length > 0 && !data.cover_image) {
+        data.cover_image = coverFiles[0];
+      }
+
+      globalForm.setValue("stepTwo", data);
+
+      const response = await onboardingService.storeStepTwoData(data);
+
+      if (response.status) {
+        const updatedData = {
+          ...data,
+          logo: response.data?.logo || data.logo,
+          cover_image: response.data?.cover_image || data.cover_image,
+        };
+
+        globalForm.setValue("stepTwo", updatedData);
+
+        if (response.data?.logo && typeof response.data.logo === "string") {
+          setLogoUrl(response.data.logo);
+          setLogoFiles([]);
+        }
+
+        if (
+          response.data?.cover_image &&
+          typeof response.data.cover_image === "string"
+        ) {
+          setCoverUrl(response.data.cover_image);
+          setCoverFiles([]);
+        }
+
+        setActiveField(null);
+
+        setActiveStep(3);
+
+        Promise.all([
+          updateSession({ on_boarding_step: 3 }),
+          save(),
+        ]).catch((error) => {
+          console.error("Background save error:", error);
+        });
+      }
+    } catch {
+      console.error("An error occurred. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  }, [
+    guided.allSectionsApproved,
+    form,
+    globalForm,
+    logoFiles,
+    coverFiles,
+    updateSession,
+    save,
+    setActiveField,
+    setActiveStep,
+  ]);
+
   return (
     <section>
       <OnboardingCard>
@@ -159,6 +368,22 @@ export default function StepTwo() {
         <CardContent>
           <Form {...form}>
             <form className="space-y-6">
+              <section
+                data-guided-section="branding"
+                tabIndex={-1}
+                className={guidedSectionSurfaceClass(
+                  guided.currentSectionIndex === 0,
+                  "space-y-6",
+                )}
+              >
+                <fieldset
+                  disabled={guided.currentSectionIndex !== 0}
+                  className={cn(
+                    "min-w-0 border-0 p-0 m-0 space-y-6",
+                    guided.currentSectionIndex !== 0 &&
+                      "pointer-events-none",
+                  )}
+                >
               <FormField
                 control={form.control}
                 name="logo"
@@ -267,12 +492,37 @@ export default function StepTwo() {
                   </FormItem>
                 )}
               />
+                  <GuidedSectionActionFooter
+                    isActive={guided.currentSectionIndex === 0}
+                    hideSectionMeta
+                  >
+                    <GuidedSectionCoreActions guided={guided} />
+                  </GuidedSectionActionFooter>
+                </fieldset>
+              </section>
+
+              <section
+                data-guided-section="banner"
+                tabIndex={-1}
+                className={guidedSectionSurfaceClass(
+                  guided.currentSectionIndex === 1,
+                  "space-y-6",
+                )}
+              >
+                <fieldset
+                  disabled={guided.currentSectionIndex !== 1}
+                  className={cn(
+                    "min-w-0 border-0 p-0 m-0 space-y-6",
+                    guided.currentSectionIndex !== 1 &&
+                      "pointer-events-none",
+                  )}
+                >
               <FormField
                 control={form.control}
                 name="banner_heading"
                 render={({ field }) => {
-                  const currentLength = field.value?.length || 0;
-                  const maxLength = 50;
+                  const text = typeof field.value === "string" ? field.value : "";
+                  const wordCount = countWords(text);
                   return (
                     <FormItem>
                       <OnboardingSectionTitle>
@@ -282,7 +532,6 @@ export default function StepTwo() {
                         <Input
                           placeholder="Landing Page Banner Heading"
                           {...field}
-                          maxLength={maxLength}
                           onFocus={() => handleFieldFocus("banner_heading")}
                           onChange={(e) => {
                             field.onChange(e);
@@ -296,10 +545,12 @@ export default function StepTwo() {
                       <div className="text-xs text-muted-foreground mt-1">
                         <span
                           className={
-                            currentLength > maxLength ? "text-destructive" : ""
+                            wordCount > BANNER_HEADING_MAX_WORDS
+                              ? "text-destructive"
+                              : ""
                           }
                         >
-                          {currentLength}/{maxLength} characters
+                          {wordCount}/{BANNER_HEADING_MAX_WORDS} words
                         </span>
                       </div>
                       <FormMessage />
@@ -347,6 +598,34 @@ export default function StepTwo() {
                   );
                 }}
               />
+                  <GuidedSectionActionFooter
+                    isActive={guided.currentSectionIndex === 1}
+                    sectionLabel={
+                      guided.sectionFlow[1]?.label ?? "Banner"
+                    }
+                    sectionProgress={`2 / ${guided.sectionFlow.length}`}
+                  >
+                    <GuidedSectionCoreActions guided={guided} />
+                  </GuidedSectionActionFooter>
+                </fieldset>
+              </section>
+
+              <section
+                data-guided-section="about"
+                tabIndex={-1}
+                className={guidedSectionSurfaceClass(
+                  guided.currentSectionIndex === 2,
+                  "space-y-6",
+                )}
+              >
+                <fieldset
+                  disabled={guided.currentSectionIndex !== 2}
+                  className={cn(
+                    "min-w-0 border-0 p-0 m-0 space-y-6",
+                    guided.currentSectionIndex !== 2 &&
+                      "pointer-events-none",
+                  )}
+                >
               <FormField
                 control={form.control}
                 name="about_title"
@@ -467,149 +746,34 @@ export default function StepTwo() {
                   );
                 }}
               />
-              <div className="flex items-center justify-center gap-4 pt-4">
-                <Button
-                  variant="event-primary"
-                  type="button"
-                  className="text-white rounded-full px-8 py-2"
-                  onClick={async () => {
-                    setLoading(true);
-                    try {
-                      // Get all form errors before triggering validation
-                      const formValues = form.getValues();
-
-                      // Check which fields are missing
-                      const requiredFields = [
-                        "banner_heading",
-                        "banner_sub_heading",
-                        "about_title",
-                        "about_description",
-                        "about_link_title",
-                        "logo",
-                        "cover_image",
-                      ] as const;
-                      const fieldLabels: Record<(typeof requiredFields)[number], string> = {
-                        banner_heading: "Banner Heading",
-                        banner_sub_heading: "Banner Sub-Heading",
-                        about_title: "Title for Your Page",
-                        about_description: "Short Description",
-                        about_link_title: "Button Text",
-                        logo: "Logo",
-                        cover_image: "Landing Page Image",
-                      };
-                      const missingFields = requiredFields.filter(
-                        (field) => !formValues[field as keyof typeof formValues]
-                      );
-
-                      if (missingFields.length > 0) {
-                        const missingLabels = missingFields.map(
-                          (f) => fieldLabels[f]
-                        );
-                        toast.error(
-                          `Please fill in the following required fields: ${missingLabels.join(", ")}`
-                        );
-                        // Trigger validation to show error messages on the form
-                        await form.trigger(
-                          missingFields as (keyof StepTwoType)[]
-                        );
-                        setLoading(false);
-                        return;
-                      }
-
-                      // Validate entire form
-                      const isValid = await form.trigger();
-
-                      if (!isValid) {
-                        // Get detailed error information
-                        const errors = form.formState.errors;
-
-                        // Show more specific error message if possible
-                        const errorFields = Object.keys(errors);
-                        toast.error(
-                          `Please correct the highlighted fields:${errorFields.join(
-                            ", "
-                          )}`
-                        );
-                        setLoading(false);
-                        return;
-                      }
-
-                      // Get form data
-                      const data = form.getValues();
-
-                      // SAFETY CHECK: Ensure files are included
-                      // If files are in state but not in form data, add them manually
-                      if (logoFiles.length > 0 && !data.logo) {
-                        data.logo = logoFiles[0];
-                      }
-
-                      if (coverFiles.length > 0 && !data.cover_image) {
-                        data.cover_image = coverFiles[0];
-                      }
-
-                      // Update global form
-                      globalForm.setValue("stepTwo", data);
-
-                      // Make API call directly
-                      const response = await onboardingService.storeStepTwoData(
-                        data
-                      );
-
-                      if (response.status) {
-                        // Update global form with backend response
-                        // Backend returns URLs (strings), preserve them as-is
-                        const updatedData = {
-                          ...data,
-                          logo: response.data?.logo || data.logo,
-                          cover_image:
-                            response.data?.cover_image || data.cover_image,
-                        };
-
-                        globalForm.setValue("stepTwo", updatedData);
-
-                        // Update preview states with backend response
-                        if (
-                          response.data?.logo &&
-                          typeof response.data.logo === "string"
-                        ) {
-                          setLogoUrl(response.data.logo);
-                          setLogoFiles([]); // Clear file state since we now have URL
-                        }
-
-                        if (
-                          response.data?.cover_image &&
-                          typeof response.data.cover_image === "string"
-                        ) {
-                          setCoverUrl(response.data.cover_image);
-                          setCoverFiles([]); // Clear file state since we now have URL
-                        }
-
-                        setActiveField(null);
-
-                        // INSTANT TRANSITION: Set active step FIRST for smooth UX
-                        setActiveStep(3);
-
-                        // Then handle async operations in background
-                        Promise.all([
-                          updateSession({ on_boarding_step: 3 }),
-                          save(),
-                        ]).catch((error) => {
-                          console.error("Background save error:", error);
-                        });
-                      } else {
-                        // Error toast is handled by axios interceptor
-                      }
-                    } catch {
-                      console.error("An error occurred. Please try again.");
-                    } finally {
-                      setLoading(false);
+                  <GuidedSectionActionFooter
+                    isActive={guided.currentSectionIndex === 2}
+                    hideSectionMeta
+                  >
+                    <GuidedSectionCoreActions guided={guided} />
+                  </GuidedSectionActionFooter>
+                </fieldset>
+              </section>
+              <GuidedMultiSectionBottomActions
+                onApproveAll={guided.handleApproveAllSections}
+                allSectionsApproved={guided.allSectionsApproved}
+                saveSlot={
+                  <Button
+                    variant="event-primary"
+                    type="button"
+                    className={guidedOnboardingSaveNextButtonClass}
+                    disabled={loading || !guided.allSectionsApproved}
+                    title={
+                      !guided.allSectionsApproved
+                        ? "Approve all sections first"
+                        : undefined
                     }
-                  }}
-                  disabled={loading}
-                >
-                  {loading ? "Saving..." : "Save & Next"}
-                </Button>
-              </div>
+                    onClick={() => void handleSaveAndNext()}
+                  >
+                    {loading ? "Saving..." : "Save & Next"}
+                  </Button>
+                }
+              />
             </form>
           </Form>
         </CardContent>

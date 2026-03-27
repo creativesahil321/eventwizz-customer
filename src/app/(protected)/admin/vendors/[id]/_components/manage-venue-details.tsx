@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -26,7 +26,14 @@ import {
   Trash2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { VenueDetail, VenueLocation } from "../_lib/types";
+import {
+  formatVenueLocationLabel,
+  formatVenueLocationLocalityLine,
+  formatVenueLocationVenueTitle,
+  type VenueDetail,
+  type VenueLocation,
+  type VenueEventCancellationRequest,
+} from "../_lib/types";
 import { LoginToVenueModal } from "./login-to-venue-modal";
 import { ResetPasswordModal } from "./reset-password-modal";
 import { ForceLogoutModal } from "./force-logout-modal";
@@ -44,6 +51,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
+import { adminEventsService } from "@/services/admin/events/admin-events.service";
 
 /** Permission key for impersonation — must match backend (e.g. impersonate-vendor). */
 const IMPERSONATE_VENDOR_PERMISSION = "impersonate-vendor";
@@ -152,6 +160,14 @@ function DomainApprovalActions({
 
 export function ManageVenueDetails({ venue }: ManageVenueDetailsProps) {
   const canImpersonateVendor = usePermission(IMPERSONATE_VENDOR_PERMISSION);
+
+  const pendingApprovalEvents = venue.recentEvents.filter(
+    (e) => e.approvalStatus === "pending",
+  );
+  const recentActivityEvents = venue.recentEvents.filter(
+    (e) => e.approvalStatus !== "pending",
+  );
+
   const defaultLocation = venue.locations[0];
   const [selectedLocationId, setSelectedLocationId] = useState<number>(
     defaultLocation?.id ?? 0,
@@ -163,6 +179,12 @@ export function ManageVenueDetails({ venue }: ManageVenueDetailsProps) {
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [confirmVenueName, setConfirmVenueName] = useState("");
   const [confirmPhrase, setConfirmPhrase] = useState("");
+  const [cancellationRequests, setCancellationRequests] = useState<
+    VenueEventCancellationRequest[]
+  >(venue.eventCancellationRequests || []);
+  const [approvingEventDateId, setApprovingEventDateId] = useState<number | null>(
+    null,
+  );
 
   const queryClient = useQueryClient();
 
@@ -190,6 +212,35 @@ export function ManageVenueDetails({ venue }: ManageVenueDetailsProps) {
   /** Financial summary for the selected location (or venue fallback) */
   const financialSummary =
     selectedLocation?.financialSummary ?? venue.financialSummary;
+
+  const locationLocalityLine = selectedLocation
+    ? formatVenueLocationLocalityLine(selectedLocation)
+    : null;
+
+  useEffect(() => {
+    setCancellationRequests(venue.eventCancellationRequests || []);
+  }, [venue.eventCancellationRequests]);
+
+  const approveCancellationMutation = useMutation({
+    mutationFn: (args: { eventId: number; eventDateId: number }) =>
+      adminEventsService.approveDateCancellation(args.eventId, args.eventDateId),
+    onMutate: (variables) => {
+      setApprovingEventDateId(variables.eventDateId);
+    },
+    onSuccess: (_response, variables) => {
+      // Remove approved request immediately from the pending list view
+      setCancellationRequests((prev) =>
+        prev.filter((request) => request.eventDateId !== variables.eventDateId),
+      );
+      // Keep server state in sync with view model
+      queryClient.invalidateQueries({
+        queryKey: ["admin", "venue", String(venue.id)],
+      });
+    },
+    onSettled: () => {
+      setApprovingEventDateId(null);
+    },
+  });
 
   return (
     <div className="flex flex-col gap-6 text-black min-w-0">
@@ -350,7 +401,7 @@ export function ManageVenueDetails({ venue }: ManageVenueDetailsProps) {
             </CardHeader>
             <CardContent className="space-y-5 pt-0">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
-                <div className="space-y-2">
+                <div className="min-w-0 space-y-2">
                   <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
                     Contact
                   </p>
@@ -368,22 +419,24 @@ export function ManageVenueDetails({ venue }: ManageVenueDetailsProps) {
                       ? venue.contact.phone
                       : NOT_PROVIDED}
                   </p>
-                  <p>
+                  <p className="min-w-0 break-words">
                     <span className="text-muted-foreground">Address:</span>{" "}
                     {venue.contact.registeredAddress?.trim()
                       ? venue.contact.registeredAddress
                       : NOT_PROVIDED}
                   </p>
                 </div>
-                <div className="space-y-2">
+                <div className="min-w-0 space-y-2">
                   <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
                     Business
                   </p>
-                  <p>
+                  <p className="min-w-0">
                     <span className="text-muted-foreground">VAT:</span>{" "}
-                    {venue.businessDocuments.vatNumber?.trim()
-                      ? venue.businessDocuments.vatNumber
-                      : NOT_PROVIDED}
+                    <span className="break-all">
+                      {venue.businessDocuments.vatNumber?.trim()
+                        ? venue.businessDocuments.vatNumber
+                        : NOT_PROVIDED}
+                    </span>
                   </p>
                   <p className="flex items-center gap-2">
                     <span className="text-muted-foreground">KYC:</span>
@@ -440,28 +493,190 @@ export function ManageVenueDetails({ venue }: ManageVenueDetailsProps) {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-5 pt-0">
-              <div>
-                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-3">
-                  Recently added events
-                </p>
-                {venue.recentEvents.length > 0 ? (
-                  <ul className="space-y-2.5 text-sm">
-                    {venue.recentEvents.map((evt, i) => (
-                      <li key={i}>
-                        {evt.title} – {evt.date}
-                      </li>
-                    ))}
-                  </ul>
-                ) : (
-                  <p className="text-sm text-muted-foreground">
-                    No events added yet.
+              <div className="space-y-5">
+                <div>
+                  <p className="text-sm font-semibold text-foreground mb-3">
+                    Pending event approvals
                   </p>
-                )}
+                  {pendingApprovalEvents.length > 0 ? (
+                    <ul className="space-y-3 text-sm">
+                      {pendingApprovalEvents.map((evt) => (
+                        <li
+                          key={evt.id}
+                          className="flex flex-col gap-2 rounded-lg border border-amber-200/80 bg-amber-50/50 px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between"
+                        >
+                          <span className="min-w-0 text-foreground space-y-1">
+                            <span className="block">
+                              <span className="font-medium">{evt.title}</span>
+                              <span className="text-muted-foreground">
+                                {" "}
+                                – {evt.date}
+                              </span>
+                            </span>
+                            {evt.locationAddress ? (
+                              <span className="block text-xs text-muted-foreground break-words">
+                                {evt.locationAddress}
+                              </span>
+                            ) : null}
+                          </span>
+                          <Button
+                            variant="event-primary"
+                            size="sm"
+                            className="w-full shrink-0 gap-1.5 sm:w-auto"
+                            asChild
+                          >
+                            <Link
+                              href={`/admin/events/${evt.id}?fromVendor=${venue.id}`}
+                            >
+                              Review
+                            </Link>
+                          </Button>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">
+                      No events awaiting approval.
+                    </p>
+                  )}
+                </div>
+
+                <div className="border-t border-slate-100 pt-5">
+                  <div className="flex items-center justify-between gap-3 mb-3">
+                    <p className="text-sm font-semibold text-foreground">
+                      Event cancellation requests
+                    </p>
+                    <span className="inline-flex rounded-md border border-slate-200 bg-slate-50 px-2 py-0.5 text-xs font-medium text-slate-600">
+                      {cancellationRequests.length} request
+                      {cancellationRequests.length === 1 ? "" : "s"}
+                    </span>
+                  </div>
+                  {cancellationRequests.length > 0 ? (
+                    <div className="max-h-[420px] overflow-y-auto overflow-x-hidden rounded-md border border-slate-100 bg-slate-50/30 p-2 pr-1">
+                      <ul className="space-y-3 text-sm">
+                        {cancellationRequests.map((request) => {
+                          const isPending = request.status === "pending_review";
+                          const canApprove = isPending && request.actions.canApprove;
+                          const isApprovingThis =
+                            approveCancellationMutation.isPending &&
+                            approvingEventDateId === request.eventDateId;
+                          return (
+                            <li
+                              key={`${request.eventId}-${request.eventDateId}`}
+                              className="rounded-lg border border-slate-200/80 bg-slate-50/50 px-3 py-3"
+                            >
+                            <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                              <div className="min-w-0">
+                                <p className="font-medium text-foreground">
+                                  {request.eventName}
+                                  <span className="text-muted-foreground font-normal">
+                                    {" "}
+                                    - {request.eventDate}
+                                  </span>
+                                </p>
+                                <p className="mt-1 text-xs text-muted-foreground">
+                                  Requested by {request.requestedBy} on{" "}
+                                  {request.requestedAt}
+                                </p>
+                              </div>
+                              <span
+                                className={cn(
+                                  "inline-flex w-fit rounded-md px-2 py-0.5 text-xs font-medium shrink-0",
+                                  request.status === "pending_review" &&
+                                    "bg-amber-100 text-amber-700",
+                                  request.status === "approved" &&
+                                    "bg-emerald-100 text-emerald-700",
+                                )}
+                              >
+                                {request.status === "pending_review"
+                                  ? "Pending review"
+                                  : "Approved"}
+                              </span>
+                            </div>
+
+                            <div className="mt-3 rounded-md border border-slate-200 bg-white px-3 py-2.5">
+                              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground mb-1">
+                                Cancellation reason
+                              </p>
+                              <p className="text-sm text-foreground leading-relaxed">
+                                {request.cancellationReason?.trim()
+                                  ? request.cancellationReason
+                                  : "No reason provided by vendor."}
+                              </p>
+                            </div>
+
+                              {canApprove ? (
+                                <div className="mt-3 flex flex-wrap gap-2">
+                                  <Button
+                                    variant="event-primary"
+                                    size="sm"
+                                    className="gap-1.5"
+                                    onClick={() =>
+                                      approveCancellationMutation.mutate({
+                                        eventId: request.eventId,
+                                        eventDateId: request.eventDateId,
+                                      })
+                                    }
+                                    disabled={isApprovingThis}
+                                  >
+                                    {isApprovingThis ? "Approving..." : "Approve"}
+                                  </Button>
+                                </div>
+                              ) : null}
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    </div>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">
+                      No cancellation requests yet.
+                    </p>
+                  )}
+                </div>
+
+                <div className="border-t border-slate-100 pt-5">
+                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-3">
+                    Approved live events
+                  </p>
+                  {recentActivityEvents.length > 0 ? (
+                    <div className="max-h-60 overflow-y-auto overflow-x-hidden rounded-md border border-slate-100 bg-slate-50/40 px-2 py-2 pr-1">
+                      <ul className="space-y-2.5 text-sm">
+                        {recentActivityEvents.map((evt) => (
+                          <li
+                            key={evt.id}
+                            className="rounded-md border border-slate-200/80 bg-white/70 px-3 py-2"
+                          >
+                            <p className="text-foreground">
+                              <span className="font-medium">{evt.title}</span>
+                              <span className="text-muted-foreground">
+                                {" "}
+                                – {evt.date}
+                              </span>
+                            </p>
+                            {evt.locationAddress ? (
+                              <p className="mt-1 text-xs text-muted-foreground break-words">
+                                {evt.locationAddress}
+                              </p>
+                            ) : null}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">
+                      {venue.recentEvents.length === 0
+                        ? "No events added yet."
+                        : "No approved live events to show."}
+                    </p>
+                  )}
+                </div>
+
                 {canImpersonateVendor && (
                   <Button
                     variant="event-primary"
                     size="sm"
-                    className="mt-3 gap-2"
+                    className="gap-2"
                     onClick={() => setLoginToVenueOpen(true)}
                   >
                     <LogIn className="h-4 w-4" />
@@ -500,7 +715,7 @@ export function ManageVenueDetails({ venue }: ManageVenueDetailsProps) {
                   <SelectContent>
                     {venue.locations.map((loc) => (
                       <SelectItem key={loc.id} value={String(loc.id)}>
-                        {loc.name}
+                        {formatVenueLocationLabel(loc)}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -509,19 +724,14 @@ export function ManageVenueDetails({ venue }: ManageVenueDetailsProps) {
               {selectedLocation && (
                 <div className="rounded-lg border border-slate-200 bg-slate-50/50 p-4 text-sm space-y-1">
                   <p className="font-medium text-foreground">
-                    {selectedLocation.name}
+                    {formatVenueLocationVenueTitle(selectedLocation)}
                   </p>
                   <p className="text-muted-foreground">
                     {selectedLocation.address}
                   </p>
-                  {(selectedLocation.city || selectedLocation.postcode) && (
+                  {locationLocalityLine && (
                     <p className="text-muted-foreground">
-                      {[selectedLocation.city, selectedLocation.postcode]
-                        .filter(Boolean)
-                        .join(", ")}
-                      {selectedLocation.country
-                        ? `, ${selectedLocation.country}`
-                        : ""}
+                      {locationLocalityLine}
                     </p>
                   )}
                 </div>
@@ -536,7 +746,7 @@ export function ManageVenueDetails({ venue }: ManageVenueDetailsProps) {
                 </CardTitle>
                 {selectedLocation && (
                   <p className="text-xs text-muted-foreground font-normal mt-1 text-left">
-                    Per: {selectedLocation.name}
+                    Per: {formatVenueLocationLabel(selectedLocation)}
                   </p>
                 )}
               </CardHeader>

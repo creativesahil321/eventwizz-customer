@@ -25,6 +25,7 @@ export default function LocationSelectionHeader({
 }: LocationSelectionHeaderProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [dropdownOpen, setDropdownOpen] = useState(false); // State for controlling dropdown visibility
+  const [isScrolled, setIsScrolled] = useState(false);
   const { settings, isLoading: isDomainLoading } = useDomain();
 
   const allLocations = settings?.locations || [];
@@ -48,7 +49,7 @@ export default function LocationSelectionHeader({
         setDropdownOpen(false);
       }
     },
-    [mobileMenuOpen, dropdownOpen]
+    [mobileMenuOpen, dropdownOpen],
   );
 
   useEffect(() => {
@@ -59,10 +60,25 @@ export default function LocationSelectionHeader({
     };
   }, [handleClickOutside]);
 
+  useEffect(() => {
+    const handleScroll = () => {
+      setIsScrolled(window.scrollY > 50);
+    };
+
+    window.addEventListener("scroll", handleScroll);
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
+
   return (
-    <header className="relative z-30">
+    <header
+      className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 text-[var(--color-on-header)] ${
+        isScrolled
+          ? "bg-[color:var(--color-header)] shadow-md"
+          : "bg-transparent"
+      }`}
+    >
       {/* Main header */}
-      <div className="bg-white/95 backdrop-blur-sm text-gray-900 py-4 border-b border-gray-200 shadow-sm">
+      <div className="py-4">
         <div className="container mx-auto flex items-center justify-between px-4">
           <motion.div
             className="flex items-center"
@@ -77,7 +93,7 @@ export default function LocationSelectionHeader({
                 alt={name || "EventWizz"}
               />
             ) : (
-              <h1 className="text-xl font-bold text-gray-900">
+              <h1 className="text-xl font-bold text-[var(--color-on-header)]">
                 {name || "EventWizz"}
               </h1>
             )}
@@ -89,20 +105,17 @@ export default function LocationSelectionHeader({
               <div className="flex items-center gap-2">
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <Button
-                      size="sm"
-                      className="flex items-center gap-2 px-4 py-2 bg-gray-900 text-white font-medium border-0 rounded-lg hover:bg-gray-800 transition-colors"
-                    >
+                    <Button size="sm" variant="event-primary">
                       <span>Book Now</span>
                       <ChevronDown size={14} />
                     </Button>
                   </DropdownMenuTrigger>
-                  <DropdownMenuContent className="bg-white border border-gray-200 text-gray-900 p-2 rounded-lg shadow-lg w-48">
-                    <div className="py-1 px-2 text-xs text-gray-500 border-b border-gray-200 mb-1">
+                  <DropdownMenuContent className="bg-[var(--color-header)] border border-[var(--color-primary)] text-[var(--color-on-header)] p-2 rounded-lg shadow-lg w-48">
+                    <div className="py-1 px-2 text-xs text-[var(--color-on-header)]/70 border-b border-[var(--color-primary)]/30 mb-1">
                       Select a location
                     </div>
                     {isLoading ? (
-                      <div className="py-2 px-2 text-sm text-gray-600">
+                      <div className="py-2 px-2 text-sm text-[var(--color-on-header)]/70">
                         Loading locations...
                       </div>
                     ) : allLocations.length > 0 ? (
@@ -111,8 +124,8 @@ export default function LocationSelectionHeader({
                           "city" in location && location.city
                             ? location.city
                             : "name" in location && location.name
-                            ? location.name
-                            : "Unknown Location";
+                              ? location.name
+                              : "Unknown Location";
 
                         const locationSlug =
                           "slug" in location && location.slug
@@ -123,17 +136,20 @@ export default function LocationSelectionHeader({
                           <DropdownMenuItem key={locationSlug} asChild>
                             <Link
                               href={`/${locationSlug}`}
-                              className="flex items-center gap-2 py-2 px-2 hover:bg-gray-100 rounded-md text-sm cursor-pointer transition-colors"
+                              className="flex items-center gap-2 py-2 px-2 hover:bg-[var(--color-primary)]/10 rounded-md text-sm cursor-pointer transition-colors"
                               onClick={() => setMobileMenuOpen(false)}
                             >
-                              <MapPin size={14} className="text-gray-600" />
+                              <MapPin
+                                size={14}
+                                className="text-[var(--color-on-header)]/70"
+                              />
                               <span>{locationName as string}</span>
                             </Link>
                           </DropdownMenuItem>
                         );
                       })
                     ) : (
-                      <div className="py-2 px-2 text-sm text-gray-600">
+                      <div className="py-2 px-2 text-sm text-[var(--color-on-header)]/70">
                         No locations available
                       </div>
                     )}
@@ -144,7 +160,7 @@ export default function LocationSelectionHeader({
 
             {/* Mobile menu button */}
             <button
-              className="md:hidden p-2 rounded-md hover:bg-gray-100 transition-colors"
+              className="md:hidden p-2 rounded-md hover:bg-[var(--color-primary)]/10 transition-colors"
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
               aria-label="Toggle mobile menu"
             >
@@ -157,7 +173,7 @@ export default function LocationSelectionHeader({
       {/* Mobile menu */}
       {mobileMenuOpen && (
         <motion.div
-          className="md:hidden absolute top-full left-0 w-full bg-white/95 backdrop-blur-sm border-b border-gray-200 shadow-lg mobile-dropdown"
+          className="md:hidden absolute top-full left-0 w-full bg-[var(--color-header)]/95 backdrop-blur-sm border-b border-[var(--color-primary)]/30 shadow-lg mobile-dropdown"
           initial={{ opacity: 0, height: 0 }}
           animate={{ opacity: 1, height: "auto" }}
           exit={{ opacity: 0, height: 0 }}
@@ -169,7 +185,7 @@ export default function LocationSelectionHeader({
                 <DropdownMenuTrigger asChild>
                   <Button
                     size="sm"
-                    className="flex items-center gap-2 px-4 py-2 bg-gray-900 text-white font-medium border-0 rounded-lg hover:bg-gray-800 transition-colors book-now-btn"
+                    className="flex items-center gap-2 px-4 py-2 bg-[var(--color-primary)] text-[var(--color-text)] font-medium border border-[var(--color-primary)] rounded-lg hover:opacity-90 transition-opacity book-now-btn"
                     onClick={(e) => {
                       e.stopPropagation();
                       setDropdownOpen(!dropdownOpen);
@@ -182,12 +198,12 @@ export default function LocationSelectionHeader({
                   </Button>
                 </DropdownMenuTrigger>
                 {dropdownOpen && (
-                  <DropdownMenuContent className="bg-white border border-gray-200 text-gray-900 p-2 rounded-lg shadow-lg w-full">
-                    <div className="py-1 px-2 text-xs text-gray-500 border-b border-gray-200 mb-1">
+                  <DropdownMenuContent className="bg-[var(--color-header)] border border-[var(--color-primary)] text-[var(--color-on-header)] p-2 rounded-lg shadow-lg w-full">
+                    <div className="py-1 px-2 text-xs text-[var(--color-on-header)]/70 border-b border-[var(--color-primary)]/30 mb-1">
                       Select a location
                     </div>
                     {isLoading ? (
-                      <div className="py-2 px-2 text-sm text-gray-600">
+                      <div className="py-2 px-2 text-sm text-[var(--color-on-header)]/70">
                         Loading locations...
                       </div>
                     ) : allLocations.length > 0 ? (
@@ -196,8 +212,8 @@ export default function LocationSelectionHeader({
                           "city" in location && location.city
                             ? location.city
                             : "name" in location && location.name
-                            ? location.name
-                            : "Unknown Location";
+                              ? location.name
+                              : "Unknown Location";
 
                         const locationSlug =
                           "slug" in location && location.slug
@@ -208,17 +224,20 @@ export default function LocationSelectionHeader({
                           <DropdownMenuItem key={locationSlug} asChild>
                             <Link
                               href={`/${locationSlug}`}
-                              className="flex items-center gap-2 py-2 px-2 hover:bg-gray-100 rounded-md text-sm transition-colors"
+                              className="flex items-center gap-2 py-2 px-2 hover:bg-[var(--color-primary)]/10 rounded-md text-sm transition-colors"
                               onClick={() => setDropdownOpen(false)}
                             >
-                              <MapPin size={14} className="text-gray-600" />
+                              <MapPin
+                                size={14}
+                                className="text-[var(--color-on-header)]/70"
+                              />
                               <span>{locationName as string}</span>
                             </Link>
                           </DropdownMenuItem>
                         );
                       })
                     ) : (
-                      <div className="py-2 px-2 text-sm text-gray-600">
+                      <div className="py-2 px-2 text-sm text-[var(--color-on-header)]/70">
                         No locations available
                       </div>
                     )}

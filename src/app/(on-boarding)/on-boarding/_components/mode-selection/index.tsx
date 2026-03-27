@@ -94,7 +94,7 @@ export default function ModeSelection({ onSelectMode }: ModeSelectionProps) {
             <img
               src={logoPath}
               alt="EventWizz"
-              className="h-10 w-auto object-contain"
+              className="h-10 w-auto object-contain [filter:drop-shadow(0_0_1px_white)_drop-shadow(0_0_6px_rgba(255,255,255,0.65))_drop-shadow(0_0_14px_rgba(255,255,255,0.35))]"
             />
           </div>
 

@@ -230,7 +230,7 @@ export default function PublishTab() {
       {isLoading ? (
         <SavingState
           title="Saving your event..."
-          description="Please wait while we save your publish settings. You'll be notified when it's done."
+          description="We're securing your publish settings and updating the event. You'll be redirected when complete."
         />
       ) : (
         <Form {...form}>

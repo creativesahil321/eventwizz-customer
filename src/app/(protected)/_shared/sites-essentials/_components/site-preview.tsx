@@ -11,7 +11,6 @@ import RecentEventsGlimpse from "@/app/(public)/vendor/_components/EventListPage
 import ContactFormSection from "@/app/(public)/vendor/_components/EventListPage/contact-form-section";
 import UpcomingEvents from "@/app/(public)/vendor/_components/EventListPage/upcoming-event";
 import FooterSection from "@/app/(public)/vendor/_components/EventListPage/footer";
-import SubscribeSection from "@/app/(public)/vendor/_components/EventListPage/subscribe";
 // ServerContext removed - already provided at layout level
 
 interface SitePreviewProps {
@@ -64,7 +63,7 @@ export function SitePreview({ formValues }: Readonly<SitePreviewProps>) {
     >
       {/* ServerContext already provided at layout level - no need to wrap again */}
       <CommonHeader
-        logo={formValues.logo}
+        logo={getPreviewUrl(formValues.logo) || null}
         contact_number={""}
         variant="preview"
       />
@@ -100,8 +99,10 @@ export function SitePreview({ formValues }: Readonly<SitePreviewProps>) {
         longitude={0}
         latitude={0}
       />
-      <SubscribeSection />
-      <FooterSection copyright={formValues.copyright} />
+      <FooterSection
+        copyright={formValues.copyright}
+        logo={getPreviewUrl(formValues.logo) || null}
+      />
     </div>
   );
 }

@@ -1,6 +1,11 @@
 "use client";
 
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import {
+  useQuery,
+  useMutation,
+  useQueryClient,
+  type QueryClient,
+} from "@tanstack/react-query";
 import { request } from "@/services/core/api-client";
 import { API_ENDPOINTS } from "@/services/core/endpoints";
 import { ApiResponse } from "@/services/core/api-client";
@@ -13,6 +18,30 @@ export const eventKeys = {
   all: ["event"] as const,
   data: (eventId?: string) => [eventKeys.all, "data", eventId] as const,
 };
+
+const EVENT_DATA_CHANGED = "event-data-changed";
+
+/** One listener for the whole app — avoids N refetches when N components use `useEventData`. */
+let eventDataChangedSubscribers = 0;
+let eventDataChangedHandler: (() => void) | null = null;
+
+function attachEventDataChangedListener(qc: QueryClient) {
+  eventDataChangedSubscribers++;
+  if (eventDataChangedSubscribers !== 1) return;
+
+  eventDataChangedHandler = () => {
+    void qc.invalidateQueries({ queryKey: eventKeys.all });
+  };
+  window.addEventListener(EVENT_DATA_CHANGED, eventDataChangedHandler);
+}
+
+function detachEventDataChangedListener() {
+  eventDataChangedSubscribers = Math.max(0, eventDataChangedSubscribers - 1);
+  if (eventDataChangedSubscribers !== 0 || !eventDataChangedHandler) return;
+
+  window.removeEventListener(EVENT_DATA_CHANGED, eventDataChangedHandler);
+  eventDataChangedHandler = null;
+}
 
 // Function to fetch event data
 async function fetchEventData(
@@ -121,23 +150,13 @@ export function useEventData(eventId?: string) {
       await queryClient.invalidateQueries({
         queryKey: eventKeys.data(eventId),
       });
-      return await refetch();
     },
   });
 
-  // Listen for the custom event from onboardingService.notifyDataChanged
   useEffect(() => {
-    const handleDataChanged = () => {
-      console.log("Data changed event received, refetching...");
-      refetch();
-    };
-
-    window.addEventListener("event-data-changed", handleDataChanged);
-
-    return () => {
-      window.removeEventListener("event-data-changed", handleDataChanged);
-    };
-  }, [refetch]);
+    attachEventDataChangedListener(queryClient);
+    return () => detachEventDataChangedListener();
+  }, [queryClient]);
 
   return {
     eventData,

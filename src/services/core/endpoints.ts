@@ -62,6 +62,7 @@ export const API_ENDPOINTS = {
       GET_MENU_CATEGORIES: "/vendor/event-menus",
       CREATE_MENU_CATEGORY: "/vendor/event-menus/store",
       BULK_UPDATE_STATUS: "/vendor/events/bulk-update-status",
+      BULK_DELETE: "/vendor/events/bulk-delete",
       GET_EVENT_OVERVIEW:
         "/vendor/events/{eventId}/overview?date_status={date_status}&date_filter={date_filter}",
     },
@@ -265,6 +266,14 @@ export const API_ENDPOINTS = {
       RESET_PASSWORD: "/admin/venues/{id}/reset-password",
       FORCE_LOGOUT: "/admin/venues/{id}/force-logout",
     },
+    EVENTS: {
+      SHOW: "/admin/events/{eventId}",
+      APPROVE: "/admin/events/{eventId}/approve",
+      REJECT: "/admin/events/{eventId}/reject",
+      REQUEST_CHANGES: "/admin/events/{eventId}/request-changes",
+      APPROVE_DATE_CANCELLATION:
+        "/admin/events/{eventId}/dates/{dateId}/approve-cancellation",
+    },
     IMPERSONATION: {
       START: "/admin/impersonate/vendor",
       EXIT: "/admin/impersonate/exit",
@@ -388,6 +397,10 @@ export const API_ENDPOINTS = {
     COMMISSION: {
       LIST: "/admin/commission",
       HISTORY: "admin/manual-commission-history",
+    },
+    COMMISSIONS: {
+      LIST: "/admin/commissions",
+      EXPORT: "/admin/commissions/export",
     },
     PROFILE: {
       GET: "/admin/profile",

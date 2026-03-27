@@ -32,6 +32,38 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { setEventIdInForm } from "../../../_lib/hooks/useEventId";
 import { VideoFormatInfo } from "@/components/shared/video-format-info";
 import { addCacheBusting } from "@/lib/image-utils";
+import { cn } from "@/lib/utils";
+import { BANNER_HEADING_MAX_WORDS, countWords } from "@/lib/word-count";
+import { useGuidedOnboardingSections } from "../../../_lib/hooks/use-guided-onboarding-sections";
+import type { GuidedSectionConfig } from "../../../_lib/hooks/use-guided-onboarding-sections";
+import {
+  GuidedMultiSectionBottomActions,
+  GuidedSectionChips,
+} from "../../guided-section-chips";
+import {
+  GuidedSectionActionFooter,
+  GuidedSectionCoreActions,
+  guidedOnboardingSaveNextButtonClass,
+} from "../../guided-sticky-approval-bar";
+import { guidedSectionSurfaceClass } from "../../guided-section-surface";
+
+function resolveStepThreeErrorIndex(keys: string[]) {
+  if (keys.some((k) => k === "__extra_validation__")) return 1;
+  if (keys.some((k) => k === "event_name" || k === "event_category_id"))
+    return 0;
+  if (
+    keys.some(
+      (k) =>
+        k.startsWith("event_banner") ||
+        k.includes("remove_event") ||
+        k === "event_banner_image" ||
+        k === "event_banner_video",
+    )
+  )
+    return 1;
+  if (keys.some((k) => k.startsWith("about_event"))) return 2;
+  return 3;
+}
 
 export default function StepThree() {
   const {
@@ -123,7 +155,7 @@ export default function StepThree() {
       return "";
     }
     const selectedCategory = eventCategories.find(
-      (category) => category.id === selectedCategoryId
+      (category) => category.id === selectedCategoryId,
     );
     return selectedCategory?.name || "";
   }, [eventCategories, selectedCategoryId]);
@@ -179,6 +211,82 @@ export default function StepThree() {
     }
   }, [globalForm]);
 
+  const sectionConfigs = useMemo((): GuidedSectionConfig<StepThreeType>[] => {
+    return [
+      {
+        id: "event-details",
+        label: "Event details",
+        description: "Event name and category.",
+        fields: ["event_name", "event_category_id"],
+      },
+      {
+        id: "event-hero",
+        label: "Banner",
+        description: "Cover image or video and banner headings.",
+        fields: ["event_banner_heading", "event_banner_sub_heading"],
+        validate: async () => {
+          const img = form.getValues("event_banner_image");
+          const vid = form.getValues("event_banner_video");
+          const hasMedia = Boolean(
+            headerBannerUrl ||
+            headerBannerFile.length > 0 ||
+            img instanceof File ||
+            (typeof img === "string" && img.length > 0) ||
+            bannerVideoUrl ||
+            bannerVideoFile.length > 0 ||
+            vid instanceof File ||
+            (typeof vid === "string" && String(vid).length > 0),
+          );
+          if (!hasMedia) {
+            toast.error(
+              "Please upload an image or video for your event banner.",
+            );
+            return false;
+          }
+          return true;
+        },
+      },
+      {
+        id: "about-event",
+        label: "About the event",
+        description: "Headings and description for your event page.",
+        fields: [
+          "about_event_heading",
+          "about_event_sub_heading",
+          "about_event_description",
+        ],
+      },
+      {
+        id: "schedule",
+        label: "Schedule",
+        description: "Scheduler title and time slots.",
+        fields: ["event_schedular_title", "event_schedular"],
+      },
+    ];
+  }, [
+    form,
+    headerBannerUrl,
+    headerBannerFile.length,
+    bannerVideoUrl,
+    bannerVideoFile.length,
+  ]);
+
+  const validateFullStepThree = useCallback(async () => {
+    const data = form.getValues();
+    if (!data.event_banner_image && !data.event_banner_video) {
+      toast.error("Please upload an image or video for your event banner.");
+      return false;
+    }
+    return true;
+  }, [form]);
+
+  const guided = useGuidedOnboardingSections({
+    form,
+    sections: sectionConfigs,
+    resolveErrorSectionIndex: resolveStepThreeErrorIndex,
+    validateFullStep: validateFullStepThree,
+  });
+
   // Handle banner image change
   const handleHeaderBannerFileChange = useCallback(
     (files: File[], onChange: (value: File | undefined) => void) => {
@@ -217,7 +325,7 @@ export default function StepThree() {
         }
       }, 300);
     },
-    [form, globalForm]
+    [form, globalForm],
   );
 
   // Handle banner video change
@@ -283,7 +391,7 @@ export default function StepThree() {
         setBannerVideoUploading(false);
       }
     },
-    [form, globalForm]
+    [form, globalForm],
   );
 
   // Handle banner image removal
@@ -294,13 +402,13 @@ export default function StepThree() {
       onChange(undefined);
       globalForm.setValue(
         "stepThree.event_banner_image",
-        undefined as unknown as File
+        undefined as unknown as File,
       );
       // Set removal flag
       globalForm.setValue("stepThree.remove_event_banner_image", true);
       form.setValue("remove_event_banner_image", true);
     },
-    [globalForm, form, setHeaderBannerFile, setHeaderBannerUrl]
+    [globalForm, form, setHeaderBannerFile, setHeaderBannerUrl],
   );
 
   // Handle banner video removal
@@ -315,7 +423,7 @@ export default function StepThree() {
       globalForm.setValue("stepThree.remove_event_banner_video", true);
       form.setValue("remove_event_banner_video", true);
     },
-    [globalForm, form, setBannerVideoFile, setBannerVideoUrl, setBannerType]
+    [globalForm, form, setBannerVideoFile, setBannerVideoUrl, setBannerType],
   );
 
   useEffect(() => {
@@ -378,15 +486,15 @@ export default function StepThree() {
       ];
 
       const missingFields = requiredFields.filter(
-        (field) => !data[field as keyof StepThreeType]
+        (field) => !data[field as keyof StepThreeType],
       );
 
       if (missingFields.length > 0) {
         // Show toast with specific missing fields
         toast.error(
           `Please fill in the following required fields: ${missingFields.join(
-            ", "
-          )}`
+            ", ",
+          )}`,
         );
         // Trigger validation to show error messages on the form
         await form.trigger(missingFields as (keyof StepThreeType)[]);
@@ -398,7 +506,7 @@ export default function StepThree() {
       if (data.event_schedular && data.event_schedular.length > 0) {
         // Check for sequence
         const validSchedules = data.event_schedular.filter(
-          (schedule) => schedule.time && schedule.title
+          (schedule) => schedule.time && schedule.title,
         );
         for (let i = 0; i < validSchedules.length - 1; i++) {
           const currentTime = validSchedules[i].time;
@@ -448,11 +556,11 @@ export default function StepThree() {
 
         // Map the error field names to user-friendly labels
         const errorLabels = errorFields.map(
-          (field) => fieldLabels[field] || field
+          (field) => fieldLabels[field] || field,
         );
 
         toast.error(
-          `Please correct the highlighted fields: ${errorLabels.join(", ")}`
+          `Please correct the highlighted fields: ${errorLabels.join(", ")}`,
         );
         setLoading(false);
         return;
@@ -462,18 +570,18 @@ export default function StepThree() {
       console.log("📤 Event banner image in form:", data.event_banner_image);
       console.log(
         "📤 Event banner image is File?:",
-        data.event_banner_image instanceof File
+        data.event_banner_image instanceof File,
       );
       console.log(
         "📤 Event banner image is Blob?:",
-        data.event_banner_image instanceof Blob
+        data.event_banner_image instanceof Blob,
       );
       console.log("📤 Event banner video in form:", data.event_banner_video);
 
       // SAFETY CHECK: Ensure banner image is included
       if (headerBannerFile.length > 0 && !data.event_banner_image) {
         console.warn(
-          "⚠️ Event banner image in state but not in form data, adding manually"
+          "⚠️ Event banner image in state but not in form data, adding manually",
         );
         data.event_banner_image = headerBannerFile[0];
       }
@@ -481,7 +589,7 @@ export default function StepThree() {
       // SAFETY CHECK: Ensure banner video is included
       if (bannerVideoFile.length > 0 && !data.event_banner_video) {
         console.warn(
-          "⚠️ Event banner video in state but not in form data, adding manually"
+          "⚠️ Event banner video in state but not in form data, adding manually",
         );
         data.event_banner_video = bannerVideoFile[0];
       }
@@ -584,27 +692,391 @@ export default function StepThree() {
               onSubmit={form.handleSubmit(handleSubmit)}
               className="space-y-6"
             >
+              <GuidedSectionChips
+                sections={guided.sectionFlow.map((s) => ({
+                  id: s.id,
+                  label: s.label,
+                  description: s.description,
+                }))}
+                currentSectionIndex={guided.currentSectionIndex}
+                approvedSections={guided.approvedSections}
+                isChipInteractive={guided.isChipInteractive}
+                onChipClick={guided.handleChipClick}
+              />
               <input type="hidden" {...form.register("step")} />
               <input type="hidden" {...form.register("vendor_location_id")} />
 
-              <section className="mb-6">
-                <OnboardingSectionTitle>Event Details</OnboardingSectionTitle>
-                <div className="mt-4 space-y-4">
-                  {/* Event Name field */}
-                  <FormField
-                    control={form.control}
-                    name="event_name"
-                    render={({ field }) => {
-                      const currentLength = field.value?.length || 0;
-                      const maxLength = 40;
-                      return (
+              <section
+                data-guided-section="event-details"
+                tabIndex={-1}
+                className={guidedSectionSurfaceClass(
+                  guided.currentSectionIndex === 0,
+                  "mb-6",
+                )}
+              >
+                <fieldset
+                  disabled={guided.currentSectionIndex !== 0}
+                  className={cn(
+                    "min-w-0 border-0 p-0 m-0",
+                    guided.currentSectionIndex !== 0 && "pointer-events-none",
+                  )}
+                >
+                  <OnboardingSectionTitle>Event Details</OnboardingSectionTitle>
+                  <div className="mt-4 space-y-4">
+                    {/* Event Name field */}
+                    <FormField
+                      control={form.control}
+                      name="event_name"
+                      render={({ field }) => {
+                        const currentLength = field.value?.length || 0;
+                        const maxLength = 40;
+                        return (
+                          <FormItem>
+                            <FormLabel className="text-md font-medium">
+                              Event Name <span className="text-red-400">*</span>
+                            </FormLabel>
+                            <FormControl>
+                              <Input
+                                placeholder="Enter your event name"
+                                {...field}
+                                value={
+                                  typeof field.value === "string"
+                                    ? field.value
+                                    : ""
+                                }
+                                maxLength={maxLength}
+                                onFocus={() => handleFieldFocus("event_name")}
+                                onChange={(e) => {
+                                  field.onChange(e);
+                                  globalForm.setValue(
+                                    "stepThree.event_name",
+                                    e.target.value,
+                                  );
+                                }}
+                              />
+                            </FormControl>
+                            <div className="text-xs text-muted-foreground mt-1">
+                              <span
+                                className={
+                                  currentLength > maxLength
+                                    ? "text-destructive"
+                                    : ""
+                                }
+                              >
+                                {currentLength}/{maxLength} characters
+                              </span>
+                            </div>
+                            <FormMessage />
+                          </FormItem>
+                        );
+                      }}
+                    />
+
+                    {/* Event Category field */}
+                    <Controller
+                      control={form.control}
+                      name="event_category_id"
+                      render={({ field }) => (
                         <FormItem>
                           <FormLabel className="text-md font-medium">
-                            Event Name <span className="text-red-400">*</span>
+                            Event Category
+                          </FormLabel>
+                          <FormControl>
+                            <CategoryDropdown
+                              categories={eventCategories}
+                              onSelect={(value) => {
+                                field.onChange(Number(value));
+                                globalForm.setValue(
+                                  "stepThree.event_category_id",
+                                  Number(value),
+                                );
+                              }}
+                              isLoading={isCategoriesLoading}
+                              initialValue={initialCategoryId}
+                              onCategoryCreated={handleCategoryCreated}
+                            />
+                          </FormControl>
+                          {form.formState.errors.event_category_id && (
+                            <FormMessage>
+                              {form.formState.errors.event_category_id.message}
+                            </FormMessage>
+                          )}
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                  <GuidedSectionActionFooter
+                    isActive={guided.currentSectionIndex === 0}
+                    hideSectionMeta
+                  >
+                    <GuidedSectionCoreActions guided={guided} />
+                  </GuidedSectionActionFooter>
+                </fieldset>
+              </section>
+
+              <section
+                data-guided-section="event-hero"
+                tabIndex={-1}
+                className={guidedSectionSurfaceClass(
+                  guided.currentSectionIndex === 1,
+                  "space-y-6",
+                )}
+              >
+                <fieldset
+                  disabled={guided.currentSectionIndex !== 1}
+                  className={cn(
+                    "min-w-0 border-0 p-0 m-0 space-y-6",
+                    guided.currentSectionIndex !== 1 && "pointer-events-none",
+                  )}
+                >
+                  <Tabs
+                    value={bannerType}
+                    onValueChange={(v) => setBannerType(v as "image" | "video")}
+                    className="w-full"
+                  >
+                    <TabsList className="grid w-full grid-cols-2">
+                      <TabsTrigger value="image">Image</TabsTrigger>
+                      <TabsTrigger value="video">Video</TabsTrigger>
+                    </TabsList>
+                    <TabsContent value="image">
+                      <FormField
+                        control={form.control}
+                        name="event_banner_image"
+                        render={({ field }) => (
+                          <FormItem>
+                            <OnboardingSectionTitle>
+                              Add a Cover Photo
+                              <span className="text-red-400">*</span>
+                            </OnboardingSectionTitle>
+                            <FormControl>
+                              <div
+                                className="flex flex-col justify-center items-center h-full space-y-2 bg-white/5 p-4 rounded-lg border border-white/10"
+                                onClick={() =>
+                                  handleFieldFocus("event_banner_image")
+                                }
+                              >
+                                {headerBannerUrl ? (
+                                  <div className="relative w-full">
+                                    <img
+                                      src={addCacheBusting(
+                                        headerBannerUrl as string,
+                                      )}
+                                      alt="Event Banner"
+                                      className="max-h-40 object-contain mx-auto mb-2"
+                                      width={100}
+                                      height={100}
+                                    />
+                                    <Button
+                                      type="button"
+                                      variant="destructive"
+                                      size="sm"
+                                      onClick={() =>
+                                        handleRemoveHeaderBanner(field.onChange)
+                                      }
+                                      className="mt-2"
+                                    >
+                                      Remove
+                                    </Button>
+                                  </div>
+                                ) : (
+                                  <>
+                                    <FileUploader
+                                      value={headerBannerFile}
+                                      onValueChange={(files) =>
+                                        handleHeaderBannerFileChange(
+                                          files,
+                                          field.onChange,
+                                        )
+                                      }
+                                      maxFileCount={1}
+                                      maxSize={2 * 1024 * 1024}
+                                      onRemove={() =>
+                                        handleRemoveHeaderBanner(field.onChange)
+                                      }
+                                      className="border-dashed"
+                                      enableCropping={true}
+                                      aspectRatio={21 / 9}
+                                      cropConfig={{
+                                        maxSizeKB: 600,
+                                        quality: 0.9,
+                                        maxWidth: 1920,
+                                        maxHeight: 823,
+                                      }}
+                                    />
+                                    {!headerBannerFile.length && (
+                                      <p className="text-sm text-gray-500 mt-2">
+                                        Upload a banner image for your event
+                                        header (required)
+                                      </p>
+                                    )}
+                                  </>
+                                )}
+                              </div>
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </TabsContent>
+                    <TabsContent value="video">
+                      <FormField
+                        control={form.control}
+                        name="event_banner_video"
+                        render={({ field }) => (
+                          <FormItem>
+                            <OnboardingSectionTitle>
+                              Add a Cover Video
+                              <span className="text-red-400">*</span>
+                            </OnboardingSectionTitle>
+                            <FormControl>
+                              <div
+                                className="flex flex-col justify-center items-center h-full space-y-2 bg-white/5 p-4 rounded-lg border border-white/10"
+                                onClick={() =>
+                                  handleFieldFocus("event_banner_video")
+                                }
+                              >
+                                {/* Display video preview if available */}
+                                {(bannerVideoFile.length > 0 ||
+                                  bannerVideoUrl) && (
+                                  <div className="relative w-full">
+                                    <video
+                                      src={
+                                        videoPreviewUrl || bannerVideoUrl || ""
+                                      }
+                                      controls
+                                      className="max-h-40 object-contain mx-auto mb-2"
+                                    />
+                                    <Button
+                                      type="button"
+                                      variant="destructive"
+                                      size="sm"
+                                      onClick={() =>
+                                        handleRemoveBannerVideo(field.onChange)
+                                      }
+                                      className="mt-2"
+                                    >
+                                      Remove
+                                    </Button>
+                                  </div>
+                                )}
+                                {/* File uploader for video */}
+                                {bannerVideoFile.length === 0 &&
+                                  !bannerVideoUrl && (
+                                    <FileUploader
+                                      value={bannerVideoFile}
+                                      onValueChange={(files) =>
+                                        handleBannerVideoChange(
+                                          files,
+                                          field.onChange,
+                                        )
+                                      }
+                                      maxFileCount={1}
+                                      maxSize={10 * 1024 * 1024} // 10MB for banner video
+                                      onRemove={() =>
+                                        handleRemoveBannerVideo(field.onChange)
+                                      }
+                                      className="border-dashed"
+                                      accept={{
+                                        "video/mp4": [".mp4"],
+                                        "video/webm": [".webm"],
+                                        "video/ogg": [".ogv"],
+                                        "video/quicktime": [".mov"],
+                                        "video/x-msvideo": [".avi"],
+                                        "video/x-matroska": [".mkv"],
+                                      }}
+                                      disabled={bannerVideoUploading}
+                                    />
+                                  )}
+                                {bannerVideoFile.length === 0 &&
+                                  !bannerVideoUrl && (
+                                    <>
+                                      <p className="text-sm text-gray-500 mt-2">
+                                        Upload a banner video for your event
+                                        header (MP4, WebM, or OGG format, max
+                                        10MB)
+                                      </p>
+                                      <div className="w-full mt-3">
+                                        <VideoFormatInfo variant="compact" />
+                                      </div>
+                                    </>
+                                  )}
+                              </div>
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </TabsContent>
+                  </Tabs>
+
+                  <FormField
+                    control={form.control}
+                    name="event_banner_heading"
+                    render={({ field }) => {
+                      const text =
+                        typeof field.value === "string" ? field.value : "";
+                      const headingWordCount = countWords(text);
+                      return (
+                        <FormItem>
+                          <FormLabel className="text-sm font-medium">
+                            Banner Heading{" "}
+                            <span className="text-red-400">*</span>
                           </FormLabel>
                           <FormControl>
                             <Input
-                              placeholder="Enter your event name"
+                              className="bg-gray-100"
+                              placeholder="Enter event title"
+                              {...field}
+                              value={
+                                typeof field.value === "string"
+                                  ? field.value
+                                  : ""
+                              }
+                              onFocus={() =>
+                                handleFieldFocus("event_banner_heading")
+                              }
+                              onChange={(e) => {
+                                field.onChange(e);
+                                globalForm.setValue(
+                                  "stepThree.event_banner_heading",
+                                  e.target.value,
+                                );
+                              }}
+                            />
+                          </FormControl>
+                          <div className="text-xs text-muted-foreground mt-1">
+                            <span
+                              className={
+                                headingWordCount > BANNER_HEADING_MAX_WORDS
+                                  ? "text-destructive"
+                                  : ""
+                              }
+                            >
+                              {headingWordCount}/{BANNER_HEADING_MAX_WORDS}{" "}
+                              words
+                            </span>
+                          </div>
+                          <FormMessage />
+                        </FormItem>
+                      );
+                    }}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="event_banner_sub_heading"
+                    render={({ field }) => {
+                      const currentLength = field.value?.length || 0;
+                      const maxLength = 80;
+                      return (
+                        <FormItem>
+                          <FormLabel className="text-sm font-medium">
+                            Write banner Sub-heading{" "}
+                            <span className="text-red-400">*</span>
+                          </FormLabel>
+                          <FormControl>
+                            <Input
+                              className="bg-gray-100"
+                              placeholder="Enter event title"
                               {...field}
                               value={
                                 typeof field.value === "string"
@@ -612,12 +1084,93 @@ export default function StepThree() {
                                   : ""
                               }
                               maxLength={maxLength}
-                              onFocus={() => handleFieldFocus("event_name")}
+                              onFocus={() =>
+                                handleFieldFocus("event_banner_sub_heading")
+                              }
                               onChange={(e) => {
                                 field.onChange(e);
                                 globalForm.setValue(
-                                  "stepThree.event_name",
-                                  e.target.value
+                                  "stepThree.event_banner_sub_heading",
+                                  e.target.value,
+                                );
+                              }}
+                            />
+                          </FormControl>
+                          <div className="text-xs text-muted-foreground mt-1">
+                            <span
+                              className={
+                                currentLength > maxLength
+                                  ? "text-destructive"
+                                  : ""
+                              }
+                            >
+                              {currentLength}/{maxLength} characters
+                            </span>
+                          </div>
+                          <FormMessage />
+                        </FormItem>
+                      );
+                    }}
+                  />
+                  <GuidedSectionActionFooter
+                    isActive={guided.currentSectionIndex === 1}
+                    hideSectionMeta
+                  >
+                    <GuidedSectionCoreActions guided={guided} />
+                  </GuidedSectionActionFooter>
+                </fieldset>
+              </section>
+
+              <section
+                data-guided-section="about-event"
+                tabIndex={-1}
+                className={guidedSectionSurfaceClass(
+                  guided.currentSectionIndex === 2,
+                  "space-y-4",
+                )}
+              >
+                <fieldset
+                  disabled={guided.currentSectionIndex !== 2}
+                  className={cn(
+                    "min-w-0 border-0 p-0 m-0 space-y-4",
+                    guided.currentSectionIndex !== 2 && "pointer-events-none",
+                  )}
+                >
+                  <OnboardingSectionTitle>
+                    Tell Guests What It’s About
+                  </OnboardingSectionTitle>
+
+                  {/* Title */}
+                  <FormField
+                    control={form.control}
+                    name="about_event_heading"
+                    render={({ field }) => {
+                      const currentLength = field.value?.length || 0;
+                      const maxLength = 50;
+                      return (
+                        <FormItem>
+                          <FormLabel className="text-sm font-medium">
+                            Title <span className="text-red-400">*</span>
+                          </FormLabel>
+                          <FormControl>
+                            <Input
+                              className="bg-gray-100"
+                              placeholder="Enter event title"
+                              {...field}
+                              value={
+                                typeof field.value === "string"
+                                  ? field.value
+                                  : ""
+                              }
+                              maxLength={maxLength}
+                              onFocus={() =>
+                                handleFieldFocus("about_event_heading")
+                              }
+                              onChange={(e) => {
+                                field.onChange(e);
+                                globalForm.setValue(
+                                  "stepThree.about_event_heading",
+                                  e.target.value,
                                 );
                               }}
                             />
@@ -639,527 +1192,211 @@ export default function StepThree() {
                     }}
                   />
 
-                  {/* Event Category field */}
-                  <Controller
+                  {/* Sub Title */}
+                  <FormField
                     control={form.control}
-                    name="event_category_id"
+                    name="about_event_sub_heading"
+                    render={({ field }) => {
+                      const currentLength = field.value?.length || 0;
+                      const maxLength = 80;
+                      return (
+                        <FormItem>
+                          <FormLabel className="text-sm font-medium">
+                            Sub Title
+                          </FormLabel>
+                          <FormControl>
+                            <Input
+                              className="bg-gray-100"
+                              placeholder="Enter event subtitle"
+                              {...field}
+                              value={
+                                typeof field.value === "string"
+                                  ? field.value
+                                  : ""
+                              }
+                              maxLength={maxLength}
+                              onFocus={() =>
+                                handleFieldFocus("about_event_sub_heading")
+                              }
+                              onChange={(e) => {
+                                field.onChange(e);
+                                globalForm.setValue(
+                                  "stepThree.about_event_sub_heading",
+                                  e.target.value,
+                                );
+                              }}
+                            />
+                          </FormControl>
+                          <div className="text-xs text-muted-foreground mt-1">
+                            <span
+                              className={
+                                currentLength > maxLength
+                                  ? "text-destructive"
+                                  : ""
+                              }
+                            >
+                              {currentLength}/{maxLength} characters
+                            </span>
+                          </div>
+                          <FormMessage />
+                        </FormItem>
+                      );
+                    }}
+                  />
+
+                  {/* Description */}
+                  <FormField
+                    control={form.control}
+                    name="about_event_description"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel className="text-md font-medium">
-                          Event Category
+                        <FormLabel className="text-sm font-medium">
+                          Description
                         </FormLabel>
                         <FormControl>
-                          <CategoryDropdown
-                            categories={eventCategories}
-                            onSelect={(value) => {
-                              field.onChange(Number(value));
+                          <TiptapEditor
+                            value={field.value}
+                            onChange={(value) => {
+                              field.onChange(value);
                               globalForm.setValue(
-                                "stepThree.event_category_id",
-                                Number(value)
+                                "stepThree.about_event_description",
+                                value,
                               );
                             }}
-                            isLoading={isCategoriesLoading}
-                            initialValue={initialCategoryId}
-                            onCategoryCreated={handleCategoryCreated}
+                            placeholder="Write a compelling description..."
+                            className="min-h-[120px] w-full overflow-hidden max-w-[300px]"
+                            maxLength={340}
+                            maxWords={50}
+                            showAIButton={true}
+                            wrapText={true}
+                            aiContext={{
+                              event_name: form.watch("event_name"),
+                              title: form.watch("about_event_heading"),
+                              sub_title: form.watch("about_event_sub_heading"),
+                              description: form.watch(
+                                "about_event_description",
+                              ),
+                              ctaText: form.watch("about_event_sub_heading"),
+                              event_category_name: currentEventCategoryName,
+                            }}
                           />
                         </FormControl>
-                        {form.formState.errors.event_category_id && (
-                          <FormMessage>
-                            {form.formState.errors.event_category_id.message}
-                          </FormMessage>
-                        )}
+                        <FormMessage />
                       </FormItem>
                     )}
                   />
-                </div>
+                  <GuidedSectionActionFooter
+                    isActive={guided.currentSectionIndex === 2}
+                    hideSectionMeta
+                  >
+                    <GuidedSectionCoreActions guided={guided} />
+                  </GuidedSectionActionFooter>
+                </fieldset>
               </section>
 
-              <Tabs
-                value={bannerType}
-                onValueChange={(v) => setBannerType(v as "image" | "video")}
-                className="w-full"
+              <section
+                data-guided-section="schedule"
+                tabIndex={-1}
+                className={guidedSectionSurfaceClass(
+                  guided.currentSectionIndex === 3,
+                  "space-y-6",
+                )}
               >
-                <TabsList className="grid w-full grid-cols-2">
-                  <TabsTrigger value="image">Image</TabsTrigger>
-                  <TabsTrigger value="video">Video</TabsTrigger>
-                </TabsList>
-                <TabsContent value="image">
-                  <FormField
-                    control={form.control}
-                    name="event_banner_image"
-                    render={({ field }) => (
-                      <FormItem>
-                        <OnboardingSectionTitle>
-                          Add a Cover Photo
-                          <span className="text-red-400">*</span>
-                        </OnboardingSectionTitle>
-                        <FormControl>
-                          <div
-                            className="flex flex-col justify-center items-center h-full space-y-2 bg-white/5 p-4 rounded-lg border border-white/10"
-                            onClick={() =>
-                              handleFieldFocus("event_banner_image")
-                            }
-                          >
-                            {headerBannerUrl ? (
-                              <div className="relative w-full">
-                                <img
-                                  src={addCacheBusting(
-                                    headerBannerUrl as string
-                                  )}
-                                  alt="Event Banner"
-                                  className="max-h-40 object-contain mx-auto mb-2"
-                                  width={100}
-                                  height={100}
-                                />
-                                <Button
-                                  type="button"
-                                  variant="destructive"
-                                  size="sm"
-                                  onClick={() =>
-                                    handleRemoveHeaderBanner(field.onChange)
-                                  }
-                                  className="mt-2"
-                                >
-                                  Remove
-                                </Button>
-                              </div>
-                            ) : (
-                              <>
-                                <FileUploader
-                                  value={headerBannerFile}
-                                  onValueChange={(files) =>
-                                    handleHeaderBannerFileChange(
-                                      files,
-                                      field.onChange
-                                    )
-                                  }
-                                  maxFileCount={1}
-                                  maxSize={2 * 1024 * 1024}
-                                  onRemove={() =>
-                                    handleRemoveHeaderBanner(field.onChange)
-                                  }
-                                  className="border-dashed"
-                                  enableCropping={true}
-                                  aspectRatio={21 / 9}
-                                  cropConfig={{
-                                    maxSizeKB: 600,
-                                    quality: 0.9,
-                                    maxWidth: 1920,
-                                    maxHeight: 823,
-                                  }}
-                                />
-                                {!headerBannerFile.length && (
-                                  <p className="text-sm text-gray-500 mt-2">
-                                    Upload a banner image for your event header
-                                    (required)
-                                  </p>
-                                )}
-                              </>
-                            )}
-                          </div>
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </TabsContent>
-                <TabsContent value="video">
-                  <FormField
-                    control={form.control}
-                    name="event_banner_video"
-                    render={({ field }) => (
-                      <FormItem>
-                        <OnboardingSectionTitle>
-                          Add a Cover Video
-                          <span className="text-red-400">*</span>
-                        </OnboardingSectionTitle>
-                        <FormControl>
-                          <div
-                            className="flex flex-col justify-center items-center h-full space-y-2 bg-white/5 p-4 rounded-lg border border-white/10"
-                            onClick={() =>
-                              handleFieldFocus("event_banner_video")
-                            }
-                          >
-                            {/* Display video preview if available */}
-                            {(bannerVideoFile.length > 0 || bannerVideoUrl) && (
-                              <div className="relative w-full">
-                                <video
-                                  src={videoPreviewUrl || bannerVideoUrl || ""}
-                                  controls
-                                  className="max-h-40 object-contain mx-auto mb-2"
-                                />
-                                <Button
-                                  type="button"
-                                  variant="destructive"
-                                  size="sm"
-                                  onClick={() =>
-                                    handleRemoveBannerVideo(field.onChange)
-                                  }
-                                  className="mt-2"
-                                >
-                                  Remove
-                                </Button>
-                              </div>
-                            )}
-                            {/* File uploader for video */}
-                            {bannerVideoFile.length === 0 &&
-                              !bannerVideoUrl && (
-                                <FileUploader
-                                  value={bannerVideoFile}
-                                  onValueChange={(files) =>
-                                    handleBannerVideoChange(
-                                      files,
-                                      field.onChange
-                                    )
-                                  }
-                                  maxFileCount={1}
-                                  maxSize={10 * 1024 * 1024} // 10MB for banner video
-                                  onRemove={() =>
-                                    handleRemoveBannerVideo(field.onChange)
-                                  }
-                                  className="border-dashed"
-                                  accept={{
-                                    "video/mp4": [".mp4"],
-                                    "video/webm": [".webm"],
-                                    "video/ogg": [".ogv"],
-                                    "video/quicktime": [".mov"],
-                                    "video/x-msvideo": [".avi"],
-                                    "video/x-matroska": [".mkv"],
-                                  }}
-                                  disabled={bannerVideoUploading}
-                                />
-                              )}
-                            {bannerVideoFile.length === 0 &&
-                              !bannerVideoUrl && (
-                                <>
-                                  <p className="text-sm text-gray-500 mt-2">
-                                    Upload a banner video for your event header
-                                    (MP4, WebM, or OGG format, max 10MB)
-                                  </p>
-                                  <div className="w-full mt-3">
-                                    <VideoFormatInfo variant="compact" />
-                                  </div>
-                                </>
-                              )}
-                          </div>
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </TabsContent>
-              </Tabs>
-
-              <FormField
-                control={form.control}
-                name="event_banner_heading"
-                render={({ field }) => {
-                  const currentLength = field.value?.length || 0;
-                  const maxLength = 20;
-                  return (
-                    <FormItem>
-                      <FormLabel className="text-sm font-medium">
-                        Banner Heading <span className="text-red-400">*</span>
-                      </FormLabel>
-                      <FormControl>
-                        <Input
-                          className="bg-gray-100"
-                          placeholder="Enter event title"
-                          {...field}
-                          value={
-                            typeof field.value === "string" ? field.value : ""
-                          }
-                          maxLength={maxLength}
-                          onFocus={() =>
-                            handleFieldFocus("event_banner_heading")
-                          }
-                          onChange={(e) => {
-                            field.onChange(e);
-                            globalForm.setValue(
-                              "stepThree.event_banner_heading",
-                              e.target.value
-                            );
-                          }}
-                        />
-                      </FormControl>
-                      <div className="text-xs text-muted-foreground mt-1">
-                        <span
-                          className={
-                            currentLength > maxLength ? "text-destructive" : ""
-                          }
-                        >
-                          {currentLength}/{maxLength} characters
-                        </span>
-                      </div>
-                      <FormMessage />
-                    </FormItem>
-                  );
-                }}
-              />
-              <FormField
-                control={form.control}
-                name="event_banner_sub_heading"
-                render={({ field }) => {
-                  const currentLength = field.value?.length || 0;
-                  const maxLength = 80;
-                  return (
-                    <FormItem>
-                      <FormLabel className="text-sm font-medium">
-                        Write banner Sub-heading{" "}
-                        <span className="text-red-400">*</span>
-                      </FormLabel>
-                      <FormControl>
-                        <Input
-                          className="bg-gray-100"
-                          placeholder="Enter event title"
-                          {...field}
-                          value={
-                            typeof field.value === "string" ? field.value : ""
-                          }
-                          maxLength={maxLength}
-                          onFocus={() =>
-                            handleFieldFocus("event_banner_sub_heading")
-                          }
-                          onChange={(e) => {
-                            field.onChange(e);
-                            globalForm.setValue(
-                              "stepThree.event_banner_sub_heading",
-                              e.target.value
-                            );
-                          }}
-                        />
-                      </FormControl>
-                      <div className="text-xs text-muted-foreground mt-1">
-                        <span
-                          className={
-                            currentLength > maxLength ? "text-destructive" : ""
-                          }
-                        >
-                          {currentLength}/{maxLength} characters
-                        </span>
-                      </div>
-                      <FormMessage />
-                    </FormItem>
-                  );
-                }}
-              />
-
-              <section className="space-y-4">
-                <OnboardingSectionTitle>
-                  Tell Guests What It’s About
-                </OnboardingSectionTitle>
-
-                {/* Title */}
-                <FormField
-                  control={form.control}
-                  name="about_event_heading"
-                  render={({ field }) => {
-                    const currentLength = field.value?.length || 0;
-                    const maxLength = 50;
-                    return (
-                      <FormItem>
-                        <FormLabel className="text-sm font-medium">
-                          Title <span className="text-red-400">*</span>
-                        </FormLabel>
-                        <FormControl>
-                          <Input
-                            className="bg-gray-100"
-                            placeholder="Enter event title"
-                            {...field}
-                            value={
-                              typeof field.value === "string" ? field.value : ""
-                            }
-                            maxLength={maxLength}
-                            onFocus={() =>
-                              handleFieldFocus("about_event_heading")
-                            }
-                            onChange={(e) => {
-                              field.onChange(e);
-                              globalForm.setValue(
-                                "stepThree.about_event_heading",
-                                e.target.value
-                              );
-                            }}
-                          />
-                        </FormControl>
-                        <div className="text-xs text-muted-foreground mt-1">
-                          <span
-                            className={
-                              currentLength > maxLength
-                                ? "text-destructive"
-                                : ""
-                            }
-                          >
-                            {currentLength}/{maxLength} characters
-                          </span>
-                        </div>
-                        <FormMessage />
-                      </FormItem>
-                    );
-                  }}
-                />
-
-                {/* Sub Title */}
-                <FormField
-                  control={form.control}
-                  name="about_event_sub_heading"
-                  render={({ field }) => {
-                    const currentLength = field.value?.length || 0;
-                    const maxLength = 80;
-                    return (
-                      <FormItem>
-                        <FormLabel className="text-sm font-medium">
-                          Sub Title
-                        </FormLabel>
-                        <FormControl>
-                          <Input
-                            className="bg-gray-100"
-                            placeholder="Enter event subtitle"
-                            {...field}
-                            value={
-                              typeof field.value === "string" ? field.value : ""
-                            }
-                            maxLength={maxLength}
-                            onFocus={() =>
-                              handleFieldFocus("about_event_sub_heading")
-                            }
-                            onChange={(e) => {
-                              field.onChange(e);
-                              globalForm.setValue(
-                                "stepThree.about_event_sub_heading",
-                                e.target.value
-                              );
-                            }}
-                          />
-                        </FormControl>
-                        <div className="text-xs text-muted-foreground mt-1">
-                          <span
-                            className={
-                              currentLength > maxLength
-                                ? "text-destructive"
-                                : ""
-                            }
-                          >
-                            {currentLength}/{maxLength} characters
-                          </span>
-                        </div>
-                        <FormMessage />
-                      </FormItem>
-                    );
-                  }}
-                />
-
-                {/* Description */}
-                <FormField
-                  control={form.control}
-                  name="about_event_description"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="text-sm font-medium">
-                        Description
-                      </FormLabel>
-                      <FormControl>
-                        <TiptapEditor
-                          value={field.value}
-                          onChange={(value) => {
-                            field.onChange(value);
-                            globalForm.setValue(
-                              "stepThree.about_event_description",
-                              value
-                            );
-                          }}
-                          placeholder="Write a compelling description..."
-                          className="min-h-[120px] w-full overflow-hidden max-w-[300px]"
-                          maxLength={340}
-                          maxWords={50}
-                          showAIButton={true}
-                          wrapText={true}
-                          aiContext={{
-                            event_name: form.watch("event_name"),
-                            title: form.watch("about_event_heading"),
-                            sub_title: form.watch("about_event_sub_heading"),
-                            description: form.watch("about_event_description"),
-                            ctaText: form.watch("about_event_sub_heading"),
-                            event_category_name: currentEventCategoryName,
-                          }}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
+                <fieldset
+                  disabled={guided.currentSectionIndex !== 3}
+                  className={cn(
+                    "min-w-0 border-0 p-0 m-0 space-y-6",
+                    guided.currentSectionIndex !== 3 && "pointer-events-none",
                   )}
-                />
-              </section>
-
-              <FormField
-                control={form.control}
-                name="event_schedular_title"
-                render={({ field }) => {
-                  const currentLength = field.value?.length || 0;
-                  const maxLength = 40;
-                  return (
-                    <FormItem>
-                      <OnboardingSectionTitle>
-                        Event Scheduler Title
-                      </OnboardingSectionTitle>
-                      <FormControl>
-                        <Input
-                          id="event-schedular-title"
-                          placeholder="e.g. Event Night"
-                          {...field}
-                          maxLength={maxLength}
-                          onFocus={() =>
-                            handleFieldFocus("event_schedular_title")
-                          }
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter") {
-                              e.preventDefault();
-                              e.stopPropagation();
-                            }
-                          }}
-                          onChange={(e) => {
-                            field.onChange(e);
-                            globalForm.setValue(
-                              "stepThree.event_schedular_title",
-                              e.target.value
-                            );
-                          }}
-                        />
-                      </FormControl>
-                      <div className="text-xs text-muted-foreground mt-1">
-                        <span
-                          className={
-                            currentLength > maxLength ? "text-destructive" : ""
-                          }
-                        >
-                          {currentLength}/{maxLength} characters
-                        </span>
-                      </div>
-                      <FormMessage />
-                    </FormItem>
-                  );
-                }}
-              />
-              <EventScheduler
-                control={form.control}
-                fields={schedulerFields}
-                append={appendScheduler}
-                remove={removeScheduler}
-              />
-
-              <div className="flex items-center justify-center gap-4 pt-4">
-                <Button
-                  variant="event-primary"
-                  type="button"
-                  onClick={() => {
-                    setActiveField(null);
-                    handleSubmit();
-                  }}
-                  disabled={loading}
-                  className="text-white rounded-full px-8 py-2"
                 >
-                  {loading ? "Saving..." : "Save & Next"}
-                </Button>
-              </div>
+                  <FormField
+                    control={form.control}
+                    name="event_schedular_title"
+                    render={({ field }) => {
+                      const currentLength = field.value?.length || 0;
+                      const maxLength = 40;
+                      return (
+                        <FormItem>
+                          <OnboardingSectionTitle>
+                            Event Scheduler Title
+                          </OnboardingSectionTitle>
+                          <FormControl>
+                            <Input
+                              id="event-schedular-title"
+                              placeholder="e.g. Event Night"
+                              {...field}
+                              maxLength={maxLength}
+                              onFocus={() =>
+                                handleFieldFocus("event_schedular_title")
+                              }
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                }
+                              }}
+                              onChange={(e) => {
+                                field.onChange(e);
+                                globalForm.setValue(
+                                  "stepThree.event_schedular_title",
+                                  e.target.value,
+                                );
+                              }}
+                            />
+                          </FormControl>
+                          <div className="text-xs text-muted-foreground mt-1">
+                            <span
+                              className={
+                                currentLength > maxLength
+                                  ? "text-destructive"
+                                  : ""
+                              }
+                            >
+                              {currentLength}/{maxLength} characters
+                            </span>
+                          </div>
+                          <FormMessage />
+                        </FormItem>
+                      );
+                    }}
+                  />
+                  <EventScheduler
+                    control={form.control}
+                    fields={schedulerFields}
+                    append={appendScheduler}
+                    remove={removeScheduler}
+                  />
+                  <GuidedSectionActionFooter
+                    isActive={guided.currentSectionIndex === 3}
+                    hideSectionMeta
+                  >
+                    <GuidedSectionCoreActions guided={guided} />
+                  </GuidedSectionActionFooter>
+                </fieldset>
+              </section>
+              <GuidedMultiSectionBottomActions
+                onApproveAll={guided.handleApproveAllSections}
+                allSectionsApproved={guided.allSectionsApproved}
+                saveSlot={
+                  <Button
+                    variant="event-primary"
+                    type="button"
+                    onClick={() => {
+                      setActiveField(null);
+                      handleSubmit();
+                    }}
+                    disabled={loading || !guided.allSectionsApproved}
+                    title={
+                      !guided.allSectionsApproved
+                        ? "Approve all sections first"
+                        : undefined
+                    }
+                    className={guidedOnboardingSaveNextButtonClass}
+                  >
+                    {loading ? "Saving..." : "Save & Next"}
+                  </Button>
+                }
+              />
             </form>
           </Form>
         </CardContent>

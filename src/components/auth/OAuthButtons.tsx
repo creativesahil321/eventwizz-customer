@@ -64,6 +64,7 @@ export const OAuthButtons = ({
     <div className={`space-y-3 ${className}`}>
       {/* Google */}
       <Button
+        variant="ghost"
         type="button"
         onClick={handleGoogleSignIn}
         disabled={isLoading}
@@ -72,7 +73,8 @@ export const OAuthButtons = ({
           bg-[var(--color-socialLogin-google,#1a73e8)]
           text-white
           relative flex items-center justify-center
-          hover:opacity-90
+          hover:bg-[var(--color-socialLogin-google-hover,#1765cc)]
+          hover:text-white
           active:opacity-80
           hover:-translate-y-[1px]
           hover:shadow-md
@@ -95,6 +97,7 @@ export const OAuthButtons = ({
 
       {/* Facebook */}
       <Button
+        variant="ghost"
         type="button"
         onClick={handleFacebookSignIn}
         disabled={isLoading}
@@ -103,7 +106,8 @@ export const OAuthButtons = ({
           bg-[var(--color-socialLogin-microsoft,#1877f2)]
           text-white
           relative flex items-center justify-center
-          hover:opacity-90
+          hover:bg-[var(--color-socialLogin-microsoft-hover,#166fe5)]
+          hover:text-white
           active:opacity-80
           hover:-translate-y-[1px]
           hover:shadow-md

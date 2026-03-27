@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useMemo, lazy, Suspense, useState } from "react";
+import { AnimatePresence, motion } from "framer-motion";
 import { useFormContext } from "../form-provider";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -8,7 +9,30 @@ import PreviewContainer from "../form-preview";
 import { useMediaQuery } from "@/hooks/use-media-query";
 import Stepper from "./stepper";
 import { Button } from "@/components/ui/button";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronsLeftRight } from "lucide-react";
+
+function StepTransition({
+  stepKey,
+  children,
+}: {
+  stepKey: number;
+  children: React.ReactNode;
+}) {
+  return (
+    <AnimatePresence mode="wait" initial={false}>
+      <motion.div
+        key={stepKey}
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        transition={{ duration: 0.2, ease: "easeOut" }}
+        className="w-full min-w-0"
+      >
+        {children}
+      </motion.div>
+    </AnimatePresence>
+  );
+}
 
 // Lazy load step components
 const StepOne = lazy(() => import("../steps/step-1"));
@@ -77,41 +101,46 @@ const SplitLayout = React.memo(
       <div className="w-full bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950">
         {!isSidebarCollapsed && <Stepper activeStep={activeStep} />}
 
-        <section className="flex w-full h-screen overflow-hidden relative">
-          <div className="absolute top-1/2 left-0 z-50 transform -translate-y-1/2">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={toggleSidebar}
-              className="bg-white/10 hover:bg-white/20 backdrop-blur-sm border border-white/10 text-white rounded-full w-10 h-10 p-0 transition-colors duration-200"
-              title={isSidebarCollapsed ? "Show Form" : "Hide Form"}
-              aria-label={isSidebarCollapsed ? "Show Form" : "Hide Form"}
-            >
-              {isSidebarCollapsed ? (
-                <ChevronRight className="h-5 w-5" />
-              ) : (
-                <ChevronLeft className="h-5 w-5" />
-              )}
-            </Button>
-          </div>
-
+        <section className="flex w-full h-screen overflow-hidden relative isolate">
           <aside
-            className={`onboarding-dark transition-all duration-500 ease-in-out overflow-hidden ${
+            id="onboarding-form-sidebar"
+            className={`onboarding-dark relative z-20 shrink-0 transition-all duration-500 ease-in-out overflow-hidden ${
               isSidebarCollapsed
-                ? "w-0 min-w-0 max-w-0 mx-0 opacity-0 pointer-events-none"
-                : "w-2/5 min-w-[320px] max-w-[400px] mx-2 opacity-100 pr-3"
+                ? "w-0 min-w-0 max-w-0 ml-0 opacity-0 pointer-events-none"
+                : "shrink-0 w-[42%] min-w-[280px] max-w-[36rem] ml-2 opacity-100 pr-2"
             }`}
           >
-            <ScrollArea className="h-[calc(100vh-40px)]">
+            <ScrollArea className="h-[calc(100vh-40px)] w-full min-w-0">
               <Suspense fallback={<StepLoader />}>
-                <Step />
+                <StepTransition stepKey={activeStep}>
+                  <Step />
+                </StepTransition>
               </Suspense>
             </ScrollArea>
           </aside>
 
-          <main
-            className="flex-1 overflow-hidden transition-all duration-500 ease-in-out"
-          >
+          {/* Expand/collapse: sits on the seam between form and preview (not screen left edge) */}
+          <div className="pointer-events-none relative z-[60] w-0 shrink-0 self-stretch">
+            <Button
+              type="button"
+              variant="event-primary"
+              size="icon"
+              onClick={toggleSidebar}
+              title={
+                isSidebarCollapsed ? "Expand form panel" : "Collapse form panel"
+              }
+              aria-expanded={!isSidebarCollapsed}
+              aria-controls="onboarding-form-sidebar"
+              aria-label={
+                isSidebarCollapsed ? "Expand form panel" : "Collapse form panel"
+              }
+              className="pointer-events-auto absolute top-1/2 left-1/2 h-11 w-11 -translate-x-1/2 -translate-y-1/2 rounded-full p-0 shadow-[0_2px_12px_rgba(0,0,0,0.35)] ring-1 ring-white/20 transition-[transform,box-shadow] duration-200 hover:shadow-[0_4px_16px_rgba(0,0,0,0.4)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950"
+            >
+              <ChevronsLeftRight className="h-5 w-5 shrink-0 opacity-95" />
+            </Button>
+          </div>
+
+          <main className="relative z-10 min-w-0 flex-1 overflow-hidden transition-all duration-500 ease-in-out">
             <div className="h-full">
               <PreviewContainer />
             </div>
@@ -119,7 +148,7 @@ const SplitLayout = React.memo(
         </section>
       </div>
     );
-  }
+  },
 );
 SplitLayout.displayName = "SplitLayout";
 
@@ -137,10 +166,10 @@ const FullLayout = React.memo(
     const scrollAreaClasses = isFullScreenCentered
       ? "h-[calc(100vh-40px)] flex flex-col justify-center items-center"
       : centered && (activeStep === 5 || activeStep === 1)
-      ? "flex justify-center" // Remove fixed height for step 5 and 1
-      : centered
-      ? "h-[calc(100vh-40px)] flex justify-center"
-      : "h-full";
+        ? "flex justify-center" // Remove fixed height for step 5 and 1
+        : centered
+          ? "h-[calc(100vh-40px)] flex justify-center"
+          : "h-full";
 
     const containerClasses =
       isFullScreenCentered || centered
@@ -161,15 +190,20 @@ const FullLayout = React.memo(
           className={`w-full ${scrollAreaClasses}`}
           type={activeStep === 5 || activeStep === 1 ? "always" : "auto"}
         >
-          <div data-step={activeStep} className={`onboarding-dark ${containerClasses}`}>
+          <div
+            data-step={activeStep}
+            className={`onboarding-dark ${containerClasses}`}
+          >
             <Suspense fallback={<StepLoader />}>
-              <Step />
+              <StepTransition stepKey={activeStep}>
+                <Step />
+              </StepTransition>
             </Suspense>
           </div>
         </ScrollArea>
       </section>
     );
-  }
+  },
 );
 FullLayout.displayName = "FullLayout";
 
@@ -210,7 +244,11 @@ const FormLayoutProvider = () => {
     );
   }
 
-  return <div className="w-full min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950">{renderedStep}</div>;
+  return (
+    <div className="w-full min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950">
+      {renderedStep}
+    </div>
+  );
 };
 FormLayoutProvider.displayName = "FormLayoutProvider";
 

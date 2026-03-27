@@ -17,6 +17,18 @@ type ColorTheme = {
   };
 };
 
+type LogoColorTone = "dark" | "light" | "colorful" | "unsure";
+
+const HEX_COLOR_REGEX = /^#[0-9A-Fa-f]{3}$|^#[0-9A-Fa-f]{6}$/;
+const GRADIENT_REGEX = /^linear-gradient\(/;
+
+const FALLBACK_DARK_TEXT = "#0F172A";
+const FALLBACK_LIGHT_TEXT = "#F8FAFC";
+const FALLBACK_LIGHT_SURFACE = "#FFFFFF";
+const FALLBACK_DARK_SURFACE = "#111827";
+const FALLBACK_LIGHT_MUTED = "#64748B";
+const FALLBACK_DARK_MUTED = "#CBD5E1";
+
 // Helper function to normalize hex colors (convert #333 to #333333)
 function normalizeHexColor(color: string): string {
   if (color.length === 4) {
@@ -26,7 +38,11 @@ function normalizeHexColor(color: string): string {
   return color;
 }
 
-// Helper function to calculate color brightness (0-255)
+function isValidHex(color: string): boolean {
+  return HEX_COLOR_REGEX.test(color);
+}
+
+// Helper function to calculate color brightness (0-255) for quick heuristics
 function getColorBrightness(hexColor: string): number {
   const normalizedColor = normalizeHexColor(hexColor);
   const r = parseInt(normalizedColor.substr(1, 2), 16);
@@ -41,33 +57,189 @@ function isDarkColor(hexColor: string): boolean {
   return getColorBrightness(hexColor) < 128;
 }
 
-// Helper function to auto-adjust colors for proper contrast
-function autoAdjustContrast(colorTheme: ColorTheme): ColorTheme {
-  const textIsDark = isDarkColor(colorTheme.text);
+function relativeLuminance(hexColor: string): number {
+  const normalizedColor = normalizeHexColor(hexColor);
+  const r = parseInt(normalizedColor.slice(1, 3), 16) / 255;
+  const g = parseInt(normalizedColor.slice(3, 5), 16) / 255;
+  const b = parseInt(normalizedColor.slice(5, 7), 16) / 255;
+  const toLinear = (c: number) =>
+    c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
 
-  // Create adjusted theme with proper contrast
-  const adjustedTheme = { ...colorTheme };
+  return (
+    0.2126 * toLinear(r) + 0.7152 * toLinear(g) + 0.0722 * toLinear(b)
+  );
+}
 
-  // If text is light (#ffffff), make header/footer dark
-  if (!textIsDark) {
-    // Text is light, so header/footer should be dark
-    if (!isDarkColor(colorTheme.header)) {
-      adjustedTheme.header = "#1a202c"; // Dark header for light text
-    }
-    if (!isDarkColor(colorTheme.footer)) {
-      adjustedTheme.footer = "#2d3748"; // Dark footer for light text
-    }
-  } else {
-    // Text is dark, so header/footer should be light
-    if (isDarkColor(colorTheme.header)) {
-      adjustedTheme.header = "#ffffff"; // Light header for dark text
-    }
-    if (isDarkColor(colorTheme.footer)) {
-      adjustedTheme.footer = "#f8f9fa"; // Light footer for dark text
-    }
+function contrastRatio(foreground: string, background: string): number {
+  const l1 = relativeLuminance(foreground);
+  const l2 = relativeLuminance(background);
+  const lighter = Math.max(l1, l2);
+  const darker = Math.min(l1, l2);
+  return (lighter + 0.05) / (darker + 0.05);
+}
+
+function extractBackgroundAnchors(background: string): string[] {
+  if (isValidHex(background)) {
+    return [normalizeHexColor(background)];
   }
 
-  return adjustedTheme;
+  const hexMatches = background.match(/#[0-9A-Fa-f]{3,6}/g);
+  if (hexMatches && hexMatches.length > 0) {
+    return hexMatches.map((c) => normalizeHexColor(c));
+  }
+
+  return ["#FFFFFF"];
+}
+
+function minContrastAgainstBackground(
+  foreground: string,
+  background: string,
+): number {
+  const anchors = extractBackgroundAnchors(background);
+  return anchors.reduce((min, anchor) => {
+    const ratio = contrastRatio(foreground, anchor);
+    return Math.min(min, ratio);
+  }, Number.POSITIVE_INFINITY);
+}
+
+function pickReadableText(background: string): string {
+  const darkCandidate = FALLBACK_DARK_TEXT;
+  const lightCandidate = FALLBACK_LIGHT_TEXT;
+
+  const darkContrast = minContrastAgainstBackground(darkCandidate, background);
+  const lightContrast = minContrastAgainstBackground(lightCandidate, background);
+
+  return darkContrast >= lightContrast ? darkCandidate : lightCandidate;
+}
+
+function pickReadableMutedText(background: string, preferredText: string): string {
+  const darkPreferred = isDarkColor(preferredText);
+  const candidate = darkPreferred ? FALLBACK_LIGHT_MUTED : FALLBACK_DARK_MUTED;
+  const minRatio = 3;
+
+  if (minContrastAgainstBackground(candidate, background) >= minRatio) {
+    return candidate;
+  }
+
+  return pickReadableText(background);
+}
+
+function ensureReadablePair(
+  foreground: string,
+  background: string,
+  minRatio = 4.5,
+): string {
+  if (!isValidHex(foreground)) return pickReadableText(background);
+  if (
+    minContrastAgainstBackground(normalizeHexColor(foreground), background) >=
+    minRatio
+  ) {
+    return normalizeHexColor(foreground);
+  }
+  return pickReadableText(background);
+}
+
+function sanitizeThemeForReadability(
+  colorTheme: ColorTheme,
+  logoColorTone: LogoColorTone = "unsure",
+): { theme: ColorTheme; autoAdjusted: boolean; adjustments: string[] } {
+  const adjustments: string[] = [];
+  const normalized: ColorTheme = {
+    ...colorTheme,
+    primary: normalizeHexColor(colorTheme.primary),
+    secondary: normalizeHexColor(colorTheme.secondary),
+    header: normalizeHexColor(colorTheme.header),
+    footer: normalizeHexColor(colorTheme.footer),
+    background: colorTheme.background.startsWith("#")
+      ? normalizeHexColor(colorTheme.background)
+      : colorTheme.background,
+    surface: normalizeHexColor(colorTheme.surface),
+    text: normalizeHexColor(colorTheme.text),
+    textDimmed: normalizeHexColor(colorTheme.textDimmed),
+    socialLogin: {
+      google: normalizeHexColor(colorTheme.socialLogin.google),
+      microsoft: normalizeHexColor(colorTheme.socialLogin.microsoft),
+    },
+  };
+
+  const prefersDarkHeader = logoColorTone === "light";
+  const prefersLightHeader = logoColorTone === "dark";
+
+  const headerTarget = prefersDarkHeader
+    ? FALLBACK_DARK_SURFACE
+    : prefersLightHeader
+      ? FALLBACK_LIGHT_SURFACE
+      : normalized.header;
+
+  const footerTarget = prefersDarkHeader
+    ? "#1F2937"
+    : prefersLightHeader
+      ? "#F8FAFC"
+      : normalized.footer;
+
+  const textCandidates = [FALLBACK_DARK_TEXT, FALLBACK_LIGHT_TEXT];
+  const readableBaseText =
+    isValidHex(normalized.text) && textCandidates.includes(normalizeHexColor(normalized.text))
+      ? normalizeHexColor(normalized.text)
+      : textCandidates
+          .map((candidate) => ({
+            candidate,
+            score: Math.min(
+              minContrastAgainstBackground(candidate, normalized.surface),
+              minContrastAgainstBackground(candidate, normalized.background),
+              minContrastAgainstBackground(candidate, headerTarget),
+              minContrastAgainstBackground(candidate, footerTarget),
+            ),
+          }))
+          .sort((a, b) => b.score - a.score)[0].candidate;
+
+  const unifiedText = ensureReadablePair(readableBaseText, normalized.surface);
+
+  const adjustedHeader = ensureReadablePair(unifiedText, headerTarget) === unifiedText
+    ? headerTarget
+    : isDarkColor(unifiedText)
+      ? FALLBACK_LIGHT_SURFACE
+      : FALLBACK_DARK_SURFACE;
+
+  const adjustedFooter = ensureReadablePair(unifiedText, footerTarget) === unifiedText
+    ? footerTarget
+    : isDarkColor(unifiedText)
+      ? "#F8FAFC"
+      : "#1F2937";
+
+  const adjustedSurface = ensureReadablePair(unifiedText, normalized.surface) === unifiedText
+    ? normalized.surface
+    : isDarkColor(unifiedText)
+      ? FALLBACK_LIGHT_SURFACE
+      : FALLBACK_DARK_SURFACE;
+
+  // Keep gradient backgrounds whenever possible; contrast is evaluated across all stops.
+  const adjustedBackground = normalized.background;
+
+  const adjustedDimmed = pickReadableMutedText(adjustedSurface, unifiedText);
+
+  const finalTheme: ColorTheme = {
+    ...normalized,
+    header: adjustedHeader,
+    footer: adjustedFooter,
+    surface: adjustedSurface,
+    background: adjustedBackground,
+    text: unifiedText,
+    textDimmed: adjustedDimmed,
+  };
+
+  if (JSON.stringify(finalTheme) !== JSON.stringify(normalized)) {
+    adjustments.push("Applied accessibility contrast guardrails across text, surface, background, header, and footer.");
+  }
+  if (prefersDarkHeader || prefersLightHeader) {
+    adjustments.push("Applied logo-color guidance for header/footer polarity.");
+  }
+
+  return {
+    theme: finalTheme,
+    autoAdjusted: adjustments.length > 0,
+    adjustments,
+  };
 }
 
 // Helper function to validate contrast and return detailed info
@@ -109,7 +281,16 @@ function validateContrast(colorTheme: ColorTheme): {
 
 export async function POST(req: Request) {
   try {
-    const { businessType, mood, style, existingBrand, customTheme, eventType } =
+    const {
+      businessType,
+      mood,
+      style,
+      existingBrand,
+      customTheme,
+      eventType,
+      logoColorTone,
+      logoColorHex,
+    } =
       await req.json();
 
     if (!env.GROQ_API_KEY) {
@@ -129,7 +310,131 @@ export async function POST(req: Request) {
       // Add specific theme context based on common keywords
       const themeLower = customTheme.toLowerCase();
 
-      if (themeLower.includes("wedding") || themeLower.includes("bridal")) {
+      if (
+        themeLower.includes("christmas") ||
+        themeLower.includes("new year") ||
+        themeLower.includes("halloween") ||
+        themeLower.includes("valentine") ||
+        themeLower.includes("easter") ||
+        themeLower.includes("diwali") ||
+        themeLower.includes("eid")
+      ) {
+        if (themeLower.includes("christmas")) {
+          contextPrompt +=
+            "Create festive Christmas event colors with rich seasonal contrast and polished holiday elegance. ";
+        } else if (themeLower.includes("new year")) {
+          contextPrompt +=
+            "Create New Year party colors with premium midnight tones, metallic accents, and celebratory contrast. ";
+        } else if (themeLower.includes("halloween")) {
+          contextPrompt +=
+            "Create Halloween event colors with bold dramatic contrast, dark surfaces, and clear readable highlights. ";
+        } else if (themeLower.includes("valentine")) {
+          contextPrompt +=
+            "Create Valentine's event colors with romantic but professional warm tones and strong readability. ";
+        } else if (themeLower.includes("easter")) {
+          contextPrompt +=
+            "Create Easter event colors with soft spring tones balanced by professional contrast. ";
+        } else if (themeLower.includes("diwali")) {
+          contextPrompt +=
+            "Create Diwali event colors inspired by festive jewel tones, warmth, and elegant high contrast. ";
+        } else if (themeLower.includes("eid")) {
+          contextPrompt +=
+            "Create Eid event colors with elegant celebratory tones, refined contrast, and a premium feel. ";
+        }
+      } else if (
+        themeLower.includes("bottomless brunch") ||
+        themeLower.includes("lipstick powder") ||
+        themeLower.includes("paint")
+      ) {
+        if (themeLower.includes("bottomless brunch")) {
+          contextPrompt +=
+            "Create bottomless brunch colors with bright daytime social vibes and clean, readable contrast. ";
+        } else {
+          contextPrompt +=
+            "Create lipstick powder and paint event colors with beauty-inspired tones while maintaining professional readability. ";
+        }
+      } else if (
+        themeLower.includes("live music") ||
+        themeLower.includes("gig") ||
+        themeLower.includes("dj night") ||
+        themeLower.includes("club") ||
+        themeLower.includes("comedy") ||
+        themeLower.includes("drag") ||
+        themeLower.includes("afrobeats") ||
+        themeLower.includes("bashment") ||
+        themeLower.includes("open mic") ||
+        themeLower.includes("spoken word")
+      ) {
+        if (themeLower.includes("live music") || themeLower.includes("gig")) {
+          contextPrompt +=
+            "Create live music and gigs colors with energetic stage-friendly tones and excellent text contrast. ";
+        } else if (themeLower.includes("dj night") || themeLower.includes("club")) {
+          contextPrompt +=
+            "Create DJ and club event colors with nightlife mood, tasteful vibrance, and highly legible UI contrast. ";
+        } else if (themeLower.includes("comedy")) {
+          contextPrompt +=
+            "Create comedy show colors with approachable lively tones and clean readability for listings and CTA buttons. ";
+        } else if (themeLower.includes("drag")) {
+          contextPrompt +=
+            "Create drag show and brunch colors with expressive, bold palettes while preserving professional accessibility. ";
+        } else if (
+          themeLower.includes("afrobeats") ||
+          themeLower.includes("bashment")
+        ) {
+          contextPrompt +=
+            "Create afrobeats and bashment event colors with rhythmic bold tones and polished high-contrast surfaces. ";
+        } else {
+          contextPrompt +=
+            "Create open mic and spoken word event colors with artistic, intimate tones and strong readability. ";
+        }
+      } else if (
+        themeLower.includes("food & drink") ||
+        themeLower.includes("food and drink") ||
+        themeLower.includes("festival") ||
+        themeLower.includes("street food") ||
+        themeLower.includes("market")
+      ) {
+        if (themeLower.includes("street food") || themeLower.includes("market")) {
+          contextPrompt +=
+            "Create street food market colors with warm urban tones and clear contrast for menu and event cards. ";
+        } else {
+          contextPrompt +=
+            "Create food and drink festival colors with appetizing lively tones and professional contrast. ";
+        }
+      } else if (
+        themeLower.includes("pride") ||
+        themeLower.includes("day rave") ||
+        themeLower.includes("outdoor party") ||
+        themeLower.includes("themed parties") ||
+        themeLower.includes("themed party")
+      ) {
+        if (themeLower.includes("pride")) {
+          contextPrompt +=
+            "Create pride event colors with inclusive vibrant tones, balanced saturation, and accessible contrast. ";
+        } else if (
+          themeLower.includes("day rave") ||
+          themeLower.includes("outdoor party")
+        ) {
+          contextPrompt +=
+            "Create day rave and outdoor party colors with sunny energetic tones and strong readability under bright backgrounds. ";
+        } else {
+          contextPrompt +=
+            "Create themed party colors with flexible celebratory palettes and polished contrast-safe UI colors. ";
+        }
+      } else if (
+        themeLower.includes("networking") ||
+        themeLower.includes("business event") ||
+        themeLower.includes("workshop") ||
+        themeLower.includes("masterclass")
+      ) {
+        if (themeLower.includes("networking") || themeLower.includes("business")) {
+          contextPrompt +=
+            "Create networking and business event colors with professional trust-building tones and premium contrast. ";
+        } else {
+          contextPrompt +=
+            "Create workshop and masterclass colors with clear educational UI hierarchy and highly readable palettes. ";
+        }
+      } else if (themeLower.includes("wedding") || themeLower.includes("bridal")) {
         contextPrompt +=
           "Create elegant, romantic colors perfect for weddings with soft pastels, golds, and whites. ";
       } else if (
@@ -145,12 +450,6 @@ export async function POST(req: Request) {
         contextPrompt +=
           "Create festive Christmas/holiday colors with traditional reds, greens, golds, and whites. ";
       } else if (
-        themeLower.includes("spiderman") ||
-        themeLower.includes("spider-man")
-      ) {
-        contextPrompt +=
-          "Create Spider-Man themed colors with classic red, blue, and web-inspired accents. ";
-      } else if (
         themeLower.includes("superhero") ||
         themeLower.includes("comic")
       ) {
@@ -162,12 +461,9 @@ export async function POST(req: Request) {
       ) {
         contextPrompt +=
           "Create movie/cinema themed colors with dramatic, cinematic colors. ";
-      } else if (
-        themeLower.includes("boys") ||
-        themeLower.includes("masculine")
-      ) {
+      } else if (themeLower.includes("masculine")) {
         contextPrompt +=
-          "Create masculine, bold colors perfect for boys' events with strong, vibrant colors. ";
+          "Create bold, professional colors with strong contrast suitable for corporate or athletic events. ";
       } else if (
         themeLower.includes("girls") ||
         themeLower.includes("feminine")
@@ -318,6 +614,28 @@ export async function POST(req: Request) {
     if (existingBrand) {
       contextPrompt += `that complements existing brand colors: ${existingBrand} `;
     }
+    if (logoColorTone) {
+      contextPrompt += `Logo color guidance: the site logo is primarily ${logoColorTone}. `;
+    }
+    if (logoColorHex) {
+      contextPrompt += `Primary logo color hex is ${logoColorHex}. `;
+    }
+
+    // Encourage gradients for visually expressive themes while still allowing solid colors.
+    if (customTheme && typeof customTheme === "string") {
+      const lower = customTheme.toLowerCase();
+      if (
+        lower.includes("sunset") ||
+        lower.includes("sunrise") ||
+        lower.includes("ocean") ||
+        lower.includes("galaxy") ||
+        lower.includes("neon") ||
+        lower.includes("tropical")
+      ) {
+        contextPrompt +=
+          "Prefer a gradient background for this theme if it improves aesthetics and readability. ";
+      }
+    }
 
     contextPrompt += `
 
@@ -358,6 +676,7 @@ IMPORTANT: For background, you can use either:
 1. A solid hex color (#RRGGBB) for simple themes
 2. A CSS linear-gradient for more dynamic themes (e.g., "linear-gradient(to right, #ff6b6b, #4ecdc4)")
 Choose based on the theme - gradients work great for dynamic themes like sunsets, ocean, galaxy, etc.
+When the user's theme implies atmosphere/depth (luxury, wedding, nightlife, cinematic, elegant, dark, sunset, ocean), prefer a subtle linear-gradient instead of flat solid.
 
 Guidelines:
 - Primary: Main brand color, should be vibrant and memorable
@@ -472,10 +791,6 @@ Remember: Return solid hex colors for most fields, but background can be either 
       }
 
       // Validate hex colors (except background which can be gradient)
-      // Accept both 3-char (#333) and 6-char (#333333) hex formats
-      const hexColorRegex = /^#[0-9A-Fa-f]{3}$|^#[0-9A-Fa-f]{6}$/;
-      const gradientRegex = /^linear-gradient\(/;
-
       for (const [key, value] of Object.entries(colorTheme)) {
         if (key === "socialLogin") continue; // Handle separately
 
@@ -483,45 +798,35 @@ Remember: Return solid hex colors for most fields, but background can be either 
           // Background can be hex or gradient
           if (
             typeof value === "string" &&
-            !hexColorRegex.test(value) &&
-            !gradientRegex.test(value)
+            !HEX_COLOR_REGEX.test(value) &&
+            !GRADIENT_REGEX.test(value)
           ) {
             throw new Error(`Invalid background color format: ${value}`);
           }
-        } else if (typeof value === "string" && !hexColorRegex.test(value)) {
+        } else if (typeof value === "string" && !HEX_COLOR_REGEX.test(value)) {
           throw new Error(`Invalid hex color format for ${key}: ${value}`);
         }
       }
 
       // Validate social login colors
-      if (!hexColorRegex.test(colorTheme.socialLogin.google)) {
+      if (!HEX_COLOR_REGEX.test(colorTheme.socialLogin.google)) {
         throw new Error(
           `Invalid google color: ${colorTheme.socialLogin.google}`
         );
       }
-      if (!hexColorRegex.test(colorTheme.socialLogin.microsoft)) {
+      if (!HEX_COLOR_REGEX.test(colorTheme.socialLogin.microsoft)) {
         throw new Error(
           `Invalid microsoft color: ${colorTheme.socialLogin.microsoft}`
         );
       }
 
-      // Check and auto-adjust contrast for accessibility
-      const contrastValidation = validateContrast(colorTheme);
-      let finalColorTheme = colorTheme;
-
-      if (contrastValidation.hasErrors) {
-        finalColorTheme = autoAdjustContrast(colorTheme);
-
-        // Verify the adjustment worked
-        const adjustedValidation = validateContrast(finalColorTheme);
-        if (adjustedValidation.hasErrors) {
-          throw new Error(
-            `Failed to auto-adjust contrast: ${adjustedValidation.errors.join(
-              " "
-            )}`
-          );
-        }
-      }
+      // Check and auto-adjust contrast for accessibility across all core surfaces
+      const { theme: finalColorTheme, autoAdjusted, adjustments } =
+        sanitizeThemeForReadability(
+          colorTheme,
+          (logoColorTone as LogoColorTone | undefined) ?? "unsure",
+        );
+      const contrastValidation = validateContrast(finalColorTheme);
 
       // Normalize all hex colors to 6-character format using the adjusted theme
       const normalizedColorTheme = {
@@ -543,9 +848,11 @@ Remember: Return solid hex colors for most fields, but background can be either 
 
       return NextResponse.json({
         colorTheme: normalizedColorTheme,
-        message: contrastValidation.hasErrors
-          ? "Color theme generated and auto-adjusted for optimal contrast!"
-          : "Color theme generated successfully!",
+        message:
+          autoAdjusted || contrastValidation.hasErrors
+            ? "Color theme generated and auto-adjusted for optimal contrast!"
+            : "Color theme generated successfully!",
+        adjustments,
         model: result.model,
         modelUsed: result.modelUsed,
       });

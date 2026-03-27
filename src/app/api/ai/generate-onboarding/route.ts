@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { tryModelsWithFallback, type FallbackResult } from "../lib/utils";
 import { env } from "@/env";
+import { STEP_NINE_MAX_FAQS } from "@/app/(on-boarding)/on-boarding/_components/form-provider/schema";
+import {
+  BANNER_HEADING_MAX_WORDS,
+  truncateToMaxWords,
+} from "@/lib/word-count";
 
 export interface AIOnboardingInput {
   venueName: string;
@@ -10,6 +15,8 @@ export interface AIOnboardingInput {
   address: string;
   contactNumber: string;
   email: string;
+  /** When true, venueName is the brand / primary Google place for a multi-location business. */
+  has_multiple_locations?: boolean;
   eventType?: string;
   guestCount?: string;
   priceRange?: string;
@@ -132,11 +139,18 @@ CRITICAL RULES:
 10. For dates with booking_type "tables" or "both": include payment_type ("full" or "deposit"). If deposit is used, set is_deposit_enabled true and include deposit_type ("amount" or "percentage"), deposit_value (e.g. "50" for £50 or "25" for 25%), and deposit_due_date (YYYY-MM-DD, before event_date).
 11. stepFive.dates: event_date must be YYYY-MM-DD. List dates in chronological ascending order (earliest first). No duplicate event_dates. Each event_date should be today or in the future.
 11. stepSix (menu) is OPTIONAL: some venues have no catering. If the venue type or vendor info suggests no food/catering, set menus to an empty array [] and keep menu_title/menu_description short; the vendor can also remove the menu section in review.
-12. stepSeven (drinks) is OPTIONAL: some venues have no drink packages. If the venue type or vendor info suggests no drinks/beverage packages, set packages to an empty array [] and keep drink_title/drink_description short; the vendor can also remove the drinks section in review.`;
+12. stepSeven (drinks) is OPTIONAL: some venues have no drink packages. If the venue type or vendor info suggests no drinks/beverage packages, set packages to an empty array [] and keep drink_title/drink_description short; the vendor can also remove the drinks section in review.
+13. stepNine.faqs: include at most ${STEP_NINE_MAX_FAQS} FAQ objects (hard limit). Prefer 5–8 high-quality FAQs over many short ones. Never return more than ${STEP_NINE_MAX_FAQS} items.`;
+
+    const businessContext =
+      input.has_multiple_locations === true
+        ? `This is a MULTI-LOCATION BRAND. The name below is the BRAND NAME as entered by the vendor (it may be any trading name, not necessarily a Google listing). Use city and address as their main or head-office context. Write copy suitable for a brand that may run events across several sites; keep tone professional and scalable (avoid implying only one physical room unless it fits).`
+        : `This is a single event venue. Write copy specific to this one location.`;
 
     const userPrompt = `Generate complete event venue website content for:
 
 VENUE INFO:
+${businessContext}
 - Name: "${input.venueName}"
 - Type: "${input.venueType}"
 - City: "${input.city}"
@@ -150,7 +164,7 @@ Generate this EXACT JSON structure:
 
 {
   "stepTwo": {
-    "banner_heading": "string (max 50 chars, compelling headline for landing page)",
+    "banner_heading": "string (max 30 words, compelling headline for landing page)",
     "banner_sub_heading": "string (max 80 chars, engaging tagline)",
     "about_title": "string (max 40 chars, title for about section)",
     "about_description": "string (max 340 chars / 50 words, professional about text, no HTML)",
@@ -158,7 +172,7 @@ Generate this EXACT JSON structure:
   },
   "stepThree": {
     "event_name": "string (max 40 chars, name for the main event)",
-    "event_banner_heading": "string (max 50 chars, event page banner heading)",
+    "event_banner_heading": "string (max 30 words, event page banner heading)",
     "event_banner_sub_heading": "string (max 80 chars, event page banner subheading)",
     "about_event_heading": "string (max 50 chars, about event section heading)",
     "about_event_sub_heading": "string (max 80 chars, about event section subheading)",
@@ -262,6 +276,8 @@ Generate this EXACT JSON structure:
   }
 }
 
+The stepNine.faqs array MUST contain at most ${STEP_NINE_MAX_FAQS} items (hard cap). Prefer 5–8 strong FAQs rather than many weak ones.
+
 Make times chronologically ascending. Make prices realistic for the venue type and location. Return ONLY the JSON.`;
 
     const result: FallbackResult = await tryModelsWithFallback(apiKey, {
@@ -305,7 +321,10 @@ Make times chronologically ascending. Make prices realistic for the venue type a
 
       // Enforce character limits
       if (content.stepTwo) {
-        content.stepTwo.banner_heading = truncate(content.stepTwo.banner_heading, 50);
+        content.stepTwo.banner_heading = truncateToMaxWords(
+          content.stepTwo.banner_heading,
+          BANNER_HEADING_MAX_WORDS,
+        );
         content.stepTwo.banner_sub_heading = truncate(content.stepTwo.banner_sub_heading, 80);
         content.stepTwo.about_title = truncate(content.stepTwo.about_title, 40);
         content.stepTwo.about_description = truncate(content.stepTwo.about_description, 340);
@@ -314,7 +333,10 @@ Make times chronologically ascending. Make prices realistic for the venue type a
 
       if (content.stepThree) {
         content.stepThree.event_name = truncate(content.stepThree.event_name, 40);
-        content.stepThree.event_banner_heading = truncate(content.stepThree.event_banner_heading, 50);
+        content.stepThree.event_banner_heading = truncateToMaxWords(
+          content.stepThree.event_banner_heading,
+          BANNER_HEADING_MAX_WORDS,
+        );
         content.stepThree.event_banner_sub_heading = truncate(content.stepThree.event_banner_sub_heading, 80);
         content.stepThree.about_event_heading = truncate(content.stepThree.about_event_heading, 50);
         content.stepThree.about_event_sub_heading = truncate(content.stepThree.about_event_sub_heading, 80);
@@ -326,6 +348,11 @@ Make times chronologically ascending. Make prices realistic for the venue type a
             title: truncate(s.title, 40),
             time: /^([01]\d|2[0-3]):([0-5]\d)$/.test(s.time) ? s.time : "12:00",
           }));
+          content.stepThree.event_schedular.sort((a, b) => {
+            const [ha, ma] = a.time.split(":").map(Number);
+            const [hb, mb] = b.time.split(":").map(Number);
+            return ha * 60 + ma - (hb * 60 + mb);
+          });
         }
       }
 
@@ -349,7 +376,9 @@ Make times chronologically ascending. Make prices realistic for the venue type a
           const fallbackDate = futureDate.toISOString().split("T")[0];
 
           const isValidDate = /^\d{4}-\d{2}-\d{2}$/.test(date.event_date || "");
-          const eventDate = isValidDate ? date.event_date : fallbackDate;
+          const todayStart = new Date(now.toISOString().split("T")[0] + "T00:00:00").getTime();
+          const eventTime = isValidDate ? new Date(date.event_date + "T00:00:00").getTime() : todayStart;
+          const eventDate = isValidDate && eventTime >= todayStart ? date.event_date : fallbackDate;
 
           const validBookingTypes = ["tickets", "tables", "both"];
           const bookingType = validBookingTypes.includes(date.booking_type)
@@ -465,10 +494,12 @@ Make times chronologically ascending. Make prices realistic for the venue type a
       }
 
       if (content.stepNine?.faqs) {
-        content.stepNine.faqs = content.stepNine.faqs.map((f) => ({
-          question: truncate(f.question, 160),
-          answer: truncate(f.answer, 500),
-        }));
+        content.stepNine.faqs = content.stepNine.faqs
+          .slice(0, STEP_NINE_MAX_FAQS)
+          .map((f) => ({
+            question: truncate(f.question, 160),
+            answer: truncate(f.answer, 500),
+          }));
       }
 
       return NextResponse.json({

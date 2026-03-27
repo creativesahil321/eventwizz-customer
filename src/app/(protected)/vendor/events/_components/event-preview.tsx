@@ -24,6 +24,10 @@ interface EventPreviewProps {
 }
 
 export function EventPreview({ data, siteEssentials }: EventPreviewProps) {
+  const contactNumber =
+    data.contact_number || data.stepEight?.contact_number || "";
+  const contactEmail = data.email || "";
+
   // Use site essentials data if available, otherwise fall back to defaults
   const themeColors = siteEssentials?.colors || {
     primary: "#0F172A",
@@ -48,12 +52,15 @@ export function EventPreview({ data, siteEssentials }: EventPreviewProps) {
     themeTypography.fontFamily?.heading || "'Inter', sans-serif";
   const bodyFont = themeTypography.fontFamily?.body || "'Inter', sans-serif";
 
-  // Apply theme colors as CSS variables
+  // Footer is usually dark; body text (--color-text) is dark too — use a dedicated
+  // footer foreground so contact lines are visible (same bug as footer === text hex).
   const previewStyles = {
     "--color-primary": themeColors.primary || "#0F172A",
     "--color-secondary": themeColors.secondary || "#64748B",
     "--color-header": themeColors.header || "#FFFFFF",
     "--color-footer": themeColors.footer || "#0F172A",
+    "--color-footer-text": "#F8FAFC",
+    "--color-footer-muted": "rgba(248, 250, 252, 0.35)",
     "--color-background": themeColors.background || "#F8FAFC",
     "--color-text": themeColors.text || "#0F172A",
     "--color-text-dimmed": themeColors.textDimmed || "#64748B",
@@ -82,7 +89,7 @@ export function EventPreview({ data, siteEssentials }: EventPreviewProps) {
       {/* ServerContext already provided at layout level - no need to wrap again */}
       {/* Header */}
       <CommonHeader
-        contact_number={data.stepEight?.contact_number || ""}
+        contact_number={contactNumber}
         logo={siteEssentials?.logo || data.logo || null}
         variant="preview"
       />
@@ -260,8 +267,8 @@ export function EventPreview({ data, siteEssentials }: EventPreviewProps) {
       <FooterSection
         logo={siteEssentials?.logo || data.logo || null}
         details={{
-          contact_number: data.stepEight?.contact_number || "",
-          email: "",
+          contact_number: contactNumber,
+          email: contactEmail,
           address: data.stepSix?.event_address || "",
         }}
         socialLinks={siteEssentials?.socialLinks}

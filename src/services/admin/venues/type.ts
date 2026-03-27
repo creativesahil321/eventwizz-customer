@@ -8,6 +8,7 @@ export interface AdminVenueItem {
   logo: string;
   address: string;
   status: string;
+  domain_status?: string;
   live_events: number;
   total_events: number;
   total_bookings: number;
@@ -86,8 +87,11 @@ export interface AdminVenueByIdBusinessDocuments {
 export interface AdminVenueByIdRecentEvent {
   id: number;
   event_name: string;
+  location_address?: string | null;
   date: string | null;
   event_date_raw: string | null;
+  /** When set: draft | pending | approved | rejected | changes_requested (backend contract). */
+  approval_status?: string | null;
 }
 
 export interface AdminVenueByIdLocation {
@@ -127,6 +131,25 @@ export interface AdminVenueByIdLoginSecurity {
   last_login: string | null;
 }
 
+export interface AdminVenueByIdCancellationRequestActions {
+  can_approve: boolean;
+  can_disapprove: boolean;
+}
+
+export interface AdminVenueByIdCancellationRequest {
+  event_id: number;
+  event_date_id: number;
+  event_name: string;
+  event_date: string | null;
+  event_date_raw: string | null;
+  requested_by: string;
+  requested_at: string;
+  requested_at_raw: string;
+  cancellation_reason: string | null;
+  status: string;
+  actions: AdminVenueByIdCancellationRequestActions;
+}
+
 /** Optional: when backend supports domain approval workflow */
 export interface AdminVenueByIdDomainApproval {
   requested_domain: string;
@@ -142,6 +165,7 @@ export interface AdminVenueByIdData {
   event_locations: AdminVenueByIdLocation[];
   financial_summary: AdminVenueByIdFinancialSummary;
   admin_notes: AdminVenueByIdAdminNotes;
+  event_cancellation_requests?: AdminVenueByIdCancellationRequest[];
   login_security: AdminVenueByIdLoginSecurity;
   domain_approval_request?: AdminVenueByIdDomainApproval;
 }

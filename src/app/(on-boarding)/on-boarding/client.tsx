@@ -27,8 +27,11 @@ function AILoadingSkeleton() {
 export default function OnboardingClientWrapper() {
   const { onboardingData, isLoading } = useOnboardingData();
   const [mode, setMode] = useState<OnboardingMode>("selecting");
+  // Tracks whether we've already resolved the mode from API/sessionStorage
+  // to avoid overwriting a freshly-picked mode with stale data
   const modeResolved = useRef(false);
 
+  // 1. On mount: restore mode from sessionStorage (fast — avoids flash of mode-selection screen)
   useEffect(() => {
     const savedMode = sessionStorage.getItem(MODE_STORAGE_KEY);
     if (savedMode === "ai" || savedMode === "manual") {
@@ -37,31 +40,53 @@ export default function OnboardingClientWrapper() {
     modeResolved.current = true;
   }, []);
 
+  // 2. When persistence API data arrives: check for DB-persisted mode first,
+  //    then fall back to the "has completed a step" heuristic.
+  //    Only runs once (modeResolved guard) to avoid overwriting user's live choice.
   useEffect(() => {
-    if (onboardingData?.data) {
-      const data = onboardingData.data as unknown as Record<string, unknown>;
-      const currentStep = Number(data.active_step || data.activeStep || data.current_step || data.on_boarding_step || 0);
-      // If vendor has completed any step, skip mode selection and go straight to the form
-      if (currentStep >= 1) {
+    if (!onboardingData?.data || modeResolved.current === false) return;
+
+    const data = onboardingData.data as unknown as Record<string, unknown>;
+
+    // Prefer the DB-persisted mode returned by GET /vendor/onboarding/steps/{id}
+    const persistedMode = data.mode as string | undefined;
+    if (persistedMode === "ai" || persistedMode === "manual") {
+      // Only apply if we haven't already resolved from sessionStorage
+      const sessionMode = sessionStorage.getItem(MODE_STORAGE_KEY);
+      if (!sessionMode) {
+        setMode(persistedMode);
+        sessionStorage.setItem(MODE_STORAGE_KEY, persistedMode);
+      }
+      return;
+    }
+
+    // Fallback: if vendor has completed at least one step, jump directly to manual form
+    const currentStep = Number(
+      data.active_step || data.activeStep || data.current_step || data.on_boarding_step || 0
+    );
+    if (currentStep >= 1) {
+      const sessionMode = sessionStorage.getItem(MODE_STORAGE_KEY);
+      if (!sessionMode) {
         setMode("manual");
         sessionStorage.setItem(MODE_STORAGE_KEY, "manual");
       }
     }
   }, [onboardingData]);
 
+  // 3. When vendor picks a mode — store locally only (no API call yet)
   const handleModeSelect = (selected: "ai" | "manual") => {
     setMode(selected);
     sessionStorage.setItem(MODE_STORAGE_KEY, selected);
   };
 
   const handleAIComplete = () => {
-    // After AI apply, always go to manual form — never back to mode selection
+    // AI flow is complete, switch to manual onboarding UI.
+    // Mode is already persisted via step payloads.
     sessionStorage.setItem(MODE_STORAGE_KEY, "manual");
     setMode("manual");
   };
 
   const handleSwitchToManual = () => {
-    // Go directly to manual form — never back to mode selection once a choice was made
     sessionStorage.setItem(MODE_STORAGE_KEY, "manual");
     setMode("manual");
   };
@@ -77,7 +102,7 @@ export default function OnboardingClientWrapper() {
   const safeData: ApiResponse | null = onboardingData || null;
 
   return (
-    <FormProvider serverData={safeData} mode={mode === "selecting" ? undefined : mode}>
+    <FormProvider serverData={safeData} mode={mode as "ai" | "manual"}>
       {mode === "ai" ? (
         <AIOnboardingFlow
           onComplete={handleAIComplete}

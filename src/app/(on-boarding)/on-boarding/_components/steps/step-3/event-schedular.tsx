@@ -235,7 +235,7 @@ const EventScheduler: React.FC<EventSchedulerProps> = ({
         </div>
       )}
       <Button
-        variant="event-secondary"
+        variant="event-outline"
         type="button"
         className="relative"
         onClick={() => {

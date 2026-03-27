@@ -58,13 +58,13 @@ export default function MenuSection({
       <div className="absolute inset-0 z-0">
         <img
           src={addCacheBusting(
-            menu_background_image || "/assets/images/events/menus.webp"
+            menu_background_image || "/assets/images/events/menus.webp",
           )}
           alt="Event background"
           className="absolute inset-0 w-full h-full object-cover opacity-30"
         />
         {/* Dark overlay */}
-        <div className="absolute inset-0 bg-black/70" />
+        <div className="absolute inset-0 bg-[var(--color-secondary)]/70" />
         {/* Optional texture overlay */}
         <div
           className="absolute inset-0 opacity-20"
@@ -76,7 +76,7 @@ export default function MenuSection({
       </div>
 
       {/* Foreground content */}
-      <div className="relative z-10 text-white">
+      <div className="relative z-10 text-[var(--color-secondary-foreground)]">
         <div className="w-full text-center py-5">
           <h2 className="text-3xl font-bold py-5 max-w-6xl mx-auto">
             {menu_title || "Heading e.g. Menu"}
@@ -122,7 +122,7 @@ export default function MenuSection({
                   <div className="w-full mb-4 overflow-hidden px-2" key={idx}>
                     <h4 className="text-base sm:text-lg font-bold flex items-start break-words overflow-hidden">
                       <Navigation2
-                        className="rotate-90 mr-1 sm:mr-2 text-red-500 flex-shrink-0 mt-1"
+                        className="rotate-90 mr-1 sm:mr-2 text-[var(--color-primary)] flex-shrink-0 mt-1"
                         size={14}
                       />
                       <span
@@ -137,7 +137,7 @@ export default function MenuSection({
                       </span>
                     </h4>
                     <div
-                      className="text-sm sm:text-base pl-4 sm:pl-6 break-words whitespace-normal overflow-hidden w-full"
+                      className="text-sm sm:text-base pl-4 sm:pl-6 break-words whitespace-normal overflow-hidden w-full text-[var(--color-secondary-foreground)]/90"
                       style={{
                         wordBreak: "break-word",
                         overflowWrap: "break-word",

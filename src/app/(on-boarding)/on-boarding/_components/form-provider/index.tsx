@@ -11,7 +11,12 @@ import {
 } from "react";
 import { useForm, UseFormReturn, Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { OnboardingFormData, onboardingSchema } from "./schema";
+import {
+  OnboardingFormData,
+  onboardingSchema,
+  normalizeStepOneFromApi,
+  coerceHasMultipleLocationsFromApi,
+} from "./schema";
 import { defaultValues } from "./defaultValues";
 import { toast } from "sonner";
 import { onboardingService } from "@/services/vendor/onboarding/onboarding.service";
@@ -34,6 +39,62 @@ interface FormContextType {
 }
 
 const FormContext = createContext<FormContextType | undefined>(undefined);
+
+function getStepElevenRecord(
+  data: Record<string, unknown>,
+): Record<string, unknown> | undefined {
+  const raw = data.stepEleven ?? data.step_eleven ?? data.step11;
+  if (raw && typeof raw === "object") {
+    return raw as Record<string, unknown>;
+  }
+  return undefined;
+}
+
+/**
+ * Hydrates `stepOne.has_multiple_locations` from persisted GET data.
+ * Priority: root → stepOne → step 11 (API often stores the flag only on `stepEleven`).
+ */
+function patchOnboardingPayloadFromApi(
+  raw: Record<string, unknown>,
+): Record<string, unknown> {
+  const dataAny = { ...raw };
+  const rootFlag = coerceHasMultipleLocationsFromApi(
+    dataAny.has_multiple_locations ?? dataAny.hasMultipleLocations,
+  );
+
+  const stepElevenRaw = getStepElevenRecord(dataAny);
+  const stepElevenFlag = coerceHasMultipleLocationsFromApi(
+    stepElevenRaw?.has_multiple_locations ??
+      stepElevenRaw?.hasMultipleLocations,
+  );
+
+  const normalizedStepOne = normalizeStepOneFromApi(dataAny.stepOne);
+  const stepOneSelfFlag = coerceHasMultipleLocationsFromApi(
+    normalizedStepOne.has_multiple_locations,
+  );
+
+  const persistedMulti =
+    rootFlag ?? stepOneSelfFlag ?? stepElevenFlag;
+
+  if (
+    dataAny.stepOne !== undefined ||
+    rootFlag !== undefined ||
+    stepElevenFlag !== undefined
+  ) {
+    dataAny.stepOne = {
+      ...defaultValues.stepOne,
+      ...(typeof dataAny.stepOne === "object" && dataAny.stepOne !== null
+        ? (dataAny.stepOne as object)
+        : {}),
+      ...normalizedStepOne,
+      ...(persistedMulti !== undefined
+        ? { has_multiple_locations: persistedMulti }
+        : {}),
+    };
+  }
+
+  return dataAny;
+}
 
 // Simplified saveStepData function
 const saveStepData = async (): Promise<{ success: boolean }> => {
@@ -78,11 +139,9 @@ export function FormProvider({
       const formData = serverData.data || serverData;
 
       if (formData && typeof formData === "object") {
-        // Type cast to any to check properties that might exist
-        const dataAny = formData as unknown as OnboardingFormData;
-
-        // Check if we have the step data directly or within data property
-        return dataAny as unknown as OnboardingFormData;
+        return patchOnboardingPayloadFromApi({
+          ...(formData as object),
+        } as Record<string, unknown>) as unknown as OnboardingFormData;
       }
     }
 
@@ -92,7 +151,7 @@ export function FormProvider({
   // Initialize the form
   const form = useForm<OnboardingFormData>({
     resolver: zodResolver(
-      onboardingSchema
+      onboardingSchema,
     ) as unknown as Resolver<OnboardingFormData>,
     defaultValues: useMemo(() => mergedDefaults, [mergedDefaults]),
     mode: "onChange",
@@ -104,7 +163,9 @@ export function FormProvider({
       const formData = serverData.data || serverData;
 
       if (formData && Object.keys(formData).length > 0) {
-        const dataAny = formData as Record<string, unknown>;
+        const dataAny = patchOnboardingPayloadFromApi({
+          ...(formData as object),
+        } as Record<string, unknown>);
         form.reset(dataAny as unknown as OnboardingFormData);
 
         // Update active step if available
@@ -180,7 +241,7 @@ export function FormProvider({
         console.error("Failed to update session with step:", error);
       }
     },
-    [setActiveStep, lastCompletedStep, updateSession]
+    [setActiveStep, lastCompletedStep, updateSession],
   );
 
   // Use a separate useEffect for hydration safety
@@ -320,7 +381,7 @@ export function FormProvider({
       save,
       next,
       back,
-    ]
+    ],
   );
 
   // Determine the layout type for the skeleton based on the active step
@@ -361,7 +422,7 @@ export function useFormContext() {
 // Simple debounce implementation
 function debounce<T extends (...args: unknown[]) => unknown>(
   fn: T,
-  delay: number
+  delay: number,
 ): (...args: Parameters<T>) => void {
   let timeoutId: NodeJS.Timeout;
   return (...args: Parameters<T>) => {

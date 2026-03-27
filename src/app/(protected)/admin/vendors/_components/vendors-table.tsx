@@ -83,7 +83,11 @@ function getVendorColumns(): ColumnDef<Vendor>[] {
       cell: ({ row }) => {
         const v = row.original;
         return (
-          <div className="flex items-start gap-3 min-w-[200px]">
+          <Link
+            href={`/admin/vendors/${v.id}`}
+            className="group flex items-start gap-3 min-w-[200px] rounded-md px-1.5 py-1 outline-none transition-colors hover:bg-slate-50 focus-visible:ring-2 focus-visible:ring-primary/40"
+            title={`View ${v.name}`}
+          >
             <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-md border border-slate-200">
               <Image
                 src={v.image}
@@ -94,14 +98,14 @@ function getVendorColumns(): ColumnDef<Vendor>[] {
               />
             </div>
             <div className="min-w-0">
-              <p className="font-semibold text-sm text-foreground leading-tight">
+              <p className="font-semibold text-sm text-foreground leading-tight transition-colors group-hover:text-primary">
                 {v.name}
               </p>
               <p className="text-xs text-muted-foreground mt-1 leading-snug line-clamp-2">
                 {v.address}
               </p>
             </div>
-          </div>
+          </Link>
         );
       },
       enableSorting: true,

@@ -1,4 +1,5 @@
 "use client";
+
 import { Button } from "@/components/ui/button";
 import { CardContent, CardHeader } from "@/components/ui/card";
 import {
@@ -10,14 +11,14 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useFormContext } from "../../form-provider";
 import { stepOneSchema, StepOneType } from "../../form-provider/schema";
 import GoogleBusinessSearch from "./google-business";
 import { env } from "@/env";
 import { fetchPlaceDetails } from "./_lib/actions";
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { OnboardingCard } from "@/components/ui/card";
 import {
   OnboardingTitle,
@@ -25,6 +26,19 @@ import {
 } from "@/components/ui/typography";
 import { onboardingService } from "@/services/vendor/onboarding/onboarding.service";
 import { useSession } from "next-auth/react";
+import { useGuidedOnboardingSections } from "../../../_lib/hooks/use-guided-onboarding-sections";
+import type { GuidedSectionConfig } from "../../../_lib/hooks/use-guided-onboarding-sections";
+import { GuidedMultiSectionBottomActions } from "../../guided-section-chips";
+import {
+  GuidedSectionActionFooter,
+  GuidedSectionCoreActions,
+  guidedOnboardingSaveNextButtonClass,
+} from "../../guided-sticky-approval-bar";
+import { guidedSectionSurfaceClass } from "../../guided-section-surface";
+import { cn } from "@/lib/utils";
+
+const RESOLVE_STEP_ONE_ERROR_INDEX = (keys: string[]) =>
+  keys.some((k) => k === "name" || k === "has_multiple_locations") ? 0 : 1;
 
 export default function StepOne() {
   const [loading, setLoading] = useState(false);
@@ -35,6 +49,9 @@ export default function StepOne() {
     resolver: zodResolver(stepOneSchema),
     defaultValues: {
       step: 1,
+      has_multiple_locations: globalForm.getValues(
+        "stepOne.has_multiple_locations",
+      ),
       name: globalForm.getValues("stepOne.name") || "",
       contact_number: globalForm.getValues("stepOne.contact_number") || "",
       email: globalForm.getValues("stepOne.email") || "",
@@ -46,31 +63,94 @@ export default function StepOne() {
     mode: "onChange",
   });
 
+  const localHasMultiple = useWatch({
+    control: form.control,
+    name: "has_multiple_locations",
+  });
+
+  const globalHasMultiple = useWatch({
+    control: globalForm.control,
+    name: "stepOne.has_multiple_locations",
+  });
+
+  /** Prefer global (hydrated from GET); local covers the gate before sync. */
+  const hasMultipleLocations = globalHasMultiple ?? localHasMultiple;
+
+  useEffect(() => {
+    const g = globalForm.getValues("stepOne");
+    if (!g || g.has_multiple_locations === undefined) return;
+    if (form.getValues("has_multiple_locations") === g.has_multiple_locations) {
+      return;
+    }
+    form.reset({
+      step: 1,
+      has_multiple_locations: g.has_multiple_locations,
+      name: g.name ?? "",
+      contact_number: g.contact_number ?? "",
+      email: g.email ?? "",
+      address: g.address ?? "",
+      domain: g.domain ?? "",
+      description: g.description ?? "",
+      city: g.city ?? "",
+    });
+  }, [globalHasMultiple, globalForm, form]);
+
+  const isBrandMode = hasMultipleLocations === true;
+
+  const sectionConfigs = useMemo(
+    (): GuidedSectionConfig<StepOneType>[] => [
+      {
+        id: "venue-search",
+        label: isBrandMode ? "Brand name" : "Venue search",
+        description: isBrandMode
+          ? "Enter your brand name (any name — not limited to Google listings)."
+          : "Pick your venue from Google Places.",
+        fields: ["name"],
+      },
+      {
+        id: "contact-details",
+        label: "Contact details",
+        description: "Phone, email, address, and city.",
+        fields: ["contact_number", "email", "address", "city"],
+      },
+    ],
+    [isBrandMode],
+  );
+
+  const guided = useGuidedOnboardingSections({
+    form,
+    sections: sectionConfigs,
+    resolveErrorSectionIndex: RESOLVE_STEP_ONE_ERROR_INDEX,
+  });
+
+  const persistLocationChoice = (value: boolean) => {
+    form.setValue("has_multiple_locations", value, { shouldValidate: true });
+    const prev = globalForm.getValues("stepOne");
+    globalForm.setValue("stepOne", {
+      ...prev,
+      has_multiple_locations: value,
+    });
+  };
+
   const handleSubmit = async (data: StepOneType) => {
+    if (!guided.allSectionsApproved) return;
     setLoading(true);
     try {
-      // Update global form state
       globalForm.setValue("stepOne", data);
 
-      // Call API using service
       const response = await onboardingService.storeStepData(data);
 
       if (response.status) {
-        // If vendor_location_id is in the response, update the session
         if (response.data?.vendor_location_id) {
           const vendorLocationId = response.data.vendor_location_id;
-
-          // Use the update method from useSession hook to update the session
           await update({
             vendor_location_id: vendorLocationId,
             on_boarding_step: response.data.on_boarding_step,
           });
         }
 
-        // INSTANT TRANSITION: Set active step FIRST for smooth UX
         setActiveStep(2);
 
-        // Then handle async operations in background
         Promise.all([
           response.data?.on_boarding_step
             ? update({ on_boarding_step: response.data.on_boarding_step })
@@ -87,6 +167,8 @@ export default function StepOne() {
     }
   };
 
+  const showLocationGate = hasMultipleLocations === undefined;
+
   return (
     <div className="flex flex-col items-center justify-center w-full min-h-screen py-8 px-4">
       <OnboardingCard className="w-full max-w-2xl">
@@ -94,156 +176,272 @@ export default function StepOne() {
           <OnboardingTitle>OK Tell us About Your Business!</OnboardingTitle>
         </CardHeader>
         <CardContent>
-          <section className="w-full mb-4">
-            <OnboardingSectionTitle>Venue Information</OnboardingSectionTitle>
-          </section>
-          <Form {...form}>
-            <form
-              onSubmit={form.handleSubmit(handleSubmit)}
-              className="space-y-6"
-            >
-              <Input type="hidden" {...form.register("domain")} />
-              <Input type="hidden" {...form.register("description")} />
-
-              {/* Venue Name - Full Width */}
-              <div className="w-full mb-6">
-                <FormField
-                  control={form.control}
-                  name="name"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="text-sm font-medium">
-                        Venue Name <span className="text-red-400">*</span>
-                      </FormLabel>
-                      <FormControl>
-                        <GoogleBusinessSearch
-                          apiKey={env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}
-                          value={field.value}
-                          onChange={(value) => field.onChange(value)}
-                          onSelect={(placeId) =>
-                            fetchPlaceDetails(form, placeId)
-                          }
-                        />
-                      </FormControl>
-                      <p className="text-xs text-[color:var(--color-primary)] mt-1 font-medium">
-                        ⓘ Only verified venues from Google Places can be
-                        selected
-                      </p>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-
-              {/* Other fields in 2-column grid */}
-              <div className="grid grid-cols-2 gap-x-8 gap-y-6">
-                <FormField
-                  control={form.control}
-                  name="contact_number"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="text-sm font-medium">
-                        Venue Contact Number
-                      </FormLabel>
-                      <FormControl>
-                        <Input
-                          type="tel"
-                          placeholder="123 456 7890"
-                          className="bg-white/5"
-                          maxLength={20}
-                          {...field}
-                          onChange={(e) => {
-                            // Only allow numbers, spaces, dashes, plus signs, and parentheses
-                            const value = e.target.value.replace(
-                              /[^\d\s\-+()]/g,
-                              ""
-                            );
-                            field.onChange(value);
-                          }}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="address"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="text-sm font-medium">
-                        Venue Address
-                      </FormLabel>
-                      <FormControl>
-                        <Input
-                          placeholder="e.g Stock Brook Country Club,..."
-                          className="bg-white/5"
-                          {...field}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="email"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="text-sm font-medium">
-                        Venue Email
-                      </FormLabel>
-                      <FormControl>
-                        <Input
-                          placeholder="Please enter venue email manually"
-                          className="bg-white/5"
-                          {...field}
-                        />
-                      </FormControl>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        Email must be entered manually for privacy reasons
-                      </p>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="city"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="text-sm font-medium">
-                        City <span className="text-red-400">*</span>
-                      </FormLabel>
-                      <FormControl>
-                        <Input
-                          placeholder="Select a venue to auto-fill"
-                          className="bg-white/5 cursor-not-allowed"
-                          readOnly
-                          {...field}
-                        />
-                      </FormControl>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        Auto-filled from Google Places when you select a venue
-                      </p>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-              <div className="flex items-center justify-center gap-4 pt-4">
+          {showLocationGate ? (
+            <div className="space-y-6">
+              <OnboardingSectionTitle>
+                Do you have multiple locations?
+              </OnboardingSectionTitle>
+              <p className="text-sm text-muted-foreground">
+                If you operate several venues under one brand, we&apos;ll label
+                this step for your brand and send the right details to our
+                systems. If you have a single venue, nothing changes in your
+                flow.
+              </p>
+              <div className="flex flex-col sm:flex-row gap-3 justify-center pt-2">
                 <Button
+                  type="button"
                   variant="event-primary"
-                  disabled={loading}
-                  type="submit"
-                  className="rounded-full px-8 py-2 text-white"
+                  className="min-w-[140px]"
+                  onClick={() => persistLocationChoice(true)}
                 >
-                  {loading ? "Saving..." : "Save & Next"}
+                  Yes, multiple locations
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="min-w-[140px] border-white/20 bg-white/5 hover:bg-white/10"
+                  onClick={() => persistLocationChoice(false)}
+                >
+                  No, single location
                 </Button>
               </div>
-            </form>
-          </Form>
+            </div>
+          ) : (
+            <>
+              <section className="w-full mb-4">
+                <OnboardingSectionTitle>
+                  {isBrandMode ? "Brand information" : "Venue Information"}
+                </OnboardingSectionTitle>
+              </section>
+              <Form {...form}>
+                <form
+                  id="onboarding-step-one-form"
+                  onSubmit={form.handleSubmit(handleSubmit)}
+                  className="space-y-6"
+                >
+                  <Input type="hidden" {...form.register("domain")} />
+                  <Input type="hidden" {...form.register("description")} />
+
+                  <section
+                    data-guided-section="venue-search"
+                    tabIndex={-1}
+                    className={guidedSectionSurfaceClass(
+                      guided.currentSectionIndex === 0,
+                    )}
+                  >
+                    <fieldset
+                      disabled={guided.currentSectionIndex !== 0}
+                      className={cn(
+                        "min-w-0 border-0 p-0 m-0",
+                        guided.currentSectionIndex !== 0 &&
+                          "pointer-events-none",
+                      )}
+                    >
+                      <div className="w-full mb-2">
+                        <FormField
+                          control={form.control}
+                          name="name"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel className="text-sm font-medium">
+                                {isBrandMode ? "Brand name" : "Venue Name"}{" "}
+                                <span className="text-red-400">*</span>
+                              </FormLabel>
+                              <FormControl>
+                                {isBrandMode ? (
+                                  <Input
+                                    placeholder="e.g. Acme Events Co."
+                                    className="bg-white/5"
+                                    maxLength={120}
+                                    {...field}
+                                    onChange={(e) =>
+                                      field.onChange(e.target.value)
+                                    }
+                                  />
+                                ) : (
+                                  <GoogleBusinessSearch
+                                    apiKey={env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}
+                                    value={field.value}
+                                    onChange={(value) => field.onChange(value)}
+                                    onSelect={(placeId) =>
+                                      fetchPlaceDetails(form, placeId)
+                                    }
+                                  />
+                                )}
+                              </FormControl>
+                              <p className="text-xs text-[color:var(--color-primary)] mt-1 font-medium">
+                                {isBrandMode
+                                  ? "ⓘ Type your trading or brand name — it does not need to match a Google listing."
+                                  : "ⓘ Only verified venues from Google Places can be selected"}
+                              </p>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </div>
+                      <GuidedSectionActionFooter
+                        isActive={guided.currentSectionIndex === 0}
+                        hideSectionMeta
+                      >
+                        <GuidedSectionCoreActions guided={guided} />
+                      </GuidedSectionActionFooter>
+                    </fieldset>
+                  </section>
+
+                  <section
+                    data-guided-section="contact-details"
+                    tabIndex={-1}
+                    className={guidedSectionSurfaceClass(
+                      guided.currentSectionIndex === 1,
+                    )}
+                  >
+                    <fieldset
+                      disabled={guided.currentSectionIndex !== 1}
+                      className={cn(
+                        "min-w-0 border-0 p-0 m-0",
+                        guided.currentSectionIndex !== 1 &&
+                          "pointer-events-none",
+                      )}
+                    >
+                      <div className="grid grid-cols-2 gap-x-8 gap-y-6">
+                        <FormField
+                          control={form.control}
+                          name="contact_number"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel className="text-sm font-medium">
+                                {isBrandMode
+                                  ? "Primary contact number"
+                                  : "Venue Contact Number"}
+                              </FormLabel>
+                              <FormControl>
+                                <Input
+                                  type="tel"
+                                  placeholder="123 456 7890"
+                                  className="bg-white/5"
+                                  maxLength={20}
+                                  {...field}
+                                  onChange={(e) => {
+                                    const value = e.target.value.replace(
+                                      /[^\d\s\-+()]/g,
+                                      "",
+                                    );
+                                    field.onChange(value);
+                                  }}
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={form.control}
+                          name="address"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel className="text-sm font-medium">
+                                {isBrandMode ? "Address" : "Venue Address"}
+                              </FormLabel>
+                              <FormControl>
+                                <Input
+                                  placeholder="e.g Stock Brook Country Club,..."
+                                  className="bg-white/5"
+                                  {...field}
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={form.control}
+                          name="email"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel className="text-sm font-medium">
+                                {isBrandMode ? "Email" : "Venue Email"}
+                              </FormLabel>
+                              <FormControl>
+                                <Input
+                                  placeholder="Please enter venue email manually"
+                                  className="bg-white/5"
+                                  {...field}
+                                />
+                              </FormControl>
+                              <p className="text-xs text-muted-foreground mt-1">
+                                Email must be entered manually for privacy
+                                reasons
+                              </p>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+
+                        <FormField
+                          control={form.control}
+                          name="city"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel className="text-sm font-medium">
+                                City <span className="text-red-400">*</span>
+                              </FormLabel>
+                              <FormControl>
+                                <Input
+                                  placeholder={
+                                    isBrandMode
+                                      ? "e.g. London"
+                                      : "Select a venue to auto-fill"
+                                  }
+                                  className={cn(
+                                    "bg-white/5",
+                                    !isBrandMode && "cursor-not-allowed",
+                                  )}
+                                  readOnly={!isBrandMode}
+                                  {...field}
+                                />
+                              </FormControl>
+                              <p className="text-xs text-muted-foreground mt-1">
+                                {isBrandMode
+                                  ? "Enter the city for your head office or main site (or your primary trading city)."
+                                  : "Auto-filled from Google Places when you select a venue"}
+                              </p>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </div>
+                      <GuidedSectionActionFooter
+                        isActive={guided.currentSectionIndex === 1}
+                        hideSectionMeta
+                      >
+                        <GuidedSectionCoreActions guided={guided} />
+                      </GuidedSectionActionFooter>
+                    </fieldset>
+                  </section>
+                  <GuidedMultiSectionBottomActions
+                    onApproveAll={guided.handleApproveAllSections}
+                    allSectionsApproved={guided.allSectionsApproved}
+                    saveSlot={
+                      <Button
+                        variant="event-primary"
+                        disabled={loading || !guided.allSectionsApproved}
+                        type="submit"
+                        form="onboarding-step-one-form"
+                        className={guidedOnboardingSaveNextButtonClass}
+                        title={
+                          !guided.allSectionsApproved
+                            ? "Approve all sections first"
+                            : undefined
+                        }
+                      >
+                        {loading ? "Saving..." : "Save & Next"}
+                      </Button>
+                    }
+                  />
+                </form>
+              </Form>
+            </>
+          )}
         </CardContent>
       </OnboardingCard>
     </div>

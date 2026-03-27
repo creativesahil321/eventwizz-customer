@@ -14,7 +14,7 @@ export default function ContactFormSection() {
   });
 
   const handleChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
   ) => {
     setFormData({
       ...formData,
@@ -35,27 +35,27 @@ export default function ContactFormSection() {
   };
 
   return (
-    <section className="bg-[#22263a] text-white py-12 md:py-16">
+    <section className="bg-[var(--color-secondary)] text-[var(--color-secondary-foreground)] py-12 md:py-16">
       <div className="container mx-auto px-4">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12 items-center">
           {/* Left Side - Text Content */}
           <div className="space-y-4">
             <div className="space-y-2">
-              <h3 className="text-lg font-medium text-gray-300">
+              <h3 className="text-lg font-medium text-[var(--color-secondary-foreground)]/80">
                 Booking and Event Assistance
               </h3>
               <h2 className="text-4xl md:text-5xl font-bold leading-tight">
                 Need help?
               </h2>
             </div>
-            <p className="text-gray-300 text-lg leading-relaxed max-w-md">
+            <p className="text-[var(--color-secondary-foreground)]/80 text-lg leading-relaxed max-w-md">
               Get in touch with our team for any questions about booking events,
               assistance with your account, or general inquiries.
             </p>
           </div>
 
           {/* Right Side - Contact Form */}
-          <div className="bg-white/5 backdrop-blur-sm rounded-lg p-6 md:p-8 border border-white/10">
+          <div className="bg-[var(--color-surface)]/20 backdrop-blur-sm rounded-lg p-6 md:p-8 border border-[var(--color-surface)]/35">
             <form onSubmit={handleSubmit} className="space-y-5">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <Input
@@ -65,7 +65,7 @@ export default function ContactFormSection() {
                   value={formData.name}
                   onChange={handleChange}
                   required
-                  className="bg-white/10 border-white/20 text-white placeholder:text-gray-400 rounded-lg focus:border-white/40 focus:ring-2 focus:ring-white/20 transition-all duration-200"
+                  className="bg-[var(--color-surface)]/80 border-[var(--color-surface)]/50 text-[var(--color-on-surface)] placeholder:text-[var(--color-on-surface)]/65 rounded-lg focus:border-[var(--color-primary)]/60 focus:ring-2 focus:ring-[var(--color-primary)]/20 transition-all duration-200"
                 />
                 <Input
                   type="email"
@@ -74,7 +74,7 @@ export default function ContactFormSection() {
                   value={formData.email}
                   onChange={handleChange}
                   required
-                  className="bg-white/10 border-white/20 text-white placeholder:text-gray-400 rounded-lg focus:border-white/40 focus:ring-2 focus:ring-white/20 transition-all duration-200"
+                  className="bg-[var(--color-surface)]/80 border-[var(--color-surface)]/50 text-[var(--color-on-surface)] placeholder:text-[var(--color-on-surface)]/65 rounded-lg focus:border-[var(--color-primary)]/60 focus:ring-2 focus:ring-[var(--color-primary)]/20 transition-all duration-200"
                 />
               </div>
               <Input
@@ -83,7 +83,7 @@ export default function ContactFormSection() {
                 placeholder="Phone Number"
                 value={formData.phone}
                 onChange={handleChange}
-                className="bg-white/10 border-white/20 text-white placeholder:text-gray-400 rounded-lg focus:border-white/40 focus:ring-2 focus:ring-white/20 transition-all duration-200"
+                className="bg-[var(--color-surface)]/80 border-[var(--color-surface)]/50 text-[var(--color-on-surface)] placeholder:text-[var(--color-on-surface)]/65 rounded-lg focus:border-[var(--color-primary)]/60 focus:ring-2 focus:ring-[var(--color-primary)]/20 transition-all duration-200"
               />
               <Textarea
                 name="message"
@@ -91,12 +91,9 @@ export default function ContactFormSection() {
                 value={formData.message}
                 onChange={handleChange}
                 required
-                className="bg-white/10 border-white/20 text-white placeholder:text-gray-400 rounded-lg focus:border-white/40 focus:ring-2 focus:ring-white/20 resize-none h-28 transition-all duration-200"
+                className="bg-[var(--color-surface)]/80 border-[var(--color-surface)]/50 text-[var(--color-on-surface)] placeholder:text-[var(--color-on-surface)]/65 rounded-lg focus:border-[var(--color-primary)]/60 focus:ring-2 focus:ring-[var(--color-primary)]/20 resize-none h-28 transition-all duration-200"
               />
-              <Button
-                type="submit"
-                className="w-full bg-white text-[#22263a] hover:bg-gray-100 rounded-lg px-6 py-3 font-semibold transition-all duration-200 transform hover:scale-[1.02]"
-              >
+              <Button type="submit" variant="event-primary">
                 Send Message
               </Button>
             </form>

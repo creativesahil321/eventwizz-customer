@@ -23,6 +23,11 @@ import {
   EventOverviewResponse,
 } from "./type";
 
+/** Step 3 API body requires a resolved venue id */
+export type StepThreeSavePayload = StepThreeType & {
+  vendor_location_id: number;
+};
+
 export const eventsService = {
   // Get current onboarding step from session
 
@@ -200,6 +205,21 @@ export const eventsService = {
   }): Promise<ApiResponse<null>> => {
     return api.post<ApiResponse<null>>(
       API_ENDPOINTS.VENDOR.EVENT.BULK_UPDATE_STATUS,
+      data,
+      {
+        returnFullResponse: true,
+      }
+    );
+  },
+
+  /**
+   * Permanently delete multiple draft events (vendor bulk delete)
+   */
+  bulkDeleteEvents: async (data: {
+    event_ids: number[];
+  }): Promise<ApiResponse<null>> => {
+    return api.post<ApiResponse<null>>(
+      API_ENDPOINTS.VENDOR.EVENT.BULK_DELETE,
       data,
       {
         returnFullResponse: true,
@@ -487,12 +507,13 @@ export const eventsService = {
   },
 
   /**
-   * Store step 5 onboarding data (booking type and dates/pricing)
-   * @param data Step 5 data to be stored
-   * @returns API response with status and message
+   * Store step 3 data (event dates, tickets/tables, payment per date).
+   * @param data Must include resolved `vendor_location_id` for the API contract.
    */
 
-  storeStepThreeData: async (data: StepThreeType): Promise<ApiResponse> => {
+  storeStepThreeData: async (
+    data: StepThreeSavePayload
+  ): Promise<ApiResponse> => {
     // Format dates to match API expectations
     const formattedDates = data.dates?.map(
       (date: StepThreeType["dates"][number]) => {
@@ -517,9 +538,17 @@ export const eventsService = {
         // Return formatted date object for API
         // Now using date.booking_type instead of data.booking_type
         const baseDate = {
+          ...(typeof date.id === "number" &&
+            Number.isFinite(date.id) &&
+            date.id > 0 && { id: date.id }),
           event_date: date.event_date,
           booking_type: date.booking_type,
           ...(date.cancelled === true && { cancelled: true }),
+          ...(date.cancelled === true &&
+            date.cancel_reason?.trim() && {
+              cancel_reason: date.cancel_reason.trim(),
+              cancellation_reason: date.cancel_reason.trim(),
+            }),
           total_table_types:
             date.booking_type !== "tickets" ? date.total_table_types : 0,
           tables: date.booking_type !== "tickets" ? date.tables : [],
@@ -544,11 +573,11 @@ export const eventsService = {
       }
     );
 
-    // Create payload with all required data
+    // Create payload with all required data (matches backend step-3 contract)
     const payload = {
-      step: data.step, // We're sending as step
+      step: data.step,
+      vendor_location_id: data.vendor_location_id,
       event_id: data.event_id,
-      // Remove global booking_type as it's now part of each date
       dates: formattedDates || [],
     };
 
@@ -580,8 +609,15 @@ export const eventsService = {
       }
     }
 
-    // Notify that data has changed if successful
-    if (response.status) {
+    // Do not broadcast refresh when the event was removed — listeners would refetch a deleted id (404 × N).
+    const eventDeleted =
+      response.status &&
+      response.data &&
+      typeof response.data === "object" &&
+      "event_deleted" in response.data &&
+      (response.data as { event_deleted?: boolean }).event_deleted === true;
+
+    if (response.status && !eventDeleted) {
       await eventsService.notifyDataChanged();
     }
 

@@ -132,15 +132,30 @@ export function FormProvider({
         // Normalize stepThree dates: the API may return "has_bookings " with a
         // trailing space in the key — strip it so the form field resolves correctly.
         const rawStepThree = eventDataAny.stepThree;
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const normalizedStepThree = rawStepThree
           ? {
               ...rawStepThree,
+              vendor_location_id:
+                rawStepThree.vendor_location_id ??
+                (eventDataAny as { vendor_location_id?: number })
+                  .vendor_location_id ??
+                eventDataAny.stepOne?.vendor_location_id,
               // eslint-disable-next-line @typescript-eslint/no-explicit-any
               dates: rawStepThree.dates?.map((date: any) => ({
                 ...date,
                 has_bookings:
                   date["has_bookings"] ?? date["has_bookings "] ?? false,
+                cancel_reason:
+                  date.cancel_reason ?? date.cancellation_reason ?? "",
+                use_cancel_date_action:
+                  date.use_cancel_date_action === true ||
+                  date.use_cancel_date_action === 1,
+                cancellation_request_pending:
+                  date.cancellation_request_pending === true ||
+                  date.cancellation_request_pending === 1,
+                has_financial_bookings:
+                  date.has_financial_bookings === true ||
+                  date.has_financial_bookings === 1,
               })),
             }
           : initialData.stepThree;

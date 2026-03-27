@@ -241,8 +241,8 @@ export default function EventOverviewClient({
             </Button>
           </Link>
           <div>
-            <h1 className="text-2xl font-bold text-white">{eventData.name}</h1>
-            <p className="text-sm text-white">
+            <h1 className="text-2xl font-bold text-[var(--text-primary)]">{eventData.name}</h1>
+            <p className="text-sm text-[var(--text-primary)]">
               Event Overview & Booking Details
             </p>
           </div>

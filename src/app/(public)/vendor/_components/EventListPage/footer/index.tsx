@@ -18,19 +18,25 @@ import { addCacheBusting } from "@/lib/image-utils";
 
 interface FooterSectionProps {
   copyright?: string | null;
+  logo?: string | null;
 }
 
-export default function FooterSection({ copyright }: FooterSectionProps = {}) {
+export default function FooterSection({
+  copyright,
+  logo,
+}: FooterSectionProps = {}) {
   const { theme } = useContext(ServerContext);
   // Cast theme to our known structure
   const vendorTheme = theme as ThemeSchema;
 
+  const logoToUse = logo || theme?.logo;
   const logoPath =
-    theme?.logo?.startsWith("/") ||
-    theme?.logo?.startsWith("data:") ||
-    theme?.logo?.startsWith("http") ||
-    theme?.logo?.startsWith("https")
-      ? theme.logo
+    logoToUse?.startsWith("/") ||
+    logoToUse?.startsWith("data:") ||
+    logoToUse?.startsWith("http") ||
+    logoToUse?.startsWith("https") ||
+    logoToUse?.startsWith("blob")
+      ? logoToUse
       : "/assets/images/logos/eventwizz-logo.png";
   // Current year for copyright
   const currentYear = new Date().getFullYear();

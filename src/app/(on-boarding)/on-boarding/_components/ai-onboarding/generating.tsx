@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { motion } from "framer-motion";
 import { Sparkles } from "lucide-react";
 
@@ -32,24 +32,43 @@ const GENERATION_STEPS = [
 
 interface AIGeneratingProps {
   venueName: string;
+  hasMultipleLocations?: boolean;
 }
 
-export default function AIGenerating({ venueName }: AIGeneratingProps) {
+export default function AIGenerating({
+  venueName,
+  hasMultipleLocations = false,
+}: AIGeneratingProps) {
   const [currentStep, setCurrentStep] = useState(0);
   const [progress, setProgress] = useState(0);
 
+  const generationSteps = useMemo(
+    () =>
+      GENERATION_STEPS.map((s, i) =>
+        i === 0
+          ? {
+              ...s,
+              label: hasMultipleLocations
+                ? "Analyzing brand & business details"
+                : s.label,
+            }
+          : s,
+      ),
+    [hasMultipleLocations],
+  );
+
   useEffect(() => {
-    const stepDuration = GENERATION_STEPS[currentStep]?.duration || 2000;
+    const stepDuration = generationSteps[currentStep]?.duration || 2000;
     const progressInterval = setInterval(() => {
       setProgress((prev) => {
-        const target = ((currentStep + 1) / GENERATION_STEPS.length) * 100;
+        const target = ((currentStep + 1) / generationSteps.length) * 100;
         const increment = 0.5;
         return prev < target ? Math.min(prev + increment, target) : prev;
       });
     }, 50);
 
     const stepTimer = setTimeout(() => {
-      if (currentStep < GENERATION_STEPS.length - 1) {
+      if (currentStep < generationSteps.length - 1) {
         setCurrentStep((prev) => prev + 1);
       }
     }, stepDuration);
@@ -58,7 +77,7 @@ export default function AIGenerating({ venueName }: AIGeneratingProps) {
       clearInterval(progressInterval);
       clearTimeout(stepTimer);
     };
-  }, [currentStep]);
+  }, [currentStep, generationSteps]);
 
   return (
     <div className="relative z-10 flex items-center justify-center min-h-screen">
@@ -84,7 +103,9 @@ export default function AIGenerating({ venueName }: AIGeneratingProps) {
           Building your site...
         </h2>
         <p className="text-slate-400 text-sm mb-8">
-          Creating professional content for{" "}
+          {hasMultipleLocations
+            ? "Creating professional content for your brand "
+            : "Creating professional content for "}
           <span className="font-medium" style={themeAccent.text}>{venueName}</span>
         </p>
 
@@ -106,7 +127,7 @@ export default function AIGenerating({ venueName }: AIGeneratingProps) {
 
         {/* Step indicators */}
         <div className="space-y-2 max-w-sm mx-auto">
-          {GENERATION_STEPS.map((genStep, index) => (
+          {generationSteps.map((genStep, index) => (
             <motion.div
               key={index}
               initial={{ opacity: 0, x: -10 }}

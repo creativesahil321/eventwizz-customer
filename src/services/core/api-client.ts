@@ -446,7 +446,22 @@ apiClient.interceptors.response.use(
           // Handle unauthorized
           handleUnauthorizedAccess(message, isSecurityViolation);
           break;
-        case 403:
+        case 403: {
+          const requestUrl403 = error.config?.url || "";
+          const isCustomerOnlyRoute =
+            requestUrl403.includes("/customer/") &&
+            !requestUrl403.includes("/vendor/");
+          if (isCustomerOnlyRoute && isBrowser) {
+            const authStore = useAuthStore.getState();
+            const at = authStore.account_type;
+            if (at && at !== "customer") {
+              console.warn(
+                `[API Client] 403 on customer-only route for non-customer (${at}); not a session violation: ${requestUrl403}`
+              );
+              return Promise.reject(error);
+            }
+          }
+
           // Handle forbidden - could also be a security issue
           if (isSecurityViolation) {
             handleUnauthorizedAccess(message, true);
@@ -544,6 +559,7 @@ apiClient.interceptors.response.use(
             }
           }
           break;
+        }
         case 404:
           // Handle not found - show error toast with message from response
           const notFoundData = error.response.data as ApiErrorResponse;

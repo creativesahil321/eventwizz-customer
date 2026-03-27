@@ -21,6 +21,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
+import AddressAutocomplete from "@/app/(protected)/vendor/events/_components/tab-event-form/tabs/_components/address-autocomplete";
 import type {
   AIEventInput,
   AIEventGeneratedContent,
@@ -28,11 +29,19 @@ import type {
   AIEventTicket,
   AIEventTable,
 } from "@/app/api/ai/generate-event/route";
+import { api } from "@/services/core/api-client";
+import type { ApiResponse } from "@/services/core/api-client";
+import { API_ENDPOINTS } from "@/services/core/endpoints";
 import { eventsService } from "@/services/vendor/events/events.service";
+import type { EventDetailData } from "@/services/vendor/events/type";
 import type { StepOneType } from "@/app/(protected)/vendor/events/_components/tab-event-form/schema";
 import {
   getDummyImages,
-  urlToFile,
+  getImagesByCategoryId,
+  urlToImageFile,
+  fetchGalleryFiles,
+  createPlaceholderEventBanner,
+  createPlaceholderPackageImage,
 } from "@/app/(on-boarding)/on-boarding/_lib/constants/dummy-images";
 
 const APPLY_STEPS = [
@@ -149,16 +158,24 @@ export default function AIEventReviewContent({
       const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
       const s = editedContent;
 
-      const eventType = eventInput.eventType || "default";
-      const dummyImages = getDummyImages(eventType);
+      const eventType = eventInput.eventType || "other";
+      // Category-based images (API category IDs 1–22): Christmas, New Year, Diwali, etc.
+      // Fall back to event-type match only when no category is selected.
+      const dummyImages =
+        categoryId > 0 ? getImagesByCategoryId(categoryId) : getDummyImages(eventType);
 
       // Step 0 — Event details (Step 1 API → creates event, returns event_id)
       setApplyStep(0);
 
-      let bannerFile: File | null = null;
-      try {
-        bannerFile = await urlToFile(dummyImages.banner, "event-banner");
-      } catch { /* proceed without banner */ }
+      const bannerFile =
+        (await urlToImageFile(dummyImages.banner, "event-banner")) ??
+        (await createPlaceholderEventBanner(s.stepOne.event_name));
+
+      const schedulerBgUrl = (dummyImages as { scheduler_background?: string }).scheduler_background;
+      const schedulerBgFile = schedulerBgUrl
+        ? (await urlToImageFile(schedulerBgUrl, "event-scheduler-background")) ??
+          (await createPlaceholderEventBanner(`${s.stepOne.event_name} · schedule`))
+        : null;
 
       const stepOneData: StepOneType = {
         step: 1 as const,
@@ -173,6 +190,7 @@ export default function AIEventReviewContent({
         event_schedular: s.stepOne.event_schedular,
         event_banner_image: bannerFile,
         event_banner_video: null,
+        event_schedular_background_image: schedulerBgFile ?? undefined,
       };
 
       const step1Res = await eventsService.storeStepOneData(stepOneData);
@@ -182,26 +200,45 @@ export default function AIEventReviewContent({
 
       if (!eventId) throw new Error("Failed to create event — no event_id returned");
 
-      // Step 1 — Packages
-      setApplyStep(1);
-      if (!removedSections.has("stepTwo")) {
-        let packageImage: File | null = null;
-        try {
-          const file = await urlToFile(dummyImages.package, "package-image");
-          if (file.type.startsWith("image/")) packageImage = file;
-        } catch { /* proceed without image */ }
-
-        await eventsService.storeStepTwoData({
-          step: 2 as const,
-          event_id: eventId,
-          package_title: s.stepTwo.package_title,
-          package_description: s.stepTwo.package_description,
-          package_button_name: s.stepTwo.package_button_name,
-          package_details: s.stepTwo.package_details,
-          package_image: packageImage,
-          gallery: [],
-        });
+      const detailRes = await api.get<ApiResponse<EventDetailData>>(
+        API_ENDPOINTS.VENDOR.EVENT.GET_EVENT.replace("{eventId}", String(eventId)),
+        { returnFullResponse: true }
+      );
+      const vendorLocationId =
+        detailRes?.data?.vendor_location_id ??
+        detailRes?.data?.stepOne?.vendor_location_id;
+      if (!vendorLocationId || vendorLocationId < 1) {
+        throw new Error(
+          "Could not resolve venue location for this event. Open the event editor and ensure a venue is selected, then try again."
+        );
       }
+
+      // Step 1 — Packages (with package image + gallery placeholders by event type)
+      setApplyStep(1);
+      const packageImage =
+        (await urlToImageFile(dummyImages.package, "package-image")) ??
+        (await createPlaceholderPackageImage(
+          removedSections.has("stepTwo") ? "Package" : s.stepTwo.package_title
+        ));
+
+      const galleryUrls = dummyImages.gallery ?? [];
+      const galleryFiles =
+        galleryUrls.length > 0
+          ? await fetchGalleryFiles(galleryUrls).then((files) =>
+              files.slice(0, 8)
+            )
+          : [];
+
+      await eventsService.storeStepTwoData({
+        step: 2 as const,
+        event_id: eventId,
+        package_title: removedSections.has("stepTwo") ? "Package" : s.stepTwo.package_title,
+        package_description: removedSections.has("stepTwo") ? "Package details" : s.stepTwo.package_description,
+        package_button_name: removedSections.has("stepTwo") ? "Book Now" : s.stepTwo.package_button_name,
+        package_details: removedSections.has("stepTwo") ? [{ title: "VIP Access" }] : s.stepTwo.package_details,
+        package_image: packageImage,
+        gallery: galleryFiles,
+      });
       await sleep(300);
 
       // Step 2 — Dates / Tickets / Tables
@@ -265,41 +302,49 @@ export default function AIEventReviewContent({
         await eventsService.storeStepThreeData({
           step: 3 as const,
           event_id: eventId,
+          vendor_location_id: vendorLocationId,
           dates,
         });
       }
       await sleep(300);
 
-      // Step 3 — Menu
+      // Step 3 — Menu (with optional menu background image when catering is enabled)
       setApplyStep(3);
-      if (!removedSections.has("stepFour")) {
-        await eventsService.storeStepFourData({
-          step: 4 as const,
-          event_id: eventId,
-          catering_option: s.stepFour.catering_option,
-          menu_title: s.stepFour.menu_title,
-          menu_description: s.stepFour.menu_description,
-          menus: s.stepFour.menus,
-        });
-      }
+      const hasCatering = !removedSections.has("stepFour") && s.stepFour.catering_option === 1;
+      const menuBgUrl = hasCatering
+        ? (dummyImages as { menu_background?: string }).menu_background
+        : null;
+      const menuBgFile = menuBgUrl
+        ? (await urlToImageFile(menuBgUrl, "menu-background")) ??
+          (await createPlaceholderPackageImage(s.stepFour.menu_title || "Menu"))
+        : null;
+      await eventsService.storeStepFourData({
+        step: 4 as const,
+        event_id: eventId,
+        catering_option: removedSections.has("stepFour") ? 0 : s.stepFour.catering_option,
+        menu_title: hasCatering ? s.stepFour.menu_title : undefined,
+        menu_description: hasCatering ? s.stepFour.menu_description : undefined,
+        menus: hasCatering ? s.stepFour.menus : undefined,
+        menu_background_image: menuBgFile ?? undefined,
+      });
       await sleep(300);
 
       // Step 4 — Drinks
       setApplyStep(4);
-      if (!removedSections.has("stepFive")) {
-        await eventsService.storeStepFiveData({
-          step: 5 as const,
-          event_id: eventId,
-          drink_title: s.stepFive.drink_title,
-          drink_description: s.stepFive.drink_description,
-          packages: s.stepFive.packages.map((p) => ({
-            title: p.title,
-            description: p.description,
-            price: p.price,
-            available_quantity: p.available_quantity,
-          })),
-        });
-      }
+      await eventsService.storeStepFiveData({
+        step: 5 as const,
+        event_id: eventId,
+        drink_title: removedSections.has("stepFive") ? "Drinks" : s.stepFive.drink_title,
+        drink_description: removedSections.has("stepFive") ? "Drink packages" : s.stepFive.drink_description,
+        packages: removedSections.has("stepFive") 
+          ? [{ title: "Standard", description: "Standard package", price: 50, available_quantity: 100 }]
+          : s.stepFive.packages.map((p) => ({
+              title: p.title,
+              description: p.description,
+              price: p.price,
+              available_quantity: p.available_quantity,
+            })),
+      });
       await sleep(300);
 
       // Step 5 — Location / pricing
@@ -1678,11 +1723,18 @@ function StepSixEditor({
 }) {
   return (
     <>
-      <EditableField
-        label="Event Address"
-        value={content.event_address}
-        onChange={(v) => onChange("event_address", v)}
-      />
+      <div className="space-y-1.5">
+        <label className="text-[10px] uppercase tracking-wide text-slate-500 font-semibold">
+          Event Address
+        </label>
+        <AddressAutocomplete
+          value={content.event_address || ""}
+          onChange={(address) => onChange("event_address", address)}
+          onSelect={(_, address) => onChange("event_address", address)}
+          placeholder="Type to search for a UK address or location..."
+          className="w-full"
+        />
+      </div>
       <EditableField
         label="Price Starting From (£)"
         value={content.price_start_from}

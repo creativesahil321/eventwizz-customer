@@ -45,10 +45,10 @@ export default function NotificationTable({
       priority: "medium", // Default priority, adjust based on your needs
       payload: {
         user: {
-          username: apiNotif.user.full_name,
-          firstName: apiNotif.user.full_name.split(" ")[0] || "",
-          lastName: apiNotif.user.full_name.split(" ").slice(1).join(" ") || "",
-          avatar: apiNotif.user.avatar,
+          username: "system",
+          firstName: apiNotif.title || "Notification",
+          lastName: "",
+          avatar: undefined,
         },
         category: "", // Extract from notice or title if needed
         notification: apiNotif.notice,

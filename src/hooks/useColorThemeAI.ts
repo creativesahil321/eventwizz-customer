@@ -8,6 +8,8 @@ type ColorThemeRequest = {
   existingBrand?: string;
   customTheme?: string;
   eventType?: string;
+  logoColorTone?: "dark" | "light" | "colorful" | "unsure";
+  logoColorHex?: string;
 };
 
 type ColorTheme = {

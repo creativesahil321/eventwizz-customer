@@ -13,15 +13,16 @@ import EventsTabSkeleton from "./events-skeleton";
 import {
   useEvents,
   useBulkUpdateEventStatus,
+  useBulkDeleteEvents,
   eventKeys,
 } from "../../_lib/queries";
 import { useQueryClient } from "@tanstack/react-query";
 import EventPagination from "./event-pagination";
 import { Button } from "@/components/ui/button";
-import { RefreshCcw, Check, X, FileEdit } from "lucide-react";
-import { useState, useEffect } from "react";
+import { RefreshCcw, Check, Trash2 } from "lucide-react";
+import { useState, useEffect, useMemo } from "react";
 import { useSession } from "next-auth/react";
-import { EventsQueryParams } from "@/services/vendor/events/type";
+import { EventItem, EventsQueryParams } from "@/services/vendor/events/type";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   AlertDialog,
@@ -58,9 +59,10 @@ export default function EventTabs({ search }: EventsProps) {
   // Confirmation modal states
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [pendingAction, setPendingAction] = useState<
-    "active" | "draft" | "cancelled" | "refresh" | null
+    "active" | "refresh" | null
   >(null);
   const [confirmMessage, setConfirmMessage] = useState("");
+  const [bulkDeleteDialogOpen, setBulkDeleteDialogOpen] = useState(false);
 
   // Query state for filters and pagination
   const [status, setStatus] = useQueryState(
@@ -98,9 +100,27 @@ export default function EventTabs({ search }: EventsProps) {
   const { mutate: bulkUpdateStatus, isPending: isUpdating } =
     useBulkUpdateEventStatus();
 
+  const { mutate: bulkDeleteEvents, isPending: isBulkDeleting } =
+    useBulkDeleteEvents();
+
   // Extract items and meta from the response
   const events = eventsData?.items || [];
   const meta = eventsData?.meta || { last_page: 1, total: 0 };
+
+  /** Bulk select, Set Active, Delete — Draft tab only (list is already drafts) */
+  const isDraftTab = status === "draft";
+  const hasDraftEventsToSelect = events.length > 0;
+  const showDraftBulkUi = isDraftTab && hasDraftEventsToSelect;
+
+  /** Selected rows: plain drafts vs submitted for admin review */
+  const selectedDraftBreakdown = useMemo(() => {
+    const picked = selectedEvents
+      .map((id) => events.find((e) => e.id === id))
+      .filter((e): e is EventItem => Boolean(e));
+    const underReview = picked.filter((e) => e.is_submitted_for_approval).length;
+    const draftOnly = picked.length - underReview;
+    return { total: picked.length, underReview, draftOnly };
+  }, [selectedEvents, events]);
 
   // Toggle selection mode
   const toggleSelectionMode = () => {
@@ -135,38 +155,15 @@ export default function EventTabs({ search }: EventsProps) {
     return event?.status === "cancelled";
   });
 
-  // Handle bulk status update with confirmation
-  const handleBulkStatusUpdate = (action: "active" | "draft" | "cancelled") => {
-    if (selectedEvents.length === 0) return;
+  // Bulk set active (draft tab only — no "Set Draft" here; everything is already draft)
+  const handleBulkSetActive = () => {
+    if (selectedEvents.length === 0 || hasCancelledEvents) return;
 
-    // Prevent reactivating or drafting cancelled events
-    if ((action === "active" || action === "draft") && hasCancelledEvents) {
-      return; // Do nothing - buttons will be disabled
-    }
-
-    // Set confirmation modal data
-    const actionLabels = {
-      active: "Set Active",
-      draft: "Set Draft",
-      cancelled: "Set Cancelled",
-    };
-
-    const actionDescriptions = {
-      active:
-        "This will set the selected events as active and make them visible to customers.",
-      draft:
-        "This will set the selected events as draft and hide them from customers.",
-      cancelled:
-        "This will cancel the selected events and they will no longer be available for booking.",
-    };
-
-    setPendingAction(action);
+    setPendingAction("active");
     setConfirmMessage(
-      `Are you sure you want to ${actionLabels[action].toLowerCase()} ${
+      `Are you sure you want to set active ${
         selectedEvents.length
-      } event${selectedEvents.length > 1 ? "s" : ""}? ${
-        actionDescriptions[action]
-      }`,
+      } event${selectedEvents.length > 1 ? "s" : ""}? This will make them visible to customers.`,
     );
     setShowConfirmModal(true);
   };
@@ -208,12 +205,37 @@ export default function EventTabs({ search }: EventsProps) {
     setPendingAction(null);
   };
 
-  // Reset page to 1 when changing tabs
+  const confirmBulkDelete = () => {
+    if (selectedEvents.length === 0) return;
+    bulkDeleteEvents(
+      { event_ids: selectedEvents },
+      {
+        onSuccess: () => {
+          setBulkDeleteDialogOpen(false);
+          setSelectedEvents([]);
+          setSelectionMode(false);
+          refetch();
+        },
+      }
+    );
+  };
+
+  // Reset page to 1 when changing tabs; exit bulk mode when leaving Draft
   useEffect(() => {
     setPage(1);
-    // Clear selection when changing tabs
     setSelectedEvents([]);
+    if (status !== "draft") {
+      setSelectionMode(false);
+    }
   }, [status, setPage]);
+
+  // No rows — hide bulk UI and exit selection (e.g. after deleting last drafts)
+  useEffect(() => {
+    if (isDraftTab && events.length === 0) {
+      setSelectionMode(false);
+      setSelectedEvents([]);
+    }
+  }, [isDraftTab, events.length]);
 
   // Force a refetch of the data immediately
   const refreshData = () => {
@@ -226,29 +248,32 @@ export default function EventTabs({ search }: EventsProps) {
   return (
     <section className="w-full bg-background flex flex-col relative rounded-md text-black">
       <header className="bg-background p-4 sm:p-6 rounded-md flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div className="flex flex-col gap-3 w-full sm:w-auto">
-          <h2 className="text-xl sm:text-2xl title-header text-black font-bold">
-            All Events
-          </h2>
+        <div className="flex flex-col gap-3 w-full sm:flex-1 min-w-0">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-3 flex-wrap">
+            <h2 className="text-xl sm:text-2xl title-header text-black font-bold shrink-0">
+              All Events
+            </h2>
+            {showDraftBulkUi && (
+              <PermissionGuard permissionKey="update-event">
+                <Button
+                  size="sm"
+                  onClick={toggleSelectionMode}
+                  variant={selectionMode ? "event-outline" : "event-primary"}
+                  className="w-fit shrink-0"
+                >
+                  <span className="hidden sm:inline">
+                    {selectionMode ? "Exit Selection" : "Select Events"}
+                  </span>
+                  <span className="sm:hidden">
+                    {selectionMode ? "Exit" : "Select"}
+                  </span>
+                </Button>
+              </PermissionGuard>
+            )}
+          </div>
           <LocationIndicator variant="card" />
         </div>
-        <div className="flex flex-wrap gap-2 w-full sm:w-auto">
-          <PermissionGuard permissionKey="update-event">
-            <Button
-              size="sm"
-              onClick={toggleSelectionMode}
-              variant={selectionMode ? "event-outline" : "event-primary"}
-              className="flex-1 sm:flex-none"
-            >
-              <span className="hidden sm:inline">
-                {selectionMode ? "Exit Selection" : "Select Events"}
-              </span>
-              <span className="sm:hidden">
-                {selectionMode ? "Exit" : "Select"}
-              </span>
-            </Button>
-          </PermissionGuard>
-
+        <div className="flex flex-wrap gap-2 w-full sm:w-auto sm:shrink-0">
           <Button
             className="text-black flex items-center gap-1 flex-1 sm:flex-none"
             size="sm"
@@ -261,11 +286,11 @@ export default function EventTabs({ search }: EventsProps) {
         </div>
       </header>
 
-      {/* Bulk Actions Bar - visible only in selection mode */}
-      {selectionMode && (
+      {/* Bulk actions: Draft tab + has rows + selection mode */}
+      {showDraftBulkUi && selectionMode && (
         <PermissionGuard permissionKey="update-event">
           <div className="bg-muted/20 p-2 sm:p-3 mb-4 rounded-md mx-2 sm:mx-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-            <div className="flex flex-col gap-2 w-full sm:w-auto">
+            <div className="flex flex-col gap-2 w-full sm:w-auto sm:flex-1 min-w-0">
               <div className="flex items-center">
                 <Checkbox
                   id="select-all"
@@ -284,71 +309,50 @@ export default function EventTabs({ search }: EventsProps) {
               </div>
               {hasCancelledEvents && (
                 <div className="text-xs text-amber-600 bg-amber-50 px-2 py-1 rounded border border-amber-200">
-                  ⚠️ Cancelled events cannot be reactivated or drafted
+                  ⚠️ Cancelled events cannot be set to active
                 </div>
               )}
             </div>
 
-            <div className="flex flex-wrap gap-2 w-full sm:w-auto">
-              {status !== "active" && (
-                <Button
-                  className="flex items-center gap-1 flex-1 sm:flex-none"
-                  variant="event-primary"
-                  size="sm"
-                  disabled={
-                    selectedEvents.length === 0 ||
-                    isUpdating ||
-                    hasCancelledEvents
-                  }
-                  onClick={() => handleBulkStatusUpdate("active")}
-                  title={
-                    hasCancelledEvents
-                      ? "Cannot reactivate cancelled events"
-                      : ""
-                  }
-                >
-                  <Check className="h-4 w-4" />
-                  <span className="hidden sm:inline">Set Active</span>
-                  <span className="sm:hidden">Active</span>
-                </Button>
-              )}
+            <div className="flex flex-wrap gap-2 w-full sm:w-auto sm:justify-end">
+              <Button
+                className="flex items-center gap-1 flex-1 sm:flex-none"
+                variant="event-primary"
+                size="sm"
+                disabled={
+                  selectedEvents.length === 0 ||
+                  isUpdating ||
+                  isBulkDeleting ||
+                  hasCancelledEvents
+                }
+                onClick={() => handleBulkSetActive()}
+                title={
+                  hasCancelledEvents
+                    ? "Cannot set cancelled events to active"
+                    : ""
+                }
+              >
+                <Check className="h-4 w-4" />
+                <span className="hidden sm:inline">Set Active</span>
+                <span className="sm:hidden">Active</span>
+              </Button>
 
-              {status !== "draft" && (
-                <Button
-                  className="flex items-center gap-1 flex-1 sm:flex-none"
-                  variant="event-secondary"
-                  size="sm"
-                  disabled={
-                    selectedEvents.length === 0 ||
-                    isUpdating ||
-                    hasCancelledEvents
-                  }
-                  onClick={() => handleBulkStatusUpdate("draft")}
-                  title={
-                    hasCancelledEvents
-                      ? "Cannot draft cancelled events"
-                      : ""
-                  }
-                >
-                  <FileEdit className="h-4 w-4" />
-                  <span className="hidden sm:inline">Set Draft</span>
-                  <span className="sm:hidden">Draft</span>
-                </Button>
-              )}
-
-              {status !== "cancelled" && (
-                <Button
-                  className="flex items-center gap-1 flex-1 sm:flex-none"
-                  variant="destructive"
-                  size="sm"
-                  disabled={selectedEvents.length === 0 || isUpdating}
-                  onClick={() => handleBulkStatusUpdate("cancelled")}
-                >
-                  <X className="h-4 w-4" />
-                  <span className="hidden sm:inline">Set Cancelled</span>
-                  <span className="sm:hidden">Cancel</span>
-                </Button>
-              )}
+              <Button
+                className="flex items-center gap-1 flex-1 sm:flex-none"
+                variant="destructive"
+                size="sm"
+                disabled={
+                  selectedEvents.length === 0 ||
+                  isUpdating ||
+                  isBulkDeleting ||
+                  hasCancelledEvents
+                }
+                onClick={() => setBulkDeleteDialogOpen(true)}
+              >
+                <Trash2 className="h-4 w-4" />
+                <span className="hidden sm:inline">Delete selected</span>
+                <span className="sm:hidden">Delete</span>
+              </Button>
             </div>
           </div>
         </PermissionGuard>
@@ -395,7 +399,7 @@ export default function EventTabs({ search }: EventsProps) {
                       <CardContent className="px-0">
                         <EventCard
                           event={event}
-                          selectionMode={selectionMode}
+                          selectionMode={showDraftBulkUi && selectionMode}
                           selected={selectedEvents.includes(event.id)}
                           onSelect={() => toggleEventSelection(event.id)}
                         />
@@ -430,6 +434,76 @@ export default function EventTabs({ search }: EventsProps) {
             <AlertDialogAction onClick={executeBulkAction}>
               Confirm
             </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog
+        open={bulkDeleteDialogOpen}
+        onOpenChange={setBulkDeleteDialogOpen}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete selected draft events?</AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-3 text-left text-sm text-muted-foreground">
+                <p>
+                  You are about to permanently remove{" "}
+                  <span className="font-semibold text-foreground">
+                    {selectedDraftBreakdown.total}
+                  </span>{" "}
+                  {selectedDraftBreakdown.total === 1 ? "event" : "events"}{" "}
+                  from your account. Customers will no longer see these events,
+                  and this cannot be undone.
+                </p>
+                {(selectedDraftBreakdown.draftOnly > 0 ||
+                  selectedDraftBreakdown.underReview > 0) && (
+                  <div className="rounded-md border border-border bg-muted/40 px-3 py-2.5">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-foreground mb-2">
+                      Selection summary
+                    </p>
+                    <ul className="list-disc space-y-1 pl-4 text-xs sm:text-sm">
+                      {selectedDraftBreakdown.draftOnly > 0 && (
+                        <li>
+                          {selectedDraftBreakdown.draftOnly}{" "}
+                          {selectedDraftBreakdown.draftOnly === 1
+                            ? "event is"
+                            : "events are"}{" "}
+                          still in draft (not submitted for review)
+                        </li>
+                      )}
+                      {selectedDraftBreakdown.underReview > 0 && (
+                        <li>
+                          {selectedDraftBreakdown.underReview}{" "}
+                          {selectedDraftBreakdown.underReview === 1
+                            ? "event is"
+                            : "events are"}{" "}
+                          submitted and awaiting admin approval
+                        </li>
+                      )}
+                    </ul>
+                  </div>
+                )}
+                <p className="text-xs">
+                  If you are unsure, choose Cancel and review your selection
+                  before proceeding.
+                </p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isBulkDeleting}>
+              Cancel
+            </AlertDialogCancel>
+            <Button
+              type="button"
+              variant="destructive"
+              disabled={isBulkDeleting}
+              className="sm:ml-2"
+              onClick={() => confirmBulkDelete()}
+            >
+              {isBulkDeleting ? "Deleting…" : "Delete events"}
+            </Button>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

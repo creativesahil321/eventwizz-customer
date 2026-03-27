@@ -19,6 +19,12 @@ import { Resolver } from "react-hook-form";
 import { useSession } from "next-auth/react";
 import { StripeConnectButton } from "./stripe-connect-button";
 import { useEventId } from "../../../_lib/hooks/useEventId";
+import { WholeStepGuidedShell } from "../../whole-step-guided-shell";
+import { guidedInsetSectionSurfaceClass } from "../../guided-section-surface";
+import {
+  GuidedWholeStepApproveButton,
+  guidedOnboardingSkipButtonClass,
+} from "../../guided-sticky-approval-bar";
 import { PayPalConnectButton } from "./paypal-connect-button";
 import { TrueLayerConnectButton } from "./truelayer-connect-button";
 import { ChevronDown, ChevronUp, Info, Sparkles } from "lucide-react";
@@ -438,12 +444,68 @@ export default function StepTen() {
           <CardContent className="px-6 py-2 pb-8">
             <Form {...form}>
               <form
-                onSubmit={form.handleSubmit(onSubmit)}
+                onSubmit={(e) => e.preventDefault()}
                 className="space-y-6"
               >
                 <input type="hidden" {...form.register("step")} />
                 <input type="hidden" {...form.register("event_id")} />
 
+                <WholeStepGuidedShell
+                  form={form}
+                  sectionId="step-ten-payments"
+                  chipLabel="Payment methods"
+                  chipDescription="Bank transfer and card providers (optional to skip)."
+                  lenientApproval
+                  renderFooter={({ guided, sectionId }) => (
+                    <div className="flex w-full flex-col items-stretch gap-3">
+                      <p className="mx-auto max-w-xl px-2 text-center text-xs text-muted-foreground">
+                        Approve when you have reviewed the options.{" "}
+                        <span className="text-foreground/90">
+                          Save &amp; Continue
+                        </span>{" "}
+                        needs at least one connected provider; use{" "}
+                        <span className="text-foreground/90">
+                          Skip for Now
+                        </span>{" "}
+                        if you will set this up later.
+                      </p>
+                      <div className="flex w-full flex-wrap items-center justify-center gap-3">
+                        <GuidedWholeStepApproveButton
+                          guided={guided}
+                          sectionId={sectionId}
+                        />
+                        <Button
+                          variant="event-primary"
+                          type="button"
+                          className="shrink-0 rounded-full px-8 py-2 text-white"
+                          disabled={loading || !guided.allSectionsApproved}
+                          title={
+                            !guided.allSectionsApproved
+                              ? "Approve this step first"
+                              : undefined
+                          }
+                          onClick={() => {
+                            if (!guided.allSectionsApproved) return;
+                            void form.handleSubmit(onSubmit)();
+                          }}
+                        >
+                          {loading ? "Saving..." : "Save & Continue"}
+                        </Button>
+                        <Button
+                          variant="event-outline"
+                          type="button"
+                          onClick={handleSkip}
+                          className={guidedOnboardingSkipButtonClass}
+                          disabled={loading}
+                        >
+                          Skip for Now
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                >
+                  {() => (
+                    <>
                 {/* Pay by Bank Section (TrueLayer) */}
                 <section className="w-full mb-6 space-y-4">
                   <div className="flex items-center gap-2">
@@ -457,7 +519,7 @@ export default function StepTen() {
                     <AlertDescription className="text-green-900 dark:!text-green-900 text-sm [&_strong]:text-green-900 [&_strong]:dark:!text-green-900">
                       <strong>Direct Bank-to-Bank Payments:</strong> Customers
                       pay directly from their banking app - no card details
-                      needed. 40% lower fees than cards. FCA authorised and
+                      needed. 40% lower fees than cards. FCA authorized and
                       trusted by millions.
                     </AlertDescription>
                   </Alert>
@@ -486,7 +548,7 @@ export default function StepTen() {
                 </div>
 
                 {/* Online Payment Providers Section */}
-                <section className="w-full mb-4 space-y-6">
+                <section className={guidedInsetSectionSurfaceClass("w-full mb-4 space-y-6")}>
                   {/* Recommended Providers */}
                   <div className="space-y-4">
                     <div className="flex items-center gap-2">
@@ -610,27 +672,9 @@ export default function StepTen() {
                     bookings until payment is set up.
                   </AlertDescription>
                 </Alert>
-
-                {/* Action Buttons */}
-                <div className="flex items-center justify-center gap-4 pt-4">
-                  <Button
-                    variant="event-primary"
-                    type="submit"
-                    className="rounded-full px-8 py-2 text-white"
-                    disabled={loading}
-                  >
-                    {loading ? "Saving..." : "Save & Continue"}
-                  </Button>
-                  <Button
-                    variant="event-secondary"
-                    type="button"
-                    onClick={handleSkip}
-                    className="rounded-full px-8 py-2 text-white"
-                    disabled={loading}
-                  >
-                    Skip for Now
-                  </Button>
-                </div>
+                    </>
+                  )}
+                </WholeStepGuidedShell>
               </form>
             </Form>
           </CardContent>

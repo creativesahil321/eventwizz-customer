@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter } from "nextjs-toploader/app";
 import { useDomain } from "@/providers/domain-provider/domain-provider";
 import LocationSelectionHeader from "./_components/LocationPage/location-selection-header";
 import LocationGrid from "./_components/LocationPage/location-grid";

@@ -68,7 +68,7 @@ export default function CartManager({}: CartManagerProps) {
   const { setCurrentEvent } = useDrinkSelectionStore();
 
   // Cart synchronization
-  const { syncCart } = useCartSync();
+  const { syncCart } = useCartSync(apiCartData);
 
   // Delete mutations
   const deleteCartDateMutation = useDeleteCartDate();

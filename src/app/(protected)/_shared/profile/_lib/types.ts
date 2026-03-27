@@ -11,6 +11,7 @@ export type ProfileResponse = {
     is_password_set: boolean;
     _key: string;
     avatar: string;
+    venue_name?: string | null;
     first_name: string;
     last_name: string;
     full_name: string;

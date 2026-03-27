@@ -1,13 +1,13 @@
 "use client";
 
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Notification } from "@/services/common/notification/type";
 import { Badge } from "@/components/ui/badge";
 import { formatDistanceToNow } from "date-fns";
-import { CATEGORY_CONFIG } from "../_lib/constants";
-import { Loader2, User } from "lucide-react";
-import { env } from "@/env";
+import { Loader2 } from "lucide-react";
+import { resolveNotificationPresentation } from "../_lib/notification-ui";
+import { useRouter } from "next/navigation";
 
 interface NotificationItemProps {
   notification: Notification;
@@ -24,17 +24,11 @@ export function NotificationItemComponent({
   onMarkAsUnread,
   isUpdating = false,
 }: NotificationItemProps) {
-  const { id, user, title, notice, icon, is_read, created_at } = notification;
-
-  // Extract category from icon if available - handle both URL and class name formats
-  const iconParts = icon ? icon.split("/").pop()?.split(" ") : [];
-  const category = iconParts?.length
-    ? iconParts[iconParts.length - 1] || "check"
-    : "system";
-
-  // Get the category config or fallback to system
-  const categoryConfig =
-    CATEGORY_CONFIG[category?.toLowerCase()] || CATEGORY_CONFIG.system;
+  const { id, title, notice, is_read, created_at, action_url, action_target } =
+    notification;
+  const notificationUi = resolveNotificationPresentation(notification);
+  const NotificationIcon = notificationUi.icon;
+  const router = useRouter();
 
   // Format the date (e.g., "2 days ago")
   const formattedDate = formatDistanceToNow(new Date(created_at), {
@@ -44,46 +38,65 @@ export function NotificationItemComponent({
   // API returns 0 for unread, 1 for read
   const status = is_read === 1 ? "read" : "unread";
 
+  const hasActionLink = Boolean(action_url && action_url.trim().length > 0);
+
+  const handleOpenNotificationLink = () => {
+    if (!hasActionLink) return;
+    const normalizedUrl = action_url!.trim();
+
+    if (action_target === "new_tab") {
+      window.open(normalizedUrl, "_blank", "noopener,noreferrer");
+      return;
+    }
+
+    if (normalizedUrl.startsWith("/")) {
+      router.push(normalizedUrl);
+      return;
+    }
+
+    window.open(normalizedUrl, "_self");
+  };
+
   return (
     <div className="flex items-center justify-between p-4 border-b border-border last:border-0 hover:bg-accent/5 transition-colors">
       <div className="flex items-center gap-4 flex-1 min-w-0">
         {/* User avatar */}
         <Avatar className="h-10 w-10">
-          <AvatarImage
-            src={
-              user.avatar
-                ? `${env.NEXT_PUBLIC_API_URL}/storage/${user.avatar}`
-                : undefined
-            }
-            alt={user.full_name}
-          />
           <AvatarFallback>
-            <User className="h-5 w-5" />
+            <NotificationIcon className="h-5 w-5" />
           </AvatarFallback>
         </Avatar>
 
         {/* Notification content */}
-        <div className="flex-1 min-w-0">
+        <button
+          type="button"
+          className="flex-1 min-w-0 text-left disabled:cursor-default"
+          disabled={!hasActionLink}
+          onClick={handleOpenNotificationLink}
+          title={hasActionLink ? "Open notification" : undefined}
+        >
           <div className="flex items-center gap-2 mb-1">
-            <span className="font-medium truncate">{user.full_name}</span>
+            <span className="font-medium truncate">{title || "Notification"}</span>
             <Badge
-              variant="primary"
-              className="text-xs capitalize"
+              variant="outline"
+              className="text-xs capitalize inline-flex items-center gap-1 bg-transparent"
               style={{
-                color: categoryConfig.color,
-                borderColor: categoryConfig.color,
+                color: notificationUi.color,
+                borderColor: notificationUi.color,
+                backgroundColor: "transparent",
               }}
             >
-              {category}
+              <NotificationIcon className="h-3 w-3" />
+              {notificationUi.categoryLabel}
             </Badge>
             <span className="text-xs text-muted-foreground flex-shrink-0">
               {formattedDate}
             </span>
           </div>
           <p className="text-sm text-muted-foreground line-clamp-1">
-            {notice || title}
+            {notice || "No additional details provided."}
           </p>
-        </div>
+        </button>
       </div>
 
       {/* Status and actions */}

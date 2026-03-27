@@ -23,7 +23,13 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
-import type { VenueDetail, VenueLocation } from "../_lib/types";
+import {
+  formatVenueLocationLabel,
+  formatVenueLocationLocalityLine,
+  formatVenueLocationVenueTitle,
+  type VenueDetail,
+  type VenueLocation,
+} from "../_lib/types";
 import { adminVenuesService } from "@/services/admin/venues/venues.service";
 
 interface EditVenueFormProps {
@@ -49,6 +55,13 @@ export function EditVenueForm({ venue }: EditVenueFormProps) {
   const router = useRouter();
   const queryClient = useQueryClient();
 
+  const pendingApprovalEvents = venue.recentEvents.filter(
+    (e) => e.approvalStatus === "pending",
+  );
+  const recentActivityEvents = venue.recentEvents.filter(
+    (e) => e.approvalStatus !== "pending",
+  );
+
   const defaultLocation = venue.locations[0];
   const [selectedLocationId, setSelectedLocationId] = useState<number>(
     defaultLocation?.id ?? 0,
@@ -73,6 +86,10 @@ export function EditVenueForm({ venue }: EditVenueFormProps) {
     defaultLocation;
   const financialSummary =
     selectedLocation?.financialSummary ?? venue.financialSummary;
+
+  const locationLocalityLine = selectedLocation
+    ? formatVenueLocationLocalityLine(selectedLocation)
+    : null;
 
   const updateMutation = useMutation({
     mutationFn: () => {
@@ -181,7 +198,7 @@ export function EditVenueForm({ venue }: EditVenueFormProps) {
               <CardContent className="space-y-5 pt-0">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   {/* ── Contact (left) ── */}
-                  <div className="space-y-4">
+                  <div className="min-w-0 space-y-4">
                     <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
                       Contact
                     </p>
@@ -257,7 +274,7 @@ export function EditVenueForm({ venue }: EditVenueFormProps) {
                   </div>
 
                   {/* ── Business (right) ── */}
-                  <div className="space-y-4">
+                  <div className="min-w-0 space-y-4">
                     <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
                       Business
                     </p>
@@ -277,7 +294,7 @@ export function EditVenueForm({ venue }: EditVenueFormProps) {
                           }
                           placeholder="e.g. 22AABBCC1234K1Z2"
                           disabled={updateMutation.isPending}
-                          className="text-sm"
+                          className="min-w-0 max-w-full font-mono text-sm"
                         />
                       </div>
                       <div className="space-y-1.5">
@@ -426,27 +443,74 @@ export function EditVenueForm({ venue }: EditVenueFormProps) {
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-5 pt-0">
-                <div>
-                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-3">
-                    Recently added events
-                  </p>
-                  {venue.recentEvents.length > 0 ? (
-                    <ul className="space-y-2.5 text-sm">
-                      {venue.recentEvents.map((evt, i) => (
-                        <li key={i}>
-                          {evt.title} – {evt.date}
-                        </li>
-                      ))}
-                    </ul>
-                  ) : (
-                    <p className="text-sm text-muted-foreground">
-                      No events added yet.
+                <div className="space-y-5">
+                  <div>
+                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-3">
+                      Pending event approvals
                     </p>
-                  )}
+                    {pendingApprovalEvents.length > 0 ? (
+                      <ul className="space-y-3 text-sm">
+                        {pendingApprovalEvents.map((evt) => (
+                          <li
+                            key={evt.id}
+                            className="flex flex-col gap-2 rounded-lg border border-amber-200/80 bg-amber-50/50 px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between"
+                          >
+                            <span className="min-w-0 text-foreground">
+                              <span className="font-medium">{evt.title}</span>
+                              <span className="text-muted-foreground">
+                                {" "}
+                                – {evt.date}
+                              </span>
+                            </span>
+                            <Button
+                              variant="event-primary"
+                              size="sm"
+                              className="w-full shrink-0 gap-1.5 sm:w-auto"
+                              asChild
+                            >
+                              <Link
+                                href={`/admin/events/${evt.id}?fromVendor=${venue.id}`}
+                              >
+                                Review
+                              </Link>
+                            </Button>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <p className="text-sm text-muted-foreground">
+                        No events awaiting approval.
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="border-t border-slate-100 pt-5">
+                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-3">
+                      Approved live events
+                    </p>
+                    {recentActivityEvents.length > 0 ? (
+                      <div className="max-h-60 overflow-y-auto overflow-x-hidden rounded-md border border-slate-100 bg-slate-50/40 px-2 py-2 pr-1">
+                        <ul className="space-y-2.5 text-sm">
+                          {recentActivityEvents.map((evt) => (
+                            <li key={evt.id}>
+                              {evt.title} – {evt.date}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    ) : (
+                      <p className="text-sm text-muted-foreground">
+                        {venue.recentEvents.length === 0
+                          ? "No events added yet."
+                          : "No approved live events to show."}
+                      </p>
+                    )}
+                  </div>
+
                   <Button
                     variant="event-outline"
                     size="sm"
-                    className="mt-3 gap-2"
+                    className="gap-2"
                     asChild
                   >
                     <Link href={`/admin/vendors/${venue.id}`}>
@@ -501,7 +565,7 @@ export function EditVenueForm({ venue }: EditVenueFormProps) {
                     <SelectContent>
                       {venue.locations.map((loc) => (
                         <SelectItem key={loc.id} value={String(loc.id)}>
-                          {loc.name}
+                          {formatVenueLocationLabel(loc)}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -510,19 +574,14 @@ export function EditVenueForm({ venue }: EditVenueFormProps) {
                 {selectedLocation && (
                   <div className="rounded-lg border border-slate-200 bg-slate-50/50 p-4 text-sm space-y-1">
                     <p className="font-medium text-foreground">
-                      {selectedLocation.name}
+                      {formatVenueLocationVenueTitle(selectedLocation)}
                     </p>
                     <p className="text-muted-foreground">
                       {selectedLocation.address}
                     </p>
-                    {(selectedLocation.city || selectedLocation.postcode) && (
+                    {locationLocalityLine && (
                       <p className="text-muted-foreground">
-                        {[selectedLocation.city, selectedLocation.postcode]
-                          .filter(Boolean)
-                          .join(", ")}
-                        {selectedLocation.country
-                          ? `, ${selectedLocation.country}`
-                          : ""}
+                        {locationLocalityLine}
                       </p>
                     )}
                   </div>
@@ -536,7 +595,7 @@ export function EditVenueForm({ venue }: EditVenueFormProps) {
                   </CardTitle>
                   {selectedLocation && (
                     <p className="text-xs text-muted-foreground font-normal mt-1 text-left">
-                      Per: {selectedLocation.name}
+                      Per: {formatVenueLocationLabel(selectedLocation)}
                     </p>
                   )}
                 </CardHeader>

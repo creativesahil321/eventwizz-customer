@@ -24,7 +24,8 @@ export default function AuthLayout({
   const [isSigningOutSecurity, setIsSigningOutSecurity] = useState(false);
   const { theme } = useContext(ServerContext);
 
-  const isSecurityViolation = searchParams.get("error") === "security_violation";
+  const isSecurityViolation =
+    searchParams.get("error") === "security_violation";
   const logoPath =
     theme?.logo?.startsWith("/") ||
     theme?.logo?.startsWith("data:") ||
@@ -109,7 +110,7 @@ export default function AuthLayout({
                 Have an account?{" "}
                 <Link
                   href="/auth/login"
-                  className="text-[var(--color-primary)] hover:text-[var(--color-primary-hover)] hover:underline cursor-pointer"
+                  className="text-[var(--color-text)] hover:text-[var(--color-primary-hover)] hover:underline cursor-pointer"
                 >
                   Sign in
                 </Link>
@@ -119,7 +120,7 @@ export default function AuthLayout({
                 Don&apos;t have an account?{" "}
                 <Link
                   href={getRegistrationPath()}
-                  className="text-[var(--color-primary)] hover:text-[var(--color-primary-hover)] hover:underline cursor-pointer"
+                  className="text-[var(--color-text)] hover:text-[var(--color-primary-hover)] hover:underline cursor-pointer"
                 >
                   Sign Up
                 </Link>

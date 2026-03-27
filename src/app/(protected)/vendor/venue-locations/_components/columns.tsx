@@ -49,9 +49,14 @@ export const getColumns = ({
         <TooltipProvider>
           <Tooltip>
             <TooltipTrigger asChild>
-              <div className="max-w-[200px] min-w-0 truncate" title={city}>
+              <button
+                type="button"
+                onClick={() => setRowAction({ type: "view", row })}
+                className="max-w-[200px] min-w-0 truncate rounded-md px-1.5 py-1 -mx-1.5 -my-1 text-left text-foreground transition-colors hover:bg-slate-50 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+                title={`View location: ${city}`}
+              >
                 {city}
-              </div>
+              </button>
             </TooltipTrigger>
             <TooltipContent className="max-w-md break-words">
               <p className="break-words whitespace-normal">{city}</p>
@@ -72,9 +77,14 @@ export const getColumns = ({
         <TooltipProvider>
           <Tooltip>
             <TooltipTrigger asChild>
-              <div className="min-w-0 max-w-[200px] truncate" title={address}>
+              <button
+                type="button"
+                onClick={() => setRowAction({ type: "view", row })}
+                className="min-w-0 max-w-[200px] truncate rounded-md px-1.5 py-1 -mx-1.5 -my-1 text-left text-foreground transition-colors hover:bg-slate-50 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+                title={`View address: ${address}`}
+              >
                 {address}
-              </div>
+              </button>
             </TooltipTrigger>
             <TooltipContent className="max-w-md break-words">
               <p className="break-words whitespace-normal">{address}</p>

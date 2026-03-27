@@ -85,7 +85,7 @@ export default function Timeline({
     // Check if can scroll left or right
     setCanScrollLeft(container.scrollLeft > 0);
     setCanScrollRight(
-      container.scrollLeft < container.scrollWidth - container.clientWidth - 1
+      container.scrollLeft < container.scrollWidth - container.clientWidth - 1,
     );
   };
 
@@ -178,7 +178,7 @@ export default function Timeline({
   };
 
   return (
-    <section className="w-full py-10 sm:py-16 px-2 sm:px-4 relative overflow-hidden bg-black">
+    <section className="w-full py-10 sm:py-16 px-2 sm:px-4 relative overflow-hidden bg-[var(--color-secondary)]">
       {eventSchedularBackgroundImage && (
         <div className="w-full h-full absolute top-0 left-0">
           <img
@@ -191,7 +191,7 @@ export default function Timeline({
 
       <div className="relative max-w-7xl mx-auto overflow-hidden">
         <div className="text-center mb-8 sm:mb-16 z-10">
-          <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold text-white">
+          <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold ">
             {eventSchedularTitle || "The Night"}
           </h2>
         </div>
@@ -203,8 +203,8 @@ export default function Timeline({
               disabled={!canScrollLeft}
               className={`absolute left-0 sm:-left-8 md:-left-16 top-1/2 transform -translate-y-1/2 z-20 flex items-center justify-center transition-all duration-200 ${
                 canScrollLeft
-                  ? "text-white hover:text-gray-300 hover:scale-110 cursor-pointer opacity-100"
-                  : "text-gray-600 cursor-not-allowed opacity-50"
+                  ? "text-[var(--color-text)] hover:text-[var(--color-text-dimmed)] hover:scale-110 cursor-pointer opacity-100"
+                  : "text-[var(--color-text-dimmed)] cursor-not-allowed opacity-50"
               }`}
               aria-label="Scroll left"
             >
@@ -221,14 +221,14 @@ export default function Timeline({
             {/* Timeline line with tick marks - visible on all screens */}
             <div className="absolute top-[30px] sm:top-10 left-14 right-14 z-10 pointer-events-none">
               {/* Main horizontal line */}
-              <div className="w-full h-[2px] bg-white opacity-70"></div>
+              <div className="w-full h-[2px] bg-[var(--color-text)] opacity-70"></div>
 
               {/* Elegant tick marks - cleaner pattern */}
               <div className="absolute inset-0">
                 {Array.from({ length: 12 }).map((_, i) => (
                   <div
                     key={i}
-                    className="absolute w-[2px] h-3 bg-white opacity-50"
+                    className="absolute w-[2px] h-3 bg-[var(--color-text)] opacity-50"
                     style={{
                       left: `${(i * 100) / 11}%`,
                       top: "-5px",
@@ -257,7 +257,7 @@ export default function Timeline({
                   }}
                 >
                   {/* Time Circle */}
-                  <div className="w-14 h-14 sm:w-16 sm:h-16 md:w-20 md:h-20 rounded-full bg-white text-black flex items-center justify-center shadow-lg mb-4 sm:mb-6 relative z-30 flex-shrink-0">
+                  <div className="w-14 h-14 sm:w-16 sm:h-16 md:w-20 md:h-20 rounded-full bg-[var(--color-background)] text-[var(--color-text)] flex items-center justify-center shadow-lg mb-4 sm:mb-6 relative z-30 flex-shrink-0">
                     <div className="text-center px-1">
                       <div className="text-xs sm:text-sm md:text-base font-bold leading-tight break-words">
                         {formatTime(item.time).split(" ")[0]}
@@ -269,7 +269,7 @@ export default function Timeline({
                   </div>
 
                   {/* Title */}
-                  <p className="text-white text-xs sm:text-sm leading-tight font-medium break-words line-clamp-3 px-1 w-full">
+                  <p className="text-[var(--color-text)] text-xs sm:text-sm leading-tight font-medium break-words line-clamp-3 px-1 w-full">
                     {item.title}
                   </p>
                 </div>
@@ -284,8 +284,8 @@ export default function Timeline({
               disabled={!canScrollRight}
               className={`absolute right-0 sm:-right-8 md:-right-16 top-1/2 transform -translate-y-1/2 z-20 flex items-center justify-center transition-all duration-200 ${
                 canScrollRight
-                  ? "text-white hover:text-gray-300 hover:scale-110 cursor-pointer opacity-100"
-                  : "text-gray-600 cursor-not-allowed opacity-50"
+                  ? "text-[var(--color-text)] hover:text-[var(--color-text-dimmed)] hover:scale-110 cursor-pointer opacity-100"
+                  : "text-[var(--color-text-dimmed)] cursor-not-allowed opacity-50"
               }`}
               aria-label="Scroll right"
             >

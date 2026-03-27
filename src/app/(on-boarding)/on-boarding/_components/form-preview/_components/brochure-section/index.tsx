@@ -94,7 +94,7 @@ export default function BrochureSection({
           />
         </section>
 
-        <section className="w-full bg-black text-white flex flex-col justify-center items-center py-5 px-2 rounded-md">
+        <section className="w-full bg-[var(--color-surface)] text-[var(--color-text)] flex flex-col justify-center items-center py-5 px-2 rounded-md">
           {renderIcon("Download", 24)}
           <h2 className="text-base sm:text-lg font-bold py-2 sm:py-3 uppercase">
             DOWNLOADS
@@ -105,7 +105,7 @@ export default function BrochureSection({
                 {renderIcon("FileText", 16)}
                 <Link
                   href={item.download_link[0]}
-                  className="text-white text-xs sm:text-sm underline break-all"
+                  className="text-[var(--color-text)] text-xs sm:text-sm underline break-all"
                   target="_blank"
                   rel="noopener noreferrer"
                   onClick={(e) => {
@@ -126,13 +126,13 @@ export default function BrochureSection({
               </div>
             ))
           ) : (
-            <p className="text-xs sm:text-sm text-gray-300">
+            <p className="text-xs sm:text-sm text-[var(--color-text-dimmed)]">
               No downloads available
             </p>
           )}
         </section>
 
-        <section className="w-full bg-black  text-white flex flex-col justify-center items-center py-5 px-2 rounded-md sm:col-span-2 md:col-span-1">
+        <section className="w-full bg-[var(--color-surface)]  text-[var(--color-text)] flex flex-col justify-center items-center py-5 px-2 rounded-md sm:col-span-2 md:col-span-1">
           {renderIcon(defaultPrice.icon, 24)}
           <h2 className="text-base sm:text-lg font-bold py-2 sm:py-3 uppercase break-words max-w-full px-2">
             {defaultPrice.title}

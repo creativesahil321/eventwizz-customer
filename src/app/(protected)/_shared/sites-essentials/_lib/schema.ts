@@ -1,4 +1,8 @@
 import { z } from "zod";
+import {
+  BANNER_HEADING_MAX_WORDS,
+  countWords,
+} from "@/lib/word-count";
 
 export const SiteEssentialsSchema = z.object({
   header_logo: z.string().min(2, { message: "Header logo is required." }),
@@ -115,10 +119,7 @@ export const siteEssentialsFormSchema = z.object({
     description: z.string().min(1, "SEO description is required"),
     keywords: z.string().min(1, "SEO keywords are required"),
   }),
-  name: z
-    .string()
-    .min(1, "Site name is required")
-    .max(50, "Site name must not exceed 50 characters"),
+  name: z.string().max(50, "Site name must not exceed 50 characters").optional(),
   copyright: z
     .string()
     .min(1, "Copyright text is required")
@@ -130,9 +131,13 @@ export const siteEssentialsFormSchema = z.object({
   // Website content fields with updated names
   banner_heading: z
     .string()
-    .max(50, "Banner heading must not exceed 50 characters")
+    .max(500, "Banner heading is too long")
     .nullable()
-    .optional(),
+    .optional()
+    .refine(
+      (s) => !s || countWords(s) <= BANNER_HEADING_MAX_WORDS,
+      `Banner heading must not exceed ${BANNER_HEADING_MAX_WORDS} words`,
+    ),
   banner_sub_heading: z
     .string()
     .max(80, "Banner sub heading must not exceed 80 characters")

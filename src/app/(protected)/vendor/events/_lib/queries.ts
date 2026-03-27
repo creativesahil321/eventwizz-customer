@@ -216,3 +216,21 @@ export const useBulkUpdateEventStatus = () => {
     },
   });
 };
+
+/**
+ * Bulk delete draft events (vendor)
+ */
+export const useBulkDeleteEvents = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (data: { event_ids: number[] }) =>
+      eventsService.bulkDeleteEvents(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: eventKeys.lists() });
+    },
+    onError: (error: Error) => {
+      console.error("Error bulk deleting events:", error);
+    },
+  });
+};

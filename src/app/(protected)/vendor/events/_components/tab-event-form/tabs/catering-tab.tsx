@@ -346,7 +346,7 @@ export default function CateringTab() {
                         <FormControl>
                           <RadioGroupItem
                             value="1"
-                            className="text-[#009ead] h-5 w-5 data-[state=checked]:bg-[var(--color-secondary,#009ead)] data-[state=checked]:border-[var(--color-secondary,#009ead)]"
+                            className="text-[#009ead] h-5 w-5 data-[state=checked]:bg-[var(--color-background,#009ead)] data-[state=checked]:border-[var(--color-background,#009ead)]"
                           />
                         </FormControl>
                         <Label className="text-lg font-medium">Yes</Label>
@@ -355,7 +355,7 @@ export default function CateringTab() {
                         <FormControl>
                           <RadioGroupItem
                             value="0"
-                            className="text-[#009ead] h-5 w-5 data-[state=checked]:bg-[var(--color-secondary,#009ead)] data-[state=checked]:border-[var(--color-secondary,#009ead)]"
+                            className="text-[#009ead] h-5 w-5 data-[state=checked]:bg-[var(--color-background,#009ead)] data-[state=checked]:border-[var(--color-background,#009ead)]"
                           />
                         </FormControl>
                         <Label className="text-lg font-medium">No</Label>

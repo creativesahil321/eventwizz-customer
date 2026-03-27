@@ -42,13 +42,6 @@ export default function HomepageHeroSec({
           {sub_heading ? sub_heading : "Landing Page Banner Sub-Heading"}
         </h2>
         {!image && <LucidImage size={52} />}
-        <div className="flex flex-row w-92 mx-auto border border-primary justify-between my-5">
-          <div className="flex flex-row justify-between w-80 items-center px-2 text-sm">
-            <div>Search Events</div>
-            <ChevronDown />
-          </div>
-          <Button className="rounded-none px-5">Search</Button>
-        </div>
       </div>
     </section>
   );

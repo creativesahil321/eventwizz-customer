@@ -1,4 +1,9 @@
 import { ThemeSchema } from "@/types/theme.types";
+import {
+  getAnchorColor,
+  normalizeHex,
+  pickReadableForeground,
+} from "@/lib/color-contrast";
 
 /**
  * Default theme constants used throughout the application
@@ -26,6 +31,28 @@ export const defaultThemeConstants = {
     },
   },
 };
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(Math.max(value, min), max);
+}
+
+function darkenHex(hexColor: string, amount = 0.12): string {
+  const hex = normalizeHex(getAnchorColor(hexColor));
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+
+  const darkenChannel = (channel: number) =>
+    clamp(Math.round(channel * (1 - amount)), 0, 255);
+
+  const nr = darkenChannel(r);
+  const ng = darkenChannel(g);
+  const nb = darkenChannel(b);
+
+  return `#${nr.toString(16).padStart(2, "0")}${ng
+    .toString(16)
+    .padStart(2, "0")}${nb.toString(16).padStart(2, "0")}`;
+}
 
 /**
  * Generates CSS variables string for theme
@@ -87,38 +114,45 @@ export function generateThemeCSS(theme: ThemeSchema | null): string {
 
     css += `--color-primary-hover: ${primaryHover};`;
     css += `--color-primary-focus: ${primaryColor};`;
-    css += `--color-primary-foreground: #ffffff;`;
+    css += `--color-primary-foreground: ${pickReadableForeground(primaryColor)};`;
 
     css += `--color-secondary-hover: ${secondaryHover};`;
     css += `--color-secondary-focus: ${secondaryColor};`;
-    css += `--color-secondary-foreground: #ffffff;`;
+    css += `--color-secondary-foreground: ${pickReadableForeground(secondaryColor)};`;
+
+    const headerColor = theme.colors.header || defaultThemeConstants.colors.header;
+    const footerColor = theme.colors.footer || defaultThemeConstants.colors.footer;
+    const surfaceColor = theme.colors.surface || defaultThemeConstants.colors.surface;
+    const backgroundColor =
+      theme.colors.background || defaultThemeConstants.colors.background;
+
+    css += `--color-on-header: ${pickReadableForeground(headerColor)};`;
+    css += `--color-on-footer: ${pickReadableForeground(footerColor)};`;
+    css += `--color-on-surface: ${pickReadableForeground(surfaceColor)};`;
+    css += `--color-on-background: ${pickReadableForeground(backgroundColor)};`;
 
     // Add social login button colors
     if (theme.colors.socialLogin) {
       // Google colors
       if (theme.colors.socialLogin.google) {
         css += `--color-socialLogin-google: ${theme.colors.socialLogin.google};`;
-        // Define hover variant (slightly darker)
-        const googleHover =
-          theme.colors.socialLogin.google === "#DB4437" ? "#C53929" : "#1765cc";
+        // Define hover variant as a darker version of selected color
+        const googleHover = darkenHex(theme.colors.socialLogin.google);
         css += `--color-socialLogin-google-hover: ${googleHover};`;
       } else if (defaultThemeConstants.colors.socialLogin?.google) {
         css += `--color-socialLogin-google: ${defaultThemeConstants.colors.socialLogin.google};`;
-        css += `--color-socialLogin-google-hover: #C53929;`;
+        css += `--color-socialLogin-google-hover: ${darkenHex(defaultThemeConstants.colors.socialLogin.google)};`;
       }
 
       // Microsoft colors
       if (theme.colors.socialLogin.microsoft) {
         css += `--color-socialLogin-microsoft: ${theme.colors.socialLogin.microsoft};`;
-        // Define hover variant (slightly darker)
-        const microsoftHover =
-          theme.colors.socialLogin.microsoft === "#0078D4"
-            ? "#006BBF"
-            : "#3d3d3d";
+        // Define hover variant as a darker version of selected color
+        const microsoftHover = darkenHex(theme.colors.socialLogin.microsoft);
         css += `--color-socialLogin-microsoft-hover: ${microsoftHover};`;
       } else if (defaultThemeConstants.colors.socialLogin?.microsoft) {
         css += `--color-socialLogin-microsoft: ${defaultThemeConstants.colors.socialLogin.microsoft};`;
-        css += `--color-socialLogin-microsoft-hover: #006BBF;`;
+        css += `--color-socialLogin-microsoft-hover: ${darkenHex(defaultThemeConstants.colors.socialLogin.microsoft)};`;
       }
     }
   }
@@ -165,22 +199,26 @@ export function getDefaultThemeCSS(): string {
       : defaultThemeConstants.colors.primary
   };
   --color-primary-focus: ${defaultThemeConstants.colors.primary};
-  --color-primary-foreground: #ffffff;
+  --color-primary-foreground: ${pickReadableForeground(defaultThemeConstants.colors.primary)};
   --color-secondary-hover: ${
     defaultThemeConstants.colors.secondary === "#1E293B"
       ? "#0F172A"
       : defaultThemeConstants.colors.secondary
   };
   --color-secondary-focus: ${defaultThemeConstants.colors.secondary};
-  --color-secondary-foreground: #ffffff;
+  --color-secondary-foreground: ${pickReadableForeground(defaultThemeConstants.colors.secondary)};
+  --color-on-header: ${pickReadableForeground(defaultThemeConstants.colors.header)};
+  --color-on-footer: ${pickReadableForeground(defaultThemeConstants.colors.footer)};
+  --color-on-surface: ${pickReadableForeground(defaultThemeConstants.colors.surface)};
+  --color-on-background: ${pickReadableForeground(defaultThemeConstants.colors.background)};
   --color-socialLogin-google: ${
     defaultThemeConstants.colors.socialLogin?.google || "#DB4437"
   };
-  --color-socialLogin-google-hover: #C53929;
+  --color-socialLogin-google-hover: ${darkenHex(defaultThemeConstants.colors.socialLogin?.google || "#DB4437")};
   --color-socialLogin-microsoft: ${
     defaultThemeConstants.colors.socialLogin?.microsoft || "#0078D4"
   };
-  --color-socialLogin-microsoft-hover: #006BBF;
+  --color-socialLogin-microsoft-hover: ${darkenHex(defaultThemeConstants.colors.socialLogin?.microsoft || "#0078D4")};
 }
 `;
 }

@@ -1,3 +1,5 @@
+"use client";
+
 /**
  * Multi-Device Cart Synchronization Example
  * Demonstrates how to handle cart sync across devices
@@ -53,7 +55,9 @@ export async function syncCartWithServer(eventSlug: string) {
     // 3. Check for mismatches
     const mismatchInfo = CartSyncDetector.detectMismatches(
       apiEventData,
-      localCartData,
+      localCartData as Parameters<
+        typeof CartSyncDetector.detectMismatches
+      >[1],
       eventSlug
     );
 
@@ -106,7 +110,9 @@ export function useCartSyncExample() {
 
     return await CartSyncManager.quickSyncCheck(
       eventData,
-      zustandEventData,
+      zustandEventData as Parameters<
+        typeof CartSyncManager.quickSyncCheck
+      >[1],
       eventSlug,
       clearAllCartMutation,
       clearAllCarts

@@ -36,68 +36,72 @@ export default function DashboardRecentBookings({
           ) : (
             <div className="space-y-3">
               {bookings.map((booking) => (
-                <Card
+                <Link
                   key={booking.booking_id}
-                  className="hover:shadow-md transition-all cursor-pointer"
+                  href={`/customer/bookings/${booking.booking_id}`}
+                  className="block rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
                 >
-                  <CardContent className="p-4">
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-start gap-3">
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2 mb-2">
-                              <h3 className="font-semibold text-base line-clamp-1">
-                                {booking.event_name}
-                              </h3>
-                            </div>
-                            <div className="flex flex-wrap items-center gap-2 mb-2">
-                              <Badge
-                                variant="outline"
-                                className={`text-xs border ${getStatusColorClass(
-                                  booking.status
-                                )}`}
-                              >
-                                {booking.status}
-                              </Badge>
-                              <Badge
-                                variant="outline"
-                                className={`text-xs border ${getStatusColorClass(
-                                  booking.payment_status
-                                )}`}
-                              >
-                                {booking.payment_status}
-                              </Badge>
-                            </div>
-                            <div className="flex items-center gap-4 text-xs text-muted-foreground">
-                              <div className="flex items-center gap-1">
-                                <Calendar className="h-3 w-3" />
-                                <span>{booking.created_ago}</span>
+                  <Card className="hover:shadow-md transition-all cursor-pointer">
+                    <CardContent className="p-4">
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-start gap-3">
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 mb-2">
+                                <h3 className="font-semibold text-base line-clamp-1">
+                                  {booking.event_name}
+                                </h3>
                               </div>
-                              <div className="flex items-center gap-1">
-                                <DollarSign className="h-3 w-3" />
-                                <span className="font-medium text-black">
-                                  £{booking.total_formatted}
-                                </span>
+                              <div className="flex flex-wrap items-center gap-2 mb-2">
+                                <Badge
+                                  variant="outline"
+                                  className={`text-xs border ${getStatusColorClass(
+                                    booking.status
+                                  )}`}
+                                >
+                                  {booking.status}
+                                </Badge>
+                                <Badge
+                                  variant="outline"
+                                  className={`text-xs border ${getStatusColorClass(
+                                    booking.payment_status
+                                  )}`}
+                                >
+                                  {booking.payment_status}
+                                </Badge>
                               </div>
+                              <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                                <div className="flex items-center gap-1">
+                                  <Calendar className="h-3 w-3" />
+                                  <span>{booking.created_ago}</span>
+                                </div>
+                                <div className="flex items-center gap-1">
+                                  <DollarSign className="h-3 w-3" />
+                                  <span className="font-medium text-black">
+                                    £{booking.total_formatted}
+                                  </span>
+                                </div>
+                              </div>
+                              <p className="text-xs text-muted-foreground mt-1">
+                                {booking.booking_ref}
+                              </p>
                             </div>
-                            <p className="text-xs text-muted-foreground mt-1">
-                              {booking.booking_ref}
-                            </p>
                           </div>
                         </div>
-                      </div>
-                      <Link href={`/customer/bookings/${booking.booking_id}`}>
                         <Button
+                          type="button"
                           variant="ghost"
                           size="sm"
                           className="h-8 w-8 p-0 flex-shrink-0"
+                          tabIndex={-1}
+                          aria-hidden="true"
                         >
                           <ArrowRight className="h-4 w-4" />
                         </Button>
-                      </Link>
-                    </div>
-                  </CardContent>
-                </Card>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </Link>
               ))}
             </div>
           )}

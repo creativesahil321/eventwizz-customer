@@ -46,7 +46,8 @@ const INPUT_CLASS =
 
 const collectInfoSchema = z
   .object({
-    venueName: z.string().min(2, "Venue name is required"),
+    has_multiple_locations: z.boolean(),
+    venueName: z.string(),
     selectedPlaceId: z.string().optional(),
     venueType: z.string().min(1, "Please select an event category"),
     city: z.string().min(1, "City is required"),
@@ -62,16 +63,41 @@ const collectInfoSchema = z
     priceRange: z.string().optional(),
     description: z.string().max(800, "Max 800 characters").optional(),
   })
-  .refine(
-    (data) =>
-      !data.venueName ||
-      data.venueName.length < 2 ||
-      !!data.selectedPlaceId,
-    {
-      message: "Please select a venue from the Google suggestions",
-      path: ["venueName"],
+  .superRefine((data, ctx) => {
+    const multi = data.has_multiple_locations === true;
+    const name = data.venueName?.trim() ?? "";
+    if (multi) {
+      if (!name) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Brand name is required",
+          path: ["venueName"],
+        });
+      } else if (name.length > 120) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Brand name must be at most 120 characters",
+          path: ["venueName"],
+        });
+      }
+      return;
     }
-  );
+    if (!name) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Venue name is required",
+        path: ["venueName"],
+      });
+      return;
+    }
+    if (name.length >= 2 && !data.selectedPlaceId) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Please select a venue from the Google suggestions",
+        path: ["venueName"],
+      });
+    }
+  });
 
 type CollectInfoForm = z.infer<typeof collectInfoSchema>;
 
@@ -100,8 +126,8 @@ const CATEGORY_ICONS: Record<string, string> = {
   "open mic & spoken word": "🎙️",
   "networking & business events": "🤝",
   "workshops & masterclasses": "📚",
-  "diwali": "🪔",
-  "eid": "🌙",
+  diwali: "🪔",
+  eid: "🌙",
 };
 
 function getCategoryIcon(categoryName: string): string {
@@ -124,9 +150,15 @@ export default function AICollectInfo({
   isLoading,
   initialData,
 }: AICollectInfoProps) {
+  const [locationGateDone, setLocationGateDone] = useState(
+    typeof initialData?.has_multiple_locations === "boolean",
+  );
+
   const form = useForm<CollectInfoForm>({
     resolver: zodResolver(collectInfoSchema),
     defaultValues: {
+      has_multiple_locations:
+        initialData?.has_multiple_locations ?? false,
       venueName: initialData?.venueName || "",
       selectedPlaceId: "",
       venueType:
@@ -147,12 +179,16 @@ export default function AICollectInfo({
 
   const selectedVenueType = form.watch("venueType");
   const [showAllCategories, setShowAllCategories] = useState(false);
-  const { data: categoriesResponse, isLoading: isCategoriesLoading } = useEventCategories();
+  const { data: categoriesResponse, isLoading: isCategoriesLoading } =
+    useEventCategories();
   const eventCategories = React.useMemo(
     () => categoriesResponse?.data ?? [],
-    [categoriesResponse?.data]
+    [categoriesResponse?.data],
   );
-  const firstPageCategories = eventCategories.slice(0, INITIAL_CATEGORY_VISIBLE);
+  const firstPageCategories = eventCategories.slice(
+    0,
+    INITIAL_CATEGORY_VISIBLE,
+  );
   const restCategories = eventCategories.slice(INITIAL_CATEGORY_VISIBLE);
   const hasMoreCategories = restCategories.length > 0;
 
@@ -160,11 +196,16 @@ export default function AICollectInfo({
   useEffect(() => {
     if (eventCategories.length === 0 || !selectedVenueType) return;
     const isNumericId = /^\d+$/.test(selectedVenueType);
-    if (isNumericId && eventCategories.some((c) => String(c.id) === selectedVenueType)) return;
+    if (
+      isNumericId &&
+      eventCategories.some((c) => String(c.id) === selectedVenueType)
+    )
+      return;
     const byName = eventCategories.find(
-      (c) => c.name.toLowerCase() === selectedVenueType.toLowerCase()
+      (c) => c.name.toLowerCase() === selectedVenueType.toLowerCase(),
     );
-    if (byName) form.setValue("venueType", String(byName.id), { shouldValidate: true });
+    if (byName)
+      form.setValue("venueType", String(byName.id), { shouldValidate: true });
   }, [eventCategories, selectedVenueType, form]);
 
   // --- Google Places Autocomplete ---
@@ -172,7 +213,8 @@ export default function AICollectInfo({
   const [searchQuery, setSearchQuery] = useState("");
   const [isSearching, setIsSearching] = useState(false);
   const [isPlaceSelected, setIsPlaceSelected] = useState(
-    !!initialData?.venueName,
+    !!initialData?.venueName &&
+      initialData?.has_multiple_locations !== true,
   );
   const autocompleteRef = useRef<google.maps.places.AutocompleteService | null>(
     null,
@@ -277,9 +319,13 @@ export default function AICollectInfo({
           )
             return;
 
-          form.setValue("venueName", place.name ?? suggestion.description ?? "", {
-            shouldValidate: true,
-          });
+          form.setValue(
+            "venueName",
+            place.name ?? suggestion.description ?? "",
+            {
+              shouldValidate: true,
+            },
+          );
           form.setValue(
             "contactNumber",
             place.international_phone_number ??
@@ -329,8 +375,22 @@ export default function AICollectInfo({
       ...rest,
       venueType: category?.name ?? data.venueType,
       event_category_id: categoryId,
+      has_multiple_locations: data.has_multiple_locations,
     };
     onSubmit(payload);
+  };
+
+  const isBrandMode = form.watch("has_multiple_locations") === true;
+
+  const pickMultipleLocations = (value: boolean) => {
+    form.setValue("has_multiple_locations", value, { shouldValidate: true });
+    if (value) {
+      form.setValue("selectedPlaceId", "", { shouldValidate: true });
+      setIsPlaceSelected(false);
+      setSearchQuery("");
+      setSuggestions([]);
+    }
+    setLocationGateDone(true);
   };
 
   // ─── Voice input for description ────────────────────────────────────────
@@ -362,105 +422,155 @@ export default function AICollectInfo({
             </span>
           </div>
           <h1 className="text-3xl font-bold text-white mb-3">
-            Tell us about your venue
+            Tell us about your business
           </h1>
           <p className="text-slate-400 text-sm max-w-md mx-auto">
-            Search for your venue on Google (UK only) and select it from the
-            suggestions to autofill details (same as manual mode). Our AI will
-            then generate your entire website.
+            {locationGateDone
+              ? isBrandMode
+                ? "Enter your brand name (any name is fine) and your business details below. Our AI will generate your website."
+                : "Search for your venue on Google (UK only) and select it from the suggestions to autofill details. Our AI will then generate your entire website."
+              : "First, let us know if you operate more than one location so we can tailor labels and data for your setup."}
           </p>
         </div>
 
-        {/* Form */}
+        {!locationGateDone ? (
+          <div className="rounded-2xl border border-white/10 bg-slate-900/60 backdrop-blur-xl p-8 space-y-6">
+            <h2 className="text-lg font-semibold text-white text-center">
+              Do you have multiple locations?
+            </h2>
+            <p className="text-slate-400 text-sm text-center max-w-md mx-auto">
+              Choose Yes if you run several venues under one brand. We’ll use
+              brand-oriented labels and the correct fields for your account.
+            </p>
+            <div className="flex flex-col sm:flex-row gap-3 justify-center">
+              <button
+                type="button"
+                disabled={isLoading}
+                onClick={() => pickMultipleLocations(true)}
+                className="px-6 py-3 rounded-xl text-white text-sm font-medium transition-opacity disabled:opacity-50"
+                style={themeAccent.button}
+              >
+                Yes, multiple locations
+              </button>
+              <button
+                type="button"
+                disabled={isLoading}
+                onClick={() => pickMultipleLocations(false)}
+                className="px-6 py-3 rounded-xl bg-white/5 border border-white/10 text-white text-sm font-medium hover:bg-white/10 transition-colors disabled:opacity-50"
+              >
+                No, single location
+              </button>
+            </div>
+          </div>
+        ) : (
         <div className="rounded-2xl border border-white/10 bg-slate-900/60 backdrop-blur-xl p-8">
           <form
             onSubmit={form.handleSubmit(handleFormSubmit)}
             className="space-y-6"
           >
-            {/* Venue Name with Google Places */}
+            {/* Brand name (free text) or venue via Google Places */}
             <div>
               <label className="flex items-center gap-2 text-sm font-medium text-slate-300 mb-2">
                 <Building2 className="w-4 h-4" style={themeAccent.text} />
-                Venue Name <span className="text-red-400">*</span>
+                {isBrandMode ? "Brand name" : "Venue Name"}{" "}
+                <span className="text-red-400">*</span>
               </label>
-              <div className="relative">
-                <div className="absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none">
-                  <Search className="w-4 h-4 text-slate-500" />
-                </div>
-                <input
-                  value={
-                    isPlaceSelected ? form.watch("venueName") : searchQuery
-                  }
-                  onChange={(e) => {
-                    if (isPlaceSelected) return;
-                    const value = e.target.value;
-                    handleVenueSearch(value);
-                    form.setValue("venueName", value, {
-                      shouldValidate: true,
-                    });
-                    form.setValue("selectedPlaceId", "", {
-                      shouldValidate: true,
-                    });
-                  }}
-                  readOnly={isPlaceSelected}
-                  placeholder="Search for your venue on Google..."
-                  className={`${INPUT_CLASS} pl-10 pr-10 ${
-                    isPlaceSelected ? "bg-green-500/10 border-green-500/20" : ""
-                  }`}
-                />
-                {isSearching && !isPlaceSelected && (
-                  <div className="absolute right-3.5 top-1/2 -translate-y-1/2">
-                    <div className="w-4 h-4 border-2 border-white/10 border-t-white/40 rounded-full animate-spin" />
-                  </div>
-                )}
-                {isPlaceSelected && (
-                  <button
-                    type="button"
-                    onClick={handleClearPlace}
-                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-red-400 transition-colors"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
-                )}
-
-                {/* Suggestions dropdown */}
-                {suggestions.length > 0 && !isPlaceSelected && searchQuery && (
-                  <ul className="absolute z-50 bg-slate-800 border border-white/10 rounded-xl w-full mt-1.5 max-h-60 overflow-auto shadow-2xl">
-                    {suggestions.map((sug, i) => (
-                      <li
-                        key={i}
-                        onClick={() => handlePlaceSelect(sug)}
-                        className="px-4 py-3 hover:bg-white/5 cursor-pointer border-b border-white/5 last:border-0 transition-colors"
-                      >
-                        <div className="flex items-start gap-2.5">
-                          <MapPin
-                            className="w-4 h-4 mt-0.5 flex-shrink-0"
-                            style={themeAccent.text}
-                          />
-                          <span className="text-sm text-slate-300">
-                            {sug.description}
-                          </span>
-                        </div>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-                {searchQuery &&
-                  suggestions.length === 0 &&
-                  !isSearching &&
-                  !isPlaceSelected && (
-                    <div className="absolute z-50 bg-slate-800 border border-white/10 rounded-xl w-full mt-1.5 p-3.5 shadow-2xl">
-                      <p className="text-sm text-slate-500 text-center">
-                        No venues found. Try a different search, or switch to
-                        Manual to enter details manually.
-                      </p>
+              {isBrandMode ? (
+                <>
+                  <input
+                    {...form.register("venueName")}
+                    maxLength={120}
+                    placeholder="e.g. Acme Events Co."
+                    className={INPUT_CLASS}
+                  />
+                  <p className="text-xs text-slate-500 mt-1.5">
+                    Type your trading or brand name — it does not need to match
+                    a Google listing.
+                  </p>
+                </>
+              ) : (
+                <>
+                  <div className="relative">
+                    <div className="absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none">
+                      <Search className="w-4 h-4 text-slate-500" />
                     </div>
-                  )}
-              </div>
-              <p className="text-xs text-slate-500 mt-1.5">
-                Only verified venues from Google suggestions can be used — same
-                as manual mode. Select one from the dropdown.
-              </p>
+                    <input
+                      value={
+                        isPlaceSelected ? form.watch("venueName") : searchQuery
+                      }
+                      onChange={(e) => {
+                        if (isPlaceSelected) return;
+                        const value = e.target.value;
+                        handleVenueSearch(value);
+                        form.setValue("venueName", value, {
+                          shouldValidate: true,
+                        });
+                        form.setValue("selectedPlaceId", "", {
+                          shouldValidate: true,
+                        });
+                      }}
+                      readOnly={isPlaceSelected}
+                      placeholder="Search for your venue on Google..."
+                      className={`${INPUT_CLASS} pl-10 pr-10 ${
+                        isPlaceSelected
+                          ? "bg-green-500/10 border-green-500/20"
+                          : ""
+                      }`}
+                    />
+                    {isSearching && !isPlaceSelected && (
+                      <div className="absolute right-3.5 top-1/2 -translate-y-1/2">
+                        <div className="w-4 h-4 border-2 border-white/10 border-t-white/40 rounded-full animate-spin" />
+                      </div>
+                    )}
+                    {isPlaceSelected && (
+                      <button
+                        type="button"
+                        onClick={handleClearPlace}
+                        className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-red-400 transition-colors"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    )}
+
+                    {suggestions.length > 0 && !isPlaceSelected && searchQuery && (
+                      <ul className="absolute z-50 bg-slate-800 border border-white/10 rounded-xl w-full mt-1.5 max-h-60 overflow-auto shadow-2xl">
+                        {suggestions.map((sug, i) => (
+                          <li
+                            key={i}
+                            onClick={() => handlePlaceSelect(sug)}
+                            className="px-4 py-3 hover:bg-white/5 cursor-pointer border-b border-white/5 last:border-0 transition-colors"
+                          >
+                            <div className="flex items-start gap-2.5">
+                              <MapPin
+                                className="w-4 h-4 mt-0.5 flex-shrink-0"
+                                style={themeAccent.text}
+                              />
+                              <span className="text-sm text-slate-300">
+                                {sug.description}
+                              </span>
+                            </div>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                    {searchQuery &&
+                      suggestions.length === 0 &&
+                      !isSearching &&
+                      !isPlaceSelected && (
+                        <div className="absolute z-50 bg-slate-800 border border-white/10 rounded-xl w-full mt-1.5 p-3.5 shadow-2xl">
+                          <p className="text-sm text-slate-500 text-center">
+                            No venues found. Try a different search, or switch
+                            to Manual to enter details manually.
+                          </p>
+                        </div>
+                      )}
+                  </div>
+                  <p className="text-xs text-slate-500 mt-1.5">
+                    Only verified venues from Google suggestions can be used —
+                    same as manual mode. Select one from the dropdown.
+                  </p>
+                </>
+              )}
               {form.formState.errors.venueName && (
                 <p className="text-red-400 text-xs mt-1.5">
                   {form.formState.errors.venueName.message}
@@ -510,8 +620,12 @@ export default function AICollectInfo({
                             : undefined
                         }
                       >
-                        <span className="text-base leading-none">{getCategoryIcon(cat.name)}</span>
-                        <span className="text-center leading-tight line-clamp-2">{cat.name}</span>
+                        <span className="text-base leading-none">
+                          {getCategoryIcon(cat.name)}
+                        </span>
+                        <span className="text-center leading-tight line-clamp-2">
+                          {cat.name}
+                        </span>
                       </button>
                     ))}
                   </div>
@@ -521,7 +635,9 @@ export default function AICollectInfo({
                       onClick={() => setShowAllCategories((v) => !v)}
                       className="w-full py-2 rounded-lg border border-dashed border-white/20 text-xs font-medium text-slate-400 hover:bg-white/5 hover:text-slate-300 hover:border-white/30 transition-colors"
                     >
-                      {showAllCategories ? "Show less" : `More categories (${restCategories.length} more)`}
+                      {showAllCategories
+                        ? "Show less"
+                        : `More categories (${restCategories.length} more)`}
                     </button>
                   )}
                   {showAllCategories && hasMoreCategories && (
@@ -550,8 +666,12 @@ export default function AICollectInfo({
                                 : undefined
                             }
                           >
-                            <span className="text-base leading-none">{getCategoryIcon(cat.name)}</span>
-                            <span className="text-center leading-tight line-clamp-2">{cat.name}</span>
+                            <span className="text-base leading-none">
+                              {getCategoryIcon(cat.name)}
+                            </span>
+                            <span className="text-center leading-tight line-clamp-2">
+                              {cat.name}
+                            </span>
                           </button>
                         ))}
                       </div>
@@ -560,7 +680,8 @@ export default function AICollectInfo({
                 </div>
               ) : (
                 <p className="text-sm text-slate-500">
-                  No categories available. Please try again or switch to Manual setup.
+                  No categories available. Please try again or switch to Manual
+                  setup.
                 </p>
               )}
               {form.formState.errors.venueType && (
@@ -616,7 +737,11 @@ export default function AICollectInfo({
                 </label>
                 <input
                   {...form.register("address")}
-                  placeholder="Full venue address"
+                  placeholder={
+                    isBrandMode
+                      ? "Head office or main site address"
+                      : "Full venue address"
+                  }
                   className={INPUT_CLASS}
                 />
                 {form.formState.errors.address && (
@@ -633,7 +758,11 @@ export default function AICollectInfo({
                 </label>
                 <input
                   {...form.register("city")}
-                  placeholder="e.g. London"
+                  placeholder={
+                    isBrandMode
+                      ? "e.g. London (main trading city)"
+                      : "e.g. London"
+                  }
                   className={INPUT_CLASS}
                 />
                 {form.formState.errors.city && (
@@ -789,6 +918,7 @@ export default function AICollectInfo({
             </div>
           </form>
         </div>
+        )}
       </div>
     </div>
   );

@@ -1,6 +1,7 @@
 "use client";
 
 import React, { createContext, useContext, ReactNode } from "react";
+import { usePathname } from "next/navigation";
 
 interface PreviewContextType {
   isPreviewMode: boolean;
@@ -32,16 +33,15 @@ export function usePreview() {
   return context;
 }
 
-// Hook to safely check if we're in preview mode without throwing errors
+/**
+ * True when previewing an event/site (provider) or when the URL is under `/preview/…`.
+ * Layout-level code (e.g. cart) is not wrapped by PreviewProvider, so the pathname
+ * check prevents customer cart APIs from firing on vendor event preview.
+ */
 export function useIsPreviewMode(): boolean {
-  try {
-    const context = useContext(PreviewContext);
-    return context?.isPreviewMode ?? false;
-  } catch {
-    // Fallback to checking URL if context is not available
-    if (typeof window !== "undefined") {
-      return window.location.pathname.includes("/preview/");
-    }
-    return false;
-  }
+  const pathname = usePathname();
+  const context = useContext(PreviewContext);
+  if (context?.isPreviewMode === true) return true;
+  if (pathname?.includes("/preview/")) return true;
+  return false;
 }

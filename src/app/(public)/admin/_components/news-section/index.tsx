@@ -57,20 +57,20 @@ export default function NewsSection() {
                   sizes="(max-width: 768px) 100vw, 33vw"
                 />
                 {/* Category pill */}
-                <div className="absolute top-3 left-3 bg-[color:var(--color-primary)] text-white text-xs font-semibold px-3 py-1 rounded-full shadow">
+                <div className="absolute top-3 left-3 bg-[color:var(--color-primary)] text-[color:var(--color-text)] text-xs font-semibold px-3 py-1 rounded-full shadow">
                   {article.category}
                 </div>
               </div>
 
               {/* Content */}
               <div className="p-6">
-                <p className="text-xs text-[color:var(--color-text-dimmed)] mb-2 font-medium">
+                <p className="text-xs text-[color:var(--color-text)] mb-2 font-medium">
                   {article.date}
                 </p>
                 <h3 className="font-bold text-[color:var(--color-text)] mb-2 leading-snug group-hover:text-[color:var(--color-primary)] transition-colors line-clamp-2">
                   {article.title}
                 </h3>
-                <p className="text-sm text-[color:var(--color-text-dimmed)] mb-4 leading-relaxed line-clamp-3">
+                <p className="text-sm text-[color:var(--color-text)] mb-4 leading-relaxed line-clamp-3">
                   {article.excerpt}
                 </p>
                 <div className="flex items-center gap-1.5 text-sm font-semibold text-[color:var(--color-primary)] group-hover:gap-2.5 transition-all">

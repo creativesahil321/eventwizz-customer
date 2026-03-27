@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { CardContent, CardHeader, OnboardingCard } from "@/components/ui/card";
@@ -42,6 +42,13 @@ import {
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 import { useEventId } from "../../../_lib/hooks/useEventId";
+import { WholeStepGuidedShell } from "../../whole-step-guided-shell";
+import { guidedInsetSectionSurfaceClass } from "../../guided-section-surface";
+import {
+  GuidedWholeStepApproveButton,
+  guidedOnboardingSaveNextButtonClass,
+} from "../../guided-sticky-approval-bar";
+import { cn } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
 import { useRouter } from "next/navigation";
 
@@ -102,6 +109,10 @@ export default function StepEleven() {
   const venueName = globalForm.getValues("stepOne.name") || "";
   const venueType = "event venue"; // Could be enhanced to get from form data
   const venueLocation = globalForm.getValues("stepOne.city") || "";
+  /** Set from step 1 save and from persistence GET (root `has_multiple_locations` merged into stepOne in FormProvider). */
+  const stepOneHasMulti = globalForm.watch("stepOne.has_multiple_locations");
+  /** Hide duplicate flow for single-location (`false`). Show when multi (`true`) or legacy payloads without the flag (`undefined`). */
+  const showDuplicateEventOptions = stepOneHasMulti !== false;
 
   // Collapsible section states
   const [isReminderOpen, setIsReminderOpen] = useState(false);
@@ -127,6 +138,12 @@ export default function StepEleven() {
     },
     mode: "onChange",
   });
+
+  useEffect(() => {
+    if (stepOneHasMulti === false) {
+      form.setValue("submit_type", "submit");
+    }
+  }, [stepOneHasMulti, form]);
 
   // Watch reminder email configuration state
   const showReminderDays =
@@ -408,7 +425,7 @@ export default function StepEleven() {
           <CardContent className="px-6 py-2 pb-8">
             <Form {...form}>
                 <form
-                  onSubmit={form.handleSubmit(onSubmit)}
+                  onSubmit={(e) => e.preventDefault()}
                   className="space-y-6"
                 >
                   {/* Hidden fields */}
@@ -420,8 +437,71 @@ export default function StepEleven() {
                     })}
                   />
 
-                  {/* Collapsible Sections */}
-                  <div className="space-y-4">
+                  <WholeStepGuidedShell
+                    form={form}
+                    sectionId="step-eleven-publish"
+                    chipLabel="Review & publish"
+                    chipDescription="Domain, reminders, and final checks before going live."
+                    renderFooter={({ guided, sectionId }) => (
+                      <div className="w-full space-y-4">
+                        <div className="flex w-full flex-wrap items-center justify-center gap-3">
+                          <GuidedWholeStepApproveButton
+                            guided={guided}
+                            sectionId={sectionId}
+                          />
+                          <Button
+                            type="button"
+                            variant="event-primary"
+                            className={cn(
+                              guidedOnboardingSaveNextButtonClass,
+                              "h-12 px-10",
+                            )}
+                            disabled={
+                              publishing ||
+                              !guided.allSectionsApproved ||
+                              !selectedDomain ||
+                              !form.watch("confirm_domain")
+                            }
+                            title={
+                              !guided.allSectionsApproved
+                                ? "Approve this step first"
+                                : undefined
+                            }
+                            onClick={() => {
+                              if (!guided.allSectionsApproved) return;
+                              void form.handleSubmit(onSubmit)();
+                            }}
+                          >
+                            {form.watch("submit_type") === "duplicate"
+                              ? "Duplicate & Submit"
+                              : "Submit"}
+                          </Button>
+                        </div>
+                        {!guided.allSectionsApproved && (
+                          <p className="text-center text-sm text-muted-foreground">
+                            Approve this step when you&apos;re happy with your
+                            settings, then submit.
+                          </p>
+                        )}
+                        {!selectedDomain && (
+                          <p className="text-center text-sm text-gray-500">
+                            Please select a subdomain to continue
+                          </p>
+                        )}
+                        {selectedDomain && !form.watch("confirm_domain") && (
+                          <p className="text-center text-sm text-gray-500">
+                            Please confirm your selection
+                          </p>
+                        )}
+                      </div>
+                    )}
+                  >
+                    {() => (
+                  <section
+                    className={guidedInsetSectionSurfaceClass(
+                      "w-full space-y-4",
+                    )}
+                  >
                     {/* Domain Configuration Section */}
                     <Collapsible
                       open={isDomainOpen}
@@ -784,7 +864,8 @@ export default function StepEleven() {
                       </CollapsibleContent>
                     </Collapsible>
 
-                    {/* Duplicate Event Section */}
+                    {/* Duplicate Event Section — only for multi-location brands (or legacy unset) */}
+                    {showDuplicateEventOptions && (
                     <Collapsible
                       open={isDuplicateOpen}
                       onOpenChange={setIsDuplicateOpen}
@@ -865,9 +946,11 @@ export default function StepEleven() {
                         </div>
                       </CollapsibleContent>
                     </Collapsible>
+                    )}
 
                     {/* Location Fields Section - Only show when duplicating */}
-                    {form.watch("submit_type") === "duplicate" && (
+                    {showDuplicateEventOptions &&
+                      form.watch("submit_type") === "duplicate" && (
                       <Collapsible
                         open={isLocationOpen}
                         onOpenChange={setIsLocationOpen}
@@ -975,37 +1058,9 @@ export default function StepEleven() {
                         </CollapsibleContent>
                       </Collapsible>
                     )}
-                  </div>
-
-                  {/* Submit Section */}
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-center gap-4">
-                      <Button
-                        type="submit"
-                        variant="event-primary"
-                        className="rounded-full px-10 py-2 h-12 text-white"
-                        disabled={
-                          publishing ||
-                          !selectedDomain ||
-                          !form.watch("confirm_domain")
-                        }
-                      >
-                        {form.watch("submit_type") === "duplicate"
-                          ? "Duplicate & Submit"
-                          : "Submit"}
-                      </Button>
-                      {!selectedDomain && (
-                        <p className="text-sm text-gray-500 whitespace-nowrap">
-                          Please select a subdomain to continue
-                        </p>
-                      )}
-                      {selectedDomain && !form.watch("confirm_domain") && (
-                        <p className="text-sm text-gray-500 whitespace-nowrap">
-                          Please confirm your selection
-                        </p>
-                      )}
-                    </div>
-                  </div>
+                  </section>
+                    )}
+                  </WholeStepGuidedShell>
                 </form>
             </Form>
           </CardContent>

@@ -19,6 +19,12 @@ import Link from "next/link";
 import { ServerContext } from "@/lib/server-context";
 import { useContext } from "react";
 import { addCacheBusting } from "@/lib/image-utils";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 const steps = [
   { id: 1, label: "Venue", icon: <MapPin size={16} /> },
@@ -34,6 +40,20 @@ const steps = [
   { id: 11, label: "Publish", icon: <UploadCloud size={16} /> },
 ];
 
+const stepTooltips: Record<number, string> = {
+  1: "Core venue details and contact information.",
+  2: "Site branding, hero banner, and about section.",
+  3: "Event identity, banner media, story, and schedule.",
+  4: "Package copy, image, details, and gallery.",
+  5: "Dates, tickets, tables, and payment rules.",
+  6: "Catering and menu information.",
+  7: "Drinks and add-on packages.",
+  8: "Brochure and location for collateral.",
+  9: "Frequently asked questions.",
+  10: "Payment provider connections.",
+  11: "Final review and publish.",
+};
+
 export default function Stepper({ activeStep }: { activeStep: number }) {
   const { setActiveStep, lastCompletedStep } = useFormContext();
   const { theme } = useContext(ServerContext);
@@ -47,6 +67,7 @@ export default function Stepper({ activeStep }: { activeStep: number }) {
       : "/assets/images/logos/eventwizz-logo.png";
 
   return (
+    <TooltipProvider delayDuration={300}>
     <div className="relative bg-slate-950/80 backdrop-blur-xl border-b border-white/[0.06] py-5">
       <div
         className="absolute inset-0 opacity-[0.04]"
@@ -62,7 +83,7 @@ export default function Stepper({ activeStep }: { activeStep: number }) {
               alt={theme?.name || "EventWizz"}
               width={110}
               height={30}
-              className="h-5 md:h-6 lg:h-11 xl:h-13 w-auto object-contain max-w-[85px] md:max-w-[95px] lg:max-w-[130px] cursor-pointer hover:opacity-80 transition-opacity"
+              className="h-5 md:h-6 lg:h-11 xl:h-13 w-auto object-contain max-w-[85px] md:max-w-[95px] lg:max-w-[130px] cursor-pointer hover:opacity-80 transition-opacity [filter:drop-shadow(0_0_1px_white)_drop-shadow(0_0_5px_rgba(255,255,255,0.6))_drop-shadow(0_0_12px_rgba(255,255,255,0.3))]"
             />
           </Link>
         </div>
@@ -98,6 +119,8 @@ export default function Stepper({ activeStep }: { activeStep: number }) {
                     key={step.id}
                     className="flex flex-col items-center relative z-20 min-w-[70px] md:min-w-[80px] flex-shrink-0"
                   >
+                    <Tooltip>
+                      <TooltipTrigger asChild>
                     <div
                       onClick={handleClick}
                       role={isCompleted ? "button" : undefined}
@@ -108,8 +131,8 @@ export default function Stepper({ activeStep }: { activeStep: number }) {
                         isCompleted
                           ? "text-white hover:brightness-110 hover:scale-110 cursor-pointer"
                           : isCurrent
-                          ? "bg-white shadow-lg hover:scale-110 cursor-pointer"
-                          : "bg-slate-900/80 text-slate-500 border-slate-700/50 cursor-not-allowed"
+                            ? "bg-white shadow-lg hover:scale-110 cursor-pointer"
+                            : "bg-slate-900/80 text-slate-500 border-slate-700/50 cursor-not-allowed",
                       )}
                       style={
                         isCompleted
@@ -119,23 +142,36 @@ export default function Stepper({ activeStep }: { activeStep: number }) {
                               boxShadow: `0 0 15px color-mix(in srgb, var(--color-primary, #3b82f6) 25%, transparent)`,
                             }
                           : isCurrent
-                          ? {
-                              borderColor: `var(--color-primary, #3b82f6)`,
-                              color: `var(--color-primary, #3b82f6)`,
-                              boxShadow: `0 0 20px color-mix(in srgb, var(--color-primary, #3b82f6) 20%, transparent)`,
-                            }
-                          : undefined
+                            ? {
+                                borderColor: `var(--color-primary, #3b82f6)`,
+                                color: `var(--color-primary, #3b82f6)`,
+                                boxShadow: `0 0 20px color-mix(in srgb, var(--color-primary, #3b82f6) 20%, transparent)`,
+                              }
+                            : undefined
                       }
                     >
                       {step.icon}
                     </div>
+                      </TooltipTrigger>
+                      <TooltipContent
+                        side="bottom"
+                        className="max-w-[220px] border border-white/10 bg-slate-900 text-slate-100 text-xs"
+                      >
+                        <span className="font-medium text-white">
+                          {step.label}
+                        </span>
+                        <p className="text-slate-400 mt-1 leading-snug">
+                          {stepTooltips[step.id] ?? ""}
+                        </p>
+                      </TooltipContent>
+                    </Tooltip>
                     <div className="text-center mt-2 w-20">
                       <p
                         className={cn(
                           "text-xs font-medium leading-snug transition-colors",
                           isCurrent || isCompleted
                             ? "text-white"
-                            : "text-slate-500"
+                            : "text-slate-500",
                         )}
                       >
                         {step.label}
@@ -149,5 +185,6 @@ export default function Stepper({ activeStep }: { activeStep: number }) {
         </div>
       </div>
     </div>
+    </TooltipProvider>
   );
 }

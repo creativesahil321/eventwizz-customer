@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { tryModelsWithFallback, type FallbackResult } from "../lib/utils";
 import { env } from "@/env";
+import {
+  BANNER_HEADING_MAX_WORDS,
+  truncateToMaxWords,
+} from "@/lib/word-count";
 
 export interface AIEventInput {
   eventName: string;
@@ -113,7 +117,7 @@ CRITICAL RULES:
 1. Return ONLY valid JSON, no explanations or markdown
 2. Respect ALL character limits exactly
 3. All text must be professional, engaging, and relevant to the event type
-4. Times must be in HH:mm 24-hour format
+4. Times must be in HH:mm 24-hour format. event_schedular must be in chronological ascending order (earliest time first).
 5. Prices must be realistic whole numbers
 6. FAQ answers should be helpful and detailed but within limits
 7. Descriptions should be compelling and SEO-friendly
@@ -141,7 +145,7 @@ Generate this EXACT JSON structure:
 {
   "stepOne": {
     "event_name": "string (max 40 chars, the event name)",
-    "event_banner_heading": "string (max 50 chars, compelling banner headline)",
+    "event_banner_heading": "string (max 30 words, compelling banner headline)",
     "event_banner_sub_heading": "string (max 80 chars, engaging banner tagline)",
     "about_event_heading": "string (max 50 chars, about section heading)",
     "about_event_sub_heading": "string (max 80 chars, about section subheading)",
@@ -261,7 +265,10 @@ Make times chronologically ascending. Make prices realistic for the event type. 
 
       if (content.stepOne) {
         content.stepOne.event_name = truncate(content.stepOne.event_name, 40);
-        content.stepOne.event_banner_heading = truncate(content.stepOne.event_banner_heading, 50);
+        content.stepOne.event_banner_heading = truncateToMaxWords(
+          content.stepOne.event_banner_heading,
+          BANNER_HEADING_MAX_WORDS,
+        );
         content.stepOne.event_banner_sub_heading = truncate(content.stepOne.event_banner_sub_heading, 80);
         content.stepOne.about_event_heading = truncate(content.stepOne.about_event_heading, 50);
         content.stepOne.about_event_sub_heading = truncate(content.stepOne.about_event_sub_heading, 80);
@@ -272,6 +279,11 @@ Make times chronologically ascending. Make prices realistic for the event type. 
             title: truncate(s.title, 40),
             time: /^([01]\d|2[0-3]):([0-5]\d)$/.test(s.time) ? s.time : "12:00",
           }));
+          content.stepOne.event_schedular.sort((a, b) => {
+            const [ha, ma] = a.time.split(":").map(Number);
+            const [hb, mb] = b.time.split(":").map(Number);
+            return ha * 60 + ma - (hb * 60 + mb);
+          });
         }
       }
 
@@ -295,7 +307,9 @@ Make times chronologically ascending. Make prices realistic for the event type. 
           const fallbackDate = futureDate.toISOString().split("T")[0];
 
           const isValidDate = /^\d{4}-\d{2}-\d{2}$/.test(date.event_date || "");
-          const eventDate = isValidDate ? date.event_date : fallbackDate;
+          const todayStart = new Date(now.toISOString().split("T")[0] + "T00:00:00").getTime();
+          const eventTime = isValidDate ? new Date(date.event_date + "T00:00:00").getTime() : todayStart;
+          const eventDate = isValidDate && eventTime >= todayStart ? date.event_date : fallbackDate;
 
           const validBookingTypes = ["tickets", "tables", "both"];
           const bookingType = validBookingTypes.includes(date.booking_type)

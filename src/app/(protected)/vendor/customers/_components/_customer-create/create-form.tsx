@@ -17,7 +17,6 @@ import { Input } from "@/components/ui/input";
 import { UserSchema, UserType } from "./schema";
 import { useCreateCustomer } from "../../_lib/queries";
 import { useState, useEffect } from "react";
-import { toast } from "sonner";
 import { UserPlus } from "lucide-react";
 import { CustomerFormSkeleton } from "../skeleton-loader";
 import { CustomerCreateResponse } from "@/services/vendor/customers/types";
@@ -72,12 +71,10 @@ export function CreateUserForm({
               }
             });
           }
-          toast.error(response.message || "Failed to create customer");
         }
       },
       onError: (error: Error) => {
         console.error("Error creating customer:", error);
-        toast.error("Failed to create customer");
       },
     });
   };

@@ -29,7 +29,7 @@ export default function LocationMap({
   const mapInstanceRef = useRef<google.maps.Map | null>(null);
   const geocoderRef = useRef<google.maps.Geocoder | null>(null);
   const [currentLocation, setCurrentLocation] = useState<MapLocation | null>(
-    null
+    null,
   );
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -142,7 +142,7 @@ export default function LocationMap({
         setIsLoading(false);
       }
     },
-    []
+    [],
   );
 
   const initializeMap = useCallback(() => {
@@ -177,7 +177,7 @@ export default function LocationMap({
       if (retryCountRef.current < maxRetries) {
         retryCountRef.current += 1;
         console.log(
-          `🗺️ Retrying map initialization (attempt ${retryCountRef.current}/${maxRetries})`
+          `🗺️ Retrying map initialization (attempt ${retryCountRef.current}/${maxRetries})`,
         );
         setTimeout(() => {
           initializeMap();
@@ -236,7 +236,7 @@ export default function LocationMap({
                 console.log("🗺️ Geocoded address:", mapAddress);
               }
               initializeMapWithCenter(mapCenter, mapAddress);
-            }
+            },
           );
           return;
         }
@@ -265,7 +265,7 @@ export default function LocationMap({
             mapCenter = { lat: location.lat(), lng: location.lng() };
             console.log(
               "🗺️ Address geocoded successfully:",
-              results[0].formatted_address
+              results[0].formatted_address,
             );
             initializeMapWithCenter(mapCenter, results[0].formatted_address);
           } else {
@@ -288,7 +288,7 @@ export default function LocationMap({
       }
 
       setError(
-        "Failed to initialize map. Please check your internet connection."
+        "Failed to initialize map. Please check your internet connection.",
       );
       setIsLoading(false);
     }
@@ -344,13 +344,17 @@ export default function LocationMap({
   }, [address, latitude, longitude, initializeMap]);
 
   return (
-    <div className={`relative ${className} overflow-hidden text-white `}>
+    <div
+      className={`relative ${className} overflow-hidden text-[var(--color-text)] `}
+    >
       {/* Event Location Header */}
       {/* Address Overlay - Only show when map is loaded and location exists */}
       {mapLoaded && currentLocation && !isLoading && !error && (
         <div className="flex items-center gap-2">
           <MapPin className="h-4 w-4 text-red-600 flex-shrink-0" />
-          <p className="text-xs text-gray-600 mt-1">Event location</p>
+          <p className="text-xs text-[var(--color-text-dimmed)] mt-1">
+            Event location
+          </p>
           <p className="text-xs text-[var(--color-text-primary)] font-medium truncate">
             {currentLocation?.address}
           </p>
@@ -360,11 +364,11 @@ export default function LocationMap({
       <div className="relative">
         {!mapLoaded ? (
           <div
-            className="w-full h-full rounded-md overflow-hidden bg-black flex items-center justify-center"
+            className="w-full h-full rounded-md overflow-hidden bg-[var(--color-surface)] flex items-center justify-center"
             style={{ minHeight: "200px" }}
           >
             <div className="text-center">
-              <MapPin className="text-white mx-auto " size={24} />
+              <MapPin className="text-[var(--color-text)] mx-auto " size={24} />
               <h2 className="text-base sm:text-lg font-bold py-2 sm:py-3 uppercase">
                 EVENT LOCATION
               </h2>
@@ -389,21 +393,21 @@ export default function LocationMap({
 
         {/* Loading Overlay - Only show when map is loaded */}
         {mapLoaded && isLoading && (
-          <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center rounded-md">
+          <div className="absolute inset-0 bg-[var(--color-surface)]/80 flex items-center justify-center rounded-md">
             <div className="flex flex-col items-center gap-2">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white"></div>
-              <p className="text-white text-sm">Loading map...</p>
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[var(--color-text)]"></div>
+              <p className="text-[var(--color-text)] text-sm">Loading map...</p>
             </div>
           </div>
         )}
 
         {/* Error Overlay - Only show when map is loaded */}
         {mapLoaded && error && (
-          <div className="absolute inset-0 bg-black bg-opacity-75 flex items-center justify-center rounded-md">
+          <div className="absolute inset-0 bg-[var(--color-surface)] bg-opacity-75 flex items-center justify-center rounded-md">
             <div className="flex flex-col items-center gap-2 text-center p-4">
-              <MapPin className="h-8 w-8 text-white" />
-              <p className="text-white text-sm">{error}</p>
-              <p className="text-white text-xs opacity-75">
+              <MapPin className="h-8 w-8 text-[var(--color-text)]" />
+              <p className="text-[var(--color-text)] text-sm">{error}</p>
+              <p className="text-[var(--color-text-dimmed)] text-xs">
                 {address || "No address provided"}
               </p>
             </div>
@@ -473,10 +477,12 @@ export default function LocationMap({
 
         {/* Map Pin Icon Overlay (when no address) */}
         {mapLoaded && !currentLocation && !isLoading && !error && (
-          <div className="absolute inset-0 bg-gray-100 flex items-center justify-center rounded-md">
-            <div className="flex flex-col items-center gap-2 text-gray-600">
+          <div className="absolute inset-0 bg-[var(--color-surface)] flex items-center justify-center rounded-md text-[var(--color-text)]">
+            <div className="flex flex-col items-center gap-2 ">
               <MapPin className="h-8 w-8" />
-              <p className="text-sm font-medium">EVENT LOCATION</p>
+              <p className="text-sm font-medium text-[var(--color-text)]">
+                EVENT LOCATION
+              </p>
               <p className="text-xs text-center px-4">
                 {address ||
                   "Enter your event address in the form to display here"}

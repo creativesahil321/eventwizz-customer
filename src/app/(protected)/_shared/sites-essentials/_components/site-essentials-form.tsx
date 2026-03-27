@@ -14,8 +14,6 @@ import { BrandingTab } from "./tabs/branding-tab";
 import { ColorsTab } from "./tabs/colors-tab";
 import { TypographyTab } from "./tabs/typography-tab";
 import { SeoTab } from "./tabs/seo-tab";
-import { useAuthStore } from "@/store/auth.store";
-import { UserRole } from "@/services/common/notification/type";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { useSitePreviewStore } from "@/store/site-preview.store";
@@ -31,13 +29,9 @@ export function SiteEssentialsForm() {
   const { setPreviewData, previewData, clearPreviewData } =
     useSitePreviewStore();
 
-  // Get the current user role
-  const { account_type } = useAuthStore();
-  const userRole = account_type as UserRole;
-
   // Track validation errors by tab
   const [tabsWithErrors, setTabsWithErrors] = useState<Record<string, boolean>>(
-    {}
+    {},
   );
   const [showErrorSummary, setShowErrorSummary] = useState(false);
   const [activeTab, setActiveTab] = useState("branding");
@@ -74,7 +68,7 @@ export function SiteEssentialsForm() {
       try {
         // Create a deep copy to avoid read-only issues
         const serverData = JSON.parse(JSON.stringify(siteEssentials));
-        
+
         // Reset form with fresh server data
         form.reset(serverData, {
           keepErrors: false,
@@ -96,7 +90,7 @@ export function SiteEssentialsForm() {
     const errorsByTab: Record<string, boolean> = {};
 
     // Check for errors in Branding tab fields
-    if (errors.name || errors.logo || errors.favicon || errors.copyright) {
+    if (errors.logo || errors.favicon || errors.copyright) {
       errorsByTab.branding = true;
     }
 
@@ -176,8 +170,9 @@ export function SiteEssentialsForm() {
     try {
       // Don't use JSON.parse(JSON.stringify()) as it destroys File objects
       // File objects need to be preserved for binary upload
+      const { ...restValues } = values;
       const payload = {
-        ...values,
+        ...restValues,
         _method: "PATCH",
       };
 
@@ -351,8 +346,8 @@ export function SiteEssentialsForm() {
             </div>
           </div>
 
-          <Card className="shadow-sm">
-            <div className="space-y-6 pb-6">
+          <Card className="shadow-sm overflow-hidden p-0 gap-0 py-0">
+            <div className="space-y-6 p-6 pb-6">
               <TabsContent value="branding" className="mt-0 w-full">
                 {tabsWithErrors.branding && (
                   <Badge variant="destructive" className="mb-3">
@@ -419,48 +414,49 @@ export function SiteEssentialsForm() {
                 </div>
               </TabsContent>
             </div>
+
+            {/* Actions sit on white, directly under tab content — avoids teal page chrome eating contrast */}
+            <div className="border-t border-border bg-white px-4 py-4 sm:px-6 sm:py-5">
+              <div className="flex flex-col gap-3 sm:flex-row sm:justify-end sm:gap-3">
+                <Button
+                  variant="outline"
+                  onClick={handlePreviewClick}
+                  type="button"
+                  disabled={previewLoading}
+                  className="flex items-center justify-center gap-2 border-slate-300 bg-white text-slate-900 hover:bg-slate-50"
+                >
+                  {previewLoading ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Eye className="h-4 w-4" />
+                  )}
+                  {previewLoading ? "Loading..." : "Preview"}
+                </Button>
+                <Button
+                  variant="outline"
+                  type="button"
+                  onClick={handleReset}
+                  disabled={previewLoading || submitting}
+                  className="flex items-center justify-center gap-2 border-slate-300 bg-white text-slate-900 hover:bg-slate-50"
+                >
+                  <RotateCcw className="h-4 w-4" /> Reset
+                </Button>
+                <Button
+                  type="submit"
+                  disabled={submitting || isLoading || previewLoading}
+                  className="flex w-full items-center justify-center gap-2 rounded-lg bg-[var(--color-primary)] px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-[var(--color-primary-hover)] disabled:opacity-50 sm:min-w-[120px] sm:w-auto"
+                >
+                  {submitting ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Save className="h-4 w-4" />
+                  )}
+                  Save
+                </Button>
+              </div>
+            </div>
           </Card>
         </Tabs>
-
-        {/* Action buttons under the form (not sticky) */}
-        <div className="flex flex-col sm:flex-row justify-center gap-3 sm:gap-4 sm:justify-end mt-8 pt-6 pb-2 border-t border-border">
-          <Button
-            variant="event-primary"
-            onClick={handlePreviewClick}
-            type="button"
-            disabled={previewLoading}
-            className="flex items-center gap-2"
-          >
-            {previewLoading ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <Eye className="h-4 w-4" />
-            )}
-            {previewLoading ? "Loading..." : "Preview"}
-          </Button>
-          <Button
-            variant="event-primary"
-            type="button"
-            onClick={handleReset}
-            disabled={previewLoading || submitting}
-            className="flex items-center gap-2"
-          >
-            <RotateCcw className="h-4 w-4" /> Reset
-          </Button>
-          <Button
-            variant="event-primary"
-            type="submit"
-            disabled={submitting || isLoading || previewLoading}
-            className="flex items-center gap-2 w-full sm:w-auto py-2 min-w-[100px] text-sm rounded-lg"
-          >
-            {submitting ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <Save className="h-4 w-4" />
-            )}
-            Save
-          </Button>
-        </div>
       </form>
     </FormProvider>
   );

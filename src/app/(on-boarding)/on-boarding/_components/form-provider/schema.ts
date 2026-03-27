@@ -1,26 +1,121 @@
 import * as z from "zod";
+import {
+  BANNER_HEADING_MAX_WORDS,
+  countWords,
+} from "@/lib/word-count";
 
 //#===step-1===#
-export const stepOneSchema = z.object({
-  step: z.literal(1),
-  name: z
-    .string()
-    .min(1, "Please select a venue from Google Places suggestions"),
-  contact_number: z
-    .string()
-    .min(1, "Contact number is required")
-    .max(20, "Contact number must not exceed 20 characters")
-    .regex(
-      /^[\d\s\-+()]+$/,
-      "Contact number can only contain numbers and phone formatting characters"
-    ),
-  email: z.string().email("Invalid email").min(1, "Email is required"),
-  address: z.string().min(1, "Address is required"),
-  domain: z.string().optional(),
-  description: z.string().optional(),
-  city: z.string().min(1, "City is required"),
-});
+export const stepOneSchema = z
+  .object({
+    step: z.literal(1),
+    has_multiple_locations: z.boolean().optional(),
+    name: z.string(),
+    contact_number: z
+      .string()
+      .min(1, "Contact number is required")
+      .max(20, "Contact number must not exceed 20 characters")
+      .regex(
+        /^[\d\s\-+()]+$/,
+        "Contact number can only contain numbers and phone formatting characters",
+      ),
+    email: z.string().email("Invalid email").min(1, "Email is required"),
+    address: z.string().min(1, "Address is required"),
+    domain: z.string().optional(),
+    description: z.string().optional(),
+    city: z.string().min(1, "City is required"),
+  })
+  .superRefine((data, ctx) => {
+    if (data.has_multiple_locations === undefined) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Please choose whether you have multiple locations",
+        path: ["has_multiple_locations"],
+      });
+    }
+    const trimmedName = data.name?.trim() ?? "";
+    if (data.has_multiple_locations === true) {
+      if (!trimmedName) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Brand name is required",
+          path: ["name"],
+        });
+      } else if (trimmedName.length > 120) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Brand name must be at most 120 characters",
+          path: ["name"],
+        });
+      }
+    } else if (!trimmedName) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Please select a venue from Google Places suggestions",
+        path: ["name"],
+      });
+    }
+  });
 export type StepOneType = z.infer<typeof stepOneSchema>;
+
+/** Merge API step-1 fields (e.g. brand_name, string booleans) into client stepOne shape. */
+export function normalizeStepOneFromApi(
+  stepOne: unknown,
+): Partial<StepOneType> & Record<string, unknown> {
+  if (!stepOne || typeof stepOne !== "object") {
+    return {};
+  }
+
+  const raw = stepOne as Record<string, unknown>;
+  const {
+    brand_name: legacyBrandSnake,
+    brandName: legacyBrandCamel,
+    ...rest
+  } = raw;
+
+  const nameFromLegacy =
+    (typeof legacyBrandSnake === "string" ? legacyBrandSnake.trim() : "") ||
+    (typeof legacyBrandCamel === "string" ? legacyBrandCamel.trim() : "");
+  const nameFromApi =
+    typeof rest.name === "string" ? rest.name.trim() : "";
+  const name = nameFromApi || nameFromLegacy;
+
+  const rawHasMulti = rest.has_multiple_locations;
+  let has_multiple_locations = rawHasMulti;
+  if (
+    rawHasMulti === true ||
+    rawHasMulti === 1 ||
+    rawHasMulti === "1" ||
+    rawHasMulti === "true"
+  ) {
+    has_multiple_locations = true;
+  } else if (
+    rawHasMulti === false ||
+    rawHasMulti === 0 ||
+    rawHasMulti === "0" ||
+    rawHasMulti === "false"
+  ) {
+    has_multiple_locations = false;
+  }
+
+  return {
+    ...rest,
+    name,
+    has_multiple_locations,
+  } as Partial<StepOneType> & Record<string, unknown>;
+}
+
+/** Root or nested persistence values (API may send 0/1 or strings). */
+export function coerceHasMultipleLocationsFromApi(
+  value: unknown,
+): boolean | undefined {
+  if (value === true || value === 1 || value === "1" || value === "true") {
+    return true;
+  }
+  if (value === false || value === 0 || value === "0" || value === "false") {
+    return false;
+  }
+  return undefined;
+}
 
 //#===step-2===#
 export const stepTwoSchema = z.object({
@@ -96,7 +191,11 @@ export const stepThreeSchema = z.object({
   event_banner_heading: z
     .string()
     .min(1, "Banner heading is required")
-    .max(50, "Banner heading must not exceed 50 characters"),
+    .max(500, "Banner heading is too long")
+    .refine(
+      (s) => countWords(s) <= BANNER_HEADING_MAX_WORDS,
+      `Banner heading must not exceed ${BANNER_HEADING_MAX_WORDS} words`,
+    ),
   event_banner_sub_heading: z
     .string()
     .min(1, "Banner sub heading is required")
@@ -495,6 +594,22 @@ export const stepFiveSchema = z
   .superRefine((data, ctx) => {
     const dates = data.dates;
     if (!dates || dates.length === 0) return;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const todayTime = today.getTime();
+    for (let i = 0; i < dates.length; i++) {
+      const d = dates[i].event_date;
+      if (d && /^\d{4}-\d{2}-\d{2}$/.test(d)) {
+        const eventTime = new Date(d + "T00:00:00").getTime();
+        if (eventTime < todayTime) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: "Event date must be today or in the future.",
+            path: ["dates", i, "event_date"],
+          });
+        }
+      }
+    }
     const eventDates = dates.map((d) => d.event_date).filter(Boolean);
     const seen = new Set<string>();
     for (let i = 0; i < eventDates.length; i++) {
@@ -885,22 +1000,30 @@ export const stepEightSchema = z
 export type StepEightType = z.infer<typeof stepEightSchema>;
 
 //#===step-9===#
+/** Site-wide cap for FAQs (manual step, AI generation, and API apply). */
+export const STEP_NINE_MAX_FAQS = 10;
+
+const stepNineFaqItemSchema = z.object({
+  id: z.number().optional(),
+  question: z
+    .string()
+    .min(1, "Question is required")
+    .max(160, "Question must not exceed 160 characters"),
+  answer: z
+    .string()
+    .min(1, "Answer is required")
+    .max(500, "Answer must not exceed 500 characters"),
+});
+
 export const stepNineSchema = z.object({
   step: z.number(),
   event_id: z.number(),
-  faqs: z.array(
-    z.object({
-      id: z.number().optional(),
-      question: z
-        .string()
-        .min(1, "Question is required")
-        .max(160, "Question must not exceed 160 characters"),
-      answer: z
-        .string()
-        .min(1, "Answer is required")
-        .max(500, "Answer must not exceed 500 characters"),
-    })
-  ),
+  faqs: z
+    .array(stepNineFaqItemSchema)
+    .max(
+      STEP_NINE_MAX_FAQS,
+      `You can add at most ${STEP_NINE_MAX_FAQS} FAQs`,
+    ),
   deleted_faq_ids: z.array(z.number()).optional(),
 });
 export type StepNineType = z.infer<typeof stepNineSchema>;
@@ -963,6 +1086,8 @@ export const stepElevenSchema = z
   .object({
     step: z.literal(11),
     event_id: z.number(),
+    /** Persisted from API; also merged into `stepOne` for step 1 gate / brand mode. */
+    has_multiple_locations: z.boolean().optional(),
     reminder_email_before_days: z.number().optional(),
     submit_type: z.enum(["duplicate", "submit"]),
     city: z.string().optional(),

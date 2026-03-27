@@ -19,12 +19,10 @@ export default function FaqSection({ faqs }: FaqSectionProps) {
   const [showMore, setShowMore] = useState(false);
 
   return (
-    <section className="w-full bg-icon-box dark:bg-background text-center py-20">
+    <section className="w-full  bg-[var(--color-secondary)] text-[var(--color-secondary-foreground)] text-center py-20">
       <div className="w-full">
-        <h2 className="text-3xl font-bold text-foreground dark:text-foreground">
-          FAQS
-        </h2>
-        <p className="py-2 text-foreground dark:text-foreground">
+        <h2 className="text-3xl font-bold ">FAQS</h2>
+        <p className="py-2 ">
           Some of the most frequently asked questions we receive
         </p>
         <section className="w-full flex items-center justify-center">
@@ -33,13 +31,12 @@ export default function FaqSection({ faqs }: FaqSectionProps) {
             onClick={() => {
               setShowMore(!showMore);
             }}
-            className="flex items-center gap-2 border rounded-[10px] border-2 border-[var(--color-primary)]"
           >
             Show All
             {showMore ? (
-              <ChevronUp className="h-4 w-4" />
+              <ChevronUp className="h-4 w-4 " />
             ) : (
-              <ChevronDown className="h-4 w-4" />
+              <ChevronDown className="h-4 w-4 " />
             )}
           </Button>
         </section>
@@ -56,10 +53,22 @@ export default function FaqSection({ faqs }: FaqSectionProps) {
                   value={`item-${index}`}
                   key={index}
                 >
-                  <AccordionTrigger className="text-xl bg-foreground text-background px-5 border-none rounded-none focus-visible:ring-0 hover:no-underline break-words whitespace-normal" style={{ wordBreak: "break-word", overflowWrap: "break-word" }}>
+                  <AccordionTrigger
+                    className="text-xl text-[var(--color-on-surface)] bg-[var(--color-surface)] px-5 border-none rounded-none focus-visible:ring-0 hover:no-underline break-words whitespace-normal"
+                    style={{
+                      wordBreak: "break-word",
+                      overflowWrap: "break-word",
+                    }}
+                  >
                     {data.question}
                   </AccordionTrigger>
-                  <AccordionContent className="px-5 bg-foreground text-background text-base break-words whitespace-normal overflow-hidden" style={{ wordBreak: "break-word", overflowWrap: "break-word" }}>
+                  <AccordionContent
+                    className="px-5 bg-[var(--color-background)] text-[var(--color-on-background)] text-base break-words whitespace-normal overflow-hidden"
+                    style={{
+                      wordBreak: "break-word",
+                      overflowWrap: "break-word",
+                    }}
+                  >
                     {data.answer}
                   </AccordionContent>
                 </AccordionItem>

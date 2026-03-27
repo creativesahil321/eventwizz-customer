@@ -66,7 +66,7 @@ export default function MenuCategoryDropdown({
   eventId,
 }: MenuCategoryDropdownProps) {
   const [selectedValue, setSelectedValue] = useState<string | undefined>(
-    initialValue ? String(initialValue) : undefined
+    initialValue ? String(initialValue) : undefined,
   );
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -166,7 +166,7 @@ export default function MenuCategoryDropdown({
       } else {
         // Error toast is handled by axios interceptor
         console.error(
-          "Failed to create menu category: Invalid response format"
+          "Failed to create menu category: Invalid response format",
         );
       }
     } catch (error) {
@@ -217,7 +217,7 @@ export default function MenuCategoryDropdown({
 
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogTrigger asChild>
-            <Button type="button" variant="event-secondary" disabled={disabled}>
+            <Button type="button" variant="event-primary" disabled={disabled}>
               Add New
             </Button>
           </DialogTrigger>

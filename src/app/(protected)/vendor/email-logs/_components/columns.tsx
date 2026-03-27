@@ -40,9 +40,19 @@ export function getColumns({
       header: ({ column }) => (
         <DataTableColumnHeader column={column} title="Email To" />
       ),
-      cell: ({ row }) => (
-        <span className="font-medium">{row.getValue("emailTo")}</span>
-      ),
+      cell: ({ row }) => {
+        const emailTo = String(row.getValue("emailTo") ?? "—");
+        return (
+          <button
+            type="button"
+            onClick={() => setRowAction({ row, type: "show" })}
+            className="max-w-full truncate rounded-md px-1.5 py-1 -mx-1.5 -my-1 text-left font-medium text-foreground transition-colors hover:bg-slate-50 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+            title={`View email log for ${emailTo}`}
+          >
+            {emailTo}
+          </button>
+        );
+      },
       enableSorting: true,
       enableHiding: false,
       size: 200,
@@ -57,12 +67,14 @@ export function getColumns({
       cell: ({ row }) => {
         const subject = (row.getValue("subject") as string) ?? "";
         return (
-          <span
-            className="font-medium block min-w-0 max-w-full truncate"
-            title={subject}
+          <button
+            type="button"
+            onClick={() => setRowAction({ row, type: "show" })}
+            className="font-medium block min-w-0 max-w-full truncate rounded-md px-1.5 py-1 -mx-1.5 -my-1 text-left text-foreground transition-colors hover:bg-slate-50 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+            title={subject || "View email log"}
           >
             {subject}
-          </span>
+          </button>
         );
       },
       enableSorting: true,

@@ -147,6 +147,37 @@ export default function CreateRoleForm({
 
   const allPermissionIds = getAllPermissionIds();
 
+  const getPermKey = (perm: ProcessedPermission) =>
+    perm.id !== undefined ? perm.id : perm.slug;
+
+  const isWriteAction = (perm: ProcessedPermission) => {
+    const s = (perm.slug || perm.label || "").toLowerCase();
+    if (s.includes("read")) return false;
+    return (
+      s.includes("create") ||
+      s.includes("delete") ||
+      s.includes("edit") ||
+      s.includes("update")
+    );
+  };
+
+  const isReadPermission = (perm: ProcessedPermission) =>
+    (perm.slug || perm.label || "").toLowerCase().includes("read");
+
+  const findReadPermissionInGroup = (group: ProcessedPermissionGroup) =>
+    group.permissions.find((p) => isReadPermission(p));
+
+  const hasWriteEnabledInGroup = (
+    group: ProcessedPermissionGroup,
+    selectedIds: number[]
+  ) =>
+    group.permissions.some(
+      (p) =>
+        p.id !== undefined &&
+        isWriteAction(p) &&
+        selectedIds.includes(getPermKey(p) as number)
+    );
+
   // Update the "all checked" state
   useEffect(() => {
     const allEnabled =
@@ -163,10 +194,40 @@ export default function CreateRoleForm({
     let updatedPermissions: number[];
 
     if (isChecked) {
-      // Add the permission ID if it's checked
-      updatedPermissions = [...currentPermissions, permissionId];
+      updatedPermissions = currentPermissions.includes(permissionId)
+        ? currentPermissions
+        : [...currentPermissions, permissionId];
+
+      // If a write permission is enabled, ensure read in same group is enabled.
+      for (const group of displayPermissions) {
+        const toggledPerm = group.permissions.find(
+          (p) => p.id !== undefined && p.id === permissionId
+        );
+        if (!toggledPerm || !isWriteAction(toggledPerm)) continue;
+
+        const readPerm = findReadPermissionInGroup(group);
+        if (
+          readPerm?.id !== undefined &&
+          !updatedPermissions.includes(readPerm.id)
+        ) {
+          updatedPermissions = [...updatedPermissions, readPerm.id];
+        }
+        break;
+      }
     } else {
-      // Remove the permission ID if it's unchecked
+      // If trying to disable READ while write exists in same group, block it.
+      for (const group of displayPermissions) {
+        const toggledPerm = group.permissions.find(
+          (p) => p.id !== undefined && p.id === permissionId
+        );
+        if (!toggledPerm || !isReadPermission(toggledPerm)) continue;
+
+        if (hasWriteEnabledInGroup(group, currentPermissions)) {
+          return;
+        }
+        break;
+      }
+
       updatedPermissions = currentPermissions.filter(
         (id) => id !== permissionId
       );

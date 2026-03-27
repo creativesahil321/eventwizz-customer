@@ -156,7 +156,17 @@ export default function CustomerOverview({
                 data.map((row) => (
                   <TableRow key={`${row.vendor_id}-${row.s_no}`}>
                     <TableCell className="font-medium">{row.s_no}</TableCell>
-                    <TableCell>{row.vendor_name}</TableCell>
+                    <TableCell>
+                      <Link
+                        href={`/admin/vendors/${row.vendor_id}`}
+                        className="group block w-full rounded-md px-2 py-1 -mx-2 -my-1 transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+                        title={`View ${row.vendor_name}`}
+                      >
+                        <span className="font-medium text-foreground transition-colors group-hover:text-primary">
+                          {row.vendor_name}
+                        </span>
+                      </Link>
+                    </TableCell>
                     <TableCell>{row.total_events}</TableCell>
                     <TableCell>
                       {row.total_earning_formatted ??

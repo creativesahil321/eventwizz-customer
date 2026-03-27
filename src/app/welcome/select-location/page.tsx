@@ -102,6 +102,13 @@ export default function WelcomeLocationSelectionPage() {
   const selectedLocation = locationsList.find(
     (l) => l.id === selectedLocationId,
   );
+  const venueName = React.useMemo(() => {
+    const selectedName = selectedLocation?.name?.trim();
+    if (selectedName) return selectedName;
+    const defaultName = locationsList.find((loc) => loc.is_default)?.name?.trim();
+    if (defaultName) return defaultName;
+    return locationsList[0]?.name?.trim() || "";
+  }, [selectedLocation?.name, locationsList]);
 
   return (
     <div className="h-screen overflow-hidden flex flex-col lg:flex-row">
@@ -151,7 +158,7 @@ export default function WelcomeLocationSelectionPage() {
               )}
             </h1>
             <p className="text-white/65 text-sm leading-relaxed mb-6 max-w-[260px]">
-              Pick a venue below and jump straight into your dashboard.
+              Pick a location below and jump straight into your dashboard.
             </p>
 
             {/* Stats pills */}
@@ -162,7 +169,7 @@ export default function WelcomeLocationSelectionPage() {
                 </div>
                 <div>
                   <p className="text-white text-sm font-medium leading-tight">
-                    {locationsList.length} venue{locationsList.length !== 1 ? "s" : ""} available
+                    {locationsList.length} location{locationsList.length !== 1 ? "s" : ""} available
                   </p>
                   <p className="text-white/50 text-xs">on your account</p>
                 </div>
@@ -296,7 +303,9 @@ export default function WelcomeLocationSelectionPage() {
               Choose a Location
             </h1>
             <p className="text-sm text-muted-foreground">
-              Select the venue to manage today
+              {venueName
+                ? `Select a location for ${venueName}`
+                : "Select the venue to manage today"}
             </p>
           </div>
 
@@ -318,9 +327,11 @@ export default function WelcomeLocationSelectionPage() {
             {/* Card header */}
             <div className="shrink-0 flex items-center justify-between px-5 pt-5 pb-4 border-b border-gray-100">
               <div>
-                <h2 className="text-lg font-bold text-gray-900">Your Venues</h2>
+                <h2 className="text-lg font-bold text-gray-900">Your Locations</h2>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  Tap a venue to select it
+                  {venueName
+                    ? `Tap a location to select it for ${venueName}`
+                    : "Tap a location to select it"}
                 </p>
               </div>
               <CreateLocationDialog />
@@ -351,10 +362,10 @@ export default function WelcomeLocationSelectionPage() {
                   </div>
                   <div>
                     <p className="font-semibold text-gray-800 mb-1">
-                      No venues yet
+                      No locations yet
                     </p>
                     <p className="text-xs text-muted-foreground mb-4">
-                      Create your first venue to get started
+                      Create your first location to get started
                     </p>
                     <CreateLocationDialog />
                   </div>
@@ -438,7 +449,9 @@ export default function WelcomeLocationSelectionPage() {
                   <p className="text-xs text-muted-foreground text-center mb-3">
                     Continuing as{" "}
                     <span className="font-semibold text-gray-700">
-                      {selectedLocation.city || selectedLocation.name}
+                      {venueName
+                        ? `${venueName} · ${selectedLocation.city || selectedLocation.name}`
+                        : selectedLocation.city || selectedLocation.name}
                     </span>
                   </p>
                 )}

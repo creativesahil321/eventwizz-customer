@@ -96,13 +96,11 @@ export default function FooterSection({
   return (
     <>
       <section
-        className="w-full bg-[color:var(--color-footer)]"
-        style={{ color: "var(--color-text)" }}
+        className="w-full bg-[color:var(--color-footer)] text-[color:var(--color-footer-text,#f8fafc)]"
       >
         <div className="container mx-auto px-5 py-5">
           <div
-            className="w-full border-b py-5"
-            style={{ borderColor: "var(--color-text-dimmed)" }}
+            className="w-full border-b py-5 border-[color:var(--color-footer-muted,rgba(248,250,252,0.35))]"
           >
             <div className="flex flex-row gap-2 justify-center items-center">
               {logo ? (
@@ -132,22 +130,22 @@ export default function FooterSection({
                 className="w-full flex flex-row justify-start sm:justify-center gap-3"
                 key={index}
               >
-                <div className="mt-1 flex-shrink-0 [&_svg]:text-[color:var(--color-text)]">
+                <div className="mt-1 flex-shrink-0 [&_svg]:text-[color:var(--color-footer-text,#f8fafc)]">
                   {info.icon}
                 </div>
                 <div className="flex-1">
-                  <h6 className="font-bold text-[color:var(--color-text)]">
+                  <h6 className="font-bold text-[color:var(--color-footer-text,#f8fafc)]">
                     {info.label}
                   </h6>
                   {info.type === "link" ? (
                     <Link
                       href={info.src || ""}
-                      className="break-all text-[color:var(--color-text)] hover:opacity-90"
+                      className="break-all text-[color:var(--color-footer-text,#f8fafc)] hover:opacity-90"
                     >
                       {info.text}
                     </Link>
                   ) : (
-                    <p className="break-all text-[color:var(--color-text)]">
+                    <p className="break-all text-[color:var(--color-footer-text,#f8fafc)]">
                       {info.text}
                     </p>
                   )}

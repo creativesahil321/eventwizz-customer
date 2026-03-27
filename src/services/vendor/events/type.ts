@@ -44,6 +44,7 @@ export interface EventItem {
 export interface EventDetailStepOne {
   event_id: number;
   step: number;
+  vendor_location_id?: number;
   event_name?: string;
   event_category_id?: number;
   event_banner_image?: string | null;
@@ -72,10 +73,15 @@ export interface EventDetailStepTwo {
 export interface EventDetailStepThree {
   event_id: number;
   step: number;
+  vendor_location_id?: number;
   dates?: Array<{
+    id?: number;
     event_date: string;
     booking_type: "tickets" | "tables" | "both";
     has_bookings?: boolean;
+    use_cancel_date_action?: boolean;
+    cancellation_request_pending?: boolean;
+    has_financial_bookings?: boolean;
     cancelled?: boolean;
     total_table_types?: number;
     tables?: Array<{
@@ -161,6 +167,8 @@ export interface EventDetailData {
   current_step?: number;
   vendor_location_id?: number;
   logo?: string | null;
+  email?: string;
+  contact_number?: string;
   stepOne?: EventDetailStepOne;
   stepTwo?: EventDetailStepTwo;
   stepThree?: EventDetailStepThree;

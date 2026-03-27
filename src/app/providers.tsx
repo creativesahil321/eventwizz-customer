@@ -51,11 +51,12 @@ export function Providers({
             <PermissionProvider>
               <ChatBotProvider>
                 <NextTopLoader
-                  color="var(--color-primary)"
+                  color="var(--color-on-header)"
                   showSpinner={false}
                   speed={300}
-                  shadow="0 0 10px var(--color-primary),0 0 5px var(--color-primary)"
-                  height={4}
+                  shadow="0 0 10px var(--color-on-header),0 0 5px var(--color-on-header)"
+                  height={5}
+                  zIndex={2147483647}
                 />
                 <SessionValidator />
                 {children}
@@ -96,14 +97,14 @@ function SessionValidator() {
         try {
           sessionStorage.setItem(
             "permissions-backup",
-            JSON.stringify(session.user.permissions)
+            JSON.stringify(session.user.permissions),
           );
           localStorage.setItem(
             "permission-storage",
             JSON.stringify({
               state: { permissions: session.user.permissions, isLoaded: true },
               version: 0,
-            })
+            }),
           );
         } catch (e) {
           console.error("Error storing permissions:", e);

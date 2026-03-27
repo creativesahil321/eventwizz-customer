@@ -21,6 +21,10 @@ import { VideoFormatInfo } from "@/components/shared/video-format-info";
 import { addCacheBusting } from "@/lib/image-utils";
 import { LocationIndicator } from "@/components/location-indicator";
 import { MapPin } from "lucide-react";
+import {
+  BANNER_HEADING_MAX_WORDS,
+  countWords,
+} from "@/lib/word-count";
 
 interface BrandingTabProps {
   /** Server values from API – source of truth after location switch so UI updates immediately */
@@ -261,8 +265,17 @@ export function BrandingTab({
             <FormItem>
               <FormLabel>Site Name</FormLabel>
               <FormControl>
-                <Input placeholder="EventWizz" {...field} />
+                <Input
+                  placeholder="EventWizz"
+                  {...field}
+                  disabled
+                  readOnly
+                  className="bg-muted text-muted-foreground cursor-not-allowed"
+                />
               </FormControl>
+              <FormDescription>
+                Site Name is system-managed and cannot be edited here.
+              </FormDescription>
               <FormMessage />
             </FormItem>
           )}
@@ -425,8 +438,7 @@ export function BrandingTab({
           control={form.control}
           name="banner_heading"
           render={({ field }) => {
-            const currentLength = field.value?.length || 0;
-            const maxLength = 50;
+            const wc = countWords(field.value || "");
             return (
               <FormItem>
                 <FormLabel>Landing Page Heading</FormLabel>
@@ -435,17 +447,16 @@ export function BrandingTab({
                     placeholder="EventWizz Events"
                     {...field}
                     value={field.value || ""}
-                    maxLength={maxLength}
                     onChange={(e) => field.onChange(e.target.value)}
                   />
                 </FormControl>
                 <div className="text-xs text-muted-foreground mt-1">
                   <span
                     className={
-                      currentLength > maxLength ? "text-destructive" : ""
+                      wc > BANNER_HEADING_MAX_WORDS ? "text-destructive" : ""
                     }
                   >
-                    {currentLength}/{maxLength} characters
+                    {wc}/{BANNER_HEADING_MAX_WORDS} words
                   </span>
                 </div>
                 <FormMessage />

@@ -3,7 +3,13 @@
 import { useQuery } from "@tanstack/react-query";
 import { adminVenuesService } from "@/services/admin/venues/venues.service";
 import type { AdminVenueByIdData } from "@/services/admin/venues/type";
-import type { VenueDetail, VenueLocation, LocationFinancialSummary } from "./types";
+import type {
+  VenueDetail,
+  VenueLocation,
+  LocationFinancialSummary,
+  EventApprovalStatus,
+  VenueEventCancellationRequest,
+} from "./types";
 
 function mapDomainStatus(
   value: string | null | undefined
@@ -40,6 +46,21 @@ function mapFinancialSummary(
   };
 }
 
+function normalizeEventApprovalStatus(
+  raw?: string | null
+): EventApprovalStatus | undefined {
+  if (raw == null || raw === "") return undefined;
+  const v = raw.toLowerCase().trim().replace(/-/g, "_");
+  if (v === "draft") return "draft";
+  if (v === "pending") return "pending";
+  if (v === "approved" || v === "live") return "approved";
+  if (v === "rejected") return "rejected";
+  if (v === "changes_requested" || v === "request_changes") {
+    return "changes_requested";
+  }
+  return undefined;
+}
+
 function mapApiToVenueDetail(data: AdminVenueByIdData): VenueDetail {
   const venue = data.venue;
   const fs = mapFinancialSummary(data.financial_summary);
@@ -62,6 +83,28 @@ function mapApiToVenueDetail(data: AdminVenueByIdData): VenueDetail {
       ? [data.admin_notes.notes]
       : [];
 
+  const eventCancellationRequests: VenueEventCancellationRequest[] =
+    data.event_cancellation_requests?.map((req) => ({
+      eventId: req.event_id,
+      eventDateId: req.event_date_id,
+      eventName: req.event_name,
+      eventDate: req.event_date ?? req.event_date_raw ?? "—",
+      requestedBy: req.requested_by,
+      requestedAt: req.requested_at,
+      requestedAtRaw: req.requested_at_raw,
+      cancellationReason: req.cancellation_reason ?? undefined,
+      status:
+        req.status === "approved"
+          ? "approved"
+          : req.status === "disapproved"
+          ? "disapproved"
+          : "pending_review",
+      actions: {
+        canApprove: req.actions?.can_approve === true,
+        canDisapprove: req.actions?.can_disapprove === true,
+      },
+    })) ?? [];
+
   return {
     id: venue.id,
     vendorId: venue.vendor_id,
@@ -83,9 +126,13 @@ function mapApiToVenueDetail(data: AdminVenueByIdData): VenueDetail {
       documentUrl: data.business_documents.document_url ?? undefined,
     },
     recentEvents: data.recently_added_events.map((e) => ({
+      id: e.id,
       title: e.event_name,
       date: e.date ?? e.event_date_raw ?? "—",
+      locationAddress: e.location_address?.trim() || undefined,
+      approvalStatus: normalizeEventApprovalStatus(e.approval_status),
     })),
+    eventCancellationRequests,
     adminNotes,
     financialSummary: fs,
     lastLogin: data.login_security.last_login ?? undefined,

@@ -30,8 +30,8 @@ export default function SubscribeSection() {
   };
 
   return (
-    <section className="py-12 text-white relative">
-      <div className="absolute inset-0 bg-black/70"></div>
+    <section className="py-12 text-[var(--color-secondary-foreground)] relative">
+      <div className="absolute inset-0 bg-[var(--color-secondary)]/85"></div>
       <div className="container mx-auto px-4 relative z-10">
         <div className="text-center mb-8">
           <p className="text-xl font-medium mb-3">
@@ -54,7 +54,7 @@ export default function SubscribeSection() {
               value={formData.name}
               onChange={handleChange}
               required
-              className="bg-white border-0 h-12 text-black w-full md:w-auto"
+              className="bg-[var(--color-surface)]/85 border-[var(--color-surface)]/55 h-12 text-[var(--color-on-surface)] placeholder:text-[var(--color-on-surface)]/65 w-full md:w-auto"
             />
 
             <Input
@@ -64,7 +64,7 @@ export default function SubscribeSection() {
               value={formData.email}
               onChange={handleChange}
               required
-              className="bg-white border-0 h-12 text-black w-full md:w-auto"
+              className="bg-[var(--color-surface)]/85 border-[var(--color-surface)]/55 h-12 text-[var(--color-on-surface)] placeholder:text-[var(--color-on-surface)]/65 w-full md:w-auto"
             />
 
             <Input
@@ -73,12 +73,13 @@ export default function SubscribeSection() {
               placeholder="Mobile Number"
               value={formData.phone}
               onChange={handleChange}
-              className="bg-white border-0 h-12 text-black w-full md:w-auto"
+              className="bg-[var(--color-surface)]/85 border-[var(--color-surface)]/55 h-12 text-[var(--color-on-surface)] placeholder:text-[var(--color-on-surface)]/65 w-full md:w-auto"
             />
 
             <Button
               type="submit"
-              className="bg-white text-black hover:bg-gray-200 font-medium h-12 px-6 mt-4 md:mt-0"
+              variant="event-primary"
+              className="h-12 px-6 mt-4 md:mt-0"
             >
               Sign up
             </Button>

@@ -18,6 +18,18 @@ import {
 } from "./type";
 // import { OnBoardingPreviewType } from "@/app/(on-boarding)/on-boarding/_components/form-provider/schema";
 
+/** Reads the persisted onboarding mode from sessionStorage (client-only, safe). */
+function getOnboardingMode(): "ai" | "manual" | null {
+  try {
+    if (typeof window === "undefined") return null;
+    const m = sessionStorage.getItem("onboarding_mode");
+    if (m === "ai" || m === "manual") return m;
+  } catch {
+    // sessionStorage may not be available in some environments
+  }
+  return null;
+}
+
 export const onboardingService = {
   /**
    * Check if response indicates onboarding is already completed
@@ -77,27 +89,39 @@ export const onboardingService = {
    * @returns API response with status and message
    */
   storeStepData: async (data: StepOneType): Promise<ApiResponse> => {
+    const nameTrimmed = (data.name ?? "").trim();
+    const addressTrimmed = (data.address ?? "").trim();
+    const emailTrimmed = (data.email ?? "").trim();
+    const contactTrimmed = (data.contact_number ?? "").trim();
+
     // Use city from form data if available, otherwise extract from address
-    let city = data.city || "";
+    let city = (data.city ?? "").trim();
 
     // If city is still empty, try to extract it from address
-    if (!city && data.address) {
-      // Try to extract city from the address
-      const addressParts = data.address.split(",").map((part) => part.trim());
+    if (!city && addressTrimmed) {
+      const addressParts = addressTrimmed.split(",").map((part) => part.trim());
       // Usually the city is the second-to-last or last part, depending on format
-      // We'll take the second-to-last part if there are at least 2 parts
       if (addressParts.length >= 2) {
         city = addressParts[addressParts.length - 2];
       }
     }
 
-    const payload = {
+    const mode = getOnboardingMode();
+    const hasMultipleFlag =
+      data.has_multiple_locations === true ||
+      data.has_multiple_locations === false;
+
+    const payload: Record<string, unknown> = {
       step: data.step,
-      name: data.name,
-      contact_number: data.contact_number,
-      email: data.email,
-      address: data.address,
-      city: city, // Add city to payload
+      name: nameTrimmed,
+      contact_number: contactTrimmed,
+      email: emailTrimmed,
+      address: addressTrimmed,
+      city: city,
+      ...(mode && { mode }),
+      ...(hasMultipleFlag && {
+        has_multiple_locations: data.has_multiple_locations,
+      }),
     };
 
     const response = await api.post<ApiResponse>(
@@ -470,9 +494,8 @@ export const onboardingService = {
 
     // Create payload with all required data
     const payload = {
-      step: data.step, // We're sending as step
+      step: data.step,
       event_id: data.event_id,
-      // Remove global booking_type as it's now part of each date
       dates: formattedDates || [],
     };
 
@@ -1040,6 +1063,31 @@ export const onboardingService = {
             ? error.message
             : `Failed to process ${gateway} return`,
         ],
+      };
+    }
+  },
+
+  /**
+   * Persist the onboarding mode ("ai" | "manual") to the backend.
+   * Sends a mode-only POST to /vendor/onboarding/store so the
+   * backend can return the saved mode on subsequent GET calls —
+   * enabling cross-device persistence without requiring a step payload.
+   */
+  saveMode: async (mode: "ai" | "manual"): Promise<ApiResponse> => {
+    try {
+      const response = await api.post<ApiResponse>(
+        API_ENDPOINTS.VENDOR.ONBOARDING.STEPS,
+        { mode },
+        { returnFullResponse: true }
+      );
+      return response as unknown as ApiResponse;
+    } catch (error) {
+      console.error("Error saving onboarding mode:", error);
+      return {
+        status: false,
+        message:
+          error instanceof Error ? error.message : "Failed to save mode",
+        data: null as unknown as import("./type").OnboardingApiResponse,
       };
     }
   },

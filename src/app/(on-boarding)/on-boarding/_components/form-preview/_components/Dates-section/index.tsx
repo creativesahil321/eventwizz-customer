@@ -78,16 +78,12 @@ export default function DatesSection({
     console.log("Cart conflict context not available");
   }
 
-  // Cart data fetching - conditional based on onboarding status and preview mode
-  try {
-    // Only fetch cart data if not in onboarding AND not in preview mode
-    useGetCartData(
-      !isOnboarding && status === "authenticated" && !isPreviewMode
-    );
-  } catch {
-    // Cart data not available - this is expected in some contexts
-    console.log("Cart data not available");
-  }
+  const sessionUser = session?.user as SessionUser | undefined;
+  useGetCartData(
+    sessionUser?.account_type === "customer" &&
+      !isOnboarding &&
+      !isPreviewMode
+  );
 
   // Get cart data to check if dates are already in cart (for future use)
   // const { data: apiCartData } = useGetCartData();
