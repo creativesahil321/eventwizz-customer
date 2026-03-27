@@ -97,7 +97,7 @@ export default function UpcomingEvents({
   // Empty state rendering when no events
   if (events.length === 0) {
     return (
-      <section className="w-full py-12">
+      <section className="w-full py-14 bg-[var(--color-surface)] border-y border-[var(--color-on-surface)]/8">
         <div className="container mx-auto px-4">
           <div className="w-full text-center mb-8">
             <h2 className="text-3xl md:text-4xl font-bold">
@@ -109,10 +109,10 @@ export default function UpcomingEvents({
           <div className="text-center py-20">
             {/* Main Message */}
             <div className="mb-12 max-w-3xl mx-auto">
-              <h3 className="text-2xl md:text-3xl font-semibold text-gray-800 mb-6">
+              <h3 className="text-2xl md:text-3xl font-semibold text-[var(--color-on-surface)] mb-6">
                 Exciting Events Coming Soon
               </h3>
-              <p className="text-lg text-gray-600 leading-relaxed">
+              <p className="text-lg text-[var(--color-on-surface)]/75 leading-relaxed">
                 We&apos;re preparing something amazing for you. Stay tuned for
                 exclusive events, special performances, and unforgettable
                 experiences. Be the first to know when tickets go live!
@@ -195,7 +195,7 @@ export default function UpcomingEvents({
             </div>
           </div>
 
-          <div className="bg-white rounded-lg shadow-md overflow-hidden">
+          <div className="bg-[var(--color-surface)] text-[var(--color-on-surface)] rounded-2xl shadow-sm border border-[var(--color-on-surface)]/10 overflow-hidden">
             <div className="flex flex-col md:flex-row">
               {/* Image section - takes 40% on desktop */}
               <div className="md:w-2/5 relative">
@@ -209,23 +209,20 @@ export default function UpcomingEvents({
               </div>
 
               {/* Content */}
-              <div className="bg-white/80 backdrop-blur-md rounded-xl p-8 border border-white/20 shadow-lg md:w-3/5">
-                <h3 className="text-3xl font-bold text-gray-900">
+              <div className="p-8 md:w-3/5">
+                <h3 className="text-3xl font-bold text-[var(--color-on-surface)]">
                   {event.title}
                 </h3>
                 <p className="text-transparent bg-clip-text bg-gradient-to-r from-[var(--color-primary)] to-[var(--color-primary)] text-2xl font-extrabold mt-2">
                   {event.price === null ? "Price revealed soon" : event.price}
                 </p>
-                <p className="text-gray-700 mt-4">
+                <p className="text-[var(--color-on-surface)]/85 mt-4">
                   Join us for this amazing event! Experience the excitement and
                   fun with friends and family. Don&apos;t miss out on this
                   opportunity to create lasting memories.
                 </p>
                 <Link href={`/${locationSlug}/events/${event.slug}`} passHref>
-                  <Button
-                    variant="event-outline"
-                    className="mt-6 px-6 py-3 rounded-full bg-gradient-to-r from-[var(--color-primary)] to-[var(--color-primary)] text-white font-semibold hover:text-white shadow-lg hover:shadow-[var(--color-primary)]/50 transition-all duration-300"
-                  >
+                  <Button variant="event-primary" className="mt-6 px-6 py-3 rounded-full">
                     {event.buttonText}
                   </Button>
                 </Link>
@@ -238,7 +235,7 @@ export default function UpcomingEvents({
   }
 
   return (
-    <section className="w-full py-12">
+    <section className="w-full py-14 bg-[var(--color-surface)] border-y border-[var(--color-on-surface)]/8">
       <div
         className={cn(
           "container mx-auto px-4",
@@ -288,7 +285,7 @@ export default function UpcomingEvents({
                   key={index}
                 >
                   <div className={cn("p-2 h-full", itemWidth)}>
-                    <div className="overflow-hidden bg-white rounded-lg shadow-md hover:shadow-lg transition-shadow duration-300 h-full flex flex-col">
+                    <div className="overflow-hidden bg-[var(--color-surface)] text-[var(--color-on-surface)] rounded-xl border border-[var(--color-on-surface)]/10 shadow-sm hover:shadow-md transition-shadow duration-300 h-full flex flex-col">
                       <div className="relative aspect-[3/4] w-full overflow-hidden flex-shrink-0">
                         <img
                           src={addCacheBusting(data.image)}
@@ -304,7 +301,7 @@ export default function UpcomingEvents({
                           }}
                         />
                       </div>
-                      <div className="p-4 relative text-black flex-1 flex flex-col">
+                      <div className="p-4 relative text-[var(--color-on-surface)] flex-1 flex flex-col">
                         <h3 className="pb-2 text-base font-bold line-clamp-2 min-h-[2.5rem]">
                           {data.title}
                         </h3>

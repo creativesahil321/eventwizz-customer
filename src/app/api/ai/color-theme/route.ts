@@ -29,6 +29,228 @@ const FALLBACK_DARK_SURFACE = "#111827";
 const FALLBACK_LIGHT_MUTED = "#64748B";
 const FALLBACK_DARK_MUTED = "#CBD5E1";
 
+function isNightlifeOrHighEnergyTheme(themeLower: string): boolean {
+  return (
+    themeLower.includes("dj") ||
+    themeLower.includes("club") ||
+    themeLower.includes("night") ||
+    themeLower.includes("afrobeats") ||
+    themeLower.includes("bashment") ||
+    themeLower.includes("rave") ||
+    themeLower.includes("neon")
+  );
+}
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(Math.max(value, min), max);
+}
+
+function hexToHsl(hexColor: string): { h: number; s: number; l: number } {
+  const hex = normalizeHexColor(hexColor);
+  const r = parseInt(hex.slice(1, 3), 16) / 255;
+  const g = parseInt(hex.slice(3, 5), 16) / 255;
+  const b = parseInt(hex.slice(5, 7), 16) / 255;
+
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  const l = (max + min) / 2;
+  const d = max - min;
+
+  if (d === 0) {
+    return { h: 0, s: 0, l: l * 100 };
+  }
+
+  const s = d / (1 - Math.abs(2 * l - 1));
+  let h = 0;
+
+  switch (max) {
+    case r:
+      h = ((g - b) / d) % 6;
+      break;
+    case g:
+      h = (b - r) / d + 2;
+      break;
+    default:
+      h = (r - g) / d + 4;
+      break;
+  }
+
+  h = Math.round(h * 60);
+  if (h < 0) h += 360;
+
+  return { h, s: s * 100, l: l * 100 };
+}
+
+function hslToHex(h: number, s: number, l: number): string {
+  const sat = clamp(s / 100, 0, 1);
+  const light = clamp(l / 100, 0, 1);
+  const c = (1 - Math.abs(2 * light - 1)) * sat;
+  const x = c * (1 - Math.abs(((h / 60) % 2) - 1));
+  const m = light - c / 2;
+
+  let r = 0;
+  let g = 0;
+  let b = 0;
+
+  if (h < 60) {
+    r = c;
+    g = x;
+  } else if (h < 120) {
+    r = x;
+    g = c;
+  } else if (h < 180) {
+    g = c;
+    b = x;
+  } else if (h < 240) {
+    g = x;
+    b = c;
+  } else if (h < 300) {
+    r = x;
+    b = c;
+  } else {
+    r = c;
+    b = x;
+  }
+
+  const toHex = (v: number) =>
+    Math.round((v + m) * 255)
+      .toString(16)
+      .padStart(2, "0");
+
+  return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
+}
+
+function softenHex(
+  hexColor: string,
+  options: { maxSaturation?: number; minLightness?: number; maxLightness?: number },
+): string {
+  if (!isValidHex(hexColor)) return hexColor;
+  const { h, s, l } = hexToHsl(hexColor);
+  const saturation = clamp(s, 0, options.maxSaturation ?? 100);
+  const lightness = clamp(
+    l,
+    options.minLightness ?? 0,
+    options.maxLightness ?? 100,
+  );
+  return hslToHex(h, saturation, lightness);
+}
+
+function resolveEffectiveLogoTone(
+  logoColorTone: LogoColorTone | undefined,
+  logoColorHex?: string,
+): LogoColorTone {
+  if (logoColorHex && isValidHex(logoColorHex)) {
+    // Very bright logos (e.g. white) should force dark header/footer.
+    return isDarkColor(normalizeHexColor(logoColorHex)) ? "dark" : "light";
+  }
+  return logoColorTone ?? "unsure";
+}
+
+function enforceProfessionalAesthetic(
+  theme: ColorTheme,
+  prefersLightProfessional: boolean,
+  logoTone: LogoColorTone,
+): { theme: ColorTheme; applied: boolean } {
+  let applied = false;
+  const next = { ...theme, socialLogin: { ...theme.socialLogin } };
+
+  const applyIfChanged = (current: string, updated: string): string => {
+    if (normalizeHexColor(current) !== normalizeHexColor(updated)) {
+      applied = true;
+    }
+    return updated;
+  };
+
+  // Keep accents expressive but avoid neon-heavy saturation.
+  next.primary = applyIfChanged(
+    next.primary,
+    softenHex(next.primary, { maxSaturation: 62, minLightness: 28, maxLightness: 58 }),
+  );
+  next.secondary = applyIfChanged(
+    next.secondary,
+    softenHex(next.secondary, { maxSaturation: 30, minLightness: 40, maxLightness: 72 }),
+  );
+
+  const prefersDarkHeader = logoTone === "light";
+  const prefersLightHeader = logoTone === "dark";
+
+  if (prefersLightProfessional) {
+    // Clean, premium baseline similar to luxury venue websites.
+    if (prefersDarkHeader) {
+      next.header = applyIfChanged(
+        next.header,
+        softenHex(next.header, {
+          maxSaturation: 16,
+          minLightness: 16,
+          maxLightness: 28,
+        }),
+      );
+      next.footer = applyIfChanged(
+        next.footer,
+        softenHex(next.footer, {
+          maxSaturation: 18,
+          minLightness: 18,
+          maxLightness: 32,
+        }),
+      );
+    } else if (prefersLightHeader) {
+      next.header = applyIfChanged(
+        next.header,
+        softenHex(next.header, {
+          maxSaturation: 8,
+          minLightness: 94,
+          maxLightness: 99,
+        }),
+      );
+      next.footer = applyIfChanged(
+        next.footer,
+        softenHex(next.footer, {
+          maxSaturation: 14,
+          minLightness: 90,
+          maxLightness: 98,
+        }),
+      );
+    } else {
+      next.header = applyIfChanged(
+        next.header,
+        softenHex(next.header, {
+          maxSaturation: 8,
+          minLightness: 94,
+          maxLightness: 99,
+        }),
+      );
+      next.footer = applyIfChanged(
+        next.footer,
+        softenHex(next.footer, {
+          maxSaturation: 14,
+          minLightness: 90,
+          maxLightness: 98,
+        }),
+      );
+    }
+
+    next.surface = applyIfChanged(next.surface, "#FFFFFF");
+    if (isValidHex(next.background)) {
+      next.background = applyIfChanged(
+        next.background,
+        softenHex(next.background, { maxSaturation: 10, minLightness: 95, maxLightness: 99 }),
+      );
+    }
+  } else {
+    // Nightlife is allowed to be deeper, but keep it polished not muddy.
+    next.primary = applyIfChanged(
+      next.primary,
+      softenHex(next.primary, { maxSaturation: 78, minLightness: 26, maxLightness: 60 }),
+    );
+    next.secondary = applyIfChanged(
+      next.secondary,
+      softenHex(next.secondary, { maxSaturation: 58, minLightness: 22, maxLightness: 56 }),
+    );
+  }
+
+  return { theme: next, applied };
+}
+
 // Helper function to normalize hex colors (convert #333 to #333333)
 function normalizeHexColor(color: string): string {
   if (color.length === 4) {
@@ -303,12 +525,15 @@ export async function POST(req: Request) {
     // Build contextual prompt based on user inputs
     let contextPrompt = "";
 
+    let prefersLightProfessional = true;
+
     // Handle custom theme input (free text)
     if (customTheme && customTheme.trim()) {
       contextPrompt = `Generate a professional color theme for: "${customTheme.trim()}". `;
 
       // Add specific theme context based on common keywords
       const themeLower = customTheme.toLowerCase();
+      prefersLightProfessional = !isNightlifeOrHighEnergyTheme(themeLower);
 
       if (
         themeLower.includes("christmas") ||
@@ -616,9 +841,24 @@ export async function POST(req: Request) {
     }
     if (logoColorTone) {
       contextPrompt += `Logo color guidance: the site logo is primarily ${logoColorTone}. `;
+      if (logoColorTone === "light") {
+        contextPrompt +=
+          "Because logo is light/white, header and footer must be dark enough for logo visibility. ";
+      } else if (logoColorTone === "dark") {
+        contextPrompt +=
+          "Because logo is dark, header and footer should stay light for strong logo visibility. ";
+      }
     }
     if (logoColorHex) {
       contextPrompt += `Primary logo color hex is ${logoColorHex}. `;
+    }
+
+    if (prefersLightProfessional) {
+      contextPrompt +=
+        "Visual direction: modern premium venue style, clean and light (similar to luxury event websites). Prefer soft neutral backgrounds, white/off-white surfaces, and restrained accents. Avoid neon or overly saturated colors. Keep the look elegant and calm. ";
+    } else {
+      contextPrompt +=
+        "Visual direction: keep a polished nightlife feel, but avoid muddy dark palettes and preserve clean readability. ";
     }
 
     // Encourage gradients for visually expressive themes while still allowing solid colors.
@@ -679,14 +919,20 @@ Choose based on the theme - gradients work great for dynamic themes like sunsets
 When the user's theme implies atmosphere/depth (luxury, wedding, nightlife, cinematic, elegant, dark, sunset, ocean), prefer a subtle linear-gradient instead of flat solid.
 
 Guidelines:
-- Primary: Main brand color, should be vibrant and memorable
-- Secondary: Complementary accent color
+- Primary: Main brand color, professional and controlled (avoid over-saturation)
+- Secondary: Complementary accent with restrained intensity
 - Header/Footer: Container backgrounds that should contrast with text colors
-- Background: Base background color (solid hex color or CSS gradient)
-- Surface: Card/container backgrounds, should contrast with background
+- Background: Prefer light neutral base for professional themes (solid or subtle gradient)
+- Surface: Prefer white or very light neutral for clean cards/panels
 - Text: High contrast with surface/background for readability
 - TextDimmed: Secondary text color, still readable but less prominent
 - Social Login: Colors that work well with respective brand guidelines
+
+STYLE QUALITY RULES:
+1. Default to clean, premium, modern palettes (not flashy/neon) unless the theme explicitly requests nightlife.
+2. Avoid very dark + very saturated combinations that feel heavy.
+3. Keep backgrounds/surfaces visually calm so photos and content stand out.
+4. Use accent colors sparingly; prioritize clarity and professionalism.
 
 CRITICAL CONTRAST RULES (MUST FOLLOW):
 1. If text is DARK (black, dark gray), then header/footer MUST be LIGHT (white, light gray, light colors)
@@ -820,12 +1066,28 @@ Remember: Return solid hex colors for most fields, but background can be either 
         );
       }
 
+      const effectiveLogoTone = resolveEffectiveLogoTone(
+        (logoColorTone as LogoColorTone | undefined) ?? "unsure",
+        typeof logoColorHex === "string" ? logoColorHex.trim() : undefined,
+      );
+
       // Check and auto-adjust contrast for accessibility across all core surfaces
-      const { theme: finalColorTheme, autoAdjusted, adjustments } =
+      const { theme: readabilitySafeTheme, autoAdjusted, adjustments } =
         sanitizeThemeForReadability(
           colorTheme,
-          (logoColorTone as LogoColorTone | undefined) ?? "unsure",
+          effectiveLogoTone,
         );
+      const {
+        theme: finalColorTheme,
+        applied: professionalStyleApplied,
+      } = enforceProfessionalAesthetic(
+        readabilitySafeTheme,
+        prefersLightProfessional,
+        effectiveLogoTone,
+      );
+      if (professionalStyleApplied) {
+        adjustments.push("Applied clean professional style balancing to reduce over-saturated or overly dark colors.");
+      }
       const contrastValidation = validateContrast(finalColorTheme);
 
       // Normalize all hex colors to 6-character format using the adjusted theme

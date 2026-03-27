@@ -75,7 +75,7 @@ export default function RecentEventsGlimpse({
   }, [images.length]);
 
   return (
-    <section className="py-12 bg-[var(--color-background)]">
+    <section className="py-14 bg-[var(--color-background)]">
       <div className="text-center mb-6">
         <h2 className="text-3xl md:text-4xl font-bold">{galleryTitle}</h2>
       </div>
@@ -143,8 +143,8 @@ export default function RecentEventsGlimpse({
         </div>
       ) : isSingleImage ? (
         // Single image layout - full width
-        <div className="w-full">
-          <div className="h-[300px] md:h-[400px] lg:h-[500px] overflow-hidden relative">
+        <div className="w-full px-4 md:px-8">
+          <div className="h-[300px] md:h-[400px] lg:h-[500px] overflow-hidden relative rounded-2xl border border-[var(--color-on-surface)]/10 shadow-sm bg-[var(--color-surface)]">
             <img
               src={addCacheBusting(images[0])}
               alt="Recent Event"
@@ -160,7 +160,7 @@ export default function RecentEventsGlimpse({
         </div>
       ) : (
         // Multiple images carousel layout
-        <div className="relative w-full overflow-hidden">
+        <div className="relative w-full overflow-hidden px-2 md:px-4">
           <div className="absolute inset-0 pointer-events-none">
             <div className="absolute inset-y-0 left-0 w-1/12 bg-gradient-to-r from-[var(--color-background)] to-transparent z-10"></div>
             <div className="absolute inset-y-0 right-0 w-1/12 bg-gradient-to-l from-[var(--color-background)] to-transparent z-10"></div>
@@ -181,7 +181,7 @@ export default function RecentEventsGlimpse({
                   key={index}
                   className="pl-4 md:basis-1/2 lg:basis-1/3"
                 >
-                  <div className="h-64 md:h-72 overflow-hidden relative">
+                  <div className="h-64 md:h-72 overflow-hidden relative rounded-xl border border-[var(--color-on-surface)]/10 shadow-sm bg-[var(--color-surface)]">
                     <img
                       src={addCacheBusting(src)}
                       alt={`Recent Event ${index + 1}`}

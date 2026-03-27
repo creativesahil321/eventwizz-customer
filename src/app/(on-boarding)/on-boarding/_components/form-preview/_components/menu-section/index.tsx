@@ -32,7 +32,7 @@ export default function MenuSection({
     .map((menu) => ({
       ...menu,
       items: menu.items.filter(
-        (item) => item.title.trim() !== "" || item.description?.trim() !== ""
+        (item) => item.title.trim() !== "" || item.description?.trim() !== "",
       ),
     }))
     .filter((menu) => menu.name.trim() !== "" && menu.items.length > 0)
@@ -64,7 +64,7 @@ export default function MenuSection({
           className="absolute inset-0 w-full h-full object-cover opacity-30"
         />
         {/* Dark overlay */}
-        <div className="absolute inset-0 bg-[var(--color-secondary)]/70" />
+        <div className="absolute inset-0 " />
         {/* Optional texture overlay */}
         <div
           className="absolute inset-0 opacity-20"

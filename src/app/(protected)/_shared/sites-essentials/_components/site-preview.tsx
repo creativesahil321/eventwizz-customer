@@ -11,6 +11,7 @@ import RecentEventsGlimpse from "@/app/(public)/vendor/_components/EventListPage
 import ContactFormSection from "@/app/(public)/vendor/_components/EventListPage/contact-form-section";
 import UpcomingEvents from "@/app/(public)/vendor/_components/EventListPage/upcoming-event";
 import FooterSection from "@/app/(public)/vendor/_components/EventListPage/footer";
+import { pickReadableForeground } from "@/lib/color-contrast";
 // ServerContext removed - already provided at layout level
 
 interface SitePreviewProps {
@@ -18,16 +19,31 @@ interface SitePreviewProps {
 }
 
 export function SitePreview({ formValues }: Readonly<SitePreviewProps>) {
+  const primary = formValues.colors?.primary || "#0F172A";
+  const secondary = formValues.colors?.secondary || "#64748B";
+  const header = formValues.colors?.header || "#FFFFFF";
+  const footer = formValues.colors?.footer || "#0F172A";
+  const background = formValues.colors?.background || "#F8FAFC";
+  const surface = formValues.colors?.surface || "#FFFFFF";
+  const text = formValues.colors?.text || "#0F172A";
+  const textDimmed = formValues.colors?.textDimmed || "#64748B";
+
   // Apply the site theme to the preview content
   const previewStyles = {
-    "--color-primary": formValues.colors?.primary || "#0F172A",
-    "--color-secondary": formValues.colors?.secondary || "#64748B",
-    "--color-header": formValues.colors?.header || "#FFFFFF",
-    "--color-footer": formValues.colors?.footer || "#0F172A",
-    "--color-background": formValues.colors?.background || "#F8FAFC",
-    "--color-text": formValues.colors?.text || "#0F172A",
-    "--color-text-dimmed": formValues.colors?.textDimmed || "#64748B",
-    "--color-surface": formValues.colors?.surface || "#FFFFFF",
+    "--color-primary": primary,
+    "--color-secondary": secondary,
+    "--color-header": header,
+    "--color-footer": footer,
+    "--color-background": background,
+    "--color-text": text,
+    "--color-text-dimmed": textDimmed,
+    "--color-surface": surface,
+    "--color-primary-foreground": pickReadableForeground(primary),
+    "--color-secondary-foreground": pickReadableForeground(secondary),
+    "--color-on-header": pickReadableForeground(header),
+    "--color-on-footer": pickReadableForeground(footer),
+    "--color-on-surface": pickReadableForeground(surface),
+    "--color-on-background": pickReadableForeground(background),
     "--font-heading":
       formValues.typography?.fontFamily?.heading || "'Inter', sans-serif",
     "--font-body":
