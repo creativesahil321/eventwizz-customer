@@ -141,8 +141,10 @@ export default function CommonHeader({
     switch (variant) {
       case "preview":
         return {
-          container: "bg-[color:var(--color-header)] shadow-sm",
-          textColor: "text-[color:var(--color-on-header)]",
+          container: isScrolled
+            ? "bg-[color:var(--color-header)] shadow-md"
+            : "bg-transparent",
+          textColor: "text-[var(--color-text)]",
           borderColor: "border-[color:var(--color-primary)]",
           hoverColor: "hover:text-[color:var(--color-primary)]",
         };
@@ -157,8 +159,10 @@ export default function CommonHeader({
         };
       default:
         return {
-          container: "bg-[color:var(--color-header)] shadow-sm",
-          textColor: "text-[color:var(--color-on-header)]",
+          container: isScrolled
+            ? "bg-[color:var(--color-header)] shadow-md"
+            : "bg-transparent",
+          textColor: "text-[var(--color-text)]",
           borderColor: "border-[color:var(--color-primary)]",
           hoverColor: "hover:text-[color:var(--color-primary)]",
         };
