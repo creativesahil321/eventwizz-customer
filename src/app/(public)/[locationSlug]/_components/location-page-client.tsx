@@ -44,28 +44,31 @@ export default function LocationPageClient({
         bannerHeading={locationData.banner_heading}
         bannerSubHeading={locationData.banner_sub_heading}
       />
-      <ExperienceSection
-        aboutTitle={locationData.about_title}
-        aboutDescription={locationData.about_description}
-        aboutLinkTitle={locationData.about_link_title}
-        aboutCtaLink={locationData.about_cta_link}
-      />
-      <PopularEvents
-        events={latestEvents}
-        sectionTitle={locationData.event_title_1 || "Popular Events"}
-        locationSlug={locationSlug}
-      />
-      <UpcomingEvents
-        events={upcomingEvents}
-        sectionTitle={locationData.event_title_2 || "Upcoming Events"}
-        locationSlug={locationSlug}
-      />
-      <RecentEventsGlimpse
-        galleryImages={locationData.event_gallery || []}
-        galleryTitle={
-          locationData.event_gallery_title || "Recent Events Glimpse"
-        }
-      />
+      {/* One surface for page background so gradients are not restarted per section */}
+      <div className="bg-[var(--color-background)] text-[var(--color-text)]">
+        <ExperienceSection
+          aboutTitle={locationData.about_title}
+          aboutDescription={locationData.about_description}
+          aboutLinkTitle={locationData.about_link_title}
+          aboutCtaLink={locationData.about_cta_link}
+        />
+        <PopularEvents
+          events={latestEvents}
+          sectionTitle={locationData.event_title_1 || "Popular Events"}
+          locationSlug={locationSlug}
+        />
+        <UpcomingEvents
+          events={upcomingEvents}
+          sectionTitle={locationData.event_title_2 || "Upcoming Events"}
+          locationSlug={locationSlug}
+        />
+        <RecentEventsGlimpse
+          galleryImages={locationData.event_gallery || []}
+          galleryTitle={
+            locationData.event_gallery_title || "Recent Events Glimpse"
+          }
+        />
+      </div>
       <ContactFormSection
         locationAddress={locationData.address || ""}
         longitude={Number(locationData.longitude) || 0}

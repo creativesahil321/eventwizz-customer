@@ -109,7 +109,7 @@ export default function UpcomingEvents({
     }
 
     return (
-      <section className="w-full py-20 bg-[var(--color-background)] border-y border-[var(--color-on-background)]/10 shadow-inner">
+      <section className="w-full py-20 bg-transparent">
         <div className="container mx-auto px-4">
           <div className="w-full text-center mb-8">
             <h2 className="text-3xl md:text-4xl font-bold">
@@ -191,7 +191,7 @@ export default function UpcomingEvents({
   if (events.length === 1) {
     const event = events[0];
     return (
-      <section className="w-full py-12">
+      <section className="w-full py-12 bg-transparent">
         <div className="container mx-auto px-4">
           <div className="flex flex-col items-center mb-8">
             <h2 className="text-3xl md:text-4xl font-bold mb-4">
@@ -234,7 +234,10 @@ export default function UpcomingEvents({
                   opportunity to create lasting memories.
                 </p>
                 <Link href={`/${locationSlug}/events/${event.slug}`} passHref>
-                  <Button variant="event-primary" className="mt-6 px-6 py-3 rounded-full">
+                  <Button
+                    variant="event-primary"
+                    className="mt-6 px-6 py-3 rounded-full"
+                  >
                     {event.buttonText}
                   </Button>
                 </Link>
@@ -247,7 +250,7 @@ export default function UpcomingEvents({
   }
 
   return (
-      <section className="w-full py-20 bg-[var(--color-background)] border-y border-[var(--color-on-background)]/10 shadow-inner">
+    <section className="w-full py-20 bg-transparent">
       <div
         className={cn(
           "container mx-auto px-4",
@@ -300,7 +303,7 @@ export default function UpcomingEvents({
                   key={index}
                 >
                   <div className={cn("p-2 h-full", itemWidth)}>
-                    <div className="overflow-hidden bg-[var(--color-background)] text-[var(--color-on-background)] rounded-xl border border-[var(--color-on-background)]/12 shadow-sm hover:shadow-md transition-shadow duration-300 h-full flex flex-col">
+                    <div className="overflow-hidden bg-[var(--color-surface)] text-[var(--color-on-surface)] rounded-xl border border-[var(--color-secondary-foreground)]/15 shadow-sm hover:shadow-md transition-shadow duration-300 h-full flex flex-col">
                       <div className="relative aspect-[3/4] w-full overflow-hidden flex-shrink-0">
                         <img
                           src={addCacheBusting(data.image)}

@@ -174,16 +174,16 @@
     @apply border-border outline-ring/50;
   }
 
+  /* One property: hex/rgb work as color; linear-gradient() works as image */
   body {
-    background-color: var(--color-background);
-    background-image: var(--color-background);
+    background: var(--color-background);
     color: var(--color-text);
     font-family: var(--font-body);
   }
 
-  /* Fix for gradient backgrounds across the app */
+  /* Same for sections using bg-[var(--color-background)] (solid or gradient from theme) */
   .bg-\[var\(--color-background\)\] {
-    background-image: var(--color-background);
+    background: var(--color-background);
   }
 
   h1,

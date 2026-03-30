@@ -24,6 +24,8 @@ import {
 import { useEffect, useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { SiteEssentialsGoogleFontsLoader } from "@/components/shared/site-essentials-google-fonts-loader";
+import { SITE_ESSENTIALS_GOOGLE_FONTS_UI } from "@/lib/site-typography-google-fonts";
 
 // Common web-safe fonts
 const webSafeFonts = [
@@ -39,19 +41,7 @@ const webSafeFonts = [
   { name: "Lucida Console", value: "Lucida Console, monospace" },
 ];
 
-// Google fonts
-const googleFonts = [
-  { name: "Roboto", value: "Roboto, sans-serif" },
-  { name: "Open Sans", value: "Open Sans, sans-serif" },
-  { name: "Lato", value: "Lato, sans-serif" },
-  { name: "Montserrat", value: "Montserrat, sans-serif" },
-  { name: "Oswald", value: "Oswald, sans-serif" },
-  { name: "Raleway", value: "Raleway, sans-serif" },
-  { name: "Poppins", value: "Poppins, sans-serif" },
-  { name: "Nunito", value: "Nunito, sans-serif" },
-  { name: "Playfair Display", value: "Playfair Display, serif" },
-  { name: "Merriweather", value: "Merriweather, serif" },
-];
+const googleFonts = SITE_ESSENTIALS_GOOGLE_FONTS_UI;
 
 export function TypographyTab() {
   const form = useFormContext<SiteEssentialsFormValues>();
@@ -128,6 +118,11 @@ export function TypographyTab() {
 
   return (
     <div className="space-y-6">
+      <SiteEssentialsGoogleFontsLoader
+        linkId="site-essentials-google-fonts-typography-tab"
+        headingStack={headingFont}
+        bodyStack={bodyFont}
+      />
       <SectionTitle
         title="Typography"
         description="Configure your site's fonts and typography settings"

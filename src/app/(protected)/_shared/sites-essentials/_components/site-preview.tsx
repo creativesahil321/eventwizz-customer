@@ -12,6 +12,7 @@ import ContactFormSection from "@/app/(public)/vendor/_components/EventListPage/
 import UpcomingEvents from "@/app/(public)/vendor/_components/EventListPage/upcoming-event";
 import FooterSection from "@/app/(public)/vendor/_components/EventListPage/footer";
 import { pickReadableForeground } from "@/lib/color-contrast";
+import { SiteEssentialsGoogleFontsLoader } from "@/components/shared/site-essentials-google-fonts-loader";
 // ServerContext removed - already provided at layout level
 
 interface SitePreviewProps {
@@ -62,21 +63,31 @@ export function SitePreview({ formValues }: Readonly<SitePreviewProps>) {
 
   // ServerContext already provided at layout level - no need to create context value
 
+  const useGradientBg = formValues.colors?.background?.includes(
+    "linear-gradient",
+  );
+
+  const mainBandStyle = useGradientBg
+    ? ({
+        ...previewStyles,
+        background: formValues.colors?.background,
+      } as React.CSSProperties)
+    : previewStyles;
+
+  const mainBandClass = useGradientBg
+    ? "bg-none text-[color:var(--color-text)]"
+    : "bg-[color:var(--color-background)] text-[color:var(--color-text)]";
+
   return (
     <div
       style={previewStyles}
-      className={`${
-        formValues.colors?.background?.includes("linear-gradient")
-          ? "bg-none"
-          : "bg-[color:var(--color-background)]"
-      } text-[color:var(--color-text)] font-[var(--font-body)]`}
-      {...(formValues.colors?.background?.includes("linear-gradient") && {
-        style: {
-          ...previewStyles,
-          background: formValues.colors.background,
-        },
-      })}
+      className="text-[color:var(--color-text)] font-[var(--font-body)]"
     >
+      <SiteEssentialsGoogleFontsLoader
+        linkId="site-essentials-google-fonts-site-preview"
+        headingStack={formValues.typography?.fontFamily?.heading}
+        bodyStack={formValues.typography?.fontFamily?.body}
+      />
       {/* ServerContext already provided at layout level - no need to wrap again */}
       <CommonHeader
         logo={getPreviewUrl(formValues.logo) || null}
@@ -90,26 +101,28 @@ export function SitePreview({ formValues }: Readonly<SitePreviewProps>) {
         bannerHeading={formValues.banner_heading}
         bannerSubHeading={formValues.banner_sub_heading}
       />
-      <ExperienceSection
-        aboutTitle={formValues.about_title || null}
-        aboutDescription={formValues.about_description || null}
-        aboutLinkTitle={formValues.about_link_title || null}
-        aboutCtaLink={formValues.about_cta_link || null}
-      />
-      <PopularEvents
-        events={[]}
-        sectionTitle={formValues.event_title_1 || "Popular Events"}
-        locationSlug=""
-      />
-      <UpcomingEvents
-        events={[]}
-        sectionTitle={formValues.event_title_2 || "Upcoming Events"}
-        locationSlug=""
-      />
-      <RecentEventsGlimpse
-        galleryImages={[]}
-        galleryTitle={formValues.event_gallery_title || "Recent Events Glimpse"}
-      />
+      <div className={mainBandClass} style={mainBandStyle}>
+        <ExperienceSection
+          aboutTitle={formValues.about_title || null}
+          aboutDescription={formValues.about_description || null}
+          aboutLinkTitle={formValues.about_link_title || null}
+          aboutCtaLink={formValues.about_cta_link || null}
+        />
+        <PopularEvents
+          events={[]}
+          sectionTitle={formValues.event_title_1 || "Popular Events"}
+          locationSlug=""
+        />
+        <UpcomingEvents
+          events={[]}
+          sectionTitle={formValues.event_title_2 || "Upcoming Events"}
+          locationSlug=""
+        />
+        <RecentEventsGlimpse
+          galleryImages={[]}
+          galleryTitle={formValues.event_gallery_title || "Recent Events Glimpse"}
+        />
+      </div>
       <ContactFormSection
         locationAddress={formValues.name || ""}
         longitude={0}

@@ -17,6 +17,7 @@ import { EventDetailData } from "@/services/vendor/events/type";
 import MenuSection from "@/app/(on-boarding)/on-boarding/_components/form-preview/_components/menu-section";
 import { SiteEssentialsFormValues } from "@/app/(protected)/_shared/sites-essentials/_lib/schema";
 import EventGallery from "@/app/(on-boarding)/on-boarding/_components/form-preview/_components/Event-gallery";
+import { SiteEssentialsGoogleFontsLoader } from "@/components/shared/site-essentials-google-fonts-loader";
 
 interface EventPreviewProps {
   data: EventDetailData;
@@ -86,6 +87,11 @@ export function EventPreview({ data, siteEssentials }: EventPreviewProps) {
         },
       })}
     >
+      <SiteEssentialsGoogleFontsLoader
+        linkId="site-essentials-google-fonts-event-preview"
+        headingStack={headingFont}
+        bodyStack={bodyFont}
+      />
       {/* ServerContext already provided at layout level - no need to wrap again */}
       {/* Header */}
       <CommonHeader

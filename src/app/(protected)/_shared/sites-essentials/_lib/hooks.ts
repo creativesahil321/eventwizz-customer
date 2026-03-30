@@ -2,12 +2,16 @@
 
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { useQueryClient } from "@tanstack/react-query";
+import { themeKeys } from "@/hooks/use-theme-query";
 import { useSiteEssentialsQuery, useSiteEssentialsMutation } from "./queries";
 import { siteEssentialsFormSchema, SiteEssentialsFormValues } from "./schema";
 
 export type { SiteEssentialsFormValues };
 
 export const useSiteEssentials = () => {
+  const queryClient = useQueryClient();
+
   // Use TanStack Query for data fetching with caching
   const {
     data: siteEssentials,
@@ -16,7 +20,7 @@ export const useSiteEssentials = () => {
   } = useSiteEssentialsQuery();
 
   // Use TanStack Mutation for updating data
-  const { mutate: updateEssentials, isPending: isMutationLoading } =
+  const { mutateAsync: updateEssentials, isPending: isMutationLoading } =
     useSiteEssentialsMutation();
 
   // Determine overall loading state
@@ -83,7 +87,10 @@ export const useSiteEssentials = () => {
     values: SiteEssentialsFormValues
   ): Promise<boolean> => {
     try {
-      updateEssentials(values);
+      await updateEssentials(values);
+      // Theme (colors, typography, etc.) is a separate query; without this the
+      // shell keeps stale CSS variables until a full reload.
+      await queryClient.invalidateQueries({ queryKey: themeKeys.all });
       return true;
     } catch (err) {
       console.error("Error updating site essentials:", err);

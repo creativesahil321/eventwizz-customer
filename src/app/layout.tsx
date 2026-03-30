@@ -15,6 +15,10 @@ import PermissionPreloader from "./permission-preloader";
 import { ServerContextProvider } from "@/lib/server-context";
 import { appConfig } from "@/config/app";
 import { GoogleTagManager } from "@next/third-parties/google";
+import {
+  googleFontsHrefFromTheme,
+  THEME_GOOGLE_FONTS_LINK_ID,
+} from "@/lib/site-typography-google-fonts";
 
 /**
  * Dynamic metadata — single source of truth for brand name, favicon, and title template.
@@ -88,6 +92,8 @@ export default async function RootLayout({
     ? generateCriticalThemeCSS(initialTheme)
     : getDefaultThemeCSS();
 
+  const themeGoogleFontsHref = googleFontsHrefFromTheme(initialTheme);
+
   /**
    * GTM is injected only on the main admin marketing site (website_role === "admin").
    * Vendor and customer tenant sites are intentionally excluded — they have
@@ -118,6 +124,13 @@ export default async function RootLayout({
           suppressHydrationWarning={true}
           dangerouslySetInnerHTML={{ __html: criticalThemeCSS }}
         />
+        {themeGoogleFontsHref ? (
+          <link
+            id={THEME_GOOGLE_FONTS_LINK_ID}
+            rel="stylesheet"
+            href={themeGoogleFontsHref}
+          />
+        ) : null}
       </head>
       <body className="antialiased" suppressHydrationWarning={true}>
         <ServerContextProvider value={{ theme: initialTheme, host, subdomain }}>

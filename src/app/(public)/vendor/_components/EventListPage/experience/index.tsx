@@ -39,9 +39,9 @@ export default function ExperienceSection({
   };
 
   return (
-    <section className="w-full py-16 bg-[var(--color-background)]">
+    <section className="w-full py-16 bg-transparent">
       <div className="container mx-auto px-4">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-12 items-start  text-[var(--color-on-surface)] p-8 md:p-10">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-12 items-start text-[var(--color-text)] p-8 md:p-10">
           <div className="w-full">
             <h2
               className="text-3xl md:text-5xl font-bold leading-tight"
@@ -50,12 +50,12 @@ export default function ExperienceSection({
           </div>
           <div className="w-full flex flex-col gap-6">
             <p
-              className="text-base md:text-lg text-[var(--color-on-surface)]/85"
+              className="text-base md:text-lg text-[var(--color-text-dimmed)]"
               dangerouslySetInnerHTML={{ __html: experienceData.description }}
             />
             <Link
               href={experienceData.buttonLink}
-              className="inline-flex items-center font-medium border-b border-[var(--color-on-surface)]/50 pb-1 hover:text-[color:var(--color-primary)] hover:border-[color:var(--color-primary)] transition-colors w-fit"
+              className="inline-flex items-center font-medium border-b border-[var(--color-text)]/35 pb-1 hover:text-[color:var(--color-primary)] hover:border-[color:var(--color-primary)] transition-colors w-fit"
             >
               {experienceData.buttonText}
               <ArrowRight className="ml-2 h-4 w-4" />

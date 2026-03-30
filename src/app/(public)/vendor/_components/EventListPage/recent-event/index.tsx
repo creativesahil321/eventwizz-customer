@@ -42,7 +42,7 @@ export default function RecentEventsGlimpse({
     if (galleryImages.length === 0) {
       return defaultEventImages;
     }
-    
+
     const extractedImages = galleryImages
       .map((img) => {
         // If img is a string (URL), return it directly
@@ -60,7 +60,7 @@ export default function RecentEventsGlimpse({
         // Filter out empty strings, null, undefined, or invalid URLs
         return url && typeof url === "string" && url.trim().length > 0;
       });
-    
+
     // If no valid images found, use defaults
     return extractedImages.length > 0 ? extractedImages : defaultEventImages;
   }, [galleryImages]);
@@ -75,7 +75,7 @@ export default function RecentEventsGlimpse({
   }, [images.length]);
 
   return (
-    <section className="py-14 bg-[var(--color-background)]">
+    <section className="py-14 bg-transparent">
       <div className="text-center mb-6">
         <h2 className="text-3xl md:text-4xl font-bold">{galleryTitle}</h2>
       </div>
@@ -171,7 +171,7 @@ export default function RecentEventsGlimpse({
               className={cn(
                 "absolute left-8 top-1/2 transform -translate-y-1/2 z-20 bg-white shadow-lg rounded-full border-2 border-gray-300 flex items-center justify-center",
                 // Always show on mobile, conditionally hide on desktop based on image count
-                !showNavigationDesktop && "md:hidden"
+                !showNavigationDesktop && "md:hidden",
               )}
             />
 
@@ -203,7 +203,7 @@ export default function RecentEventsGlimpse({
               className={cn(
                 "absolute right-8 top-1/2 transform -translate-y-1/2 z-20 bg-white shadow-lg rounded-full border-2 border-gray-300 flex items-center justify-center",
                 // Always show on mobile, conditionally hide on desktop based on image count
-                !showNavigationDesktop && "md:hidden"
+                !showNavigationDesktop && "md:hidden",
               )}
             />
           </Carousel>

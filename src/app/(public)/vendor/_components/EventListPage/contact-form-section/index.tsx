@@ -35,7 +35,7 @@ export default function ContactFormSection() {
   };
 
   return (
-    <section className="bg-[var(--color-secondary)] text-[var(--color-secondary-foreground)] py-12 md:py-16">
+    <section className="bg-[var(--color-surface)] text-[var(--color-secondary-foreground)] py-12 md:py-16">
       <div className="container mx-auto px-4">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12 items-center">
           {/* Left Side - Text Content */}
@@ -55,7 +55,7 @@ export default function ContactFormSection() {
           </div>
 
           {/* Right Side - Contact Form */}
-          <div className="bg-[var(--color-surface)]/20 backdrop-blur-sm rounded-lg p-6 md:p-8 border border-[var(--color-primary)]/35">
+          <div className="bg-[var(--color-primary)] backdrop-blur-sm rounded-lg p-6 md:p-8 border border-[var(--color-primary)]/35">
             <form onSubmit={handleSubmit} className="space-y-5">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <Input
@@ -93,7 +93,7 @@ export default function ContactFormSection() {
                 required
                 className="bg-[var(--color-surface)]/80 border-[var(--color-surface)]/50 text-[var(--color-on-surface)] placeholder:text-[var(--color-on-surface)]/65 rounded-lg focus:border-[var(--color-primary)]/60 focus:ring-2 focus:ring-[var(--color-primary)]/20 resize-none h-28 transition-all duration-200"
               />
-              <Button type="submit" variant="event-primary">
+              <Button type="submit" variant="event-secondary">
                 Send Message
               </Button>
             </form>

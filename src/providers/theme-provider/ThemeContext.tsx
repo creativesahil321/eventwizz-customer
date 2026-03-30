@@ -14,6 +14,7 @@ import {
 import { Toaster } from "@/components/ui/sonner";
 import { useThemeQuery, themeKeys } from "@/hooks/use-theme-query";
 import { generateThemeCSS } from "@/services/common/theme/constants/theme";
+import { syncDocumentGoogleFontLinkForTheme } from "@/lib/site-typography-google-fonts";
 import { useQueryClient } from "@tanstack/react-query";
 
 /**
@@ -172,6 +173,8 @@ const applyThemeToDOM = (settings: ThemeSchema): void => {
       root.style.setProperty(name.trim(), value.trim());
     }
   });
+
+  syncDocumentGoogleFontLinkForTheme(settings);
 
   // Update favicon dynamically so it stays in sync with the theme
   if (settings.favicon) {

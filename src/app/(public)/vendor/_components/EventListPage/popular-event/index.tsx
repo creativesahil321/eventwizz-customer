@@ -103,13 +103,13 @@ export default function PopularEvents({
       return (
         <SitePreviewDummyEventSection
           sectionTitle={sectionTitleText}
-          band="secondary"
+          band="background"
         />
       );
     }
 
     return (
-      <section className="w-full py-16 bg-[var(--color-secondary)] text-[var(--color-secondary-foreground)]">
+      <section className="w-full py-16 bg-transparent text-[var(--color-text)]">
         <div className="container mx-auto px-4">
           <div className="w-full text-center mb-8">
             <h2 className="text-3xl md:text-4xl font-bold">
@@ -121,10 +121,10 @@ export default function PopularEvents({
           <div className="text-center py-20">
             {/* Main Message */}
             <div className="mb-12 max-w-3xl mx-auto">
-              <h3 className="text-2xl md:text-3xl font-semibold text-[var(--color-secondary-foreground)] mb-6">
+              <h3 className="text-2xl md:text-3xl font-semibold text-[var(--color-text)] mb-6">
                 Exciting Events Coming Soon
               </h3>
-              <p className="text-lg text-[var(--color-secondary-foreground)]/80 leading-relaxed">
+              <p className="text-lg text-[var(--color-text-dimmed)] leading-relaxed">
                 We&apos;re preparing something amazing for you. Stay tuned for
                 exclusive events, special performances, and unforgettable
                 experiences. Be the first to know when tickets go live!
@@ -191,7 +191,7 @@ export default function PopularEvents({
   if (events.length === 1) {
     const event = events[0];
     return (
-      <section className="w-full py-12">
+      <section className="w-full py-12 bg-transparent">
         <div className="container mx-auto px-4">
           <div className="flex flex-col items-center mb-8">
             <h2 className="text-3xl md:text-4xl font-bold mb-4">
@@ -250,7 +250,7 @@ export default function PopularEvents({
   }
 
   return (
-      <section className="w-full py-16 bg-[var(--color-secondary)] text-[var(--color-secondary-foreground)] border-t border-[var(--color-secondary-foreground)]/15">
+      <section className="w-full py-16 bg-transparent text-[var(--color-text)]">
       <div
         className={cn(
           "container mx-auto px-4",
@@ -259,7 +259,7 @@ export default function PopularEvents({
         )}
       >
         <div className="w-full text-center mb-10">
-          <span className="inline-block mb-2 text-xs font-semibold tracking-[0.18em] uppercase text-[var(--color-secondary-foreground)]/75">
+          <span className="inline-block mb-2 text-xs font-semibold tracking-[0.18em] uppercase text-[var(--color-text-dimmed)]">
             Featured right now
           </span>
           <h2 className="text-3xl md:text-4xl font-bold">{sectionTitleText}</h2>
