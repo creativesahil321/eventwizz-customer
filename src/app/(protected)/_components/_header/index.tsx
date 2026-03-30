@@ -61,7 +61,7 @@ const Header: React.FC<HeaderProps> = memo(({ menus }) => {
   const headerClass = useMemo(
     () =>
       cn(
-        "flex-none min-w-0 bg-[var(--color-header)]  dark:border-b backdrop-blur-lg px-4 py-3 md:px-6 md:py-4 flex items-center justify-between sticky top-0 z-50 shadow-base transition-all duration-300 overflow-hidden",
+        "flex-none min-w-0 bg-[var(--color-header)] text-[var(--color-on-header)] dark:border-b backdrop-blur-lg px-4 py-3 md:px-6 md:py-4 flex items-center justify-between sticky top-0 z-50 shadow-base transition-all duration-300 overflow-hidden",
         collapsed ? "xl:ml-[60px]" : "xl:ml-[264px]",
       ),
     [collapsed],

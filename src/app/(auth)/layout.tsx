@@ -95,32 +95,32 @@ export default function AuthLayout({
 
   return (
     <div className="min-h-screen flex flex-col overflow-x-hidden font-sans bg-[var(--color-background)]">
-      <header className="w-full h-16 bg-[var(--color-header)] text-[var(--color-header-foreground,var(--color-foreground))]">
+      <header className="w-full h-16 bg-[var(--color-header)] text-[var(--color-on-header)]">
         <div className="max-w-[1400px] h-full mx-auto px-4 sm:px-6 flex items-center justify-between">
-          <Link href="/" className="flex items-center space-x-2">
+          <Link href="/" className="flex items-center space-x-2 shrink-0">
             <img
               className="h-8 w-auto object-contain"
               alt="EventWizz"
               src={addCacheBusting(logoPath)}
             />
           </Link>
-          <nav>
+          <nav className="text-sm text-[var(--color-on-header)]/85">
             {isRegistrationPage ? (
-              <div className="text-sm text-[var(--color-text-dimmed,rgba(0,0,0,0.6))]">
+              <div>
                 Have an account?{" "}
                 <Link
                   href="/auth/login"
-                  className="text-[var(--color-text)] hover:text-[var(--color-primary-hover)] hover:underline cursor-pointer"
+                  className="font-medium text-[var(--color-on-header)] hover:text-[color:var(--color-primary)] hover:underline underline-offset-2"
                 >
                   Sign in
                 </Link>
               </div>
             ) : (
-              <div className="text-sm text-[var(--color-text-dimmed,rgba(0,0,0,0.6))]">
+              <div>
                 Don&apos;t have an account?{" "}
                 <Link
                   href={getRegistrationPath()}
-                  className="text-[var(--color-text)] hover:text-[var(--color-primary-hover)] hover:underline cursor-pointer"
+                  className="font-medium text-[var(--color-on-header)] hover:text-[color:var(--color-primary)] hover:underline underline-offset-2"
                 >
                   Sign Up
                 </Link>

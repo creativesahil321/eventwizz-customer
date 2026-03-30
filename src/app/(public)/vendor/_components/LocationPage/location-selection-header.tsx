@@ -13,6 +13,8 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useDomain } from "@/providers/domain-provider/domain-provider";
 import { addCacheBusting } from "@/lib/image-utils";
+import { useSession } from "next-auth/react";
+import { logout } from "@/lib/auth/logout";
 
 interface LocationSelectionHeaderProps {
   logo?: string;
@@ -27,9 +29,17 @@ export default function LocationSelectionHeader({
   const [dropdownOpen, setDropdownOpen] = useState(false); // State for controlling dropdown visibility
   const [isScrolled, setIsScrolled] = useState(false);
   const { settings, isLoading: isDomainLoading } = useDomain();
+  const { data: session, status: sessionStatus } = useSession();
+  const isAuthenticated = sessionStatus === "authenticated";
+  const accountType = session?.user?.account_type;
+  const dashboardHref = accountType ? `/${accountType}/dashboard` : "/auth/login";
 
   const allLocations = settings?.locations || [];
   const isLoading = isDomainLoading;
+
+  // Match CommonHeader default variant: on-header text + primary border/hover
+  const headerChromeLinkClass =
+    "text-sm hover:text-[color:var(--color-primary)] transition-colors border-2 border-[color:var(--color-primary)] rounded-lg px-2 py-1 whitespace-nowrap";
 
   // Close mobile menu if user clicks outside
   const handleClickOutside = useCallback(
@@ -86,22 +96,24 @@ export default function LocationSelectionHeader({
             animate={{ opacity: 1, x: 0 }}
             transition={{ duration: 0.5 }}
           >
-            {logo ? (
-              <img
-                src={addCacheBusting(logo)}
-                className="h-14 md:h-16 w-auto object-contain max-w-[200px]"
-                alt={name || "EventWizz"}
-              />
-            ) : (
-              <h1 className="text-xl font-bold text-[var(--color-on-header)]">
-                {name || "EventWizz"}
-              </h1>
-            )}
+            <Link href="/" className="inline-flex items-center" aria-label="Home">
+              {logo ? (
+                <img
+                  src={addCacheBusting(logo)}
+                  className="h-14 md:h-16 w-auto object-contain max-w-[200px]"
+                  alt={name || "EventWizz"}
+                />
+              ) : (
+                <span className="text-xl font-bold text-[var(--color-on-header)]">
+                  {name || "EventWizz"}
+                </span>
+              )}
+            </Link>
           </motion.div>
 
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3 md:gap-4">
             {/* Desktop menu */}
-            <div className="hidden md:flex items-center gap-6">
+            <div className="hidden md:flex items-center gap-3 lg:gap-4">
               <div className="flex items-center gap-2">
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
@@ -156,13 +168,41 @@ export default function LocationSelectionHeader({
                   </DropdownMenuContent>
                 </DropdownMenu>
               </div>
+
+              {sessionStatus !== "loading" &&
+                (isAuthenticated ? (
+                  <>
+                    <Link href={dashboardHref} className={headerChromeLinkClass}>
+                      Dashboard
+                    </Link>
+                    <button
+                      type="button"
+                      className={`${headerChromeLinkClass} cursor-pointer bg-transparent text-[var(--color-on-header)] text-left`}
+                      aria-label="Log out"
+                      onClick={() => void logout()}
+                    >
+                      Log out
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <Link href="/auth/login" className={headerChromeLinkClass}>
+                      Log In
+                    </Link>
+                    <Link href="/auth/register" className={headerChromeLinkClass}>
+                      Register
+                    </Link>
+                  </>
+                ))}
             </div>
 
             {/* Mobile menu button */}
             <button
-              className="md:hidden p-2 rounded-md hover:bg-[var(--color-primary)]/10 transition-colors"
+              type="button"
+              className="md:hidden p-2 rounded-md hover:bg-[var(--color-primary)]/10 transition-colors text-[var(--color-on-header)]"
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              aria-label="Toggle mobile menu"
+              aria-label={mobileMenuOpen ? "Close menu" : "Open menu"}
+              aria-expanded={mobileMenuOpen}
             >
               <Menu size={24} />
             </button>
@@ -185,7 +225,7 @@ export default function LocationSelectionHeader({
                 <DropdownMenuTrigger asChild>
                   <Button
                     size="sm"
-                    className="flex items-center gap-2 px-4 py-2 bg-[var(--color-primary)] text-[var(--color-text)] font-medium border border-[var(--color-primary)] rounded-lg hover:opacity-90 transition-opacity book-now-btn"
+                    className="flex items-center gap-2 px-4 py-2 bg-[var(--color-primary)] text-[var(--color-primary-foreground)] font-medium border border-[var(--color-primary)] rounded-lg hover:opacity-90 transition-opacity book-now-btn"
                     onClick={(e) => {
                       e.stopPropagation();
                       setDropdownOpen(!dropdownOpen);
@@ -244,6 +284,47 @@ export default function LocationSelectionHeader({
                   </DropdownMenuContent>
                 )}
               </DropdownMenu>
+
+              {sessionStatus !== "loading" &&
+                (isAuthenticated ? (
+                  <>
+                    <Link
+                      href={dashboardHref}
+                      className={`${headerChromeLinkClass} inline-flex w-full justify-center text-[var(--color-on-header)]`}
+                      onClick={() => setMobileMenuOpen(false)}
+                    >
+                      Dashboard
+                    </Link>
+                    <button
+                      type="button"
+                      className={`${headerChromeLinkClass} w-full cursor-pointer bg-transparent text-center text-[var(--color-on-header)]`}
+                      aria-label="Log out"
+                      onClick={() => {
+                        setMobileMenuOpen(false);
+                        void logout();
+                      }}
+                    >
+                      Log out
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <Link
+                      href="/auth/login"
+                      className={`${headerChromeLinkClass} inline-flex w-full justify-center text-[var(--color-on-header)]`}
+                      onClick={() => setMobileMenuOpen(false)}
+                    >
+                      Log In
+                    </Link>
+                    <Link
+                      href="/auth/register"
+                      className={`${headerChromeLinkClass} inline-flex w-full justify-center text-[var(--color-on-header)]`}
+                      onClick={() => setMobileMenuOpen(false)}
+                    >
+                      Register
+                    </Link>
+                  </>
+                ))}
             </nav>
           </div>
         </motion.div>

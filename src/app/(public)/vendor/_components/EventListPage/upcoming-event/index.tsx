@@ -27,6 +27,8 @@ const eventImages = [
 ];
 
 import { EventComponentProps } from "../event-types";
+import { useIsPreviewMode } from "@/contexts/preview-context";
+import { SitePreviewDummyEventSection } from "../site-preview-dummy-events";
 
 export default function UpcomingEvents({
   events: apiEvents,
@@ -34,6 +36,7 @@ export default function UpcomingEvents({
   locationSlug,
 }: EventComponentProps) {
   const [pendingEventSlug, setPendingEventSlug] = useState<string | null>(null);
+  const isSitePreview = useIsPreviewMode();
   const { theme } = useContext(ServerContext);
   const vendorTheme = theme as ThemeSchema;
 
@@ -94,8 +97,17 @@ export default function UpcomingEvents({
     return config;
   }, [events.length]);
 
-  // Empty state rendering when no events
+  // Empty state: Site Essentials preview shows labeled dummy cards; live site keeps coming soon
   if (events.length === 0) {
+    if (isSitePreview) {
+      return (
+        <SitePreviewDummyEventSection
+          sectionTitle={sectionTitleText}
+          band="background"
+        />
+      );
+    }
+
     return (
       <section className="w-full py-20 bg-[var(--color-background)] border-y border-[var(--color-on-background)]/10 shadow-inner">
         <div className="container mx-auto px-4">

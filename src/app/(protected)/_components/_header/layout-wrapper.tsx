@@ -13,7 +13,7 @@ export default function HeaderLayoutWrapper({
   return (
     <section
       className={cn(
-        `flex-none bg-[var(--color-header)] text-[var(--color-header-foreground,var(--color-foreground))] backdrop-blur-lg p-3 flex items-center justify-between relative theme-light shadow-base`,
+        `flex-none bg-[var(--color-header)] text-[var(--color-on-header)] backdrop-blur-lg p-3 flex items-center justify-between relative theme-light shadow-base`,
         {
           "ml-80": !collapsed,
           "ml-20": collapsed,

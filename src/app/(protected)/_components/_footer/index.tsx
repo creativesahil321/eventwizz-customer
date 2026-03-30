@@ -14,12 +14,12 @@ const Footer: React.FC<FooterProps> = memo(
     return (
       <footer
         className={cn(
-          "flex-none border-t bg-[var(--color-footer)] text-[var(--color-footer-foreground,var(--color-text))] dark:border-t-1 py-4 px-4 sm:px-6 bottom-0 z-50 shadow-base",
+          "flex-none border-t bg-[var(--color-footer)] text-[var(--color-on-footer)] dark:border-t-1 py-4 px-4 sm:px-6 bottom-0 z-50 shadow-base",
           collapsed ? "lg:ml-[60px]" : "lg:ml-[264px]",
           "hidden md:block"
         )}
       >
-        <div className="flex flex-col sm:flex-row justify-between text-default-600 text-center sm:text-left">
+        <div className="flex flex-col sm:flex-row justify-between text-[var(--color-on-footer)]/85 text-center sm:text-left">
           <div className="text-sm">
             COPYRIGHT © {copyrightYear} {companyName}, All rights Reserved
           </div>

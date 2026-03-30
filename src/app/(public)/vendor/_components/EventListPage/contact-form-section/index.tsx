@@ -55,7 +55,7 @@ export default function ContactFormSection() {
           </div>
 
           {/* Right Side - Contact Form */}
-          <div className="bg-[var(--color-surface)]/20 backdrop-blur-sm rounded-lg p-6 md:p-8 border border-[var(--color-surface)]/35">
+          <div className="bg-[var(--color-surface)]/20 backdrop-blur-sm rounded-lg p-6 md:p-8 border border-[var(--color-primary)]/35">
             <form onSubmit={handleSubmit} className="space-y-5">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <Input

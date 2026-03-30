@@ -109,7 +109,7 @@ const UserDropdown = memo(() => {
     <div className="relative">
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button className="flex items-center gap-2 bg-transparent text-[var(--color-text)] shadow-none hover:bg-transparent pr-2">
+          <Button className="flex items-center gap-2 bg-transparent text-[var(--color-on-header)] shadow-none hover:bg-transparent hover:text-[var(--color-on-header)]/90 pr-2">
             {isValidUrl(userImage) ? (
               <img
                 className="h-[32px] w-[32px] rounded-full object-cover"

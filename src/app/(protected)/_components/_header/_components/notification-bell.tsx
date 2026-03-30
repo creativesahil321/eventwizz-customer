@@ -71,7 +71,7 @@ export function NotificationBell() {
         stats?.unread ? `(${stats.unread} unread)` : ""
       }`}
     >
-      <Bell className="h-5 w-5 text-[var(--color-text)] " />
+      <Bell className="h-5 w-5 text-[var(--color-on-header)]" />
 
       {/* Notification badge */}
       {stats && stats.unread && stats.unread > 0 && (

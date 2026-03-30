@@ -27,6 +27,8 @@ const eventImages = [
 ];
 
 import { EventComponentProps } from "../event-types";
+import { useIsPreviewMode } from "@/contexts/preview-context";
+import { SitePreviewDummyEventSection } from "../site-preview-dummy-events";
 
 export default function PopularEvents({
   events: apiEvents,
@@ -34,6 +36,7 @@ export default function PopularEvents({
   locationSlug,
 }: EventComponentProps) {
   const [pendingEventSlug, setPendingEventSlug] = useState<string | null>(null);
+  const isSitePreview = useIsPreviewMode();
   const { theme } = useContext(ServerContext);
   const vendorTheme = theme as ThemeSchema;
 
@@ -94,8 +97,17 @@ export default function PopularEvents({
     return config;
   }, [events.length]);
 
-  // Empty state rendering when no events
+  // Empty state: Site Essentials preview shows labeled dummy cards; live site keeps coming soon
   if (events.length === 0) {
+    if (isSitePreview) {
+      return (
+        <SitePreviewDummyEventSection
+          sectionTitle={sectionTitleText}
+          band="secondary"
+        />
+      );
+    }
+
     return (
       <section className="w-full py-16 bg-[var(--color-secondary)] text-[var(--color-secondary-foreground)]">
         <div className="container mx-auto px-4">

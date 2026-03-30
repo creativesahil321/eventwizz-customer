@@ -25,7 +25,7 @@ const buttonVariants = cva(
         "event-secondary":
           "bg-[var(--color-secondary)] hover:bg-[var(--color-secondary-hover)] text-[var(--color-secondary-foreground)] border-[var(--color-secondary)] hover:scale-[1.03] transition-all duration-200 shadow-sm hover:shadow-md cursor-pointer",
         "event-outline":
-          "bg-[var(--color-surface)] border border-[var(--color-primary)] text-[var(--color-primary)] shadow-xs hover:bg-[var(--color-primary)] hover:text-[var(--color-primary-foreground)] hover:scale-[1.02] hover:border-[var(--color-primary-hover)] transition-all duration-200 cursor-pointer shadow-sm hover:shadow-md",
+          "bg-[var(--color-white)] border border-[var(--color-primary)] text-[var(--color-primary)] shadow-xs hover:bg-[var(--color-primary)] hover:text-[var(--color-primary-foreground)] hover:scale-[1.02] hover:border-[var(--color-primary-hover)] transition-all duration-200 cursor-pointer shadow-sm hover:shadow-md",
         "event-ghost":
           "text-[var(--color-primary)] hover:text-[var(--color-primary-hover)] hover:underline hover:bg-[#f8fafa] transition-all duration-200 cursor-pointer",
         "event-social":
