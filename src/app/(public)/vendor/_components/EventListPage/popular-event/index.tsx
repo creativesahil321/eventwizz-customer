@@ -97,7 +97,7 @@ export default function PopularEvents({
   // Empty state rendering when no events
   if (events.length === 0) {
     return (
-      <section className="w-full py-14 bg-[var(--color-background)]">
+      <section className="w-full py-16 bg-[var(--color-secondary)] text-[var(--color-secondary-foreground)]">
         <div className="container mx-auto px-4">
           <div className="w-full text-center mb-8">
             <h2 className="text-3xl md:text-4xl font-bold">
@@ -109,10 +109,10 @@ export default function PopularEvents({
           <div className="text-center py-20">
             {/* Main Message */}
             <div className="mb-12 max-w-3xl mx-auto">
-              <h3 className="text-2xl md:text-3xl font-semibold text-[var(--color-text)] mb-6">
+              <h3 className="text-2xl md:text-3xl font-semibold text-[var(--color-secondary-foreground)] mb-6">
                 Exciting Events Coming Soon
               </h3>
-              <p className="text-lg text-[var(--color-text-dimmed)] leading-relaxed">
+              <p className="text-lg text-[var(--color-secondary-foreground)]/80 leading-relaxed">
                 We&apos;re preparing something amazing for you. Stay tuned for
                 exclusive events, special performances, and unforgettable
                 experiences. Be the first to know when tickets go live!
@@ -222,7 +222,10 @@ export default function PopularEvents({
                   opportunity to create lasting memories.
                 </p>
                 <Link href={`/${locationSlug}/events/${event.slug}`} passHref>
-                  <Button variant="event-primary" className="mt-6 px-6 py-3 rounded-full">
+                  <Button
+                    variant="event-primary"
+                    className="mt-6 px-6 py-3 rounded-full"
+                  >
                     {event.buttonText}
                   </Button>
                 </Link>
@@ -235,7 +238,7 @@ export default function PopularEvents({
   }
 
   return (
-    <section className="w-full py-14 bg-[var(--color-background)]">
+      <section className="w-full py-16 bg-[var(--color-secondary)] text-[var(--color-secondary-foreground)] border-t border-[var(--color-secondary-foreground)]/15">
       <div
         className={cn(
           "container mx-auto px-4",
@@ -244,6 +247,9 @@ export default function PopularEvents({
         )}
       >
         <div className="w-full text-center mb-10">
+          <span className="inline-block mb-2 text-xs font-semibold tracking-[0.18em] uppercase text-[var(--color-secondary-foreground)]/75">
+            Featured right now
+          </span>
           <h2 className="text-3xl md:text-4xl font-bold">{sectionTitleText}</h2>
         </div>
         <div
@@ -285,7 +291,7 @@ export default function PopularEvents({
                   key={index}
                 >
                   <div className={cn("p-2 h-full", itemWidth)}>
-                    <div className="overflow-hidden bg-[var(--color-surface)] text-[var(--color-on-surface)] rounded-xl border border-[var(--color-on-surface)]/10 shadow-sm hover:shadow-md transition-shadow duration-300 h-full flex flex-col">
+                    <div className="overflow-hidden bg-[var(--color-surface)] text-[var(--color-on-surface)] rounded-xl border border-[var(--color-secondary-foreground)]/15 shadow-sm hover:shadow-md transition-shadow duration-300 h-full flex flex-col">
                       <div className="relative aspect-[3/4] w-full overflow-hidden flex-shrink-0">
                         <img
                           src={addCacheBusting(data.image)}

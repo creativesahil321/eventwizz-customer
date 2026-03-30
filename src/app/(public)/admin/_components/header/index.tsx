@@ -32,7 +32,7 @@ export default function AdminHeader() {
 
   return (
     <>
-      <header className="fixed top-0 left-0 right-0 bg-[color:var(--color-header)]/90 backdrop-blur-md z-50 shadow-sm">
+      <header className="fixed top-0 left-0 right-0 bg-[color:var(--color-header)]/90 text-[var(--color-on-header)] backdrop-blur-md z-50 shadow-sm">
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex-shrink-0">
             <Link href="/" className="flex items-center">
@@ -106,7 +106,7 @@ export default function AdminHeader() {
                 <Link
                   key={link.href}
                   href={link.href}
-                  className="text-sm font-medium hover:text-[color:var(--color-primary)] transition-colors py-2 border-b text-[color:var(--color-text)]"
+                  className="text-sm font-medium hover:text-[color:var(--color-primary)] transition-colors py-2 border-b border-[var(--color-on-header)]/15"
                   onClick={() => setMobileMenuOpen(false)}
                 >
                   {link.label}

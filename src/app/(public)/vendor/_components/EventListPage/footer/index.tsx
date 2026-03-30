@@ -101,8 +101,8 @@ export default function FooterSection({
   ];
 
   return (
-    <section className="px-4 sm:px-6 md:p-10 py-8 md:py-10 bg-[color:var(--color-footer)]">
-      <div className="container mx-auto border-b border-white/20 text-center pb-6">
+    <section className="px-4 sm:px-6 md:p-10 py-8 md:py-10 bg-[color:var(--color-footer)] text-[var(--color-on-footer)]">
+      <div className="container mx-auto border-b border-[var(--color-on-footer)]/20 text-center pb-6">
         <Link href="/">
           <div className="h-20 flex items-center justify-center">
             <img
@@ -169,7 +169,7 @@ export default function FooterSection({
           )
         )}
       </div>
-      <div className="container mx-auto pt-6 px-4 md:px-0 text-center text-[color:var(--color-text-dimmed)]">
+      <div className="container mx-auto pt-6 px-4 md:px-0 text-center text-[var(--color-on-footer)]/75">
         <p className="text-sm md:text-base">
           {copyright ||
             vendorTheme?.copyright ||

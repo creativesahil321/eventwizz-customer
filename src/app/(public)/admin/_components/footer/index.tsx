@@ -32,7 +32,7 @@ export default function AdminFooter() {
       : "/assets/images/logos/eventwizz-logo.png";
 
   return (
-    <footer className="bg-[color:var(--color-footer)] text-[color:var(--color-text)] py-12">
+    <footer className="bg-[color:var(--color-footer)] text-[var(--color-on-footer)] py-12">
       <div className="container mx-auto px-4">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-10 mb-10">
           {/* Brand */}
@@ -42,7 +42,7 @@ export default function AdminFooter() {
               alt="EventWizz"
               className="h-10 w-auto mb-4"
             />
-            <p className="text-sm text-[color:var(--color-text-dimmed)] leading-relaxed">
+            <p className="text-sm text-[var(--color-on-footer)]/80 leading-relaxed">
               Creating unforgettable events with professional planning and
               management services.
             </p>
@@ -58,7 +58,7 @@ export default function AdminFooter() {
                 <li key={link.href}>
                   <Link
                     href={link.href}
-                    className="text-sm text-[color:var(--color-text-dimmed)] hover:text-[color:var(--color-primary)] transition-colors"
+                    className="text-sm text-[var(--color-on-footer)]/80 hover:text-[color:var(--color-primary)] transition-colors"
                   >
                     {link.label}
                   </Link>
@@ -77,7 +77,7 @@ export default function AdminFooter() {
                 <li key={link.href}>
                   <Link
                     href={link.href}
-                    className="text-sm text-[color:var(--color-text-dimmed)] hover:text-[color:var(--color-primary)] transition-colors"
+                    className="text-sm text-[var(--color-on-footer)]/80 hover:text-[color:var(--color-primary)] transition-colors"
                   >
                     {link.label}
                   </Link>
@@ -94,7 +94,7 @@ export default function AdminFooter() {
             <ul className="space-y-2">
               {SERVICES.map((service) => (
                 <li key={service}>
-                  <span className="text-sm text-[color:var(--color-text-dimmed)]">
+                  <span className="text-sm text-[var(--color-on-footer)]/80">
                     {service}
                   </span>
                 </li>
@@ -104,8 +104,8 @@ export default function AdminFooter() {
         </div>
 
         {/* Copyright */}
-        <div className="border-t border-[color:var(--color-surface)] pt-6 text-center">
-          <p className="text-xs text-[color:var(--color-text-dimmed)]">
+        <div className="border-t border-[var(--color-on-footer)]/25 pt-6 text-center">
+          <p className="text-xs text-[var(--color-on-footer)]/70">
             &copy; {currentYear} EventWizz. All rights reserved.
           </p>
         </div>

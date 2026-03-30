@@ -159,8 +159,6 @@ export function ColorsTab() {
 
       <Separator className="my-6" />
 
-      <SiteContrastPreview />
-
       {/* Primary Colors Card */}
       <Card className="border-2 shadow-sm">
         <CardHeader className="bg-gradient-to-r from-blue-50 to-indigo-50 border-b">
@@ -245,6 +243,7 @@ export function ColorsTab() {
           </div>
         </CardHeader>
         <CardContent className="pt-6">
+          <SiteContrastPreview compact />
           <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
             <FormField
               control={form.control}

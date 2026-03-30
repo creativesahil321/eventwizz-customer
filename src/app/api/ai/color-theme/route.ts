@@ -29,6 +29,47 @@ const FALLBACK_DARK_SURFACE = "#111827";
 const FALLBACK_LIGHT_MUTED = "#64748B";
 const FALLBACK_DARK_MUTED = "#CBD5E1";
 
+function isValidHttpUrl(value: string): boolean {
+  try {
+    const url = new URL(value);
+    return url.protocol === "http:" || url.protocol === "https:";
+  } catch {
+    return false;
+  }
+}
+
+async function analyzeWebsiteTheme(url: string): Promise<{
+  title?: string;
+  colors: string[];
+}> {
+  const response = await fetch(url, {
+    headers: {
+      "User-Agent":
+        "Mozilla/5.0 (compatible; EventWizzThemeBot/1.0; +https://eventwizz.com)",
+    },
+    redirect: "follow",
+    cache: "no-store",
+  });
+
+  if (!response.ok) {
+    throw new Error(`Website returned status ${response.status}`);
+  }
+
+  const html = await response.text();
+  const titleMatch = html.match(/<title[^>]*>([^<]*)<\/title>/i);
+  const title = titleMatch?.[1]?.trim();
+
+  const colors = Array.from(
+    new Set(
+      (html.match(/#[0-9A-Fa-f]{6}|#[0-9A-Fa-f]{3}/g) ?? [])
+        .map((c) => normalizeHexColor(c))
+        .slice(0, 24),
+    ),
+  );
+
+  return { title, colors };
+}
+
 function isNightlifeOrHighEnergyTheme(themeLower: string): boolean {
   return (
     themeLower.includes("dj") ||
@@ -161,20 +202,19 @@ function enforceProfessionalAesthetic(
     return updated;
   };
 
-  // Keep accents expressive but avoid neon-heavy saturation.
-  next.primary = applyIfChanged(
-    next.primary,
-    softenHex(next.primary, { maxSaturation: 62, minLightness: 28, maxLightness: 58 }),
-  );
-  next.secondary = applyIfChanged(
-    next.secondary,
-    softenHex(next.secondary, { maxSaturation: 30, minLightness: 40, maxLightness: 72 }),
-  );
-
   const prefersDarkHeader = logoTone === "light";
   const prefersLightHeader = logoTone === "dark";
 
   if (prefersLightProfessional) {
+    // Primary: restrained accent (not neon); secondary: very soft tint for full-width bands.
+    next.primary = applyIfChanged(
+      next.primary,
+      softenHex(next.primary, { maxSaturation: 56, minLightness: 26, maxLightness: 56 }),
+    );
+    next.secondary = applyIfChanged(
+      next.secondary,
+      softenHex(next.secondary, { maxSaturation: 14, minLightness: 93, maxLightness: 98 }),
+    );
     // Clean, premium baseline similar to luxury venue websites.
     if (prefersDarkHeader) {
       next.header = applyIfChanged(
@@ -237,14 +277,14 @@ function enforceProfessionalAesthetic(
       );
     }
   } else {
-    // Nightlife is allowed to be deeper, but keep it polished not muddy.
+    // Nightlife: richer but still polished; secondary stays usable for bands without mud.
     next.primary = applyIfChanged(
       next.primary,
       softenHex(next.primary, { maxSaturation: 78, minLightness: 26, maxLightness: 60 }),
     );
     next.secondary = applyIfChanged(
       next.secondary,
-      softenHex(next.secondary, { maxSaturation: 58, minLightness: 22, maxLightness: 56 }),
+      softenHex(next.secondary, { maxSaturation: 48, minLightness: 28, maxLightness: 58 }),
     );
   }
 
@@ -509,6 +549,7 @@ export async function POST(req: Request) {
       style,
       existingBrand,
       customTheme,
+      websiteUrl,
       eventType,
       logoColorTone,
       logoColorHex,
@@ -524,11 +565,43 @@ export async function POST(req: Request) {
 
     // Build contextual prompt based on user inputs
     let contextPrompt = "";
+    let websiteAnalysis: { title?: string; colors: string[] } | null = null;
 
     let prefersLightProfessional = true;
 
+    if (websiteUrl && typeof websiteUrl === "string" && websiteUrl.trim()) {
+      const cleanUrl = websiteUrl.trim();
+      if (!isValidHttpUrl(cleanUrl)) {
+        return NextResponse.json(
+          { error: "Please provide a valid website URL starting with http:// or https://" },
+          { status: 400 },
+        );
+      }
+      try {
+        websiteAnalysis = await analyzeWebsiteTheme(cleanUrl);
+      } catch (error) {
+        return NextResponse.json(
+          {
+            error: "Could not analyze this website URL. Please check the link and try again.",
+            details: error instanceof Error ? error.message : "Unknown error",
+          },
+          { status: 400 },
+        );
+      }
+    }
+
     // Handle custom theme input (free text)
-    if (customTheme && customTheme.trim()) {
+    if (websiteAnalysis) {
+      contextPrompt = `Generate a professional color theme inspired by website: "${websiteUrl}". `;
+      if (websiteAnalysis.title) {
+        contextPrompt += `Website title: "${websiteAnalysis.title}". `;
+      }
+      if (websiteAnalysis.colors.length > 0) {
+        contextPrompt += `Extracted website colors: ${websiteAnalysis.colors.join(", ")}. `;
+      }
+      contextPrompt +=
+        "Use this as inspiration, but optimize for readability, cleaner modern aesthetics, and professional event platform UI.";
+    } else if (customTheme && customTheme.trim()) {
       contextPrompt = `Generate a professional color theme for: "${customTheme.trim()}". `;
 
       // Add specific theme context based on common keywords
@@ -855,7 +928,7 @@ export async function POST(req: Request) {
 
     if (prefersLightProfessional) {
       contextPrompt +=
-        "Visual direction: modern premium venue style, clean and light (similar to luxury event websites). Prefer soft neutral backgrounds, white/off-white surfaces, and restrained accents. Avoid neon or overly saturated colors. Keep the look elegant and calm. ";
+        "Visual direction: modern premium venue style, clean and light (similar to luxury event websites). Prefer soft neutral backgrounds, white/off-white surfaces, and restrained accents. Avoid neon or overly saturated colors. Keep the look elegant and calm. Secondary is often used as full-width section bands—output secondary as a very light, low-saturation tint (whisper of the palette); put brand emphasis on primary and header/footer, not loud secondary fills. ";
     } else {
       contextPrompt +=
         "Visual direction: keep a polished nightlife feel, but avoid muddy dark palettes and preserve clean readability. ";
@@ -920,7 +993,7 @@ When the user's theme implies atmosphere/depth (luxury, wedding, nightlife, cine
 
 Guidelines:
 - Primary: Main brand color, professional and controlled (avoid over-saturation)
-- Secondary: Complementary accent with restrained intensity
+- Secondary: For professional/light themes, a very soft neutral tint suitable for large section backgrounds (low saturation, high lightness); not a loud mid-tone accent
 - Header/Footer: Container backgrounds that should contrast with text colors
 - Background: Prefer light neutral base for professional themes (solid or subtle gradient)
 - Surface: Prefer white or very light neutral for clean cards/panels

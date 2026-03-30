@@ -21,6 +21,11 @@ import ReferralUrl from "./_components/referral";
 import { PermissionGuard } from "@/components/permission";
 import NotificationBell from "./_components/notification-bell";
 import { LocationSelector } from "@/components/location-selector";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { useSession } from "next-auth/react";
 import { useLocationsQuery } from "@/app/(protected)/vendor/venue-locations/_lib/queries";
 import { useProfileData } from "@/app/(protected)/_shared/profile/_lib";
@@ -86,13 +91,30 @@ const Header: React.FC<HeaderProps> = memo(({ menus }) => {
 
         {/* Location Selector - Only show for vendors with multiple locations */}
         {isVendor && venueName && (
-          <div className="hidden lg:flex items-center gap-1.5 rounded-md border border-[var(--color-border)] bg-background px-2.5 py-1.5 mr-1 max-w-[220px]">
-            <Building2 className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-            <span className="text-xs text-muted-foreground shrink-0">Venue:</span>
-            <span className="text-sm font-semibold text-foreground truncate">
-              {venueName}
-            </span>
-          </div>
+          <Tooltip delayDuration={200}>
+            <TooltipTrigger asChild>
+              <div
+                className="hidden lg:flex items-center gap-1.5 rounded-md border border-[var(--color-border)] bg-background px-2.5 py-1.5 mr-1 max-w-[220px] min-w-0 cursor-default"
+                aria-label={`Venue: ${venueName}`}
+              >
+                <Building2 className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                <span className="text-xs text-muted-foreground shrink-0">
+                  Venue:
+                </span>
+                <span className="text-sm font-semibold text-foreground truncate min-w-0">
+                  {venueName}
+                </span>
+              </div>
+            </TooltipTrigger>
+            <TooltipContent
+              side="bottom"
+              align="end"
+              sideOffset={6}
+              className="max-w-[min(90vw,24rem)] border border-[var(--color-border)] shadow-md"
+            >
+              <span className="text-sm font-medium">{venueName}</span>
+            </TooltipContent>
+          </Tooltip>
         )}
 
         {/* Location Selector - Only show for vendors with multiple locations */}

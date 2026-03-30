@@ -41,7 +41,7 @@ export default function ExperienceSection({
   return (
     <section className="w-full py-16 bg-[var(--color-background)]">
       <div className="container mx-auto px-4">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-12 items-start rounded-2xl bg-[var(--color-surface)] text-[var(--color-on-surface)] border border-[var(--color-on-surface)]/10 p-8 md:p-10 shadow-sm">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-12 items-start  text-[var(--color-on-surface)] p-8 md:p-10">
           <div className="w-full">
             <h2
               className="text-3xl md:text-5xl font-bold leading-tight"

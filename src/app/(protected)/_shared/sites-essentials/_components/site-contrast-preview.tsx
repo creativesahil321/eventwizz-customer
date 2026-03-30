@@ -203,7 +203,11 @@ function ReadabilityRow({
   );
 }
 
-export function SiteContrastPreview() {
+interface SiteContrastPreviewProps {
+  compact?: boolean;
+}
+
+export function SiteContrastPreview({ compact = false }: SiteContrastPreviewProps) {
   const form = useFormContext<SiteEssentialsFormValues>();
   const text = useWatch({ control: form.control, name: "colors.text" });
   const textDimmed = useWatch({ control: form.control, name: "colors.textDimmed" });
@@ -301,6 +305,82 @@ export function SiteContrastPreview() {
   const anyFail = bands.some((b) => b === "fail");
   const anyWarn = bands.some((b) => b === "large-only");
   const allPass = bands.every((b) => b === "pass");
+
+  const failedChecks = checks
+    .map((check) => ({
+      ...check,
+      band: contrastBand(check.ratio),
+    }))
+    .filter((check) => check.band !== "pass");
+
+  if (compact) {
+    return (
+      <div className="mb-5 rounded-xl border border-slate-200 bg-slate-50/80 p-3">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <p className="text-sm font-semibold text-slate-900">
+            Readability check
+          </p>
+          <div className="flex items-center gap-2 text-xs">
+            <span
+              className={`rounded-md px-2 py-1 font-medium ${
+                allPass
+                  ? "bg-emerald-100 text-emerald-800"
+                  : anyFail
+                    ? "bg-red-100 text-red-800"
+                    : "bg-amber-100 text-amber-800"
+              }`}
+            >
+              {allPass ? "All pass" : anyFail ? "Needs fixes" : "Borderline"}
+            </span>
+            <span className="text-slate-500">
+              {checks.length - failedChecks.length}/{checks.length} pass
+            </span>
+          </div>
+        </div>
+
+        <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+          {checks.map((check) => {
+            const band = contrastBand(check.ratio);
+            return (
+              <div
+                key={check.title}
+                className="flex items-center justify-between rounded-md border border-slate-200 bg-white px-2.5 py-2 text-xs"
+              >
+                <span className="truncate pr-2 text-slate-700">{check.title}</span>
+                <span
+                  className={`shrink-0 rounded px-1.5 py-0.5 font-medium ${
+                    band === "pass"
+                      ? "bg-emerald-100 text-emerald-800"
+                      : band === "large-only"
+                        ? "bg-amber-100 text-amber-800"
+                        : "bg-red-100 text-red-800"
+                  }`}
+                >
+                  {band === "pass" ? "Pass" : band === "large-only" ? "Tip" : "Fix"}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+
+        {failedChecks.length > 0 && (
+          <div className="mt-3 space-y-1.5">
+            {failedChecks.slice(0, 3).map((check) => (
+              <p key={check.title} className="text-xs text-slate-700">
+                <span className="font-medium">{check.title}:</span>{" "}
+                {getFixSuggestion(
+                  check.band,
+                  check.fixKey,
+                  check.foreground,
+                  check.background,
+                )}
+              </p>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  }
 
   return (
     <Card className="border-2 border-slate-200 shadow-md ring-1 ring-slate-100">

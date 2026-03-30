@@ -116,7 +116,7 @@ export default function HeadersSec({
         isScrolled
           ? "bg-[color:var(--color-header)] shadow-md"
           : "bg-transparent"
-      } text-[var(--color-text)] dark:bg-background`}
+      } text-[var(--color-on-header)] dark:bg-background`}
     >
       <div className="container mx-auto">
         {/* Desktop Header */}
@@ -204,7 +204,7 @@ export default function HeadersSec({
 
         {/* Mobile Menu Panel */}
         <div
-          className={`md:hidden fixed top-0 left-0 w-[70%] max-w-xs h-screen bg-white dark:bg-gray-900 bg-[color:var(--color-surface)] z-50 transform transition-transform duration-300 ease-in-out ${
+          className={`md:hidden fixed top-0 left-0 w-[70%] max-w-xs h-screen bg-white dark:bg-gray-900 bg-[color:var(--color-surface)] text-[var(--color-on-surface)] z-50 transform transition-transform duration-300 ease-in-out ${
             mobileMenuOpen ? "translate-x-0" : "-translate-x-full"
           }`}
         >

@@ -144,7 +144,8 @@ export default function CommonHeader({
           container: isScrolled
             ? "bg-[color:var(--color-header)] shadow-md"
             : "bg-transparent",
-          textColor: "text-[var(--color-text)]",
+          // Header chrome must use on-header (readable on --color-header), not body --color-text
+          textColor: "text-[var(--color-on-header)]",
           borderColor: "border-[color:var(--color-primary)]",
           hoverColor: "hover:text-[color:var(--color-primary)]",
         };
@@ -162,7 +163,7 @@ export default function CommonHeader({
           container: isScrolled
             ? "bg-[color:var(--color-header)] shadow-md"
             : "bg-transparent",
-          textColor: "text-[var(--color-text)]",
+          textColor: "text-[var(--color-on-header)]",
           borderColor: "border-[color:var(--color-primary)]",
           hoverColor: "hover:text-[color:var(--color-primary)]",
         };

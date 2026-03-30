@@ -10,6 +10,7 @@ type ColorThemeRequest = {
   eventType?: string;
   logoColorTone?: "dark" | "light" | "colorful" | "unsure";
   logoColorHex?: string;
+  websiteUrl?: string;
 };
 
 type ColorTheme = {
