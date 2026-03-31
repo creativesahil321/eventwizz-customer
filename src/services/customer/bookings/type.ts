@@ -180,7 +180,8 @@ export interface BookingEventDate {
   payment_status: string;
   total_amount: number;
   paid_amount: number | null;
-  pending_payment: number;
+  pending_payment: number | null;
+  can_pay_now?: boolean;
   tables: TableAllocation[];
   tickets: BookingTicketDetails[];
   drinks: BookingDrinkDetails[];
@@ -230,6 +231,7 @@ export interface BookingDetailsData {
   addons_amount: number;
   total: number;
   reschedule_status?: boolean;
+  can_pay_now?: boolean;
   event_dates: BookingEventDate[];
 }
 

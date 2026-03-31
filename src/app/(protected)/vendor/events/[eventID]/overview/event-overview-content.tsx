@@ -158,6 +158,11 @@ export default function EventOverviewClient({
   type TicketInfo = NonNullable<TableEntry["tickets"]>[0];
   type DrinkInfo = NonNullable<TableEntry["drinks"]>[0];
 
+  const drinksSectionLabel = (row: TableEntry) => {
+    const raw = (row.drink_title ?? "").trim();
+    return raw || "Drinks";
+  };
+
   // Handler for tab changes
   const handleTabChange = (value: string) => {
     setSelectedTab(value as "all" | "available" | "sold_out");
@@ -680,7 +685,7 @@ className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm 
                                     <div className="flex items-center gap-1.5">
                                       <GlassWater className="h-3.5 w-3.5 text-muted-foreground" />
                                       <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                                        Drinks
+                                        {drinksSectionLabel(table)}
                                       </p>
                                     </div>
                                     {table.drinks.length > 3 && (

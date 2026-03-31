@@ -59,6 +59,7 @@ type TableEntry = {
   submittedOn: string;
   soldOut: boolean;
   tickets?: TicketInfo[];
+  drink_title?: string;
   drinks?: DrinkInfo[];
 };
 

@@ -131,7 +131,8 @@ interface BookingDate {
   items: BookingItem[]; // Breakdown of tables and tickets
   total: string;
   transactionId?: string;
-  paymentStatus: "paid" | "pending" | "partial" | "refunded";
+  paymentStatus: "paid" | "pending" | "partial" | "refunded" | "cancelled";
+  canPayNow?: boolean;
   partialPayment?: string; // Show if customer made partial payment
   tickets?: BookingTicket[]; // Full ticket details
   drinks?: BookingDrink[]; // Full drink details
@@ -168,6 +169,8 @@ interface BookingData {
   total_tables?: number;
   total_people?: number;
   payment_status: string;
+  /** When false, hide booking-level payment CTAs (from API can_pay_now) */
+  canPayNow?: boolean;
   booked_by?: string;
   location?: string;
   is_menu_choice?: boolean;
@@ -259,7 +262,8 @@ export default function BookingInfoTab({ bookingData }: BookingInfoTabProps) {
   const getPendingAmount = (dateInfo: BookingDate): string | null => {
     if (
       dateInfo.paymentStatus === "paid" ||
-      dateInfo.paymentStatus === "refunded"
+      dateInfo.paymentStatus === "refunded" ||
+      dateInfo.paymentStatus === "cancelled"
     )
       return null;
     if (!dateInfo.partialPayment) return null;
@@ -310,10 +314,12 @@ export default function BookingInfoTab({ bookingData }: BookingInfoTabProps) {
     });
   };
 
-  const handlePayAll = () => {
-    // TODO: Implement pay all dates functionality
-    toast.info("Pay all dates feature coming soon");
-  };
+  const firstPayableUnpaidDate = bookingData.dates.find(
+    (d) =>
+      d.canPayNow !== false &&
+      (d.paymentStatus === "pending" || d.paymentStatus === "partial") &&
+      getPendingAmount(d) != null,
+  );
 
   // Handle Reschedule
   const handleRescheduleClick = (dateInfo: BookingDate) => {
@@ -446,7 +452,9 @@ export default function BookingInfoTab({ bookingData }: BookingInfoTabProps) {
               ? "Partial"
               : status === "refunded"
                 ? "Refunded"
-                : status
+                : status === "cancelled"
+                  ? "Cancelled"
+                  : status
       }
     />
   );
@@ -475,24 +483,28 @@ export default function BookingInfoTab({ bookingData }: BookingInfoTabProps) {
               </h3>
             </div>
 
-            {/* Pay All Button - Only show if there are multiple dates with pending payments (2+ unpaid dates); exclude refunded */}
+            {/* One bulk CTA for multi-date bookings (replaces duplicate footer + old “Pay all” toast) */}
             {bookingData.dates.length > 1 &&
-              bookingData.dates.filter(
-                (d) =>
-                  d.paymentStatus === "pending" ||
-                  d.paymentStatus === "partial",
-              ).length > 1 && (
+              summary.outstanding > 0 &&
+              bookingData.canPayNow !== false &&
+              firstPayableUnpaidDate && (
                 <Button
-                  onClick={handlePayAll}
+                  onClick={() =>
+                    handleSingleDatePaymentClick(firstPayableUnpaidDate)
+                  }
                   size="sm"
                   className="gap-2 cursor-pointer"
+                  title="Pay the next outstanding amount for this booking. You can pay remaining dates separately if needed."
                   style={{
                     backgroundColor: "var(--color-primary)",
                     color: "var(--color-primary-foreground)",
                   }}
                 >
                   <Banknote className="h-4 w-4" />
-                  Pay All Dates
+                  <span className="hidden sm:inline">
+                    Settle full booking balance
+                  </span>
+                  <span className="sm:hidden">Pay balance</span>
                 </Button>
               )}
           </div>
@@ -628,41 +640,44 @@ export default function BookingInfoTab({ bookingData }: BookingInfoTabProps) {
                       </div>
                     </AccordionTrigger>
                     <div className="flex flex-col gap-2 items-end shrink-0 sm:ml-3 sm:flex-row sm:items-center sm:gap-2">
-                      {dateInfo.paymentStatus === "pending" ||
-                      dateInfo.paymentStatus === "partial" ? (
-                        <>
-                          {(() => {
-                            const pendingAmount = getPendingAmount(dateInfo);
-                            return pendingAmount ? (
-                              <div className="flex flex-col items-end gap-0.5">
-                                <p className="text-xs text-muted-foreground">
-                                  Pending
-                                </p>
-                                <p className="text-sm font-semibold text-red-600">
-                                  {pendingAmount}
-                                </p>
-                              </div>
-                            ) : null;
-                          })()}
-                          <Button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleSingleDatePaymentClick(dateInfo);
-                            }}
-                            size="sm"
-                            className="gap-1.5 cursor-pointer h-8 px-3 w-full sm:w-auto"
-                            style={{
-                              backgroundColor: "var(--color-primary)",
-                              color: "var(--color-primary-foreground)",
-                            }}
-                          >
-                            <Banknote className="h-3.5 w-3.5" />
-                            Pay Now
-                          </Button>
-                        </>
-                      ) : (
-                        getPaymentStatusBadge(dateInfo.paymentStatus)
-                      )}
+                      {(() => {
+                        const pendingAmount = getPendingAmount(dateInfo);
+                        const showPayRow =
+                          dateInfo.canPayNow !== false &&
+                          (dateInfo.paymentStatus === "pending" ||
+                            dateInfo.paymentStatus === "partial") &&
+                          pendingAmount;
+                        if (!showPayRow) {
+                          return getPaymentStatusBadge(dateInfo.paymentStatus);
+                        }
+                        return (
+                          <>
+                            <div className="flex flex-col items-end gap-0.5">
+                              <p className="text-xs text-muted-foreground">
+                                Pending
+                              </p>
+                              <p className="text-sm font-semibold text-red-600">
+                                {pendingAmount}
+                              </p>
+                            </div>
+                            <Button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleSingleDatePaymentClick(dateInfo);
+                              }}
+                              size="sm"
+                              className="gap-1.5 cursor-pointer h-8 px-3 w-full sm:w-auto"
+                              style={{
+                                backgroundColor: "var(--color-primary)",
+                                color: "var(--color-primary-foreground)",
+                              }}
+                            >
+                              <Banknote className="h-3.5 w-3.5" />
+                              Pay Now
+                            </Button>
+                          </>
+                        );
+                      })()}
                     </div>
                   </div>
                   <AccordionContent className="px-4 pb-4 bg-gradient-to-br from-gray-50/80 to-white border-t">
@@ -1827,33 +1842,6 @@ export default function BookingInfoTab({ bookingData }: BookingInfoTabProps) {
               </span>
             </div>
 
-            {/* Bulk pay CTA: only when multiple dates (single date uses per-row Pay Now) */}
-            {summary.outstanding > 0 &&
-              (bookingData.dates?.length ?? 0) > 1 &&
-              (() => {
-                const firstUnpaidDate = bookingData.dates.find(
-                  (d) =>
-                    d.paymentStatus === "partial" ||
-                    d.paymentStatus === "pending",
-                );
-                return firstUnpaidDate ? (
-                  <div className="pt-4 flex justify-end">
-                    <Button
-                      onClick={() =>
-                        handleSingleDatePaymentClick(firstUnpaidDate)
-                      }
-                      size="sm"
-                      className="gap-1.5 h-9 px-4 font-medium cursor-pointer shadow-sm border border-[var(--color-primary)] bg-[var(--color-primary)] text-[var(--color-primary-foreground)] hover:bg-[var(--color-primary)]/90"
-                    >
-                      <Banknote className="h-3.5 w-3.5" />
-                      <span className="hidden sm:inline">
-                        Pay outstanding balance
-                      </span>
-                      <span className="sm:hidden">Pay now</span>
-                    </Button>
-                  </div>
-                ) : null;
-              })()}
           </div>
         </CardContent>
       </Card>

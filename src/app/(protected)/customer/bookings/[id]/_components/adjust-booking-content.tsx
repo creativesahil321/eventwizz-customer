@@ -56,10 +56,11 @@ export default function AdjustBookingContent({
 
   const normalizePaymentStatus = (
     status: string,
-  ): "paid" | "pending" | "partial" | "refunded" => {
+  ): "paid" | "pending" | "partial" | "refunded" | "cancelled" => {
     const s = status?.toLowerCase().trim() ?? "";
     if (s === "paid") return "paid";
     if (s === "refunded") return "refunded";
+    if (s === "cancelled" || s === "canceled") return "cancelled";
     if (s === "partial payment" || s === "partial") return "partial";
     return "pending";
   };
@@ -92,6 +93,7 @@ export default function AdjustBookingContent({
             bookingData.booking_number || bookingData.booking_id.toString(),
           location: bookingData.location,
           payment_status: paymentStatusFromAmounts,
+          canPayNow: bookingData.can_pay_now !== false,
           is_menu_choice: bookingData.is_menu_choice || false,
           summary: {
             subTotal: subTotalAmount,
@@ -116,6 +118,7 @@ export default function AdjustBookingContent({
             parentBookingDate: eventDate.parent_booking_date || null,
             hasUnbookedEventDates: eventDate.has_unbooked_event_dates,
             paymentStatus: normalizePaymentStatus(eventDate.payment_status),
+            canPayNow: eventDate.can_pay_now !== false,
             total: `£${eventDate.total_amount.toFixed(2)}`,
             partialPayment: eventDate.paid_amount
               ? `£${eventDate.paid_amount.toFixed(2)}`

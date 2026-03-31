@@ -324,6 +324,8 @@ export interface EventOverviewDateEntry {
   tablesLeft: number;
   totalPeople: number;
   tickets: EventOverviewTicket[];
+  /** Section label from event (e.g. meal package, drink packages) */
+  drink_title?: string;
   drinks: EventOverviewDrink[];
 }
 
