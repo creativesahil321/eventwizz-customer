@@ -95,9 +95,7 @@ export default function FooterSection({
 
   return (
     <>
-      <section
-        className="w-full bg-[color:var(--color-footer)] text-[color:var(--color-footer-text,#f8fafc)]"
-      >
+      <section className="w-full bg-[color:var(--color-footer)] text-[var(--color-on-footer)]">
         <div className="container mx-auto px-5 py-5">
           <div
             className="w-full border-b py-5 border-[color:var(--color-footer-muted,rgba(248,250,252,0.35))]"
@@ -116,7 +114,7 @@ export default function FooterSection({
                 </div>
               )}
             </div>
-            <div className="flex flex-row justify-center pt-5 gap-3 [&_a]:text-[color:var(--color-text)] [&_svg]:text-[color:var(--color-text)]">
+            <div className="flex flex-row justify-center pt-5 gap-3 [&_a]:text-[var(--color-on-footer)] [&_svg]:text-[var(--color-on-footer)] hover:[&_a]:opacity-90">
               {displaySocialLinks.map((social, index) => (
                 <Link key={index} href={social.src}>
                   {social.icon}
@@ -130,22 +128,22 @@ export default function FooterSection({
                 className="w-full flex flex-row justify-start sm:justify-center gap-3"
                 key={index}
               >
-                <div className="mt-1 flex-shrink-0 [&_svg]:text-[color:var(--color-footer-text,#f8fafc)]">
+                <div className="mt-1 flex-shrink-0 [&_svg]:text-[var(--color-on-footer)]">
                   {info.icon}
                 </div>
                 <div className="flex-1">
-                  <h6 className="font-bold text-[color:var(--color-footer-text,#f8fafc)]">
+                  <h6 className="font-bold text-[var(--color-on-footer)]">
                     {info.label}
                   </h6>
                   {info.type === "link" ? (
                     <Link
                       href={info.src || ""}
-                      className="break-all text-[color:var(--color-footer-text,#f8fafc)] hover:opacity-90"
+                      className="break-all text-[var(--color-on-footer)] hover:opacity-90"
                     >
                       {info.text}
                     </Link>
                   ) : (
-                    <p className="break-all text-[color:var(--color-footer-text,#f8fafc)]">
+                    <p className="break-all text-[var(--color-on-footer)]">
                       {info.text}
                     </p>
                   )}

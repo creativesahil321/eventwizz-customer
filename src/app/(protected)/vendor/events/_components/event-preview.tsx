@@ -18,6 +18,7 @@ import MenuSection from "@/app/(on-boarding)/on-boarding/_components/form-previe
 import { SiteEssentialsFormValues } from "@/app/(protected)/_shared/sites-essentials/_lib/schema";
 import EventGallery from "@/app/(on-boarding)/on-boarding/_components/form-preview/_components/Event-gallery";
 import { SiteEssentialsGoogleFontsLoader } from "@/components/shared/site-essentials-google-fonts-loader";
+import { pickReadableForeground } from "@/lib/color-contrast";
 
 interface EventPreviewProps {
   data: EventDetailData;
@@ -41,6 +42,13 @@ export function EventPreview({ data, siteEssentials }: EventPreviewProps) {
     surface: "#FFFFFF",
   };
 
+  const primaryHex = themeColors.primary || "#0F172A";
+  const secondaryHex = themeColors.secondary || "#64748B";
+  const headerHex = themeColors.header || "#FFFFFF";
+  const footerHex = themeColors.footer || "#0F172A";
+  const backgroundHex = themeColors.background || "#F8FAFC";
+  const surfaceHex = themeColors.surface || "#FFFFFF";
+
   const themeTypography = siteEssentials?.typography || {
     fontFamily: {
       heading: "'Inter', sans-serif",
@@ -53,19 +61,23 @@ export function EventPreview({ data, siteEssentials }: EventPreviewProps) {
     themeTypography.fontFamily?.heading || "'Inter', sans-serif";
   const bodyFont = themeTypography.fontFamily?.body || "'Inter', sans-serif";
 
-  // Footer is usually dark; body text (--color-text) is dark too — use a dedicated
-  // footer foreground so contact lines are visible (same bug as footer === text hex).
   const previewStyles = {
-    "--color-primary": themeColors.primary || "#0F172A",
-    "--color-secondary": themeColors.secondary || "#64748B",
-    "--color-header": themeColors.header || "#FFFFFF",
-    "--color-footer": themeColors.footer || "#0F172A",
-    "--color-footer-text": "#F8FAFC",
-    "--color-footer-muted": "rgba(248, 250, 252, 0.35)",
-    "--color-background": themeColors.background || "#F8FAFC",
+    "--color-primary": primaryHex,
+    "--color-secondary": secondaryHex,
+    "--color-header": headerHex,
+    "--color-footer": footerHex,
+    "--color-background": backgroundHex,
     "--color-text": themeColors.text || "#0F172A",
     "--color-text-dimmed": themeColors.textDimmed || "#64748B",
-    "--color-surface": themeColors.surface || "#FFFFFF",
+    "--color-surface": surfaceHex,
+    "--color-primary-foreground": pickReadableForeground(primaryHex),
+    "--color-secondary-foreground": pickReadableForeground(secondaryHex),
+    "--color-on-header": pickReadableForeground(headerHex),
+    "--color-on-footer": pickReadableForeground(footerHex),
+    "--color-on-surface": pickReadableForeground(surfaceHex),
+    "--color-on-background": pickReadableForeground(backgroundHex),
+    "--color-footer-text": pickReadableForeground(footerHex),
+    "--color-footer-muted": "rgba(248, 250, 252, 0.35)",
     "--font-heading": headingFont,
     "--font-body": bodyFont,
   } as React.CSSProperties;

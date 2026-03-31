@@ -16,10 +16,10 @@ type EventCardProps = {
 };
 
 const statusClassMap: Record<string, string> = {
-  active: "rounded-full bg-ev",
-  old: "stroke-blue-500",
-  draft: "rounded-full bg-gray-400 stroke-gray-400",
-  cancelled: "rounded-full bg-red-500 stroke-red-500",
+  active: "rounded-full bg-green-500",
+  past: "rounded-full bg-blue-500",
+  draft: "rounded-full bg-gray-400",
+  cancelled: "rounded-full bg-red-500",
 };
 
 export const statusClass = (status: string) =>
@@ -65,8 +65,8 @@ export default function EventCard({
           selected
             ? "ring-2 ring-[var(--color-primary)]"
             : selectionMode
-            ? "ring-1 ring-gray-200"
-            : ""
+              ? "ring-1 ring-gray-200"
+              : ""
         } ${
           selectionMode
             ? "cursor-pointer transition-all hover:opacity-90 hover:shadow-md"
@@ -111,7 +111,10 @@ export default function EventCard({
             {event.image ? (
               <div className="relative w-full aspect-[4/3] overflow-hidden rounded-md rounded-bl-none rounded-br-none group">
                 <img
-                  src={addCacheBusting(event.image, event.updated_at?.toString() || null)}
+                  src={addCacheBusting(
+                    event.image,
+                    event.updated_at?.toString() || null,
+                  )}
                   alt={event.name}
                   className="absolute inset-0 w-full h-full object-cover"
                 />
@@ -143,19 +146,19 @@ export default function EventCard({
               <p
                 className={`font-medium flex items-center gap-1.5 sm:gap-2 text-xs sm:text-sm min-w-0 ${
                   event?.status?.toLowerCase() === "active"
-                    ? "text-ev"
-                    : event?.status?.toLowerCase() === "old"
-                    ? "text-blue-500"
-                    : event?.status?.toLowerCase() === "draft"
-                    ? "text-gray-400"
-                    : event?.status?.toLowerCase() === "cancelled"
-                    ? "text-red-500"
-                    : "text-foreground"
+                    ? "text-event-green"
+                    : event?.status?.toLowerCase() === "past"
+                      ? "text-blue-500"
+                      : event?.status?.toLowerCase() === "draft"
+                        ? "text-gray-400"
+                        : event?.status?.toLowerCase() === "cancelled"
+                          ? "text-red-500"
+                          : "text-foreground"
                 }`}
               >
                 <Dot
                   className={`w-3 h-3 flex-shrink-0 ${statusClass(
-                    event?.status
+                    event?.status,
                   )}`}
                 />
                 <span className="truncate">{formattedStatus}</span>

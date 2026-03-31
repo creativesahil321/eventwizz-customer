@@ -19,6 +19,7 @@ import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Card } from "@/components/ui/card";
 import { EventPreview } from "@/app/(protected)/vendor/events/_components/event-preview";
+import { PreviewProvider } from "@/contexts/preview-context";
 import { adminEventsService } from "@/services/admin/events/admin-events.service";
 import type { EventDetailData } from "@/services/vendor/events/type";
 
@@ -175,7 +176,9 @@ export function AdminEventReviewContent({
       </div>
 
       <div className="relative isolate w-full min-h-[70vh] overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm [transform:translateZ(0)]">
-        <EventPreview data={eventPayload} siteEssentials={null} />
+        <PreviewProvider isPreviewMode>
+          <EventPreview data={eventPayload} siteEssentials={null} />
+        </PreviewProvider>
       </div>
 
       <Dialog open={rejectOpen} onOpenChange={setRejectOpen}>

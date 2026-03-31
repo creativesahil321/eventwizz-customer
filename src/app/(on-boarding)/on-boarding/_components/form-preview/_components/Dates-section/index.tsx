@@ -331,7 +331,9 @@ export default function DatesSection({
             {heading}
           </h2>
           <Button
-            className="bg-[#1a1a24] hover:bg-[#26273a] text-white py-1 sm:py-1.5 px-6 sm:px-8 rounded-md text-xs sm:text-sm border border-[#333450]"
+            type="button"
+            variant="outline"
+            className="bg-[#1a1a24] hover:bg-[#26273a] !text-white py-1 sm:py-1.5 px-6 sm:px-8 rounded-md text-xs sm:text-sm border border-white/25 shadow-sm"
             onClick={() => router.push("/auth/login")}
           >
             {text}
@@ -539,7 +541,9 @@ export default function DatesSection({
           {heading}
         </h2>
         <Button
-          className="bg-[#1a1a24] hover:bg-[#26273a] text-white py-1 sm:py-1.5 px-6 sm:px-8 rounded-md text-xs sm:text-sm border border-[#333450]"
+          type="button"
+          variant="outline"
+          className="bg-[#1a1a24] hover:bg-[#26273a] !text-white py-1 sm:py-1.5 px-6 sm:px-8 rounded-md text-xs sm:text-sm border border-white/25 shadow-sm"
           onClick={() => router.push("/auth/login")}
         >
           {text}

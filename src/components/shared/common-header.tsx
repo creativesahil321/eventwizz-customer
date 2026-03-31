@@ -16,6 +16,7 @@ import { useSession } from "next-auth/react";
 import { ThemeSchema } from "@/types/theme.types";
 import CartButton from "./cart-button";
 import { addCacheBusting } from "@/lib/image-utils";
+import { cn } from "@/lib/utils";
 // import { useIsPreviewMode } from "@/contexts/preview-context"; // Available for future use
 
 // Define icon mapping with proper typing
@@ -141,10 +142,12 @@ export default function CommonHeader({
     switch (variant) {
       case "preview":
         return {
-          container: isScrolled
-            ? "bg-[color:var(--color-header)] shadow-md"
-            : "bg-transparent",
-          // Header chrome must use on-header (readable on --color-header), not body --color-text
+          // Always solid: transparent bar sits over dark hero but still used --color-on-header
+          // from the theme token (e.g. light header → dark text) → unreadable. Same in admin review embed.
+          container: cn(
+            "bg-[color:var(--color-header)]",
+            isScrolled ? "shadow-md" : "shadow-sm",
+          ),
           textColor: "text-[var(--color-on-header)]",
           borderColor: "border-[color:var(--color-primary)]",
           hoverColor: "hover:text-[color:var(--color-primary)]",
@@ -181,9 +184,16 @@ export default function CommonHeader({
     }
   };
 
+  // Avoid dark:bg-background here: it overrides vendor --color-header and causes dark-on-dark
+  // chrome when the app shell is in dark mode (e.g. admin event review iframe preview).
+  const headerDarkModeBg =
+    variant === "onboarding"
+      ? "dark:bg-background"
+      : "dark:bg-[color:var(--color-header)]";
+
   return (
     <section
-      className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${styles.container} ${styles.textColor} dark:bg-background ${className}`}
+      className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${styles.container} ${styles.textColor} ${headerDarkModeBg} ${className}`}
     >
       <div className="container mx-auto">
         {/* Desktop Header */}
