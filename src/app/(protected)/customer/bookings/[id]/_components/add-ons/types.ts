@@ -9,11 +9,29 @@ export interface TableData {
   price_per_person: number;
 }
 
+/** Normalized from booking details API (see adjust-booking-content) */
+export type BookingDatePaymentStatus =
+  | "paid"
+  | "pending"
+  | "partial"
+  | "refunded"
+  | "cancelled";
+
 export interface BookingDate {
   id: string;
   date: string;
   people: number;
+  /** When missing, date is treated as eligible (legacy API) */
+  paymentStatus?: BookingDatePaymentStatus;
   tables?: TableData[];
+}
+
+/** Add-ons / edits allowed only for active payment states */
+export function isBookingDateEligibleForAddOns(
+  status?: BookingDatePaymentStatus,
+): boolean {
+  if (status === undefined) return true;
+  return status === "paid" || status === "pending" || status === "partial";
 }
 
 export interface DrinkItem {

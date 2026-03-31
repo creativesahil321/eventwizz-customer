@@ -420,6 +420,7 @@ export default function AdjustBookingContent({
                   dates={transformedData.dates.map((d) => ({
                     id: d.id,
                     date: d.date,
+                    paymentStatus: d.paymentStatus,
                     people: d.items.reduce(
                       (sum, item) => sum + item.people_added,
                       0,

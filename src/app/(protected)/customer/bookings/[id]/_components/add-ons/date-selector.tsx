@@ -8,7 +8,11 @@ import {
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Calendar, Users } from "lucide-react";
-import { BookingDate } from "./types";
+import {
+  BookingDate,
+  isBookingDateEligibleForAddOns,
+  type BookingDatePaymentStatus,
+} from "./types";
 
 interface DateSelectorProps {
   dates: BookingDate[];
@@ -24,8 +28,44 @@ export function DateSelector({
   const selectedDateData = dates.find((d) => d.id === selectedDate);
   const hasMultipleDates = dates.length > 1;
 
+  const statusLabel = (s?: BookingDatePaymentStatus) => {
+    if (s === "refunded") return "Refunded";
+    if (s === "cancelled") return "Cancelled";
+    return null;
+  };
+
   // If only one date, just display it without dropdown
   if (!hasMultipleDates && selectedDateData) {
+    const eligible = isBookingDateEligibleForAddOns(
+      selectedDateData.paymentStatus,
+    );
+    if (!eligible) {
+      return (
+        <div className="space-y-2 pb-4 border-b">
+          <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
+            <Calendar className="h-4 w-4" />
+            Event Date
+          </label>
+          <div className="w-full min-h-12 px-3 py-2 border border-amber-200 rounded-lg bg-amber-50/80 flex items-center gap-3">
+            <div className="p-1.5 rounded-md bg-amber-100 flex-shrink-0">
+              <Calendar className="h-4 w-4 text-amber-700" />
+            </div>
+            <div className="text-left flex-1 min-w-0">
+              <div className="font-medium text-sm text-gray-900 truncate">
+                {selectedDateData.date}
+              </div>
+              <p className="text-xs text-amber-900 mt-0.5">
+                Add-ons aren&apos;t available for this date
+                {statusLabel(selectedDateData.paymentStatus)
+                  ? ` (${statusLabel(selectedDateData.paymentStatus)})`
+                  : ""}
+                . Contact the venue if you need help.
+              </p>
+            </div>
+          </div>
+        </div>
+      );
+    }
     return (
       <div className="space-y-2 pb-4 border-b">
         <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
@@ -79,19 +119,34 @@ export function DateSelector({
           </div>
         </SelectTrigger>
         <SelectContent>
-          {dates.map((date) => (
-            <SelectItem key={date.id} value={date.id}>
-              <div className="flex items-center justify-between w-full gap-4">
-                <span className="font-medium">{date.date}</span>
-                <Badge
-                  variant="secondary"
-                  className="rounded-full w-6 h-6 flex items-center justify-center p-0 text-xs"
-                >
-                  {date.people}
-                </Badge>
-              </div>
-            </SelectItem>
-          ))}
+          {dates.map((date) => {
+            const eligible = isBookingDateEligibleForAddOns(date.paymentStatus);
+            const tag = statusLabel(date.paymentStatus);
+            return (
+              <SelectItem key={date.id} value={date.id} disabled={!eligible}>
+                <div className="flex items-center justify-between w-full gap-4">
+                  <span
+                    className={
+                      eligible ? "font-medium" : "font-medium text-muted-foreground"
+                    }
+                  >
+                    {date.date}
+                    {tag ? (
+                      <span className="ml-2 text-xs font-normal text-muted-foreground">
+                        — {tag}
+                      </span>
+                    ) : null}
+                  </span>
+                  <Badge
+                    variant="secondary"
+                    className="rounded-full w-6 h-6 flex items-center justify-center p-0 text-xs shrink-0"
+                  >
+                    {date.people}
+                  </Badge>
+                </div>
+              </SelectItem>
+            );
+          })}
         </SelectContent>
       </Select>
     </div>
