@@ -59,6 +59,7 @@ export default function CartManager({}: CartManagerProps) {
     getNewDatesFromAPI,
     getDateData,
     hasUnsavedChanges,
+    editingData,
     removeDate,
     removeAllDates,
     clearAllCarts,
@@ -278,7 +279,13 @@ export default function CartManager({}: CartManagerProps) {
       totalCartItems: availableDates.length, // Count dates as items
       unsavedDatesCount: unsavedCount,
     };
-  }, [availableDates, getDateData, currentEventSlug, hasUnsavedChanges]);
+  }, [
+    availableDates,
+    editingData,
+    getDateData,
+    currentEventSlug,
+    hasUnsavedChanges,
+  ]);
 
   // Calculate payment amounts using per-date logic
   useMemo(() => {

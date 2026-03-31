@@ -158,6 +158,7 @@ export default function BookingSummary({}: BookingSummaryProps) {
     }, [
       currentEventSlug,
       availableDates,
+      editingData,
       getDateData,
       hasUnsavedChanges,
       validateDateRequirements,
