@@ -32,12 +32,13 @@ export type StatusThemeKey = keyof typeof STATUS_THEME;
  */
 function normalizeStatus(status: string): string {
   const s = status?.toLowerCase().trim() || "";
-  if (s.includes("paid") || s === "confirmed" || s === "success" || s === "completed") return "success";
-  if (s.includes("pending") || s === "draft") return "pending";
+  // "partial payment" / "partially paid" contain "paid" — check partial before paid
   if (s.includes("partial") || s === "processing") return "info";
+  if (s.includes("pending") || s === "draft") return "pending";
+  if (s.includes("paid") || s === "confirmed" || s === "success" || s === "completed")
+    return "success";
   if (s.includes("fail") || s.includes("cancel") || s === "cancelled") return "destructive";
   if (s.includes("refund")) return "neutral";
-  if (s === "partially_paid") return "info";
   return "neutral";
 }
 

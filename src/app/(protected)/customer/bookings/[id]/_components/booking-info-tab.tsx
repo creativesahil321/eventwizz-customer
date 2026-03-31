@@ -1827,9 +1827,9 @@ export default function BookingInfoTab({ bookingData }: BookingInfoTabProps) {
               </span>
             </div>
 
-            {/* Pay Now CTA when there is an outstanding balance */}
+            {/* Bulk pay CTA: only when multiple dates (single date uses per-row Pay Now) */}
             {summary.outstanding > 0 &&
-              bookingData.dates?.length > 0 &&
+              (bookingData.dates?.length ?? 0) > 1 &&
               (() => {
                 const firstUnpaidDate = bookingData.dates.find(
                   (d) =>

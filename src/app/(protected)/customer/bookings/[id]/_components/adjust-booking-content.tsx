@@ -73,6 +73,17 @@ export default function AdjustBookingContent({
         const depositSelectedAmount = parseAmount(bookingData.partial_payment);
         const outstandingAmount = Math.max(totalAmount - paidAmount, 0);
 
+        const apiPaymentStatus = bookingData.payment_status?.trim() ?? "";
+        const apiPaymentLower = apiPaymentStatus.toLowerCase();
+        const paymentStatusFromAmounts =
+          outstandingAmount > 0
+            ? paidAmount > 0
+              ? "Partial Payment"
+              : apiPaymentStatus || "Pending"
+            : apiPaymentLower.includes("refund")
+              ? apiPaymentStatus
+              : "Paid";
+
         return {
           id: bookingId,
           event_name: bookingData.event_name,
@@ -80,7 +91,7 @@ export default function AdjustBookingContent({
           booking_number:
             bookingData.booking_number || bookingData.booking_id.toString(),
           location: bookingData.location,
-          payment_status: bookingData.payment_status,
+          payment_status: paymentStatusFromAmounts,
           is_menu_choice: bookingData.is_menu_choice || false,
           summary: {
             subTotal: subTotalAmount,
