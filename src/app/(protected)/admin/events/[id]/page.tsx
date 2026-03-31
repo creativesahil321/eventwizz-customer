@@ -15,7 +15,7 @@ export default async function AdminEventReviewPage({
 
   return (
     <section className="page min-w-0 text-black">
-      <Shell className="gap-6">
+      <Shell className="gap-6 items-start">
         <AdminEventReviewContent
           eventId={id}
           fromVendor={sp.fromVendor ?? null}

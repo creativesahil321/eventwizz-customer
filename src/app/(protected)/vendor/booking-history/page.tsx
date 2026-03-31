@@ -4,7 +4,7 @@ import React, { useState, useEffect } from "react";
 import type { Table } from "@tanstack/react-table";
 import {
   Search,
-  DollarSign,
+  PoundSterling,
   Clock,
   Receipt,
   Loader2,
@@ -270,7 +270,7 @@ export default function BookingHistoryPage() {
                     {
                       label: "Total Deposit",
                       value: summaryTotals.totalDeposit,
-                      icon: DollarSign,
+                      icon: PoundSterling,
                       iconBg: "bg-emerald-500/10",
                       iconColor: "text-emerald-600",
                       valueColor: "text-emerald-600",

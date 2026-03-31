@@ -329,21 +329,42 @@ export default function AIEventReviewContent({
       });
       await sleep(300);
 
-      // Step 4 — Drinks
+      // Step 4 — Drinks / other packages (API always requires title, description, non-empty packages)
       setApplyStep(4);
+      const drinksSectionRemoved = removedSections.has("stepFive");
+      const mappedDrinkPackages = (s.stepFive.packages ?? [])
+        .filter((p) => String(p.title ?? "").trim() !== "")
+        .map((p) => ({
+          title: p.title,
+          description: p.description,
+          price: p.price,
+          available_quantity: p.available_quantity,
+        }));
+      const hasUsableDrinksContent =
+        !drinksSectionRemoved &&
+        String(s.stepFive.drink_title ?? "").trim() !== "" &&
+        String(s.stepFive.drink_description ?? "").trim() !== "" &&
+        mappedDrinkPackages.length > 0;
+
+      const placeholderDrinkPackages = [
+        {
+          title: "Standard",
+          description: "Standard package",
+          price: 50,
+          available_quantity: 100,
+        },
+      ];
+
       await eventsService.storeStepFiveData({
         step: 5 as const,
         event_id: eventId,
-        drink_title: removedSections.has("stepFive") ? "Drinks" : s.stepFive.drink_title,
-        drink_description: removedSections.has("stepFive") ? "Drink packages" : s.stepFive.drink_description,
-        packages: removedSections.has("stepFive") 
-          ? [{ title: "Standard", description: "Standard package", price: 50, available_quantity: 100 }]
-          : s.stepFive.packages.map((p) => ({
-              title: p.title,
-              description: p.description,
-              price: p.price,
-              available_quantity: p.available_quantity,
-            })),
+        drink_title: hasUsableDrinksContent
+          ? s.stepFive.drink_title.trim()
+          : "Drinks",
+        drink_description: hasUsableDrinksContent
+          ? s.stepFive.drink_description.trim()
+          : "Drink packages",
+        packages: hasUsableDrinksContent ? mappedDrinkPackages : placeholderDrinkPackages,
       });
       await sleep(300);
 

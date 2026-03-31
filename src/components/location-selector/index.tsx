@@ -19,7 +19,7 @@ import { useSession } from "next-auth/react";
 export function LocationSelector() {
   const { data: session } = useSession();
   const isVendor = session?.user?.account_type === "vendor";
-  
+
   // Only fetch locations if user is vendor
   const { data: locationsResult } = useLocationsQuery(isVendor);
   const currentLocationId = useCurrentLocationId();
@@ -87,7 +87,7 @@ export function LocationSelector() {
           >
             <div className="flex items-center justify-between w-full gap-3 min-w-0">
               <div className="flex items-center gap-2.5 min-w-0 flex-1">
-                <MapPin className="h-3.5 w-3.5 text-[var(--color-secondary,#009ead)] flex-shrink-0" />
+                <MapPin className="h-3.5 w-3.5 text-[var(--color-primary)] flex-shrink-0" />
                 <span className="font-medium text-sm truncate">
                   {location.city || location.name}
                 </span>

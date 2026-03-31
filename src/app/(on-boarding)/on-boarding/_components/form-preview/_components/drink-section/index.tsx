@@ -160,7 +160,7 @@ export default function DrinkSection({
                   {/* Price + Actions */}
                   <article className="flex flex-col sm:flex-row items-center gap-3 sm:gap-4 w-full sm:w-auto mt-2 sm:mt-0">
                     <p className="flex items-center space-x-1 text-lg sm:text-xl md:text-2xl font-semibold whitespace-nowrap">
-                      <span>€</span>
+                      <span>£</span>
                       <span>{singlePackage.price}</span>
                     </p>
 

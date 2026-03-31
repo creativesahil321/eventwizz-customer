@@ -19,7 +19,7 @@ interface IconDropdownProps {
 const popularIcons = [
   "MapPin",
   "Calendar",
-  "DollarSign", 
+  "PoundSterling",
   "ArrowBigDownDash",
   "Image",
   "Tag",

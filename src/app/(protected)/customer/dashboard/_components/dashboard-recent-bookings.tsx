@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { getStatusColorClass } from "@/lib/status-theme";
-import { Calendar, DollarSign, ArrowRight } from "lucide-react";
+import { Calendar, PoundSterling, ArrowRight } from "lucide-react";
 import Link from "next/link";
 import type { CustomerDashboardRecentBooking } from "@/services/customer/dashboard";
 
@@ -76,7 +76,7 @@ export default function DashboardRecentBookings({
                                   <span>{booking.created_ago}</span>
                                 </div>
                                 <div className="flex items-center gap-1">
-                                  <DollarSign className="h-3 w-3" />
+                                  <PoundSterling className="h-3 w-3" />
                                   <span className="font-medium text-black">
                                     £{booking.total_formatted}
                                   </span>

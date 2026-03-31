@@ -39,6 +39,11 @@ interface CommonHeaderProps {
   variant?: "default" | "preview" | "onboarding";
   className?: string;
   hasBackgroundImage?: boolean; // New prop to indicate if there's a background image
+  /**
+   * When variant is `preview`, add left padding for the floating "Back to Editor" control on `/preview/event`.
+   * Set false for embedded previews (e.g. admin event approval) where that button is not shown.
+   */
+  previewBackButtonOffset?: boolean;
 }
 
 export default function CommonHeader({
@@ -47,6 +52,7 @@ export default function CommonHeader({
   variant = "default",
   className = "",
   hasBackgroundImage = false,
+  previewBackButtonOffset = true,
 }: CommonHeaderProps) {
   const { theme } = useContext(ServerContext);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -199,7 +205,11 @@ export default function CommonHeader({
         {/* Desktop Header */}
         <div className="hidden md:flex justify-between items-center py-3">
           <div
-            className={`flex items-center gap-3 w-1/3 ${variant === "preview" ? "pl-[11.5rem]" : ""}`}
+            className={`flex items-center gap-3 w-1/3 ${
+              variant === "preview" && previewBackButtonOffset
+                ? "pl-[11.5rem]"
+                : ""
+            }`}
           >
             {isOnboardingMode ? (
               <div

@@ -285,6 +285,7 @@ export default function TabEventForm() {
                   <div className="bg-white rounded-lg p-0 sm:p-0">
                     <EventPreview
                       data={(eventData as { data?: object })?.data || {}}
+                      embedInShell
                     />
                   </div>
                 </TabsContent>

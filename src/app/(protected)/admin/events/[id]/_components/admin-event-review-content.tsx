@@ -130,13 +130,13 @@ export function AdminEventReviewContent({
   const mutating = approveMut.isPending || rejectMut.isPending;
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+    <div className="flex w-full min-w-0 flex-col gap-5">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0 space-y-1">
           <Button
             variant="event-primary"
             size="sm"
-            className="gap-1.5 -ml-2 h-8"
+            className="gap-1.5 h-8 w-fit"
             asChild
           >
             <Link href={backHref}>
@@ -152,7 +152,7 @@ export function AdminEventReviewContent({
           </p>
         </div>
         {/* Request changes: intentionally omitted for now (was: button + Dialog + requestChangesMut). */}
-        <div className="flex shrink-0 flex-wrap gap-2">
+        <div className="flex shrink-0 flex-wrap gap-2 sm:pt-1">
           <Button
             size="sm"
             className="gap-1.5 bg-emerald-600 hover:bg-emerald-700"
@@ -175,9 +175,14 @@ export function AdminEventReviewContent({
         </div>
       </div>
 
-      <div className="relative isolate w-full min-h-[70vh] overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm [transform:translateZ(0)]">
+      {/* Full width of the admin content column so preview lines up with Back / Approve / Reject above */}
+      <div className="relative isolate w-full min-h-[min(70vh,720px)] max-h-[min(88vh,calc(100dvh-9.5rem))] overflow-x-hidden overflow-y-auto rounded-xl border border-slate-200/90 bg-slate-50/80 shadow-[0_1px_3px_rgba(0,0,0,0.06)] scroll-smooth [transform:translateZ(0)] ring-1 ring-slate-200/60">
         <PreviewProvider isPreviewMode>
-          <EventPreview data={eventPayload} siteEssentials={null} />
+          <EventPreview
+            data={eventPayload}
+            siteEssentials={null}
+            embedInShell
+          />
         </PreviewProvider>
       </div>
 

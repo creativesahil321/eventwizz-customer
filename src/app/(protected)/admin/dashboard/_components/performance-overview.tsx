@@ -2,7 +2,7 @@
 
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useCallback } from "react";
-import { DollarSign, PieChart, UserPlus, Wallet } from "lucide-react";
+import { PoundSterling, PieChart, UserPlus, Wallet } from "lucide-react";
 import { Card, CardTitle } from "@/components/ui/card";
 
 const PERIODS = ["daily", "weekly", "monthly"] as const;
@@ -47,7 +47,7 @@ export default function PerformanceOverview({
       label: "Total Revenue",
       displayLabel: "Total Revenue",
       value: data.totalRevenue,
-      icon: <DollarSign className="size-6 text-white" />,
+      icon: <PoundSterling className="size-6 text-white" />,
       bgColor: "bg-blue-900",
     },
     {

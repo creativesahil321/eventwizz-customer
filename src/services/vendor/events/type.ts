@@ -161,9 +161,17 @@ export interface EventDetailStepEight {
   city?: string;
   address?: string;
   contact_number?: string;
+  /** Map / brochure when returned by API */
+  latitude?: number | string | null;
+  longitude?: number | string | null;
 }
 
 export interface EventDetailData {
+  /** Public event slug when returned by the API (used for preview parity with live event pages). */
+  slug?: string;
+  /** Venue coordinates when API returns them at root (same as public event detail). */
+  lat?: string | number | null;
+  long?: string | number | null;
   current_step?: number;
   vendor_location_id?: number;
   logo?: string | null;

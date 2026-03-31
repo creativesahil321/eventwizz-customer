@@ -13,10 +13,10 @@ import { STATUS_CONFIG } from "../_lib/constants";
 const normalizeCurrencyCode = (currency: string | undefined | null): string => {
   if (!currency) return "GBP";
 
-  const currencyUpper = currency.trim().toUpperCase();
+  const trimmed = currency.trim();
+  const upper = trimmed.toUpperCase();
 
-  // Map currency symbols to ISO codes
-  const currencyMap: Record<string, string> = {
+  const symbolAndCodeMap: Record<string, string> = {
     "£": "GBP",
     $: "USD",
     "€": "EUR",
@@ -34,17 +34,17 @@ const normalizeCurrencyCode = (currency: string | undefined | null): string => {
     CAD: "CAD",
   };
 
-  // Check if it's a known symbol or code
-  if (currencyMap[currencyUpper]) {
-    return currencyMap[currencyUpper];
+  if (symbolAndCodeMap[trimmed] != null) {
+    return symbolAndCodeMap[trimmed];
+  }
+  if (symbolAndCodeMap[upper] != null) {
+    return symbolAndCodeMap[upper];
   }
 
-  // If it's already a valid ISO code (3 letters), return it
-  if (/^[A-Z]{3}$/.test(currencyUpper)) {
-    return currencyUpper;
+  if (/^[A-Z]{3}$/.test(upper)) {
+    return upper;
   }
 
-  // Default to GBP if unknown
   return "GBP";
 };
 

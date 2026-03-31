@@ -10,11 +10,11 @@ import { ThemeSchema } from "@/types/theme.types";
 // const FALLBACK_VIDEO_URL =
 //   "https://www.lovebrunch.co.uk/cdn/shop/videos/c/vp/5db45c2d897b410e96fcb1d4b4956c46/5db45c2d897b410e96fcb1d4b4956c46.HD-720p-4.5Mbps-43850554.mp4?v=0";
 const DEFAULT_IMAGE_URL = "https://tinyurl.com/bdycmxcv";
-// const FALLBACK_VIDEO_URL =
-//   "https://videos.pexels.com/video-files/9228852/9228852-uhd_2560_1440_24fps.mp4";
+ const FALLBACK_VIDEO_URL =
+   "https://videos.pexels.com/video-files/9228852/9228852-uhd_2560_1440_24fps.mp4";
 // const FALLBACK_VIDEO_URL =
 //   "https://assets.mixkit.co/videos/48504/48504-720.mp4";
-const FALLBACK_VIDEO_URL = "https://assets.mixkit.co/videos/339/339-720.mp4";
+// const FALLBACK_VIDEO_URL = "https://assets.mixkit.co/videos/339/339-720.mp4";
 // const FALLBACK_VIDEO_URL =
 //   "https://assets.mixkit.co/videos/40627/40627-720.mp4";
 // const FALLBACK_VIDEO_URL =

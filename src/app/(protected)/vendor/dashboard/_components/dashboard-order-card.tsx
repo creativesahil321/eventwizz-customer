@@ -1,8 +1,8 @@
 import type { LucideIcon } from "lucide-react";
 import {
-  BadgeDollarSign,
-  CircleDollarSign,
+  BadgePoundSterling,
   CreditCard,
+  PoundSterling,
   ReceiptText,
   ShoppingCart,
 } from "lucide-react";
@@ -31,13 +31,13 @@ function getOrderItemIcon(title: string): LucideIcon {
     case "total bookings":
       return ShoppingCart;
     case "total payment":
-      return CircleDollarSign;
+      return PoundSterling;
     case "received payment":
       return CreditCard;
     case "total commission":
       return ReceiptText;
     case "commission due":
-      return BadgeDollarSign;
+      return BadgePoundSterling;
     default:
       return ShoppingCart;
   }

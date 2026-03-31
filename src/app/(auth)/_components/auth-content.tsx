@@ -86,7 +86,7 @@ export function AuthContent() {
               <div className={statLabel}>Tickets Sold</div>
             </div>
             <div className={statCard}>
-              <div className={statNumber}>$500M</div>
+              <div className={statNumber}>£500M</div>
               <div className={statLabel}>Revenue Generated</div>
             </div>
             <div className={statCard}>

@@ -108,9 +108,9 @@ export function mapLastEventToBestSale(item: VendorDashboardLastEventItem): Best
   return {
     icon: "",
     venue_name: item.event_name,
-    price: new Intl.NumberFormat("en-US", {
+    price: new Intl.NumberFormat("en-GB", {
       style: "currency",
-      currency: "USD",
+      currency: "GBP",
       minimumFractionDigits: 0,
       maximumFractionDigits: 0,
     }).format(item.amount),
