@@ -10,6 +10,59 @@ export function resolveCurrencySymbol(symbol?: string | null): string {
   return s && s.length > 0 ? s : DEFAULT_CURRENCY_SYMBOL;
 }
 
+/** Map common display symbols to ISO 4217 (fallback when API omits currency code). */
+const SYMBOL_TO_ISO4217: Readonly<Record<string, string>> = {
+  "£": "GBP",
+  "$": "USD",
+  "€": "EUR",
+  "₹": "INR",
+  "¥": "JPY",
+};
+
+function inferIsoFromAmountPrefix(amount: unknown): string | undefined {
+  if (typeof amount !== "string") return undefined;
+  const t = amount.trim();
+  if (t.startsWith("£")) return "GBP";
+  if (t.startsWith("$")) return "USD";
+  if (t.startsWith("€")) return "EUR";
+  if (t.startsWith("₹")) return "INR";
+  if (t.startsWith("¥")) return "JPY";
+  return undefined;
+}
+
+/**
+ * Best-effort ISO 4217 code for transaction detail UIs.
+ * Checks several API field names, then amount prefix, then tenant symbol.
+ */
+export function resolveTransactionCurrencyIso(
+  raw: {
+    currency?: string | null;
+    currency_code?: string | null;
+    currencyCode?: string | null;
+    amount?: string | null;
+  },
+  tenantSymbol: string,
+): string {
+  const candidates = [
+    raw.currency_code,
+    raw.currencyCode,
+    raw.currency,
+  ];
+  for (const c of candidates) {
+    if (typeof c === "string") {
+      const t = c.trim();
+      if (t.length >= 3) return t.toUpperCase();
+      if (t.length === 1 && SYMBOL_TO_ISO4217[t]) {
+        return SYMBOL_TO_ISO4217[t];
+      }
+    }
+  }
+  const fromAmount = inferIsoFromAmountPrefix(raw.amount);
+  if (fromAmount) return fromAmount;
+  const sym = resolveCurrencySymbol(tenantSymbol);
+  return SYMBOL_TO_ISO4217[sym] ?? "GBP";
+}
+
 /**
  * Format a numeric amount with the given symbol (prefix style: £10.00).
  */

@@ -10,7 +10,10 @@ export interface Transaction {
   amount: string; // Formatted string from API (may include symbol)
   /** Numeric amount when API provides it (preferred for display/sort) */
   amount_raw?: number;
-  currency: string;
+  /** ISO 4217 when API sends `currency` */
+  currency?: string;
+  /** Alternate API key (Laravel / Stripe-style payloads) */
+  currency_code?: string;
   status: string; // Display: "Pending", "Completed", etc.
   status_key: string; // API key: "pending", "success", etc.
   payment_method: string; // Display: "Card Payment"

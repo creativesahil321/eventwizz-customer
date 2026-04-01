@@ -17,7 +17,6 @@ const PAYMENT_GATEWAYS = {
     name: "Stripe",
     description: "Credit or debit card",
     icon: CreditCard,
-    fees: "2.9% + 30¢",
     processingTime: "Instant",
     color: "blue",
   },
@@ -26,7 +25,6 @@ const PAYMENT_GATEWAYS = {
     name: "PayPal",
     description: "Pay with your PayPal account",
     icon: Smartphone,
-    fees: "2.9% + 30¢",
     processingTime: "Instant",
     color: "yellow",
   },
@@ -35,7 +33,6 @@ const PAYMENT_GATEWAYS = {
     name: "TrueLayer",
     description: "Pay directly from your bank",
     icon: Building2,
-    fees: "No fees",
     processingTime: "1-2 business days",
     color: "green",
   },
@@ -44,7 +41,6 @@ const PAYMENT_GATEWAYS = {
     name: "WorldPay",
     description: "Secure card payments",
     icon: CreditCard,
-    fees: "2.5% + 25¢",
     processingTime: "Instant",
     color: "purple",
   },
@@ -53,7 +49,6 @@ const PAYMENT_GATEWAYS = {
     name: "Klarna",
     description: "Buy now, pay later",
     icon: Clock,
-    fees: "No fees",
     processingTime: "Instant approval",
     color: "pink",
   },
@@ -179,10 +174,8 @@ export default function PaymentGatewaySelector({
                         <CheckCircle className="h-3.5 w-3.5 text-blue-600 flex-shrink-0" />
                       )}
                     </div>
-                    <div className="flex items-center gap-1.5 text-xs text-gray-500">
-                      <span>{gateway.fees}</span>
-                      <span>•</span>
-                      <span className="truncate">{gateway.processingTime}</span>
+                    <div className="text-xs text-gray-500 truncate">
+                      {gateway.processingTime}
                     </div>
                   </div>
                 </div>

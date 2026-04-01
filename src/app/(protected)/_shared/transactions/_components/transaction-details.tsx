@@ -26,7 +26,10 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useCurrencyFormat } from "@/hooks/use-currency-format";
-import { parseFormattedMoney } from "@/lib/currency-format";
+import {
+  parseFormattedMoney,
+  resolveTransactionCurrencyIso,
+} from "@/lib/currency-format";
 
 interface TransactionDetailsProps {
   transaction: Transaction | null;
@@ -82,7 +85,8 @@ export function TransactionDetailsComponent({
   isOpen,
   onClose,
 }: TransactionDetailsProps) {
-  const { formatLocale: formatMoneyLocale } = useCurrencyFormat();
+  const { formatLocale: formatMoneyLocale, symbol: tenantCurrencySymbol } =
+    useCurrencyFormat();
 
   if (!transaction) return null;
 
@@ -138,6 +142,11 @@ export function TransactionDetailsComponent({
   const formattedAmount = Number.isFinite(numericAmount)
     ? formatMoneyLocale(numericAmount)
     : amount || "—";
+
+  const currencyIso = resolveTransactionCurrencyIso(
+    { currency, currency_code: transaction.currency_code, amount },
+    tenantCurrencySymbol,
+  );
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -248,7 +257,7 @@ export function TransactionDetailsComponent({
                 Currency
               </p>
               <p className="text-sm font-medium text-black break-words">
-                {currency}
+                {currencyIso}
               </p>
             </div>
           </div>

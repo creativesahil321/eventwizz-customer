@@ -59,22 +59,6 @@ const getGatewayDescription = (gatewayName: string) => {
   }
 };
 
-const getGatewayFees = (gatewayName: string) => {
-  const name = gatewayName.toLowerCase();
-
-  if (name.includes("stripe")) {
-    return "2.9% + 30¢";
-  } else if (name.includes("paypal")) {
-    return "2.9% + 30¢";
-  } else if (name.includes("worldpay")) {
-    return "2.5% + 25¢";
-  } else if (name.includes("klarna")) {
-    return "No fees";
-  } else {
-    return "Varies";
-  }
-};
-
 export default function PaymentGatewaySelector({
   gateways,
   selectedGateway,
@@ -136,12 +120,9 @@ export default function PaymentGatewaySelector({
                         getGatewayDescription(gateway.name)}
                     </p>
                     <div className="flex items-center space-x-4">
-                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
-                        Fees: {gateway.fees || getGatewayFees(gateway.name)}
-                      </span>
                       <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
                         <Clock className="h-3 w-3 mr-1" />
-                        Instant
+                        {gateway.processing_time?.trim() || "Instant"}
                       </span>
                     </div>
                   </div>
