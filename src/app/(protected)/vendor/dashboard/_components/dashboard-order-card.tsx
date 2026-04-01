@@ -1,11 +1,15 @@
+"use client";
+
 import type { LucideIcon } from "lucide-react";
 import {
-  BadgePoundSterling,
+  Banknote,
   CreditCard,
-  PoundSterling,
   ReceiptText,
   ShoppingCart,
+  Wallet,
 } from "lucide-react";
+import { useCurrencySymbol } from "@/hooks/use-currency-format";
+import { formatMoneyLocale } from "@/lib/currency-format";
 
 /**
  * Order card item interface
@@ -31,22 +35,28 @@ function getOrderItemIcon(title: string): LucideIcon {
     case "total bookings":
       return ShoppingCart;
     case "total payment":
-      return PoundSterling;
+      return Wallet;
     case "received payment":
       return CreditCard;
     case "total commission":
       return ReceiptText;
     case "commission due":
-      return BadgePoundSterling;
+      return Banknote;
     default:
       return ShoppingCart;
   }
+}
+
+/** Booking count only — all other dashboard stat cards are monetary */
+function isCountStatTitle(title: string): boolean {
+  return title.trim().toLowerCase() === "total bookings";
 }
 
 /**
  * Component to display order statistics in cards
  */
 export default function OrderCard({ orders, columns = 4 }: OrderCardProps) {
+  const currencySymbol = useCurrencySymbol();
   const isThreeWideLayout = columns === 4 && orders.length === 3;
 
   const gridCols =
@@ -60,6 +70,18 @@ export default function OrderCard({ orders, columns = 4 }: OrderCardProps) {
     <div className={`grid grid-cols-1 ${gridCols} gap-4`}>
       {orders.map((order: OrderItem, index: number) => {
         const Icon = getOrderItemIcon(order.title);
+        const numeric =
+          typeof order.value === "number"
+            ? order.value
+            : Number.parseFloat(String(order.value));
+        const displayValue = isCountStatTitle(order.title)
+          ? String(
+              Number.isFinite(numeric) ? Math.trunc(numeric) : order.value,
+            )
+          : formatMoneyLocale(
+              Number.isFinite(numeric) ? numeric : 0,
+              currencySymbol,
+            );
 
         return (
           <div className="w-full bg-background items-center" key={index}>
@@ -70,7 +92,7 @@ export default function OrderCard({ orders, columns = 4 }: OrderCardProps) {
                 </div>
                 <section className="w-full flex items-start lg:items-end justify-between lg:justify-end flex-col">
                   <p className="text-base text-muted-foreground">{order.title}</p>
-                  <p className="text-2xl font-bold">{order.value}</p>
+                  <p className="text-2xl font-bold">{displayValue}</p>
                 </section>
               </section>
             </article>

@@ -25,6 +25,8 @@ import {
   X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useCurrencyFormat } from "@/hooks/use-currency-format";
+import { parseFormattedMoney } from "@/lib/currency-format";
 
 interface TransactionDetailsProps {
   transaction: Transaction | null;
@@ -80,6 +82,8 @@ export function TransactionDetailsComponent({
   isOpen,
   onClose,
 }: TransactionDetailsProps) {
+  const { formatLocale: formatMoneyLocale } = useCurrencyFormat();
+
   if (!transaction) return null;
 
   const {
@@ -95,6 +99,7 @@ export function TransactionDetailsComponent({
     created_at,
     paid_at,
     booking_number,
+    amount_raw,
   } = transaction;
 
   // Use status_key for config lookup, fallback to status
@@ -126,9 +131,13 @@ export function TransactionDetailsComponent({
   const fullDate = createdDate ? format(createdDate, "PPP p") : "N/A";
   const paidDateFormatted = paidDate ? format(paidDate, "PPP p") : null;
 
-  // Format amount - amount is already formatted as "£50.00" from API
-  const formattedAmount =
-    amount || `${currency}${parseFloat(String(amount || 0)).toFixed(2)}`;
+  const numericAmount =
+    typeof amount_raw === "number" && Number.isFinite(amount_raw)
+      ? amount_raw
+      : parseFormattedMoney(String(amount ?? ""));
+  const formattedAmount = Number.isFinite(numericAmount)
+    ? formatMoneyLocale(numericAmount)
+    : amount || "—";
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>

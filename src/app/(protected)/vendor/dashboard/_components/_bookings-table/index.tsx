@@ -8,6 +8,8 @@ import { DataTableSkeleton } from "@/components/data-table/data-table-skeleton";
 import { DataTable } from "@/components/data-table/data-table";
 import { useDataTable } from "@/hooks/data-table/use-data-table";
 import { DataTableToolbar } from "./data-table-toolbar";
+import { useCurrencySymbol } from "@/hooks/use-currency-format";
+import { formatMoneyLocale } from "@/lib/currency-format";
 
 type DashboardBookingsTableProps = {
   initialData: Booking[];
@@ -20,6 +22,7 @@ export default function DashboardBookingsTable({
   search,
   isLoading = false,
 }: DashboardBookingsTableProps) {
+  const currencySymbol = useCurrencySymbol();
   const router = useRouter();
   const onViewBooking = React.useCallback(
     (booking: Booking) => {
@@ -28,8 +31,13 @@ export default function DashboardBookingsTable({
     [router]
   );
   const columns = React.useMemo(
-    () => getColumns({ onViewBooking }),
-    [onViewBooking],
+    () =>
+      getColumns({
+        onViewBooking,
+        formatMoneyLocale: (amount: number) =>
+          formatMoneyLocale(amount, currencySymbol),
+      }),
+    [onViewBooking, currencySymbol],
   );
 
   const getRowId = React.useCallback((originalRow: Booking) => {

@@ -11,14 +11,33 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { parseFormattedMoney } from "@/lib/currency-format";
+
+function bookingMoneyAmount(value: unknown): number {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value;
+  }
+  if (value == null || value === "") {
+    return 0;
+  }
+  const s = String(value);
+  const parsed = parseFormattedMoney(s);
+  if (Number.isFinite(parsed)) {
+    return parsed;
+  }
+  const plain = Number(s.replace(/,/g, ""));
+  return Number.isFinite(plain) ? plain : 0;
+}
 
 interface GetColumnsProps {
   /** Navigate to booking history detail page; row.original.id is booking_id from API */
   onViewBooking: (booking: Booking) => void;
+  formatMoneyLocale: (amount: number) => string;
 }
 
 export function getColumns({
   onViewBooking,
+  formatMoneyLocale,
 }: GetColumnsProps): ColumnDef<Booking>[] {
   return [
     {
@@ -162,17 +181,15 @@ export function getColumns({
       ),
       cell: ({ row }) => (
         <span className="font-medium text-right tabular-nums block">
-          {row.getValue("total_amount")}
+          {formatMoneyLocale(bookingMoneyAmount(row.original.total_amount))}
         </span>
       ),
       enableSorting: true,
       enableHiding: false,
       meta: { className: "text-right align-middle" },
-      sortingFn: (rowA, rowB) => {
-        const amountA = Number(rowA.getValue("total_amount"));
-        const amountB = Number(rowB.getValue("total_amount"));
-        return amountA - amountB;
-      },
+      sortingFn: (rowA, rowB) =>
+        bookingMoneyAmount(rowA.original.total_amount) -
+        bookingMoneyAmount(rowB.original.total_amount),
     },
     {
       accessorKey: "balance_amount",
@@ -187,17 +204,15 @@ export function getColumns({
       ),
       cell: ({ row }) => (
         <span className="font-medium text-right tabular-nums block">
-          {row.getValue("balance_amount")}
+          {formatMoneyLocale(bookingMoneyAmount(row.original.balance_amount))}
         </span>
       ),
       enableSorting: true,
       enableHiding: false,
       meta: { className: "text-right align-middle" },
-      sortingFn: (rowA, rowB) => {
-        const amountA = Number(rowA.getValue("balance_amount"));
-        const amountB = Number(rowB.getValue("balance_amount"));
-        return amountA - amountB;
-      },
+      sortingFn: (rowA, rowB) =>
+        bookingMoneyAmount(rowA.original.balance_amount) -
+        bookingMoneyAmount(rowB.original.balance_amount),
     },
     {
       accessorKey: "status",

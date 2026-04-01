@@ -29,6 +29,7 @@ import {
 import { EmptyPlaceholder } from "@/components/empty-placeholder";
 import { Receipt } from "lucide-react";
 import { TransactionsListSkeleton } from "./skeleton-loader";
+import { useCurrencyFormat } from "@/hooks/use-currency-format";
 
 interface TransactionMeta {
   total: number;
@@ -52,11 +53,16 @@ export function TransactionListComponent({
   onPageChange,
   isLoading,
 }: TransactionListProps) {
+  const { formatLocale: formatMoneyLocale } = useCurrencyFormat();
   const [sorting, setSorting] = useState<SortingState>([]);
 
   const columns = useMemo(
-    () => getTransactionColumns({ onViewDetails }),
-    [onViewDetails]
+    () =>
+      getTransactionColumns({
+        onViewDetails,
+        formatMoneyLocale,
+      }),
+    [onViewDetails, formatMoneyLocale],
   );
 
   const table = useReactTable({

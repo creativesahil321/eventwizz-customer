@@ -23,6 +23,7 @@ export const DateCard = ({
   onDateClick,
   isFirstRow = false,
 }: DateCardProps) => {
+  const { formatCompact: formatMoneyCompact } = useCurrencyFormat();
   const dateInfo = getDateInfo(dateItem);
 
   return (

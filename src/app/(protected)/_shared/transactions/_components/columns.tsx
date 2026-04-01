@@ -6,55 +6,25 @@ import React from "react";
 import { Transaction } from "../_lib/types";
 import { formatDistanceToNow } from "date-fns";
 import { STATUS_CONFIG } from "../_lib/constants";
-import { DEFAULT_CURRENCY_SYMBOL } from "@/lib/currency-format";
+import { parseFormattedMoney } from "@/lib/currency-format";
 
-/**
- * Normalize currency code - converts currency symbols to ISO 4217 codes
- */
-const normalizeCurrencyCode = (currency: string | undefined | null): string => {
-  if (!currency) return "GBP";
-
-  const trimmed = currency.trim();
-  const upper = trimmed.toUpperCase();
-
-  const symbolAndCodeMap: Record<string, string> = {
-    "£": "GBP",
-    $: "USD",
-    "€": "EUR",
-    "¥": "JPY",
-    "₹": "INR",
-    A$: "AUD",
-    C$: "CAD",
-    CHF: "CHF",
-    GBP: "GBP",
-    USD: "USD",
-    EUR: "EUR",
-    JPY: "JPY",
-    INR: "INR",
-    AUD: "AUD",
-    CAD: "CAD",
-  };
-
-  if (symbolAndCodeMap[trimmed] != null) {
-    return symbolAndCodeMap[trimmed];
+function transactionAmountNumber(t: Transaction): number {
+  if (typeof t.amount_raw === "number" && Number.isFinite(t.amount_raw)) {
+    return t.amount_raw;
   }
-  if (symbolAndCodeMap[upper] != null) {
-    return symbolAndCodeMap[upper];
-  }
-
-  if (/^[A-Z]{3}$/.test(upper)) {
-    return upper;
-  }
-
-  return "GBP";
-};
+  const parsed = parseFormattedMoney(String(t.amount ?? ""));
+  return Number.isFinite(parsed) ? parsed : 0;
+}
 
 interface GetTransactionColumnsProps {
   onViewDetails: (transaction: Transaction) => void;
+  /** Tenant-aware grouped amount (matches summary header) */
+  formatMoneyLocale: (amount: number) => string;
 }
 
 export function getTransactionColumns({
   onViewDetails,
+  formatMoneyLocale,
 }: GetTransactionColumnsProps): ColumnDef<Transaction>[] {
   return [
     {
@@ -113,34 +83,18 @@ export function getTransactionColumns({
       ),
       cell: ({ row }) => {
         const transaction = row.original;
-        const amount = parseFloat(transaction.amount);
-        const currencyCode = normalizeCurrencyCode(transaction.currency);
-
-        try {
-          const formatted = new Intl.NumberFormat("en-GB", {
-            style: "currency",
-            currency: currencyCode,
-          }).format(amount);
-          return (
-            <span className="font-bold text-sm text-primary">{formatted}</span>
-          );
-        } catch (error) {
-          console.error("Error formatting currency:", error);
-          return (
-            <span className="font-bold text-sm text-primary">
-              {transaction.currency || DEFAULT_CURRENCY_SYMBOL}
-              {amount.toFixed(2)}
-            </span>
-          );
-        }
+        const n = transactionAmountNumber(transaction);
+        return (
+          <span className="font-bold text-sm text-primary">
+            {formatMoneyLocale(n)}
+          </span>
+        );
       },
       enableSorting: true,
       enableHiding: false,
-      sortingFn: (rowA, rowB) => {
-        const amountA = parseFloat(rowA.getValue("amount") as string);
-        const amountB = parseFloat(rowB.getValue("amount") as string);
-        return amountA - amountB;
-      },
+      sortingFn: (rowA, rowB) =>
+        transactionAmountNumber(rowA.original) -
+        transactionAmountNumber(rowB.original),
     },
     {
       accessorKey: "status",

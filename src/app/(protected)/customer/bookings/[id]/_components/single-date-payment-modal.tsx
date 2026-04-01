@@ -48,6 +48,7 @@ export function SingleDatePaymentModal({
   rescheduleRequest,
   isProcessing = false,
 }: SingleDatePaymentModalProps) {
+  const { format: formatCurrency } = useCurrencyFormat();
   const [selectedPaymentPlan, setSelectedPaymentPlan] = useState<
     "full" | "deposit" | null
   >(null);

@@ -44,7 +44,7 @@ export function TransactionsDataTable({
   onViewDetails,
   stats,
 }: TransactionsDataTableProps) {
-  const { format: formatMoneyDisplay } = useCurrencyFormat();
+  const { formatLocale: formatMoneyDisplay } = useCurrencyFormat();
   const [searchInput, setSearchInput] = React.useState(filters.search || "");
 
   // Check if any filters are actually applied (not "all" or empty)

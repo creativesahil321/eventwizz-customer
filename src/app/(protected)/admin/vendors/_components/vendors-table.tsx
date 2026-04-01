@@ -169,7 +169,7 @@ function getVendorColumns(
       ),
       cell: ({ row }) => (
         <span className="text-sm font-medium">
-          {formatCurrency(row.getValue("totalEarnings"))}
+          {formatLocale(row.getValue("totalEarnings"))}
         </span>
       ),
       enableSorting: true,

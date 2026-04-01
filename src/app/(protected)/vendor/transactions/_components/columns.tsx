@@ -5,15 +5,25 @@ import { Download } from "lucide-react";
 import React from "react";
 import { DataTableRowAction, Transaction } from "../_lib/types";
 import { StatusBadge } from "@/components/ui/status-badge";
+import { parseFormattedMoney } from "@/lib/currency-format";
+
+function ledgerAmount(value: string): number {
+  const parsed = parseFormattedMoney(String(value ?? ""));
+  if (Number.isFinite(parsed)) return parsed;
+  const n = parseFloat(String(value).replace(/,/g, ""));
+  return Number.isFinite(n) ? n : 0;
+}
 
 interface GetTransactionColumnsProps {
   setRowAction: React.Dispatch<
     React.SetStateAction<DataTableRowAction<Transaction> | null>
   >;
+  formatMoneyLocale: (amount: number) => string;
 }
 
 export function getTransactionColumns({
   setRowAction,
+  formatMoneyLocale,
 }: GetTransactionColumnsProps): ColumnDef<Transaction>[] {
   return [
     {
@@ -189,22 +199,18 @@ export function getTransactionColumns({
         />
       ),
       cell: ({ row }) => {
-        const amount = parseFloat(row.getValue("amount") as string);
-        const formatted = new Intl.NumberFormat("en-GB", {
-          style: "currency",
-          currency: "GBP",
-        }).format(amount);
+        const n = ledgerAmount(row.original.amount);
         return (
-          <span className="font-bold text-sm text-primary">{formatted}</span>
+          <span className="font-bold text-sm text-primary">
+            {formatMoneyLocale(n)}
+          </span>
         );
       },
       enableSorting: true,
       enableHiding: false,
-      sortingFn: (rowA, rowB) => {
-        const amountA = parseFloat(rowA.getValue("amount") as string);
-        const amountB = parseFloat(rowB.getValue("amount") as string);
-        return amountA - amountB;
-      },
+      sortingFn: (rowA, rowB) =>
+        ledgerAmount(rowA.original.amount) -
+        ledgerAmount(rowB.original.amount),
     },
     {
       accessorKey: "platform_fee",
@@ -216,24 +222,18 @@ export function getTransactionColumns({
         />
       ),
       cell: ({ row }) => {
-        const fee = parseFloat(row.getValue("platform_fee") as string);
-        const formatted = new Intl.NumberFormat("en-GB", {
-          style: "currency",
-          currency: "GBP",
-        }).format(fee);
+        const n = ledgerAmount(row.original.platform_fee);
         return (
           <span className="font-semibold text-sm text-green-600">
-            {formatted}
+            {formatMoneyLocale(n)}
           </span>
         );
       },
       enableSorting: true,
       enableHiding: false,
-      sortingFn: (rowA, rowB) => {
-        const feeA = parseFloat(rowA.getValue("platform_fee") as string);
-        const feeB = parseFloat(rowB.getValue("platform_fee") as string);
-        return feeA - feeB;
-      },
+      sortingFn: (rowA, rowB) =>
+        ledgerAmount(rowA.original.platform_fee) -
+        ledgerAmount(rowB.original.platform_fee),
     },
     {
       id: "receipt",

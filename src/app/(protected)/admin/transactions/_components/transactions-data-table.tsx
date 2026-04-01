@@ -23,6 +23,7 @@ import type { SearchParams, Transaction } from "../_lib/types";
 import { getTransactionColumns } from "./columns";
 import { DUMMY_TRANSACTIONS, getDummyEarnings } from "../_lib/dummy-data";
 import { cn } from "@/lib/utils";
+import { useCurrencyFormat } from "@/hooks/use-currency-format";
 
 type AdminTransactionsDataTableProps = {
   search: SearchParams;
@@ -39,6 +40,7 @@ export function AdminTransactionsDataTable({
   search,
   onEarningsUpdate,
 }: AdminTransactionsDataTableProps) {
+  const { formatLocale: formatMoneyLocale } = useCurrencyFormat();
   const [rowAction, setRowAction] = useState<{
     row: { original: Transaction };
     type: "download";
@@ -50,8 +52,8 @@ export function AdminTransactionsDataTable({
   });
 
   const columns = useMemo(
-    () => getTransactionColumns({ setRowAction }),
-    [setRowAction]
+    () => getTransactionColumns({ setRowAction, formatMoneyLocale }),
+    [formatMoneyLocale],
   );
 
   const filteredData = useMemo(() => {

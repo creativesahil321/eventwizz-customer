@@ -12,6 +12,7 @@ import {
   TransactionStats,
   TransactionMeta,
 } from "@/app/(protected)/_shared/transactions/_lib/types";
+import { parseFormattedMoney } from "@/lib/currency-format";
 
 export interface CustomerTransactionsResponse {
   status: boolean;
@@ -105,12 +106,16 @@ export const transactionService = {
     // Fetch summary from API
     const response = await fetchCustomerTransactions({ page: 1, limit: 1 });
 
-    const raw = String(response.summary.amount ?? "").replace(/,/g, "");
-    const total_amount_value = parseFloat(raw) || 0;
+    const total_amount_value = parseFormattedMoney(
+      String(response.summary.amount ?? ""),
+    );
+    const safeTotal = Number.isFinite(total_amount_value)
+      ? total_amount_value
+      : 0;
 
     return {
       total_transactions: response.summary.total,
-      total_amount_value,
+      total_amount_value: safeTotal,
       pending_count: 0, // Not provided by API, can be added later if needed
       completed_count: 0, // Not provided by API, can be added later if needed
       failed_count: 0, // Not provided by API, can be added later if needed

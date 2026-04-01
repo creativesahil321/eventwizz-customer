@@ -5,7 +5,7 @@ import {
   ArrowLeft,
   Calendar,
   Users,
-  PoundSterling,
+  Wallet,
   ChevronDown,
   CheckCircle2,
   XCircle,
@@ -29,7 +29,8 @@ import { useEventOverview } from "./_hooks/useEventOverview";
 import { EmptyPlaceholder } from "@/components/empty-placeholder";
 import EventOverviewSkeleton from "./_components/overview-skeleton";
 import { BookingItemSkeleton } from "./_components/booking-item-skeleton";
-import { useCurrencySymbol } from "@/hooks/use-currency-format";
+import { useCurrencyFormat } from "@/hooks/use-currency-format";
+import { parseFormattedMoney } from "@/lib/currency-format";
 
 interface EventOverviewClientProps {
   eventId: string;
@@ -38,7 +39,7 @@ interface EventOverviewClientProps {
 export default function EventOverviewClient({
   eventId,
 }: EventOverviewClientProps) {
-  const currencySymbol = useCurrencySymbol();
+  const { formatLocale: formatMoneyLocale } = useCurrencyFormat();
   const [dateFilter, setDateFilter] = useState("");
   const [selectedTab, setSelectedTab] = useState<
     "all" | "available" | "sold_out"
@@ -153,6 +154,13 @@ export default function EventOverviewClient({
   if (!eventData || !paginationMeta) {
     return <EventOverviewSkeleton />;
   }
+
+  const totalRevenueNumeric = parseFormattedMoney(
+    String(eventData.totalRevenue ?? ""),
+  );
+  const totalRevenueDisplay = Number.isFinite(totalRevenueNumeric)
+    ? formatMoneyLocale(totalRevenueNumeric)
+    : String(eventData.totalRevenue ?? "—");
 
   // Type aliases for easier usage
   type TableEntry = EventOverviewResponse["data"][0];
@@ -271,12 +279,10 @@ export default function EventOverviewClient({
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Revenue</CardTitle>
-            <PoundSterling className="h-4 w-4 text-muted-foreground" />
+            <Wallet className="h-4 w-4 text-muted-foreground" aria-hidden />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">
-              {eventData.totalRevenue.replace(/\$/g, currencySymbol)}
-            </div>
+            <div className="text-2xl font-bold">{totalRevenueDisplay}</div>
             <p className="text-xs text-muted-foreground">
               From {eventData.totalBookings} bookings
             </p>

@@ -25,6 +25,7 @@ import { getTransactionColumns } from "./columns";
 import { useVendorTransactions, useDownloadSingleReceipt } from "../_lib/queries";
 import { DataTablePagination } from "@/components/data-table/data-table-pagination";
 import { TransactionsTableSkeleton } from "./skeleton-loader";
+import { useCurrencyFormat } from "@/hooks/use-currency-format";
 
 type TransactionsDataTableProps = {
   search: SearchParams;
@@ -35,6 +36,7 @@ export function TransactionsDataTable({
   search,
   onEarningsUpdate,
 }: TransactionsDataTableProps) {
+  const { formatLocale: formatMoneyLocale } = useCurrencyFormat();
   const [rowAction, setRowAction] =
     React.useState<DataTableRowAction<Transaction> | null>(null);
   const [sorting, setSorting] = React.useState<SortingState>([]);
@@ -47,8 +49,8 @@ export function TransactionsDataTable({
   });
 
   const columns = useMemo(
-    () => getTransactionColumns({ setRowAction }),
-    [setRowAction]
+    () => getTransactionColumns({ setRowAction, formatMoneyLocale }),
+    [formatMoneyLocale],
   );
 
   const { data, isLoading, isError } = useVendorTransactions({

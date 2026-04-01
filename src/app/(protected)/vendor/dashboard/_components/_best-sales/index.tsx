@@ -11,20 +11,16 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { useCurrencyFormat } from "@/hooks/use-currency-format";
 
 export type BestSale = {
   icon: string;
   venue_name: string;
-  price: string;
+  amount: number;
 };
 
 export type SortBy = "name" | "amount";
 export type SortOrder = "asc" | "desc";
-
-function parsePrice(price: string): number {
-  const num = parseFloat(price.replace(/[^0-9.-]/g, ""));
-  return Number.isNaN(num) ? 0 : num;
-}
 
 interface BestSalesProps {
   sales: BestSale[];
@@ -40,6 +36,7 @@ export default function BestSales({
   sortOrder: controlledSortOrder,
   onSortChange,
 }: BestSalesProps) {
+  const { formatLocale: formatMoneyLocale } = useCurrencyFormat();
   const [localSortBy, setLocalSortBy] = useState<SortBy>("amount");
   const [localSortOrder, setLocalSortOrder] = useState<SortOrder>("desc");
 
@@ -62,7 +59,7 @@ export default function BestSales({
       if (sortBy === "name") {
         cmp = a.venue_name.localeCompare(b.venue_name);
       } else {
-        cmp = parsePrice(a.price) - parsePrice(b.price);
+        cmp = a.amount - b.amount;
       }
       return sortOrder === "asc" ? cmp : -cmp;
     });
@@ -123,7 +120,7 @@ export default function BestSales({
                 <span className="text-lg font-medium">{item.venue_name}</span>
               </div>
               <span className="text-md text-muted-foreground font-semibold">
-                {item.price}
+                {formatMoneyLocale(item.amount)}
               </span>
             </Card>
           ))}

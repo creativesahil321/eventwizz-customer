@@ -27,7 +27,8 @@ export interface OrderCardItem {
 export interface BestSaleItem {
   icon: string;
   venue_name: string;
-  price: string;
+  /** Raw amount; UI formats with tenant currency */
+  amount: number;
 }
 
 export function mapSummaryToItems(summary: VendorDashboardSummary): SummaryItem[] {
@@ -108,12 +109,7 @@ export function mapLastEventToBestSale(item: VendorDashboardLastEventItem): Best
   return {
     icon: "",
     venue_name: item.event_name,
-    price: new Intl.NumberFormat("en-GB", {
-      style: "currency",
-      currency: "GBP",
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(item.amount),
+    amount: Number(item.amount) || 0,
   };
 }
 

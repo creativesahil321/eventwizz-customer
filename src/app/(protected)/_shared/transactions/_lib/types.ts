@@ -7,8 +7,9 @@ export interface Transaction {
   id: number;
   date: string; // e.g., "5 days ago"
   transaction_id: string;
-  amount: string; // Formatted: "£50.00"
-  amount_raw: number;
+  amount: string; // Formatted string from API (may include symbol)
+  /** Numeric amount when API provides it (preferred for display/sort) */
+  amount_raw?: number;
   currency: string;
   status: string; // Display: "Pending", "Completed", etc.
   status_key: string; // API key: "pending", "success", etc.
