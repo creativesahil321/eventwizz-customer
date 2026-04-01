@@ -20,6 +20,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import { useCurrencyFormat } from "@/hooks/use-currency-format";
 
 interface PaymentSuccessData {
   booking_id: number;
@@ -34,6 +35,7 @@ interface PaymentSuccessData {
 }
 
 function PaymentSuccessContent() {
+  const { format: formatMoney } = useCurrencyFormat();
   const searchParams = useSearchParams();
   const router = useRouter();
 
@@ -241,7 +243,7 @@ function PaymentSuccessContent() {
                     <span>Amount Paid</span>
                   </div>
                   <p className="font-bold text-xl text-green-600">
-                    £{parseFloat(paymentData.amount).toFixed(2)}
+                    {formatMoney(parseFloat(paymentData.amount))}
                   </p>
                 </div>
 

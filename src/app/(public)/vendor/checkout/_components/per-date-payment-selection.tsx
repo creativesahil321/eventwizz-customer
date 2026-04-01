@@ -14,6 +14,7 @@ import { Separator } from "@/components/ui/separator";
 import { Calendar, CheckCircle, Clock, Info } from "lucide-react";
 import { ApiEventCartData, ApiDateData } from "@/lib/types/cart.types";
 import { format } from "date-fns";
+import { useCurrencyFormat } from "@/hooks/use-currency-format";
 
 interface PerDatePaymentSelectionProps {
   eventData: ApiEventCartData | null;
@@ -32,6 +33,8 @@ export default function PerDatePaymentSelection({
   getDateData,
   eventSlug,
 }: PerDatePaymentSelectionProps) {
+  const { format: formatCurrency } = useCurrencyFormat();
+
   if (!eventData) return null;
 
   const dateKeys = Object.keys(eventData).filter(
@@ -45,8 +48,6 @@ export default function PerDatePaymentSelection({
         "payment_gateways",
       ].includes(key)
   );
-
-  const formatCurrency = (amount: number) => `£${amount.toFixed(2)}`;
 
   const formatDate = (dateString: string) => {
     try {

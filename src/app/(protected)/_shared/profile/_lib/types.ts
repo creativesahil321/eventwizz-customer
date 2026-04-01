@@ -22,6 +22,8 @@ export type ProfileResponse = {
     state: string | null;
     country: string | null;
     post_code: string | null;
+    /** When present (tenant branding), matches theme API display symbol */
+    currency_symbol?: string;
   };
   errors?: string[];
 };

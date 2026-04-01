@@ -21,6 +21,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { X, Search } from "lucide-react";
 import { TransactionsTableSkeleton } from "./skeleton-loader";
+import { useCurrencyFormat } from "@/hooks/use-currency-format";
 
 interface TransactionsDataTableProps {
   transactions: Transaction[];
@@ -43,6 +44,7 @@ export function TransactionsDataTable({
   onViewDetails,
   stats,
 }: TransactionsDataTableProps) {
+  const { format: formatMoneyDisplay } = useCurrencyFormat();
   const [searchInput, setSearchInput] = React.useState(filters.search || "");
 
   // Check if any filters are actually applied (not "all" or empty)
@@ -89,7 +91,7 @@ export function TransactionsDataTable({
               <div className="text-muted-foreground">
                 Amount:{" "}
                 <span className="font-semibold text-foreground">
-                  {stats.total_amount}
+                  {formatMoneyDisplay(stats.total_amount_value)}
                 </span>
               </div>
             </div>

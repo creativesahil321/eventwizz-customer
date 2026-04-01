@@ -142,6 +142,8 @@ export interface ThemeSchema {
   // Additional fields
   copyright?: string;
   domain?: string;
+  /** Display symbol from tenant/theme API (e.g. £, $, €) */
+  currency_symbol?: string;
   contactDetails?: ContactDetails;
   socialLinks?: SocialLinks;
   seo?: SEO;
@@ -162,6 +164,8 @@ export interface ThemeSettings {
   copyright: string;
   domain: string;
   website_role: string;
+  /** Resolved display symbol for money formatting */
+  currency_symbol: string;
 }
 
 /**

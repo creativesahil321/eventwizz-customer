@@ -22,6 +22,7 @@ import { useEventFormContext } from "../../events-form-provider";
 import { StepTwoType, stepTwoSchema } from "../schema";
 import { eventsService } from "@/services/vendor/events/events.service";
 import { addCacheBusting } from "@/lib/image-utils";
+import { useCurrencySymbol } from "@/hooks/use-currency-format";
 
 // Define interfaces for gallery items and files with preview
 interface FileWithPreview extends File {
@@ -35,6 +36,7 @@ interface GalleryItem {
 }
 
 export default function PackageTab() {
+  const currencySymbol = useCurrencySymbol();
   // Access the GLOBAL form context
   const {
     form: globalForm,
@@ -386,7 +388,7 @@ export default function PackageTab() {
                     <FormControl>
                       <Input
                         {...field}
-                        placeholder="e.g., Prices From £65 Plus VAT Include:"
+                        placeholder={`e.g., Prices From ${currencySymbol}65 Plus VAT Include:`}
                         className="h-10 bg-[#F9FAFB] border-[#E5E7EB]"
                         maxLength={160}
                       />

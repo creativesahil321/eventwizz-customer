@@ -14,6 +14,17 @@ import {
   extractEventsFromApiResponse,
   findEventBySlug,
 } from "./cart-calculations";
+import { formatMoney, resolveCurrencySymbol } from "@/lib/currency-format";
+import { useDomainStore } from "@/store/domain.store";
+
+function checkoutLogCurrencySymbol(): string {
+  if (typeof window !== "undefined") {
+    return resolveCurrencySymbol(
+      useDomainStore.getState().settings?.currency_symbol,
+    );
+  }
+  return resolveCurrencySymbol(undefined);
+}
 
 /**
  * Transform cart edit store data into checkout API format
@@ -168,10 +179,9 @@ export function transformCartToCheckout(
       if (depositType === "percentage") {
         // Percentage: calculate % of table total
         depositAmount = (tableTotalAmount * depositValue) / 100;
+        const sym = checkoutLogCurrencySymbol();
         console.log(
-          `💰 Deposit (${depositValue}% of £${tableTotalAmount}): £${depositAmount.toFixed(
-            2
-          )}`
+          `💰 Deposit (${depositValue}% of ${formatMoney(tableTotalAmount, sym)}): ${formatMoney(depositAmount, sym)}`,
         );
       } else {
         // Amount: multiply by guest count
@@ -182,10 +192,9 @@ export function transformCartToCheckout(
           );
           depositAmount += depositValue * totalGuests;
         });
+        const sym = checkoutLogCurrencySymbol();
         console.log(
-          `💰 Deposit (£${depositValue} per guest): £${depositAmount.toFixed(
-            2
-          )}`
+          `💰 Deposit (${formatMoney(depositValue, sym)} per guest): ${formatMoney(depositAmount, sym)}`,
         );
       }
 
@@ -217,7 +226,9 @@ export function transformCartToCheckout(
     } else {
       // Full payment - pay entire date total today
       totalDueToday += dateTotal;
-      console.log(`📊 Date ${date} full payment: £${dateTotal.toFixed(2)}`);
+      console.log(
+        `📊 Date ${date} full payment: ${formatMoney(dateTotal, checkoutLogCurrencySymbol())}`,
+      );
     }
 
     const isDeposit = dateData.paymentType === "deposit" && isDepositEnabled;

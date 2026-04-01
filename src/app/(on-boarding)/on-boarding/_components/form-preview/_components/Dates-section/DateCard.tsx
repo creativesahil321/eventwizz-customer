@@ -3,9 +3,12 @@
  * Individual date card for event booking
  */
 
+"use client";
+
 import { motion } from "framer-motion";
 import { getDateInfo } from "@/lib/utils";
 import { DatesSectionType } from ".";
+import { useCurrencyFormat } from "@/hooks/use-currency-format";
 
 interface DateCardProps {
   dateItem: DatesSectionType[0];
@@ -45,7 +48,7 @@ export const DateCard = ({
         <p className="text-xs sm:text-sm">{dateInfo.month}</p>
       </div>
       <div className="bg-gradient-to-b from-[var(--color-primary)] to-[#232a61] text-white text-xl sm:text-2xl tracking-wider py-1 sm:py-1.5">
-        £{dateInfo.price}
+        {formatMoneyCompact(Number.parseFloat(String(dateInfo.price)))}
       </div>
     </motion.div>
   );

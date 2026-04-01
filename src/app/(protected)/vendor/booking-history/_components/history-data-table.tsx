@@ -13,6 +13,7 @@ import UpdateHistoryDialog from "./_history-update";
 import MailHistoryDialog from "./_history-mail";
 import { useRouter } from "next/navigation";
 import { useQueryState, parseAsInteger } from "nuqs";
+import { useCurrencyFormat } from "@/hooks/use-currency-format";
 
 const dynamicStatusFilter = [
   { id: 1, title: "Successful Orders", value: "success", count: 0 },
@@ -28,11 +29,12 @@ type HistoryDataTableProps = {
 
 function HistoryDataTable({ search, tableRef }: HistoryDataTableProps) {
   const router = useRouter();
+  const { format: formatMoney } = useCurrencyFormat();
   const [rowAction, setRowAction] =
     React.useState<DataTableRowAction<History> | null>(null);
   const columns = useMemo(
-    () => getHistoryColumns({ setRowAction }),
-    [setRowAction]
+    () => getHistoryColumns({ setRowAction, formatMoney }),
+    [setRowAction, formatMoney],
   );
 
   useEffect(() => {

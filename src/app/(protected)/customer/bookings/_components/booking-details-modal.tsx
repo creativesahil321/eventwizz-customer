@@ -21,6 +21,8 @@ import {
 } from "lucide-react";
 import { Booking } from "../_lib/types";
 import Image from "next/image";
+import { useCurrencyFormat } from "@/hooks/use-currency-format";
+import { parseFormattedMoney } from "@/lib/currency-format";
 
 interface BookingDetailsModalProps {
   booking: Booking | null;
@@ -33,7 +35,14 @@ export default function BookingDetailsModal({
   open,
   onOpenChange,
 }: BookingDetailsModalProps) {
+  const { symbol, format: formatMoney } = useCurrencyFormat();
+
   if (!booking) return null;
+
+  const discountValue = parseFormattedMoney(booking.discount || "0", symbol);
+  const balanceValue = parseFormattedMoney(booking.balance_amount || "0", symbol);
+  const showDiscount = discountValue !== 0;
+  const showBalance = balanceValue !== 0;
 
   const DetailRow = ({
     icon: Icon,
@@ -169,26 +178,25 @@ export default function BookingDetailsModal({
                   </span>
                 </div>
 
-                {booking.discount !== "£0" && booking.discount !== "$0" && (
+                {showDiscount && (
                   <div className="flex justify-between text-sm">
                     <span className="text-muted-foreground">Discount</span>
                     <span className="font-semibold text-orange-600">
-                      -{booking.discount}
+                      -{formatMoney(Math.abs(discountValue))}
                     </span>
                   </div>
                 )}
 
-                {booking.balance_amount !== "£0" &&
-                  booking.balance_amount !== "$0" && (
-                    <div className="flex justify-between text-sm">
-                      <span className="text-muted-foreground">
-                        Balance Amount
-                      </span>
-                      <span className="font-semibold text-red-600">
-                        {booking.balance_amount}
-                      </span>
-                    </div>
-                  )}
+                {showBalance && (
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">
+                      Balance Amount
+                    </span>
+                    <span className="font-semibold text-red-600">
+                      {formatMoney(balanceValue)}
+                    </span>
+                  </div>
+                )}
 
                 <Separator className="my-2" />
 

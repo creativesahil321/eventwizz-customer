@@ -13,6 +13,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { CreditCard, Calendar, CheckCircle, Clock } from "lucide-react";
 import { PaymentInfo } from "@/lib/types/cart.types";
 import { format } from "date-fns";
+import { useCurrencyFormat } from "@/hooks/use-currency-format";
 
 interface CompactPaymentSelectionProps {
   paymentInfo: PaymentInfo;
@@ -29,6 +30,7 @@ export default function CompactPaymentSelection({
   selectedType = "full",
   disabled = false,
 }: CompactPaymentSelectionProps) {
+  const { format: formatCurrency } = useCurrencyFormat();
   const [selectedPaymentType, setSelectedPaymentType] = useState<
     "full" | "deposit"
   >(selectedType);
@@ -41,8 +43,6 @@ export default function CompactPaymentSelection({
   const depositAmount = paymentInfo.deposit_amount;
   const balanceAmount = totalAmount - depositAmount;
   const balanceDueDate = paymentInfo.balance_due_date;
-
-  const formatCurrency = (amount: number) => `£${amount.toFixed(2)}`;
 
   const formatDate = (dateString: string | null) => {
     if (!dateString) return null;

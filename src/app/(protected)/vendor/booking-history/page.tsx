@@ -37,8 +37,10 @@ import { useQueryState, parseAsInteger } from "nuqs";
 import { TableToolbarActions } from "./_components/table-toolbar-actions";
 import { LocationIndicator } from "@/components/location-indicator";
 import { PermissionRoute } from "@/components/permission";
+import { useCurrencyFormat } from "@/hooks/use-currency-format";
 
 export default function BookingHistoryPage() {
+  const { format: formatMoney } = useCurrencyFormat();
   const [globalFilterValue, setGlobalFilterValue] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
@@ -331,7 +333,7 @@ export default function BookingHistoryPage() {
                             stat.valueColor,
                           )}
                         >
-                          £{stat.value.toFixed(2)}
+                          {formatMoney(stat.value)}
                         </p>
                       </div>
                     </div>

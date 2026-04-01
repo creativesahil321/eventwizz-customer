@@ -19,6 +19,7 @@ import { useGetCartData } from "@/services/customer/cart/query";
 import { useOnboarding } from "@/hooks/use-onboarding";
 import { useIsPreviewMode } from "@/contexts/preview-context";
 import { addCacheBusting } from "@/lib/image-utils";
+import { useCurrencySymbol } from "@/hooks/use-currency-format";
 
 // Define proper user interface for session
 interface SessionUser {
@@ -48,6 +49,7 @@ export default function DatesSection({
   eventName,
   eventImage,
 }: DatesSectionProps) {
+  const currencySymbol = useCurrencySymbol();
   const router = useRouter();
   const { data: session, status } = useSession();
   const { isOnboarding } = useOnboarding();
@@ -415,7 +417,7 @@ export default function DatesSection({
                           ? "SOLD OUT"
                           : isInCart
                           ? "VIEW CART"
-                          : `£${dateInfo.price}`}
+                          : `${currencySymbol}${dateInfo.price}`}
                       </div>
                     </div>
                   );
@@ -481,7 +483,7 @@ export default function DatesSection({
                           ? "SOLD OUT"
                           : isInCart
                           ? "VIEW CART"
-                          : `£${dateInfo.price}`}
+                          : `${currencySymbol}${dateInfo.price}`}
                       </div>
                     </div>
                   );
@@ -647,7 +649,7 @@ export default function DatesSection({
                         ? "SOLD OUT"
                         : isInCart
                         ? "VIEW CART"
-                        : `£${dateInfo.price}`}
+                        : `${currencySymbol}${dateInfo.price}`}
                     </div>
                   </motion.div>
                 );
@@ -733,7 +735,7 @@ export default function DatesSection({
                         ? "SOLD OUT"
                         : isInCart
                         ? "VIEW CART"
-                        : `£${dateInfo.price}`}
+                        : `${currencySymbol}${dateInfo.price}`}
                     </div>
                   </motion.div>
                 );

@@ -1,8 +1,11 @@
+"use client";
+
 import { Button } from "@/components/ui/button";
 import { useState, useEffect } from "react";
 import { useDrinkSelectionStore } from "@/store/drink-selection.store";
 import { useHydration } from "@/hooks/useHydration";
 import { ChevronDown, ChevronUp } from "lucide-react";
+import { useCurrencyFormat } from "@/hooks/use-currency-format";
 
 type DrinkPackage = {
   id?: number; // Optional for backward compatibility, but should always be present from API
@@ -25,6 +28,7 @@ export default function DrinkSection({
   packages,
   eventSlug,
 }: DrinkSectionProps) {
+  const { format: formatMoney } = useCurrencyFormat();
   const [showMore, setShowMore] = useState(false);
   const isHydrated = useHydration(); // Professional hydration handling
   const {
@@ -160,8 +164,7 @@ export default function DrinkSection({
                   {/* Price + Actions */}
                   <article className="flex flex-col sm:flex-row items-center gap-3 sm:gap-4 w-full sm:w-auto mt-2 sm:mt-0">
                     <p className="flex items-center space-x-1 text-lg sm:text-xl md:text-2xl font-semibold whitespace-nowrap">
-                      <span>£</span>
-                      <span>{singlePackage.price}</span>
+                      <span>{formatMoney(singlePackage.price)}</span>
                     </p>
 
                     {quantity === 0 ? (

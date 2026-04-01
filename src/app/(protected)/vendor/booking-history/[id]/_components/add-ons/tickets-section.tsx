@@ -9,6 +9,7 @@ import {
 import { Ticket } from "lucide-react";
 import { QuantityControls } from "./quantity-controls";
 import { TicketItem } from "./types";
+import { useCurrencyFormat } from "@/hooks/use-currency-format";
 
 interface TicketsSectionProps {
   tickets: TicketItem[];
@@ -21,6 +22,7 @@ export function TicketsSection({
   onQuantityChange,
   onRemove,
 }: TicketsSectionProps) {
+  const { format: formatMoney } = useCurrencyFormat();
   const totalTickets = tickets.reduce(
     (sum, ticket) => sum + ticket.quantity,
     0
@@ -77,7 +79,7 @@ export function TicketsSection({
                       </p>
                     )}
                     <p className="text-xs text-gray-500">
-                      £{ticket.price.toFixed(2)} per ticket
+                      {formatMoney(ticket.price)} per ticket
                     </p>
                   </div>
                   <QuantityControls
@@ -86,7 +88,6 @@ export function TicketsSection({
                     onIncrease={() => onQuantityChange(ticket.id, 1)}
                     onDecrease={() => onQuantityChange(ticket.id, -1)}
                     onRemove={() => onRemove(ticket.id)}
-                    size="sm"
                   />
                 </div>
               </div>

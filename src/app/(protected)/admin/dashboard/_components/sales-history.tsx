@@ -9,6 +9,7 @@ import {
   ChartTooltip,
   ChartTooltipContent,
 } from "@/components/ui/chart";
+import { useCurrencySymbol } from "@/hooks/use-currency-format";
 
 const chartConfig = {
   sales: {
@@ -76,7 +77,7 @@ export default function SalesHistory({
             <YAxis
               tickLine={false}
               axisLine={false}
-              tickFormatter={(value) => `£${value}`}
+              tickFormatter={(value) => `${currencySymbol}${value}`}
             />
             <ChartTooltip content={<ChartTooltipContent hideLabel />} />
             <Bar

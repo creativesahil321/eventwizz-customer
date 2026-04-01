@@ -24,8 +24,10 @@ import { DateRangePicker } from "@/components/ui/date-range-picker";
 import { DateRange } from "react-day-picker";
 import { format, startOfYear, endOfDay } from "date-fns";
 import { useQueryState, parseAsInteger } from "nuqs";
+import { useCurrencyFormat } from "@/hooks/use-currency-format";
 
 export default function TransactionsPage() {
+  const { format: formatMoney } = useCurrencyFormat();
   const [globalFilterValue, setGlobalFilterValue] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
@@ -107,7 +109,7 @@ export default function TransactionsPage() {
                     <Loader2 className="h-5 w-5 animate-spin text-primary" />
                   )}
                 </h1>
-                <LocationIndicator variant="card" context="Transactions" />
+                <LocationIndicator variant="card" />
                 <div
                   className={cn(
                     "flex items-center gap-2 transition-opacity duration-200",
@@ -118,7 +120,7 @@ export default function TransactionsPage() {
                     Earnings:
                   </span>
                   <span className="text-lg font-bold text-green-600">
-                    £{parseFloat(earnings).toFixed(2)}
+                    {formatMoney(parseFloat(earnings))}
                   </span>
                 </div>
               </div>

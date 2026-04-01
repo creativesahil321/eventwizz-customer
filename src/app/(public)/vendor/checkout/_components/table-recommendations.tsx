@@ -3,6 +3,8 @@
  * Similar to tickets section layout
  */
 
+"use client";
+
 import { useState, useMemo, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -29,6 +31,7 @@ import {
 } from "../_lib/table-recommendations";
 import QuantityControls from "./quantity-controls";
 import GuestAllocationModal from "./guest-allocation-modal";
+import { useCurrencyFormat } from "@/hooks/use-currency-format";
 
 interface TableRecommendationsProps {
   eventSlug: string;
@@ -47,6 +50,8 @@ export default function TableRecommendations({
   onUpdateQuantity,
   getTotalQuantity,
 }: TableRecommendationsProps) {
+  const { format: formatMoney, formatCompact: formatMoneyUnit } =
+    useCurrencyFormat();
   const {
     getDateData,
     updatePeopleCount,
@@ -555,7 +560,9 @@ export default function TableRecommendations({
                           </p>
                           <div className="flex gap-4 text-xs text-gray-500">
                             <span>
-                              £{getCostPerPerson(rec, peopleCount).toFixed(0)}
+                              {formatMoneyUnit(
+                                getCostPerPerson(rec, peopleCount),
+                              )}
                               /person
                             </span>
                             {rec.tablesNeeded > 1 && (
@@ -670,15 +677,11 @@ export default function TableRecommendations({
                                     {rec.recommendation}
                                   </p>
                                   <div className="flex gap-4 text-xs text-gray-500">
+                                    <span>{formatMoney(rec.totalCost)}</span>
                                     <span>
-                                      £{rec.totalCost.toLocaleString()}
-                                    </span>
-                                    <span>
-                                      £
-                                      {getCostPerPerson(
-                                        rec,
-                                        peopleCount
-                                      ).toFixed(0)}
+                                      {formatMoneyUnit(
+                                        getCostPerPerson(rec, peopleCount),
+                                      )}
                                       /person
                                     </span>
                                     {rec.tablesNeeded > 1 && (
@@ -782,7 +785,9 @@ export default function TableRecommendations({
                           </p>
                           <div className="flex gap-4 text-xs text-gray-500">
                             <span>
-                              £{getCostPerPerson(rec, peopleCount).toFixed(0)}
+                              {formatMoneyUnit(
+                                getCostPerPerson(rec, peopleCount),
+                              )}
                               /person
                             </span>
                             {rec.tablesNeeded > 1 && (

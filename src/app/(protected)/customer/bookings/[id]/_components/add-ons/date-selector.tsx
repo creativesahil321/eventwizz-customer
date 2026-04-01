@@ -31,6 +31,8 @@ export function DateSelector({
   const statusLabel = (s?: BookingDatePaymentStatus) => {
     if (s === "refunded") return "Refunded";
     if (s === "cancelled") return "Cancelled";
+    if (s === "rescheduled") return "Rescheduled";
+    if (s === "unknown") return "Unavailable";
     return null;
   };
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Accordion,
@@ -26,13 +26,14 @@ import { useSaveVendorAddOns } from "@/services/vendor/bookings/hooks/useSaveVen
 import { toast } from "sonner";
 
 // Import types
-import type {
-  BookingDate,
-  DrinkItem,
-  TicketItem,
-  AvailableTableSize,
-  NewTableState,
-  TableData,
+import {
+  isBookingDateEligibleForAddOns,
+  type BookingDate,
+  type DrinkItem,
+  type TicketItem,
+  type AvailableTableSize,
+  type NewTableState,
+  type TableData,
 } from "./add-ons/types";
 
 interface AddOnsTabProps {
@@ -48,14 +49,23 @@ export default function AddOnsTab({
   dates = [],
   onSaveSuccess,
 }: AddOnsTabProps) {
-  const [selectedDate, setSelectedDate] = useState<string>(dates[0]?.id || "");
+  const eligibleDates = useMemo(
+    () => dates.filter((d) => isBookingDateEligibleForAddOns(d.paymentStatus)),
+    [dates],
+  );
 
-  // Update selectedDate when dates are loaded
-  useEffect(() => {
-    if (dates.length > 0 && !selectedDate) {
-      setSelectedDate(dates[0].id);
+  const [userPickedDateId, setUserPickedDateId] = useState<string | null>(null);
+
+  const selectedDate = useMemo(() => {
+    if (eligibleDates.length === 0) return "";
+    if (
+      userPickedDateId &&
+      eligibleDates.some((d) => d.id === userPickedDateId)
+    ) {
+      return userPickedDateId;
     }
-  }, [dates, selectedDate]);
+    return eligibleDates[0].id;
+  }, [eligibleDates, userPickedDateId]);
 
   // Fetch add-ons data from API
   const {
@@ -752,8 +762,17 @@ export default function AddOnsTab({
   // Calculate validation (after hasChanges is defined)
   const validation = validateAddOns();
 
+  const addOnsAllowedForSelection =
+    !!selectedDate &&
+    isBookingDateEligibleForAddOns(
+      dates.find((d) => d.id === selectedDate)?.paymentStatus,
+    );
+
   const isSaveDisabled =
-    saveAddOnsMutation.isPending || !hasChanges || !validation.isValid;
+    saveAddOnsMutation.isPending ||
+    !hasChanges ||
+    !validation.isValid ||
+    !addOnsAllowedForSelection;
 
   // Handle allocation confirmation from modal (for new tables)
   const handleAllocationConfirm = (allocations: Record<number, number[]>) => {
@@ -793,8 +812,36 @@ export default function AddOnsTab({
     );
   }
 
+  if (eligibleDates.length === 0) {
+    return (
+      <div className="border rounded-lg p-6 bg-amber-50 border-amber-200">
+        <div className="flex items-start gap-3">
+          <div className="p-2 rounded-lg bg-amber-100">
+            <UtensilsCrossed className="h-5 w-5 text-amber-700" />
+          </div>
+          <div className="flex-1 text-left">
+            <h3 className="font-semibold text-amber-900 mb-1">
+              Add-ons aren&apos;t available
+            </h3>
+            <p className="text-sm text-amber-800">
+              None of the event dates can be edited here (for example refunded,
+              cancelled, or inactive statuses). Add-ons apply only to dates that
+              are paid, pending, or partially paid.
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   // Handle save changes
   const handleSaveChanges = () => {
+    if (!addOnsAllowedForSelection || !selectedDate) {
+      toast.error(
+        "This date cannot be modified. Choose a date with an active payment status.",
+      );
+      return;
+    }
     // Validate before saving (similar to checkout)
     const validationResult = validateAddOns();
     if (!validationResult.isValid) {
@@ -1126,7 +1173,7 @@ export default function AddOnsTab({
       <DateSelector
         dates={dates}
         selectedDate={selectedDate}
-        onDateChange={setSelectedDate}
+        onDateChange={setUserPickedDateId}
       />
 
       {/* Informative message when no add-on options are available and no existing tables */}

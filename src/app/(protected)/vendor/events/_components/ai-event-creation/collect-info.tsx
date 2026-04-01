@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -37,6 +37,7 @@ import type { AIEventInput } from "@/app/api/ai/generate-event/route";
 import { eventsService } from "@/services/vendor/events/events.service";
 import type { EventCategory } from "@/services/vendor/events/type";
 import { ApiResponse } from "@/services/core/api-client";
+import { useCurrencySymbol } from "@/hooks/use-currency-format";
 
 const collectInfoSchema = z.object({
   eventName: z.string().min(2, "Event name must be at least 2 characters").max(40, "Event name max 40 characters"),
@@ -63,13 +64,6 @@ const GUEST_OPTIONS = [
   { value: "100-250", label: "100 – 250 guests" },
   { value: "250-500", label: "250 – 500 guests" },
   { value: "500+", label: "500+ guests" },
-];
-
-const PRICE_OPTIONS = [
-  { value: "budget", label: "Budget (£10 – £50)" },
-  { value: "mid", label: "Mid-range (£50 – £150)" },
-  { value: "premium", label: "Premium (£150 – £500)" },
-  { value: "luxury", label: "Luxury (£500+)" },
 ];
 
 const accent = {
@@ -314,7 +308,7 @@ export default function AIEventCollectInfo({
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          {PRICE_OPTIONS.map((opt) => (
+                          {priceOptions.map((opt) => (
                             <SelectItem key={opt.value} value={opt.value}>
                               {opt.label}
                             </SelectItem>

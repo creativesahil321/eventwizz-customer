@@ -43,6 +43,7 @@ import {
   createPlaceholderEventBanner,
   createPlaceholderPackageImage,
 } from "@/app/(on-boarding)/on-boarding/_lib/constants/dummy-images";
+import { useCurrencySymbol } from "@/hooks/use-currency-format";
 
 const APPLY_STEPS = [
   { label: "Event details & schedule", icon: "📅" },
@@ -1019,6 +1020,7 @@ function StepThreeEditor({
   content: AIEventGeneratedContent["stepThree"];
   onChange: (v: AIEventGeneratedContent["stepThree"]) => void;
 }) {
+  const currencySymbol = useCurrencySymbol();
   const { dates } = content;
 
   const setDates = (newDates: AIEventDate[]) => onChange({ ...content, dates: newDates });
@@ -1269,7 +1271,7 @@ function StepThreeEditor({
                       </div>
                       <div className="flex-1">
                         <label className="text-[10px] text-slate-600 block mb-0.5">
-                          Price (£)
+                          Price ({currencySymbol})
                         </label>
                         <Input
                           type="number"
@@ -1353,7 +1355,7 @@ function StepThreeEditor({
                     <div className="flex gap-1.5">
                       <div className="flex-1">
                         <label className="text-[10px] text-slate-600 block mb-0.5">
-                          Price (£)
+                          Price ({currencySymbol})
                         </label>
                         <Input
                           type="number"
@@ -1484,7 +1486,7 @@ function StepThreeEditor({
                         <div>
                           <label className="text-[10px] text-slate-500 block mb-0.5">
                             {(date.deposit_type ?? "amount") === "amount"
-                              ? "Deposit amount/person (£)"
+                              ? `Deposit amount/person (${currencySymbol})`
                               : "Deposit percentage (%)"}
                           </label>
                           <Input
@@ -1604,6 +1606,7 @@ function StepFiveEditor({
   content: AIEventGeneratedContent["stepFive"];
   onChange: (v: AIEventGeneratedContent["stepFive"]) => void;
 }) {
+  const currencySymbol = useCurrencySymbol();
   if (content.packages.length === 0) {
     return (
       <p className="text-xs text-slate-500 italic">
@@ -1699,7 +1702,9 @@ function StepFiveEditor({
               />
               <div className="flex gap-1.5">
                 <div className="flex-1">
-                  <label className="text-[10px] text-slate-600 block mb-0.5">Price (£)</label>
+                  <label className="text-[10px] text-slate-600 block mb-0.5">
+                    Price ({currencySymbol})
+                  </label>
                   <Input
                     type="number"
                     value={pkg.price}
@@ -1742,6 +1747,7 @@ function StepSixEditor({
   content: AIEventGeneratedContent["stepSix"];
   onChange: (f: string, v: unknown) => void;
 }) {
+  const currencySymbol = useCurrencySymbol();
   return (
     <>
       <div className="space-y-1.5">
@@ -1757,7 +1763,7 @@ function StepSixEditor({
         />
       </div>
       <EditableField
-        label="Price Starting From (£)"
+        label={`Price Starting From (${currencySymbol})`}
         value={content.price_start_from}
         onChange={(v) => onChange("price_start_from", v)}
       />

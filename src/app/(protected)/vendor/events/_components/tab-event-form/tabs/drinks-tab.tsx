@@ -18,8 +18,10 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { X, PlusCircle } from "lucide-react";
+import { useCurrencySymbol } from "@/hooks/use-currency-format";
 
 export default function DrinksTab() {
+  const currencySymbol = useCurrencySymbol();
   const [isLoading, setIsLoading] = useState(false);
   const { form: globalForm, save, setActiveField, readOnly } = useEventFormContext();
 
@@ -326,7 +328,7 @@ export default function DrinksTab() {
                           <Input
                             type="number"
                             className="h-10 bg-[#F9FAFB] border-[#E5E7EB]"
-                            placeholder="£0.00"
+                            placeholder={`${currencySymbol}0.00`}
                             value={field.value === 0 ? "" : field.value ?? ""}
                             onFocus={() =>
                               handleFieldFocus(`packages.${index}.price`)

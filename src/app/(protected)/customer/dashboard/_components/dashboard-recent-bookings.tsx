@@ -6,6 +6,8 @@ import { getStatusColorClass } from "@/lib/status-theme";
 import { Calendar, PoundSterling, ArrowRight } from "lucide-react";
 import Link from "next/link";
 import type { CustomerDashboardRecentBooking } from "@/services/customer/dashboard";
+import { useCurrencyFormat } from "@/hooks/use-currency-format";
+import { parseFormattedMoney } from "@/lib/currency-format";
 
 interface DashboardRecentBookingsProps {
   readonly bookings: CustomerDashboardRecentBooking[];
@@ -14,6 +16,8 @@ interface DashboardRecentBookingsProps {
 export default function DashboardRecentBookings({
   bookings,
 }: DashboardRecentBookingsProps) {
+  const { symbol, format: formatMoney } = useCurrencyFormat();
+
   return (
     <section className="w-full flex items-center justify-between relative text-black">
       <section className="w-full relative bg-background dark:border p-4 sm:p-6 rounded-md">
@@ -78,7 +82,12 @@ export default function DashboardRecentBookings({
                                 <div className="flex items-center gap-1">
                                   <PoundSterling className="h-3 w-3" />
                                   <span className="font-medium text-black">
-                                    £{booking.total_formatted}
+                                    {formatMoney(
+                                      parseFormattedMoney(
+                                        booking.total_formatted,
+                                        symbol,
+                                      ),
+                                    )}
                                   </span>
                                 </div>
                               </div>

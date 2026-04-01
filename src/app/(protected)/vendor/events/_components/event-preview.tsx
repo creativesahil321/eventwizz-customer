@@ -1,3 +1,5 @@
+"use client";
+
 import React from "react";
 
 import AboutEventSec from "@/app/(on-boarding)/on-boarding/_components/form-preview/_components/About-event-sec";
@@ -22,6 +24,7 @@ import {
 } from "@/lib/color-contrast";
 import { CartConflictProvider } from "@/app/(public)/vendor/checkout/_components/cart-conflict-provider";
 import { addCacheBusting } from "@/lib/image-utils";
+import { useCurrencyFormat } from "@/hooks/use-currency-format";
 
 import "@/app/(public)/[locationSlug]/events/[eventSlug]/event-detail.css";
 
@@ -41,6 +44,7 @@ export function EventPreview({
   siteEssentials,
   embedInShell = false,
 }: EventPreviewProps) {
+  const { format: formatMoney } = useCurrencyFormat();
   const contactNumber =
     data.contact_number || data.stepEight?.contact_number || "";
 
@@ -160,15 +164,15 @@ export function EventPreview({
   const showFaqs = faqs.length > 0;
 
   const firstPkg = s5?.packages?.[0];
+  const brochureFallbackAmount =
+    firstPkg != null
+      ? typeof firstPkg.price === "number"
+        ? firstPkg.price
+        : parseFloat(String(firstPkg.price || 0)) || 45
+      : 45;
   const brochurePriceDescription =
     s6?.price_start_from?.trim() ||
-    `£${
-      firstPkg != null
-        ? typeof firstPkg.price === "number"
-          ? firstPkg.price.toFixed(2)
-          : String(firstPkg.price || "45.00")
-        : "45.00"
-    } PP exc VAT`;
+    `${formatMoney(brochureFallbackAmount)} PP exc VAT`;
 
   const heroStyles = {
     container: "relative w-full h-[100vh] min-h-[500px] overflow-hidden",

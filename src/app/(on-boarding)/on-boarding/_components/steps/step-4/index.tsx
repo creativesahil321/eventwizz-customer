@@ -45,6 +45,7 @@ import {
   guidedOnboardingSkipButtonClass,
 } from "../../guided-sticky-approval-bar";
 import { guidedSectionSurfaceClass } from "../../guided-section-surface";
+import { useCurrencySymbol } from "@/hooks/use-currency-format";
 
 function resolveStepFourErrorIndex(keys: string[]) {
   if (keys.some((k) => k === "__extra_validation__")) return 1;
@@ -62,6 +63,7 @@ interface FileWithPreview extends File {
 }
 
 const StepFour = () => {
+  const currencySymbol = useCurrencySymbol();
   const {
     form: globalForm,
     save,
@@ -470,7 +472,7 @@ const StepFour = () => {
                             <FormControl>
                               <Input
                                 {...field}
-                                placeholder="e.g., Prices From £65 Plus VAT Include:"
+                                placeholder={`e.g., Prices From ${currencySymbol}65 Plus VAT Include:`}
                                 className="h-11 bg-white/5 border-white/10"
                                 maxLength={maxLength}
                                 onFocus={() =>

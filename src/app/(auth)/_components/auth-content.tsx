@@ -1,11 +1,13 @@
 import { usePathname } from "next/navigation";
 import { useDomain } from "@/providers/domain-provider/domain-provider";
 import { appConfig } from "@/config/app";
+import { resolveCurrencySymbol } from "@/lib/currency-format";
 
 export function AuthContent() {
   const pathname = usePathname();
   const { settings } = useDomain();
   const siteName = settings?.name || appConfig.name;
+  const currencySymbol = resolveCurrencySymbol(settings?.currency_symbol);
 
   const segments = pathname?.split("/") || [];
   const isRegister = segments.includes("register");
@@ -86,7 +88,9 @@ export function AuthContent() {
               <div className={statLabel}>Tickets Sold</div>
             </div>
             <div className={statCard}>
-              <div className={statNumber}>£500M</div>
+              <div className={statNumber}>
+                {currencySymbol}500M
+              </div>
               <div className={statLabel}>Revenue Generated</div>
             </div>
             <div className={statCard}>

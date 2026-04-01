@@ -80,7 +80,7 @@ export default function PaymentGatewaySelector({
   selectedGateway,
   onSelectGateway,
   totalAmount, // eslint-disable-line @typescript-eslint/no-unused-vars
-  currency = "£", // eslint-disable-line @typescript-eslint/no-unused-vars
+  currency: _currency,
   isLoading = false,
   className = "",
 }: PaymentGatewaySelectorProps) {

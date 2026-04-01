@@ -37,11 +37,13 @@ import { useCartEditStore } from "@/store/cart-edit.store";
 import { usePaymentGatewaySelection } from "@/store/payment-gateway-selection.store";
 import PaymentGatewaySelector from "./payment-gateway-selector";
 import { addCacheBusting } from "@/lib/image-utils";
+import { useCurrencyFormat } from "@/hooks/use-currency-format";
 // PaymentInfo import removed as it's not used in this component
 
 type BookingSummaryProps = Record<string, never>;
 
 export default function BookingSummary({}: BookingSummaryProps) {
+  const { format: formatMoney } = useCurrencyFormat();
   // Removed unused selectedPaymentTypes state - payment types are managed in Zustand store
   const isPreviewMode = useIsPreviewMode();
   const { isPending } = useStoreEventBooking();
@@ -456,7 +458,7 @@ export default function BookingSummary({}: BookingSummaryProps) {
                           </span>
                         </div>
                         <span className="text-sm font-semibold text-gray-900 flex-shrink-0">
-                          £{fullDateAmount.toFixed(2)}
+                          {formatMoney(fullDateAmount)}
                         </span>
                       </div>
 
@@ -558,27 +560,27 @@ export default function BookingSummary({}: BookingSummaryProps) {
                           <div className="flex justify-between text-xs">
                             <span className="text-blue-600">Today:</span>
                             <span className="font-medium text-blue-600">
-                              £{paymentAmounts.todayAmount.toFixed(2)}
+                              {formatMoney(paymentAmounts.todayAmount)}
                             </span>
                           </div>
                           <div className="flex justify-between text-xs">
                             <span className="text-orange-600">Later:</span>
                             <span className="font-medium text-orange-600">
-                              £{paymentAmounts.laterAmount.toFixed(2)}
+                              {formatMoney(paymentAmounts.laterAmount)}
                             </span>
                           </div>
                           <div className="text-xs text-gray-500">
                             Deposit:{" "}
                             {dateData.depositType === "percentage"
                               ? `${dateData.depositValue}%`
-                              : `£${dateData.depositValue} per person`}
+                              : `${formatMoney(Number(dateData.depositValue))} per person`}
                           </div>
                         </div>
                       ) : (
                         <div className="flex justify-between text-xs">
                           <span className="text-green-600">Today:</span>
                           <span className="font-medium text-green-600">
-                            £{paymentAmounts.todayAmount.toFixed(2)}
+                            {formatMoney(paymentAmounts.todayAmount)}
                           </span>
                         </div>
                       )}
@@ -599,15 +601,15 @@ export default function BookingSummary({}: BookingSummaryProps) {
                 Booking Total
               </span>
               <span className="text-lg font-bold text-gray-900">
-                £{(totalToday + totalLater).toFixed(2)}
+                {formatMoney(totalToday + totalLater)}
               </span>
             </div>
 
             {/* Show payment split info only if deposit selected */}
             {totalLater > 0 && (
               <div className="text-xs text-gray-500">
-                Split payment: £{totalToday.toFixed(2)} today + £
-                {totalLater.toFixed(2)} later
+                Split payment: {formatMoney(totalToday)} today +{" "}
+                {formatMoney(totalLater)} later
               </div>
             )}
           </div>
@@ -645,13 +647,13 @@ export default function BookingSummary({}: BookingSummaryProps) {
                 Amount to Pay Today
               </span>
               <span className="text-2xl font-bold text-blue-600">
-                £{finalTotal.toFixed(2)}
+                {formatMoney(finalTotal)}
               </span>
             </div>
 
             {totalLater > 0 && (
               <div className="text-xs text-gray-600 mt-2 pt-2 border-t border-blue-200">
-                Balance of £{totalLater.toFixed(2)} due before event date
+                Balance of {formatMoney(totalLater)} due before event date
               </div>
             )}
 

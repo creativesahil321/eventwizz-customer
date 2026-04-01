@@ -6,6 +6,7 @@ import React from "react";
 import { Transaction } from "../_lib/types";
 import { formatDistanceToNow } from "date-fns";
 import { STATUS_CONFIG } from "../_lib/constants";
+import { DEFAULT_CURRENCY_SYMBOL } from "@/lib/currency-format";
 
 /**
  * Normalize currency code - converts currency symbols to ISO 4217 codes
@@ -127,7 +128,7 @@ export function getTransactionColumns({
           console.error("Error formatting currency:", error);
           return (
             <span className="font-bold text-sm text-primary">
-              {transaction.currency || "£"}
+              {transaction.currency || DEFAULT_CURRENCY_SYMBOL}
               {amount.toFixed(2)}
             </span>
           );

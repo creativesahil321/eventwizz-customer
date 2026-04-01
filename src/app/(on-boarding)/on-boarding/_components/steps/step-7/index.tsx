@@ -32,8 +32,10 @@ import {
   guidedOnboardingSaveNextButtonClass,
   guidedOnboardingSkipButtonClass,
 } from "../../guided-sticky-approval-bar";
+import { useCurrencySymbol } from "@/hooks/use-currency-format";
 
 export default function StepSeven() {
+  const currencySymbol = useCurrencySymbol();
   const { form: globalForm, save, setActiveStep } = useFormContext();
   const { handleFieldFocus } = useFieldFocusHandler();
   const [loading, setLoading] = useState(false);
@@ -493,7 +495,7 @@ export default function StepSeven() {
                                         `packages.${index}.price`
                                       )
                                     }
-                                    placeholder="£0.00"
+                                    placeholder={`${currencySymbol}0.00`}
                                   />
                                 </FormControl>
                                 <FormMessage />

@@ -21,6 +21,7 @@ import { DataTable } from "@/components/data-table/data-table";
 import { DataTablePagination } from "@/components/data-table/data-table-pagination";
 import { DataTableColumnHeader } from "@/components/data-table/data-table-column-header";
 import { cn } from "@/lib/utils";
+import { useCurrencyFormat } from "@/hooks/use-currency-format";
 
 export interface Vendor {
   id: number;
@@ -48,14 +49,9 @@ interface VendorsTableProps {
   onPaginationChange?: (pageIndex: number, pageSize: number) => void;
 }
 
-function formatCurrency(value: number): string {
-  return `£${value.toLocaleString("en-GB", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  })}`;
-}
-
-function getVendorColumns(): ColumnDef<Vendor>[] {
+function getVendorColumns(
+  formatLocale: (value: number) => string,
+): ColumnDef<Vendor>[] {
   return [
     {
       id: "index",
@@ -189,7 +185,7 @@ function getVendorColumns(): ColumnDef<Vendor>[] {
       ),
       cell: ({ row }) => (
         <span className="text-sm">
-          {formatCurrency(row.getValue("adminCommission"))}
+          {formatLocale(row.getValue("adminCommission"))}
         </span>
       ),
       enableSorting: true,
@@ -205,7 +201,7 @@ function getVendorColumns(): ColumnDef<Vendor>[] {
       ),
       cell: ({ row }) => (
         <span className="text-sm">
-          {formatCurrency(row.getValue("commissionPending"))}
+          {formatLocale(row.getValue("commissionPending"))}
         </span>
       ),
       enableSorting: true,
@@ -221,7 +217,7 @@ function getVendorColumns(): ColumnDef<Vendor>[] {
       ),
       cell: ({ row }) => (
         <span className="text-sm font-medium">
-          {formatCurrency(row.getValue("netPayout"))}
+          {formatLocale(row.getValue("netPayout"))}
         </span>
       ),
       enableSorting: true,
@@ -273,6 +269,7 @@ export function VendorsTable({
   pageSize: controlledPageSize = 30,
   onPaginationChange,
 }: VendorsTableProps) {
+  const { formatLocale } = useCurrencyFormat();
   const isServerPaginated =
     serverPageCount != null && onPaginationChange != null;
 
@@ -308,7 +305,10 @@ export function VendorsTable({
     return data;
   }, [vendors, statusFilter, searchQuery, isServerPaginated]);
 
-  const columns = useMemo(() => getVendorColumns(), []);
+  const columns = useMemo(
+    () => getVendorColumns(formatLocale),
+    [formatLocale],
+  );
 
   const table = useReactTable({
     data: filteredData,

@@ -21,6 +21,8 @@ import {
 import { Booking } from "../_lib/types";
 import { formatBookingStatus } from "../_lib/utils";
 import { addCacheBusting } from "@/lib/image-utils";
+import { useCurrencyFormat } from "@/hooks/use-currency-format";
+import { parseFormattedMoney } from "@/lib/currency-format";
 
 interface BookingCardProps {
   booking: Booking;
@@ -33,6 +35,10 @@ export default function BookingCard({
   onViewDetails,
   onAddMenu,
 }: BookingCardProps) {
+  const { symbol, format: formatMoney } = useCurrencyFormat();
+  const totalRaw = booking.total || booking.total_amount;
+  const totalNum = parseFormattedMoney(String(totalRaw ?? "0"), symbol);
+
   return (
     <Card className="overflow-hidden hover:shadow-lg transition-all duration-300 hover:scale-[1.02] flex flex-col h-full relative !p-0 border-[var(--color-border)]">
       {/* Booking ID and Status Badges - Always Visible */}
@@ -157,7 +163,9 @@ export default function BookingCard({
             Total Price
           </span>
           <span className="text-lg sm:text-xl font-bold text-[var(--color-primary)]">
-            £{booking.total || booking.total_amount}
+            {Number.isFinite(totalNum)
+              ? formatMoney(totalNum)
+              : String(totalRaw ?? "")}
           </span>
         </div>
 

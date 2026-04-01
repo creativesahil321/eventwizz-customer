@@ -41,6 +41,8 @@ import type {
   RescheduleBookingPayload,
   BookingPaymentPayload,
 } from "@/services/customer/bookings/type";
+import { useCurrencyFormat } from "@/hooks/use-currency-format";
+import { parseFormattedMoney } from "@/lib/currency-format";
 
 interface BookingItem {
   type: "table" | "ticket";
@@ -187,6 +189,8 @@ interface BookingInfoTabProps {
 }
 
 export default function BookingInfoTab({ bookingData }: BookingInfoTabProps) {
+  const { format: formatMoneyDisplay, formatCompact: formatMoneyUnit, symbol } =
+    useCurrencyFormat();
   const router = useRouter();
   const deleteAddOnsMutation = useDeleteAddOns();
   const rescheduleMutation = useRescheduleBooking();
@@ -218,12 +222,12 @@ export default function BookingInfoTab({ bookingData }: BookingInfoTabProps) {
 
   const summaryFormatted: PaymentSummaryFormattedData =
     bookingData.summaryFormatted || {
-      subTotal: "£0.00",
-      addOns: "£0.00",
-      total: "£0.00",
-      paid: "£0.00",
-      outstanding: "£0.00",
-      depositSelected: "£0.00",
+      subTotal: formatMoneyDisplay(0),
+      addOns: formatMoneyDisplay(0),
+      total: formatMoneyDisplay(0),
+      paid: formatMoneyDisplay(0),
+      outstanding: formatMoneyDisplay(0),
+      depositSelected: formatMoneyDisplay(0),
     };
 
   // Get table count for a date
@@ -268,22 +272,15 @@ export default function BookingInfoTab({ bookingData }: BookingInfoTabProps) {
       return null;
     if (!dateInfo.partialPayment) return null;
 
-    // Extract numeric values from strings (e.g., "£60" -> 60)
-    const totalMatch = dateInfo.total.match(/[\d.]+/);
-    const paidMatch = dateInfo.partialPayment.match(/[\d.]+/);
+    const total = parseFormattedMoney(dateInfo.total, symbol);
+    const paid = parseFormattedMoney(dateInfo.partialPayment, symbol);
+    if (!Number.isFinite(total) || !Number.isFinite(paid)) return null;
 
-    if (!totalMatch || !paidMatch) return null;
-
-    const total = parseFloat(totalMatch[0]);
-    const paid = parseFloat(paidMatch[0]);
     const pending = total - paid;
 
     if (pending <= 0) return null;
 
-    // Preserve currency symbol from total
-    const currencySymbol =
-      dateInfo.total.replace(/[\d.,]/g, "").trim()[0] || "£";
-    return `${currencySymbol}${pending.toFixed(2)}`;
+    return formatMoneyDisplay(pending);
   };
 
   const handleMenuChoices = () => {
@@ -740,7 +737,9 @@ export default function BookingInfoTab({ bookingData }: BookingInfoTabProps) {
                                             </p>
                                           </div>
                                           <p className="text-lg font-bold text-amber-900">
-                                            £{request.unpaid_amount.toFixed(2)}
+                                            {formatMoneyDisplay(
+                                              request.unpaid_amount,
+                                            )}
                                           </p>
                                         </div>
                                       </div>
@@ -1022,19 +1021,20 @@ export default function BookingInfoTab({ bookingData }: BookingInfoTabProps) {
                                     {item.price_per_person &&
                                       item.people_added > 0 && (
                                         <p className="text-xs text-muted-foreground mt-1.5">
-                                          £{item.price_per_person} ×{" "}
-                                          {item.people_added}
+                                          {formatMoneyUnit(
+                                            Number(item.price_per_person),
+                                          )}{" "}
+                                          × {item.people_added}
                                         </p>
                                       )}
                                   </div>
                                   <div className="flex shrink-0 flex-wrap items-center gap-3">
                                     {item.price_per_person ? (
                                       <p className="shrink-0 text-sm font-semibold text-foreground whitespace-nowrap">
-                                        £
-                                        {(
+                                        {formatMoneyDisplay(
                                           item.price_per_person *
-                                          item.people_added
-                                        ).toFixed(2)}
+                                            item.people_added,
+                                        )}
                                       </p>
                                     ) : (
                                       <div className="flex flex-col items-end gap-1">
@@ -1112,16 +1112,17 @@ export default function BookingInfoTab({ bookingData }: BookingInfoTabProps) {
                                               </p>
                                             )}
                                             <p className="mt-0.5 text-xs text-muted-foreground">
-                                              £{ticket.price_per_ticket} ×{" "}
-                                              {ticket.quantity}
+                                              {formatMoneyUnit(
+                                                Number(ticket.price_per_ticket),
+                                              )}{" "}
+                                              × {ticket.quantity}
                                             </p>
                                           </div>
                                           <p className="shrink-0 text-sm font-semibold text-foreground whitespace-nowrap">
-                                            £
-                                            {(
+                                            {formatMoneyDisplay(
                                               ticket.price_per_ticket *
-                                              ticket.quantity
-                                            ).toFixed(2)}
+                                                ticket.quantity,
+                                            )}
                                           </p>
                                         </div>
                                       ))}
@@ -1165,14 +1166,16 @@ export default function BookingInfoTab({ bookingData }: BookingInfoTabProps) {
                                               {drink.title}
                                             </p>
                                             <p className="mt-0.5 text-xs text-muted-foreground">
-                                              £{drink.price} × {drink.quantity}
+                                              {formatMoneyUnit(
+                                                Number(drink.price),
+                                              )}{" "}
+                                              × {drink.quantity}
                                             </p>
                                           </div>
                                           <p className="shrink-0 text-sm font-semibold text-foreground whitespace-nowrap">
-                                            £
-                                            {(
-                                              drink.price * drink.quantity
-                                            ).toFixed(2)}
+                                            {formatMoneyDisplay(
+                                              drink.price * drink.quantity,
+                                            )}
                                           </p>
                                         </div>
                                       ))}
@@ -1452,18 +1455,22 @@ export default function BookingInfoTab({ bookingData }: BookingInfoTabProps) {
                                                       {/* Price Breakdown */}
                                                       {table.price_per_person && (
                                                         <p className="text-xs text-muted-foreground mt-1.5">
-                                                          £
-                                                          {
-                                                            table.price_per_person
-                                                          }{" "}
+                                                          {formatMoneyUnit(
+                                                            parseFloat(
+                                                              String(
+                                                                table.price_per_person,
+                                                              ),
+                                                            ),
+                                                          )}{" "}
                                                           × {table.people}
                                                         </p>
                                                       )}
                                                     </div>
                                                     <div className="flex shrink-0 flex-wrap items-center gap-3">
                                                       <p className="shrink-0 text-sm font-semibold text-foreground whitespace-nowrap">
-                                                        £
-                                                        {table.total.toFixed(2)}
+                                                        {formatMoneyDisplay(
+                                                          table.total,
+                                                        )}
                                                       </p>
                                                       <Button
                                                         variant="ghost"
@@ -1510,21 +1517,25 @@ export default function BookingInfoTab({ bookingData }: BookingInfoTabProps) {
                                                           {drink.title}
                                                         </p>
                                                         <p className="mt-0.5 text-xs text-muted-foreground">
-                                                          £{drink.price} ×{" "}
-                                                          {drink.quantity}
+                                                          {formatMoneyUnit(
+                                                            parseFloat(
+                                                              drink.price,
+                                                            ),
+                                                          )}{" "}
+                                                          × {drink.quantity}
                                                         </p>
                                                       </div>
                                                       <div className="flex shrink-0 flex-wrap items-center gap-3">
                                                         <p className="shrink-0 text-sm font-semibold text-foreground whitespace-nowrap">
-                                                          £
-                                                          {(
+                                                          {formatMoneyDisplay(
                                                             parseFloat(
                                                               drink.price,
                                                             ) *
-                                                            parseInt(
-                                                              drink.quantity,
-                                                            )
-                                                          ).toFixed(2)}
+                                                              parseInt(
+                                                                drink.quantity,
+                                                                10,
+                                                              ),
+                                                          )}
                                                         </p>
                                                         <Button
                                                           variant="ghost"
@@ -1584,24 +1595,25 @@ export default function BookingInfoTab({ bookingData }: BookingInfoTabProps) {
                                                           </p>
                                                         )}
                                                         <p className="mt-0.5 text-xs text-muted-foreground">
-                                                          £
-                                                          {
-                                                            ticket.price_per_ticket
-                                                          }{" "}
+                                                          {formatMoneyUnit(
+                                                            parseFloat(
+                                                              ticket.price_per_ticket,
+                                                            ),
+                                                          )}{" "}
                                                           × {ticket.quantity}
                                                         </p>
                                                       </div>
                                                       <div className="flex shrink-0 flex-wrap items-center gap-3">
                                                         <p className="shrink-0 text-sm font-semibold text-foreground whitespace-nowrap">
-                                                          £
-                                                          {(
+                                                          {formatMoneyDisplay(
                                                             parseFloat(
                                                               ticket.price_per_ticket,
                                                             ) *
-                                                            parseInt(
-                                                              ticket.quantity,
-                                                            )
-                                                          ).toFixed(2)}
+                                                              parseInt(
+                                                                ticket.quantity,
+                                                                10,
+                                                              ),
+                                                          )}
                                                         </p>
                                                         <Button
                                                           variant="ghost"
@@ -1879,8 +1891,9 @@ export default function BookingInfoTab({ bookingData }: BookingInfoTabProps) {
                   0,
                 )
               : 0,
-            price: parseFloat(
-              selectedDateForReschedule.total.replace("£", "").replace(",", ""),
+            price: parseFormattedMoney(
+              selectedDateForReschedule.total,
+              symbol,
             ),
           }}
           bookingId={parseInt(bookingData.booking_id)}
@@ -1903,25 +1916,22 @@ export default function BookingInfoTab({ bookingData }: BookingInfoTabProps) {
           dateInfo={{
             date: selectedDateForPayment.date,
             dateKey: selectedDateForPayment.id,
-            totalAmount: parseFloat(
-              selectedDateForPayment.total.replace("£", "").replace(",", ""),
+            totalAmount: parseFormattedMoney(
+              selectedDateForPayment.total,
+              symbol,
             ),
             paidAmount: selectedDateForPayment.partialPayment
-              ? parseFloat(
-                  selectedDateForPayment.partialPayment
-                    .replace("£", "")
-                    .replace(",", ""),
+              ? parseFormattedMoney(
+                  selectedDateForPayment.partialPayment,
+                  symbol,
                 )
               : 0,
             pendingPayment:
-              parseFloat(
-                selectedDateForPayment.total.replace("£", "").replace(",", ""),
-              ) -
+              parseFormattedMoney(selectedDateForPayment.total, symbol) -
               (selectedDateForPayment.partialPayment
-                ? parseFloat(
-                    selectedDateForPayment.partialPayment
-                      .replace("£", "")
-                      .replace(",", ""),
+                ? parseFormattedMoney(
+                    selectedDateForPayment.partialPayment,
+                    symbol,
                   )
                 : 0),
             partialPaymentOption:

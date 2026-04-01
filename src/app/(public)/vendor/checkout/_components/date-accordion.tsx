@@ -3,6 +3,8 @@
  * Handles date-specific cart editing with AUTO-SAVE functionality
  */
 
+"use client";
+
 import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -41,6 +43,7 @@ import {
   extractEventsFromApiResponse,
   findEventBySlug,
 } from "../_lib/cart-calculations";
+import { useCurrencyFormat } from "@/hooks/use-currency-format";
 
 interface DateAccordionProps {
   eventSlug: string;
@@ -63,6 +66,8 @@ export default function DateAccordion({
   onToggle,
   onRemoveDate,
 }: DateAccordionProps) {
+  const { format: formatMoney, formatCompact: formatMoneyUnit } =
+    useCurrencyFormat();
   const [isSaving, setIsSaving] = useState(false);
   const [isAutoSaving, setIsAutoSaving] = useState(false);
   const autoSaveTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -429,7 +434,7 @@ export default function DateAccordion({
                   className="font-semibold"
                   style={{ color: "var(--color-primary)" }}
                 >
-                  £{totalAmount.toFixed(2)}
+                  {formatMoney(totalAmount)}
                 </p>
               </div>
             )}
@@ -557,7 +562,8 @@ export default function DateAccordion({
                           {ticket.title}
                         </h4>
                         <p className="text-xs sm:text-sm text-gray-600 mb-1 break-words">
-                          £{ticket.price} • {ticket.description}
+                          {formatMoneyUnit(Number(ticket.price))} •{" "}
+                          {ticket.description}
                         </p>
                         <p className="text-xs text-gray-500">
                           Capacity: {ticket.maxQuantity}
@@ -608,7 +614,8 @@ export default function DateAccordion({
                           {drink.title}
                         </h4>
                         <p className="text-xs sm:text-sm text-gray-600 break-words">
-                          £{drink.price} • Quantity in cart: {drink.quantity}
+                          {formatMoneyUnit(Number(drink.price))} • Quantity in
+                          cart: {drink.quantity}
                         </p>
                       </div>
                       <div className="flex-shrink-0">

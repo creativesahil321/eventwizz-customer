@@ -25,6 +25,7 @@ import { env } from "@/env";
 import type { AIOnboardingInput } from "@/app/api/ai/generate-onboarding/route";
 import { useEventCategories } from "@/services/vendor/events/query";
 import { useVoiceInput } from "@/hooks/useVoiceInput";
+import { useCurrencySymbol } from "@/hooks/use-currency-format";
 
 const themeAccent = {
   badge: {
@@ -150,6 +151,7 @@ export default function AICollectInfo({
   isLoading,
   initialData,
 }: AICollectInfoProps) {
+  const currencySymbol = useCurrencySymbol();
   const [locationGateDone, setLocationGateDone] = useState(
     typeof initialData?.has_multiple_locations === "boolean",
   );
@@ -874,7 +876,7 @@ export default function AICollectInfo({
                 placeholder={
                   isListening
                     ? "Listening… speak your requirements…"
-                    : `Example: "We host premium wedding events for 200+ guests. We offer 2 ticket types: General (£50) and VIP (£120, includes dinner). We have 50 tables…"`
+                    : `Example: "We host premium wedding events for 200+ guests. We offer 2 ticket types: General (${currencySymbol}50) and VIP (${currencySymbol}120, includes dinner). We have 50 tables…"`
                 }
                 rows={5}
                 maxLength={800}

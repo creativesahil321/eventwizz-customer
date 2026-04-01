@@ -55,7 +55,8 @@ export interface TransactionMeta {
 
 export interface TransactionStats {
   total_transactions: number;
-  total_amount: string;
+  /** Numeric total from API summary (formatted in UI with tenant currency) */
+  total_amount_value: number;
   pending_count: number;
   completed_count: number;
   failed_count: number;

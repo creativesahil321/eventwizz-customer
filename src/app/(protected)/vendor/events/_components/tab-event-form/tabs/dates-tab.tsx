@@ -32,7 +32,13 @@ import {
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { PlusCircle, Trash2, XCircle } from "lucide-react";
+import {
+  PlusCircle,
+  Trash2,
+  XCircle,
+  ChevronDown,
+  ChevronRight,
+} from "lucide-react";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
@@ -169,6 +175,9 @@ export default function DatesTab() {
     null
   );
   const skipEmptyDatesConfirmRef = useRef(false);
+  const prevDateFieldCountRef = useRef<number | undefined>(undefined);
+  /** Row open state keyed by useFieldArray `field.id` (same collapse pattern as onboarding step 5). */
+  const [openDateRowIds, setOpenDateRowIds] = useState<string[]>([]);
   const { form: globalForm, save, readOnly } = useEventFormContext();
 
   // Get event_id from global form
@@ -227,6 +236,23 @@ export default function DatesTab() {
     control,
     name: "dates",
   });
+
+  // Open newly added / duplicated rows automatically (matches onboarding step 5 behavior).
+  useEffect(() => {
+    const len = dateFields.length;
+    if (
+      prevDateFieldCountRef.current !== undefined &&
+      len > prevDateFieldCountRef.current
+    ) {
+      const lastField = dateFields[len - 1];
+      if (lastField) {
+        setOpenDateRowIds((prev) =>
+          prev.includes(lastField.id) ? prev : [...prev, lastField.id]
+        );
+      }
+    }
+    prevDateFieldCountRef.current = len;
+  }, [dateFields]);
 
   const requestCancelDate = useCallback(
     (dateIndex: number) => {
@@ -1053,27 +1079,50 @@ export default function DatesTab() {
   );
 
   const renderDateFields = useCallback(
-    (dateIndex: number) => {
+    (dateIndex: number, dateRowId: string) => {
+      const isOpen = openDateRowIds.includes(dateRowId);
       return (
         <div
-          key={`date-${dateIndex}`}
-          className="border-2 border-gray-200 rounded-lg p-4 sm:p-5 mb-6 bg-white shadow-sm hover:shadow-md transition-all"
+          key={dateRowId}
+          className="border border-gray-200 rounded-lg mb-6 bg-white shadow-sm hover:shadow-md transition-all"
         >
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-0 mb-4">
-            <h3 className="text-lg font-semibold truncate flex-1 min-w-0 flex items-center gap-2">
-              {formatDateDisplay(watch(`dates.${dateIndex}.event_date`))}
-              {watch(`dates.${dateIndex}.cancelled`) && (
-                <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-700 border border-red-200">
-                  Cancelled
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-0 p-4 sm:p-5 border-b border-gray-100">
+            <div className="flex items-start gap-2 sm:gap-3 flex-1 min-w-0">
+              <button
+                type="button"
+                aria-expanded={isOpen}
+                onClick={() => {
+                  setOpenDateRowIds((prev) =>
+                    isOpen
+                      ? prev.filter((id) => id !== dateRowId)
+                      : [...prev, dateRowId]
+                  );
+                }}
+                className="flex items-center gap-2 text-left hover:text-blue-600 transition-colors min-w-0 flex-1"
+              >
+                {isOpen ? (
+                  <ChevronDown className="h-5 w-5 shrink-0" />
+                ) : (
+                  <ChevronRight className="h-5 w-5 shrink-0" />
+                )}
+                <span className="text-lg font-semibold flex flex-wrap items-center gap-2 min-w-0">
+                  <span className="truncate">
+                    {formatDateDisplay(watch(`dates.${dateIndex}.event_date`))}
+                  </span>
+                  {watch(`dates.${dateIndex}.cancelled`) && (
+                    <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-700 border border-red-200 shrink-0">
+                      Cancelled
+                    </span>
+                  )}
+                  {watch(`dates.${dateIndex}.cancellation_request_pending`) && (
+                    <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-amber-100 text-amber-800 border border-amber-200 shrink-0">
+                      Pending admin
+                    </span>
+                  )}
                 </span>
-              )}
-              {watch(`dates.${dateIndex}.cancellation_request_pending`) && (
-                <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-amber-100 text-amber-800 border border-amber-200">
-                  Pending admin
-                </span>
-              )}
-            </h3>
-            <div className="flex items-center gap-2 w-full sm:w-auto">
+              </button>
+            </div>
+            <div className="flex items-center gap-2 w-full sm:w-auto shrink-0">
               {(() => {
                 const cancellationPending = watch(
                   `dates.${dateIndex}.cancellation_request_pending`
@@ -1130,7 +1179,12 @@ export default function DatesTab() {
                     disabled={readOnly}
                     className="text-destructive hover:text-white bg-destructive/10 w-full sm:w-auto"
                     size="sm"
-                    onClick={() => remove(dateIndex)}
+                    onClick={() => {
+                      remove(dateIndex);
+                      setOpenDateRowIds((prev) =>
+                        prev.filter((id) => id !== dateRowId)
+                      );
+                    }}
                   >
                     <Trash2 className="h-4 w-4 mr-2" />
                     <span className="hidden sm:inline">Remove Date</span>
@@ -1141,6 +1195,8 @@ export default function DatesTab() {
             </div>
           </div>
 
+          {isOpen && (
+            <div className="p-4 sm:p-5">
           <div className="grid grid-cols-1 gap-4 sm:gap-5 mb-4">
             <FormField
               control={control}
@@ -1523,6 +1579,8 @@ export default function DatesTab() {
               Duplicate
             </Button>
           </div>
+            </div>
+          )}
         </div>
       );
     },
@@ -1538,6 +1596,7 @@ export default function DatesTab() {
       setValue,
       requestCancelDate,
       readOnly,
+      openDateRowIds,
     ]
   );
 
@@ -1791,7 +1850,9 @@ export default function DatesTab() {
             </p>
           </div>
 
-          {dateFields.map((field, index) => renderDateFields(index))}
+          {dateFields.map((field, index) =>
+            renderDateFields(index, field.id)
+          )}
 
           <Button
             type="button"

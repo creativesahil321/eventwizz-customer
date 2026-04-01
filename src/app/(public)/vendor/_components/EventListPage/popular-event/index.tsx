@@ -29,6 +29,10 @@ const eventImages = [
 import { EventComponentProps } from "../event-types";
 import { useIsPreviewMode } from "@/contexts/preview-context";
 import { SitePreviewDummyEventSection } from "../site-preview-dummy-events";
+import {
+  formatMoneyCompact,
+  resolveCurrencySymbol,
+} from "@/lib/currency-format";
 
 export default function PopularEvents({
   events: apiEvents,
@@ -39,6 +43,7 @@ export default function PopularEvents({
   const isSitePreview = useIsPreviewMode();
   const { theme } = useContext(ServerContext);
   const vendorTheme = theme as ThemeSchema;
+  const currencySym = resolveCurrencySymbol(vendorTheme?.currency_symbol);
 
   const sectionTitleText =
     sectionTitle || vendorTheme?.event_title_1 || "Popular Events";
@@ -50,7 +55,10 @@ export default function PopularEvents({
   function mapApiEventsToUI(apiEvents: Event[]) {
     return apiEvents.map((event) => ({
       title: event.name || "",
-      price: event.lowest_price ? `£${event.lowest_price}` : null,
+      price:
+        event.lowest_price != null && event.lowest_price !== ""
+          ? formatMoneyCompact(Number(event.lowest_price), currencySym)
+          : null,
       buttonText: "View Event",
       image: event.banner_image || eventImages[0],
       slug: event.slug || "",

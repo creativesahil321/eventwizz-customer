@@ -18,8 +18,10 @@ import BookingInfoTab from "./booking-info-tab";
 import AddOnsTab from "./add-ons-tab";
 import { toast } from "sonner";
 import { useBookingDetails } from "@/services/customer/bookings/query";
+import { normalizePaymentStatusForAddOnsDate } from "@/lib/booking-addons-eligibility";
 import { bookingsService } from "@/services/customer/bookings/bookings.service";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useCurrencyFormat } from "@/hooks/use-currency-format";
 
 interface AdjustBookingContentProps {
   bookingId: string;
@@ -28,6 +30,7 @@ interface AdjustBookingContentProps {
 export default function AdjustBookingContent({
   bookingId,
 }: AdjustBookingContentProps) {
+  const { format: formatCurrency } = useCurrencyFormat();
   const router = useRouter();
   const [activeTab, setActiveTab] = useState("booking-info");
   const [isDownloadingInvoice, setIsDownloadingInvoice] = useState(false);
@@ -51,8 +54,6 @@ export default function AdjustBookingContent({
     }
     return 0;
   };
-
-  const formatCurrency = (amount: number) => `£${amount.toFixed(2)}`;
 
   const normalizePaymentStatus = (
     status: string,
@@ -119,9 +120,9 @@ export default function AdjustBookingContent({
             hasUnbookedEventDates: eventDate.has_unbooked_event_dates,
             paymentStatus: normalizePaymentStatus(eventDate.payment_status),
             canPayNow: eventDate.can_pay_now !== false,
-            total: `£${eventDate.total_amount.toFixed(2)}`,
+            total: formatCurrency(eventDate.total_amount),
             partialPayment: eventDate.paid_amount
-              ? `£${eventDate.paid_amount.toFixed(2)}`
+              ? formatCurrency(eventDate.paid_amount)
               : undefined,
             tickets: eventDate.tickets, // Full ticket details
             drinks: eventDate.drinks, // Full drink details
@@ -417,10 +418,16 @@ export default function AdjustBookingContent({
                 <AddOnsTab
                   bookingId={bookingId}
                   onSaveSuccess={() => setActiveTab("booking-info")}
-                  dates={transformedData.dates.map((d) => ({
+                  dates={transformedData.dates.map((d) => {
+                    const raw = bookingData?.event_dates?.find(
+                      (ed) => ed.date_key === d.id,
+                    );
+                    return {
                     id: d.id,
                     date: d.date,
-                    paymentStatus: d.paymentStatus,
+                    paymentStatus: normalizePaymentStatusForAddOnsDate(
+                      raw?.payment_status,
+                    ),
                     people: d.items.reduce(
                       (sum, item) => sum + item.people_added,
                       0,
@@ -456,7 +463,8 @@ export default function AdjustBookingContent({
                           price_per_person: item.price_per_person || 0,
                         };
                       }),
-                  }))}
+                  };
+                  })}
                 />
               </div>
             </TabsContent>

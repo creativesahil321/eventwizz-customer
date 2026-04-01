@@ -11,6 +11,7 @@ import {
   generateTableRecommendations,
   getCostPerPerson,
 } from "../../_lib/table-recommendations";
+import { useCurrencyFormat } from "@/hooks/use-currency-format";
 
 interface NewTablesSectionProps {
   peopleForNewTables: number;
@@ -33,6 +34,8 @@ export function NewTablesSection({
   onAddNewTable,
   setNewTables,
 }: NewTablesSectionProps) {
+  const { format: formatMoney, formatCompact: formatMoneyUnit } =
+    useCurrencyFormat();
   const [showAllOptions, setShowAllOptions] = useState(false);
 
   if (peopleForNewTables === 0) {
@@ -212,11 +215,9 @@ export function NewTablesSection({
                       </p>
                       <div className="flex gap-4 text-xs text-gray-500">
                         <span>
-                          £
-                          {getCostPerPerson(
-                            rec,
-                            peopleForRecommendations
-                          ).toFixed(0)}
+                          {formatMoneyUnit(
+                            getCostPerPerson(rec, peopleForRecommendations),
+                          )}
                           /person
                         </span>
                         {rec.tablesNeeded > 1 && (
@@ -329,13 +330,14 @@ export function NewTablesSection({
                                 {rec.recommendation}
                               </p>
                               <div className="flex gap-4 text-xs text-gray-500">
-                                <span>£{rec.totalCost.toLocaleString()}</span>
+                                <span>{formatMoney(rec.totalCost)}</span>
                                 <span>
-                                  £
-                                  {getCostPerPerson(
-                                    rec,
-                                    peopleForRecommendations
-                                  ).toFixed(0)}
+                                  {formatMoneyUnit(
+                                    getCostPerPerson(
+                                      rec,
+                                      peopleForRecommendations,
+                                    ),
+                                  )}
                                   /person
                                 </span>
                                 {rec.tablesNeeded > 1 && (

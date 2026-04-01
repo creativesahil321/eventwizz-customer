@@ -4,6 +4,8 @@
  * Matches checkout system exactly
  */
 
+"use client";
+
 import { useState, useEffect, useMemo, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -26,6 +28,7 @@ import {
   generateAllocationSummary,
   TableAllocationData,
 } from "../_lib/guest-allocation";
+import { useCurrencyFormat } from "@/hooks/use-currency-format";
 
 interface NewTableSelection {
   id: number;
@@ -57,6 +60,7 @@ export default function GuestAllocationModal({
   eventName,
   dateString,
 }: GuestAllocationModalProps) {
+  const { formatCompact: formatMoneyUnit } = useCurrencyFormat();
   // Local state for allocations
   const [allocations, setAllocations] = useState<Record<number, number[]>>({});
   // Track raw input values to allow clearing/editing
@@ -763,7 +767,9 @@ export default function GuestAllocationModal({
                   {table.pricePerPerson > 0 && (
                     <div className="text-right">
                       <div className="text-lg font-bold text-gray-900">
-                        £{table.pricePerPerson || table.price}
+                        {formatMoneyUnit(
+                          Number(table.pricePerPerson || table.price),
+                        )}
                       </div>
                       <div className="text-xs text-gray-500">per person</div>
                     </div>

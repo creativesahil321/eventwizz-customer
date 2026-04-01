@@ -105,9 +105,12 @@ export const transactionService = {
     // Fetch summary from API
     const response = await fetchCustomerTransactions({ page: 1, limit: 1 });
 
+    const raw = String(response.summary.amount ?? "").replace(/,/g, "");
+    const total_amount_value = parseFloat(raw) || 0;
+
     return {
       total_transactions: response.summary.total,
-      total_amount: `£${response.summary.amount}`,
+      total_amount_value,
       pending_count: 0, // Not provided by API, can be added later if needed
       completed_count: 0, // Not provided by API, can be added later if needed
       failed_count: 0, // Not provided by API, can be added later if needed

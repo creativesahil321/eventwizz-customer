@@ -1,4 +1,7 @@
+"use client";
+
 import { Button } from "@/components/ui/button";
+import { useCurrencyFormat } from "@/hooks/use-currency-format";
 import {
   Dialog,
   DialogContent,
@@ -27,6 +30,8 @@ export default function ShowBookingDialog({
   onOpenChange,
   ...props
 }: ShowBookingDialogProps) {
+  const { format: formatMoney } = useCurrencyFormat();
+
   if (!booking) {
     return null;
   }
@@ -113,13 +118,13 @@ export default function ShowBookingDialog({
                   <div>
                     <Label className="text-sm">Paid Amount</Label>
                     <p className="mt-1 text-sm text-muted-foreground">
-                      ${booking.paid_amount.toFixed(2)}
+                      {formatMoney(booking.paid_amount)}
                     </p>
                   </div>
                   <div>
                     <Label className="text-sm">Balance Amount</Label>
                     <p className="mt-1 text-sm text-muted-foreground">
-                      ${booking.balance_amount.toFixed(2)}
+                      {formatMoney(booking.balance_amount)}
                     </p>
                   </div>
                 </div>
@@ -127,13 +132,13 @@ export default function ShowBookingDialog({
                   <div>
                     <Label className="text-sm">Discount</Label>
                     <p className="mt-1 text-sm text-muted-foreground">
-                      ${booking.discount.toFixed(2)}
+                      {formatMoney(booking.discount)}
                     </p>
                   </div>
                   <div>
                     <Label className="text-sm">Total Amount</Label>
                     <p className="mt-1 text-sm text-muted-foreground">
-                      ${booking.total_amount.toFixed(2)}
+                      {formatMoney(booking.total_amount)}
                     </p>
                   </div>
                 </div>
@@ -169,7 +174,7 @@ export default function ShowBookingDialog({
                             {new Date(tx.date).toLocaleString()}
                           </p>
                           <p className="text-sm">
-                            <strong>Amount:</strong> ${tx.amount.toFixed(2)}
+                            <strong>Amount:</strong> {formatMoney(tx.amount)}
                           </p>
                           <p className="text-sm">
                             <strong>Status:</strong> {tx.status}

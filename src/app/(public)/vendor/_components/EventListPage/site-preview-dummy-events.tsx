@@ -1,7 +1,9 @@
 "use client";
 
+import { useMemo } from "react";
 import { addCacheBusting } from "@/lib/image-utils";
 import { Button } from "@/components/ui/button";
+import { useCurrencyFormat } from "@/hooks/use-currency-format";
 
 const PREVIEW_IMAGES = [
   "/assets/images/events/dummyEvents/concert-event.jpg",
@@ -9,20 +11,12 @@ const PREVIEW_IMAGES = [
   "/assets/images/events/dummyEvents/music-event.jpg",
 ] as const;
 
-const DUMMY_EVENTS = [
-  {
-    title: "Sample: Evening Gala",
-    price: "From £45 (demo pricing)",
-    image: PREVIEW_IMAGES[0],
-  },
-  {
-    title: "Sample: Live Music Night",
-    price: "From £28 (demo pricing)",
-    image: PREVIEW_IMAGES[1],
-  },
+const DUMMY_EVENT_META = [
+  { title: "Sample: Evening Gala", fromAmount: 45, image: PREVIEW_IMAGES[0] },
+  { title: "Sample: Live Music Night", fromAmount: 28, image: PREVIEW_IMAGES[1] },
   {
     title: "Sample: Weekend Brunch Club",
-    price: "From £35 (demo pricing)",
+    fromAmount: 35,
     image: PREVIEW_IMAGES[2],
   },
 ] as const;
@@ -42,6 +36,16 @@ export function SitePreviewDummyEventSection({
   sectionTitle,
   band,
 }: SitePreviewDummyEventSectionProps) {
+  const { formatCompact } = useCurrencyFormat();
+  const dummyEvents = useMemo(
+    () =>
+      DUMMY_EVENT_META.map((e) => ({
+        title: e.title,
+        image: e.image,
+        price: `From ${formatCompact(e.fromAmount)} (demo pricing)`,
+      })),
+    [formatCompact],
+  );
   const isSecondary = band === "secondary";
 
   const sectionClass = isSecondary
@@ -85,7 +89,7 @@ export function SitePreviewDummyEventSection({
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-5xl mx-auto pt-2">
-          {DUMMY_EVENTS.map((event, index) => (
+          {dummyEvents.map((event, index) => (
             <div key={index} className="relative p-1">
               <span
                 className="absolute top-4 right-4 z-20 rounded-md bg-amber-600 text-white text-[10px] font-bold uppercase tracking-wider px-2 py-1 shadow-md ring-2 ring-white/90"

@@ -18,9 +18,11 @@ interface GetHistoryColumnsProps {
   setRowAction: React.Dispatch<
     React.SetStateAction<DataTableRowAction<History> | null>
   >;
+  formatMoney: (amount: number) => string;
 }
 export function getHistoryColumns({
   setRowAction,
+  formatMoney,
 }: GetHistoryColumnsProps): ColumnDef<History>[] {
   return [
     createSelectColumn<History>(),
@@ -220,11 +222,16 @@ export function getHistoryColumns({
           title="Amount"
         />
       ),
-      cell: ({ row }) => (
-        <span className="font-bold text-sm text-primary">
-          £{row.getValue("amount")}
-        </span>
-      ),
+      cell: ({ row }) => {
+        const raw = row.getValue("amount");
+        const n =
+          typeof raw === "string" ? parseFloat(raw) || 0 : Number(raw) || 0;
+        return (
+          <span className="font-bold text-sm text-primary">
+            {formatMoney(n)}
+          </span>
+        );
+      },
       enableSorting: true,
       enableHiding: false,
       sortingFn: (rowA, rowB) => {
@@ -259,7 +266,7 @@ export function getHistoryColumns({
 
         return (
           <span className="font-semibold text-sm text-green-600">
-            £{value.toFixed(2)}
+            {formatMoney(value)}
           </span>
         );
       },
@@ -303,7 +310,7 @@ export function getHistoryColumns({
 
         return (
           <span className="font-semibold text-sm text-purple-600">
-            £{value.toFixed(2)}
+            {formatMoney(value)}
           </span>
         );
       },
@@ -347,7 +354,7 @@ export function getHistoryColumns({
 
         return (
           <span className="font-semibold text-sm text-orange-600">
-            £{value.toFixed(2)}
+            {formatMoney(value)}
           </span>
         );
       },

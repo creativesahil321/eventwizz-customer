@@ -1,3 +1,8 @@
+import type { BookingDatePaymentStatus } from "@/lib/booking-addons-eligibility";
+
+export type { BookingDatePaymentStatus } from "@/lib/booking-addons-eligibility";
+export { isBookingDateEligibleForAddOns } from "@/lib/booking-addons-eligibility";
+
 export interface TableData {
   id: string; // Internal ID for React state management
   tableConfigId: number; // Actual table configuration ID from backend (required for API)
@@ -13,6 +18,7 @@ export interface BookingDate {
   id: string;
   date: string;
   people: number;
+  paymentStatus?: BookingDatePaymentStatus;
   tables?: TableData[];
 }
 

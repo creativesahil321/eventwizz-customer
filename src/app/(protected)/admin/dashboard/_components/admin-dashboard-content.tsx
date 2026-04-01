@@ -10,6 +10,7 @@ import SalesHistory from "./sales-history";
 import VenuesCommission from "./venues-commission";
 import NewCustomers from "./new-customers";
 import { PageLoader } from "@/components/ui/page-loader";
+import { useCurrencyFormat } from "@/hooks/use-currency-format";
 
 function searchParamsToRecord(
   searchParams: ReturnType<typeof useSearchParams>
@@ -46,6 +47,7 @@ function toParsedSearch(
 }
 
 export default function AdminDashboardContent() {
+  const { format: formatTenantMoney } = useCurrencyFormat();
   const searchParams = useSearchParams();
   const searchRecord = useMemo(
     () => searchParamsToRecord(searchParams),
@@ -65,12 +67,8 @@ export default function AdminDashboardContent() {
     newlyAddedVenues,
   } = useMemo(() => {
     const formatCurrency = (value: number | undefined): string => {
-      if (value == null || Number.isNaN(value)) return "£0.00";
-      return new Intl.NumberFormat("en-GB", {
-        style: "currency",
-        currency: "GBP",
-        minimumFractionDigits: 2,
-      }).format(value);
+      if (value == null || Number.isNaN(value)) return formatTenantMoney(0);
+      return formatTenantMoney(value);
     };
 
     const empty = {
@@ -80,9 +78,9 @@ export default function AdminDashboardContent() {
         { id: "disabled_vendors", label: "Disabled Vendors", value: 0 },
       ],
       performanceData: {
-        totalRevenue: "£0.00",
-        commissionEarned: "£0.00",
-        commissionPending: "£0.00",
+        totalRevenue: formatTenantMoney(0),
+        commissionEarned: formatTenantMoney(0),
+        commissionPending: formatTenantMoney(0),
         newVendors: 0,
       },
       venueCommissions: [] as { id: number; name: string; commission: string; value: number; lastUpdated?: string }[],
@@ -134,7 +132,7 @@ export default function AdminDashboardContent() {
       vendorOverview: vo,
       newlyAddedVenues: nav,
     };
-  }, [response]);
+  }, [response, formatTenantMoney]);
 
   if (isLoading && !response) {
     return <PageLoader />;

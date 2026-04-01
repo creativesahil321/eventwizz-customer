@@ -75,6 +75,8 @@ import {
 } from "@/components/ui/tooltip";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { normalizePaymentStatusForAddOnsDate } from "@/lib/booking-addons-eligibility";
+import { useCurrencyFormat } from "@/hooks/use-currency-format";
 
 interface AdjustBookingContentProps {
   bookingId: string;
@@ -147,14 +149,17 @@ export default function AdjustBookingContent({
   // Add booking note mutation
   const addNoteMutation = useAddBookingNote();
 
+  const { format: formatMoneyDisplay, formatCompact: formatMoneyUnit } =
+    useCurrencyFormat();
+
   const notes = bookingData?.comments ?? [];
 
   // Helper function to safely format amounts (handles null/undefined)
   const formatAmount = (value: number | null | undefined): string => {
     if (value === null || value === undefined) {
-      return "£0.00";
+      return formatMoneyDisplay(0);
     }
-    return `£${Number(value).toFixed(2)}`;
+    return formatMoneyDisplay(Number(value));
   };
 
   // Handler for deleting add-ons
@@ -1080,7 +1085,12 @@ export default function AdjustBookingContent({
                                                     </div>
                                                   )}
                                                 <p className="text-xs text-muted-foreground mt-1.5">
-                                                  £{table.price_per_person ?? 0}{" "}
+                                                  {formatMoneyUnit(
+                                                    Number(
+                                                      table.price_per_person ??
+                                                        0,
+                                                    ),
+                                                  )}{" "}
                                                   × {table.people ?? 0}
                                                 </p>
                                               </div>
@@ -1159,8 +1169,10 @@ export default function AdjustBookingContent({
                                                 </p>
                                               )}
                                               <p className="text-xs text-muted-foreground mt-0.5">
-                                                £{ticket.price_per_ticket} ×{" "}
-                                                {ticket.quantity}
+                                                {formatMoneyUnit(
+                                                  Number(ticket.price_per_ticket),
+                                                )}{" "}
+                                                × {ticket.quantity}
                                               </p>
                                             </div>
                                             <p className="text-sm font-semibold text-foreground shrink-0">
@@ -1196,8 +1208,10 @@ export default function AdjustBookingContent({
                                                 {drink.title}
                                               </p>
                                               <p className="text-xs text-muted-foreground mt-0.5">
-                                                £{drink.price} ×{" "}
-                                                {drink.quantity}
+                                                {formatMoneyUnit(
+                                                  Number(drink.price),
+                                                )}{" "}
+                                                × {drink.quantity}
                                               </p>
                                             </div>
                                             <p className="text-sm font-semibold text-foreground shrink-0">
@@ -1469,19 +1483,19 @@ export default function AdjustBookingContent({
                                                         {/* Price Breakdown */}
                                                         {table.price_per_person && (
                                                           <p className="text-xs text-muted-foreground mt-1.5">
-                                                            £
-                                                            {
-                                                              table.price_per_person
-                                                            }{" "}
+                                                            {formatMoneyUnit(
+                                                              Number(
+                                                                table.price_per_person,
+                                                              ),
+                                                            )}{" "}
                                                             × {table.people}
                                                           </p>
                                                         )}
                                                       </div>
                                                       <div className="flex items-center gap-3 shrink-0">
                                                         <p className="text-sm font-semibold text-foreground shrink-0">
-                                                          £
-                                                          {table.total.toFixed(
-                                                            2,
+                                                          {formatMoneyDisplay(
+                                                            Number(table.total),
                                                           )}
                                                         </p>
                                                         <Button
@@ -1529,17 +1543,18 @@ export default function AdjustBookingContent({
                                                             {drink.title}
                                                           </p>
                                                           <p className="text-xs text-muted-foreground mt-0.5">
-                                                            £{drink.price} ×{" "}
-                                                            {drink.quantity}
+                                                            {formatMoneyUnit(
+                                                              Number(drink.price),
+                                                            )}{" "}
+                                                            × {drink.quantity}
                                                           </p>
                                                         </div>
                                                         <div className="flex items-center gap-3 shrink-0">
                                                           <p className="text-sm font-semibold text-foreground shrink-0">
-                                                            £
-                                                            {(
+                                                            {formatMoneyDisplay(
                                                               drink.price *
-                                                              drink.quantity
-                                                            ).toFixed(2)}
+                                                                drink.quantity,
+                                                            )}
                                                           </p>
                                                           <Button
                                                             variant="ghost"
@@ -1600,20 +1615,20 @@ export default function AdjustBookingContent({
                                                             </p>
                                                           )}
                                                           <p className="text-xs text-muted-foreground mt-0.5">
-                                                            £
-                                                            {
-                                                              ticket.price_per_ticket
-                                                            }{" "}
+                                                            {formatMoneyUnit(
+                                                              Number(
+                                                                ticket.price_per_ticket,
+                                                              ),
+                                                            )}{" "}
                                                             × {ticket.quantity}
                                                           </p>
                                                         </div>
                                                         <div className="flex items-center gap-3 shrink-0">
                                                           <p className="text-sm font-semibold text-foreground shrink-0">
-                                                            £
-                                                            {(
+                                                            {formatMoneyDisplay(
                                                               ticket.price_per_ticket *
-                                                              ticket.quantity
-                                                            ).toFixed(2)}
+                                                                ticket.quantity,
+                                                            )}
                                                           </p>
                                                           <Button
                                                             variant="ghost"
@@ -1844,6 +1859,9 @@ export default function AdjustBookingContent({
                     id: date.date_key, // Use date_key as id for API calls
                     date: date.date,
                     people: totalPeople,
+                    paymentStatus: normalizePaymentStatusForAddOnsDate(
+                      date.payment_status,
+                    ),
                   };
                 })}
               />

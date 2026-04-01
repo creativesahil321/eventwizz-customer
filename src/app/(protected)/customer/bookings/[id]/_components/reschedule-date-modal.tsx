@@ -25,6 +25,7 @@ import type {
   RescheduleBookingPayload,
 } from "@/services/customer/bookings/type";
 import PaymentGatewaySelector from "@/app/(public)/vendor/checkout/_components/payment-gateway-selector";
+import { useCurrencyFormat } from "@/hooks/use-currency-format";
 
 interface RescheduleDateModalProps {
   isOpen: boolean;
@@ -65,6 +66,7 @@ export function RescheduleDateModal({
   isProcessing = false,
   onConfirm,
 }: RescheduleDateModalProps) {
+  const { format: formatMoney } = useCurrencyFormat();
   const [currentStep, setCurrentStep] = useState<Step>(
     hasAddons ? "warning" : "select"
   );
@@ -452,7 +454,7 @@ export function RescheduleDateModal({
                         <div>
                           <span className="text-blue-700">Price:</span>
                           <p className="font-medium text-blue-900">
-                            £{currentDate.price.toFixed(2)}
+                            {formatMoney(currentDate.price)}
                           </p>
                         </div>
                         <div className="flex items-center gap-2">
@@ -530,7 +532,7 @@ export function RescheduleDateModal({
                             </div>
                             <div className="flex sm:flex-col items-center sm:items-end justify-between sm:justify-start w-full sm:w-auto gap-2">
                               <p className="text-base sm:text-lg font-bold text-gray-900">
-                                £{date.price.toFixed(2)}
+                                {formatMoney(date.price)}
                               </p>
                               <Button
                                 size="sm"
@@ -583,7 +585,9 @@ export function RescheduleDateModal({
                       <div className="flex items-center justify-between text-red-700">
                         <span>Price:</span>
                         <span className="font-bold">
-                          £{currentDateData.price}
+                          {formatMoney(
+                            Number.parseFloat(String(currentDateData.price)),
+                          )}
                         </span>
                       </div>
                       <div className="flex items-center justify-between text-red-700">
@@ -618,7 +622,7 @@ export function RescheduleDateModal({
                       <div className="flex items-center justify-between text-green-700">
                         <span>Price:</span>
                         <span className="font-bold">
-                          £{selectedDate.price.toFixed(2)}
+                          {formatMoney(selectedDate.price)}
                         </span>
                       </div>
                       <div className="flex items-center justify-between text-green-700">
@@ -647,7 +651,7 @@ export function RescheduleDateModal({
                         Additional Payment Required:
                       </span>
                       <span className="text-lg font-bold text-orange-900">
-                        £{priceDifference.toFixed(2)}
+                        {formatMoney(priceDifference)}
                       </span>
                     </div>
                   </div>

@@ -14,6 +14,7 @@ import {
 
 // Payment System Types
 export interface PaymentInfo {
+  deposit_amount: any;
   type: "full" | "deposit";
   is_deposit_enabled: boolean;
   deposit_type: "amount" | "percentage";

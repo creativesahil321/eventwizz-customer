@@ -36,7 +36,10 @@ import {
 } from "../../guided-sticky-approval-bar";
 import EventLocationMap from "./event-location-map";
 import AddressAutocomplete from "./address-autocomplete";
+import { useCurrencySymbol } from "@/hooks/use-currency-format";
+
 export default function StepEight() {
+  const currencySymbol = useCurrencySymbol();
   const { handleFieldFocus } = useFieldFocusHandler();
   const {
     form: globalForm,
@@ -152,7 +155,7 @@ export default function StepEight() {
         ? {
             price: {
               title: "PRICES FROM",
-              description: `£${form.getValues("price_start_from")} PP exc VAT`,
+              description: `${currencySymbol}${form.getValues("price_start_from")} PP exc VAT`,
               link: "#",
               icon: "Tag",
               price_title:
@@ -163,7 +166,7 @@ export default function StepEight() {
       // Initialize downloads array if needed
       downloads: currentStepEight.downloads || [],
     });
-  }, [form, globalForm]);
+  }, [form, globalForm, currencySymbol]);
 
   // Generic function to handle PDF uploads to downloads array
   const handlePdfUploadToDownloads = (
@@ -312,7 +315,7 @@ export default function StepEight() {
         price: {
           title: "PRICES FROM",
           description: data.price_start_from
-            ? `£${data.price_start_from} PP exc VAT`
+            ? `${currencySymbol}${data.price_start_from} PP exc VAT`
             : "",
           link: "#",
           icon: "Tag",
@@ -874,7 +877,7 @@ export default function StepEight() {
                                   price_start_from: e.target.value,
                                   price: {
                                     title: "PRICES FROM",
-                                    description: `£${e.target.value} PP exc VAT`,
+                                    description: `${currencySymbol}${e.target.value} PP exc VAT`,
                                     link: "#",
                                     icon: "Tag",
                                     price_title:

@@ -1,8 +1,11 @@
+"use client";
+
 import Link from "next/link";
 import * as Icons from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useOnboarding } from "@/hooks/use-onboarding";
 import LocationMap from "./location-map";
+import { useCurrencyFormat } from "@/hooks/use-currency-format";
 
 type LucideIconName = keyof typeof Icons;
 
@@ -41,6 +44,7 @@ export default function BrochureSection({
   price,
 }: BrochureSectionProps) {
   const { textColorClass } = useOnboarding();
+  const { format: formatMoney } = useCurrencyFormat();
 
   const renderIcon = (iconName?: string, size = 24) => {
     if (!iconName) return null;
@@ -62,7 +66,7 @@ export default function BrochureSection({
 
   const defaultPrice = {
     title: price?.title || "PRICES FROM",
-    description: price?.description || "£45.00 PP exc VAT",
+    description: price?.description || `${formatMoney(45)} PP exc VAT`,
     link: price?.link || "#",
     price_title: price?.price_title || "Book Now",
     icon: price?.icon || "Tag",

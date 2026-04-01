@@ -4,6 +4,10 @@
  */
 
 import { CART_CONSTANTS } from "../constants/cart.constants";
+import {
+  DEFAULT_CURRENCY_SYMBOL,
+  formatMoney,
+} from "@/lib/currency-format";
 
 /**
  * Normalize slug for comparison (handles URL encoding)
@@ -13,11 +17,12 @@ export const normalizeSlug = (slug: string): string => {
 };
 
 /**
- * Format currency amount
+ * Format currency amount (pass symbol from {@link useCurrencySymbol} when available).
  */
-export const formatCurrency = (amount: number): string => {
-  return `£${amount.toFixed(2)}`;
-};
+export const formatCurrency = (
+  amount: number,
+  symbol: string = DEFAULT_CURRENCY_SYMBOL,
+): string => formatMoney(amount, symbol);
 
 /**
  * Calculate total (no fees)

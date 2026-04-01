@@ -1,6 +1,7 @@
 import { ThemeSchema } from "@/types/theme.types";
 import { UserType } from "@/types/auth.types";
 import { themeService } from "@/services/common/theme/theme.service";
+import { resolveCurrencySymbol } from "@/lib/currency-format";
 
 // Interface for processed tenant data
 export interface TenantData {
@@ -85,6 +86,7 @@ export const getTenantIdFromDomain = async (
         website_role: (themeData?.website_role as UserType) || null,
         parentDomain: null,
         settings: {
+          ...themeData,
           colors: themeData?.colors || {
             primary: "#019ead",
             secondary: "#2D2D2D",
@@ -95,12 +97,19 @@ export const getTenantIdFromDomain = async (
               body: "Inter",
             },
           },
-          contactDetails: themeData?.contactDetails || {},
+          contactDetails: themeData?.contactDetails || {
+            email: "",
+            alternativeEmail: "",
+            phone: "",
+            alternativePhone: "",
+            address: "",
+          },
           logo: themeData?.logo || "",
           favicon: themeData?.favicon || "",
           name: themeData?.name || "EventWizz",
           website_role: themeData?.website_role || "",
           locations: themeData?.locations || [],
+          currency_symbol: resolveCurrencySymbol(themeData?.currency_symbol),
         },
       };
 
@@ -124,10 +133,17 @@ export const getTenantIdFromDomain = async (
               body: "Inter",
             },
           },
-          contactDetails: {},
+          contactDetails: {
+            email: "",
+            alternativeEmail: "",
+            phone: "",
+            alternativePhone: "",
+            address: "",
+          },
           logo: "",
           favicon: "",
           name: "EventWizz",
+          currency_symbol: resolveCurrencySymbol(undefined),
         },
       };
 

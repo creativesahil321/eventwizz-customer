@@ -9,6 +9,7 @@ import {
 import { Wine } from "lucide-react";
 import { QuantityControls } from "./quantity-controls";
 import { DrinkItem } from "./types";
+import { useCurrencyFormat } from "@/hooks/use-currency-format";
 
 interface DrinksSectionProps {
   drinks: DrinkItem[];
@@ -21,6 +22,7 @@ export function DrinksSection({
   onQuantityChange,
   onRemove,
 }: DrinksSectionProps) {
+  const { format: formatMoney } = useCurrencyFormat();
   const totalDrinks = drinks.reduce((sum, drink) => sum + drink.quantity, 0);
 
   return (
@@ -74,7 +76,7 @@ export function DrinksSection({
                       </p>
                     )}
                     <p className="text-xs text-gray-500">
-                      £{drink.price.toFixed(2)} per item
+                      {formatMoney(drink.price)} per item
                     </p>
                   </div>
                   <QuantityControls

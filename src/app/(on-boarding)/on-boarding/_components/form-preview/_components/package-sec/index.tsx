@@ -4,6 +4,7 @@ import { ImageIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useOnboarding } from "@/hooks/use-onboarding";
 import { addCacheBusting } from "@/lib/image-utils";
+import { useCurrencySymbol } from "@/hooks/use-currency-format";
 
 type PackageDetail = {
   title: string;
@@ -34,6 +35,7 @@ export default function PackageSection({
   packageDetails,
 }: PackageSectionProps) {
   const { textColorClass } = useOnboarding();
+  const currencySymbol = useCurrencySymbol();
 
   const getImageSrc = (image: PackageImage | File | null | string) => {
     if (typeof image === "string") return image;
@@ -79,7 +81,7 @@ export default function PackageSection({
               hyphens: "auto",
             }}
           >
-            {subHeading || "Prices From £65 Plus VAT Include:"}
+            {subHeading || `Prices From ${currencySymbol}65 Plus VAT Include:`}
           </p>
 
           <ul className="space-y-3 mt-6">

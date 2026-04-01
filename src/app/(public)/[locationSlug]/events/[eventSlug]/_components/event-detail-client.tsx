@@ -21,6 +21,7 @@ import EventGallery from "@/app/(on-boarding)/on-boarding/_components/form-previ
 import { ThemeAnimationManager } from "@/components/theme-animations/theme-animation-manager";
 import { CartConflictProvider } from "@/app/(public)/vendor/checkout/_components/cart-conflict-provider";
 import { addCacheBusting } from "@/lib/image-utils";
+import { useCurrencyFormat } from "@/hooks/use-currency-format";
 
 interface EventDetailClientProps {
   event: EventDetail;
@@ -34,6 +35,7 @@ export default function EventDetailClient({
   eventSlug,
   host,
 }: EventDetailClientProps) {
+  const { formatCompact: formatPriceUnit } = useCurrencyFormat();
   // Fetch event data using TanStack Query
   const { data } = useEventDetail(eventSlug, host);
 
@@ -244,9 +246,9 @@ export default function EventDetailClient({
             ]}
             price={{
               title: "PRICES FROM",
-              description: `£${
-                eventData.packages?.[0]?.price || "45.00"
-              } PP exc VAT`,
+              description: `${formatPriceUnit(
+                Number(eventData.packages?.[0]?.price) || 45,
+              )} PP exc VAT`,
               link: "#booking",
               price_title: "Book Now",
             }}

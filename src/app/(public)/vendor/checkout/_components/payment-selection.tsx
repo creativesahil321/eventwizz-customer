@@ -24,6 +24,7 @@ import {
 import { motion } from "framer-motion";
 import { PaymentInfo } from "@/lib/types/cart.types";
 import { format } from "date-fns";
+import { useCurrencyFormat } from "@/hooks/use-currency-format";
 
 interface PaymentSelectionProps {
   paymentInfo: PaymentInfo;
@@ -40,6 +41,7 @@ export default function PaymentSelection({
   selectedType = "full",
   disabled = false,
 }: PaymentSelectionProps) {
+  const { format: formatCurrency } = useCurrencyFormat();
   const [selectedPaymentType, setSelectedPaymentType] = useState<
     "full" | "deposit"
   >(selectedType);
@@ -52,8 +54,6 @@ export default function PaymentSelection({
   const depositAmount = paymentInfo.deposit_amount;
   const balanceAmount = totalAmount - depositAmount;
   const balanceDueDate = paymentInfo.balance_due_date;
-
-  const formatCurrency = (amount: number) => `£${amount.toFixed(2)}`;
 
   const formatDate = (dateString: string | null) => {
     if (!dateString) return null;
@@ -255,10 +255,9 @@ export function CompactPaymentSelection({
   selectedType = "full",
   disabled = false,
 }: PaymentSelectionProps) {
+  const { format: formatCurrency } = useCurrencyFormat();
   const depositAmount = paymentInfo.deposit_amount;
   const balanceAmount = totalAmount - depositAmount;
-
-  const formatCurrency = (amount: number) => `£${amount.toFixed(2)}`;
 
   return (
     <div className="space-y-3">

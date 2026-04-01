@@ -14,6 +14,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { CheckCircle2, Clock, Calendar, X, Loader2 } from "lucide-react";
+import { useCurrencyFormat } from "@/hooks/use-currency-format";
 
 interface SingleDatePaymentModalProps {
   isOpen: boolean;
@@ -87,8 +88,6 @@ export function SingleDatePaymentModal({
       : effectivePaymentPlan === "deposit"
         ? fullAmount - depositAmount
         : fullAmount;
-
-  const formatCurrency = (amount: number) => `£${amount.toFixed(2)}`;
 
   const handleConfirm = () => {
     if (!effectivePaymentPlan) return;

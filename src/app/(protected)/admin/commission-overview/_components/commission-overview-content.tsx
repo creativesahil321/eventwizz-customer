@@ -46,6 +46,7 @@ import type {
   CommissionEntry,
   CommissionStatusTab,
 } from "@/services/admin/commissions";
+import { useCurrencyFormat } from "@/hooks/use-currency-format";
 
 const PERIOD_OPTIONS = ["today", "weekly", "monthly", "yearly"] as const;
 const PAGE_SIZE_OPTIONS = [10, 20, 30, 50, 100] as const;
@@ -76,6 +77,7 @@ function actionClass(action: CommissionEntry["action"], type: CommissionEntry["t
 }
 
 export function CommissionOverviewContent() {
+  const { format: formatMoney } = useCurrencyFormat();
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -214,7 +216,7 @@ export function CommissionOverviewContent() {
                     </div>
                     <div>
                       <p className="text-xs font-medium text-muted-foreground">Total Commission Earned</p>
-                      <p className="text-base font-semibold text-rose-600 sm:text-lg">{overview?.total_commission_earned_formatted ?? "£0.00"}</p>
+                      <p className="text-base font-semibold text-rose-600 sm:text-lg">{overview?.total_commission_earned_formatted ?? formatMoney(0)}</p>
                     </div>
                   </div>
 
@@ -224,7 +226,7 @@ export function CommissionOverviewContent() {
                     </div>
                     <div>
                       <p className="text-xs font-medium text-muted-foreground">Total Commission Received</p>
-                      <p className="text-base font-semibold text-violet-600 sm:text-lg">{overview?.total_commission_received_formatted ?? "£0.00"}</p>
+                      <p className="text-base font-semibold text-violet-600 sm:text-lg">{overview?.total_commission_received_formatted ?? formatMoney(0)}</p>
                     </div>
                   </div>
 
@@ -234,7 +236,7 @@ export function CommissionOverviewContent() {
                     </div>
                     <div>
                       <p className="text-xs font-medium text-muted-foreground">Total Commission Due</p>
-                      <p className="text-base font-semibold text-cyan-600 sm:text-lg">{overview?.total_commission_due_formatted ?? "£0.00"}</p>
+                      <p className="text-base font-semibold text-cyan-600 sm:text-lg">{overview?.total_commission_due_formatted ?? formatMoney(0)}</p>
                     </div>
                   </div>
 
@@ -244,7 +246,7 @@ export function CommissionOverviewContent() {
                     </div>
                     <div>
                       <p className="text-xs font-medium text-muted-foreground">Total Revenue</p>
-                      <p className="text-base font-semibold text-emerald-600 sm:text-lg">{overview?.total_revenue_formatted ?? "£0.00"}</p>
+                      <p className="text-base font-semibold text-emerald-600 sm:text-lg">{overview?.total_revenue_formatted ?? formatMoney(0)}</p>
                     </div>
                   </div>
                 </div>

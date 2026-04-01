@@ -9,6 +9,7 @@ import {
   ChartTooltip,
   ChartTooltipContent,
 } from "@/components/ui/chart";
+import { useCurrencySymbol } from "@/hooks/use-currency-format";
 
 type ChartDataItem = {
   month: string;
@@ -23,6 +24,7 @@ const chartConfig = {
 } satisfies ChartConfig;
 
 export default function SalesHistory({ sales }: { sales: ChartDataItem[] }) {
+  const currencySymbol = useCurrencySymbol();
   return (
     <Card className="shadow-none border-none">
       <CardHeader className="relative">
@@ -44,7 +46,7 @@ export default function SalesHistory({ sales }: { sales: ChartDataItem[] }) {
             <YAxis
               tickLine={false}
               axisLine={false}
-              tickFormatter={(value) => `$${value}`}
+              tickFormatter={(value) => `${currencySymbol}${value}`}
             />
             <ChartTooltip content={<ChartTooltipContent hideLabel />} />
             <Bar

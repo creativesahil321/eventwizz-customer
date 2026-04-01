@@ -6,6 +6,7 @@ import PaymentGatewaySelector, {
   PaymentGateway,
 } from "./payment-gateway-selector";
 import { toast } from "sonner";
+import { useCurrencySymbol } from "@/hooks/use-currency-format";
 
 interface PaymentModalProps {
   isOpen: boolean;
@@ -26,12 +27,14 @@ export default function PaymentModal({
   bookingId,
   totalAmount,
   paymentGateways,
-  currency = "£",
+  currency,
   onPaymentSuccess,
   onPaymentError,
   title = "Complete Payment",
   description = "Pay for your booking to secure your reservation",
 }: PaymentModalProps) {
+  const tenantSymbol = useCurrencySymbol();
+  const displaySymbol = currency ?? tenantSymbol;
   const [selectedGateway, setSelectedGateway] = useState<PaymentGateway | null>(
     null
   );
@@ -145,7 +148,7 @@ export default function PaymentModal({
                 <div className="text-right">
                   <p className="text-sm text-gray-600">Amount Due</p>
                   <p className="text-lg font-bold text-gray-900">
-                    {currency}
+                    {displaySymbol}
                     {totalAmount.toFixed(2)}
                   </p>
                 </div>
@@ -158,7 +161,7 @@ export default function PaymentModal({
               selectedGateway={selectedGateway}
               onSelectGateway={handleGatewaySelect}
               totalAmount={totalAmount}
-              currency={currency}
+              currency={displaySymbol}
               isLoading={isProcessing}
             />
 
@@ -180,7 +183,7 @@ export default function PaymentModal({
                       <span>Processing Payment...</span>
                     </div>
                   ) : (
-                    `Pay ${currency}${totalAmount.toFixed(2)} with ${
+                    `Pay ${displaySymbol}${totalAmount.toFixed(2)} with ${
                       selectedGateway.name
                     }`
                   )}

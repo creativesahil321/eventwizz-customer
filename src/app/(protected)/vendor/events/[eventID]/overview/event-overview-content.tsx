@@ -29,6 +29,7 @@ import { useEventOverview } from "./_hooks/useEventOverview";
 import { EmptyPlaceholder } from "@/components/empty-placeholder";
 import EventOverviewSkeleton from "./_components/overview-skeleton";
 import { BookingItemSkeleton } from "./_components/booking-item-skeleton";
+import { useCurrencySymbol } from "@/hooks/use-currency-format";
 
 interface EventOverviewClientProps {
   eventId: string;
@@ -37,6 +38,7 @@ interface EventOverviewClientProps {
 export default function EventOverviewClient({
   eventId,
 }: EventOverviewClientProps) {
+  const currencySymbol = useCurrencySymbol();
   const [dateFilter, setDateFilter] = useState("");
   const [selectedTab, setSelectedTab] = useState<
     "all" | "available" | "sold_out"
@@ -273,7 +275,7 @@ export default function EventOverviewClient({
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {eventData.totalRevenue.replace(/\$/g, "£")}
+              {eventData.totalRevenue.replace(/\$/g, currencySymbol)}
             </div>
             <p className="text-xs text-muted-foreground">
               From {eventData.totalBookings} bookings

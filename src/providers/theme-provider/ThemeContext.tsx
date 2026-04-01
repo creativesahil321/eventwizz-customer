@@ -16,6 +16,7 @@ import { useThemeQuery, themeKeys } from "@/hooks/use-theme-query";
 import { generateThemeCSS } from "@/services/common/theme/constants/theme";
 import { syncDocumentGoogleFontLinkForTheme } from "@/lib/site-typography-google-fonts";
 import { useQueryClient } from "@tanstack/react-query";
+import { resolveCurrencySymbol } from "@/lib/currency-format";
 
 /**
  * Context type definition for theme data and state
@@ -150,6 +151,7 @@ const mapSchemaToSettings = (
     copyright: schema.copyright || "",
     domain: schema.domain || "",
     website_role: schema.website_role || "",
+    currency_symbol: resolveCurrencySymbol(schema.currency_symbol),
   };
 };
 
