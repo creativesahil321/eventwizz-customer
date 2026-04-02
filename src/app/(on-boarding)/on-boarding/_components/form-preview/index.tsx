@@ -8,7 +8,10 @@ import React, {
   useRef,
 } from "react";
 import { useFormContext } from "../form-provider";
-import { OnboardingFormData } from "../form-provider/schema";
+import {
+  OnboardingFormData,
+  type StepFiveType,
+} from "../form-provider/schema";
 import { Skeleton } from "@/components/ui/skeleton";
 import { PreviewProvider } from "@/contexts/preview-context";
 import CommonHeader from "@/components/shared/common-header";
@@ -38,6 +41,33 @@ const SectionLoader = () => (
     <Skeleton className="h-4 w-2/3" />
   </div>
 );
+
+/** Lowest ticket/table price per date for customer-facing date cards (preview). */
+function minPriceFromStepFiveDate(
+  d: StepFiveType["dates"][number],
+): number {
+  const nums: number[] = [];
+  for (const t of d.tickets ?? []) {
+    const n = Number(t.price);
+    if (!Number.isNaN(n) && n >= 0) nums.push(n);
+  }
+  for (const t of d.tables ?? []) {
+    const n = Number(t.price);
+    if (!Number.isNaN(n) && n >= 0) nums.push(n);
+  }
+  if (nums.length === 0) return 0;
+  return Math.min(...nums);
+}
+
+function buildDatesPreviewFromStepFive(
+  dates: StepFiveType["dates"] | undefined,
+): Array<{ event_date: string; price: number }> {
+  if (!dates?.length) return [];
+  return dates.map((d) => ({
+    event_date: d.event_date,
+    price: minPriceFromStepFiveDate(d),
+  }));
+}
 
 // Only load components needed for the current step
 export default function FormPreview() {
@@ -292,6 +322,26 @@ export default function FormPreview() {
     }
   }, [activeStep, activeField]);
 
+  // When editing dates, scroll the preview so the booking strip is in view (split layout).
+  useEffect(() => {
+    if (activeStep !== 5) return;
+    const id = window.requestAnimationFrame(() => {
+      const container = previewContainerRef.current;
+      const target = datesRef.current;
+      if (!container || !target) return;
+      container.scrollTo({
+        top: Math.max(0, target.offsetTop - 24),
+        behavior: "smooth",
+      });
+    });
+    return () => cancelAnimationFrame(id);
+  }, [activeStep]);
+
+  const datesPreviewItems = useMemo(
+    () => buildDatesPreviewFromStepFive(formState.stepFive?.dates),
+    [formState.stepFive?.dates],
+  );
+
   // Render only site preview components for step 2
   const renderStepTwoPreview = () => {
     return (
@@ -476,12 +526,8 @@ export default function FormPreview() {
         >
           <Suspense fallback={<SectionLoader />}>
             <DatesSection
-              dates={
-                formState.stepFive?.dates?.map((date) => ({
-                  event_date: date.event_date,
-                  price: 65, // Simple fixed price for preview
-                })) || []
-              }
+              dates={datesPreviewItems}
+              eventName={formState.stepThree?.event_name || undefined}
             />
           </Suspense>
         </div>
@@ -533,6 +579,7 @@ export default function FormPreview() {
                   price: Number(pkg.price),
                 })) || []
               }
+              defaultExpanded
             />
           </Suspense>
         </div>
@@ -573,7 +620,10 @@ export default function FormPreview() {
           )}`}
         >
           <Suspense fallback={<SectionLoader />}>
-            <FaqSection faqs={formState.stepNine?.faqs || []} />
+            <FaqSection
+              faqs={formState.stepNine?.faqs || []}
+              defaultExpanded
+            />
           </Suspense>
         </div>
 

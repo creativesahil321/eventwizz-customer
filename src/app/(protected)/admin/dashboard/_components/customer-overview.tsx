@@ -23,6 +23,7 @@ import {
   PaginationPrevious,
 } from "@/components/ui/pagination";
 import type { VendorOverviewRow } from "@/services/admin/dashboard/types";
+import { useCurrencyFormat } from "@/hooks/use-currency-format";
 
 interface PaginationMeta {
   current_page: number;
@@ -80,6 +81,7 @@ export default function CustomerOverview({
   pagination,
   search,
 }: CustomerOverviewProps) {
+  const { formatLocale: formatMoneyLocale } = useCurrencyFormat();
   const router = useRouter();
   const pathname = usePathname();
   const basePath = "/admin/dashboard";
@@ -169,28 +171,13 @@ export default function CustomerOverview({
                     </TableCell>
                     <TableCell>{row.total_events}</TableCell>
                     <TableCell>
-                      {row.total_earning_formatted ??
-                        new Intl.NumberFormat("en-GB", {
-                          style: "currency",
-                          currency: "GBP",
-                          minimumFractionDigits: 2,
-                        }).format(row.total_earning ?? 0)}
+                      {formatMoneyLocale(row.total_earning ?? 0)}
                     </TableCell>
                     <TableCell>
-                      {row.commission_earned_formatted ??
-                        new Intl.NumberFormat("en-GB", {
-                          style: "currency",
-                          currency: "GBP",
-                          minimumFractionDigits: 2,
-                        }).format(row.commission_earned ?? 0)}
+                      {formatMoneyLocale(row.commission_earned ?? 0)}
                     </TableCell>
                     <TableCell>
-                      {row.commission_pending_formatted ??
-                        new Intl.NumberFormat("en-GB", {
-                          style: "currency",
-                          currency: "GBP",
-                          minimumFractionDigits: 2,
-                        }).format(row.commission_pending ?? 0)}
+                      {formatMoneyLocale(row.commission_pending ?? 0)}
                     </TableCell>
                     <TableCell className="text-right">
                       <Button variant="ghost" size="icon" asChild>

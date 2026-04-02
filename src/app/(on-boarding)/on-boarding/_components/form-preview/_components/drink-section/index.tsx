@@ -20,6 +20,8 @@ type DrinkSectionProps = {
   description: string;
   packages: DrinkPackage[];
   eventSlug?: string; // Optional for backward compatibility
+  /** Onboarding preview: show package list without an extra click */
+  defaultExpanded?: boolean;
 };
 
 export default function DrinkSection({
@@ -27,9 +29,10 @@ export default function DrinkSection({
   description,
   packages,
   eventSlug,
+  defaultExpanded = false,
 }: DrinkSectionProps) {
   const { format: formatMoney } = useCurrencyFormat();
-  const [showMore, setShowMore] = useState(false);
+  const [showMore, setShowMore] = useState(defaultExpanded);
   const isHydrated = useHydration(); // Professional hydration handling
   const {
     addDrink,
@@ -128,7 +131,7 @@ export default function DrinkSection({
             )}
           </Button>
         </section>
-        <section className="flex w-full flex-col space-y-4 sm:space-y-6 mt-4 sm:mt-6 overflow-hidden">
+        <section className="flex w-full flex-col space-y-4 sm:space-y-6 mt-4 sm:mt-6 overflow-hidden text-left">
           {showMore &&
             filteredPackages?.length > 0 &&
             filteredPackages.map((singlePackage, idx) => {
@@ -137,16 +140,16 @@ export default function DrinkSection({
                 : 0;
               return (
                 <section
-                  className="text-[var(--color-text)] bg-[var(--color-surface)] flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4 p-4 sm:p-6  rounded-lg border border-[var(--color-surface)]/10 w-full"
+                  className="text-[var(--color-text)] bg-[var(--color-surface)] flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4 p-4 sm:p-6 rounded-lg border border-[var(--color-surface)]/10 w-full text-left"
                   key={idx}
                 >
-                  {/* Details */}
-                  <article className="flex flex-col items-start w-full sm:min-w-0 sm:max-w-none flex-1">
-                    <h3 className="text-base sm:text-lg md:text-xl font-semibold mb-1 sm:mb-2 break-words w-full">
+                  {/* Details — explicit text-left counters inherited text-center from parent hero */}
+                  <article className="flex flex-col items-start w-full sm:min-w-0 sm:max-w-none flex-1 text-left">
+                    <h3 className="text-base sm:text-lg md:text-xl font-semibold mb-1 sm:mb-2 break-words w-full text-left">
                       {singlePackage.title}
                     </h3>
                     <div
-                      className="text-xs sm:text-sm md:text-base text-[var(--color-text-dimmed)] text-start leading-relaxed break-words whitespace-normal overflow-hidden prose prose-sm max-w-full w-full"
+                      className="text-xs sm:text-sm md:text-base text-[var(--color-text-dimmed)] text-left leading-relaxed break-words whitespace-normal overflow-hidden prose prose-sm max-w-full w-full prose-p:my-1 prose-headings:text-left"
                       style={{
                         wordBreak: "break-word",
                         overflowWrap: "break-word",

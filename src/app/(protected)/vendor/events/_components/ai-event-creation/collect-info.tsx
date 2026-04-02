@@ -5,16 +5,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { motion } from "framer-motion";
-import {
-  Sparkles,
-  ArrowRight,
-  Loader2,
-  PenTool,
-  Mic,
-  MicOff,
-  Square,
-} from "lucide-react";
-import { useVoiceInput } from "@/hooks/useVoiceInput";
+import { Sparkles, ArrowRight, Loader2, PenTool } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -38,11 +29,16 @@ import { eventsService } from "@/services/vendor/events/events.service";
 import type { EventCategory } from "@/services/vendor/events/type";
 import { ApiResponse } from "@/services/core/api-client";
 import { useCurrencySymbol } from "@/hooks/use-currency-format";
+import AddressAutocomplete from "@/app/(protected)/vendor/events/_components/tab-event-form/tabs/_components/address-autocomplete";
 
 const collectInfoSchema = z.object({
   eventName: z.string().min(2, "Event name must be at least 2 characters").max(40, "Event name max 40 characters"),
   eventType: z.string().min(1, "Please select an event type"),
   eventCategoryId: z.string().min(1, "Please select a category"),
+  venueAddress: z
+    .string()
+    .trim()
+    .min(5, "Enter the full address or location where this event takes place"),
   eventDescription: z.string().max(800, "Description max 800 characters").optional(),
   guestCount: z.string().optional(),
   priceRange: z.string().optional(),
@@ -75,6 +71,11 @@ const accent = {
   } as React.CSSProperties,
 };
 
+const labelClass = "text-sm font-medium text-slate-300";
+const formItemClass = "space-y-2";
+const selectTriggerClass =
+  "bg-white/5 border-white/10 text-white h-10 w-full min-h-10";
+
 export default function AIEventCollectInfo({
   onSubmit,
   onSwitchToManual,
@@ -91,6 +92,10 @@ export default function AIEventCollectInfo({
       eventName: initialData?.eventName || "",
       eventType: initialData?.eventType || "",
       eventCategoryId: "",
+      venueAddress:
+        initialData?.venueAddress?.trim() ||
+        venueInfo?.address?.trim() ||
+        "",
       eventDescription: initialData?.eventDescription || "",
       guestCount: initialData?.guestCount || "",
       priceRange: initialData?.priceRange || "",
@@ -98,15 +103,18 @@ export default function AIEventCollectInfo({
     mode: "onChange",
   });
 
-  const {
-    voiceState,
-    interimText,
-    toggle: toggleVoice,
-    isSupported: voiceSupported,
-  } = useVoiceInput((text: string) => {
-    form.setValue("eventDescription", text, { shouldValidate: true });
-  });
-  const isListening = voiceState === "listening";
+  const currencySymbol = useCurrencySymbol();
+  const priceOptions = useMemo(
+    () =>
+      [
+        `Under ${currencySymbol}50 per person`,
+        `${currencySymbol}50 – ${currencySymbol}150 per person`,
+        `${currencySymbol}150 – ${currencySymbol}500 per person`,
+        `${currencySymbol}500+ per person`,
+        "Flexible / not sure",
+      ].map((text) => ({ value: text, label: text })),
+    [currencySymbol],
+  );
 
   useEffect(() => {
     const fetchCategories = async () => {
@@ -134,7 +142,20 @@ export default function AIEventCollectInfo({
     fetchCategories();
   }, []);
 
+  useEffect(() => {
+    const fromVenue = venueInfo?.address?.trim();
+    if (!fromVenue) return;
+    const current = form.getValues("venueAddress")?.trim() ?? "";
+    if (current.length < 5) {
+      form.setValue("venueAddress", fromVenue, {
+        shouldValidate: true,
+        shouldDirty: false,
+      });
+    }
+  }, [venueInfo?.address, form]);
+
   const handleFormSubmit = (data: CollectInfoForm) => {
+    const addr = data.venueAddress.trim();
     const payload: AIEventInput = {
       eventName: data.eventName,
       eventType: data.eventType,
@@ -143,7 +164,7 @@ export default function AIEventCollectInfo({
       priceRange: data.priceRange,
       venueName: venueInfo?.name,
       venueCity: venueInfo?.city,
-      venueAddress: venueInfo?.address,
+      venueAddress: addr,
     };
     onSubmit(payload, Number(data.eventCategoryId));
   };
@@ -180,16 +201,19 @@ export default function AIEventCollectInfo({
         </div>
 
         {/* Form */}
-        <div className="bg-white/[0.04] backdrop-blur-sm border border-white/10 rounded-2xl p-4 sm:p-6">
+        <div
+          className="bg-white/[0.04] backdrop-blur-sm border border-white/10 rounded-2xl p-5 sm:p-7"
+          style={{ colorScheme: "dark" }}
+        >
           <Form {...form}>
-            <form onSubmit={form.handleSubmit(handleFormSubmit)} className="space-y-5">
+            <form onSubmit={form.handleSubmit(handleFormSubmit)} className="space-y-6">
               {/* Event Name */}
               <FormField
                 control={form.control}
                 name="eventName"
                 render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-sm text-slate-300">
+                  <FormItem className={formItemClass}>
+                    <FormLabel className={labelClass}>
                       Event Name <span className="text-red-400">*</span>
                     </FormLabel>
                     <FormControl>
@@ -197,7 +221,7 @@ export default function AIEventCollectInfo({
                         {...field}
                         placeholder="e.g. Summer Gala 2026"
                         maxLength={40}
-                        className="bg-white/5 border-white/10 text-white placeholder:text-slate-500 h-10"
+                        className="h-10 border-white/10 bg-white/5 text-white placeholder:text-slate-500 shadow-[inset_0_0_0_1000px_rgb(255_255_255/0.05)] [color-scheme:dark] [&:-webkit-autofill]:[-webkit-text-fill-color:rgb(255_255_255)] [&:-webkit-autofill]:shadow-[inset_0_0_0_1000px_rgb(39_39_42/0.95)] [&:-webkit-autofill]:[transition:background-color_9999s_ease-out]"
                       />
                     </FormControl>
                     <FormMessage />
@@ -205,80 +229,109 @@ export default function AIEventCollectInfo({
                 )}
               />
 
-              {/* Category */}
-              <FormField
-                control={form.control}
-                name="eventCategoryId"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-sm text-slate-300">
-                      Category <span className="text-red-400">*</span>
-                    </FormLabel>
-                    <Select
-                      onValueChange={field.onChange}
-                      value={field.value}
-                      disabled={categoriesLoading}
-                    >
-                      <FormControl>
-                        <SelectTrigger className="bg-white/5 border-white/10 text-white h-10">
-                          <SelectValue placeholder={categoriesLoading ? "Loading…" : "Select category"} />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {categories.map((cat) => (
-                          <SelectItem key={cat.id} value={String(cat.id)}>
-                            {cat.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+              {/* Category + Event Type — aligned row on larger screens */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-5">
+                <FormField
+                  control={form.control}
+                  name="eventCategoryId"
+                  render={({ field }) => (
+                    <FormItem className={formItemClass}>
+                      <FormLabel className={labelClass}>
+                        Category <span className="text-red-400">*</span>
+                      </FormLabel>
+                      <Select
+                        onValueChange={field.onChange}
+                        value={field.value}
+                        disabled={categoriesLoading}
+                      >
+                        <FormControl>
+                          <SelectTrigger className={selectTriggerClass}>
+                            <SelectValue placeholder={categoriesLoading ? "Loading…" : "Select category"} />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {categories.map((cat) => (
+                            <SelectItem key={cat.id} value={String(cat.id)}>
+                              {cat.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
 
-              {/* Event Type */}
+                <FormField
+                  control={form.control}
+                  name="eventType"
+                  render={({ field }) => (
+                    <FormItem className={formItemClass}>
+                      <FormLabel className={labelClass}>
+                        Event Type <span className="text-red-400">*</span>
+                      </FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value}>
+                        <FormControl>
+                          <SelectTrigger className={selectTriggerClass}>
+                            <SelectValue placeholder="Select type" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {["Wedding", "Corporate", "Party", "Conference", "Concert", "Restaurant", "Sports", "Other"].map((t) => (
+                            <SelectItem key={t} value={t.toLowerCase()}>
+                              {t}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              {/* Google Places — same component as manual event “more info” */}
               <FormField
                 control={form.control}
-                name="eventType"
+                name="venueAddress"
                 render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-sm text-slate-300">
-                      Event Type <span className="text-red-400">*</span>
+                  <FormItem className={formItemClass}>
+                    <FormLabel className={labelClass}>
+                      Event address <span className="text-red-400">*</span>
                     </FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
-                      <FormControl>
-                        <SelectTrigger className="bg-white/5 border-white/10 text-white h-10">
-                          <SelectValue placeholder="Select type" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {["Wedding", "Corporate", "Party", "Conference", "Concert", "Restaurant", "Sports", "Other"].map((t) => (
-                          <SelectItem key={t} value={t.toLowerCase()}>
-                            {t}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <FormControl>
+                      <AddressAutocomplete
+                        value={field.value ?? ""}
+                        onChange={(v) => field.onChange(v)}
+                        onSelect={(_placeId, formatted) => {
+                          field.onChange(formatted);
+                          void form.trigger("venueAddress");
+                        }}
+                        onBlur={field.onBlur}
+                        placeholder="Start typing — search UK addresses & places"
+                        variant="dark"
+                      />
+                    </FormControl>
+                    <p className="text-xs text-slate-500 leading-relaxed">
+                      Choose a suggestion so we save a full formatted address. You can fine-tune on the map in the event editor.
+                    </p>
                     <FormMessage />
                   </FormItem>
                 )}
               />
 
               {/* Guest Count + Price Range */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-5 sm:items-start">
                 <FormField
                   control={form.control}
                   name="guestCount"
                   render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="text-sm text-slate-300">
-                        Guest Count
-                      </FormLabel>
+                    <FormItem className={formItemClass}>
+                      <FormLabel className={labelClass}>Guest Count</FormLabel>
                       <Select onValueChange={field.onChange} value={field.value}>
                         <FormControl>
-                          <SelectTrigger className="bg-white/5 border-white/10 text-white h-10">
-                            <SelectValue placeholder="Select" />
+                          <SelectTrigger className={selectTriggerClass}>
+                            <SelectValue placeholder="Select range" />
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
@@ -297,14 +350,12 @@ export default function AIEventCollectInfo({
                   control={form.control}
                   name="priceRange"
                   render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="text-sm text-slate-300">
-                        Price Range
-                      </FormLabel>
+                    <FormItem className={formItemClass}>
+                      <FormLabel className={labelClass}>Price Range</FormLabel>
                       <Select onValueChange={field.onChange} value={field.value}>
                         <FormControl>
-                          <SelectTrigger className="bg-white/5 border-white/10 text-white h-10">
-                            <SelectValue placeholder="Select" />
+                          <SelectTrigger className={selectTriggerClass}>
+                            <SelectValue placeholder="Select range" />
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
@@ -320,96 +371,27 @@ export default function AIEventCollectInfo({
                 />
               </div>
 
-              {/* Additional Details with voice input */}
+              {/* Additional Details */}
               <FormField
                 control={form.control}
                 name="eventDescription"
                 render={({ field }) => (
-                  <FormItem>
-                    <div className="flex items-center justify-between gap-2 mb-2">
-                      <FormLabel className="text-sm text-slate-300">
-                        Additional Details{" "}
-                        <span className="text-slate-500 font-normal">(optional)</span>
-                      </FormLabel>
-                      {voiceSupported ? (
-                        <button
-                          type="button"
-                          onClick={toggleVoice}
-                          title={isListening ? "Stop recording" : "Speak your requirements"}
-                          className={`relative flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all border ${
-                            isListening
-                              ? "bg-red-500/20 border-red-500/40 text-red-400 hover:bg-red-500/30"
-                              : "bg-white/5 border-white/10 text-slate-400 hover:border-white/20 hover:text-slate-200"
-                          }`}
-                        >
-                          {isListening ? (
-                            <>
-                              <span className="absolute inset-0 rounded-full animate-ping bg-red-500/20 pointer-events-none" />
-                              <Square className="w-3 h-3 fill-red-400" />
-                              <span>Stop</span>
-                            </>
-                          ) : (
-                            <>
-                              <Mic className="w-3 h-3" />
-                              <span>Speak</span>
-                            </>
-                          )}
-                        </button>
-                      ) : voiceState === "unsupported" ? (
-                        <span className="flex items-center gap-1 text-xs text-slate-600">
-                          <MicOff className="w-3 h-3" />
-                          Voice not supported
-                        </span>
-                      ) : null}
-                    </div>
-                    {isListening && (
-                      <div className="flex items-center gap-2 mb-2 px-3 py-2 rounded-lg bg-red-500/10 border border-red-500/20">
-                        <div className="flex gap-0.5 items-end h-4">
-                          {[1, 2, 3, 4].map((i) => (
-                            <div
-                              key={i}
-                              className="w-1 rounded-full bg-red-400 animate-pulse"
-                              style={{
-                                height: `${[60, 100, 75, 90][i - 1]}%`,
-                                animationDelay: `${i * 0.1}s`,
-                                animationDuration: "0.8s",
-                              }}
-                            />
-                          ))}
-                        </div>
-                        <span className="text-xs text-red-400 font-medium">Listening…</span>
-                        {interimText && (
-                          <span className="text-xs text-slate-500 italic truncate max-w-[180px]">
-                            {interimText}
-                          </span>
-                        )}
-                      </div>
-                    )}
-                    {voiceState === "error" && (
-                      <p className="text-xs text-amber-400 mb-2">
-                        Microphone access denied or not available. Allow access in browser settings.
-                      </p>
-                    )}
+                  <FormItem className={formItemClass}>
+                    <FormLabel className={labelClass}>
+                      Additional Details{" "}
+                      <span className="text-slate-500 font-normal">(optional)</span>
+                    </FormLabel>
                     <FormControl>
                       <Textarea
                         {...field}
-                        placeholder={
-                          isListening
-                            ? "Listening… speak your requirements…"
-                            : "Describe your event — any specific requirements for tickets, tables, pricing, menu, or other packages that the AI should follow…"
-                        }
+                        placeholder="Describe your event — any specific requirements for tickets, tables, pricing, menu, or other packages that the AI should follow…"
                         maxLength={800}
                         rows={4}
-                        className={`bg-white/5 border-white/10 text-white placeholder:text-slate-500 resize-none ${
-                          isListening ? "border-red-500/30 ring-1 ring-red-500/20" : ""
-                        }`}
+                        className="bg-white/5 border-white/10 text-white placeholder:text-slate-500 resize-none"
                       />
                     </FormControl>
-                    <div className="flex justify-between mt-1">
-                      {voiceSupported && !isListening && (
-                        <span className="text-[10px] text-slate-600 truncate max-w-[50%] sm:max-w-none">Works best in Chrome or Edge</span>
-                      )}
-                      <span className="text-xs text-slate-600 ml-auto">
+                    <div className="flex justify-end mt-1">
+                      <span className="text-xs text-slate-600">
                         {field.value?.length || 0}/800
                       </span>
                     </div>
@@ -419,11 +401,11 @@ export default function AIEventCollectInfo({
               />
 
               {/* Buttons */}
-              <div className="flex flex-col-reverse sm:flex-row gap-3 pt-2">
+              <div className="flex flex-col-reverse gap-3 pt-2 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
                 <button
                   type="button"
                   onClick={onSwitchToManual}
-                  className="flex items-center justify-center gap-2 text-sm text-slate-500 hover:text-slate-300 transition-colors py-2.5 sm:order-2 sm:py-0"
+                  className="flex items-center justify-center gap-2 text-sm text-slate-500 hover:text-slate-300 transition-colors py-2 min-h-[44px] sm:min-h-0 sm:justify-start sm:order-2"
                 >
                   <PenTool className="w-3.5 h-3.5 flex-shrink-0" />
                   Switch to manual setup
@@ -431,7 +413,7 @@ export default function AIEventCollectInfo({
                 <Button
                   type="submit"
                   disabled={isLoading || categoriesLoading}
-                  className="flex-1 min-h-[44px] h-11 rounded-xl text-white font-medium touch-manipulation w-full sm:w-auto"
+                  className="min-h-[44px] h-11 rounded-xl text-white font-medium touch-manipulation w-full sm:w-auto sm:min-w-[200px] sm:order-1"
                   style={{ background: "var(--color-primary, #3b82f6)" }}
                 >
                   {isLoading ? (

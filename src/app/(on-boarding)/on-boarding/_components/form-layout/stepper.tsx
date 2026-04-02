@@ -90,7 +90,7 @@ export default function Stepper({ activeStep }: { activeStep: number }) {
 
         <div className="flex items-center justify-between max-w-7xl mx-auto pl-28 md:pl-32 lg:pl-36 xl:pl-40 pr-4">
           <div className="relative flex-1 overflow-x-auto overflow-y-visible no-scrollbar">
-            <div className="relative flex justify-center items-start space-x-2 md:space-x-3 lg:space-x-4 min-w-max px-4 md:px-6">
+            <div className="relative flex justify-center items-start space-x-2 md:space-x-3 lg:space-x-4 min-w-max px-4 md:px-6 mt-2">
               <div className="absolute top-[22px] left-4 md:left-6 right-4 md:right-6 h-[2px] bg-white/[0.08] z-0 rounded-full" />
 
               <div
@@ -105,11 +105,16 @@ export default function Stepper({ activeStep }: { activeStep: number }) {
               />
 
               {steps.map((step) => {
-                const isCompleted = step.id <= lastCompletedStep;
                 const isCurrent = step.id === activeStep;
+                const isReachable =
+                  step.id <= lastCompletedStep || step.id === activeStep;
+                const isPast = step.id < activeStep;
+                /** Ahead on the line but user can still jump back (e.g. lastCompletedStep ahead of active) */
+                const isAheadUnlocked =
+                  step.id > activeStep && step.id <= lastCompletedStep;
 
                 const handleClick = async () => {
-                  if (isCompleted || step.id === activeStep) {
+                  if (isReachable) {
                     await setActiveStep(step.id);
                   }
                 };
@@ -123,29 +128,36 @@ export default function Stepper({ activeStep }: { activeStep: number }) {
                       <TooltipTrigger asChild>
                     <div
                       onClick={handleClick}
-                      role={isCompleted ? "button" : undefined}
-                      tabIndex={isCompleted ? 0 : -1}
-                      aria-disabled={!isCompleted && step.id !== activeStep}
+                      role={isReachable ? "button" : undefined}
+                      tabIndex={isReachable ? 0 : -1}
+                      aria-current={isCurrent ? "step" : undefined}
+                      aria-label={
+                        isCurrent
+                          ? `${step.label} (current step)`
+                          : step.label
+                      }
+                      aria-disabled={!isReachable}
                       className={cn(
-                        "flex items-center justify-center w-10 h-10 rounded-full border-2 transition-all duration-300 ease-in-out transform",
-                        isCompleted
-                          ? "text-white hover:brightness-110 hover:scale-110 cursor-pointer"
-                          : isCurrent
-                            ? "bg-white shadow-lg hover:scale-110 cursor-pointer"
-                            : "bg-slate-900/80 text-slate-500 border-slate-700/50 cursor-not-allowed",
+                        "flex items-center justify-center rounded-full border-2 transition-all duration-300 ease-in-out transform",
+                        isCurrent
+                          ? "z-30 h-11 w-11 cursor-pointer text-white ring-2 ring-[var(--color-primary,#3b82f6)] ring-offset-2 ring-offset-slate-950 scale-110 shadow-[0_0_28px_color-mix(in_srgb,var(--color-primary,#3b82f6)_55%,transparent)] hover:scale-[1.14]"
+                          : isPast
+                            ? "h-10 w-10 cursor-pointer text-white hover:brightness-110 hover:scale-105 opacity-90 hover:opacity-100"
+                            : isAheadUnlocked
+                              ? "h-10 w-10 cursor-pointer border-[var(--color-primary,#3b82f6)]/60 bg-slate-900/90 text-[var(--color-primary,#7dd3fc)] hover:scale-105 hover:border-[var(--color-primary,#3b82f6)]"
+                              : "h-10 w-10 bg-slate-900/80 text-slate-500 border-slate-700/50 cursor-not-allowed",
                       )}
                       style={
-                        isCompleted
+                        isCurrent
                           ? {
                               background: `linear-gradient(135deg, var(--color-primary, #3b82f6), var(--color-secondary, #8b5cf6))`,
-                              borderColor: `var(--color-primary, #3b82f6)`,
-                              boxShadow: `0 0 15px color-mix(in srgb, var(--color-primary, #3b82f6) 25%, transparent)`,
+                              borderColor: `color-mix(in srgb, white 35%, var(--color-primary, #3b82f6))`,
                             }
-                          : isCurrent
+                          : isPast
                             ? {
-                                borderColor: `var(--color-primary, #3b82f6)`,
-                                color: `var(--color-primary, #3b82f6)`,
-                                boxShadow: `0 0 20px color-mix(in srgb, var(--color-primary, #3b82f6) 20%, transparent)`,
+                                background: `linear-gradient(135deg, var(--color-primary, #3b82f6), var(--color-secondary, #8b5cf6))`,
+                                borderColor: `color-mix(in srgb, var(--color-primary, #3b82f6) 70%, transparent)`,
+                                boxShadow: `0 0 10px color-mix(in srgb, var(--color-primary, #3b82f6) 18%, transparent)`,
                               }
                             : undefined
                       }
@@ -157,8 +169,20 @@ export default function Stepper({ activeStep }: { activeStep: number }) {
                         side="bottom"
                         className="max-w-[220px] border border-white/10 bg-slate-900 text-slate-100 text-xs"
                       >
-                        <span className="font-medium text-white">
+                        <span
+                          className={cn(
+                            "font-medium",
+                            isCurrent
+                              ? "text-[var(--color-primary,#7dd3fc)]"
+                              : "text-white",
+                          )}
+                        >
                           {step.label}
+                          {isCurrent ? (
+                            <span className="ml-1.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--color-primary,#93c5fd)]">
+                              · You are here
+                            </span>
+                          ) : null}
                         </span>
                         <p className="text-slate-400 mt-1 leading-snug">
                           {stepTooltips[step.id] ?? ""}
@@ -169,9 +193,15 @@ export default function Stepper({ activeStep }: { activeStep: number }) {
                       <p
                         className={cn(
                           "text-xs font-medium leading-snug transition-colors",
-                          isCurrent || isCompleted
-                            ? "text-white"
-                            : "text-slate-500",
+                          isCurrent &&
+                            "font-semibold text-[var(--color-primary,#93c5fd)] drop-shadow-[0_0_8px_color-mix(in_srgb,var(--color-primary,#3b82f6)_40%,transparent)]",
+                          !isCurrent &&
+                            (isPast || isAheadUnlocked) &&
+                            "text-white/90",
+                          !isCurrent &&
+                            !isPast &&
+                            !isAheadUnlocked &&
+                            "text-slate-500",
                         )}
                       >
                         {step.label}

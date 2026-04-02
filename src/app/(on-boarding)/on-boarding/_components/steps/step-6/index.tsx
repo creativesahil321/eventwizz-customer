@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useMemo, useCallback } from "react";
-import { useForm, useFieldArray, Controller } from "react-hook-form";
+import { useForm, useFieldArray, Controller, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { CardContent, CardHeader, OnboardingCard } from "@/components/ui/card";
 import {
@@ -20,7 +20,7 @@ import { stepSixSchema, StepSixType } from "../../form-provider/schema";
 import { X, PlusCircle } from "lucide-react";
 import {
   OnboardingTitle,
-  OnboardingSectionTitle,
+  OnboardingFieldGroupTitle,
 } from "@/components/ui/typography";
 import { toast } from "sonner";
 import { onboardingService } from "@/services/vendor/onboarding/onboarding.service";
@@ -29,11 +29,8 @@ import { useFieldFocusHandler } from "../../form-preview/field-focus-handler";
 import { useEventId } from "../../../_lib/hooks/useEventId";
 import { WholeStepGuidedShell } from "../../whole-step-guided-shell";
 import { guidedInsetSectionSurfaceClass } from "../../guided-section-surface";
-import {
-  GuidedWholeStepApproveButton,
-  guidedOnboardingSaveNextButtonClass,
-  guidedOnboardingSkipButtonClass,
-} from "../../guided-sticky-approval-bar";
+import { guidedOnboardingSkipButtonClass } from "../../guided-sticky-approval-bar";
+import { GuidedWholeStepBottomActions } from "../../guided-section-chips";
 import MenuCategoryDropdown from "./menu-category-dropdown";
 import { useEventMenuCategories } from "@/services/vendor/events/query";
 import { EventMenuCategory } from "@/services/vendor/events/type";
@@ -48,7 +45,17 @@ type MenuType = {
 const emptyMenus: MenuType[] = [];
 
 export default function StepSix() {
-  const { form: globalForm, save, setActiveStep } = useFormContext();
+  const {
+    form: globalForm,
+    save,
+    setActiveStep,
+    persistedProgressHydrated,
+  } = useFormContext();
+
+  const stepSixPersistedApproved = useWatch({
+    control: globalForm.control,
+    name: "stepSix.isApproved",
+  });
   const { handleFieldFocus, clearActiveField } = useFieldFocusHandler();
   const { update: updateSession } = useSession();
   const [loading, setLoading] = useState(false);
@@ -64,7 +71,7 @@ export default function StepSix() {
   // Extract menu categories from response
   const eventMenuCategories = useMemo(
     () => menuCategoriesResponse?.data || [],
-    [menuCategoriesResponse]
+    [menuCategoriesResponse],
   );
 
   // Update local state when API data changes
@@ -88,7 +95,7 @@ export default function StepSix() {
             ...menu,
             items: menu.items.filter(
               (item) =>
-                item.title.trim() !== "" || item.description?.trim() !== ""
+                item.title.trim() !== "" || item.description?.trim() !== "",
             ),
           }))
           .filter((menu) => menu.name.trim() !== "" && menu.items.length > 0)
@@ -262,12 +269,12 @@ export default function StepSix() {
       showMenuSection
     ) {
       const selectedCategory = localMenuCategories.find(
-        (cat) => cat.id === Number(categoryId)
+        (cat) => cat.id === Number(categoryId),
       );
 
       if (selectedCategory) {
         const existingMenuIndex = menuFields.findIndex(
-          (field) => field.name === selectedCategory.name
+          (field) => field.name === selectedCategory.name,
         );
 
         if (existingMenuIndex === -1) {
@@ -298,7 +305,7 @@ export default function StepSix() {
 
       // Create a menu entry for this category
       const existingMenuIndex = menuFields.findIndex(
-        (field) => field.name === newCategory.name
+        (field) => field.name === newCategory.name,
       );
 
       if (existingMenuIndex === -1) {
@@ -338,14 +345,14 @@ export default function StepSix() {
         const otherErrorFields = Object.keys(errors).filter(
           (key) =>
             !["menu_title", "menu_description", "menus"].includes(key) ||
-            data.catering_option !== 1
+            data.catering_option !== 1,
         );
 
         if (otherErrorFields.length > 0) {
           errorMessages.push(
             `Please correct the highlighted fields: ${otherErrorFields.join(
-              ", "
-            )}`
+              ", ",
+            )}`,
           );
         }
 
@@ -379,10 +386,7 @@ export default function StepSix() {
         globalForm.setValue("stepSix", baseFormData);
       }
 
-      // Save to global form
-      await save();
-
-      // Store step 6 data with API
+      // Store step 6 data with API (do not await save() here — same pattern as steps 4 & 7)
       // Only send menu-related fields if catering option is Yes
       const payload =
         data.catering_option === 1
@@ -394,11 +398,13 @@ export default function StepSix() {
               menu_description: data.menu_description,
               menus: data.menus || [],
               event_menu_category_id: data.event_menu_category_id,
+              isApproved: true as const,
             }
           : {
               step: 6 as const,
               event_id: data.event_id,
               catering_option: data.catering_option,
+              isApproved: true as const,
             };
 
       const step6Response = await onboardingService.storeStepSixData(payload);
@@ -407,13 +413,20 @@ export default function StepSix() {
         throw new Error("Failed to save catering options");
       }
 
+      globalForm.setValue("stepSix", {
+        ...globalForm.getValues("stepSix"),
+        isApproved: true,
+      });
+
       clearActiveField();
 
-      // INSTANT TRANSITION: Set active step FIRST for smooth UX
+      // INSTANT TRANSITION: move to next step immediately after API success (like step 4)
       setActiveStep(7);
 
-      // Then handle async operations in background
-      updateSession({ on_boarding_step: 7 }).catch((error) => {
+      Promise.all([
+        save(),
+        updateSession({ on_boarding_step: 7 }),
+      ]).catch((error) => {
         console.error("Background save error:", error);
       });
     } catch (error) {
@@ -435,10 +448,7 @@ export default function StepSix() {
 
           <CardContent className="px-6 py-2 pb-8">
             <Form {...form}>
-              <form
-                onSubmit={(e) => e.preventDefault()}
-                className="space-y-6"
-              >
+              <form onSubmit={(e) => e.preventDefault()} className="space-y-6">
                 <input type="hidden" {...form.register("step")} />
                 <input
                   type="hidden"
@@ -452,445 +462,455 @@ export default function StepSix() {
                   sectionId="step-six-catering"
                   chipLabel="Catering & menu"
                   chipDescription="Food choices and optional menu content."
-                  renderFooter={({ guided, sectionId }) => (
-                    <>
-                      <GuidedWholeStepApproveButton
-                        guided={guided}
-                        sectionId={sectionId}
-                      />
-                      <Button
-                        variant="event-primary"
-                        type="button"
-                        className={guidedOnboardingSaveNextButtonClass}
-                        disabled={loading || !guided.allSectionsApproved}
-                        title={
-                          !guided.allSectionsApproved
-                            ? "Approve this step first"
-                            : undefined
-                        }
-                        onClick={() => {
-                          if (!guided.allSectionsApproved) return;
-                          void form.handleSubmit(onSubmit)();
-                        }}
-                      >
-                        {loading ? "Saving..." : "Save & Next"}
-                      </Button>
-                      <Button
-                        variant="event-outline"
-                        type="button"
-                        onClick={() => setActiveStep(7)}
-                        className={guidedOnboardingSkipButtonClass}
-                      >
-                        Skip
-                      </Button>
-                    </>
+                  persistenceHydrated={persistedProgressHydrated}
+                  persistedStepApproved={stepSixPersistedApproved === true}
+                  renderFooter={({ guided }) => (
+                    <GuidedWholeStepBottomActions
+                      guided={guided}
+                      loading={loading}
+                      labelWhenReady="Save & continue"
+                      onContinue={() => void form.handleSubmit(onSubmit)()}
+                      extraActions={
+                        <Button
+                          variant="event-outline"
+                          type="button"
+                          onClick={() => setActiveStep(7)}
+                          className={guidedOnboardingSkipButtonClass}
+                        >
+                          Skip
+                        </Button>
+                      }
+                    />
                   )}
                 >
                   {() => (
                     <>
-                <section className={guidedInsetSectionSurfaceClass("w-full mb-4")}>
-                  <FormField
-                    control={form.control}
-                    name="catering_option"
-                    render={({ field }) => (
-                      <FormItem>
-                        <OnboardingSectionTitle className="text-xl font-medium">
-                          Are there food choices we need to add?
-                        </OnboardingSectionTitle>
-                        <FormControl>
-                          <RadioGroup
-                            onValueChange={(value) => {
-                              const numValue = Number(value);
-                              field.onChange(numValue);
-                              globalForm.setValue(
-                                "stepSix.catering_option",
-                                numValue
+                      <section
+                        className={guidedInsetSectionSurfaceClass(
+                          "w-full mb-4",
+                        )}
+                      >
+                        <FormField
+                          control={form.control}
+                          name="catering_option"
+                          render={({ field }) => (
+                            <FormItem>
+                              <OnboardingFieldGroupTitle>
+                                Are there food choices we need to add?
+                              </OnboardingFieldGroupTitle>
+                              <FormControl>
+                                <RadioGroup
+                                  onValueChange={(value) => {
+                                    const numValue = Number(value);
+                                    field.onChange(numValue);
+                                    globalForm.setValue(
+                                      "stepSix.catering_option",
+                                      numValue,
+                                    );
+                                    setShowMenuSection(numValue === 1);
+                                  }}
+                                  defaultValue={String(field.value)}
+                                  className="flex mt-4 space-x-6"
+                                  onFocus={() =>
+                                    handleFieldFocus("catering_option")
+                                  }
+                                >
+                                  <FormItem className="flex items-center space-x-3 space-y-0">
+                                    <FormControl>
+                                      <RadioGroupItem
+                                        value="1"
+                                        className="text-[#009ead] h-5 w-5 data-[state=checked]:bg-[var(--color-secondary,#009ead)] data-[state=checked]:border-[var(--color-secondary,#009ead)]"
+                                        onFocus={() =>
+                                          handleFieldFocus("catering_option")
+                                        }
+                                      />
+                                    </FormControl>
+                                    <FormLabel className="text-lg font-medium">
+                                      Yes
+                                    </FormLabel>
+                                  </FormItem>
+                                  <FormItem className="flex items-center space-x-3 space-y-0">
+                                    <FormControl>
+                                      <RadioGroupItem
+                                        value="0"
+                                        className="text-[#009ead] h-5 w-5 data-[state=checked]:bg-[var(--color-secondary,#009ead)] data-[state=checked]:border-[var(--color-secondary,#009ead)]"
+                                        onFocus={() =>
+                                          handleFieldFocus("catering_option")
+                                        }
+                                      />
+                                    </FormControl>
+                                    <FormLabel className="text-lg font-medium">
+                                      No
+                                    </FormLabel>
+                                  </FormItem>
+                                </RadioGroup>
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </section>
+
+                      {showMenuSection && (
+                        <div className="my-6 border-t border-white/10 pt-6">
+                          <OnboardingFieldGroupTitle className="mb-4">
+                            Menu Details
+                          </OnboardingFieldGroupTitle>
+
+                          <FormField
+                            control={form.control}
+                            name="menu_title"
+                            render={({ field }) => {
+                              const maxLength = 40;
+                              const currentLength = field.value?.length || 0;
+                              return (
+                                <FormItem>
+                                  <FormLabel className="text-base font-medium">
+                                    Menu Title
+                                  </FormLabel>
+                                  <FormControl>
+                                    <Input
+                                      {...field}
+                                      placeholder="e.g., The Menus"
+                                      className="h-10 bg-white/5 border-white/10"
+                                      maxLength={maxLength}
+                                      onChange={(e) => {
+                                        field.onChange(e);
+                                        globalForm.setValue(
+                                          "stepSix.menu_title",
+                                          e.target.value,
+                                        );
+                                      }}
+                                      onFocus={() =>
+                                        handleFieldFocus("menu_title")
+                                      }
+                                    />
+                                  </FormControl>
+                                  <div className="flex justify-end mt-1">
+                                    <span
+                                      className={`text-xs ${
+                                        currentLength > maxLength
+                                          ? "text-destructive"
+                                          : ""
+                                      }`}
+                                    >
+                                      {currentLength}/{maxLength} characters
+                                    </span>
+                                  </div>
+                                  <FormMessage />
+                                </FormItem>
                               );
-                              setShowMenuSection(numValue === 1);
                             }}
-                            defaultValue={String(field.value)}
-                            className="flex mt-4 space-x-6"
-                            onFocus={() => handleFieldFocus("catering_option")}
-                          >
-                            <FormItem className="flex items-center space-x-3 space-y-0">
-                              <FormControl>
-                                <RadioGroupItem
-                                  value="1"
-                                  className="text-[#009ead] h-5 w-5 data-[state=checked]:bg-[var(--color-secondary,#009ead)] data-[state=checked]:border-[var(--color-secondary,#009ead)]"
-                                  onFocus={() =>
-                                    handleFieldFocus("catering_option")
-                                  }
-                                />
-                              </FormControl>
-                              <FormLabel className="text-lg font-medium">
-                                Yes
-                              </FormLabel>
-                            </FormItem>
-                            <FormItem className="flex items-center space-x-3 space-y-0">
-                              <FormControl>
-                                <RadioGroupItem
-                                  value="0"
-                                  className="text-[#009ead] h-5 w-5 data-[state=checked]:bg-[var(--color-secondary,#009ead)] data-[state=checked]:border-[var(--color-secondary,#009ead)]"
-                                  onFocus={() =>
-                                    handleFieldFocus("catering_option")
-                                  }
-                                />
-                              </FormControl>
-                              <FormLabel className="text-lg font-medium">
-                                No
-                              </FormLabel>
-                            </FormItem>
-                          </RadioGroup>
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </section>
+                          />
 
-                {showMenuSection && (
-                  <div className="border-t border-gray-200 my-6 pt-6">
-                    <OnboardingSectionTitle className="text-xl font-medium mb-4">
-                      Menu Details
-                    </OnboardingSectionTitle>
+                          <FormField
+                            control={form.control}
+                            name="menu_description"
+                            render={({ field }) => {
+                              const maxLength = 160;
+                              const currentLength = field.value?.length || 0;
+                              return (
+                                <FormItem className="mt-4">
+                                  <FormLabel className="text-base font-medium">
+                                    Menu Description
+                                  </FormLabel>
+                                  <FormControl>
+                                    <Input
+                                      {...field}
+                                      placeholder="e.g., Select The Menus"
+                                      className="h-10 bg-white/5 border-white/10"
+                                      maxLength={maxLength}
+                                      onChange={(e) => {
+                                        field.onChange(e);
+                                        globalForm.setValue(
+                                          "stepSix.menu_description",
+                                          e.target.value,
+                                        );
+                                      }}
+                                      onFocus={() =>
+                                        handleFieldFocus("menu_description")
+                                      }
+                                    />
+                                  </FormControl>
+                                  <div className="flex justify-end mt-1">
+                                    <span
+                                      className={`text-xs ${
+                                        currentLength > maxLength
+                                          ? "text-destructive"
+                                          : ""
+                                      }`}
+                                    >
+                                      {currentLength}/{maxLength} characters
+                                    </span>
+                                  </div>
+                                  <FormMessage />
+                                </FormItem>
+                              );
+                            }}
+                          />
 
-                    <FormField
-                      control={form.control}
-                      name="menu_title"
-                      render={({ field }) => {
-                        const maxLength = 40;
-                        const currentLength = field.value?.length || 0;
-                        return (
-                          <FormItem>
-                            <FormLabel className="text-base font-medium">
-                              Menu Title
-                            </FormLabel>
-                            <FormControl>
-                              <Input
-                                {...field}
-                                placeholder="e.g., The Menus"
-                                className="h-10 bg-white/5 border-white/10"
-                                maxLength={maxLength}
-                                onChange={(e) => {
-                                  field.onChange(e);
-                                  globalForm.setValue(
-                                    "stepSix.menu_title",
-                                    e.target.value
-                                  );
-                                }}
-                                onFocus={() => handleFieldFocus("menu_title")}
-                              />
-                            </FormControl>
-                            <div className="flex justify-end mt-1">
-                              <span
-                                className={`text-xs ${
-                                  currentLength > maxLength
-                                    ? "text-destructive"
-                                    : ""
-                                }`}
-                              >
-                                {currentLength}/{maxLength} characters
-                              </span>
-                            </div>
-                            <FormMessage />
-                          </FormItem>
-                        );
-                      }}
-                    />
-
-                    <FormField
-                      control={form.control}
-                      name="menu_description"
-                      render={({ field }) => {
-                        const maxLength = 160;
-                        const currentLength = field.value?.length || 0;
-                        return (
+                          {/* Menu Category field */}
                           <FormItem className="mt-4">
                             <FormLabel className="text-base font-medium">
-                              Menu Description
+                              Menu Category
                             </FormLabel>
-                            <FormControl>
-                              <Input
-                                {...field}
-                                placeholder="e.g., Select The Menus"
-                                className="h-10 bg-white/5 border-white/10"
-                                maxLength={maxLength}
-                                onChange={(e) => {
-                                  field.onChange(e);
-                                  globalForm.setValue(
-                                    "stepSix.menu_description",
-                                    e.target.value
-                                  );
-                                }}
-                                onFocus={() =>
-                                  handleFieldFocus("menu_description")
-                                }
-                              />
-                            </FormControl>
-                            <div className="flex justify-end mt-1">
-                              <span
-                                className={`text-xs ${
-                                  currentLength > maxLength
-                                    ? "text-destructive"
-                                    : ""
-                                }`}
-                              >
-                                {currentLength}/{maxLength} characters
-                              </span>
-                            </div>
-                            <FormMessage />
-                          </FormItem>
-                        );
-                      }}
-                    />
+                            <Controller
+                              control={form.control}
+                              name="event_menu_category_id"
+                              render={({ field }) => (
+                                <FormControl>
+                                  <MenuCategoryDropdown
+                                    categories={localMenuCategories}
+                                    onSelect={(value) => {
+                                      field.onChange(Number(value));
+                                      globalForm.setValue(
+                                        "stepSix.event_menu_category_id",
+                                        Number(value),
+                                      );
 
-                    {/* Menu Category field */}
-                    <FormItem className="mt-4">
-                      <FormLabel className="text-base font-medium">
-                        Menu Category
-                      </FormLabel>
-                      <Controller
-                        control={form.control}
-                        name="event_menu_category_id"
-                        render={({ field }) => (
-                          <FormControl>
-                            <MenuCategoryDropdown
-                              categories={localMenuCategories}
-                              onSelect={(value) => {
-                                field.onChange(Number(value));
-                                globalForm.setValue(
-                                  "stepSix.event_menu_category_id",
-                                  Number(value)
-                                );
+                                      // Add the selected category to the menu items if it doesn't exist
+                                      const selectedCategory =
+                                        localMenuCategories.find(
+                                          (cat) => cat.id === Number(value),
+                                        );
 
-                                // Add the selected category to the menu items if it doesn't exist
-                                const selectedCategory =
-                                  localMenuCategories.find(
-                                    (cat) => cat.id === Number(value)
-                                  );
-
-                                if (selectedCategory) {
-                                  const existingMenuIndex =
-                                    menuFields.findIndex(
-                                      (field) =>
-                                        field.name === selectedCategory.name
-                                    );
-
-                                  if (existingMenuIndex === -1) {
-                                    createMenuEntry(selectedCategory.name);
-                                  }
-                                }
-                              }}
-                              isLoading={isMenuCategoriesLoading}
-                              initialValue={initialMenuCategoryId}
-                              onCategoryCreated={handleMenuCategoryCreated}
-                              disabled={menuFields.length >= 4}
-                              eventId={getCurrentEventId()}
-                            />
-                          </FormControl>
-                        )}
-                      />
-                      {form.formState.errors.event_menu_category_id && (
-                        <FormMessage>
-                          {form.formState.errors.event_menu_category_id.message}
-                        </FormMessage>
-                      )}
-                      {menuFields.length >= 4 && (
-                        <p className="text-amber-600 text-sm mt-2">
-                          Maximum limit of 4 menu categories reached.
-                        </p>
-                      )}
-                    </FormItem>
-
-                    {menuFields.length === 0 && form.formState.errors.menus && (
-                      <FormMessage className="mt-2">
-                        {form.formState.errors.menus.message}
-                      </FormMessage>
-                    )}
-
-                    {menuFields.length > 0 && (
-                      <div className="space-y-6 mt-4">
-                        {menuFields.map((menu, menuIndex) => (
-                          <div
-                            key={menu.id}
-                            className="space-y-4 border border-white/10 p-4 rounded-md bg-white"
-                          >
-                            <div className="flex justify-between items-center">
-                              <h3 className="text-md font-semibold text-slate-100">
-                                {menu.name}
-                              </h3>
-                              <Button
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                onClick={() => removeMenu(menuIndex)}
-                                className="h-8 w-8 p-0 rounded-full"
-                              >
-                                <X size={16} />
-                              </Button>
-                            </div>
-
-                            <div className="space-y-4">
-                              {form
-                                .watch(`menus.${menuIndex}.items`)
-                                ?.map((item, itemIndex) => (
-                                  <div
-                                    key={itemIndex}
-                                    className="flex flex-col gap-4"
-                                  >
-                                    <div className="flex gap-4 items-start">
-                                      <FormField
-                                        control={form.control}
-                                        name={`menus.${menuIndex}.items.${itemIndex}.title`}
-                                        render={({ field }) => {
-                                          const maxLength = 40;
-                                          const currentLength =
-                                            field.value?.length || 0;
-                                          return (
-                                            <FormItem className="flex-1">
-                                              <FormLabel className="text-sm font-medium">
-                                                Item Title
-                                              </FormLabel>
-                                              <FormControl>
-                                                <Input
-                                                  {...field}
-                                                  placeholder="e.g., Chicken Curry"
-                                                  className="h-10 bg-white/5 border-white/10"
-                                                  maxLength={maxLength}
-                                                  onChange={(e) => {
-                                                    field.onChange(e);
-                                                    // Update global form immediately
-                                                    const currentMenus =
-                                                      form.getValues("menus");
-                                                    if (
-                                                      currentMenus &&
-                                                      currentMenus.length >
-                                                        menuIndex
-                                                    ) {
-                                                      const updatedMenus = [
-                                                        ...currentMenus,
-                                                      ];
-                                                      updatedMenus[
-                                                        menuIndex
-                                                      ].items[itemIndex].title =
-                                                        e.target.value;
-                                                      globalForm.setValue(
-                                                        "stepSix.menus",
-                                                        updatedMenus
-                                                      );
-                                                    }
-                                                  }}
-                                                  onFocus={() =>
-                                                    handleFieldFocus(
-                                                      `menus.${menuIndex}.items.${itemIndex}.title`
-                                                    )
-                                                  }
-                                                />
-                                              </FormControl>
-                                              <div className="flex justify-end mt-1">
-                                                <span
-                                                  className={`text-xs ${
-                                                    currentLength > maxLength
-                                                      ? "text-destructive"
-                                                      : ""
-                                                  }`}
-                                                >
-                                                  {currentLength}/{maxLength}{" "}
-                                                  characters
-                                                </span>
-                                              </div>
-                                              <FormMessage />
-                                            </FormItem>
+                                      if (selectedCategory) {
+                                        const existingMenuIndex =
+                                          menuFields.findIndex(
+                                            (field) =>
+                                              field.name ===
+                                              selectedCategory.name,
                                           );
-                                        }}
-                                      />
-                                      <div className="pt-6">
-                                        <Button
-                                          type="button"
-                                          variant="outline"
-                                          size="sm"
-                                          onClick={() =>
-                                            handleRemoveItem(
-                                              menuIndex,
-                                              itemIndex
-                                            )
-                                          }
-                                          className="h-8 w-8 p-0 rounded-full border-red-400 text-red-500"
-                                          disabled={
-                                            form.watch(
-                                              `menus.${menuIndex}.items`
-                                            )?.length === 1
-                                          }
+
+                                        if (existingMenuIndex === -1) {
+                                          createMenuEntry(
+                                            selectedCategory.name,
+                                          );
+                                        }
+                                      }
+                                    }}
+                                    isLoading={isMenuCategoriesLoading}
+                                    initialValue={initialMenuCategoryId}
+                                    onCategoryCreated={
+                                      handleMenuCategoryCreated
+                                    }
+                                    disabled={menuFields.length >= 4}
+                                    eventId={getCurrentEventId()}
+                                  />
+                                </FormControl>
+                              )}
+                            />
+                            {form.formState.errors.event_menu_category_id && (
+                              <FormMessage>
+                                {
+                                  form.formState.errors.event_menu_category_id
+                                    .message
+                                }
+                              </FormMessage>
+                            )}
+                            {menuFields.length >= 4 && (
+                              <p className="text-amber-600 text-sm mt-2">
+                                Maximum limit of 4 menu categories reached.
+                              </p>
+                            )}
+                          </FormItem>
+
+                          {menuFields.length === 0 &&
+                            form.formState.errors.menus && (
+                              <FormMessage className="mt-2">
+                                {form.formState.errors.menus.message}
+                              </FormMessage>
+                            )}
+
+                          {menuFields.length > 0 && (
+                            <div className="space-y-6 mt-4">
+                              {menuFields.map((menu, menuIndex) => (
+                                <div
+                                  key={menu.id}
+                                  className="space-y-4 rounded-lg border border-white/10 bg-white/[0.03] p-4"
+                                >
+                                  <div className="flex justify-between items-center">
+                                    <h3 className="text-md font-semibold text-slate-100">
+                                      {menu.name}
+                                    </h3>
+                                    <Button
+                                      type="button"
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => removeMenu(menuIndex)}
+                                      className="h-8 w-8 p-0 rounded-full"
+                                    >
+                                      <X size={16} />
+                                    </Button>
+                                  </div>
+
+                                  <div className="space-y-4">
+                                    {form
+                                      .watch(`menus.${menuIndex}.items`)
+                                      ?.map((item, itemIndex) => (
+                                        <div
+                                          key={itemIndex}
+                                          className="flex flex-col gap-4"
                                         >
-                                          <X size={16} />
-                                        </Button>
-                                      </div>
-                                    </div>
-                                    <FormField
-                                      control={form.control}
-                                      name={`menus.${menuIndex}.items.${itemIndex}.description`}
-                                      render={({ field }) => (
-                                        <FormItem>
-                                          <FormLabel className="text-sm font-medium">
-                                            Description
-                                          </FormLabel>
-                                          <FormControl>
-                                            <Input
-                                              {...field}
-                                              placeholder="e.g., Spicy chicken with basmati rice"
-                                              className="h-10 bg-white/5 border-white/10"
-                                              maxLength={160}
-                                              onChange={(e) => {
-                                                field.onChange(e);
-                                                // Update global form immediately
-                                                const currentMenus =
-                                                  form.getValues("menus");
-                                                if (
-                                                  currentMenus &&
-                                                  currentMenus.length >
-                                                    menuIndex
-                                                ) {
-                                                  const updatedMenus = [
-                                                    ...currentMenus,
-                                                  ];
-                                                  updatedMenus[menuIndex].items[
-                                                    itemIndex
-                                                  ].description =
-                                                    e.target.value;
-                                                  globalForm.setValue(
-                                                    "stepSix.menus",
-                                                    updatedMenus
-                                                  );
-                                                }
+                                          <div className="flex gap-4 items-start">
+                                            <FormField
+                                              control={form.control}
+                                              name={`menus.${menuIndex}.items.${itemIndex}.title`}
+                                              render={({ field }) => {
+                                                const maxLength = 40;
+                                                const currentLength =
+                                                  field.value?.length || 0;
+                                                return (
+                                                  <FormItem className="flex-1">
+                                                    <FormLabel className="text-sm font-medium">
+                                                      Item Title
+                                                    </FormLabel>
+                                                    <FormControl>
+                                                      <Input
+                                                        {...field}
+                                                        placeholder="e.g., Chicken Curry"
+                                                        className="h-10 bg-white/5 border-white/10"
+                                                        maxLength={maxLength}
+                                                        onChange={(e) => {
+                                                          field.onChange(e);
+                                                          // Update global form immediately
+                                                          const currentMenus =
+                                                            form.getValues(
+                                                              "menus",
+                                                            );
+                                                          if (
+                                                            currentMenus &&
+                                                            currentMenus.length >
+                                                              menuIndex
+                                                          ) {
+                                                            const updatedMenus =
+                                                              [...currentMenus];
+                                                            updatedMenus[
+                                                              menuIndex
+                                                            ].items[
+                                                              itemIndex
+                                                            ].title =
+                                                              e.target.value;
+                                                            globalForm.setValue(
+                                                              "stepSix.menus",
+                                                              updatedMenus,
+                                                            );
+                                                          }
+                                                        }}
+                                                        onFocus={() =>
+                                                          handleFieldFocus(
+                                                            `menus.${menuIndex}.items.${itemIndex}.title`,
+                                                          )
+                                                        }
+                                                      />
+                                                    </FormControl>
+                                                    <div className="flex justify-end mt-1">
+                                                      <span
+                                                        className={`text-xs ${
+                                                          currentLength >
+                                                          maxLength
+                                                            ? "text-destructive"
+                                                            : ""
+                                                        }`}
+                                                      >
+                                                        {currentLength}/
+                                                        {maxLength} characters
+                                                      </span>
+                                                    </div>
+                                                    <FormMessage />
+                                                  </FormItem>
+                                                );
                                               }}
                                             />
-                                          </FormControl>
-                                          <FormMessage />
-                                        </FormItem>
-                                      )}
-                                    />
+                                            <div className="pt-6">
+                                              <Button
+                                                type="button"
+                                                variant="outline"
+                                                size="sm"
+                                                onClick={() =>
+                                                  handleRemoveItem(
+                                                    menuIndex,
+                                                    itemIndex,
+                                                  )
+                                                }
+                                                className="h-8 w-8 p-0 rounded-full border-red-400 text-red-500"
+                                                disabled={
+                                                  form.watch(
+                                                    `menus.${menuIndex}.items`,
+                                                  )?.length === 1
+                                                }
+                                              >
+                                                <X size={16} />
+                                              </Button>
+                                            </div>
+                                          </div>
+                                          <FormField
+                                            control={form.control}
+                                            name={`menus.${menuIndex}.items.${itemIndex}.description`}
+                                            render={({ field }) => (
+                                              <FormItem>
+                                                <FormLabel className="text-sm font-medium">
+                                                  Description
+                                                </FormLabel>
+                                                <FormControl>
+                                                  <Input
+                                                    {...field}
+                                                    placeholder="e.g., Spicy chicken with basmati rice"
+                                                    className="h-10 bg-white/5 border-white/10"
+                                                    maxLength={160}
+                                                    onChange={(e) => {
+                                                      field.onChange(e);
+                                                      // Update global form immediately
+                                                      const currentMenus =
+                                                        form.getValues("menus");
+                                                      if (
+                                                        currentMenus &&
+                                                        currentMenus.length >
+                                                          menuIndex
+                                                      ) {
+                                                        const updatedMenus = [
+                                                          ...currentMenus,
+                                                        ];
+                                                        updatedMenus[
+                                                          menuIndex
+                                                        ].items[
+                                                          itemIndex
+                                                        ].description =
+                                                          e.target.value;
+                                                        globalForm.setValue(
+                                                          "stepSix.menus",
+                                                          updatedMenus,
+                                                        );
+                                                      }
+                                                    }}
+                                                  />
+                                                </FormControl>
+                                                <FormMessage />
+                                              </FormItem>
+                                            )}
+                                          />
+                                        </div>
+                                      ))}
+                                    <Button
+                                      type="button"
+                                      variant="event-outline"
+                                      onClick={() => appendItem(menuIndex)}
+                                      disabled={
+                                        (form.watch(`menus.${menuIndex}.items`)
+                                          ?.length || 0) >= 10
+                                      }
+                                      className="text-white"
+                                    >
+                                      <PlusCircle className="h-4 w-4 mr-2" />
+                                      Add Menu Item
+                                    </Button>
                                   </div>
-                                ))}
-                              <Button
-                                type="button"
-                                variant="event-outline"
-                                onClick={() => appendItem(menuIndex)}
-                                disabled={
-                                  (form.watch(`menus.${menuIndex}.items`)
-                                    ?.length || 0) >= 10
-                                }
-                                className="text-white"
-                              >
-                                <PlusCircle className="h-4 w-4 mr-2" />
-                                Add Menu Item
-                              </Button>
+                                </div>
+                              ))}
                             </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                )}
+                          )}
+                        </div>
+                      )}
                     </>
                   )}
                 </WholeStepGuidedShell>

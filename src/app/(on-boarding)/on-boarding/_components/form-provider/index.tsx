@@ -29,9 +29,14 @@ interface FormContextType {
   form: UseFormReturn<OnboardingFormData>;
   activeStep: number;
   lastCompletedStep: number; // Add lastCompletedStep
+  /** True after persistence GET was merged into the form (per-step `isApproved` is reliable). */
+  persistedProgressHydrated: boolean;
   activeField: string | null;
   setActiveField: (fieldName: string | null) => void;
-  setActiveStep: (step: number) => Promise<void>;
+  setActiveStep: (
+    step: number,
+    options?: { skipSessionSync?: boolean },
+  ) => Promise<void>;
   save: () => Promise<void>;
   next: () => Promise<void>;
   back: () => Promise<void>;
@@ -96,6 +101,19 @@ function patchOnboardingPayloadFromApi(
   return dataAny;
 }
 
+function parseLastCompletedStepFromPayload(
+  dataAny: Record<string, unknown>,
+  stepFromData: number,
+): number {
+  const raw = dataAny.last_completed_step ?? dataAny.lastCompletedStep;
+  if (raw !== undefined && raw !== null && raw !== "") {
+    const n = Number(raw);
+    if (!Number.isNaN(n) && n >= 0) return n;
+  }
+  if (stepFromData > 0) return Math.max(stepFromData, 1);
+  return 1;
+}
+
 // Simplified saveStepData function
 const saveStepData = async (): Promise<{ success: boolean }> => {
   return new Promise((resolve) => {
@@ -121,6 +139,8 @@ export function FormProvider({
   // Get initial step after component mount
   const [activeStep, setActiveStep] = useState<number>(1); // Default to 1
   const [lastCompletedStep, setLastCompletedStep] = useState<number>(1); // Track last completed step
+  const [persistedProgressHydrated, setPersistedProgressHydrated] =
+    useState(false);
   const [activeField, setActiveField] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [initialDataLoaded, setInitialDataLoaded] = useState(false);
@@ -167,6 +187,7 @@ export function FormProvider({
           ...(formData as object),
         } as Record<string, unknown>);
         form.reset(dataAny as unknown as OnboardingFormData);
+        setPersistedProgressHydrated(true);
 
         // Update active step if available
         const stepFromData =
@@ -179,15 +200,11 @@ export function FormProvider({
           setActiveStep(stepFromData);
         }
 
-        // Update last completed step if available
-        const lastCompleted =
-          Number(dataAny.last_completed_step) ||
-          Number(dataAny.lastCompletedStep) ||
-          Math.max(Number(stepFromData || 1), 1);
-
-        if (lastCompleted && lastCompleted > 0) {
-          setLastCompletedStep(lastCompleted);
-        }
+        const lastCompleted = parseLastCompletedStepFromPayload(
+          dataAny,
+          stepFromData,
+        );
+        setLastCompletedStep(lastCompleted >= 0 ? lastCompleted : 1);
       }
     }
   }, [serverData, form]);
@@ -220,7 +237,7 @@ export function FormProvider({
 
   // Custom function to set active step and update session - instant with no delay
   const updateActiveStep = useCallback(
-    async (step: number) => {
+    async (step: number, options?: { skipSessionSync?: boolean }) => {
       setActiveField(null); // Reset active field when changing steps
 
       // Update step immediately - no delay, no blank screen
@@ -229,6 +246,10 @@ export function FormProvider({
       // Update last completed step if moving forward
       if (step > lastCompletedStep) {
         setLastCompletedStep(step);
+      }
+
+      if (options?.skipSessionSync) {
+        return;
       }
 
       // Update the session using NextAuth (async in background)
@@ -361,7 +382,8 @@ export function FormProvider({
     () => ({
       form,
       activeStep,
-      lastCompletedStep, // Add lastCompletedStep to context value
+      lastCompletedStep,
+      persistedProgressHydrated,
       activeField,
       setActiveField,
       setActiveStep: updateActiveStep,
@@ -373,7 +395,8 @@ export function FormProvider({
     [
       form,
       activeStep,
-      lastCompletedStep, // Add lastCompletedStep to context value
+      lastCompletedStep,
+      persistedProgressHydrated,
       activeField,
       setActiveField,
       isLoading,
@@ -386,8 +409,8 @@ export function FormProvider({
 
   // Determine the layout type for the skeleton based on the active step
   const getSkeletonLayout = () => {
-    const splitLayoutSteps = new Set([2, 3, 4, 6, 7, 8, 9]);
-    const centeredSteps = new Set([5, 6, 11, 10, 12]);
+    const splitLayoutSteps = new Set([2, 3, 4, 5, 6, 7, 8, 9]);
+    const centeredSteps = new Set([6, 11, 10, 12]);
 
     if (splitLayoutSteps.has(activeStep)) {
       return "split";

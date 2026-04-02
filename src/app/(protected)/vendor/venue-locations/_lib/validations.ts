@@ -15,7 +15,15 @@ export const locationSchema = z.object({
   name: z.string().optional(), // Set from venue (create) or location (update)
   address: z.string().min(1, "Address is required"),
   city: z.string().min(1, "City is required"),
-  email: z.string().min(1, "Email is required").email("Invalid email format"),
+  email: z
+    .string()
+    .transform((s) => s.trim())
+    .pipe(
+      z.union([
+        z.literal(""),
+        z.string().email("Invalid email format"),
+      ]),
+    ),
   contact_number: z.string().min(1, "Contact number is required"),
   slug: z.string().optional(),
   is_default: z.boolean().default(false),

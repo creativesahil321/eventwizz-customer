@@ -424,7 +424,7 @@ export default function EventLocationMap({
       <div className="relative">
         <div
           ref={mapRef}
-          className="w-full h-64 rounded-lg border border-gray-300 overflow-hidden"
+          className="h-64 w-full overflow-hidden rounded-lg border border-white/20"
           style={{ minHeight: "256px" }}
         />
 
@@ -451,10 +451,10 @@ export default function EventLocationMap({
 
         {/* Loading Overlay */}
         {isLoading && (
-          <div className="absolute inset-0 bg-white bg-opacity-75 flex items-center justify-center rounded-lg">
+          <div className="absolute inset-0 flex items-center justify-center rounded-lg bg-slate-950/80 backdrop-blur-sm">
             <div className="flex items-center space-x-2">
-              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
-              <span className="text-sm text-gray-600">Loading map...</span>
+              <div className="h-6 w-6 animate-spin rounded-full border-2 border-white/20 border-t-[var(--color-primary,#38bdf8)]" />
+              <span className="text-sm text-muted-foreground">Loading map...</span>
             </div>
           </div>
         )}
@@ -477,14 +477,14 @@ export default function EventLocationMap({
 
       {/* Location Info */}
       {currentLocation && !isLoading && (
-        <div className="bg-gray-50 rounded-lg p-3 text-xs">
+        <div className="rounded-lg border border-white/10 bg-white/[0.04] p-3 text-xs">
           <div className="flex items-center justify-between">
             <div className="flex-1">
-              <p className="font-medium text-gray-700 mb-1">
+              <p className="mb-1 font-medium text-foreground">
                 Selected Location:
               </p>
-              <p className="text-gray-600 mb-1">{currentLocation.address}</p>
-              <p className="text-gray-500">
+              <p className="mb-1 text-muted-foreground">{currentLocation.address}</p>
+              <p className="text-muted-foreground/90">
                 Coordinates: {currentLocation.latitude.toFixed(6)},{" "}
                 {currentLocation.longitude.toFixed(6)}
               </p>

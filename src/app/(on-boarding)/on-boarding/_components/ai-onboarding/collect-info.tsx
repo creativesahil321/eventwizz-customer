@@ -17,14 +17,10 @@ import {
   Search,
   X,
   Info,
-  Mic,
-  MicOff,
-  Square,
 } from "lucide-react";
 import { env } from "@/env";
 import type { AIOnboardingInput } from "@/app/api/ai/generate-onboarding/route";
 import { useEventCategories } from "@/services/vendor/events/query";
-import { useVoiceInput } from "@/hooks/useVoiceInput";
 import { useCurrencySymbol } from "@/hooks/use-currency-format";
 
 const themeAccent = {
@@ -395,17 +391,6 @@ export default function AICollectInfo({
     setLocationGateDone(true);
   };
 
-  // ─── Voice input for description ────────────────────────────────────────
-  const {
-    voiceState,
-    interimText,
-    toggle: toggleVoice,
-    isSupported: voiceSupported,
-  } = useVoiceInput((text: string) => {
-    form.setValue("description", text, { shouldValidate: true });
-  });
-  const isListening = voiceState === "listening";
-
   return (
     <div className="relative z-10 flex items-center justify-center min-h-screen py-10 px-4">
       <div className="w-full max-w-2xl">
@@ -775,122 +760,31 @@ export default function AICollectInfo({
               </div>
             </div>
 
-            {/* Enhanced Description with Voice */}
+            {/* Description (optional — helps AI) */}
             <div>
-              <div className="flex items-center justify-between mb-2">
-                <label className="flex items-center gap-2 text-sm font-medium text-slate-300">
-                  <Info className="w-4 h-4" style={themeAccent.text} />
-                  Describe your event setup{" "}
-                  <span className="text-slate-500 font-normal">
-                    (optional but helps AI)
-                  </span>
-                </label>
-
-                {/* Voice button */}
-                {voiceSupported ? (
-                  <button
-                    type="button"
-                    onClick={toggleVoice}
-                    title={
-                      isListening ? "Stop recording" : "Speak your requirements"
-                    }
-                    className={`relative flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all duration-300 border ${
-                      isListening
-                        ? "bg-red-500/20 border-red-500/40 text-red-400 hover:bg-red-500/30"
-                        : "bg-white/5 border-white/10 text-slate-400 hover:border-white/20 hover:text-slate-200"
-                    }`}
-                  >
-                    {isListening ? (
-                      <>
-                        {/* Pulsing ring */}
-                        <span className="absolute inset-0 rounded-full animate-ping bg-red-500/20 pointer-events-none" />
-                        <Square className="w-3 h-3 fill-red-400" />
-                        <span>Stop</span>
-                      </>
-                    ) : (
-                      <>
-                        <Mic className="w-3 h-3" />
-                        <span>Speak</span>
-                      </>
-                    )}
-                  </button>
-                ) : voiceState === "unsupported" ? (
-                  <span className="flex items-center gap-1 text-xs text-slate-600">
-                    <MicOff className="w-3 h-3" />
-                    Voice not supported
-                  </span>
-                ) : null}
-              </div>
+              <label className="flex items-center gap-2 text-sm font-medium text-slate-300 mb-2">
+                <Info className="w-4 h-4" style={themeAccent.text} />
+                Describe your event setup{" "}
+                <span className="text-slate-500 font-normal">
+                  (optional but helps AI)
+                </span>
+              </label>
 
               <p className="text-slate-500 text-xs mb-2.5 leading-relaxed">
                 The more detail you give, the better AI generates your site.
                 Include ticket types, table configurations, pricing, food
                 preferences, guest count, etc.
-                {voiceSupported && (
-                  <span className="text-slate-600">
-                    {" "}
-                    — or tap <strong className="text-slate-500">
-                      Speak
-                    </strong>{" "}
-                    and just talk.
-                  </span>
-                )}
               </p>
-
-              {/* Listening indicator */}
-              {isListening && (
-                <div className="flex items-center gap-2 mb-2 px-3 py-2 rounded-lg bg-red-500/10 border border-red-500/20">
-                  <div className="flex gap-0.5 items-end h-4">
-                    {[1, 2, 3, 4].map((i) => (
-                      <div
-                        key={i}
-                        className="w-1 rounded-full bg-red-400 animate-pulse"
-                        style={{
-                          height: `${[60, 100, 75, 90][i - 1]}%`,
-                          animationDelay: `${i * 0.1}s`,
-                          animationDuration: "0.8s",
-                        }}
-                      />
-                    ))}
-                  </div>
-                  <span className="text-xs text-red-400 font-medium">
-                    Listening… speak clearly
-                  </span>
-                  {interimText && (
-                    <span className="text-xs text-slate-500 italic truncate max-w-[180px]">
-                      {interimText}
-                    </span>
-                  )}
-                </div>
-              )}
-
-              {voiceState === "error" && (
-                <p className="text-xs text-amber-400 mb-2">
-                  ⚠ Microphone access denied or not available. Please allow
-                  access in your browser settings.
-                </p>
-              )}
 
               <textarea
                 {...form.register("description")}
-                placeholder={
-                  isListening
-                    ? "Listening… speak your requirements…"
-                    : `Example: "We host premium wedding events for 200+ guests. We offer 2 ticket types: General (${currencySymbol}50) and VIP (${currencySymbol}120, includes dinner). We have 50 tables…"`
-                }
+                placeholder={`Example: "We host premium wedding events for 200+ guests. We offer 2 ticket types: General (${currencySymbol}50) and VIP (${currencySymbol}120, includes dinner). We have 50 tables…"`}
                 rows={5}
                 maxLength={800}
-                className={`${INPUT_CLASS} resize-none transition-all duration-300 ${
-                  isListening ? "border-red-500/30 ring-1 ring-red-500/20" : ""
-                }`}
+                className={`${INPUT_CLASS} resize-none`}
               />
-              <div className="flex items-center justify-between mt-1">
-                {voiceSupported && !isListening && (
-                  <p className="text-[10px] text-slate-600">
-                    🎤 Works best in Chrome or Edge
-                  </p>
-                )}
-                <p className="text-slate-600 text-xs ml-auto">
+              <div className="flex justify-end mt-1">
+                <p className="text-slate-600 text-xs">
                   {form.watch("description")?.length || 0}/800
                 </p>
               </div>

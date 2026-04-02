@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { FileText, Upload, X } from "lucide-react";
+import { CheckCircle2, FileText, Upload, X } from "lucide-react";
 import Dropzone, {
   type DropzoneProps,
   type FileRejection,
@@ -19,6 +19,18 @@ import {
   CroppedImage,
 } from "@/components/ui/image-cropper/types";
 import { autoCompressImages } from "@/components/ui/image-cropper/auto-compress";
+
+/** Group dropzone rejections so "too many files" variants always merge (avoids toast spam). */
+function aggregateRejectionKey(error: {
+  code?: string;
+  message: string;
+}): string {
+  const lower = error.message.toLowerCase();
+  if (error.code === "too-many-files" || lower.includes("too many files")) {
+    return "too-many-files";
+  }
+  return error.code ?? error.message;
+}
 
 interface FileUploaderProps extends React.HTMLAttributes<HTMLDivElement> {
   /**
@@ -183,6 +195,22 @@ export function FileUploader(props: FileUploaderProps) {
     return acceptKeys.some((key) => key.startsWith("video/"));
   }, [accept]);
 
+  /** PDFs/docs only — no image crop/compress messaging */
+  const isDocumentOnlyUploader = React.useMemo(() => {
+    if (!accept) return false;
+    const keys = Object.keys(accept);
+    if (keys.length === 0) return false;
+    return !keys.some(
+      (key) => key.startsWith("image/") || key.startsWith("video/"),
+    );
+  }, [accept]);
+
+  const isPdfOnlyUploader = React.useMemo(() => {
+    if (!accept) return false;
+    const keys = Object.keys(accept);
+    return keys.length > 0 && keys.every((key) => key === "application/pdf");
+  }, [accept]);
+
   const [files, setFiles] = useControllableState({
     prop: valueProp,
     onChange: onValueChange,
@@ -259,7 +287,7 @@ export function FileUploader(props: FileUploaderProps) {
       const newFiles = [croppedImage.file].map((file) =>
         Object.assign(file, {
           preview: croppedImage.previewUrl,
-        })
+        }),
       );
 
       const updatedFiles = files ? [...files, ...newFiles] : newFiles;
@@ -292,7 +320,7 @@ export function FileUploader(props: FileUploaderProps) {
         });
       }
     },
-    [files, pendingFiles, maxFileCount, onUpload, setFiles, onValueChange]
+    [files, pendingFiles, maxFileCount, onUpload, setFiles, onValueChange],
   );
 
   // Handle cropping cancellation
@@ -321,28 +349,64 @@ export function FileUploader(props: FileUploaderProps) {
 
       if (autoCompress && rejectedFiles.length > 0) {
         const rejectedImageFiles: File[] = [];
+        type OtherRejectionAgg = {
+          message: string;
+          count: number;
+          sampleName: string;
+          code?: string;
+        };
+        const otherRejections = new Map<string, OtherRejectionAgg>();
 
         rejectedFiles.forEach(({ file, errors }) => {
           // Check if this is an image file rejected due to size
           const isSizeError = errors.some(
             (error) =>
               error.message.includes("larger than") ||
-              error.code === "file-too-large"
+              error.code === "file-too-large",
           );
 
           if (isImageFile(file) && isSizeError) {
             // This image was rejected for size - we'll compress it
             rejectedImageFiles.push(file);
           } else {
-            // Non-image file or other error - show error toast
-            errors.forEach((error) => {
+            for (const error of errors) {
               const formattedMessage = formatFileUploadError(error.message);
-              toast.error(
-                `File ${file.name} was rejected: ${formattedMessage}`
-              );
-            });
+              const key = aggregateRejectionKey(error);
+              const prev = otherRejections.get(key);
+              if (prev) {
+                prev.count += 1;
+              } else {
+                otherRejections.set(key, {
+                  message: formattedMessage,
+                  count: 1,
+                  sampleName: file.name,
+                  code:
+                    key === "too-many-files" ? "too-many-files" : error.code,
+                });
+              }
+            }
           }
         });
+
+        otherRejections.forEach(
+          ({ message, count, sampleName, code }, mapKey) => {
+            if (code === "too-many-files" || mapKey === "too-many-files") {
+              toast.error(
+                count === 1
+                  ? `File ${sampleName} was not added: ${message}`
+                  : `${count} files were skipped — you can add up to ${maxFileCount} file${
+                      maxFileCount === 1 ? "" : "s"
+                    } at a time.`,
+              );
+              return;
+            }
+            if (count === 1) {
+              toast.error(`File ${sampleName} was rejected: ${message}`);
+            } else {
+              toast.error(`${count} files were rejected: ${message}`);
+            }
+          },
+        );
 
         // Compress rejected image files
         if (rejectedImageFiles.length > 0) {
@@ -351,7 +415,7 @@ export function FileUploader(props: FileUploaderProps) {
               `Compressing ${rejectedImageFiles.length} large image${
                 rejectedImageFiles.length > 1 ? "s" : ""
               }...`,
-              { duration: 2000 }
+              { duration: 2000 },
             );
 
             const compressedFiles = await autoCompressImages(
@@ -361,7 +425,7 @@ export function FileUploader(props: FileUploaderProps) {
                 maxWidthOrHeight: 1920,
                 quality: 0.85,
                 useWebWorker: true,
-              }
+              },
             );
 
             // Add compressed files to processed files
@@ -369,7 +433,7 @@ export function FileUploader(props: FileUploaderProps) {
           } catch (error) {
             console.warn("Auto-compression failed:", error);
             toast.error(
-              "Failed to compress some images. Please try smaller files."
+              "Failed to compress some images. Please try smaller files.",
             );
           }
         }
@@ -381,7 +445,7 @@ export function FileUploader(props: FileUploaderProps) {
           const largeImages = processedFiles.filter(
             (file) =>
               isImageFile(file) &&
-              file.size > autoCompressMaxSizeMB * 1024 * 1024
+              file.size > autoCompressMaxSizeMB * 1024 * 1024,
           );
 
           if (largeImages.length > 0) {
@@ -418,7 +482,7 @@ export function FileUploader(props: FileUploaderProps) {
       const newFiles = processedFiles.map((file) =>
         Object.assign(file, {
           preview: URL.createObjectURL(file),
-        })
+        }),
       );
 
       const updatedFiles = files ? [...files, ...newFiles] : newFiles;
@@ -457,7 +521,7 @@ export function FileUploader(props: FileUploaderProps) {
       aspectRatio,
       autoCompress,
       autoCompressMaxSizeMB,
-    ]
+    ],
   );
   function onRemove(index: number) {
     if (!files) return;
@@ -494,7 +558,11 @@ export function FileUploader(props: FileUploaderProps) {
           // When autoCompress is enabled, allow very large files to pass validation
           // We'll compress image files automatically in onDrop
           // 100MB limit allows most images to pass, then we compress them
-          maxSize={autoCompress ? 100 * 1024 * 1024 : maxSize}
+          maxSize={
+            autoCompress && !isDocumentOnlyUploader
+              ? 100 * 1024 * 1024
+              : maxSize
+          }
           maxFiles={maxFileCount}
           multiple={maxFileCount > 1 || multiple}
           disabled={isDisabled}
@@ -507,7 +575,7 @@ export function FileUploader(props: FileUploaderProps) {
                 "ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
                 isDragActive && "border-muted-foreground/50",
                 isDisabled && "pointer-events-none opacity-60",
-                className
+                className,
               )}
               {...dropzoneProps}
             >
@@ -539,8 +607,12 @@ export function FileUploader(props: FileUploaderProps) {
                     <p className="text-sm text-muted-foreground/70">
                       {moreLabel
                         ? maxFileCount > 1
-                          ? `You can add ${maxFileCount === Infinity ? "more" : maxFileCount} more images`
-                          : "You can add 1 more image"
+                          ? isDocumentOnlyUploader
+                            ? `You can add ${maxFileCount === Infinity ? "more" : maxFileCount} more files`
+                            : `You can add ${maxFileCount === Infinity ? "more" : maxFileCount} more images`
+                          : isDocumentOnlyUploader
+                            ? "You can add 1 more file"
+                            : "You can add 1 more image"
                         : `You can upload${
                             maxFileCount > 1
                               ? ` ${
@@ -550,21 +622,30 @@ export function FileUploader(props: FileUploaderProps) {
                                 } files`
                               : ` a file`
                           }`}
-                      {!isVideoUploader && autoCompress
-                        ? ` (images will be automatically optimized)`
-                        : !isVideoUploader
-                          ? ` (up to ${formatBytes(maxSize)} each)`
-                          : ""}
+                      {(() => {
+                        if (isVideoUploader) return "";
+                        if (isDocumentOnlyUploader) {
+                          return isPdfOnlyUploader
+                            ? ` (PDF only, up to ${formatBytes(maxSize)})`
+                            : ` (up to ${formatBytes(maxSize)} each)`;
+                        }
+                        if (autoCompress) {
+                          return ` (images will be automatically optimized)`;
+                        }
+                        return ` (up to ${formatBytes(maxSize)} each)`;
+                      })()}
                     </p>
-                    {!isVideoUploader && (enableCropping || autoCompress) && (
-                      <p className="text-xs text-blue-600 font-medium mt-1">
-                        {enableCropping && autoCompress
-                          ? "✂️ Images will be cropped & optimized automatically"
-                          : enableCropping
-                          ? "✂️ Images will be cropped automatically"
-                          : "🔄 Images will be optimized automatically"}
-                      </p>
-                    )}
+                    {!isVideoUploader &&
+                      !isDocumentOnlyUploader &&
+                      (enableCropping || autoCompress) && (
+                        <p className="text-xs text-blue-600 font-medium mt-1">
+                          {enableCropping && autoCompress
+                            ? "✂️ Images will be cropped & optimized automatically"
+                            : enableCropping
+                              ? "✂️ Images will be cropped automatically"
+                              : "🔄 Images will be optimized automatically"}
+                        </p>
+                      )}
                   </div>
                 </div>
               )}
@@ -580,6 +661,7 @@ export function FileUploader(props: FileUploaderProps) {
                   file={file}
                   onRemove={() => onRemove(index)}
                   progress={progresses?.[file.name]}
+                  showReadyIcon
                 />
               ))}
             </div>
@@ -607,26 +689,44 @@ interface FileCardProps {
   file: File;
   onRemove: () => void;
   progress?: number;
+  /** When true, show a check when the file is not actively uploading */
+  showReadyIcon?: boolean;
 }
 
-function FileCard({ file, progress, onRemove }: FileCardProps) {
+function FileCard({ file, progress, onRemove, showReadyIcon }: FileCardProps) {
+  const progressTracked = progress !== undefined;
+  const uploading = progressTracked && progress < 100;
+  const uploadComplete = progressTracked && progress >= 100;
+  const showCheck = showReadyIcon && (!progressTracked || uploadComplete);
+  const displayName =
+    file.name.length > 24 ? `${file.name.slice(0, 21)}…` : file.name;
+
   return (
-    <div className="relative flex items-center">
-      <div className="flex flex-1">
+    <div className="relative flex items-center gap-2">
+      <div className="flex min-w-0 flex-1 items-center gap-3">
         {isFileWithPreview(file) ? <FilePreview file={file} /> : null}
-        <div className="flex w-full flex-col gap-2">
+        <div className="flex min-w-0 flex-1 flex-col gap-2">
           <div className="flex flex-col gap-px">
             <p className="line-clamp-1 text-sm font-medium text-foreground/80">
-              {file.name.slice(0, 20) + "..."}
+              {displayName}
             </p>
             <p className="text-xs text-muted-foreground">
               {formatBytes(file.size)}
             </p>
           </div>
-          {progress ? <Progress value={progress} /> : null}
+          {uploading ? <Progress value={progress} /> : null}
         </div>
       </div>
-      <div className="flex items-center gap-2">
+      <div className="flex shrink-0 items-center gap-2">
+        {showCheck ? (
+          <span className="flex items-center" title="Ready to upload">
+            <CheckCircle2
+              className="size-5 text-emerald-500"
+              aria-hidden="true"
+            />
+            <span className="sr-only">File ready</span>
+          </span>
+        ) : null}
         <Button
           type="button"
           variant="outline"

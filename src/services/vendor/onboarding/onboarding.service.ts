@@ -30,6 +30,28 @@ function getOnboardingMode(): "ai" | "manual" | null {
   return null;
 }
 
+/**
+ * Manual onboarding: backend expects `isApproved` on step saves.
+ * Omit during AI bulk-apply (`onboarding_mode === "ai"`) so steps are not all marked approved.
+ */
+function appendManualIsApprovedToFormData(
+  formData: FormData,
+  isApproved: boolean | undefined,
+): void {
+  if (getOnboardingMode() !== "manual") return;
+  if (typeof isApproved !== "boolean") return;
+  formData.append("isApproved", isApproved ? "1" : "0");
+}
+
+function mergeManualIsApproved<T extends Record<string, unknown>>(
+  payload: T,
+  isApproved: boolean | undefined,
+): T & { isApproved?: boolean } {
+  if (getOnboardingMode() !== "manual") return payload;
+  if (typeof isApproved !== "boolean") return payload;
+  return { ...payload, isApproved };
+}
+
 export const onboardingService = {
   /**
    * Check if response indicates onboarding is already completed
@@ -126,7 +148,7 @@ export const onboardingService = {
 
     const response = await api.post<ApiResponse>(
       API_ENDPOINTS.VENDOR.ONBOARDING.STEPS,
-      payload,
+      mergeManualIsApproved(payload, data.isApproved),
       {
         returnFullResponse: true,
       }
@@ -213,6 +235,8 @@ export const onboardingService = {
         formData.append("cover_image", data.cover_image);
       }
     }
+
+    appendManualIsApprovedToFormData(formData, data.isApproved);
 
     const response = await request<ApiResponse>({
       method: "POST",
@@ -335,6 +359,8 @@ export const onboardingService = {
       });
     }
 
+    appendManualIsApprovedToFormData(formData, data.isApproved);
+
     const response = await request<ApiResponse>({
       method: "POST",
       url: API_ENDPOINTS.VENDOR.ONBOARDING.STEPS,
@@ -408,6 +434,8 @@ export const onboardingService = {
         formData.append("gallery_order", JSON.stringify(galleryOrder));
       }
     }
+
+    appendManualIsApprovedToFormData(formData, data.isApproved);
 
     const response = await request<ApiResponse>({
       method: "POST",
@@ -493,11 +521,14 @@ export const onboardingService = {
     );
 
     // Create payload with all required data
-    const payload = {
-      step: data.step,
-      event_id: data.event_id,
-      dates: formattedDates || [],
-    };
+    const payload = mergeManualIsApproved(
+      {
+        step: data.step,
+        event_id: data.event_id,
+        dates: formattedDates || [],
+      },
+      data.isApproved,
+    );
 
     const response = await api.post<ApiResponse>(
       API_ENDPOINTS.VENDOR.ONBOARDING.STEPS,
@@ -562,6 +593,8 @@ export const onboardingService = {
       });
     }
 
+    appendManualIsApprovedToFormData(formData, data.isApproved);
+
     const response = await api.post<ApiResponse>(
       API_ENDPOINTS.VENDOR.ONBOARDING.STEPS,
       formData,
@@ -595,13 +628,16 @@ export const onboardingService = {
    * @returns API response with status and message
    */
   storeStepSevenData: async (data: StepSevenType): Promise<ApiResponse> => {
-    const payload = {
-      step: data.step || 7,
-      event_id: data.event_id,
-      drink_title: data.drink_title,
-      drink_description: data.drink_description,
-      packages: data.packages,
-    };
+    const payload = mergeManualIsApproved(
+      {
+        step: data.step || 7,
+        event_id: data.event_id,
+        drink_title: data.drink_title,
+        drink_description: data.drink_description,
+        packages: data.packages,
+      },
+      data.isApproved,
+    );
 
     const response = await api.post<ApiResponse>(
       API_ENDPOINTS.VENDOR.ONBOARDING.STEPS,
@@ -694,6 +730,8 @@ export const onboardingService = {
           data.price_start_from_button_text
         );
       }
+
+      appendManualIsApprovedToFormData(formData, data.isApproved);
     } else {
       formData = data;
     }
@@ -758,6 +796,8 @@ export const onboardingService = {
       });
     }
 
+    appendManualIsApprovedToFormData(formData, data.isApproved);
+
     // Use the same endpoint as other steps
     const response = await request<ApiResponse>({
       method: "POST",
@@ -799,6 +839,8 @@ export const onboardingService = {
     // Add basic fields only
     formData.append("step", data.step.toString());
     formData.append("event_id", data.event_id.toString());
+
+    appendManualIsApprovedToFormData(formData, data.isApproved);
 
     const response = await request<ApiResponse>({
       method: "POST",
@@ -882,6 +924,8 @@ export const onboardingService = {
         data.reminder_email_before_days.toString()
       );
     }
+
+    appendManualIsApprovedToFormData(formData, data.isApproved);
 
     const response = await request<ApiResponse>({
       method: "POST",

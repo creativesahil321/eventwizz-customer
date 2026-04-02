@@ -1,3 +1,5 @@
+"use client";
+
 import {
   Accordion,
   AccordionContent,
@@ -13,10 +15,15 @@ type Faq = {
 };
 type FaqSectionProps = {
   faqs: Faq[];
+  /** Onboarding preview: show FAQ list without an extra click */
+  defaultExpanded?: boolean;
 };
 
-export default function FaqSection({ faqs }: FaqSectionProps) {
-  const [showMore, setShowMore] = useState(false);
+export default function FaqSection({
+  faqs,
+  defaultExpanded = false,
+}: FaqSectionProps) {
+  const [showMore, setShowMore] = useState(defaultExpanded);
 
   return (
     <section className="w-full  bg-[var(--color-secondary)] text-[var(--color-secondary-foreground)] text-center py-20">

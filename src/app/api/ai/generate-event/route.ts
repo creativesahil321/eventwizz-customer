@@ -111,6 +111,14 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    const addressTrimmed = input.venueAddress?.trim() ?? "";
+    if (addressTrimmed.length < 5) {
+      return NextResponse.json(
+        { error: "Event address is required (where the event takes place)" },
+        { status: 400 }
+      );
+    }
+
     const systemPrompt = `You are an expert event marketing copywriter. Generate professional, engaging content for an event listing on a venue booking platform.
 
 CRITICAL RULES:

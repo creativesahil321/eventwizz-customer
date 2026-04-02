@@ -26,6 +26,10 @@ type Options<T extends FieldValues> = {
    * Save/submit handlers should still run full validation.
    */
   skipFullFormTriggerOnApproveAll?: boolean;
+  /** True after onboarding GET merged into the form (avoid seeding before persistence is loaded). */
+  persistenceHydrated?: boolean;
+  /** From API `stepN.isApproved` — treat all guided sections as already approved. */
+  persistedStepApproved?: boolean;
 };
 
 export function useGuidedOnboardingSections<T extends FieldValues>({
@@ -34,6 +38,8 @@ export function useGuidedOnboardingSections<T extends FieldValues>({
   resolveErrorSectionIndex,
   validateFullStep,
   skipFullFormTriggerOnApproveAll,
+  persistenceHydrated = false,
+  persistedStepApproved = false,
 }: Options<T>) {
   const sectionFlow = useMemo(() => sections, [sections]);
 
@@ -41,6 +47,23 @@ export function useGuidedOnboardingSections<T extends FieldValues>({
     () => new Set(),
   );
   const [currentSectionIndex, setCurrentSectionIndex] = useState(0);
+
+  const sectionIdsKey = useMemo(
+    () => sectionFlow.map((s) => s.id).join("\0"),
+    [sectionFlow],
+  );
+
+  useEffect(() => {
+    if (!persistenceHydrated || !persistedStepApproved) return;
+    if (sectionFlow.length === 0) return;
+    setApprovedSections(new Set(sectionFlow.map((s) => s.id)));
+    setCurrentSectionIndex(Math.max(0, sectionFlow.length - 1));
+  }, [
+    persistenceHydrated,
+    persistedStepApproved,
+    sectionIdsKey,
+    sectionFlow.length,
+  ]);
 
   const currentSection = sectionFlow[currentSectionIndex];
   const allSectionsApproved =
@@ -122,7 +145,7 @@ export function useGuidedOnboardingSections<T extends FieldValues>({
     sectionFlow.length,
   ]);
 
-  const handleApproveAllSections = useCallback(async () => {
+  const handleApproveAllSections = useCallback(async (): Promise<boolean> => {
     const goToLastSection = () => {
       setCurrentSectionIndex(Math.max(0, sectionFlow.length - 1));
     };
@@ -134,13 +157,13 @@ export function useGuidedOnboardingSections<T extends FieldValues>({
       if (extraOk) {
         setApprovedSections(new Set(sectionFlow.map((s) => s.id)));
         goToLastSection();
-      } else {
-        const idx = resolveErrorSectionIndex(["__extra_validation__"]);
-        setCurrentSectionIndex(
-          Math.max(0, Math.min(idx, sectionFlow.length - 1)),
-        );
+        return true;
       }
-      return;
+      const idx = resolveErrorSectionIndex(["__extra_validation__"]);
+      setCurrentSectionIndex(
+        Math.max(0, Math.min(idx, sectionFlow.length - 1)),
+      );
+      return false;
     }
 
     const schemaOk = await form.trigger(undefined, { shouldFocus: true });
@@ -150,20 +173,21 @@ export function useGuidedOnboardingSections<T extends FieldValues>({
     if (schemaOk && extraOk) {
       setApprovedSections(new Set(sectionFlow.map((s) => s.id)));
       goToLastSection();
-      return;
+      return true;
     }
     if (schemaOk && !extraOk) {
       const idx = resolveErrorSectionIndex(["__extra_validation__"]);
       setCurrentSectionIndex(
         Math.max(0, Math.min(idx, sectionFlow.length - 1)),
       );
-      return;
+      return false;
     }
     const errorKeys = Object.keys(form.formState.errors);
     const idx = resolveErrorSectionIndex(errorKeys);
     setCurrentSectionIndex(
       Math.max(0, Math.min(idx, sectionFlow.length - 1)),
     );
+    return false;
   }, [
     form,
     sectionFlow,
@@ -171,6 +195,23 @@ export function useGuidedOnboardingSections<T extends FieldValues>({
     validateFullStep,
     skipFullFormTriggerOnApproveAll,
   ]);
+
+  /** Re-open a completed section: clears approval for this section and all following ones, then focuses it. */
+  const handleUnlockSection = useCallback(
+    (index: number) => {
+      const section = sectionFlow[index];
+      if (!section) return;
+      setApprovedSections((prev) => {
+        const next = new Set(prev);
+        for (let i = index; i < sectionFlow.length; i++) {
+          next.delete(sectionFlow[i].id);
+        }
+        return next;
+      });
+      setCurrentSectionIndex(index);
+    },
+    [sectionFlow],
+  );
 
   const handleChipClick = useCallback(
     async (index: number) => {
@@ -225,5 +266,6 @@ export function useGuidedOnboardingSections<T extends FieldValues>({
     handleApproveSection,
     handleApproveAllSections,
     handleChipClick,
+    handleUnlockSection,
   };
 }

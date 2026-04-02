@@ -1,5 +1,6 @@
 "use client";
 import * as React from "react";
+import { useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -10,6 +11,8 @@ import {
 } from "@/components/ui/dialog";
 import { Trash } from "lucide-react";
 import { EmailLog } from "../../_lib/types";
+import { useCurrencyFormat } from "@/hooks/use-currency-format";
+import { reformatMonetaryAmountsInHtml } from "@/lib/currency-format";
 
 interface EmailDialogProps extends React.ComponentPropsWithoutRef<
   typeof Dialog
@@ -24,6 +27,12 @@ export function EmailShowDialog({
   onOpenChange,
   ...props
 }: EmailDialogProps) {
+  const { formatLocale } = useCurrencyFormat();
+  const bodyHtml = (template as EmailLog)?.body as string | undefined;
+  const displayBody = useMemo(
+    () => reformatMonetaryAmountsInHtml(bodyHtml ?? "", formatLocale),
+    [bodyHtml, formatLocale],
+  );
   const formattedDate = new Date(
     (template as EmailLog)?.created_at as string,
   ).toLocaleString();
@@ -75,7 +84,7 @@ export function EmailShowDialog({
             <div
               className="prose prose-sm max-w-full text-foreground opacity-80 break-words whitespace-normal"
               dangerouslySetInnerHTML={{
-                __html: ((template as EmailLog)?.body as string) || "",
+                __html: displayBody,
               }}
             />
           </div>

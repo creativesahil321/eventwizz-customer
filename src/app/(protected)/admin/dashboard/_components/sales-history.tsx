@@ -34,6 +34,7 @@ export default function SalesHistory({
   period,
   isFetching = false,
 }: SalesHistoryProps) {
+  const currencySymbol = useCurrencySymbol();
   const chartData = sales.length ? sales : [{ month: "—", sales: 0 }];
   const periodLabel = period === "monthly" ? "Monthly" : "Yearly";
 

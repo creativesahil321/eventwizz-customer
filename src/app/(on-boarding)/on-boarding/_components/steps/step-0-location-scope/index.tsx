@@ -3,7 +3,7 @@
 import { OnboardingCard } from "@/components/ui/card";
 import { CardContent, CardHeader } from "@/components/ui/card";
 import {
-  OnboardingSectionTitle,
+  OnboardingFieldGroupTitle,
   OnboardingTitle,
 } from "@/components/ui/typography";
 import { cn } from "@/lib/utils";
@@ -35,7 +35,9 @@ export default function StepZeroLocationScope() {
           </p>
         </CardHeader>
         <CardContent className="space-y-4">
-          <OnboardingSectionTitle>Location type</OnboardingSectionTitle>
+          <OnboardingFieldGroupTitle className="text-base">
+            Location type
+          </OnboardingFieldGroupTitle>
           <div className="grid gap-4 sm:grid-cols-2">
             <button
               type="button"

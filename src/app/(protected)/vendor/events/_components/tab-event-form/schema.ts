@@ -213,7 +213,7 @@ const validateDepositDueDate = (data: unknown) => {
   );
 };
 const depositDueDateMessage = {
-  message: "Deposit due date is required when deposit payment is selected",
+  message: "Balance due date is required when deposit payment is selected",
   path: ["deposit_due_date"],
 };
 
@@ -483,7 +483,7 @@ const dateSchema = baseDateSchema
       if (depositDate >= eventDate) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
-          message: "Deposit due date must be before the event date",
+          message: "Balance due date must be before the event date",
           path: ["deposit_due_date"],
         });
       }

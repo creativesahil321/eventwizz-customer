@@ -4,6 +4,7 @@ export const defaultValues: OnboardingFormData = {
   activeStep: 1,
   last_completed_step: 1,
   stepOne: {
+    isApproved: false,
     step: 1,
     has_multiple_locations: undefined,
     name: "",
@@ -15,6 +16,7 @@ export const defaultValues: OnboardingFormData = {
     city: "",
   },
   stepTwo: {
+    isApproved: false,
     step: 2,
     logo: null,
     cover_image: null,
@@ -25,6 +27,7 @@ export const defaultValues: OnboardingFormData = {
     about_link_title: "",
   },
   stepThree: {
+    isApproved: false,
     step: 3,
     vendor_location_id: 0,
     event_category_id: 0,
@@ -46,6 +49,7 @@ export const defaultValues: OnboardingFormData = {
     // gallery: [],
   },
   stepFour: {
+    isApproved: false,
     step: 4,
     event_id: 0,
     package_image: null,
@@ -59,6 +63,7 @@ export const defaultValues: OnboardingFormData = {
     ],
   },
   stepFive: {
+    isApproved: false,
     step: 5,
     event_id: 0,
     dates: [
@@ -80,6 +85,7 @@ export const defaultValues: OnboardingFormData = {
     ],
   },
   stepSix: {
+    isApproved: false,
     step: 6,
     event_id: 0,
     catering_option: 0,
@@ -100,6 +106,7 @@ export const defaultValues: OnboardingFormData = {
   },
 
   stepSeven: {
+    isApproved: false,
     step: 7,
     event_id: 0,
     drink_title: "",
@@ -115,6 +122,7 @@ export const defaultValues: OnboardingFormData = {
   },
 
   stepEight: {
+    isApproved: false,
     step: 8,
     event_id: 0,
     brochure_pdf: null,
@@ -132,6 +140,7 @@ export const defaultValues: OnboardingFormData = {
     more_info: [],
   },
   stepNine: {
+    isApproved: false,
     step: 9,
     event_id: 0,
     faqs: [
@@ -142,6 +151,7 @@ export const defaultValues: OnboardingFormData = {
     ],
   },
   stepTen: {
+    isApproved: false,
     step: 10,
     event_id: 0,
     payment_gateways: {
@@ -173,6 +183,7 @@ export const defaultValues: OnboardingFormData = {
     is_skipped: false,
   },
   stepEleven: {
+    isApproved: false,
     step: 11,
     event_id: 0,
     has_multiple_locations: undefined as boolean | undefined,
@@ -183,4 +194,5 @@ export const defaultValues: OnboardingFormData = {
     domain: "",
     confirm_domain: false,
   },
+  isApproved: false
 };

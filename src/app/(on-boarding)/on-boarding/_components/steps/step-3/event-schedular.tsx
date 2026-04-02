@@ -15,7 +15,7 @@ import {
 import { X, AlertCircle } from "lucide-react";
 import { StepThreeType } from "../../form-provider/schema"; // Adjust path as needed
 import { useFormContext } from "../../form-provider";
-import { OnboardingSectionTitle } from "@/components/ui/typography";
+import { OnboardingFieldGroupTitle } from "@/components/ui/typography";
 import { useState } from "react";
 
 type SchedulerField = FieldArrayWithId<StepThreeType, "event_schedular", "id">;
@@ -119,12 +119,12 @@ const EventScheduler: React.FC<EventSchedulerProps> = ({
 
   return (
     <div className="space-y-4">
-      <OnboardingSectionTitle>Event Scheduler</OnboardingSectionTitle>
+      <OnboardingFieldGroupTitle>Event Scheduler</OnboardingFieldGroupTitle>
 
       {fields.map((fieldItem, index) => (
         <div
           key={fieldItem.id}
-          className="flex items-start justify-between gap-4 p-4 border border-gray-200 rounded-md bg-white"
+          className="flex items-start justify-between gap-4 rounded-lg border border-white/10 bg-white/[0.03] p-4"
         >
           <FormField
             control={control}

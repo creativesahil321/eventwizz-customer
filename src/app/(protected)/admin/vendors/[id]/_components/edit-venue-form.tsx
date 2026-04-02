@@ -31,18 +31,10 @@ import {
   type VenueLocation,
 } from "../_lib/types";
 import { adminVenuesService } from "@/services/admin/venues/venues.service";
+import { useCurrencyFormat } from "@/hooks/use-currency-format";
 
 interface EditVenueFormProps {
   venue: VenueDetail;
-}
-
-function formatCurrency(value: number): string {
-  return new Intl.NumberFormat("en-GB", {
-    style: "currency",
-    currency: "GBP",
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(value);
 }
 
 const NEVER = "Never";
@@ -52,6 +44,7 @@ const NEVER = "Never";
  * and Business Documents editable. Events, notes, location and financials read-only.
  */
 export function EditVenueForm({ venue }: EditVenueFormProps) {
+  const { formatLocale: formatMoney } = useCurrencyFormat();
   const router = useRouter();
   const queryClient = useQueryClient();
 
@@ -622,19 +615,19 @@ export function EditVenueForm({ venue }: EditVenueFormProps) {
                     <div>
                       <p className="text-muted-foreground">Total Revenue</p>
                       <p className="font-medium mt-0.5">
-                        {formatCurrency(financialSummary.totalRevenue)}
+                        {formatMoney(financialSummary.totalRevenue ?? 0)}
                       </p>
                     </div>
                     <div>
                       <p className="text-muted-foreground">Commission Earned</p>
                       <p className="font-medium mt-0.5">
-                        {formatCurrency(financialSummary.commissionEarned)}
+                        {formatMoney(financialSummary.commissionEarned ?? 0)}
                       </p>
                     </div>
                     <div>
                       <p className="text-muted-foreground">Payout Released</p>
                       <p className="font-medium mt-0.5">
-                        {formatCurrency(financialSummary.payoutReleased)}
+                        {formatMoney(financialSummary.payoutReleased ?? 0)}
                       </p>
                     </div>
                     <div>
@@ -642,7 +635,7 @@ export function EditVenueForm({ venue }: EditVenueFormProps) {
                         Pending commission
                       </p>
                       <p className="font-medium mt-0.5">
-                        {formatCurrency(financialSummary.pendingCommission)}
+                        {formatMoney(financialSummary.pendingCommission ?? 0)}
                       </p>
                     </div>
                   </div>

@@ -137,7 +137,29 @@ export function parseFormattedMoney(
   const sym = resolveCurrencySymbol(knownSymbol);
   s = s.replace(new RegExp(`^\\s*${escapeRegExp(sym)}\\s*`, "i"), "");
   s = s.replace(new RegExp(`\\s*${escapeRegExp(sym)}\\s*$`, "i"), "");
-  s = s.replace(/[$€]/g, "").replace(/,/g, "").trim();
+  // Strip any common display symbol so API strings like "£200" still parse when tenant uses "$"
+  s = s.replace(/[£$€₹¥]/g, "").replace(/,/g, "").trim();
   const n = parseFloat(s);
   return n;
+}
+
+const HTML_CURRENCY_AMOUNT =
+  /(£|\$|€|₹|¥)\s*([\d,]+\.\d{2})/g;
+
+/**
+ * Replace inline monetary amounts in HTML/email bodies (e.g. £400.00) with
+ * {@link formatMoneyLocale}-style strings using the tenant symbol from {@code formatLocale}.
+ * Does not parse HTML; safe for typical stored email HTML that encodes amounts as text.
+ */
+export function reformatMonetaryAmountsInHtml(
+  html: string,
+  formatLocale: (amount: number) => string,
+): string {
+  if (!html) return html;
+  return html.replace(HTML_CURRENCY_AMOUNT, (full, sym: string, numStr: string) => {
+    const raw = `${sym}${numStr}`;
+    const n = parseFormattedMoney(raw, sym);
+    if (!Number.isFinite(n)) return full;
+    return formatLocale(n);
+  });
 }

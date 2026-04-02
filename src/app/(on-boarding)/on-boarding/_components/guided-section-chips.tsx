@@ -1,9 +1,11 @@
 "use client";
 
 import type { ReactNode } from "react";
+import { useState } from "react";
 import { Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { guidedOnboardingSaveNextButtonClass } from "./guided-sticky-approval-bar";
 import {
   Tooltip,
   TooltipContent,
@@ -106,12 +108,6 @@ export function GuidedSectionChips({
   );
 }
 
-type ApproveAllProps = {
-  onApproveAll: () => void | Promise<void>;
-  allSectionsApproved: boolean;
-  className?: string;
-};
-
 const guidedValidateApproveAllButtonClass =
   "rounded-full border-white/20 bg-white/5 text-white hover:bg-white/10";
 
@@ -120,7 +116,7 @@ export function GuidedValidateApproveAllButton({
   onApproveAll,
   className,
 }: {
-  onApproveAll: () => void | Promise<void>;
+  onApproveAll: () => boolean | void | Promise<boolean | void>;
   className?: string;
 }) {
   return (
@@ -141,26 +137,63 @@ export function GuidedApproveAllStatusMessage({
 }: {
   allSectionsApproved: boolean;
 }) {
-  if (!allSectionsApproved) return null;
+  if (!allSectionsApproved) {
+    return (
+      <span className="text-center text-xs text-slate-500">
+        One button below checks every section, saves, and takes you forward.
+      </span>
+    );
+  }
   return (
     <span className="text-center text-xs text-emerald-400/90">
-      All sections approved — you can continue.
+      All sections approved — save and continue when you&apos;re ready.
     </span>
   );
 }
 
 /**
- * Multi-section steps (1–4): validate + status first, then primary save row (save last).
- * Keeps one consistent bottom stack in the split sidebar.
+ * Multi-section steps (1–4): single primary control — validate & approve (if needed), then save + next.
  */
 export function GuidedMultiSectionBottomActions({
   onApproveAll,
   allSectionsApproved,
-  saveSlot,
+  onContinue,
+  loading = false,
+  extraActions,
   className,
-}: ApproveAllProps & {
-  saveSlot: ReactNode;
+}: {
+  onApproveAll: () => boolean | Promise<boolean>;
+  allSectionsApproved: boolean;
+  onContinue: () => void | Promise<void>;
+  loading?: boolean;
+  extraActions?: ReactNode;
+  className?: string;
 }) {
+  const [approving, setApproving] = useState(false);
+  const busy = loading || approving;
+
+  const handlePrimaryClick = async () => {
+    if (busy) return;
+    if (!allSectionsApproved) {
+      setApproving(true);
+      try {
+        const ok = await onApproveAll();
+        if (!ok) return;
+      } finally {
+        setApproving(false);
+      }
+    }
+    await onContinue();
+  };
+
+  const primaryLabel = busy
+    ? loading
+      ? "Saving..."
+      : "Validating..."
+    : allSectionsApproved
+      ? "Save & continue"
+      : "Validate, approve & continue";
+
   return (
     <div
       className={cn(
@@ -168,14 +201,120 @@ export function GuidedMultiSectionBottomActions({
         className,
       )}
     >
-      {!allSectionsApproved && (
-        <GuidedValidateApproveAllButton onApproveAll={onApproveAll} />
-      )}
       <GuidedApproveAllStatusMessage
         allSectionsApproved={allSectionsApproved}
       />
       <div className="flex w-full min-w-0 flex-row flex-wrap items-center justify-center gap-3">
-        {saveSlot}
+        <Button
+          type="button"
+          variant="event-primary"
+          disabled={busy}
+          className={guidedOnboardingSaveNextButtonClass}
+          onClick={() => void handlePrimaryClick()}
+        >
+          {primaryLabel}
+        </Button>
+        {extraActions}
+      </div>
+    </div>
+  );
+}
+
+type GuidedWholeStepSlice = {
+  allSectionsApproved: boolean;
+  handleApproveAllSections: () => Promise<boolean>;
+};
+
+/**
+ * Steps 5–11 (single guided section): one primary button — validate & approve if needed, then save/continue/submit.
+ */
+export function GuidedWholeStepBottomActions({
+  guided,
+  onContinue,
+  loading = false,
+  labelWhenReady,
+  continueDisabled = false,
+  continueTitle,
+  extraActions,
+  hintSlot,
+  /** When set, replaces default approve/save hint row (e.g. payment step gateway warning). */
+  statusSlot,
+  className,
+  primaryButtonClassName,
+}: {
+  guided: GuidedWholeStepSlice;
+  onContinue: () => void | Promise<void>;
+  loading?: boolean;
+  labelWhenReady: string;
+  continueDisabled?: boolean;
+  continueTitle?: string;
+  extraActions?: ReactNode;
+  hintSlot?: ReactNode;
+  statusSlot?: ReactNode;
+  className?: string;
+  primaryButtonClassName?: string;
+}) {
+  const [approving, setApproving] = useState(false);
+  const busy = loading || approving;
+
+  const primaryDisabled =
+    busy || (guided.allSectionsApproved && continueDisabled);
+
+  const handlePrimaryClick = async () => {
+    if (primaryDisabled) return;
+    const wasApproved = guided.allSectionsApproved;
+    if (!wasApproved) {
+      setApproving(true);
+      try {
+        const ok = await guided.handleApproveAllSections();
+        if (!ok) return;
+      } finally {
+        setApproving(false);
+      }
+      await onContinue();
+      return;
+    }
+    await onContinue();
+  };
+
+  const primaryLabel = busy
+    ? approving
+      ? "Validating..."
+      : "Saving..."
+    : guided.allSectionsApproved
+      ? labelWhenReady
+      : "Validate, approve & continue";
+
+  return (
+    <div
+      className={cn(
+        "flex w-full min-w-0 flex-col items-center justify-center gap-3",
+        className,
+      )}
+    >
+      {hintSlot}
+      {statusSlot !== undefined ? (
+        statusSlot
+      ) : (
+        <GuidedApproveAllStatusMessage
+          allSectionsApproved={guided.allSectionsApproved}
+        />
+      )}
+      <div className="flex w-full min-w-0 flex-row flex-wrap items-center justify-center gap-3">
+        <Button
+          type="button"
+          variant="event-primary"
+          disabled={primaryDisabled}
+          title={continueTitle}
+          className={cn(
+            guidedOnboardingSaveNextButtonClass,
+            primaryButtonClassName,
+          )}
+          onClick={() => void handlePrimaryClick()}
+        >
+          {primaryLabel}
+        </Button>
+        {extraActions}
       </div>
     </div>
   );

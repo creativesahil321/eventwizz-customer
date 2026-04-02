@@ -14,9 +14,12 @@ interface AddressAutocompleteProps {
   onChange: (address: string) => void;
   onSelect?: (placeId: string, address: string) => void;
   onFocus?: () => void;
+  onBlur?: () => void;
   placeholder?: string;
   className?: string;
   autoFocus?: boolean;
+  /** Matches vendor dark surfaces (e.g. AI event collect). Default: light input. */
+  variant?: "default" | "dark";
 }
 
 export default function AddressAutocomplete({
@@ -24,10 +27,13 @@ export default function AddressAutocomplete({
   onChange,
   onSelect,
   onFocus,
+  onBlur,
   placeholder = "Type to search for a UK address or location...",
   className = "",
   autoFocus = false,
+  variant = "default",
 }: AddressAutocompleteProps) {
+  const isDark = variant === "dark";
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -280,18 +286,27 @@ export default function AddressAutocomplete({
     };
   }, []);
 
+  const inputClassName = isDark
+    ? `h-10 w-full rounded-md border px-3 text-sm shadow-none transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary,#3b82f6)]/40 focus-visible:ring-offset-0 ${
+        isSelected
+          ? "border-emerald-500/35 bg-emerald-950/25 text-slate-100 cursor-default"
+          : "border-white/10 bg-white/5 text-white placeholder:text-slate-500"
+      }`
+    : `w-full border p-2 rounded ${
+        isSelected ? "bg-green-50 cursor-not-allowed" : "bg-white"
+      }`;
+
   return (
     <div className={`relative w-full ${className}`}>
       <Input
         ref={inputRef}
-        className={`w-full border p-2 rounded ${
-          isSelected ? "bg-green-50 cursor-not-allowed" : "bg-white"
-        }`}
+        className={inputClassName}
         value={isSelected ? value : searchQuery}
         onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
           handleInputChange(e.target.value)
         }
         onFocus={handleFocus}
+        onBlur={onBlur}
         placeholder={isSelected ? "" : placeholder}
         readOnly={isSelected}
       />
@@ -299,7 +314,11 @@ export default function AddressAutocomplete({
       {/* Loading spinner */}
       {isSearching && !isSelected && (
         <div className="absolute right-10 top-1/2 transform -translate-y-1/2">
-          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+          <div
+            className={`animate-spin rounded-full h-4 w-4 border-b-2 ${
+              isDark ? "border-[var(--color-primary,#3b82f6)]" : "border-blue-600"
+            }`}
+          />
         </div>
       )}
 
@@ -309,7 +328,11 @@ export default function AddressAutocomplete({
           <button
             type="button"
             onClick={handleClear}
-            className="text-gray-400 hover:text-red-600 transition-colors font-bold"
+            className={
+              isDark
+                ? "text-slate-500 hover:text-red-400 transition-colors font-bold text-sm"
+                : "text-gray-400 hover:text-red-600 transition-colors font-bold"
+            }
             title="Clear selection"
           >
             ✕
@@ -319,16 +342,32 @@ export default function AddressAutocomplete({
 
       {/* Suggestions dropdown */}
       {suggestions.length > 0 && !isSelected && searchQuery && (
-        <div className="absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-y-auto">
+        <div
+          className={
+            isDark
+              ? "absolute z-[60] w-full mt-1 rounded-lg border border-white/10 bg-slate-950/98 backdrop-blur-md shadow-xl shadow-black/40 max-h-60 overflow-y-auto"
+              : "absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-y-auto"
+          }
+        >
           {suggestions.map((suggestion) => (
             <div
               key={suggestion.place_id}
-              className="px-4 py-3 cursor-pointer hover:bg-gray-50 border-b border-gray-100 last:border-b-0"
+              className={
+                isDark
+                  ? "px-3 py-2.5 cursor-pointer border-b border-white/5 last:border-b-0 hover:bg-white/[0.06] text-left"
+                  : "px-4 py-3 cursor-pointer hover:bg-gray-50 border-b border-gray-100 last:border-b-0"
+              }
               onClick={() => handleSuggestionSelect(suggestion)}
             >
-              <div className="flex items-center space-x-2">
-                <span className="text-gray-400">📍</span>
-                <span className="text-sm text-gray-800">
+              <div className="flex items-start gap-2">
+                <span className={isDark ? "text-slate-500 shrink-0" : "text-gray-400"}>
+                  📍
+                </span>
+                <span
+                  className={
+                    isDark ? "text-sm text-slate-200 leading-snug" : "text-sm text-gray-800"
+                  }
+                >
                   {suggestion.description}
                 </span>
               </div>
@@ -343,11 +382,20 @@ export default function AddressAutocomplete({
         !isSearching &&
         !isSelected &&
         searchQuery.length >= 2 && (
-          <div className="absolute z-50 w-full mt-1 rounded-md border border-amber-200 bg-amber-50 p-4 shadow-lg dark:border-amber-800 dark:bg-amber-950/30">
-            <p className="text-sm text-amber-800 dark:text-amber-200">
-              Google didn&apos;t find that location. Please select from the
-              suggestions above, or use the map below to set your location
-              manually.
+          <div
+            className={
+              isDark
+                ? "absolute z-[60] w-full mt-1 rounded-lg border border-amber-500/25 bg-amber-950/40 p-3 shadow-lg"
+                : "absolute z-50 w-full mt-1 rounded-md border border-amber-200 bg-amber-50 p-4 shadow-lg dark:border-amber-800 dark:bg-amber-950/30"
+            }
+          >
+            <p
+              className={
+                isDark ? "text-xs text-amber-100/90 leading-relaxed" : "text-sm text-amber-800 dark:text-amber-200"
+              }
+            >
+              Google didn&apos;t find that location. Try a different search or
+              pick a suggestion from the list.
             </p>
           </div>
         )}
@@ -357,12 +405,20 @@ export default function AddressAutocomplete({
         searchQuery.length >= 2 &&
         !isSearching &&
         !autocompleteService.current && (
-          <div className="absolute z-50 w-full mt-1 bg-yellow-50 border border-yellow-300 rounded-md shadow-lg p-4">
-            <div className="flex items-center space-x-2 text-yellow-700">
+          <div
+            className={
+              isDark
+                ? "absolute z-[60] w-full mt-1 rounded-lg border border-yellow-500/30 bg-yellow-950/35 p-3 shadow-lg"
+                : "absolute z-50 w-full mt-1 bg-yellow-50 border border-yellow-300 rounded-md shadow-lg p-4"
+            }
+          >
+            <div
+              className={`flex items-start gap-2 ${isDark ? "text-yellow-100/90 text-xs" : "text-yellow-700"}`}
+            >
               <span>⚠️</span>
-              <span className="text-sm">
-                Address search is temporarily unavailable. Please use the map
-                below to set your location.
+              <span className={isDark ? "" : "text-sm"}>
+                Address search is unavailable. Check your connection or try again
+                shortly.
               </span>
             </div>
           </div>

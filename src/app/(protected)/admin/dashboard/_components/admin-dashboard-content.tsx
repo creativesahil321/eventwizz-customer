@@ -47,7 +47,7 @@ function toParsedSearch(
 }
 
 export default function AdminDashboardContent() {
-  const { format: formatTenantMoney } = useCurrencyFormat();
+  const { formatLocale: formatTenantMoney } = useCurrencyFormat();
   const searchParams = useSearchParams();
   const searchRecord = useMemo(
     () => searchParamsToRecord(searchParams),
@@ -112,15 +112,15 @@ export default function AdminDashboardContent() {
         { id: "disabled_vendors", label: "Disabled Vendors", value: summary.disabled_vendors },
       ],
       performanceData: {
-        totalRevenue: performance.total_revenue_formatted ?? formatCurrency(performance.total_revenue),
-        commissionEarned: performance.admin_commission_formatted ?? formatCurrency(performance.admin_commission),
-        commissionPending: performance.commission_pending_formatted ?? formatCurrency(performance.commission_pending),
+        totalRevenue: formatCurrency(performance.total_revenue),
+        commissionEarned: formatCurrency(performance.admin_commission),
+        commissionPending: formatCurrency(performance.commission_pending),
         newVendors: performance.new_vendors,
       },
       venueCommissions: (venuesCommission.venues ?? []).map((venue, index) => ({
         id: venue.vendor_id ?? index + 1,
         name: venue.venue_name,
-        commission: venue.total_commission_formatted ?? formatCurrency(venue.total_commission),
+        commission: formatCurrency(venue.total_commission),
         value: venue.percentage ?? 0,
         lastUpdated: venuesCommission.last_updated_formatted,
       })),

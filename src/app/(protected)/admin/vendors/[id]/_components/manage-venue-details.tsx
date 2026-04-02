@@ -52,21 +52,13 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
 import { adminEventsService } from "@/services/admin/events/admin-events.service";
+import { useCurrencyFormat } from "@/hooks/use-currency-format";
 
 /** Permission key for impersonation — must match backend (e.g. impersonate-vendor). */
 const IMPERSONATE_VENDOR_PERMISSION = "impersonate-vendor";
 
 interface ManageVenueDetailsProps {
   venue: VenueDetail;
-}
-
-function formatCurrency(value: number): string {
-  return new Intl.NumberFormat("en-GB", {
-    style: "currency",
-    currency: "GBP",
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(value);
 }
 
 const NOT_PROVIDED = "Not provided";
@@ -159,6 +151,7 @@ function DomainApprovalActions({
 }
 
 export function ManageVenueDetails({ venue }: ManageVenueDetailsProps) {
+  const { formatLocale: formatMoney } = useCurrencyFormat();
   const canImpersonateVendor = usePermission(IMPERSONATE_VENDOR_PERMISSION);
 
   const pendingApprovalEvents = venue.recentEvents.filter(
@@ -773,25 +766,25 @@ export function ManageVenueDetails({ venue }: ManageVenueDetailsProps) {
                   <div>
                     <p className="text-muted-foreground">Total Revenue</p>
                     <p className="font-medium mt-0.5">
-                      {formatCurrency(financialSummary.totalRevenue)}
+                      {formatMoney(financialSummary.totalRevenue ?? 0)}
                     </p>
                   </div>
                   <div>
                     <p className="text-muted-foreground">Commission Earned</p>
                     <p className="font-medium mt-0.5">
-                      {formatCurrency(financialSummary.commissionEarned)}
+                      {formatMoney(financialSummary.commissionEarned ?? 0)}
                     </p>
                   </div>
                   <div>
                     <p className="text-muted-foreground">Payout Released</p>
                     <p className="font-medium mt-0.5">
-                      {formatCurrency(financialSummary.payoutReleased)}
+                      {formatMoney(financialSummary.payoutReleased ?? 0)}
                     </p>
                   </div>
                   <div>
                     <p className="text-muted-foreground">Pending commission</p>
                     <p className="font-medium mt-0.5">
-                      {formatCurrency(financialSummary.pendingCommission)}
+                      {formatMoney(financialSummary.pendingCommission ?? 0)}
                     </p>
                   </div>
                 </div>

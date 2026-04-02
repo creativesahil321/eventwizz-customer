@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { CardContent, CardHeader, OnboardingCard } from "@/components/ui/card";
 import {
@@ -18,7 +18,6 @@ import { onboardingService } from "@/services/vendor/onboarding/onboarding.servi
 import { useSession } from "next-auth/react";
 import {
   OnboardingTitle,
-  OnboardingSectionTitle,
   RadioButtonLabel,
 } from "@/components/ui/typography";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
@@ -30,25 +29,15 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
 import GoogleLocationSearch from "./google-location-search";
 import { fetchLocationDetails } from "./_lib/actions";
 import { env } from "@/env";
 import { useDomainSuggestions } from "./_lib/hooks/useDomainSuggestions";
-import { Loader2, ChevronDown, Check, CheckCircle2 } from "lucide-react";
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
+import { Loader2, Check, CheckCircle2, Globe, Mail, MapPin } from "lucide-react";
 import { useEventId } from "../../../_lib/hooks/useEventId";
 import { WholeStepGuidedShell } from "../../whole-step-guided-shell";
 import { guidedInsetSectionSurfaceClass } from "../../guided-section-surface";
-import {
-  GuidedWholeStepApproveButton,
-  guidedOnboardingSaveNextButtonClass,
-} from "../../guided-sticky-approval-bar";
-import { cn } from "@/lib/utils";
+import { GuidedWholeStepBottomActions } from "../../guided-section-chips";
 import { motion, AnimatePresence } from "framer-motion";
 import { useRouter } from "next/navigation";
 
@@ -70,8 +59,18 @@ const extraOptions = [
   { value: 180, label: "Before 6 Months" },
 ];
 
+const publishCardClass =
+  "rounded-xl border border-white/[0.08] bg-white/[0.02] p-5 sm:p-6 space-y-4";
+const publishStepBadgeClass =
+  "flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/[0.06] text-sm font-semibold tabular-nums text-slate-100";
+
 export default function StepEleven() {
-  const { form: globalForm } = useFormContext();
+  const { form: globalForm, persistedProgressHydrated } = useFormContext();
+
+  const stepElevenPersistedApproved = useWatch({
+    control: globalForm.control,
+    name: "stepEleven.isApproved",
+  });
   const { update } = useSession();
   const router = useRouter();
   const [publishing, setPublishing] = useState(false);
@@ -114,11 +113,6 @@ export default function StepEleven() {
   /** Hide duplicate flow for single-location (`false`). Show when multi (`true`) or legacy payloads without the flag (`undefined`). */
   const showDuplicateEventOptions = stepOneHasMulti !== false;
 
-  // Collapsible section states
-  const [isReminderOpen, setIsReminderOpen] = useState(false);
-  const [isDomainOpen, setIsDomainOpen] = useState(true);
-  const [isDuplicateOpen, setIsDuplicateOpen] = useState(false);
-  const [isLocationOpen, setIsLocationOpen] = useState(false);
   const eventId = useEventId(globalForm, "stepEleven");
 
   const form = useForm<StepElevenType>({
@@ -171,6 +165,7 @@ export default function StepEleven() {
         reminder_email_before_days?: number;
         domain: string;
         confirm_domain: boolean;
+        isApproved?: boolean;
       };
 
       const payload: StepElevenPayload = {
@@ -179,6 +174,7 @@ export default function StepEleven() {
         submit_type: values.submit_type,
         domain: values.domain,
         confirm_domain: values.confirm_domain,
+        isApproved: true,
       };
 
       if (values.submit_type === "duplicate") {
@@ -202,8 +198,12 @@ export default function StepEleven() {
 
       // Step 2 — setting up event page (actual API call happens here)
       setPublishStep(2);
-      const response = await onboardingService.storeStepElevenData(payload);
+      const response = await onboardingService.storeStepElevenData(
+        payload as StepElevenType,
+      );
       if (!response?.status) throw new Error("Failed to publish");
+
+      globalForm.setValue("stepEleven", { ...values, isApproved: true });
 
       // Step 3 — publishing site
       setPublishStep(3);
@@ -416,10 +416,15 @@ export default function StepEleven() {
 
       <div className="w-full max-w-4xl mx-auto relative">
         <OnboardingCard className="w-full mx-auto shadow-sm">
-          <CardHeader className="pb-2 pt-4">
+          <CardHeader className="space-y-2 pb-4 pt-4 text-center sm:text-left">
             <OnboardingTitle>
-              Almost Done! Let&apos;s Submit Your Event
+              Almost done — publish your event
             </OnboardingTitle>
+            <p className="mx-auto max-w-xl text-sm leading-relaxed text-slate-400 sm:mx-0">
+              Choose the web address for bookings, optionally turn on balance
+              reminders, then submit. Everything stays editable in your
+              dashboard later.
+            </p>
           </CardHeader>
 
           <CardContent className="px-6 py-2 pb-8">
@@ -440,56 +445,35 @@ export default function StepEleven() {
                   <WholeStepGuidedShell
                     form={form}
                     sectionId="step-eleven-publish"
-                    chipLabel="Review & publish"
-                    chipDescription="Domain, reminders, and final checks before going live."
-                    renderFooter={({ guided, sectionId }) => (
+                    chipLabel="Publish"
+                    chipDescription="Domain, reminders, and submit."
+                    persistenceHydrated={persistedProgressHydrated}
+                    persistedStepApproved={stepElevenPersistedApproved === true}
+                    renderFooter={({ guided }) => (
                       <div className="w-full space-y-4">
-                        <div className="flex w-full flex-wrap items-center justify-center gap-3">
-                          <GuidedWholeStepApproveButton
-                            guided={guided}
-                            sectionId={sectionId}
-                          />
-                          <Button
-                            type="button"
-                            variant="event-primary"
-                            className={cn(
-                              guidedOnboardingSaveNextButtonClass,
-                              "h-12 px-10",
-                            )}
-                            disabled={
-                              publishing ||
-                              !guided.allSectionsApproved ||
-                              !selectedDomain ||
-                              !form.watch("confirm_domain")
-                            }
-                            title={
-                              !guided.allSectionsApproved
-                                ? "Approve this step first"
-                                : undefined
-                            }
-                            onClick={() => {
-                              if (!guided.allSectionsApproved) return;
-                              void form.handleSubmit(onSubmit)();
-                            }}
-                          >
-                            {form.watch("submit_type") === "duplicate"
-                              ? "Duplicate & Submit"
-                              : "Submit"}
-                          </Button>
-                        </div>
-                        {!guided.allSectionsApproved && (
-                          <p className="text-center text-sm text-muted-foreground">
-                            Approve this step when you&apos;re happy with your
-                            settings, then submit.
-                          </p>
-                        )}
+                        <GuidedWholeStepBottomActions
+                          guided={guided}
+                          loading={publishing}
+                          labelWhenReady={
+                            form.watch("submit_type") === "duplicate"
+                              ? "Duplicate & submit"
+                              : "Submit"
+                          }
+                          continueDisabled={
+                            publishing ||
+                            !selectedDomain ||
+                            !form.watch("confirm_domain")
+                          }
+                          onContinue={() => void form.handleSubmit(onSubmit)()}
+                          primaryButtonClassName="h-12 px-10"
+                        />
                         {!selectedDomain && (
-                          <p className="text-center text-sm text-gray-500">
+                          <p className="text-center text-sm text-muted-foreground">
                             Please select a subdomain to continue
                           </p>
                         )}
                         {selectedDomain && !form.watch("confirm_domain") && (
-                          <p className="text-center text-sm text-gray-500">
+                          <p className="text-center text-sm text-muted-foreground">
                             Please confirm your selection
                           </p>
                         )}
@@ -499,44 +483,30 @@ export default function StepEleven() {
                     {() => (
                   <section
                     className={guidedInsetSectionSurfaceClass(
-                      "w-full space-y-4",
+                      "w-full space-y-6 sm:space-y-8",
                     )}
                   >
-                    {/* Domain Configuration Section */}
-                    <Collapsible
-                      open={isDomainOpen}
-                      onOpenChange={setIsDomainOpen}
-                    >
-                      <CollapsibleTrigger asChild>
-                        <Button
-                          variant="ghost"
-                          className="flex w-full justify-between items-center p-4 border border-gray-200 rounded-lg hover:bg-white/10"
-                        >
-                          <div className="flex items-center gap-2">
-                            <span className="text-blue-600">🌐</span>
-                            <span className="font-medium">
-                              Website Domain Configuration
-                            </span>
+                    {/* 1 — Website address (required) */}
+                    <div className={publishCardClass}>
+                      <div className="flex gap-4">
+                        <span className={publishStepBadgeClass}>1</span>
+                        <div className="min-w-0 flex-1 space-y-4">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <Globe
+                              className="h-5 w-5 shrink-0 text-sky-400/90"
+                              aria-hidden
+                            />
+                            <h3 className="text-base font-semibold tracking-tight text-white">
+                              Your booking website address
+                            </h3>
                           </div>
-                          <ChevronDown
-                            className={`h-4 w-4 transition-transform ${
-                              isDomainOpen ? "rotate-180" : ""
-                            }`}
-                          />
-                        </Button>
-                      </CollapsibleTrigger>
-                      <CollapsibleContent className="px-4 pb-4 border border-gray-200 rounded-lg bg-white/[0.03]">
-                        <div className="space-y-4 mt-4">
-                          <OnboardingSectionTitle>
-                            Choose Your Website Domain
-                          </OnboardingSectionTitle>
-                          <p className="text-sm text-gray-600">
-                            Your website will be at:{" "}
-                            <strong>
+                          <p className="text-sm leading-relaxed text-slate-400">
+                            Public link:{" "}
+                            <strong className="font-medium text-slate-200">
                               {(
                                 selectedDomain ||
                                 venueName ||
-                                "Enter subdomain name"
+                                "yoursubdomain"
                               ).replace(/\.com$|\.eventwizz\.com$/g, "")}
                               .eventwizz.com
                             </strong>
@@ -544,9 +514,9 @@ export default function StepEleven() {
 
                           <div className="space-y-3">
                             <div className="space-y-2">
-                              <p className="text-sm text-gray-600">
-                                New subdomain:
-                              </p>
+                              <label className="text-sm font-medium text-slate-300">
+                                Subdomain
+                              </label>
                               <div className="relative">
                                 <Input
                                   placeholder="Enter subdomain name"
@@ -567,10 +537,10 @@ export default function StepEleven() {
                                       );
                                     }
                                   }}
-                                  className="pr-20 h-9 bg-white border-gray-300 text-sm"
+                                  className="h-9 border-white/20 bg-white/5 pr-20 text-sm"
                                   maxLength={63}
                                 />
-                                <div className="absolute right-3 top-1/2 transform -translate-y-1/2 flex items-center text-sm text-gray-500">
+                                <div className="absolute right-3 top-1/2 flex -translate-y-1/2 transform items-center text-sm text-muted-foreground">
                                   .eventwizz.com
                                 </div>
                                 {selectedDomain && (
@@ -611,7 +581,7 @@ export default function StepEleven() {
                                     ) ||
                                     suggestionsError.includes("content")) && (
                                     <div className="mt-2">
-                                      <p className="text-xs text-gray-500 mb-2">
+                                      <p className="mb-2 text-xs text-muted-foreground">
                                         Try these alternatives:
                                       </p>
                                       <div className="flex flex-wrap gap-2">
@@ -629,7 +599,7 @@ export default function StepEleven() {
                                               setSelectedDomain(alt);
                                               form.setValue("domain", alt);
                                             }}
-                                            className="px-3 py-1.5 text-sm rounded-full border bg-gray-50 border-gray-200 text-gray-700 hover:bg-white/10 hover:border-gray-300 transition-all duration-200"
+                                            className="rounded-full border border-white/15 bg-white/[0.06] px-3 py-1.5 text-sm text-foreground transition-all duration-200 hover:border-white/25 hover:bg-white/[0.1]"
                                           >
                                             {alt}
                                           </button>
@@ -655,10 +625,10 @@ export default function StepEleven() {
                                           suggestion.domain
                                         );
                                       }}
-                                      className={`px-3 py-1.5 text-sm rounded-full border transition-all duration-200 hover:shadow-sm ${
+                                      className={`rounded-full border px-3 py-1.5 text-sm transition-all duration-200 hover:shadow-sm ${
                                         selectedDomain === suggestion.domain
-                                          ? "bg-blue-100 border-blue-300 text-blue-700 shadow-sm"
-                                          : "bg-gray-50 border-gray-200 text-gray-700 hover:bg-white/10 hover:border-gray-300"
+                                          ? "border-[var(--color-primary,#3b82f6)] bg-[var(--color-primary,#3b82f6)]/15 text-foreground shadow-sm"
+                                          : "border-white/15 bg-white/[0.06] text-foreground hover:border-white/25 hover:bg-white/[0.1]"
                                       }`}
                                     >
                                       {suggestion.domain.replace(
@@ -674,7 +644,7 @@ export default function StepEleven() {
                             {/* Show message when no suggestions available but user is typing */}
                             {isGeneratingSuggestions &&
                               (selectedDomain || "").length >= 3 && (
-                                <div className="flex items-center gap-2 text-xs text-blue-600 mt-2">
+                                <div className="mt-2 flex items-center gap-2 text-xs text-[var(--color-primary,#38bdf8)]">
                                   <Loader2 className="h-3 w-3 animate-spin" />
                                   Finding suggestions...
                                 </div>
@@ -706,7 +676,7 @@ export default function StepEleven() {
                                         onChange={(e) => {
                                           field.onChange(e.target.checked);
                                         }}
-                                        className="mt-1 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                                        className="mt-1 h-4 w-4 rounded border-white/30 text-[var(--color-primary,#38bdf8)] focus:ring-[var(--color-primary)]"
                                         disabled={!selectedDomain}
                                       />
                                     </FormControl>
@@ -722,42 +692,38 @@ export default function StepEleven() {
                             />
                           </div>
                         </div>
-                      </CollapsibleContent>
-                    </Collapsible>
+                      </div>
+                    </div>
 
-                    {/* Reminder Email Section */}
-                    <Collapsible
-                      open={isReminderOpen}
-                      onOpenChange={setIsReminderOpen}
-                    >
-                      <CollapsibleTrigger asChild>
-                        <Button
-                          variant="ghost"
-                          className="flex w-full justify-between items-center p-4 border border-gray-200 rounded-lg hover:bg-white/10"
-                        >
-                          <div className="flex items-center gap-2">
-                            <span className="text-orange-600">📧</span>
-                            <span className="font-medium">
-                              Reminder Email Settings
+                    {/* 2 — Reminder emails (optional) */}
+                    <div className={publishCardClass}>
+                      <div className="flex gap-4">
+                        <span className={publishStepBadgeClass}>2</span>
+                        <div className="min-w-0 flex-1 space-y-4">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <Mail
+                              className="h-5 w-5 shrink-0 text-amber-400/90"
+                              aria-hidden
+                            />
+                            <h3 className="text-base font-semibold tracking-tight text-white">
+                              Balance reminder emails
+                            </h3>
+                            <span className="rounded-full border border-white/10 bg-white/[0.04] px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-slate-400">
+                              Optional
                             </span>
                           </div>
-                          <ChevronDown
-                            className={`h-4 w-4 transition-transform ${
-                              isReminderOpen ? "rotate-180" : ""
-                            }`}
-                          />
-                        </Button>
-                      </CollapsibleTrigger>
-                      <CollapsibleContent className="px-4 pb-4 border border-gray-200 rounded-lg bg-white/[0.03]">
-                        <div className="space-y-4 mt-4">
+                          <p className="text-sm leading-relaxed text-slate-400">
+                            Send a reminder before the event so guests can pay
+                            any remaining balance. You can change this later.
+                          </p>
                           <FormField
                             control={form.control}
                             name="reminder_email_before_days"
                             render={({ field }) => (
                               <FormItem className="relative">
-                                <OnboardingSectionTitle>
-                                  Would You Like To Configure Reminder Emails?
-                                </OnboardingSectionTitle>
+                                <p className="text-sm font-medium text-slate-300">
+                                  Send reminders?
+                                </p>
                                 <FormControl>
                                   <RadioGroup
                                     onValueChange={(value) => {
@@ -780,7 +746,7 @@ export default function StepEleven() {
                                         />
                                       </FormControl>
                                       <RadioButtonLabel>
-                                        Configure Now
+                                        Yes, set up reminders
                                       </RadioButtonLabel>
                                     </FormItem>
                                     <FormItem className="flex items-center space-x-3 space-y-0">
@@ -791,7 +757,7 @@ export default function StepEleven() {
                                         />
                                       </FormControl>
                                       <RadioButtonLabel>
-                                        Configure Later
+                                        Not now
                                       </RadioButtonLabel>
                                     </FormItem>
                                   </RadioGroup>
@@ -814,10 +780,9 @@ export default function StepEleven() {
 
                                 return (
                                   <FormItem className="relative">
-                                    <OnboardingSectionTitle>
-                                      How Many Days Before The Event Do You Want
-                                      To Remind Customers To Pay Their Balance?
-                                    </OnboardingSectionTitle>
+                                    <p className="text-sm font-medium text-slate-300">
+                                      How many days before the event?
+                                    </p>
                                     <Select
                                       onValueChange={(value) => {
                                         const numValue = parseInt(value, 10);
@@ -861,47 +826,38 @@ export default function StepEleven() {
                             />
                           )}
                         </div>
-                      </CollapsibleContent>
-                    </Collapsible>
+                      </div>
+                    </div>
 
-                    {/* Duplicate Event Section — only for multi-location brands (or legacy unset) */}
+                    {/* 3 — Copy event to another venue (multi-location only) */}
                     {showDuplicateEventOptions && (
-                    <Collapsible
-                      open={isDuplicateOpen}
-                      onOpenChange={setIsDuplicateOpen}
-                    >
-                      <CollapsibleTrigger asChild>
-                        <Button
-                          variant="ghost"
-                          className="flex w-full justify-between items-center p-4 border border-gray-200 rounded-lg hover:bg-white/10"
-                        >
-                          <div className="flex items-center gap-2">
-                            <span className="text-purple-600">📋</span>
-                            <span className="font-medium">
-                              Event Duplication Options
-                            </span>
+                    <div className={publishCardClass}>
+                      <div className="flex gap-4">
+                        <span className={publishStepBadgeClass}>3</span>
+                        <div className="min-w-0 flex-1 space-y-4">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <MapPin
+                              className="h-5 w-5 shrink-0 text-violet-400/90"
+                              aria-hidden
+                            />
+                            <h3 className="text-base font-semibold tracking-tight text-white">
+                              Another venue?
+                            </h3>
                           </div>
-                          <ChevronDown
-                            className={`h-4 w-4 transition-transform ${
-                              isDuplicateOpen ? "rotate-180" : ""
-                            }`}
-                          />
-                        </Button>
-                      </CollapsibleTrigger>
-                      <CollapsibleContent className="px-4 pb-4 border border-gray-200 rounded-lg bg-white/[0.03]">
-                        <div className="space-y-4 mt-4">
+                          <p className="text-sm leading-relaxed text-slate-400">
+                            Only if you run more than one location: duplicate
+                            this event and attach it to a different address.
+                            You can edit everything in the dashboard.
+                          </p>
                           <FormField
                             control={form.control}
                             name="submit_type"
                             render={({ field }) => (
                               <FormItem className="relative">
-                                <OnboardingSectionTitle>
-                                  Would You Like To Duplicate The Event You Just
-                                  Created And Add It To Another Location?{" "}
-                                  <span className="text-red-500">*</span>{" "}
-                                  Don&apos;t Worry It Can Be Edited In The
-                                  Dashboard.
-                                </OnboardingSectionTitle>
+                                <p className="text-sm font-medium text-slate-300">
+                                  Duplicate this event for another location?{" "}
+                                  <span className="text-red-400">*</span>
+                                </p>
                                 <FormControl>
                                   <RadioGroup
                                     onValueChange={(value) => {
@@ -923,7 +879,7 @@ export default function StepEleven() {
                                         />
                                       </FormControl>
                                       <RadioButtonLabel>
-                                        Yes Duplicate It
+                                        Yes, duplicate
                                       </RadioButtonLabel>
                                     </FormItem>
                                     <FormItem className="flex items-center space-x-3 space-y-0">
@@ -934,7 +890,7 @@ export default function StepEleven() {
                                         />
                                       </FormControl>
                                       <RadioButtonLabel>
-                                        No Don&apos;t Duplicate It
+                                        No, only this event
                                       </RadioButtonLabel>
                                     </FormItem>
                                   </RadioGroup>
@@ -943,120 +899,97 @@ export default function StepEleven() {
                               </FormItem>
                             )}
                           />
-                        </div>
-                      </CollapsibleContent>
-                    </Collapsible>
-                    )}
 
-                    {/* Location Fields Section - Only show when duplicating */}
-                    {showDuplicateEventOptions &&
-                      form.watch("submit_type") === "duplicate" && (
-                      <Collapsible
-                        open={isLocationOpen}
-                        onOpenChange={setIsLocationOpen}
-                      >
-                        <CollapsibleTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            className="flex w-full justify-between items-center p-4 border border-gray-200 rounded-lg hover:bg-white/10"
-                          >
-                            <div className="flex items-center gap-2">
-                              <span className="text-green-600">📍</span>
-                              <span className="font-medium">
-                                Additional Location Details
-                              </span>
+                          {form.watch("submit_type") === "duplicate" && (
+                            <div className="space-y-4 border-t border-white/10 pt-6">
+                              <p className="text-sm font-medium text-slate-200">
+                                Other venue address &amp; contact
+                              </p>
+                              <FormField
+                                control={form.control}
+                                name="address"
+                                render={({ field }) => (
+                                  <FormItem>
+                                    <FormLabel className="text-sm font-medium text-slate-300">
+                                      Address{" "}
+                                      <span className="text-red-400">*</span>
+                                    </FormLabel>
+                                    <FormControl>
+                                      <GoogleLocationSearch
+                                        apiKey={
+                                          env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY
+                                        }
+                                        value={field.value || ""}
+                                        onChange={(value) =>
+                                          field.onChange(value)
+                                        }
+                                        onSelect={(placeId) =>
+                                          fetchLocationDetails(form, placeId)
+                                        }
+                                        placeholder="Search for a location..."
+                                        variant="dark"
+                                      />
+                                    </FormControl>
+                                    <FormMessage />
+                                  </FormItem>
+                                )}
+                              />
+
+                              <FormField
+                                control={form.control}
+                                name="city"
+                                render={({ field }) => (
+                                  <FormItem>
+                                    <FormLabel className="text-sm font-medium text-slate-300">
+                                      City{" "}
+                                      <span className="text-red-400">*</span>
+                                    </FormLabel>
+                                    <FormControl>
+                                      <Input
+                                        {...field}
+                                        placeholder="City"
+                                        className="h-10 border-white/10 bg-white/5"
+                                      />
+                                    </FormControl>
+                                    <FormMessage />
+                                  </FormItem>
+                                )}
+                              />
+
+                              <FormField
+                                control={form.control}
+                                name="contact_number"
+                                render={({ field }) => (
+                                  <FormItem>
+                                    <FormLabel className="text-sm font-medium text-slate-300">
+                                      Contact number{" "}
+                                      <span className="text-red-400">*</span>
+                                    </FormLabel>
+                                    <FormControl>
+                                      <Input
+                                        {...field}
+                                        type="tel"
+                                        inputMode="numeric"
+                                        placeholder="Phone number"
+                                        className="h-10 border-white/10 bg-white/5"
+                                        onChange={(e) => {
+                                          const value = e.target.value.replace(
+                                            /[^0-9+\-() ]/g,
+                                            ""
+                                          );
+                                          field.onChange(value);
+                                        }}
+                                      />
+                                    </FormControl>
+                                    <FormMessage />
+                                  </FormItem>
+                                )}
+                              />
                             </div>
-                            <ChevronDown
-                              className={`h-4 w-4 transition-transform ${
-                                isLocationOpen ? "rotate-180" : ""
-                              }`}
-                            />
-                          </Button>
-                        </CollapsibleTrigger>
-                        <CollapsibleContent className="px-4 pb-4 border border-gray-200 rounded-lg bg-white/[0.03]">
-                          <div className="space-y-4 mt-4">
-                            <FormField
-                              control={form.control}
-                              name="address"
-                              render={({ field }) => (
-                                <FormItem>
-                                  <FormLabel className="text-base font-medium">
-                                    Address{" "}
-                                    <span className="text-red-500">*</span>
-                                  </FormLabel>
-                                  <FormControl>
-                                    <GoogleLocationSearch
-                                      apiKey={
-                                        env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY
-                                      }
-                                      value={field.value || ""}
-                                      onChange={(value) =>
-                                        field.onChange(value)
-                                      }
-                                      onSelect={(placeId) =>
-                                        fetchLocationDetails(form, placeId)
-                                      }
-                                      placeholder="Search for a location..."
-                                    />
-                                  </FormControl>
-                                  <FormMessage />
-                                </FormItem>
-                              )}
-                            />
-
-                            <FormField
-                              control={form.control}
-                              name="city"
-                              render={({ field }) => (
-                                <FormItem>
-                                  <FormLabel className="text-base font-medium">
-                                    City <span className="text-red-500">*</span>
-                                  </FormLabel>
-                                  <FormControl>
-                                    <Input
-                                      {...field}
-                                      placeholder="Enter city"
-                                      className="h-10 bg-white/5 border-white/10"
-                                    />
-                                  </FormControl>
-                                  <FormMessage />
-                                </FormItem>
-                              )}
-                            />
-
-                            <FormField
-                              control={form.control}
-                              name="contact_number"
-                              render={({ field }) => (
-                                <FormItem>
-                                  <FormLabel className="text-base font-medium">
-                                    Contact Number{" "}
-                                    <span className="text-red-500">*</span>
-                                  </FormLabel>
-                                  <FormControl>
-                                    <Input
-                                      {...field}
-                                      type="tel"
-                                      inputMode="numeric"
-                                      placeholder="Enter contact number"
-                                      className="h-10 bg-white/5 border-white/10"
-                                      onChange={(e) => {
-                                        // Only allow numbers, spaces, +, -, and parentheses
-                                        const value = e.target.value.replace(
-                                          /[^0-9+\-() ]/g,
-                                          ""
-                                        );
-                                        field.onChange(value);
-                                      }}
-                                    />
-                                  </FormControl>
-                                  <FormMessage />
-                                </FormItem>
-                              )}
-                            />
-                          </div>
-                        </CollapsibleContent>
-                      </Collapsible>
+                          )}
+                        </div>
+                      </div>
+                    </div>
                     )}
                   </section>
                     )}

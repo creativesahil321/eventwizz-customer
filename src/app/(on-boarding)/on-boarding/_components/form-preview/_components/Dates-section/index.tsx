@@ -155,6 +155,8 @@ export default function DatesSection({
 
   // Handle date card click - add to cart and redirect to checkout
   const handleDateClick = (dateItem: DatesSectionType[0]) => {
+    if (isPreviewMode) return;
+
     // Check if this date is already in cart
     if (isDateInCart(dateItem.event_date)) {
       toast.info("This date is already in your cart!");
@@ -259,26 +261,46 @@ export default function DatesSection({
 
   // Helper function to format date and use direct price from API
   const getDateInfo = (dateItem: DatesSectionType[0]) => {
-    // Create a new date object with proper timezone handling
-    const dateObj = new Date(`${dateItem.event_date}T12:00:00`);
+    const raw = dateItem.event_date?.trim() ?? "";
+    const dateObj =
+      raw.length >= 8 ? new Date(`${raw}T12:00:00`) : new Date(NaN);
+    const valid = !Number.isNaN(dateObj.getTime());
 
-    // Get day name and month
-    const day = dateObj.toLocaleString("default", { weekday: "long" });
-    const month = dateObj.toLocaleString("default", { month: "long" });
-    const dateNum = dateObj.getDate();
-
-    // Ensure price is a valid number before calling toFixed
-    const price =
+    const priceNum =
       typeof dateItem.price === "number" && !isNaN(dateItem.price)
         ? dateItem.price
         : 0;
+
+    if (!valid) {
+      return {
+        day: "Choose",
+        month: "event date",
+        date: "—" as const,
+        price: priceNum > 0 ? priceNum.toFixed(0) : "—",
+        isPlaceholder: true as const,
+      };
+    }
+
+    const day = dateObj.toLocaleString("default", { weekday: "long" });
+    const month = dateObj.toLocaleString("default", { month: "long" });
+    const dateNum = dateObj.getDate();
 
     return {
       day,
       month,
       date: dateNum,
-      price: price.toFixed(0),
+      price: priceNum.toFixed(0),
+      isPlaceholder: false as const,
     };
+  };
+
+  const dateCardPriceFooter = (
+    dateInfo: ReturnType<typeof getDateInfo>,
+  ): string => {
+    if (dateInfo.isPlaceholder && dateInfo.price === "—") {
+      return "Set date";
+    }
+    return `${currencySymbol}${dateInfo.price}`;
   };
 
   // If no dates, show a default preview with dummy data
@@ -336,7 +358,9 @@ export default function DatesSection({
             type="button"
             variant="outline"
             className="bg-[#1a1a24] hover:bg-[#26273a] !text-white py-1 sm:py-1.5 px-6 sm:px-8 rounded-md text-xs sm:text-sm border border-white/25 shadow-sm"
-            onClick={() => router.push("/auth/login")}
+            onClick={() => {
+              if (!isPreviewMode) router.push("/auth/login");
+            }}
           >
             {text}
           </Button>
@@ -417,7 +441,7 @@ export default function DatesSection({
                           ? "SOLD OUT"
                           : isInCart
                           ? "VIEW CART"
-                          : `${currencySymbol}${dateInfo.price}`}
+                          : dateCardPriceFooter(dateInfo)}
                       </div>
                     </div>
                   );
@@ -483,7 +507,7 @@ export default function DatesSection({
                           ? "SOLD OUT"
                           : isInCart
                           ? "VIEW CART"
-                          : `${currencySymbol}${dateInfo.price}`}
+                          : dateCardPriceFooter(dateInfo)}
                       </div>
                     </div>
                   );
@@ -546,7 +570,9 @@ export default function DatesSection({
           type="button"
           variant="outline"
           className="bg-[#1a1a24] hover:bg-[#26273a] !text-white py-1 sm:py-1.5 px-6 sm:px-8 rounded-md text-xs sm:text-sm border border-white/25 shadow-sm"
-          onClick={() => router.push("/auth/login")}
+          onClick={() => {
+            if (!isPreviewMode) router.push("/auth/login");
+          }}
         >
           {text}
         </Button>
@@ -649,7 +675,7 @@ export default function DatesSection({
                         ? "SOLD OUT"
                         : isInCart
                         ? "VIEW CART"
-                        : `${currencySymbol}${dateInfo.price}`}
+                        : dateCardPriceFooter(dateInfo)}
                     </div>
                   </motion.div>
                 );
@@ -735,7 +761,7 @@ export default function DatesSection({
                         ? "SOLD OUT"
                         : isInCart
                         ? "VIEW CART"
-                        : `${currencySymbol}${dateInfo.price}`}
+                        : dateCardPriceFooter(dateInfo)}
                     </div>
                   </motion.div>
                 );

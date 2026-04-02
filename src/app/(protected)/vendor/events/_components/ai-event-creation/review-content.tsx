@@ -1521,7 +1521,7 @@ function StepThreeEditor({
                         </div>
                         <div>
                           <label className="text-[10px] text-slate-500 block mb-0.5">
-                            Deposit due date
+                            Balance due date
                           </label>
                           <input
                             type="date"

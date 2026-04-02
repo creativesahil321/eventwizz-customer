@@ -8,6 +8,8 @@ import {
 export const stepOneSchema = z
   .object({
     step: z.literal(1),
+    /** Persisted from API; manual saves send true after approve. Omitted during AI bulk-apply (mode ai). */
+    isApproved: z.boolean().optional(),
     has_multiple_locations: z.boolean().optional(),
     name: z.string(),
     contact_number: z
@@ -120,6 +122,7 @@ export function coerceHasMultipleLocationsFromApi(
 //#===step-2===#
 export const stepTwoSchema = z.object({
   step: z.literal(2),
+  isApproved: z.boolean().optional(),
   logo: z.any().optional(),
   cover_image: z.any().optional(),
   banner_heading: z
@@ -177,6 +180,7 @@ const validateTimeSequence: (
 };
 
 export const stepThreeSchema = z.object({
+  isApproved: z.boolean().optional(),
   step: z.literal(3),
   vendor_location_id: z.number().optional(),
   event_category_id: z.number().min(1, "Event Category is required"),
@@ -237,6 +241,7 @@ export type StepThreeType = z.infer<typeof stepThreeSchema>;
 export const stepFourSchema = z
   .object({
     step: z.literal(4),
+    isApproved: z.boolean().optional(),
     event_id: z.number().min(1, "Event ID is required"),
     package_image: z
       .union([z.instanceof(File), z.string().url(), z.null()])
@@ -322,7 +327,7 @@ const validateDepositDueDate = (data: unknown) => {
 };
 
 const depositDueDateMessage = {
-  message: "Deposit due date is required when deposit payment is selected",
+  message: "Balance due date is required when deposit payment is selected",
   path: ["deposit_due_date"],
 };
 
@@ -536,7 +541,7 @@ const dateSchema = baseDateSchema
       if (depositDate >= eventDate) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
-          message: "Deposit due date must be before the event date",
+          message: "Balance due date must be before the event date",
           path: ["deposit_due_date"],
         });
       }
@@ -588,6 +593,7 @@ const dateSchema = baseDateSchema
 export const stepFiveSchema = z
   .object({
     step: z.literal(5),
+    isApproved: z.boolean().optional(),
     event_id: z.number().min(1, "Event ID is required"),
     dates: z.array(dateSchema).min(1, "At least one date is required"),
   })
@@ -698,6 +704,7 @@ export const getDefaultDate = (
 export const stepSixSchema = z
   .object({
     step: z.literal(6),
+    isApproved: z.boolean().optional(),
     event_id: z.number().min(1, "Event ID is required"),
     catering_option: z.number().min(0).max(1),
     menu_title: z
@@ -787,6 +794,7 @@ export const StepSixSchema = stepSixSchema;
 //#===step-7===#
 export const stepSevenSchema = z.object({
   step: z.literal(7),
+  isApproved: z.boolean().optional(),
   event_id: z.number(),
   drink_title: z
     .string()
@@ -893,6 +901,7 @@ export type StepSevenType = z.infer<typeof stepSevenSchema>;
 export const stepEightSchema = z
   .object({
     step: z.number(),
+    isApproved: z.boolean().optional(),
     event_id: z.number(),
     remove_brochure_pdf: z.boolean().optional(),
     remove_brochure_pdf_2: z.boolean().optional(),
@@ -1017,6 +1026,7 @@ const stepNineFaqItemSchema = z.object({
 
 export const stepNineSchema = z.object({
   step: z.number(),
+  isApproved: z.boolean().optional(),
   event_id: z.number(),
   faqs: z
     .array(stepNineFaqItemSchema)
@@ -1054,6 +1064,7 @@ const paymentGatewaysSchema = z.object({
 export const stepTenSchema = z
   .object({
     step: z.literal(10),
+    isApproved: z.boolean().optional(),
     event_id: z.number(),
     payment_gateways: paymentGatewaysSchema.optional(),
     is_skipped: z.boolean().default(false),
@@ -1085,6 +1096,7 @@ export type StepTenType = z.infer<typeof stepTenSchema>;
 export const stepElevenSchema = z
   .object({
     step: z.literal(11),
+    isApproved: z.boolean().optional(),
     event_id: z.number(),
     /** Persisted from API; also merged into `stepOne` for step 1 gate / brand mode. */
     has_multiple_locations: z.boolean().optional(),
@@ -1145,6 +1157,7 @@ export type StepElevenType = z.infer<typeof stepElevenSchema>;
 
 //#===on-boarding-schema===#
 export const onboardingSchema = z.object({
+  isApproved: z.boolean().default(false),
   activeStep: z.number().min(1).max(11),
   last_completed_step: z.number().min(1).max(11),
   stepOne: stepOneSchema,

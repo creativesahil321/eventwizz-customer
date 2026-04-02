@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
-import { useForm, Controller } from "react-hook-form";
+import { useForm, Controller, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { CardContent, CardHeader, OnboardingCard } from "@/components/ui/card";
 import {
@@ -20,7 +20,7 @@ import { FileUploader } from "@/components/ui/file-uploader";
 import { toast } from "sonner";
 import {
   OnboardingTitle,
-  OnboardingSectionTitle,
+  OnboardingFieldGroupTitle,
 } from "@/components/ui/typography";
 import { onboardingService } from "@/services/vendor/onboarding/onboarding.service";
 import { Resolver } from "react-hook-form";
@@ -29,11 +29,8 @@ import { useFieldFocusHandler } from "../../form-preview/field-focus-handler";
 import { useEventId } from "../../../_lib/hooks/useEventId";
 import { WholeStepGuidedShell } from "../../whole-step-guided-shell";
 import { guidedInsetSectionSurfaceClass } from "../../guided-section-surface";
-import {
-  GuidedWholeStepApproveButton,
-  guidedOnboardingSaveNextButtonClass,
-  guidedOnboardingSkipButtonClass,
-} from "../../guided-sticky-approval-bar";
+import { guidedOnboardingSkipButtonClass } from "../../guided-sticky-approval-bar";
+import { GuidedWholeStepBottomActions } from "../../guided-section-chips";
 import EventLocationMap from "./event-location-map";
 import AddressAutocomplete from "./address-autocomplete";
 import { useCurrencySymbol } from "@/hooks/use-currency-format";
@@ -46,7 +43,13 @@ export default function StepEight() {
     save,
     setActiveStep,
     activeField,
+    persistedProgressHydrated,
   } = useFormContext();
+
+  const stepEightPersistedApproved = useWatch({
+    control: globalForm.control,
+    name: "stepEight.isApproved",
+  });
   const [loading, setLoading] = useState(false);
   const { update: updateSession } = useSession();
   // Get the address from Step 1 to prefill the event address
@@ -342,9 +345,16 @@ export default function StepEight() {
 
       try {
         // Use the onboardingService
-        const response = await onboardingService.storeStepEightData(data);
+        const response = await onboardingService.storeStepEightData({
+          ...data,
+          isApproved: true,
+        });
 
         if (response?.status) {
+          globalForm.setValue("stepEight", {
+            ...formattedData,
+            isApproved: true,
+          });
           // INSTANT TRANSITION: Set active step FIRST for smooth UX
           setActiveStep(9);
 
@@ -411,49 +421,36 @@ export default function StepEight() {
                   sectionId="step-eight-brochure-location"
                   chipLabel="Brochure & location"
                   chipDescription="PDF, address, map, and pricing call-to-action."
-                  renderFooter={({ guided, sectionId }) => (
-                    <>
-                      <GuidedWholeStepApproveButton
-                        guided={guided}
-                        sectionId={sectionId}
-                      />
-                      <Button
-                        variant="event-primary"
-                        type="button"
-                        className={guidedOnboardingSaveNextButtonClass}
-                        disabled={loading || !guided.allSectionsApproved}
-                        title={
-                          !guided.allSectionsApproved
-                            ? "Approve this step first"
-                            : undefined
-                        }
-                        onClick={() => {
-                          if (!guided.allSectionsApproved) return;
-                          void form.handleSubmit(handleSubmit)();
-                        }}
-                      >
-                        {loading ? "Saving..." : "Save & Next"}
-                      </Button>
-                      <Button
-                        variant="event-outline"
-                        type="button"
-                        onClick={() => setActiveStep(9)}
-                        className={guidedOnboardingSkipButtonClass}
-                      >
-                        Skip
-                      </Button>
-                    </>
+                  persistenceHydrated={persistedProgressHydrated}
+                  persistedStepApproved={stepEightPersistedApproved === true}
+                  renderFooter={({ guided }) => (
+                    <GuidedWholeStepBottomActions
+                      guided={guided}
+                      loading={loading}
+                      labelWhenReady="Save & continue"
+                      onContinue={() => void form.handleSubmit(handleSubmit)()}
+                      extraActions={
+                        <Button
+                          variant="event-outline"
+                          type="button"
+                          onClick={() => setActiveStep(9)}
+                          className={guidedOnboardingSkipButtonClass}
+                        >
+                          Skip
+                        </Button>
+                      }
+                    />
                   )}
                 >
                   {() => (
                     <>
                 {/* Brochure Section */}
                 <section className={guidedInsetSectionSurfaceClass("w-full mb-4")}>
-                  <OnboardingSectionTitle className="text-xl font-medium">
+                  <OnboardingFieldGroupTitle>
                     Add More Information
-                  </OnboardingSectionTitle>
+                  </OnboardingFieldGroupTitle>
 
-                  <div className="w-full min-w-0 space-y-6 border border-white/10 p-4 sm:p-6 rounded-md bg-white mt-4">
+                  <div className="mt-4 w-full min-w-0 space-y-6 rounded-lg border border-white/10 bg-white/[0.03] p-4 sm:p-6">
                     <FormField
                       control={form.control}
                       name="brochure_pdf"
@@ -466,7 +463,7 @@ export default function StepEight() {
                           <FormControl>
                             {brochurePdfUrl ? (
                               <div className="w-full min-w-0">
-                                <div className="flex items-center justify-between gap-3 bg-gray-100 p-4 rounded-md mb-2 min-w-0">
+                                <div className="mb-2 flex min-w-0 items-center justify-between gap-3 rounded-lg border border-white/10 bg-white/[0.06] p-4">
                                   <div className="flex items-center min-w-0 flex-1 overflow-hidden">
                                     <svg
                                       className="shrink-0"
@@ -543,7 +540,7 @@ export default function StepEight() {
                             )}
                           </FormControl>
                           <FormMessage />
-                          <p className="text-xs text-gray-500 mt-1">
+                          <p className="text-xs text-muted-foreground mt-1">
                             Upload your event brochure (PDF only)
                           </p>
                         </FormItem>
@@ -560,7 +557,7 @@ export default function StepEight() {
                           <FormControl>
                             {brochurePdfUrl2 ? (
                               <div className="w-full min-w-0">
-                                <div className="flex items-center justify-between gap-3 bg-gray-100 p-4 rounded-md mb-2 min-w-0">
+                                <div className="mb-2 flex min-w-0 items-center justify-between gap-3 rounded-lg border border-white/10 bg-white/[0.06] p-4">
                                   <div className="flex items-center min-w-0 flex-1 overflow-hidden">
                                     <svg
                                       className="shrink-0"
@@ -637,7 +634,7 @@ export default function StepEight() {
                             )}
                           </FormControl>
                           <FormMessage />
-                          <p className="text-xs text-gray-500 mt-1">
+                          <p className="text-xs text-muted-foreground mt-1">
                             Upload your event brochure (PDF only)
                           </p>
                         </FormItem>
@@ -655,7 +652,7 @@ export default function StepEight() {
                           <FormControl>
                             {faqPdfUrl ? (
                               <div className="w-full min-w-0">
-                                <div className="flex items-center justify-between gap-3 bg-gray-100 p-4 rounded-md mb-2 min-w-0">
+                                <div className="mb-2 flex min-w-0 items-center justify-between gap-3 rounded-lg border border-white/10 bg-white/[0.06] p-4">
                                   <div className="flex items-center min-w-0 flex-1 overflow-hidden">
                                     <svg
                                       className="shrink-0"
@@ -731,7 +728,7 @@ export default function StepEight() {
                             )}
                           </FormControl>
                           <FormMessage />
-                          <p className="text-xs text-gray-500 mt-1">
+                          <p className="text-xs text-muted-foreground mt-1">
                             Upload your FAQ document (PDF only)
                           </p>
                         </FormItem>
@@ -741,11 +738,11 @@ export default function StepEight() {
                 </section>
 
                 <section className={guidedInsetSectionSurfaceClass("w-full mb-4")}>
-                  <OnboardingSectionTitle className="text-xl font-medium">
+                  <OnboardingFieldGroupTitle>
                     Event Location
-                  </OnboardingSectionTitle>
+                  </OnboardingFieldGroupTitle>
 
-                  <div className="space-y-4 border border-white/10 p-6 rounded-md bg-white">
+                  <div className="space-y-4 rounded-lg border border-white/10 bg-white/[0.03] p-6">
                     <FormField
                       control={form.control}
                       name="event_address"
@@ -796,9 +793,10 @@ export default function StepEight() {
                               autoFocus={activeField === "event_address"}
                               placeholder="Type to search for a UK address or location..."
                               className="w-full"
+                              variant="dark"
                             />
                           </FormControl>
-                          <p className="text-xs text-blue-600 mt-1 font-medium">
+                          <p className="mt-1 text-xs font-medium text-[var(--color-primary,#38bdf8)]">
                             ⓘ Search for UK addresses or use the map below to
                             set exact location
                           </p>
@@ -844,11 +842,11 @@ export default function StepEight() {
 
                 {/* Price Section */}
                 <section className={guidedInsetSectionSurfaceClass("w-full mb-4")}>
-                  <OnboardingSectionTitle className="text-xl font-medium">
+                  <OnboardingFieldGroupTitle>
                     Price Information
-                  </OnboardingSectionTitle>
+                  </OnboardingFieldGroupTitle>
 
-                  <div className="space-y-4 border border-white/10 p-6 rounded-md bg-white mt-4">
+                  <div className="mt-4 space-y-4 rounded-lg border border-white/10 bg-white/[0.03] p-6">
                     <FormField
                       control={form.control}
                       name="price_start_from"
@@ -893,7 +891,7 @@ export default function StepEight() {
                             />
                           </FormControl>
                           <FormMessage />
-                          <p className="text-xs text-gray-500 mt-1">
+                          <p className="text-xs text-muted-foreground mt-1">
                             Enter the starting price (numbers only)
                           </p>
                         </FormItem>

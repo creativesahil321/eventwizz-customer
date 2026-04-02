@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { useForm, useFieldArray } from "react-hook-form";
+import { useForm, useFieldArray, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { CardContent, CardHeader, OnboardingCard } from "@/components/ui/card";
 import {
@@ -25,7 +25,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import {
   OnboardingTitle,
-  OnboardingSectionTitle,
+  OnboardingFieldGroupTitle,
 } from "@/components/ui/typography";
 import { onboardingService } from "@/services/vendor/onboarding/onboarding.service";
 import { useSession } from "next-auth/react";
@@ -33,11 +33,8 @@ import { useFieldFocusHandler } from "../../form-preview/field-focus-handler";
 import { useEventId } from "../../../_lib/hooks/useEventId";
 import { WholeStepGuidedShell } from "../../whole-step-guided-shell";
 import { guidedInsetSectionSurfaceClass } from "../../guided-section-surface";
-import {
-  GuidedWholeStepApproveButton,
-  guidedOnboardingSaveNextButtonClass,
-  guidedOnboardingSkipButtonClass,
-} from "../../guided-sticky-approval-bar";
+import { guidedOnboardingSkipButtonClass } from "../../guided-sticky-approval-bar";
+import { GuidedWholeStepBottomActions } from "../../guided-section-chips";
 
 function normalizeStepNineFaqs(
   faqs: StepNineType["faqs"] | undefined,
@@ -47,7 +44,17 @@ function normalizeStepNineFaqs(
 }
 
 export default function StepNine() {
-  const { form: globalForm, save, setActiveStep } = useFormContext();
+  const {
+    form: globalForm,
+    save,
+    setActiveStep,
+    persistedProgressHydrated,
+  } = useFormContext();
+
+  const stepNinePersistedApproved = useWatch({
+    control: globalForm.control,
+    name: "stepNine.isApproved",
+  });
   const [loading, setLoading] = useState(false);
   const { update: updateSession } = useSession();
 
@@ -136,9 +143,6 @@ export default function StepNine() {
   const onSubmit = async (data: StepNineType) => {
     setLoading(true);
     try {
-      // Update global form state
-      globalForm.setValue("stepNine", data);
-
       // Validate the form
       const isValid = await form.trigger();
       if (!isValid) {
@@ -161,10 +165,13 @@ export default function StepNine() {
         data.deleted_faq_ids = deletedFaqIds;
       }
 
+      const payload = { ...data, isApproved: true as const };
+
       // Call the API using the service
-      const response = await onboardingService.storeStepNineData(data);
+      const response = await onboardingService.storeStepNineData(payload);
 
       if (response?.status) {
+        globalForm.setValue("stepNine", payload);
         // INSTANT TRANSITION: Set active step FIRST for smooth UX
         setActiveStep(10);
 
@@ -211,45 +218,30 @@ export default function StepNine() {
                   sectionId="step-nine-faqs"
                   chipLabel="FAQs"
                   chipDescription="Questions and answers for your event page."
-                  renderFooter={({ guided, sectionId }) => (
-                    <>
-                      <GuidedWholeStepApproveButton
-                        guided={guided}
-                        sectionId={sectionId}
-                      />
-                      <Button
-                        variant="event-primary"
-                        type="button"
-                        className={guidedOnboardingSaveNextButtonClass}
-                        disabled={loading || !guided.allSectionsApproved}
-                        title={
-                          !guided.allSectionsApproved
-                            ? "Approve this step first"
-                            : undefined
-                        }
-                        onClick={() => {
-                          if (!guided.allSectionsApproved) return;
-                          void form.handleSubmit(onSubmit)();
-                        }}
-                      >
-                        {loading ? "Saving..." : "Save & Next"}
-                      </Button>
-                      <Button
-                        variant="event-outline"
-                        type="button"
-                        onClick={() => setActiveStep(10)}
-                        className={guidedOnboardingSkipButtonClass}
-                      >
-                        Skip
-                      </Button>
-                    </>
+                  persistenceHydrated={persistedProgressHydrated}
+                  persistedStepApproved={stepNinePersistedApproved === true}
+                  renderFooter={({ guided }) => (
+                    <GuidedWholeStepBottomActions
+                      guided={guided}
+                      loading={loading}
+                      labelWhenReady="Save & continue"
+                      onContinue={() => void form.handleSubmit(onSubmit)()}
+                      extraActions={
+                        <Button
+                          variant="event-outline"
+                          type="button"
+                          onClick={() => setActiveStep(10)}
+                          className={guidedOnboardingSkipButtonClass}
+                        >
+                          Skip
+                        </Button>
+                      }
+                    />
                   )}
                 >
                   {() => (
                     <section className={guidedInsetSectionSurfaceClass("w-full mb-4")}>
-                      <OnboardingSectionTitle className="text-xl font-medium">
-                        FAQ List
-                      </OnboardingSectionTitle>
+                      <OnboardingFieldGroupTitle>FAQ List</OnboardingFieldGroupTitle>
 
                       <div className="space-y-8 mt-4">
                         {fields.map((field, index) => (
@@ -270,7 +262,7 @@ export default function StepNine() {
                               </Button>
                             </div>
 
-                            <div className="mb-2 text-sm font-medium text-gray-500">
+                            <div className="mb-2 text-sm font-medium text-muted-foreground">
                               FAQ #{index + 1}
                             </div>
 
@@ -389,7 +381,7 @@ export default function StepNine() {
                             type="button"
                             onClick={handleAppend}
                             disabled={fields.length >= STEP_NINE_MAX_FAQS}
-                            className="bg-white/5 hover:bg-white/10 text-gray-700 border border-white/10 disabled:opacity-50"
+                            className="border border-white/15 bg-white/[0.04] text-foreground hover:bg-white/[0.08] disabled:opacity-50"
                           >
                             <span className="mr-1">+</span> Add Another FAQ
                           </Button>

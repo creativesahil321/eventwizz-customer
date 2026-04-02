@@ -1516,13 +1516,13 @@ export default function DatesTab() {
                               )}
                             />
 
-                            {/* Deposit Due Date */}
+                            {/* Balance due date */}
                             <FormField
                               control={control}
                               name={`dates.${dateIndex}.deposit_due_date`}
                               render={({ field }) => (
                                 <FormItem>
-                                  <FormLabel>Deposit Due Date</FormLabel>
+                                  <FormLabel>Balance due date</FormLabel>
                                   <FormControl>
                                     <div className="relative w-full">
                                       <Input

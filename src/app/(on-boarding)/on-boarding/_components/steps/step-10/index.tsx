@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from "react";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { CardContent, CardHeader, OnboardingCard } from "@/components/ui/card";
 import { Form } from "@/components/ui/form";
@@ -12,19 +12,17 @@ import { stepTenSchema, StepTenType } from "../../form-provider/schema";
 import { toast } from "sonner";
 import { onboardingService } from "@/services/vendor/onboarding/onboarding.service";
 import {
-  OnboardingSectionTitle,
+  OnboardingFieldGroupTitle,
   OnboardingTitle,
 } from "@/components/ui/typography";
-import { Resolver } from "react-hook-form";
+import { Resolver, type FieldErrors } from "react-hook-form";
 import { useSession } from "next-auth/react";
 import { StripeConnectButton } from "./stripe-connect-button";
 import { useEventId } from "../../../_lib/hooks/useEventId";
 import { WholeStepGuidedShell } from "../../whole-step-guided-shell";
 import { guidedInsetSectionSurfaceClass } from "../../guided-section-surface";
-import {
-  GuidedWholeStepApproveButton,
-  guidedOnboardingSkipButtonClass,
-} from "../../guided-sticky-approval-bar";
+import { guidedOnboardingSkipButtonClass } from "../../guided-sticky-approval-bar";
+import { GuidedWholeStepBottomActions } from "../../guided-section-chips";
 import { PayPalConnectButton } from "./paypal-connect-button";
 import { TrueLayerConnectButton } from "./truelayer-connect-button";
 import { ChevronDown, ChevronUp, Info, Sparkles } from "lucide-react";
@@ -35,7 +33,17 @@ import {
 } from "@/components/ui/collapsible";
 
 export default function StepTen() {
-  const { form: globalForm, save, setActiveStep } = useFormContext();
+  const {
+    form: globalForm,
+    save,
+    setActiveStep,
+    persistedProgressHydrated,
+  } = useFormContext();
+
+  const stepTenPersistedApproved = useWatch({
+    control: globalForm.control,
+    name: "stepTen.isApproved",
+  });
   const [loading, setLoading] = useState(false);
   const { update: updateSession } = useSession();
   const [showAdvancedOptions, setShowAdvancedOptions] = useState(false);
@@ -115,6 +123,14 @@ export default function StepTen() {
 
   // Watch form values
   const paymentGateways = form.watch("payment_gateways");
+
+  const hasConnectedGateway = Boolean(
+    paymentGateways?.stripe?.status ||
+      paymentGateways?.paypal?.status ||
+      paymentGateways?.truelayer?.status ||
+      paymentGateways?.worldpay?.status ||
+      paymentGateways?.klarna?.status,
+  );
 
   // Handler for TrueLayer Connect (Pay by Bank)
   const handleTrueLayerConnect = async () => {
@@ -383,30 +399,32 @@ export default function StepTen() {
     }
   };
 
-  // Handler for Submit
+  const onSubmitInvalid = useCallback((errors: FieldErrors<StepTenType>) => {
+    if (errors.payment_gateways) {
+      toast.error(
+        "Connect at least one payment method (bank, Stripe, or PayPal) to save, or tap Skip for now.",
+        { duration: 6500 },
+      );
+    } else {
+      toast.error("Please fix the highlighted fields to continue.");
+    }
+  }, []);
+
+  // Handler for Submit (only runs after Zod + RHF validation passes)
   const onSubmit = async (data: StepTenType) => {
     setLoading(true);
     try {
       globalForm.setValue("stepTen", data);
 
-      const isValid = await form.trigger();
-
-      if (!isValid) {
-        const errors = form.formState.errors;
-        if (errors.payment_gateways) {
-          toast.error("Please connect at least one payment provider or skip");
-        } else {
-          toast.error("Please complete all required fields");
-        }
-        setLoading(false);
-        return;
-      }
-
       data.event_id = data?.event_id as number;
 
-      const response = await onboardingService.storeStepTenData(data);
+      const response = await onboardingService.storeStepTenData({
+        ...data,
+        isApproved: true,
+      });
 
       if (response && response.status) {
+        globalForm.setValue("stepTen", { ...data, isApproved: true });
         // INSTANT TRANSITION: Set active step FIRST for smooth UX
         setActiveStep(11);
         toast.success("Payment settings saved successfully!");
@@ -456,41 +474,46 @@ export default function StepTen() {
                   chipLabel="Payment methods"
                   chipDescription="Bank transfer and card providers (optional to skip)."
                   lenientApproval
-                  renderFooter={({ guided, sectionId }) => (
-                    <div className="flex w-full flex-col items-stretch gap-3">
-                      <p className="mx-auto max-w-xl px-2 text-center text-xs text-muted-foreground">
-                        Approve when you have reviewed the options.{" "}
-                        <span className="text-foreground/90">
-                          Save &amp; Continue
-                        </span>{" "}
-                        needs at least one connected provider; use{" "}
-                        <span className="text-foreground/90">
-                          Skip for Now
-                        </span>{" "}
-                        if you will set this up later.
-                      </p>
-                      <div className="flex w-full flex-wrap items-center justify-center gap-3">
-                        <GuidedWholeStepApproveButton
-                          guided={guided}
-                          sectionId={sectionId}
-                        />
-                        <Button
-                          variant="event-primary"
-                          type="button"
-                          className="shrink-0 rounded-full px-8 py-2 text-white"
-                          disabled={loading || !guided.allSectionsApproved}
-                          title={
-                            !guided.allSectionsApproved
-                              ? "Approve this step first"
-                              : undefined
-                          }
-                          onClick={() => {
-                            if (!guided.allSectionsApproved) return;
-                            void form.handleSubmit(onSubmit)();
-                          }}
-                        >
-                          {loading ? "Saving..." : "Save & Continue"}
-                        </Button>
+                  persistenceHydrated={persistedProgressHydrated}
+                  persistedStepApproved={stepTenPersistedApproved === true}
+                  renderFooter={({ guided }) => (
+                    <GuidedWholeStepBottomActions
+                      guided={guided}
+                      loading={loading}
+                      labelWhenReady="Save & continue"
+                      onContinue={() =>
+                        void form.handleSubmit(onSubmit, onSubmitInvalid)()
+                      }
+                      statusSlot={
+                        guided.allSectionsApproved && !hasConnectedGateway ? (
+                          <span className="mx-auto max-w-xl px-2 text-center text-xs text-amber-500/95">
+                            You&apos;ve reviewed this step, but{" "}
+                            <strong className="font-semibold text-amber-200">
+                              Save &amp; continue
+                            </strong>{" "}
+                            only works after at least one provider is connected.
+                            Use{" "}
+                            <strong className="font-semibold text-amber-200">
+                              Skip for now
+                            </strong>{" "}
+                            if you&apos;ll set this up later.
+                          </span>
+                        ) : undefined
+                      }
+                      hintSlot={
+                        <p className="mx-auto max-w-xl px-2 text-center text-xs text-muted-foreground">
+                          <span className="text-foreground/90">
+                            Save &amp; continue
+                          </span>{" "}
+                          saves and moves on only when a payment provider is
+                          connected. Not ready? Use{" "}
+                          <span className="text-foreground/90">
+                            Skip for now
+                          </span>
+                          .
+                        </p>
+                      }
+                      extraActions={
                         <Button
                           variant="event-outline"
                           type="button"
@@ -500,8 +523,8 @@ export default function StepTen() {
                         >
                           Skip for Now
                         </Button>
-                      </div>
-                    </div>
+                      }
+                    />
                   )}
                 >
                   {() => (
@@ -509,9 +532,9 @@ export default function StepTen() {
                 {/* Pay by Bank Section (TrueLayer) */}
                 <section className="w-full mb-6 space-y-4">
                   <div className="flex items-center gap-2">
-                    <OnboardingSectionTitle className="text-xl font-medium">
+                    <OnboardingFieldGroupTitle className="text-base">
                       🏦 Pay by Bank Transfer
-                    </OnboardingSectionTitle>
+                    </OnboardingFieldGroupTitle>
                     <Sparkles className="w-5 h-5 text-green-500" />
                   </div>
                   <Alert className="border-green-300 bg-green-100 text-green-900 dark:!border-green-400 dark:!bg-green-100 dark:!text-green-900">
@@ -541,10 +564,12 @@ export default function StepTen() {
                 </section>
 
                 {/* Visual Separator */}
-                <div className="flex items-center justify-center my-8">
-                  <div className="flex-1 border-t border-gray-200 dark:border-gray-600" />
-                  <div className="px-4 text-sm text-gray-600 dark:text-gray-300 bg-background dark:bg-background font-medium">OR</div>
-                  <div className="flex-1 border-t border-gray-200 dark:border-gray-600" />
+                <div className="my-8 flex items-center justify-center">
+                  <div className="flex-1 border-t border-white/15" />
+                  <div className="bg-transparent px-4 text-sm font-medium text-muted-foreground">
+                    OR
+                  </div>
+                  <div className="flex-1 border-t border-white/15" />
                 </div>
 
                 {/* Online Payment Providers Section */}
@@ -552,9 +577,9 @@ export default function StepTen() {
                   {/* Recommended Providers */}
                   <div className="space-y-4">
                     <div className="flex items-center gap-2">
-                      <OnboardingSectionTitle className="text-xl font-medium">
+                      <OnboardingFieldGroupTitle className="text-base">
                         💳 Online Card Payments
-                      </OnboardingSectionTitle>
+                      </OnboardingFieldGroupTitle>
                       <Sparkles className="w-5 h-5 text-yellow-500" />
                     </div>
                     <Alert
@@ -614,7 +639,7 @@ export default function StepTen() {
                           <span className="font-medium">
                             ⚙️ Advanced Options
                           </span>
-                          <span className="text-xs text-gray-500 dark:text-gray-400">
+                          <span className="text-xs text-muted-foreground">
                             (WorldPay, Klarna)
                           </span>
                         </div>

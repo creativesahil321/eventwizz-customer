@@ -9,6 +9,7 @@ import {
 import { useGuidedOnboardingSections } from "../_lib/hooks/use-guided-onboarding-sections";
 import type { GuidedSectionConfig } from "../_lib/hooks/use-guided-onboarding-sections";
 import { guidedSectionSurfaceClass } from "./guided-section-surface";
+import { GuidedSectionTitleBar } from "./guided-section-title-bar";
 
 export type GuidedContext<T extends FieldValues> = ReturnType<
   typeof useGuidedOnboardingSections<T>
@@ -32,6 +33,10 @@ type Props<T extends FieldValues> = {
    * Save/submit still validates via `handleSubmit` / `trigger`.
    */
   lenientApproval?: boolean;
+  /** From FormProvider after persistence GET merged. */
+  persistenceHydrated?: boolean;
+  /** From global `stepN.isApproved` when API already marked this step approved. */
+  persistedStepApproved?: boolean;
 };
 
 /**
@@ -45,6 +50,8 @@ export function WholeStepGuidedShell<T extends FieldValues>({
   children,
   renderFooter,
   lenientApproval = false,
+  persistenceHydrated = false,
+  persistedStepApproved = false,
 }: Props<T>) {
   const sectionConfigs = useMemo((): GuidedSectionConfig<T>[] => {
     return [
@@ -65,6 +72,8 @@ export function WholeStepGuidedShell<T extends FieldValues>({
     sections: sectionConfigs,
     resolveErrorSectionIndex: () => 0,
     skipFullFormTriggerOnApproveAll: lenientApproval,
+    persistenceHydrated,
+    persistedStepApproved,
   });
 
   return (
@@ -75,6 +84,12 @@ export function WholeStepGuidedShell<T extends FieldValues>({
         className={guidedSectionSurfaceClass(true, "overflow-hidden p-0")}
       >
         <div className="p-5 sm:p-6 space-y-6">
+          <GuidedSectionTitleBar
+            sectionIndex={0}
+            sectionId={sectionId}
+            guided={guided}
+            title={chipLabel}
+          />
           {children(guided)}
           <GuidedSectionActionFooter
             isActive

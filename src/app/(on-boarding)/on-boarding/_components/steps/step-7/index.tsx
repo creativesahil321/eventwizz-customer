@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { useForm, useFieldArray } from "react-hook-form";
+import { useForm, useFieldArray, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { CardContent, CardHeader, OnboardingCard } from "@/components/ui/card";
 import {
@@ -18,7 +18,7 @@ import { useFormContext } from "../../form-provider";
 import { stepSevenSchema, StepSevenType } from "../../form-provider/schema";
 import {
   OnboardingTitle,
-  OnboardingSectionTitle,
+  OnboardingFieldGroupTitle,
 } from "@/components/ui/typography";
 import { toast } from "sonner";
 import { onboardingService } from "@/services/vendor/onboarding/onboarding.service";
@@ -27,16 +27,23 @@ import { useFieldFocusHandler } from "../../form-preview/field-focus-handler";
 import { useEventId } from "../../../_lib/hooks/useEventId";
 import { WholeStepGuidedShell } from "../../whole-step-guided-shell";
 import { guidedInsetSectionSurfaceClass } from "../../guided-section-surface";
-import {
-  GuidedWholeStepApproveButton,
-  guidedOnboardingSaveNextButtonClass,
-  guidedOnboardingSkipButtonClass,
-} from "../../guided-sticky-approval-bar";
+import { guidedOnboardingSkipButtonClass } from "../../guided-sticky-approval-bar";
+import { GuidedWholeStepBottomActions } from "../../guided-section-chips";
 import { useCurrencySymbol } from "@/hooks/use-currency-format";
 
 export default function StepSeven() {
   const currencySymbol = useCurrencySymbol();
-  const { form: globalForm, save, setActiveStep } = useFormContext();
+  const {
+    form: globalForm,
+    save,
+    setActiveStep,
+    persistedProgressHydrated,
+  } = useFormContext();
+
+  const stepSevenPersistedApproved = useWatch({
+    control: globalForm.control,
+    name: "stepSeven.isApproved",
+  });
   const { handleFieldFocus } = useFieldFocusHandler();
   const [loading, setLoading] = useState(false);
   const { update: updateSession } = useSession();
@@ -141,13 +148,14 @@ export default function StepSeven() {
         return;
       }
 
-      // Update global form state only after validation passes
-      globalForm.setValue("stepSeven", data);
-
       // Call the API using the service
-      const response = await onboardingService.storeStepSevenData(data);
+      const response = await onboardingService.storeStepSevenData({
+        ...data,
+        isApproved: true,
+      });
 
       if (response?.status) {
+        globalForm.setValue("stepSeven", { ...data, isApproved: true });
         // INSTANT TRANSITION: Set active step FIRST for smooth UX
         setActiveStep(8);
 
@@ -190,46 +198,31 @@ export default function StepSeven() {
                   sectionId="step-seven-packages"
                   chipLabel="Other packages"
                   chipDescription="Optional add-on packages and pricing."
-                  renderFooter={({ guided, sectionId }) => (
-                    <>
-                      <GuidedWholeStepApproveButton
-                        guided={guided}
-                        sectionId={sectionId}
-                      />
-                      <Button
-                        variant="event-primary"
-                        type="button"
-                        className={guidedOnboardingSaveNextButtonClass}
-                        disabled={loading || !guided.allSectionsApproved}
-                        title={
-                          !guided.allSectionsApproved
-                            ? "Approve this step first"
-                            : undefined
-                        }
-                        onClick={() => {
-                          if (!guided.allSectionsApproved) return;
-                          void form.handleSubmit(onSubmit)();
-                        }}
-                      >
-                        {loading ? "Saving..." : "Save & Next"}
-                      </Button>
-                      <Button
-                        variant="event-outline"
-                        type="button"
-                        onClick={() => setActiveStep(8)}
-                        className={guidedOnboardingSkipButtonClass}
-                      >
-                        Skip
-                      </Button>
-                    </>
+                  persistenceHydrated={persistedProgressHydrated}
+                  persistedStepApproved={stepSevenPersistedApproved === true}
+                  renderFooter={({ guided }) => (
+                    <GuidedWholeStepBottomActions
+                      guided={guided}
+                      loading={loading}
+                      labelWhenReady="Save & continue"
+                      onContinue={() => void form.handleSubmit(onSubmit)()}
+                      extraActions={
+                        <Button
+                          variant="event-outline"
+                          type="button"
+                          onClick={() => setActiveStep(8)}
+                          className={guidedOnboardingSkipButtonClass}
+                        >
+                          Skip
+                        </Button>
+                      }
+                    />
                   )}
                 >
                   {() => (
                 <div className="space-y-6">
                   <section className={guidedInsetSectionSurfaceClass("w-full mb-4")}>
-                    <OnboardingSectionTitle className="text-xl font-medium">
-                      Title
-                    </OnboardingSectionTitle>
+                    <OnboardingFieldGroupTitle>Title</OnboardingFieldGroupTitle>
                     <FormField
                       control={form.control}
                       name="drink_title"
@@ -273,9 +266,9 @@ export default function StepSeven() {
                   </section>
 
                   <section className={guidedInsetSectionSurfaceClass("w-full mb-4")}>
-                    <OnboardingSectionTitle className="text-xl font-medium">
+                    <OnboardingFieldGroupTitle>
                       Description
-                    </OnboardingSectionTitle>
+                    </OnboardingFieldGroupTitle>
                     <FormField
                       control={form.control}
                       name="drink_description"
@@ -321,15 +314,15 @@ export default function StepSeven() {
                   </section>
 
                   <section className={guidedInsetSectionSurfaceClass("w-full mb-4")}>
-                    <OnboardingSectionTitle className="text-xl font-medium">
+                    <OnboardingFieldGroupTitle>
                       Packages Deals
-                    </OnboardingSectionTitle>
+                    </OnboardingFieldGroupTitle>
 
                     <div className="space-y-6 mt-4">
                       {fields.map((field, index) => (
                         <div
                           key={field.id}
-                          className="space-y-4 border border-white/10 p-6 rounded-md bg-white"
+                          className="space-y-4 rounded-lg border border-white/10 bg-white/[0.03] p-6"
                         >
                           <FormField
                             control={form.control}
@@ -592,7 +585,7 @@ export default function StepSeven() {
                               available_quantity: 100,
                             })
                           }
-                          className="mt-4 bg-white border-gray-200 text-sm"
+                          className="mt-4 border-white/20 bg-white/[0.04] text-sm hover:bg-white/[0.08]"
                         >
                           Add More Package
                         </Button>

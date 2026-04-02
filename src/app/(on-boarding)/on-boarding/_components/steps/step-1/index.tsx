@@ -22,7 +22,7 @@ import { useEffect, useMemo, useState } from "react";
 import { OnboardingCard } from "@/components/ui/card";
 import {
   OnboardingTitle,
-  OnboardingSectionTitle,
+  OnboardingFieldGroupTitle,
 } from "@/components/ui/typography";
 import { onboardingService } from "@/services/vendor/onboarding/onboarding.service";
 import { useSession } from "next-auth/react";
@@ -32,9 +32,9 @@ import { GuidedMultiSectionBottomActions } from "../../guided-section-chips";
 import {
   GuidedSectionActionFooter,
   GuidedSectionCoreActions,
-  guidedOnboardingSaveNextButtonClass,
 } from "../../guided-sticky-approval-bar";
 import { guidedSectionSurfaceClass } from "../../guided-section-surface";
+import { GuidedSectionTitleBar } from "../../guided-section-title-bar";
 import { cn } from "@/lib/utils";
 
 const RESOLVE_STEP_ONE_ERROR_INDEX = (keys: string[]) =>
@@ -42,7 +42,17 @@ const RESOLVE_STEP_ONE_ERROR_INDEX = (keys: string[]) =>
 
 export default function StepOne() {
   const [loading, setLoading] = useState(false);
-  const { form: globalForm, save, setActiveStep } = useFormContext();
+  const {
+    form: globalForm,
+    save,
+    setActiveStep,
+    persistedProgressHydrated,
+  } = useFormContext();
+
+  const stepOnePersistedApproved = useWatch({
+    control: globalForm.control,
+    name: "stepOne.isApproved",
+  });
   const { update } = useSession();
 
   const form = useForm<StepOneType>({
@@ -121,6 +131,8 @@ export default function StepOne() {
     form,
     sections: sectionConfigs,
     resolveErrorSectionIndex: RESOLVE_STEP_ONE_ERROR_INDEX,
+    persistenceHydrated: persistedProgressHydrated,
+    persistedStepApproved: stepOnePersistedApproved === true,
   });
 
   const persistLocationChoice = (value: boolean) => {
@@ -132,15 +144,16 @@ export default function StepOne() {
     });
   };
 
-  const handleSubmit = async (data: StepOneType) => {
-    if (!guided.allSectionsApproved) return;
+  const persistStepOne = async (data: StepOneType) => {
     setLoading(true);
     try {
-      globalForm.setValue("stepOne", data);
-
-      const response = await onboardingService.storeStepData(data);
+      const response = await onboardingService.storeStepData({
+        ...data,
+        isApproved: true,
+      });
 
       if (response.status) {
+        globalForm.setValue("stepOne", { ...data, isApproved: true });
         if (response.data?.vendor_location_id) {
           const vendorLocationId = response.data.vendor_location_id;
           await update({
@@ -167,6 +180,14 @@ export default function StepOne() {
     }
   };
 
+  const handleContinue = async () => {
+    if (!guided.allSectionsApproved) {
+      const ok = await guided.handleApproveAllSections();
+      if (!ok) return;
+    }
+    await form.handleSubmit(persistStepOne)();
+  };
+
   const showLocationGate = hasMultipleLocations === undefined;
 
   return (
@@ -178,9 +199,9 @@ export default function StepOne() {
         <CardContent>
           {showLocationGate ? (
             <div className="space-y-6">
-              <OnboardingSectionTitle>
+              <OnboardingFieldGroupTitle className="text-base">
                 Do you have multiple locations?
-              </OnboardingSectionTitle>
+              </OnboardingFieldGroupTitle>
               <p className="text-sm text-muted-foreground">
                 If you operate several venues under one brand, we&apos;ll label
                 this step for your brand and send the right details to our
@@ -209,14 +230,17 @@ export default function StepOne() {
           ) : (
             <>
               <section className="w-full mb-4">
-                <OnboardingSectionTitle>
+                <OnboardingFieldGroupTitle className="text-base">
                   {isBrandMode ? "Brand information" : "Venue Information"}
-                </OnboardingSectionTitle>
+                </OnboardingFieldGroupTitle>
               </section>
               <Form {...form}>
                 <form
                   id="onboarding-step-one-form"
-                  onSubmit={form.handleSubmit(handleSubmit)}
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    void handleContinue();
+                  }}
                   className="space-y-6"
                 >
                   <Input type="hidden" {...form.register("domain")} />
@@ -226,14 +250,27 @@ export default function StepOne() {
                     data-guided-section="venue-search"
                     tabIndex={-1}
                     className={guidedSectionSurfaceClass(
-                      guided.currentSectionIndex === 0,
+                      guided.allSectionsApproved ||
+                        guided.currentSectionIndex === 0,
                     )}
                   >
+                    <GuidedSectionTitleBar
+                      sectionIndex={0}
+                      sectionId="venue-search"
+                      guided={guided}
+                      title={
+                        isBrandMode ? "Brand name" : "Venue search"
+                      }
+                    />
                     <fieldset
-                      disabled={guided.currentSectionIndex !== 0}
+                      disabled={
+                        !guided.allSectionsApproved &&
+                        guided.currentSectionIndex !== 0
+                      }
                       className={cn(
                         "min-w-0 border-0 p-0 m-0",
-                        guided.currentSectionIndex !== 0 &&
+                        !guided.allSectionsApproved &&
+                          guided.currentSectionIndex !== 0 &&
                           "pointer-events-none",
                       )}
                     >
@@ -292,14 +329,25 @@ export default function StepOne() {
                     data-guided-section="contact-details"
                     tabIndex={-1}
                     className={guidedSectionSurfaceClass(
-                      guided.currentSectionIndex === 1,
+                      guided.allSectionsApproved ||
+                        guided.currentSectionIndex === 1,
                     )}
                   >
+                    <GuidedSectionTitleBar
+                      sectionIndex={1}
+                      sectionId="contact-details"
+                      guided={guided}
+                      title="Contact details"
+                    />
                     <fieldset
-                      disabled={guided.currentSectionIndex !== 1}
+                      disabled={
+                        !guided.allSectionsApproved &&
+                        guided.currentSectionIndex !== 1
+                      }
                       className={cn(
                         "min-w-0 border-0 p-0 m-0",
-                        guided.currentSectionIndex !== 1 &&
+                        !guided.allSectionsApproved &&
+                          guided.currentSectionIndex !== 1 &&
                           "pointer-events-none",
                       )}
                     >
@@ -421,22 +469,8 @@ export default function StepOne() {
                   <GuidedMultiSectionBottomActions
                     onApproveAll={guided.handleApproveAllSections}
                     allSectionsApproved={guided.allSectionsApproved}
-                    saveSlot={
-                      <Button
-                        variant="event-primary"
-                        disabled={loading || !guided.allSectionsApproved}
-                        type="submit"
-                        form="onboarding-step-one-form"
-                        className={guidedOnboardingSaveNextButtonClass}
-                        title={
-                          !guided.allSectionsApproved
-                            ? "Approve all sections first"
-                            : undefined
-                        }
-                      >
-                        {loading ? "Saving..." : "Save & Next"}
-                      </Button>
-                    }
+                    loading={loading}
+                    onContinue={handleContinue}
                   />
                 </form>
               </Form>

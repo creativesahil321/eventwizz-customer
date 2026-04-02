@@ -1,6 +1,6 @@
 "use client";
 import React, { useState, useEffect, useCallback } from "react";
-import { useForm, useFieldArray, Resolver } from "react-hook-form";
+import { useForm, useFieldArray, Resolver, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Button } from "@/components/ui/button";
 import {
@@ -21,7 +21,7 @@ import {
 import { useFormContext } from "../../form-provider";
 import { toast } from "sonner";
 import {
-  OnboardingSectionTitle,
+  OnboardingFieldGroupTitle,
   OnboardingTitle,
 } from "@/components/ui/typography";
 import { OnboardingCard } from "@/components/ui/card";
@@ -41,12 +41,8 @@ import { useSession } from "next-auth/react";
 import { useFieldFocusHandler } from "../../form-preview/field-focus-handler";
 import { useEventId } from "../../../_lib/hooks/useEventId";
 import { WholeStepGuidedShell } from "../../whole-step-guided-shell";
-import { guidedInsetSectionSurfaceClass } from "../../guided-section-surface";
-import {
-  GuidedWholeStepApproveButton,
-  guidedOnboardingSaveNextButtonClass,
-  guidedOnboardingSkipButtonClass,
-} from "../../guided-sticky-approval-bar";
+import { guidedOnboardingSkipButtonClass } from "../../guided-sticky-approval-bar";
+import { GuidedWholeStepBottomActions } from "../../guided-section-chips";
 
 // Helper function to get today's date in YYYY-MM-DD format
 const getTodayDateString = () => {
@@ -80,7 +76,17 @@ const formatDateDisplay = (dateString: string | undefined | null): string => {
 };
 
 export default function StepFive() {
-  const { form: globalForm, save, setActiveStep } = useFormContext();
+  const {
+    form: globalForm,
+    save,
+    setActiveStep,
+    persistedProgressHydrated,
+  } = useFormContext();
+
+  const stepFivePersistedApproved = useWatch({
+    control: globalForm.control,
+    name: "stepFive.isApproved",
+  });
   const { handleFieldFocus, clearActiveField } = useFieldFocusHandler();
   const [loading, setLoading] = useState(false);
   const [openAccordions, setOpenAccordions] = useState<string[]>([]);
@@ -168,6 +174,28 @@ export default function StepFive() {
     control: form.control,
     name: "dates",
   });
+
+  // Keep global onboarding form in sync so the split preview (FormPreview) updates live.
+  // Previously stepFive was only written on Save & Next, so duplicate/add date never appeared in preview.
+  useEffect(() => {
+    const pushToGlobal = () => {
+      const data = form.getValues();
+      globalForm.setValue(
+        "stepFive",
+        {
+          ...data,
+          event_id: eventId,
+        },
+        { shouldValidate: false, shouldDirty: true },
+      );
+    };
+
+    pushToGlobal();
+    const subscription = form.watch(() => {
+      pushToGlobal();
+    });
+    return () => subscription.unsubscribe();
+  }, [form, globalForm, eventId]);
 
   // Update dates when booking type changes for a specific date
   const updateDate = useCallback(
@@ -303,9 +331,9 @@ export default function StepFive() {
 
       return (
         <>
-          <OnboardingSectionTitle>Ticket Information</OnboardingSectionTitle>
-          <div className="mt-6 bg-gray-50 rounded-lg p-5">
-            <div className="flex justify-between items-center">
+          <OnboardingFieldGroupTitle>Ticket Information</OnboardingFieldGroupTitle>
+          <div className="mt-5 space-y-4 pt-4 border-t border-white/10">
+            <div className="flex justify-between items-center gap-3">
               <Button
                 type="button"
                 variant="outline"
@@ -323,20 +351,20 @@ export default function StepFive() {
                     },
                   ]);
                 }}
-                className="bg-white hover:bg-white/10"
+                className="border-white/20 bg-white/[0.04] hover:bg-white/[0.08]"
               >
                 <PlusCircle className="h-4 w-4 mr-2" />
                 Add Ticket
               </Button>
             </div>
 
-            <div className="mt-4 space-y-4">
+            <div className="mt-2 space-y-3">
               {form
                 .watch(`dates.${dateIndex}.tickets`)
                 ?.map((_, ticketIndex) => (
                   <div
                     key={`ticket-${dateIndex}-${ticketIndex}`}
-                    className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4 bg-white p-4 rounded-lg border border-gray-200 shadow-sm"
+                    className="grid grid-cols-1 md:grid-cols-2 gap-4 rounded-lg border border-white/10 bg-white/[0.03] p-4"
                   >
                     <FormField
                       control={form.control}
@@ -558,15 +586,16 @@ export default function StepFive() {
         return null;
 
       return (
-        <div className="mt-4">
-          <div className="flex justify-between items-center">
-            <OnboardingSectionTitle className="text-base font-medium">
+        <div className="mt-5 space-y-4 border-t border-white/10 pt-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <OnboardingFieldGroupTitle>
               Table Information
-            </OnboardingSectionTitle>
+            </OnboardingFieldGroupTitle>
             <Button
               type="button"
               variant="outline"
               size="sm"
+              className="border-white/20 bg-white/[0.04] hover:bg-white/[0.08]"
               onClick={() => {
                 const tables =
                   form.getValues(`dates.${dateIndex}.tables`) || [];
@@ -586,18 +615,23 @@ export default function StepFive() {
             </Button>
           </div>
 
-          <div className="mt-4">
+          <div className="space-y-3">
             {form.watch(`dates.${dateIndex}.tables`)?.map((_, tableIndex) => (
               <div
                 key={`table-${dateIndex}-${tableIndex}`}
-                className="grid grid-cols-4 gap-4 mt-4 bg-gray-50 dark:bg-gray-800 p-4 rounded-lg"
+                className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-5 rounded-lg border border-white/10 bg-white/[0.03] p-4"
               >
                 <FormField
                   control={form.control}
                   name={`dates.${dateIndex}.tables.${tableIndex}.min_persons`}
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Minimum No. of People/Table</FormLabel>
+                      <FormLabel
+                        className="text-sm font-medium leading-snug"
+                        title="Minimum number of people per table"
+                      >
+                        Min. people / table
+                      </FormLabel>
                       <FormControl>
                         <Input
                           type="number"
@@ -607,7 +641,7 @@ export default function StepFive() {
                           {...field}
                           placeholder="Enter minimum people"
                           value={field.value ?? ""}
-                          className="w-full [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                          className="w-full h-11 bg-white/5 border-white/10 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                           onChange={(e) => {
                             const value = e.target.value;
                             // Allow empty value
@@ -676,7 +710,12 @@ export default function StepFive() {
                   name={`dates.${dateIndex}.tables.${tableIndex}.max_persons`}
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Maximum No. of People/Table</FormLabel>
+                      <FormLabel
+                        className="text-sm font-medium leading-snug"
+                        title="Maximum number of people per table"
+                      >
+                        Max. people / table
+                      </FormLabel>
                       <FormControl>
                         <Input
                           type="number"
@@ -686,7 +725,7 @@ export default function StepFive() {
                           {...field}
                           placeholder="Enter maximum people"
                           value={field.value ?? ""}
-                          className="w-full [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                          className="w-full h-11 bg-white/5 border-white/10 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                           onChange={(e) => {
                             const value = e.target.value;
                             // Allow empty value
@@ -755,7 +794,9 @@ export default function StepFive() {
                   name={`dates.${dateIndex}.tables.${tableIndex}.price`}
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Price/Person</FormLabel>
+                      <FormLabel className="text-sm font-medium">
+                        Price / person
+                      </FormLabel>
                       <FormControl>
                         <Input
                           type="number"
@@ -765,7 +806,7 @@ export default function StepFive() {
                           {...field}
                           placeholder="Enter price (max 9,999)"
                           value={field.value ?? ""}
-                          className="w-full [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                          className="w-full h-11 bg-white/5 border-white/10 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                           onChange={(e) => {
                             const value = e.target.value;
                             if (value === "") {
@@ -798,7 +839,9 @@ export default function StepFive() {
                   name={`dates.${dateIndex}.tables.${tableIndex}.total_tables`}
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Total Tables</FormLabel>
+                      <FormLabel className="text-sm font-medium">
+                        Total tables
+                      </FormLabel>
                       <FormControl>
                         <Input
                           type="number"
@@ -808,7 +851,7 @@ export default function StepFive() {
                           {...field}
                           placeholder="Enter number of tables (max 5,000)"
                           value={field.value ?? ""}
-                          className="w-full [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                          className="w-full h-11 bg-white/5 border-white/10 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                           onChange={(e) => {
                             const value = e.target.value;
                             if (value === "") {
@@ -838,12 +881,12 @@ export default function StepFive() {
                 />
 
                 {/* Remove table button */}
-                <div className="col-span-4 flex justify-end">
+                <div className="col-span-1 md:col-span-2 flex justify-end pt-1">
                   <Button
                     type="button"
                     variant="ghost"
                     size="sm"
-                    className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                    className="text-red-400 hover:text-red-300 hover:bg-red-500/20"
                     onClick={() => {
                       const tables =
                         form.getValues(`dates.${dateIndex}.tables`) || [];
@@ -886,10 +929,10 @@ export default function StepFive() {
       return (
         <div
           key={`date-${dateIndex}`}
-          className="border border-gray-200 rounded-lg mb-6 bg-white shadow-sm hover:shadow-md transition-all"
+          className="mb-4 overflow-hidden rounded-xl border border-white/10 bg-white/[0.02] transition-colors hover:border-white/15"
         >
-          <div className="flex justify-between items-center p-5 border-b border-gray-100">
-            <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 px-4 py-3 sm:px-5 sm:py-3.5">
+            <div className="flex min-w-0 items-center gap-3">
               <button
                 type="button"
                 onClick={() => {
@@ -899,14 +942,14 @@ export default function StepFive() {
                       : [...prev, accordionValue]
                   );
                 }}
-                className="flex items-center gap-2 text-left hover:text-blue-600 transition-colors"
+                className="flex min-w-0 items-center gap-2 text-left transition-colors hover:text-[var(--color-primary,#3b82f6)]"
               >
                 {isOpen ? (
                   <ChevronDown className="h-5 w-5" />
                 ) : (
                   <ChevronRight className="h-5 w-5" />
                 )}
-                <h3 className="text-lg font-semibold">
+                <h3 className="text-base font-semibold sm:text-lg">
                   {formatDateDisplay(dateValue)}
                 </h3>
               </button>
@@ -926,8 +969,8 @@ export default function StepFive() {
           </div>
 
           {isOpen && (
-            <div className="p-5">
-              <div className="grid grid-cols-1 gap-5 mb-4">
+            <div className="space-y-5 px-4 py-5 sm:px-5">
+              <div className="grid grid-cols-1 gap-5">
                 <FormField
                   control={form.control}
                   name={`dates.${dateIndex}.event_date`}
@@ -960,7 +1003,7 @@ export default function StepFive() {
                           />
                           {!field.value && (
                             <span
-                              className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-500 sm:hidden"
+                              className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground sm:hidden"
                               aria-hidden
                             >
                               dd-mm-yyyy
@@ -1020,24 +1063,23 @@ export default function StepFive() {
               {/* Payment & Display Settings section - only show for tables/both booking types */}
               {(form.watch(`dates.${dateIndex}.booking_type`) === "tables" ||
                 form.watch(`dates.${dateIndex}.booking_type`) === "both") && (
-                <>
-                  <OnboardingSectionTitle className="mt-6">
+                <div className="mt-5 space-y-3 border-t border-white/10 pt-5">
+                  <OnboardingFieldGroupTitle>
                     Table Payment Settings
-                  </OnboardingSectionTitle>
-                  <p className="text-sm text-gray-600 mb-4">
+                  </OnboardingFieldGroupTitle>
+                  <p className="text-sm text-muted-foreground">
                     Configure payment options for table bookings (deposit or
                     full payment)
                   </p>
-                  <div className="mt-6 bg-gray-50 rounded-lg p-5">
-                    <div className="bg-gray-50 rounded-lg p-5">
+                  <div className="space-y-5 rounded-lg border border-white/10 bg-white/[0.03] p-4 sm:p-5">
                       {/* Payment Type */}
-                      <div className="mb-5">
+                      <div>
                         <FormField
                           control={form.control}
                           name={`dates.${dateIndex}.payment_type`}
                           render={({ field }) => (
                             <FormItem>
-                              <FormLabel className="text-md font-medium text-gray-700">
+                              <FormLabel className="text-md font-medium">
                                 Payment Type
                               </FormLabel>
                               <FormControl>
@@ -1092,16 +1134,16 @@ export default function StepFive() {
                       {/* Conditional deposit fields */}
                       {form.watch(`dates.${dateIndex}.payment_type`) ===
                         "deposit" && (
-                        <div className="space-y-4 mb-5 p-4 bg-white rounded-md border border-gray-100">
+                        <div className="space-y-4 border-t border-white/10 pt-4">
                           {/* Enable/Disable Deposit Toggle */}
                           <FormField
                             control={form.control}
                             name={`dates.${dateIndex}.is_deposit_enabled`}
                             render={({ field }) => (
-                              <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm">
+                              <FormItem className="flex flex-row items-center justify-between rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2.5">
                                 <div className="space-y-0.5">
                                   <FormLabel>Enable Deposit</FormLabel>
-                                  <div className="text-sm text-gray-500">
+                                  <div className="text-sm text-muted-foreground">
                                     Allow customers to pay deposit for this date
                                   </div>
                                 </div>
@@ -1121,12 +1163,12 @@ export default function StepFive() {
                           ) && (
                             <>
                               {/* Deposit Type Selection */}
-                              <FormField
-                                control={form.control}
-                                name={`dates.${dateIndex}.deposit_type`}
-                                render={({ field }) => (
+                                <FormField
+                                  control={form.control}
+                                  name={`dates.${dateIndex}.deposit_type`}
+                                  render={({ field }) => (
                                   <FormItem>
-                                    <FormLabel className="text-md font-medium text-gray-700">
+                                    <FormLabel className="text-md font-medium">
                                       Deposit Type
                                     </FormLabel>
                                     <FormControl>
@@ -1211,7 +1253,7 @@ export default function StepFive() {
                                           }
                                           {...field}
                                           value={field.value ?? ""}
-                                          className="w-full [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                          className="w-full h-11 bg-white/5 border-white/10 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                           onChange={(e) => {
                                             const value = e.target.value;
                                             const depositType = form.watch(
@@ -1271,13 +1313,13 @@ export default function StepFive() {
                                   )}
                                 />
 
-                                {/* Deposit Due Date */}
+                                {/* Balance due date */}
                                 <FormField
                                   control={form.control}
                                   name={`dates.${dateIndex}.deposit_due_date`}
                                   render={({ field }) => (
                                     <FormItem>
-                                      <FormLabel>Deposit Due Date</FormLabel>
+                                      <FormLabel>Balance due date</FormLabel>
                                       <FormControl>
                                         <div className="relative w-full">
                                           <Input
@@ -1285,7 +1327,7 @@ export default function StepFive() {
                                             placeholder="Select due date"
                                             {...field}
                                             min={getTodayDateString()}
-                                            className="w-full"
+                                            className="w-full h-11 bg-white/5 border-white/10"
                                             onFocus={() =>
                                               handleFieldFocus(
                                                 `dates.${dateIndex}.deposit_due_date`
@@ -1294,7 +1336,7 @@ export default function StepFive() {
                                           />
                                           {!field.value && (
                                             <span
-                                              className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-500 sm:hidden"
+                                              className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground sm:hidden"
                                               aria-hidden
                                             >
                                               dd-mm-yyyy
@@ -1311,15 +1353,14 @@ export default function StepFive() {
                           )}
                         </div>
                       )}
-                    </div>
                   </div>
-                </>
+                </div>
               )}
             </div>
           )}
 
           {/* Duplicate Date Button */}
-          <div className="flex justify-end mt-4 p-4">
+          <div className="mt-3 flex justify-end border-t border-white/10 px-4 pb-1 pt-3 sm:px-5">
             <Button
               type="button"
               variant="outline"
@@ -1441,9 +1482,13 @@ export default function StepFive() {
       }
 
       // Make API call to store the data
-      const response = await onboardingService.storeStepFiveData(data);
+      const response = await onboardingService.storeStepFiveData({
+        ...data,
+        isApproved: true,
+      });
 
       if (response && response.status) {
+        globalForm.setValue("stepFive", { ...data, isApproved: true });
         // Update global form with the returned data if needed
         if (response.data) {
           // Session update will handle event_id persistence
@@ -1487,53 +1532,33 @@ export default function StepFive() {
               <WholeStepGuidedShell
                 form={form}
                 sectionId="step-five-booking"
-                chipLabel="Dates, tickets & tables"
-                chipDescription="Confirm dates, booking type, and pricing for each slot."
-                renderFooter={({ guided, sectionId }) => (
-                  <>
-                    <GuidedWholeStepApproveButton
-                      guided={guided}
-                      sectionId={sectionId}
-                    />
-                    <Button
-                      type="button"
-                      variant="event-primary"
-                      onClick={() => {
-                        if (!guided.allSectionsApproved) return;
-                        void handleSubmit();
-                      }}
-                      disabled={loading || !guided.allSectionsApproved}
-                      title={
-                        !guided.allSectionsApproved
-                          ? "Approve this step first"
-                          : undefined
-                      }
-                      className={guidedOnboardingSaveNextButtonClass}
-                    >
-                      {loading ? "Saving..." : "Save & Next"}
-                    </Button>
-                    <Button
-                      variant="event-outline"
-                      type="button"
-                      onClick={() => setActiveStep(6)}
-                      className={guidedOnboardingSkipButtonClass}
-                    >
-                      Skip
-                    </Button>
-                  </>
+                chipLabel="Event Dates & Pricing"
+                chipDescription="Set dates, booking type, and pricing for each slot."
+                persistenceHydrated={persistedProgressHydrated}
+                persistedStepApproved={stepFivePersistedApproved === true}
+                renderFooter={({ guided }) => (
+                  <GuidedWholeStepBottomActions
+                    guided={guided}
+                    loading={loading}
+                    labelWhenReady="Save & continue"
+                    onContinue={() => void handleSubmit()}
+                    extraActions={
+                      <Button
+                        variant="event-outline"
+                        type="button"
+                        onClick={() => setActiveStep(6)}
+                        className={guidedOnboardingSkipButtonClass}
+                      >
+                        Skip
+                      </Button>
+                    }
+                  />
                 )}
               >
                 {() => (
-                  <section
-                    className={guidedInsetSectionSurfaceClass(
-                      "w-full space-y-4",
-                    )}
-                  >
-                    <div className="mt-2">
-                      <OnboardingSectionTitle className="text-xl font-bold">
-                        Event Dates & Pricing
-                      </OnboardingSectionTitle>
-                      <p className="text-sm text-muted-foreground mt-1 mb-4">
+                  <div className="w-full space-y-5">
+                    <div>
+                      <p className="text-sm text-muted-foreground">
                         Set your event dates, payment options, and pricing
                         details
                       </p>
@@ -1544,13 +1569,13 @@ export default function StepFive() {
                     <Button
                       type="button"
                       variant="outline"
-                      className="w-full flex items-center gap-2 justify-center border-white/15 bg-transparent"
+                      className="flex w-full items-center justify-center gap-2 border-white/20 bg-white/[0.03] hover:bg-white/[0.06]"
                       onClick={handleAddDate}
                     >
                       <PlusCircle className="h-4 w-4" />
                       Add Another Date
                     </Button>
-                  </section>
+                  </div>
                 )}
               </WholeStepGuidedShell>
             </form>

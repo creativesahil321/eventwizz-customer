@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useCallback, useEffect, useMemo } from "react";
-import { useForm, useFieldArray, Controller } from "react-hook-form";
+import { useForm, useFieldArray, Controller, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
   Form,
@@ -21,7 +21,7 @@ import { stepThreeSchema, StepThreeType } from "../../form-provider/schema";
 import { CardHeader, CardContent, OnboardingCard } from "@/components/ui/card";
 import {
   OnboardingTitle,
-  OnboardingSectionTitle,
+  OnboardingFieldGroupTitle,
 } from "@/components/ui/typography";
 import { toast } from "sonner";
 import { onboardingService } from "@/services/vendor/onboarding/onboarding.service";
@@ -36,16 +36,13 @@ import { cn } from "@/lib/utils";
 import { BANNER_HEADING_MAX_WORDS, countWords } from "@/lib/word-count";
 import { useGuidedOnboardingSections } from "../../../_lib/hooks/use-guided-onboarding-sections";
 import type { GuidedSectionConfig } from "../../../_lib/hooks/use-guided-onboarding-sections";
-import {
-  GuidedMultiSectionBottomActions,
-  GuidedSectionChips,
-} from "../../guided-section-chips";
+import { GuidedMultiSectionBottomActions } from "../../guided-section-chips";
 import {
   GuidedSectionActionFooter,
   GuidedSectionCoreActions,
-  guidedOnboardingSaveNextButtonClass,
 } from "../../guided-sticky-approval-bar";
 import { guidedSectionSurfaceClass } from "../../guided-section-surface";
+import { GuidedSectionTitleBar } from "../../guided-section-title-bar";
 
 function resolveStepThreeErrorIndex(keys: string[]) {
   if (keys.some((k) => k === "__extra_validation__")) return 1;
@@ -71,7 +68,13 @@ export default function StepThree() {
     save,
     setActiveStep,
     setActiveField,
+    persistedProgressHydrated,
   } = useFormContext();
+
+  const stepThreePersistedApproved = useWatch({
+    control: globalForm.control,
+    name: "stepThree.isApproved",
+  });
   const [loading, setLoading] = useState(false);
 
   // Get session data and update function
@@ -285,6 +288,8 @@ export default function StepThree() {
     sections: sectionConfigs,
     resolveErrorSectionIndex: resolveStepThreeErrorIndex,
     validateFullStep: validateFullStepThree,
+    persistenceHydrated: persistedProgressHydrated,
+    persistedStepApproved: stepThreePersistedApproved === true,
   });
 
   // Handle banner image change
@@ -596,13 +601,13 @@ export default function StepThree() {
 
       console.log("📤 Final data to send:", data);
 
-      // Update global form
-      globalForm.setValue("stepThree", data);
+      const payload = { ...data, isApproved: true as const };
 
       // Make API call directly
-      const response = await onboardingService.storeStepThreeData(data);
+      const response = await onboardingService.storeStepThreeData(payload);
 
       if (response && response.status) {
+        globalForm.setValue("stepThree", payload);
         // Type assertion to handle the response data structure
         const responseData = response.data as {
           id?: number;
@@ -673,6 +678,15 @@ export default function StepThree() {
     }
   };
 
+  const handleContinue = async () => {
+    if (!guided.allSectionsApproved) {
+      const ok = await guided.handleApproveAllSections();
+      if (!ok) return;
+    }
+    setActiveField(null);
+    await handleSubmit();
+  };
+
   // Function to handle refreshing categories after creating a new one
   const handleCategoryCreated = () => {
     refetchCategories();
@@ -689,20 +703,12 @@ export default function StepThree() {
         <CardContent>
           <Form {...form}>
             <form
-              onSubmit={form.handleSubmit(handleSubmit)}
+              onSubmit={(e) => {
+                e.preventDefault();
+                void handleContinue();
+              }}
               className="space-y-6"
             >
-              <GuidedSectionChips
-                sections={guided.sectionFlow.map((s) => ({
-                  id: s.id,
-                  label: s.label,
-                  description: s.description,
-                }))}
-                currentSectionIndex={guided.currentSectionIndex}
-                approvedSections={guided.approvedSections}
-                isChipInteractive={guided.isChipInteractive}
-                onChipClick={guided.handleChipClick}
-              />
               <input type="hidden" {...form.register("step")} />
               <input type="hidden" {...form.register("vendor_location_id")} />
 
@@ -710,18 +716,29 @@ export default function StepThree() {
                 data-guided-section="event-details"
                 tabIndex={-1}
                 className={guidedSectionSurfaceClass(
-                  guided.currentSectionIndex === 0,
+                  guided.allSectionsApproved ||
+                    guided.currentSectionIndex === 0,
                   "mb-6",
                 )}
               >
+                <GuidedSectionTitleBar
+                  sectionIndex={0}
+                  sectionId="event-details"
+                  guided={guided}
+                  title="Event details"
+                />
                 <fieldset
-                  disabled={guided.currentSectionIndex !== 0}
+                  disabled={
+                    !guided.allSectionsApproved &&
+                    guided.currentSectionIndex !== 0
+                  }
                   className={cn(
                     "min-w-0 border-0 p-0 m-0",
-                    guided.currentSectionIndex !== 0 && "pointer-events-none",
+                    !guided.allSectionsApproved &&
+                      guided.currentSectionIndex !== 0 &&
+                      "pointer-events-none",
                   )}
                 >
-                  <OnboardingSectionTitle>Event Details</OnboardingSectionTitle>
                   <div className="mt-4 space-y-4">
                     {/* Event Name field */}
                     <FormField
@@ -818,15 +835,27 @@ export default function StepThree() {
                 data-guided-section="event-hero"
                 tabIndex={-1}
                 className={guidedSectionSurfaceClass(
-                  guided.currentSectionIndex === 1,
+                  guided.allSectionsApproved ||
+                    guided.currentSectionIndex === 1,
                   "space-y-6",
                 )}
               >
+                <GuidedSectionTitleBar
+                  sectionIndex={1}
+                  sectionId="event-hero"
+                  guided={guided}
+                  title="Banner"
+                />
                 <fieldset
-                  disabled={guided.currentSectionIndex !== 1}
+                  disabled={
+                    !guided.allSectionsApproved &&
+                    guided.currentSectionIndex !== 1
+                  }
                   className={cn(
                     "min-w-0 border-0 p-0 m-0 space-y-6",
-                    guided.currentSectionIndex !== 1 && "pointer-events-none",
+                    !guided.allSectionsApproved &&
+                      guided.currentSectionIndex !== 1 &&
+                      "pointer-events-none",
                   )}
                 >
                   <Tabs
@@ -844,10 +873,10 @@ export default function StepThree() {
                         name="event_banner_image"
                         render={({ field }) => (
                           <FormItem>
-                            <OnboardingSectionTitle>
+                            <OnboardingFieldGroupTitle>
                               Add a Cover Photo
                               <span className="text-red-400">*</span>
-                            </OnboardingSectionTitle>
+                            </OnboardingFieldGroupTitle>
                             <FormControl>
                               <div
                                 className="flex flex-col justify-center items-center h-full space-y-2 bg-white/5 p-4 rounded-lg border border-white/10"
@@ -904,7 +933,7 @@ export default function StepThree() {
                                       }}
                                     />
                                     {!headerBannerFile.length && (
-                                      <p className="text-sm text-gray-500 mt-2">
+                                      <p className="mt-2 text-sm text-muted-foreground">
                                         Upload a banner image for your event
                                         header (required)
                                       </p>
@@ -924,10 +953,10 @@ export default function StepThree() {
                         name="event_banner_video"
                         render={({ field }) => (
                           <FormItem>
-                            <OnboardingSectionTitle>
+                            <OnboardingFieldGroupTitle>
                               Add a Cover Video
                               <span className="text-red-400">*</span>
-                            </OnboardingSectionTitle>
+                            </OnboardingFieldGroupTitle>
                             <FormControl>
                               <div
                                 className="flex flex-col justify-center items-center h-full space-y-2 bg-white/5 p-4 rounded-lg border border-white/10"
@@ -990,7 +1019,7 @@ export default function StepThree() {
                                 {bannerVideoFile.length === 0 &&
                                   !bannerVideoUrl && (
                                     <>
-                                      <p className="text-sm text-gray-500 mt-2">
+                                      <p className="mt-2 text-sm text-muted-foreground">
                                         Upload a banner video for your event
                                         header (MP4, WebM, or OGG format, max
                                         10MB)
@@ -1024,7 +1053,7 @@ export default function StepThree() {
                           </FormLabel>
                           <FormControl>
                             <Input
-                              className="bg-gray-100"
+                              className="h-11 bg-white/5 border-white/10"
                               placeholder="Enter event title"
                               {...field}
                               value={
@@ -1075,7 +1104,7 @@ export default function StepThree() {
                           </FormLabel>
                           <FormControl>
                             <Input
-                              className="bg-gray-100"
+                              className="h-11 bg-white/5 border-white/10"
                               placeholder="Enter event title"
                               {...field}
                               value={
@@ -1125,10 +1154,17 @@ export default function StepThree() {
                 data-guided-section="about-event"
                 tabIndex={-1}
                 className={guidedSectionSurfaceClass(
-                  guided.currentSectionIndex === 2,
+                  guided.allSectionsApproved ||
+                    guided.currentSectionIndex === 2,
                   "space-y-4",
                 )}
               >
+                <GuidedSectionTitleBar
+                  sectionIndex={2}
+                  sectionId="about-event"
+                  guided={guided}
+                  title="About the event"
+                />
                 <fieldset
                   disabled={guided.currentSectionIndex !== 2}
                   className={cn(
@@ -1136,9 +1172,9 @@ export default function StepThree() {
                     guided.currentSectionIndex !== 2 && "pointer-events-none",
                   )}
                 >
-                  <OnboardingSectionTitle>
-                    Tell Guests What It’s About
-                  </OnboardingSectionTitle>
+                  <p className="-mt-2 mb-4 text-sm text-muted-foreground">
+                    Tell guests what your event is about.
+                  </p>
 
                   {/* Title */}
                   <FormField
@@ -1154,7 +1190,7 @@ export default function StepThree() {
                           </FormLabel>
                           <FormControl>
                             <Input
-                              className="bg-gray-100"
+                              className="h-11 bg-white/5 border-white/10"
                               placeholder="Enter event title"
                               {...field}
                               value={
@@ -1206,7 +1242,7 @@ export default function StepThree() {
                           </FormLabel>
                           <FormControl>
                             <Input
-                              className="bg-gray-100"
+                              className="h-11 bg-white/5 border-white/10"
                               placeholder="Enter event subtitle"
                               {...field}
                               value={
@@ -1298,15 +1334,27 @@ export default function StepThree() {
                 data-guided-section="schedule"
                 tabIndex={-1}
                 className={guidedSectionSurfaceClass(
-                  guided.currentSectionIndex === 3,
+                  guided.allSectionsApproved ||
+                    guided.currentSectionIndex === 3,
                   "space-y-6",
                 )}
               >
+                <GuidedSectionTitleBar
+                  sectionIndex={3}
+                  sectionId="schedule"
+                  guided={guided}
+                  title="Schedule"
+                />
                 <fieldset
-                  disabled={guided.currentSectionIndex !== 3}
+                  disabled={
+                    !guided.allSectionsApproved &&
+                    guided.currentSectionIndex !== 3
+                  }
                   className={cn(
                     "min-w-0 border-0 p-0 m-0 space-y-6",
-                    guided.currentSectionIndex !== 3 && "pointer-events-none",
+                    !guided.allSectionsApproved &&
+                      guided.currentSectionIndex !== 3 &&
+                      "pointer-events-none",
                   )}
                 >
                   <FormField
@@ -1317,9 +1365,9 @@ export default function StepThree() {
                       const maxLength = 40;
                       return (
                         <FormItem>
-                          <OnboardingSectionTitle>
+                          <OnboardingFieldGroupTitle>
                             Event Scheduler Title
-                          </OnboardingSectionTitle>
+                          </OnboardingFieldGroupTitle>
                           <FormControl>
                             <Input
                               id="event-schedular-title"
@@ -1377,25 +1425,8 @@ export default function StepThree() {
               <GuidedMultiSectionBottomActions
                 onApproveAll={guided.handleApproveAllSections}
                 allSectionsApproved={guided.allSectionsApproved}
-                saveSlot={
-                  <Button
-                    variant="event-primary"
-                    type="button"
-                    onClick={() => {
-                      setActiveField(null);
-                      handleSubmit();
-                    }}
-                    disabled={loading || !guided.allSectionsApproved}
-                    title={
-                      !guided.allSectionsApproved
-                        ? "Approve all sections first"
-                        : undefined
-                    }
-                    className={guidedOnboardingSaveNextButtonClass}
-                  >
-                    {loading ? "Saving..." : "Save & Next"}
-                  </Button>
-                }
+                loading={loading}
+                onContinue={() => void handleContinue()}
               />
             </form>
           </Form>

@@ -1,6 +1,7 @@
 "use client";
 
 import { Input } from "@/components/ui/input";
+import { cn } from "@/lib/utils";
 import React, { useEffect, useRef, useState } from "react";
 import { Loader } from "@googlemaps/js-api-loader";
 
@@ -18,6 +19,8 @@ type Props = {
   placeholder?: string;
   disabled?: boolean;
   className?: string;
+  /** Opaque dark panel + light text (onboarding / dark cards). Matches step-8 AddressAutocomplete. */
+  variant?: "default" | "dark";
 };
 
 declare global {
@@ -35,7 +38,9 @@ const GoogleLocationSearch: React.FC<Props> = ({
   placeholder = "Search for a location...",
   disabled = false,
   className = "",
+  variant = "default",
 }) => {
+  const isDark = variant === "dark";
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [isSelected, setIsSelected] = useState(false);
@@ -162,15 +167,56 @@ const GoogleLocationSearch: React.FC<Props> = ({
     suggestions.length === 0 &&
     !isSelected;
 
+  const inputClassName = isDark
+    ? cn(
+        "h-10 w-full border-white/10 text-slate-100 placeholder:text-slate-500",
+        isSelected
+          ? "cursor-default bg-emerald-950/40 text-slate-100 ring-1 ring-emerald-500/30"
+          : "bg-white/5",
+      )
+    : cn(
+        "h-10 w-full border-white/10",
+        isSelected
+          ? "cursor-default bg-green-50 dark:bg-green-950/30"
+          : "bg-white/5",
+      );
+
+  const listClassName = isDark
+    ? "absolute z-[300] mt-1.5 w-full max-h-60 overflow-auto rounded-lg border border-white/10 bg-slate-800 py-1 shadow-xl"
+    : "absolute z-[300] mt-1.5 w-full max-h-60 overflow-auto rounded-lg border border-slate-200 bg-white py-1 shadow-2xl ring-1 ring-black/10 dark:border-slate-500/90 dark:bg-slate-950 dark:ring-black/50";
+
+  const rowClassName = isDark
+    ? "flex cursor-pointer items-start gap-3 border-b border-white/5 px-3 py-2.5 text-left last:border-b-0 hover:bg-white/10 focus:bg-white/10 focus:outline-none"
+    : "flex cursor-pointer items-start gap-3 border-b border-slate-100 px-3 py-2.5 text-left last:border-b-0 hover:bg-slate-100 focus:bg-slate-100 focus:outline-none dark:border-slate-700/90 dark:hover:bg-slate-800 dark:focus:bg-slate-800";
+
+  const pinClassName = isDark
+    ? "mt-0.5 shrink-0 text-sky-400"
+    : "mt-0.5 shrink-0 text-sky-600 dark:text-sky-400";
+
+  const suggestionTextClassName = isDark
+    ? "min-w-0 flex-1 text-sm font-medium leading-snug text-slate-200"
+    : "min-w-0 flex-1 text-sm font-medium leading-snug text-slate-900 dark:text-slate-50";
+
+  const clearBtnClassName = isDark
+    ? "text-slate-400 hover:text-red-400"
+    : "text-muted-foreground hover:text-destructive";
+
+  const noResultsClassName = isDark
+    ? "absolute z-[300] mt-1 w-full rounded-lg border border-white/10 bg-slate-800 p-4 shadow-xl"
+    : "absolute z-50 mt-1 w-full rounded-md border border-amber-200 bg-amber-50 p-4 dark:border-amber-800 dark:bg-amber-950/30";
+
+  const noResultsTextClassName = isDark
+    ? "text-sm text-slate-300"
+    : "text-sm text-amber-800 dark:text-amber-200";
+
   return (
-    <div className={`relative w-full ${className}`.trim()}>
+    <div
+      className={cn("relative z-20 w-full", className)}
+      style={isDark ? { colorScheme: "dark" } : undefined}
+    >
       <Input
         ref={inputRef}
-        className={`w-full h-10 border-white/10 ${
-          isSelected
-            ? "bg-green-50 dark:bg-green-950/30 cursor-default"
-            : "bg-white/5"
-        }`}
+        className={inputClassName}
         value={isSelected ? value : searchQuery}
         onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
           handleInputChange(e.target.value)
@@ -216,7 +262,10 @@ const GoogleLocationSearch: React.FC<Props> = ({
         <button
           type="button"
           onClick={handleClear}
-          className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-destructive font-bold transition-colors"
+          className={cn(
+            "absolute right-3 top-1/2 -translate-y-1/2 font-bold transition-colors",
+            clearBtnClassName,
+          )}
           title="Clear selection"
           aria-label="Clear selection"
         >
@@ -225,23 +274,35 @@ const GoogleLocationSearch: React.FC<Props> = ({
       )}
 
       {suggestions.length > 0 && !isSelected && (
-        <ul className="absolute z-50 mt-1 w-full max-h-60 overflow-auto rounded-md border border-white/10 bg-background shadow-lg">
+        <ul className={listClassName} role="listbox">
           {suggestions.map((sug) => (
             <li
               key={sug.place_id}
+              role="option"
               onClick={() => handleSuggestionSelect(sug)}
-              className="flex cursor-pointer items-center gap-2 border-b border-white/10 px-4 py-3 last:border-b-0 hover:bg-muted/50"
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  handleSuggestionSelect(sug);
+                }
+              }}
+              tabIndex={0}
+              className={rowClassName}
             >
-              <span className="text-muted-foreground">📍</span>
-              <span className="text-sm text-foreground">{sug.description}</span>
+              <span className={pinClassName} aria-hidden>
+                📍
+              </span>
+              <span className={suggestionTextClassName}>
+                {sug.description}
+              </span>
             </li>
           ))}
         </ul>
       )}
 
       {showNoResults && (
-        <div className="absolute z-50 mt-1 w-full rounded-md border border-amber-200 bg-amber-50 p-4 dark:border-amber-800 dark:bg-amber-950/30">
-          <p className="text-sm text-amber-800 dark:text-amber-200">
+        <div className={noResultsClassName}>
+          <p className={noResultsTextClassName}>
             Google didn&apos;t find that location. Please select from the
             suggestions above.
           </p>

@@ -77,7 +77,7 @@ function actionClass(action: CommissionEntry["action"], type: CommissionEntry["t
 }
 
 export function CommissionOverviewContent() {
-  const { format: formatMoney } = useCurrencyFormat();
+  const { formatLocale: formatMoneyLocale } = useCurrencyFormat();
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -216,7 +216,9 @@ export function CommissionOverviewContent() {
                     </div>
                     <div>
                       <p className="text-xs font-medium text-muted-foreground">Total Commission Earned</p>
-                      <p className="text-base font-semibold text-rose-600 sm:text-lg">{overview?.total_commission_earned_formatted ?? formatMoney(0)}</p>
+                      <p className="text-base font-semibold text-rose-600 sm:text-lg">
+                        {formatMoneyLocale(overview?.total_commission_earned ?? 0)}
+                      </p>
                     </div>
                   </div>
 
@@ -226,7 +228,9 @@ export function CommissionOverviewContent() {
                     </div>
                     <div>
                       <p className="text-xs font-medium text-muted-foreground">Total Commission Received</p>
-                      <p className="text-base font-semibold text-violet-600 sm:text-lg">{overview?.total_commission_received_formatted ?? formatMoney(0)}</p>
+                      <p className="text-base font-semibold text-violet-600 sm:text-lg">
+                        {formatMoneyLocale(overview?.total_commission_received ?? 0)}
+                      </p>
                     </div>
                   </div>
 
@@ -236,7 +240,9 @@ export function CommissionOverviewContent() {
                     </div>
                     <div>
                       <p className="text-xs font-medium text-muted-foreground">Total Commission Due</p>
-                      <p className="text-base font-semibold text-cyan-600 sm:text-lg">{overview?.total_commission_due_formatted ?? formatMoney(0)}</p>
+                      <p className="text-base font-semibold text-cyan-600 sm:text-lg">
+                        {formatMoneyLocale(overview?.total_commission_due ?? 0)}
+                      </p>
                     </div>
                   </div>
 
@@ -246,7 +252,9 @@ export function CommissionOverviewContent() {
                     </div>
                     <div>
                       <p className="text-xs font-medium text-muted-foreground">Total Revenue</p>
-                      <p className="text-base font-semibold text-emerald-600 sm:text-lg">{overview?.total_revenue_formatted ?? formatMoney(0)}</p>
+                      <p className="text-base font-semibold text-emerald-600 sm:text-lg">
+                        {formatMoneyLocale(overview?.total_revenue ?? 0)}
+                      </p>
                     </div>
                   </div>
                 </div>
@@ -364,7 +372,9 @@ export function CommissionOverviewContent() {
                         <TableCell className="py-4 px-4">{row.date}</TableCell>
                         <TableCell className="py-4 px-4">{row.booking_number}</TableCell>
                         <TableCell className="py-4 px-4">{row.venue_name}</TableCell>
-                        <TableCell className="py-4 px-4 text-right font-medium">{row.commission_settled_formatted}</TableCell>
+                        <TableCell className="py-4 px-4 text-right font-medium">
+                          {formatMoneyLocale(row.commission_settled ?? 0)}
+                        </TableCell>
                         <TableCell className="py-4 px-4">{row.paid_date ?? "—"}</TableCell>
                         <TableCell className="py-4 px-4">
                           <span className={`inline-flex items-center rounded-md border px-2 py-1 text-xs font-medium ${actionClass(row.action, row.type)}`}>

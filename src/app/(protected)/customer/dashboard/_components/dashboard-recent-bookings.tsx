@@ -60,7 +60,7 @@ export default function DashboardRecentBookings({
                                 <Badge
                                   variant="outline"
                                   className={`text-xs border ${getStatusColorClass(
-                                    booking.status,
+                                    booking.status
                                   )}`}
                                 >
                                   {booking.status}
@@ -68,7 +68,7 @@ export default function DashboardRecentBookings({
                                 <Badge
                                   variant="outline"
                                   className={`text-xs border ${getStatusColorClass(
-                                    booking.payment_status,
+                                    booking.payment_status
                                   )}`}
                                 >
                                   {booking.payment_status}

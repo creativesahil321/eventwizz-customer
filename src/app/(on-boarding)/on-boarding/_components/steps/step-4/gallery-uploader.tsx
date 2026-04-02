@@ -4,7 +4,7 @@ import { ControllerRenderProps } from "react-hook-form";
 import React, { useEffect, useState, DragEvent } from "react";
 import { StepFourType } from "../../form-provider/schema";
 import { useFormContext } from "../../form-provider";
-import { OnboardingSectionTitle } from "@/components/ui/typography";
+import { OnboardingFieldGroupTitle } from "@/components/ui/typography";
 import { Button } from "@/components/ui/button";
 import { Trash, GripVertical } from "lucide-react";
 
@@ -165,7 +165,7 @@ const GalleryUploader: React.FC<GalleryUploaderProps> = ({ field }) => {
 
   return (
     <FormItem className="w-full">
-      <OnboardingSectionTitle>Gallery Images</OnboardingSectionTitle>
+      <OnboardingFieldGroupTitle>Gallery Images</OnboardingFieldGroupTitle>
 
       {/* Display gallery preview grid */}
       {galleryItems.length > 0 && (
@@ -178,7 +178,7 @@ const GalleryUploader: React.FC<GalleryUploaderProps> = ({ field }) => {
                   ? "border-blue-500 border-2"
                   : index === 0
                   ? "border-green-500"
-                  : "border-gray-200"
+                  : "border-white/15"
               } ${
                 draggedItem === index ? "opacity-50" : "opacity-100"
               } transition-all cursor-move`}
@@ -190,8 +190,8 @@ const GalleryUploader: React.FC<GalleryUploaderProps> = ({ field }) => {
               onDrop={handleDrop}
             >
               {/* Drag handle */}
-              <div className="absolute top-2 left-2 z-10 bg-white/80 rounded-full p-1 shadow-sm">
-                <GripVertical className="h-4 w-4 text-gray-600" />
+              <div className="absolute left-2 top-2 z-10 rounded-full bg-black/40 p-1 shadow-sm backdrop-blur-sm">
+                <GripVertical className="h-4 w-4 text-white/80" />
               </div>
 
               {/* Render image preview based on type */}
@@ -267,7 +267,7 @@ const GalleryUploader: React.FC<GalleryUploaderProps> = ({ field }) => {
       )}
 
       {galleryItems.length > 0 && (
-        <p className="text-gray-600 text-sm mt-2">
+        <p className="mt-2 text-sm text-muted-foreground">
           <strong>Tip:</strong> Drag images to reorder them. The first image
           will be used as the main image.
         </p>

@@ -83,6 +83,26 @@ export function OnboardingSectionTitle({
   );
 }
 
+/**
+ * Field-group labels inside a guided onboarding section (no gradient bar).
+ * Reserve {@link OnboardingSectionTitle} for major section headers / title bars only.
+ */
+export function OnboardingFieldGroupTitle({
+  children,
+  className,
+}: TypographyProps) {
+  return (
+    <h4
+      className={cn(
+        "text-sm font-semibold leading-snug tracking-tight text-slate-200",
+        className,
+      )}
+    >
+      {children}
+    </h4>
+  );
+}
+
 export function Paragraph({ children, className }: TypographyProps) {
   return (
     <p className={cn("font-body text-base text-black", className)}>

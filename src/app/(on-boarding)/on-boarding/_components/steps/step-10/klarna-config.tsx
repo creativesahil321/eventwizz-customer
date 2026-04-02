@@ -77,7 +77,7 @@ export function KlarnaConfig({
       </Alert>
 
       {/* Help Link */}
-      <div className="flex items-center gap-2 text-sm text-gray-600">
+      <div className="flex items-center gap-2 text-sm text-muted-foreground">
         <Info className="w-4 h-4" />
         <span>Need help? </span>
         <Button

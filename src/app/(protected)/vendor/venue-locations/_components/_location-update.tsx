@@ -190,7 +190,10 @@ export default function UpdateLocationDialog({
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>
-                    Email <span className="text-destructive">*</span>
+                    Email{" "}
+                    <span className="text-muted-foreground font-normal">
+                      (optional)
+                    </span>
                   </FormLabel>
                   <FormControl>
                     <Input

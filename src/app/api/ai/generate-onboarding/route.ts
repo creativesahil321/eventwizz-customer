@@ -409,13 +409,13 @@ Make times chronologically ascending. Make prices realistic for the venue type a
             tickets: bookingType !== "tables" && tickets.length > 0
               ? tickets
               : bookingType !== "tables"
-              ? [{ title: "General Admission", description: "Standard entry ticket", total_capacity: "100", price: "50" }]
-              : [],
+                ? [{ title: "General Admission", description: "Standard entry ticket", total_capacity: "100", price: "50" }]
+                : [],
             tables: bookingType !== "tickets" && tables.length > 0
               ? tables
               : bookingType !== "tickets"
-              ? [{ min_persons: "2", max_persons: "6", price: "100", total_tables: "10" }]
-              : [],
+                ? [{ min_persons: "2", max_persons: "6", price: "100", total_tables: "10" }]
+                : [],
             payment_type: isTablesOrBoth ? paymentType : "full",
             is_deposit_enabled: isTablesOrBoth ? (isDepositEnabled && paymentType === "deposit") : false,
             deposit_type: isTablesOrBoth && isDepositEnabled ? (date.deposit_type === "percentage" ? "percentage" : "amount") : undefined,
@@ -479,11 +479,11 @@ Make times chronologically ascending. Make prices realistic for the venue type a
         const rawPackages = content.stepSeven.packages;
         content.stepSeven.packages = Array.isArray(rawPackages) && rawPackages.length > 0
           ? rawPackages.map((p) => ({
-              title: truncate(p.title, 25),
-              description: truncate(p.description, 160),
-              price: Math.max(1, Math.min(999999, Math.round(Number(p.price) || 50))),
-              available_quantity: Math.max(1, Math.min(500, Math.round(Number(p.available_quantity) || 100))),
-            }))
+            title: truncate(p.title, 25),
+            description: truncate(p.description, 160),
+            price: Math.max(1, Math.min(999999, Math.round(Number(p.price) || 50))),
+            available_quantity: Math.max(1, Math.min(500, Math.round(Number(p.available_quantity) || 100))),
+          }))
           : [];
       } else {
         content.stepSeven = {

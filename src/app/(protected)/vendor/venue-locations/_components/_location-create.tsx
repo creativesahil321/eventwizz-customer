@@ -184,7 +184,10 @@ export default function CreateLocationDialog() {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>
-                      Email <span className="text-destructive">*</span>
+                      Email{" "}
+                      <span className="text-muted-foreground font-normal">
+                        (optional)
+                      </span>
                     </FormLabel>
                     <FormControl>
                       <Input

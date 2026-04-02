@@ -1,10 +1,10 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useCallback, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import AICollectInfo from "./collect-info";
 import AIGenerating from "./generating";
-import AIReviewContent from "./review-content";
+import AIAutoApply from "./ai-auto-apply";
 import { useAIOnboarding } from "../../_lib/hooks/useAIOnboarding";
 import type { AIOnboardingInput } from "@/app/api/ai/generate-onboarding/route";
 
@@ -32,13 +32,13 @@ export default function AIOnboardingFlow({
     }
   };
 
-  const handleReviewComplete = () => {
+  const handleAIApplyComplete = () => {
     onComplete();
   };
 
-  const handleBackToCollect = () => {
-    setStep("collecting");
-  };
+  const handleApplyFailed = useCallback(() => {
+    setStep("error");
+  }, [setStep]);
 
   return (
     <div className="relative min-h-screen w-full overflow-hidden bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950">
@@ -87,20 +87,19 @@ export default function AIOnboardingFlow({
           </motion.div>
         )}
 
-        {step === "reviewing" && content && venueInput && (
+        {step === "applying" && content && venueInput && (
           <motion.div
-            key="review"
+            key="applying"
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -20 }}
             transition={{ duration: 0.4 }}
           >
-            <AIReviewContent
+            <AIAutoApply
               content={content}
               venueInput={venueInput}
-              onComplete={handleReviewComplete}
-              onRegenerate={handleRetry}
-              onBack={handleBackToCollect}
+              onComplete={handleAIApplyComplete}
+              onApplyFailed={handleApplyFailed}
             />
           </motion.div>
         )}

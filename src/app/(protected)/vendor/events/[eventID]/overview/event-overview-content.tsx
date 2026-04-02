@@ -39,7 +39,8 @@ interface EventOverviewClientProps {
 export default function EventOverviewClient({
   eventId,
 }: EventOverviewClientProps) {
-  const { formatLocale: formatMoneyLocale } = useCurrencyFormat();
+  const { formatLocale: formatMoneyLocale, symbol: tenantCurrencySymbol } =
+    useCurrencyFormat();
   const [dateFilter, setDateFilter] = useState("");
   const [selectedTab, setSelectedTab] = useState<
     "all" | "available" | "sold_out"
@@ -157,10 +158,16 @@ export default function EventOverviewClient({
 
   const totalRevenueNumeric = parseFormattedMoney(
     String(eventData.totalRevenue ?? ""),
+    tenantCurrencySymbol,
   );
   const totalRevenueDisplay = Number.isFinite(totalRevenueNumeric)
     ? formatMoneyLocale(totalRevenueNumeric)
     : String(eventData.totalRevenue ?? "—");
+
+  const formatOverviewPrice = (raw: string) => {
+    const n = parseFormattedMoney(String(raw ?? ""), tenantCurrencySymbol);
+    return Number.isFinite(n) ? formatMoneyLocale(n) : String(raw ?? "—");
+  };
 
   // Type aliases for easier usage
   type TableEntry = EventOverviewResponse["data"][0];
@@ -466,7 +473,7 @@ className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm 
                                             </span>{" "}
                                             × Table of {tableConfig.size}{" "}
                                             <span className="text-muted-foreground">
-                                              ({tableConfig.price})
+                                              ({formatOverviewPrice(tableConfig.price)})
                                             </span>
                                           </p>
                                         ),
