@@ -11,7 +11,7 @@ import { API_ENDPOINTS } from "@/services/core/endpoints";
 import { ApiResponse } from "@/services/core/api-client";
 import { useSession } from "next-auth/react";
 import { useEffect } from "react";
-import { useIsPreviewMode } from "@/contexts/preview-context";
+import { useIsPreviewModeFromProvider } from "@/contexts/preview-context";
 
 // Define query key for event data
 export const eventKeys = {
@@ -46,7 +46,7 @@ function detachEventDataChangedListener() {
 // Function to fetch event data
 async function fetchEventData(
   token: string,
-  eventId: string
+  eventId: string,
 ): Promise<ApiResponse | null> {
   if (!token || !eventId) {
     console.warn("Missing token or eventId for event data fetch:", {
@@ -74,7 +74,7 @@ async function fetchEventData(
   try {
     const endpoint = API_ENDPOINTS.VENDOR.EVENT.GET_EVENT.replace(
       "{eventId}",
-      eventId
+      eventId,
     );
 
     const response = await request<ApiResponse>({
@@ -119,7 +119,7 @@ export function useEventData(eventId?: string) {
   const { data: session } = useSession();
   const queryClient = useQueryClient();
   const token = session?.user?.token;
-  const isPreviewMode = useIsPreviewMode();
+  const isPreviewFromProvider = useIsPreviewModeFromProvider();
 
   // Validate eventId before making the query
   const isValidEventId =
@@ -139,7 +139,9 @@ export function useEventData(eventId?: string) {
   } = useQuery({
     queryKey: eventKeys.data(eventId),
     queryFn: () => fetchEventData(token as string, eventId as string),
-    enabled: !!token && !!isValidEventId && !isPreviewMode, // Disable API calls in preview mode
+    // Do not use URL `/preview/…` here — that blocked `/preview/event?id=` from loading.
+    // Only skip when an ancestor PreviewProvider opts in (none today for useEventData call sites).
+    enabled: !!token && !!isValidEventId && !isPreviewFromProvider,
     staleTime: 1000 * 60 * 5, // 5 minutes
     refetchOnWindowFocus: false,
   });

@@ -4,6 +4,7 @@ import { useContext } from "react";
 import { motion } from "framer-motion";
 import { ServerContext } from "@/lib/server-context";
 import { ThemeSchema } from "@/types/theme.types";
+import { SiteHeading } from "@/components/public/site-heading";
 // Default fallback media
 // const FALLBACK_VIDEO_URL =
 //   "https://www.bestpartiesever.com/wp-content/uploads/2025/03/Website-video-combined-edit-online-video-cutter.com-1.mp4";
@@ -51,6 +52,12 @@ export default function HeroBanner({
     propBannerSubHeading ||
     vendorTheme?.banner_sub_heading ||
     "Discover amazing events that match your interests";
+
+  const bannerAccentHint =
+    typeof vendorTheme?.banner_heading_accent === "string" &&
+    vendorTheme.banner_heading_accent.trim().length > 0
+      ? vendorTheme.banner_heading_accent.trim()
+      : null;
 
   // Media sources with priority: API cover_video > API cover_image > theme video > theme image > fallback video
   const apiVideoUrl = coverVideo || null;
@@ -108,9 +115,13 @@ export default function HeroBanner({
           transition={{ duration: 0.8 }}
           className="text-center"
         >
-          <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-white mb-6">
-            {bannerHeading}
-          </h1>
+          <SiteHeading
+            level={1}
+            title={bannerHeading}
+            accentHint={bannerAccentHint}
+            variant="onDark"
+            className="mb-6 font-bold !text-4xl md:!text-5xl lg:!text-6xl"
+          />
 
           <p className="text-xl text-white/80 max-w-2xl mx-auto">
             {bannerSubheading}

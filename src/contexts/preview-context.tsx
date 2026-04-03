@@ -34,6 +34,16 @@ export function usePreview() {
 }
 
 /**
+ * True only when wrapped by `PreviewProvider` with `isPreviewMode`.
+ * Unlike `useIsPreviewMode()`, this does **not** treat `/preview/…` URLs as preview —
+ * so standalone `/preview/event` can still run authenticated event-detail fetches.
+ */
+export function useIsPreviewModeFromProvider(): boolean {
+  const context = useContext(PreviewContext);
+  return context?.isPreviewMode === true;
+}
+
+/**
  * True when previewing an event/site (provider) or when the URL is under `/preview/…`.
  * Layout-level code (e.g. cart) is not wrapped by PreviewProvider, so the pathname
  * check prevents customer cart APIs from firing on vendor event preview.

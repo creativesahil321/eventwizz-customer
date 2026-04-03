@@ -87,6 +87,7 @@ export function SitePreview({ formValues }: Readonly<SitePreviewProps>) {
         linkId="site-essentials-google-fonts-site-preview"
         headingStack={formValues.typography?.fontFamily?.heading}
         bodyStack={formValues.typography?.fontFamily?.body}
+        customStylesheetUrls={formValues.typography?.customFontStylesheetUrls}
       />
       {/* ServerContext already provided at layout level - no need to wrap again */}
       <CommonHeader

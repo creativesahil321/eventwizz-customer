@@ -23,6 +23,8 @@ export interface ThemeColors {
   };
 }
 
+import type { HeadingEmphasis } from "@/lib/heading-emphasis";
+
 /**
  * Typography configuration
  */
@@ -31,6 +33,13 @@ export interface ThemeTypography {
     heading: string; // Font for headings
     body: string; // Font for body text
   };
+  /** Optional https:// stylesheet URLs (e.g. CDNFonts) for non–Google Fonts. */
+  customFontStylesheetUrls?: string[];
+  /**
+   * How marketing headings render on the public vendor site.
+   * Omitted or unknown values are treated as `uniform` on the frontend.
+   */
+  headingEmphasis?: HeadingEmphasis;
 }
 
 /**
@@ -109,6 +118,8 @@ export interface ThemeSchema {
       heading?: string;
       body?: string;
     };
+    customFontStylesheetUrls?: string[];
+    headingEmphasis?: HeadingEmphasis;
   };
 
   logo?: string;
@@ -124,6 +135,8 @@ export interface ThemeSchema {
 
   // Landing page content fields
   banner_heading?: string;
+  /** Substring of banner_heading to style as accent when headingEmphasis is accent_tail */
+  banner_heading_accent?: string | null;
   banner_sub_heading?: string;
   cover_image?: string;
   cover_video?: string; // Video URL for landing page banner

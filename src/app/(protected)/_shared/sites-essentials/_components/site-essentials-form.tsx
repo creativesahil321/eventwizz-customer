@@ -18,6 +18,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { useSitePreviewStore } from "@/store/site-preview.store";
 import { SocialMediaTab } from "./tabs/social-media-tab";
+import { ThemePresetsTab } from "./tabs/theme-presets-tab";
 
 export function SiteEssentialsForm() {
   const { form, onSubmit, isLoading, siteEssentials, fetchSiteEssentials } =
@@ -34,7 +35,7 @@ export function SiteEssentialsForm() {
     {},
   );
   const [showErrorSummary, setShowErrorSummary] = useState(false);
-  const [activeTab, setActiveTab] = useState("branding");
+  const [activeTab, setActiveTab] = useState("presets");
 
   // Load preview data into form if available
   // BUT never override File objects - form submission should use form's File objects, not preview store data
@@ -288,6 +289,12 @@ export function SiteEssentialsForm() {
             <div className="w-full overflow-x-auto pb-2 no-scrollbar">
               <TabsList className="flex w-max min-w-full bg-background p-1 h-auto rounded-lg gap-1">
                 <TabsTrigger
+                  value="presets"
+                  className="px-3 sm:px-4 py-1 h-8 text-xs font-medium whitespace-nowrap relative rounded-md data-[state=active]:bg-[var(--color-primary)] data-[state=active]:text-white data-[state=active]:shadow-sm mx-0.5"
+                >
+                  Presets
+                </TabsTrigger>
+                <TabsTrigger
                   value="branding"
                   className="px-3 sm:px-4 py-1 h-8 text-xs font-medium whitespace-nowrap relative rounded-md data-[state=active]:bg-[var(--color-primary)] data-[state=active]:text-white data-[state=active]:shadow-sm mx-0.5"
                 >
@@ -348,6 +355,16 @@ export function SiteEssentialsForm() {
 
           <Card className="shadow-sm overflow-hidden p-0 gap-0 py-0">
             <div className="space-y-6 p-6 pb-6">
+              <TabsContent value="presets" className="mt-0 w-full">
+                <div className="bg-white rounded-lg p-3 sm:p-6">
+                  <ThemePresetsTab
+                    onGoToColors={() => setActiveTab("colors")}
+                    onGoToTypography={() => setActiveTab("typography")}
+                    onGoToBranding={() => setActiveTab("branding")}
+                  />
+                </div>
+              </TabsContent>
+
               <TabsContent value="branding" className="mt-0 w-full">
                 {tabsWithErrors.branding && (
                   <Badge variant="destructive" className="mb-3">

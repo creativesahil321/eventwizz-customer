@@ -16,6 +16,7 @@ import PackageSec from "@/app/(on-boarding)/on-boarding/_components/form-preview
 import Timeline from "@/app/(on-boarding)/on-boarding/_components/form-preview/_components/Time-line";
 import BrochureSection from "@/app/(on-boarding)/on-boarding/_components/form-preview/_components/brochure-section";
 import CommonHeader from "@/components/shared/common-header";
+import { SiteHeading } from "@/components/public/site-heading";
 import FooterSection from "@/app/(public)/vendor/_components/EventListPage/footer";
 import EventGallery from "@/app/(on-boarding)/on-boarding/_components/form-preview/_components/Event-gallery";
 import { ThemeAnimationManager } from "@/components/theme-animations/theme-animation-manager";
@@ -53,6 +54,17 @@ export default function EventDetailClient({
   const bookingRef = useRef<HTMLDivElement>(null);
   const datesSectionRef = useRef<HTMLDivElement>(null);
 
+  const heroTitle =
+    eventData.event_banner_heading?.trim() ||
+    eventData.event_name?.trim() ||
+    "";
+
+  const heroAccentHint =
+    typeof eventData.event_banner_heading_accent === "string" &&
+    eventData.event_banner_heading_accent.trim().length > 0
+      ? eventData.event_banner_heading_accent.trim()
+      : null;
+
   // Enhanced hero section styles
   const heroStyles = {
     container: "relative w-full h-[100vh] min-h-[500px] overflow-hidden",
@@ -60,7 +72,6 @@ export default function EventDetailClient({
     videoBackground: "absolute inset-0 w-full h-full object-cover",
     content:
       "relative z-20 flex flex-col justify-center items-center h-full text-center text-white px-4",
-    heading: "text-4xl md:text-5xl lg:text-6xl font-bold mb-4",
     subheading: "text-xl md:text-2xl font-medium max-w-3xl mx-auto",
   };
 
@@ -112,9 +123,13 @@ export default function EventDetailClient({
           )}
           <div className={heroStyles.overlay}></div>
           <div className={heroStyles.content}>
-            <h1 className={heroStyles.heading}>
-              {eventData.event_banner_heading || eventData.event_name}
-            </h1>
+            <SiteHeading
+              level={1}
+              title={heroTitle}
+              accentHint={heroAccentHint}
+              variant="onDark"
+              className="mb-4 font-bold !text-4xl md:!text-5xl lg:!text-6xl"
+            />
             <h2 className={heroStyles.subheading}>
               {eventData.event_banner_sub_heading}
             </h2>

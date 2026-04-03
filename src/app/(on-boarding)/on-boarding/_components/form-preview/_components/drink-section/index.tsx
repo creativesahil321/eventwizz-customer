@@ -117,11 +117,11 @@ export default function DrinkSection({
         )}
         <section className="w-full flex items-center justify-center mt-4 sm:mt-6">
           <Button
-            variant="event-outline"
+            variant="event-primary"
             onClick={() => {
               setShowMore(!showMore);
             }}
-            className="flex items-center gap-2 border rounded-[10px] border-2 border-[var(--color-primary)] text-sm sm:text-base px-4 sm:px-6 py-2 sm:py-2.5 w-full sm:w-auto"
+            className="flex items-center gap-2 text-sm sm:text-base px-4 sm:px-6 py-2 sm:py-2.5 w-full sm:w-auto"
           >
             View Package List
             {showMore ? (
@@ -172,7 +172,7 @@ export default function DrinkSection({
 
                     {quantity === 0 ? (
                       <Button
-                        variant="event-outline"
+                        variant="event-primary"
                         size="sm"
                         onClick={() => handleAdd(singlePackage)}
                         className="w-full sm:w-auto text-sm sm:text-base px-4 sm:px-6 py-2"

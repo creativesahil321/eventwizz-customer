@@ -9,6 +9,7 @@ import { SitePreview } from "@/app/(protected)/_shared/sites-essentials/_compone
 import { SiteEssentialsFormValues } from "@/app/(protected)/_shared/sites-essentials/_lib/schema";
 import { Skeleton } from "@/components/ui/skeleton";
 import { PreviewProvider } from "@/contexts/preview-context";
+import { PreviewThemeCustomizer } from "@/components/preview/preview-theme-customizer";
 
 export default function SitePreviewPage() {
   const router = useRouter();
@@ -137,6 +138,12 @@ export default function SitePreviewPage() {
       <div className="relative min-h-screen">
         {/* Site Preview - Full screen without any wrapper controls */}
         <SitePreview formValues={formData} />
+
+        <PreviewThemeCustomizer
+          values={formData}
+          onValuesChange={setFormData}
+          brandName={formData.name?.trim() || "Site preview"}
+        />
 
         {/* Preview chrome: Back button in its own layer so it doesn't overlap header */}
         <div className="fixed top-4 left-4 z-[60] isolate">

@@ -15,6 +15,10 @@ interface LocationGridProps {
   onSelect: (slug: string) => void;
 }
 
+function isRemoteImage(src: string) {
+  return /^https?:\/\//i.test(src);
+}
+
 export default function LocationGrid({
   locations,
   isLoading,
@@ -25,19 +29,18 @@ export default function LocationGrid({
 
   if (isLoading) {
     return (
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-7 md:gap-8">
+      <div className="grid grid-cols-1 gap-6 md:grid-cols-2 md:gap-8 lg:grid-cols-3 lg:gap-8">
         {Array(6)
           .fill(0)
           .map((_, idx) => (
             <Card
               key={idx}
-              className="overflow-hidden border-0 p-0 gap-0 py-0 rounded-2xl shadow-lg ring-1 ring-white/50"
+              className="overflow-hidden rounded-2xl border border-[color:color-mix(in_srgb,var(--color-text)_8%,transparent)] bg-[var(--color-surface)] p-0 shadow-sm"
             >
-              <Skeleton className="aspect-[16/10] w-full rounded-none" />
-              <div className="p-5 sm:p-6 space-y-4">
-                <Skeleton className="h-5 w-36" />
-                <Skeleton className="h-[4.5rem] w-full rounded-xl" />
-                <Skeleton className="h-11 w-full rounded-xl" />
+              <Skeleton className="aspect-[4/3] w-full rounded-none" />
+              <div className="space-y-3 p-5">
+                <Skeleton className="mx-auto h-4 w-2/3" />
+                <Skeleton className="h-10 w-full rounded-full" />
               </div>
             </Card>
           ))}
@@ -47,13 +50,19 @@ export default function LocationGrid({
 
   if (!locations || locations.length === 0) {
     return (
-      <div className="text-center py-16">
-        <div className="bg-white border border-gray-200 rounded-lg p-12 max-w-md mx-auto">
-          <MapPin size={48} className="mx-auto mb-4 text-gray-400" />
-          <h3 className="text-2xl font-semibold text-gray-900 mb-2">
-            No Locations Found
+      <div className="py-16 text-center">
+        <div
+          className="mx-auto max-w-md rounded-2xl border border-[color:color-mix(in_srgb,var(--color-text)_10%,transparent)] bg-[var(--color-surface)] p-12 text-[var(--color-on-surface)] shadow-sm"
+        >
+          <MapPin
+            size={48}
+            className="mx-auto mb-4 opacity-40 text-[color:var(--color-primary)]"
+            aria-hidden
+          />
+          <h3 className="mb-2 text-2xl font-semibold font-heading">
+            No locations yet
           </h3>
-          <p className="text-gray-600">
+          <p className="text-[var(--color-text-dimmed)]">
             There are no event locations available at the moment. Check back
             soon!
           </p>
@@ -63,15 +72,15 @@ export default function LocationGrid({
   }
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-7 md:gap-8">
+    <div className="grid grid-cols-1 gap-6 md:grid-cols-2 md:gap-8 lg:grid-cols-3 lg:gap-8">
       <AnimatePresence>
         {locations.map((location, idx) => {
           const locationName =
             "city" in location && location.city
               ? location.city
               : "name" in location && location.name
-              ? location.name
-              : "Unknown Location";
+                ? location.name
+                : "Unknown Location";
 
           const locationSlug =
             "slug" in location && location.slug ? location.slug : "";
@@ -79,8 +88,6 @@ export default function LocationGrid({
             "id" in location && location.id ? location.id : idx;
           const isHovered = hoveredCard === locationSlug;
 
-          // Get event data directly from location object (from API)
-          // Check if location has the API fields (LocationData type)
           const locationData = location as LocationData;
           const totalEvents =
             typeof locationData.total_events === "number"
@@ -99,147 +106,138 @@ export default function LocationGrid({
               ? location.cover_image
               : null;
 
+          const handleCardClick = () => {
+            if (!locationSlug || pendingSlug) return;
+            setPendingSlug(locationSlug);
+            onSelect(locationSlug);
+          };
+
           return (
             <motion.div
               key={locationId}
-              initial={{ opacity: 0, y: 20 }}
+              initial={{ opacity: 0, y: 16 }}
               animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95 }}
+              exit={{ opacity: 0, scale: 0.98 }}
               transition={{
-                duration: 0.3,
-                delay: idx * 0.05,
+                duration: 0.35,
+                delay: idx * 0.04,
+                ease: [0.22, 1, 0.36, 1],
               }}
               whileHover={{
-                y: -6,
-                transition: { type: "spring", stiffness: 380, damping: 28 },
+                y: -4,
+                transition: { type: "spring", stiffness: 400, damping: 30 },
               }}
               onHoverStart={() => setHoveredCard(locationSlug)}
               onHoverEnd={() => setHoveredCard(null)}
             >
               <Card
-                className="overflow-hidden border-0 cursor-pointer group flex flex-col h-full rounded-2xl p-0 gap-0 py-0 bg-white/95 text-card-foreground shadow-[0_4px_6px_-1px_rgba(0,0,0,0.06),0_16px_32px_-12px_rgba(0,0,0,0.22)] ring-1 ring-white/70 hover:shadow-[0_24px_48px_-16px_rgba(0,0,0,0.35)] transition-[box-shadow,transform] duration-300"
-                onClick={() => {
-                  if (!locationSlug || pendingSlug) return;
-                  setPendingSlug(locationSlug);
-                  onSelect(locationSlug);
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    handleCardClick();
+                  }
                 }}
+                className="group flex h-full cursor-pointer flex-col overflow-hidden rounded-2xl border border-[color:color-mix(in_srgb,var(--color-text)_8%,transparent)] bg-[var(--color-surface)] p-0 text-[var(--color-on-surface)] shadow-sm transition-shadow duration-300 hover:shadow-xl hover:shadow-black/10"
+                onClick={handleCardClick}
               >
-                {/* Header Image — fixed aspect so grid feels even */}
-                <div
-                  className="relative aspect-[16/10] w-full overflow-hidden rounded-t-2xl"
-                  style={{ background: "var(--color-background)" }}
-                >
+                {/* Image region — Lovable-style tall hero on card */}
+                <div className="relative aspect-[4/3] w-full overflow-hidden bg-[var(--color-background)]">
                   {coverImage && typeof coverImage === "string" ? (
                     <Image
                       src={coverImage}
                       alt={locationName}
                       fill
                       sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-                      className="object-cover transition-transform duration-500 ease-out group-hover:scale-[1.04]"
+                      className="object-cover transition-transform duration-700 ease-out group-hover:scale-105"
+                      unoptimized={isRemoteImage(coverImage)}
                       onError={(e) => {
                         (e.target as HTMLImageElement).style.display = "none";
                       }}
                     />
                   ) : (
                     <div
-                      className="absolute inset-0 bg-gradient-to-br from-neutral-200 to-neutral-400"
+                      className="absolute inset-0 bg-gradient-to-br from-[color:color-mix(in_srgb,var(--color-primary)_25%,var(--color-background))] to-[var(--color-background)]"
                       aria-hidden
                     />
                   )}
 
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/35 to-transparent" />
 
-                  <div className="absolute bottom-3 left-3 max-w-[calc(100%-1.5rem)]">
-                    <div className="inline-flex items-center gap-1.5 rounded-full border border-white/25 bg-black/40 px-3 py-1.5 shadow-lg backdrop-blur-md">
-                      <MapPin
-                        size={14}
-                        className="shrink-0 text-white/95"
-                        aria-hidden
-                      />
-                      <h3 className="text-sm font-semibold tracking-tight text-white drop-shadow-sm">
-                        {locationName}
-                      </h3>
+                  {/* Event count pill — top right */}
+                  <div className="absolute right-3 top-3 md:right-4 md:top-4">
+                    <div className="rounded-full bg-[var(--color-primary)] px-3 py-1.5 text-xs font-semibold tracking-wide text-[var(--color-primary-foreground)] shadow-lg backdrop-blur-sm">
+                      {totalEvents}{" "}
+                      {totalEvents === 1 ? "event" : "events"}
                     </div>
+                  </div>
+
+                  {/* Location pin + title on image */}
+                  <div className="absolute bottom-0 left-0 right-0 p-4 md:p-5">
+                    <div className="mb-2 inline-flex items-center gap-1.5 text-white/90">
+                      <MapPin className="h-4 w-4 shrink-0" aria-hidden />
+                      <span className="text-xs font-medium uppercase tracking-[0.2em] text-white/75">
+                        Location
+                      </span>
+                    </div>
+                    <h3 className="font-heading text-2xl italic leading-tight text-white drop-shadow-md md:text-3xl">
+                      {locationName}
+                    </h3>
                   </div>
                 </div>
 
-                {/* Content */}
-                <div className="flex flex-1 flex-col p-5 sm:p-6">
-                  <div className="flex flex-1 flex-col gap-4">
-                    {/* Event Count */}
-                    <div className="flex items-baseline gap-2">
-                      <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-[color-mix(in_srgb,var(--color-primary)_12%,transparent)] text-[color:var(--color-primary)]">
-                        <Calendar size={16} strokeWidth={2} aria-hidden />
-                      </span>
-                      <div className="leading-tight">
-                        <span className="text-2xl font-bold tabular-nums text-gray-900">
-                          {totalEvents}
-                        </span>
-                        <span className="ml-1.5 text-sm font-medium text-gray-500">
-                          {totalEvents === 1 ? "event" : "events"}
-                        </span>
+                {/* Lower panel — next event + CTA */}
+                <div className="flex flex-1 flex-col gap-4 p-5">
+                  {upcomingEvent ? (
+                    <div className="flex gap-3 rounded-xl border border-[color:color-mix(in_srgb,var(--color-text)_10%,transparent)] bg-[color:color-mix(in_srgb,var(--color-text)_4%,var(--color-surface))] p-3.5">
+                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[color:color-mix(in_srgb,var(--color-primary)_14%,transparent)] text-[color:var(--color-primary)]">
+                        <Clock className="h-4 w-4" aria-hidden />
                       </div>
-                    </div>
-
-                    {/* Upcoming Event */}
-                    {upcomingEvent ? (
-                      <div className="flex gap-3 rounded-xl border border-gray-200/80 bg-gradient-to-br from-gray-50 to-gray-100/80 p-4 shadow-inner ring-1 ring-black/[0.03]">
-                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-white shadow-sm ring-1 ring-gray-100">
-                          <Clock
-                            size={18}
-                            className="text-[color:var(--color-primary)]"
-                            aria-hidden
-                          />
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <p className="text-[10px] font-semibold uppercase tracking-wider text-gray-500">
-                            Next up
-                          </p>
-                          <div className="mt-0.5 text-base font-semibold leading-snug text-gray-900 line-clamp-2">
-                            {upcomingEvent.name}
-                          </div>
-                          <div className="mt-1 text-sm text-gray-600">
-                            {upcomingEvent.date}
-                          </div>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="rounded-xl border border-dashed border-gray-200 bg-gray-50/80 px-4 py-3 text-center">
-                        <p className="text-sm text-gray-500">
-                          {totalEvents > 0
-                            ? "No upcoming events scheduled"
-                            : "Check back soon for new events"}
+                      <div className="min-w-0 flex-1 text-left">
+                        <p className="text-[10px] font-semibold uppercase tracking-wider text-[var(--color-text-dimmed)]">
+                          Next up
+                        </p>
+                        <p className="mt-0.5 line-clamp-2 text-sm font-semibold leading-snug text-[var(--color-on-surface)]">
+                          {upcomingEvent.name}
+                        </p>
+                        <p className="mt-1 flex items-center gap-1.5 text-xs text-[var(--color-text-dimmed)]">
+                          <Calendar className="h-3.5 w-3.5 shrink-0" />
+                          {upcomingEvent.date}
                         </p>
                       </div>
-                    )}
-                  </div>
+                    </div>
+                  ) : (
+                    <p className="rounded-xl border border-dashed border-[color:color-mix(in_srgb,var(--color-text)_12%,transparent)] bg-[color:color-mix(in_srgb,var(--color-text)_3%,transparent)] px-4 py-3 text-center text-sm text-[var(--color-text-dimmed)]">
+                      {totalEvents > 0
+                        ? "No upcoming events scheduled"
+                        : "New events coming soon"}
+                    </p>
+                  )}
 
-                  {/* Action Button */}
                   <button
                     type="button"
-                    className="mt-6 flex w-full items-center justify-center gap-2 rounded-xl bg-[color:var(--color-primary)] px-4 py-3 text-sm font-semibold text-[var(--color-primary-foreground)] shadow-lg shadow-black/15 transition-all duration-200 hover:brightness-110 hover:shadow-xl hover:shadow-black/20 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--color-primary)] focus-visible:ring-offset-2"
+                    className="mt-auto flex w-full items-center justify-center gap-2 rounded-full bg-[var(--color-primary)] px-4 py-3 text-sm font-semibold text-[var(--color-primary-foreground)] transition-all duration-200 hover:opacity-95 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--color-primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--color-surface)] disabled:opacity-70"
                     onClick={(e) => {
                       e.stopPropagation();
-                      if (!locationSlug || pendingSlug) return;
-                      setPendingSlug(locationSlug);
-                      onSelect(locationSlug);
+                      handleCardClick();
                     }}
                     disabled={pendingSlug === locationSlug}
                   >
                     {pendingSlug === locationSlug ? (
                       <>
-                        <Loader2 size={16} className="animate-spin" />
-                        <span>Opening...</span>
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        <span>Opening…</span>
                       </>
                     ) : (
                       <>
-                        <span>Explore Events</span>
+                        <span>Browse events</span>
                         <motion.span
                           className="inline-flex"
-                          animate={{ x: isHovered ? 5 : 0 }}
+                          animate={{ x: isHovered ? 4 : 0 }}
                           transition={{ duration: 0.2, ease: "easeOut" }}
                         >
-                          <ArrowRight size={17} strokeWidth={2.25} aria-hidden />
+                          <ArrowRight className="h-4 w-4" aria-hidden />
                         </motion.span>
                       </>
                     )}

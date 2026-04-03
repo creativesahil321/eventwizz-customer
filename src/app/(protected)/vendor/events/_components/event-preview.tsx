@@ -170,9 +170,17 @@ export function EventPreview({
         ? firstPkg.price
         : parseFloat(String(firstPkg.price || 0)) || 45
       : 45;
-  const brochurePriceDescription =
-    s6?.price_start_from?.trim() ||
-    `${formatMoney(brochureFallbackAmount)} PP exc VAT`;
+  // `price_start_from` is stored as a plain number string (e.g. "50") — always format with tenant currency like onboarding / live brochure.
+  const rawPriceFrom = s6?.price_start_from?.trim() ?? "";
+  const parsedFromField =
+    rawPriceFrom !== ""
+      ? parseFloat(rawPriceFrom.replace(/[^0-9.-]/g, ""))
+      : NaN;
+  const brochureAmount =
+    rawPriceFrom !== "" && Number.isFinite(parsedFromField) && parsedFromField >= 0
+      ? parsedFromField
+      : brochureFallbackAmount;
+  const brochurePriceDescription = `${formatMoney(brochureAmount)} PP exc VAT`;
 
   const heroStyles = {
     container: "relative w-full h-[100vh] min-h-[500px] overflow-hidden",
@@ -240,6 +248,9 @@ export function EventPreview({
           linkId="site-essentials-google-fonts-event-preview"
           headingStack={headingFont}
           bodyStack={bodyFont}
+          customStylesheetUrls={
+            siteEssentials?.typography?.customFontStylesheetUrls
+          }
         />
 
         <CommonHeader

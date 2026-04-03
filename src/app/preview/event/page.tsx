@@ -1,6 +1,7 @@
 "use client";
 
 import { useRouter, useSearchParams } from "next/navigation";
+import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft } from "lucide-react";
 import { EventPreview } from "@/app/(protected)/vendor/events/_components/event-preview";
@@ -11,6 +12,7 @@ import { useSitePreviewStore } from "@/store/site-preview.store";
 import { PreviewProvider } from "@/contexts/preview-context";
 import { useSiteEssentialsQuery } from "@/app/(protected)/_shared/sites-essentials/_lib/queries";
 import { SiteEssentialsFormValues } from "@/app/(protected)/_shared/sites-essentials/_lib/schema";
+import { PreviewThemeCustomizer } from "@/components/preview/preview-theme-customizer";
 
 export default function EventPreviewPage() {
   const router = useRouter();
@@ -29,10 +31,27 @@ export default function EventPreviewPage() {
 
   // Prefer the store (reflects unsaved in-progress edits); fall back to the
   // API response so that already-saved colors always show in the preview
-  const siteEssentials: SiteEssentialsFormValues | null =
-    storeSiteEssentials ?? (apiSiteEssentials as SiteEssentialsFormValues | null) ?? null;
+  const baseSiteEssentials: SiteEssentialsFormValues | null =
+    storeSiteEssentials ??
+    (apiSiteEssentials as SiteEssentialsFormValues | null) ??
+    null;
+
+  const [themeTweak, setThemeTweak] =
+    useState<SiteEssentialsFormValues | null>(null);
+
+  const siteEssentials: SiteEssentialsFormValues | null = useMemo(() => {
+    return themeTweak ?? baseSiteEssentials;
+  }, [themeTweak, baseSiteEssentials]);
+
+  useEffect(() => {
+    setThemeTweak(null);
+  }, [eventId]);
 
   const handleGoBack = () => {
+    if (eventId && /^\d+$/.test(eventId)) {
+      router.push(`/vendor/events/${eventId}`);
+      return;
+    }
     router.back();
   };
 
@@ -120,6 +139,14 @@ export default function EventPreviewPage() {
           data={eventData.data as EventDetailData}
           siteEssentials={siteEssentials}
         />
+
+        {siteEssentials ? (
+          <PreviewThemeCustomizer
+            values={siteEssentials}
+            onValuesChange={setThemeTweak}
+            brandName={siteEssentials.name?.trim() || "Event preview"}
+          />
+        ) : null}
 
         {/* Preview chrome: Back button in its own layer so it doesn't overlap header */}
         <div className="fixed top-4 left-4 z-[60] isolate">

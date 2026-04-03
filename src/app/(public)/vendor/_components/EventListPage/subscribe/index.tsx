@@ -21,7 +21,6 @@ export default function SubscribeSection() {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     console.log("Subscription submitted:", formData);
-    // TODO: Implement actual subscription submission
     setFormData({
       name: "",
       email: "",
@@ -29,62 +28,66 @@ export default function SubscribeSection() {
     });
   };
 
+  const fieldClass =
+    "h-12 border-[color:color-mix(in_srgb,var(--color-text)_14%,transparent)] bg-[var(--color-background)]/90 text-[var(--color-text)] placeholder:text-[var(--color-text-dimmed)]";
+
   return (
-    <section className="py-12 text-[var(--color-secondary-foreground)] relative">
-      <div className="absolute inset-0 bg-[var(--color-secondary)]/85"></div>
-      <div className="container mx-auto px-4 relative z-10">
-        <div className="text-center mb-8">
-          <p className="text-xl font-medium mb-3">
-            Subscribe for Exclusive Updates!
-          </p>
-          <h2 className="text-2xl md:text-4xl font-bold max-w-3xl mx-auto">
-            Get exclusives, event updates, & news – subscribe now!
-          </h2>
-        </div>
+    <section className="relative overflow-hidden py-16 md:py-20">
+      <div
+        className="absolute inset-0 bg-[var(--color-surface)]"
+        aria-hidden
+      />
+      <div className="relative z-10 container mx-auto px-6 text-center">
+        <p className="mb-3 text-xs font-semibold uppercase tracking-[0.28em] text-[color:var(--color-primary)]">
+          Stay Updated
+        </p>
+        <h2 className="mb-4 font-heading text-3xl italic text-[var(--color-on-surface)] md:text-4xl">
+          Subscribe for Exclusive Updates!
+        </h2>
+        <p className="mx-auto mb-8 max-w-xl font-heading text-lg italic text-[var(--color-text-dimmed)] md:text-xl">
+          Get exclusive event updates & news — subscribe now!
+        </p>
 
-        <div className="max-w-4xl mx-auto">
-          <form
-            onSubmit={handleSubmit}
-            className="flex flex-col md:flex-row gap-4 justify-center items-center"
+        <form
+          onSubmit={handleSubmit}
+          className="mx-auto flex max-w-4xl flex-col items-stretch justify-center gap-3 md:flex-row md:flex-wrap md:items-center"
+        >
+          <Input
+            type="text"
+            name="name"
+            placeholder="Your Name"
+            value={formData.name}
+            onChange={handleChange}
+            required
+            className={`${fieldClass} w-full md:min-w-[160px] md:flex-1`}
+          />
+
+          <Input
+            type="email"
+            name="email"
+            placeholder="Email Address"
+            value={formData.email}
+            onChange={handleChange}
+            required
+            className={`${fieldClass} w-full md:min-w-[200px] md:flex-1`}
+          />
+
+          <Input
+            type="tel"
+            name="phone"
+            placeholder="Mobile Number"
+            value={formData.phone}
+            onChange={handleChange}
+            className={`${fieldClass} w-full md:min-w-[160px] md:flex-1`}
+          />
+
+          <Button
+            type="submit"
+            className="h-12 shrink-0 bg-[var(--color-primary)] px-8 font-medium text-[var(--color-primary-foreground)] hover:opacity-95 md:mt-0"
           >
-            <Input
-              type="text"
-              name="name"
-              placeholder="Your Name"
-              value={formData.name}
-              onChange={handleChange}
-              required
-              className="bg-[var(--color-surface)]/85 border-[var(--color-surface)]/55 h-12 text-[var(--color-on-surface)] placeholder:text-[var(--color-on-surface)]/65 w-full md:w-auto"
-            />
-
-            <Input
-              type="email"
-              name="email"
-              placeholder="Email Address"
-              value={formData.email}
-              onChange={handleChange}
-              required
-              className="bg-[var(--color-surface)]/85 border-[var(--color-surface)]/55 h-12 text-[var(--color-on-surface)] placeholder:text-[var(--color-on-surface)]/65 w-full md:w-auto"
-            />
-
-            <Input
-              type="tel"
-              name="phone"
-              placeholder="Mobile Number"
-              value={formData.phone}
-              onChange={handleChange}
-              className="bg-[var(--color-surface)]/85 border-[var(--color-surface)]/55 h-12 text-[var(--color-on-surface)] placeholder:text-[var(--color-on-surface)]/65 w-full md:w-auto"
-            />
-
-            <Button
-              type="submit"
-              variant="event-primary"
-              className="h-12 px-6 mt-4 md:mt-0"
-            >
-              Sign up
-            </Button>
-          </form>
-        </div>
+            Subscribe
+          </Button>
+        </form>
       </div>
     </section>
   );

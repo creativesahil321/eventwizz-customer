@@ -1,18 +1,22 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import AIEventCollectInfo from "./collect-info";
 import AIEventGenerating from "./generating";
-import AIEventReviewContent from "./review-content";
+import { AIEventApplyOverlay } from "./ai-event-apply-overlay";
 import { useAIEventCreation } from "../../_lib/hooks/useAIEventCreation";
 import type { AIEventInput } from "@/app/api/ai/generate-event/route";
+import type { AIEventGeneratedContent } from "@/app/api/ai/generate-event/route";
+import { applyAIGeneratedEventToBackend } from "../../_lib/apply-ai-generated-event";
 
 interface AIEventCreationFlowProps {
   onComplete: (eventId: number) => void;
   onSwitchToManual: () => void;
   venueInfo?: { name?: string; city?: string; address?: string };
 }
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 export default function AIEventCreationFlow({
   onComplete,
@@ -23,17 +27,66 @@ export default function AIEventCreationFlow({
     useAIEventCreation();
   const [eventInput, setEventInput] = useState<AIEventInput | null>(null);
   const [categoryId, setCategoryId] = useState<number>(0);
+  const [applyStep, setApplyStep] = useState(-1);
+  const [applyDone, setApplyDone] = useState(false);
+  const [applyError, setApplyError] = useState<string | null>(null);
+
+  const lastGenRef = useRef<AIEventGeneratedContent | null>(null);
+  const lastInputRef = useRef<AIEventInput | null>(null);
+  const lastCatRef = useRef(0);
+
+  const runPersistGeneratedEvent = useCallback(
+    async (
+      gen: AIEventGeneratedContent,
+      input: AIEventInput,
+      catId: number
+    ): Promise<void> => {
+      lastGenRef.current = gen;
+      lastInputRef.current = input;
+      lastCatRef.current = catId;
+      setApplyError(null);
+      setApplyStep(-1);
+      setApplyDone(false);
+      try {
+        const eventId = await applyAIGeneratedEventToBackend({
+          content: gen,
+          eventInput: input,
+          categoryId: catId,
+          onProgress: setApplyStep,
+        });
+        setApplyDone(true);
+        await sleep(2500);
+        onComplete(eventId);
+      } catch (err) {
+        console.error("Error applying AI event content:", err);
+        const message =
+          err instanceof Error ? err.message : "Could not create your event. Please try again.";
+        setApplyError(message);
+      }
+    },
+    [onComplete]
+  );
 
   const handleCollectComplete = async (input: AIEventInput, catId: number) => {
     setEventInput(input);
     setCategoryId(catId);
-    await generateContent(input);
+    const gen = await generateContent(input);
+    if (!gen) return;
+    await runPersistGeneratedEvent(gen, input, catId);
   };
 
   const handleRetry = async () => {
-    if (eventInput) {
-      await generateContent(eventInput);
-    }
+    if (!eventInput) return;
+    const gen = await generateContent(eventInput);
+    if (gen) await runPersistGeneratedEvent(gen, eventInput, categoryId);
+  };
+
+  const handleRetryApply = () => {
+    const gen = lastGenRef.current;
+    const inp = lastInputRef.current;
+    const cid = lastCatRef.current;
+    if (!gen || !inp) return;
+    void runPersistGeneratedEvent(gen, inp, cid);
   };
 
   return (
@@ -81,22 +134,52 @@ export default function AIEventCreationFlow({
           </motion.div>
         )}
 
-        {step === "reviewing" && content && eventInput && (
+        {step === "applying" && content && eventInput && (
           <motion.div
-            key="review"
+            key="applying"
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -20 }}
             transition={{ duration: 0.4 }}
+            className="relative z-10"
           >
-            <AIEventReviewContent
-              content={content}
-              eventInput={eventInput}
-              categoryId={categoryId}
-              onComplete={onComplete}
-              onRegenerate={handleRetry}
-              onBack={() => setStep("collecting")}
-            />
+            {applyError ? (
+              <div className="relative z-10 flex items-center justify-center min-h-screen py-8 px-4">
+                <div className="relative z-10 text-center max-w-md mx-auto w-full">
+                  <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-red-500/10 border border-red-500/20 flex items-center justify-center mx-auto mb-4 sm:mb-6">
+                    <span className="text-xl sm:text-2xl">!</span>
+                  </div>
+                  <h2 className="text-xl sm:text-2xl font-bold text-white mb-2 sm:mb-3">
+                    Couldn&apos;t create event
+                  </h2>
+                  <p className="text-slate-400 mb-4 sm:mb-6 text-xs sm:text-sm break-words">
+                    {applyError}
+                  </p>
+                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-2 sm:gap-3">
+                    <button
+                      type="button"
+                      onClick={handleRetryApply}
+                      className="min-h-[44px] px-6 py-2.5 rounded-full text-white text-sm font-medium transition-colors touch-manipulation"
+                      style={{ background: "var(--color-primary, #3b82f6)" }}
+                    >
+                      Try again
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setApplyError(null);
+                        reset();
+                      }}
+                      className="min-h-[44px] px-6 py-2.5 rounded-full bg-white/5 hover:bg-white/10 text-white text-sm font-medium border border-white/10 transition-colors touch-manipulation"
+                    >
+                      Edit details
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <AIEventApplyOverlay applyStep={applyStep} applyDone={applyDone} />
+            )}
           </motion.div>
         )}
 
@@ -125,7 +208,9 @@ export default function AIEventCreationFlow({
                   Try Again
                 </button>
                 <button
-                  onClick={() => { reset(); setStep("collecting"); }}
+                  onClick={() => {
+                    reset();
+                  }}
                   className="min-h-[44px] px-6 py-2.5 rounded-full bg-white/5 hover:bg-white/10 text-white text-sm font-medium border border-white/10 transition-colors touch-manipulation"
                 >
                   Go Back

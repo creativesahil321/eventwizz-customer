@@ -5,12 +5,15 @@ import {
   collectSiteEssentialsGoogleFamilies,
   siteEssentialsGoogleFontsStylesheetHref,
 } from "@/lib/site-typography-google-fonts";
+import { normalizeCustomFontStylesheetUrls } from "@/lib/site-custom-font-stylesheets";
 
 type SiteEssentialsGoogleFontsLoaderProps = {
   /** Unique id per surface (e.g. typography preview vs. site preview). */
   linkId: string;
   headingStack?: string | null;
   bodyStack?: string | null;
+  /** Non–Google Fonts loaded via https:// stylesheet (e.g. CDNFonts). */
+  customStylesheetUrls?: string[] | null;
 };
 
 /**
@@ -22,7 +25,10 @@ export function SiteEssentialsGoogleFontsLoader({
   linkId,
   headingStack,
   bodyStack,
+  customStylesheetUrls,
 }: SiteEssentialsGoogleFontsLoaderProps) {
+  const customUrlsKey = (customStylesheetUrls ?? []).join("\0");
+
   useEffect(() => {
     const families = collectSiteEssentialsGoogleFamilies(
       headingStack,
@@ -53,6 +59,22 @@ export function SiteEssentialsGoogleFontsLoader({
       document.getElementById(linkId)?.remove();
     };
   }, [linkId, headingStack, bodyStack]);
+
+  useEffect(() => {
+    const urls = normalizeCustomFontStylesheetUrls(customStylesheetUrls);
+    const prefix = `${linkId}-custom-font-`;
+    document.querySelectorAll(`link[id^="${prefix}"]`).forEach((el) => el.remove());
+    urls.forEach((href, i) => {
+      const link = document.createElement("link");
+      link.id = `${prefix}${i}`;
+      link.rel = "stylesheet";
+      link.href = href;
+      document.head.appendChild(link);
+    });
+    return () => {
+      document.querySelectorAll(`link[id^="${prefix}"]`).forEach((el) => el.remove());
+    };
+  }, [linkId, customUrlsKey]);
 
   return null;
 }

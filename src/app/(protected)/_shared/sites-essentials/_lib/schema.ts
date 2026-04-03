@@ -3,6 +3,7 @@ import {
   BANNER_HEADING_MAX_WORDS,
   countWords,
 } from "@/lib/word-count";
+import { HEADING_EMPHASIS_VALUES } from "@/lib/heading-emphasis";
 
 export const SiteEssentialsSchema = z.object({
   header_logo: z.string().min(2, { message: "Header logo is required." }),
@@ -64,6 +65,20 @@ export type FontName =
   | "Cabin"
   | "PT Sans";
 
+const httpsStylesheetUrlSchema = z
+  .string()
+  .max(2048, "URL must be at most 2048 characters")
+  .refine(
+    (s) => {
+      try {
+        return new URL(s.trim()).protocol === "https:";
+      } catch {
+        return false;
+      }
+    },
+    { message: "Must be a valid https:// stylesheet URL" },
+  );
+
 // Form schema for validation
 export const siteEssentialsFormSchema = z.object({
   colors: z.object({
@@ -85,6 +100,13 @@ export const siteEssentialsFormSchema = z.object({
       heading: z.string().min(1, "Heading font is required"),
       body: z.string().min(1, "Body font is required"),
     }),
+    customFontStylesheetUrls: z
+      .array(httpsStylesheetUrlSchema)
+      .max(5, "At most 5 custom font stylesheets")
+      .optional(),
+    headingEmphasis: z
+      .enum(HEADING_EMPHASIS_VALUES)
+      .optional(),
   }),
 
   socialLinks: z.object({
@@ -141,6 +163,11 @@ export const siteEssentialsFormSchema = z.object({
   banner_sub_heading: z
     .string()
     .max(80, "Banner sub heading must not exceed 80 characters")
+    .nullable()
+    .optional(),
+  banner_heading_accent: z
+    .string()
+    .max(120, "Accent phrase must not exceed 120 characters")
     .nullable()
     .optional(),
   cover_image: z.any().optional(),

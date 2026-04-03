@@ -165,6 +165,8 @@ export interface EventDetail {
   event_banner_image: string;
   event_banner_video: string | null;
   event_banner_heading: string;
+  /** Optional substring of the hero line to style as accent when theme uses accent_tail */
+  event_banner_heading_accent?: string | null;
   event_banner_sub_heading: string;
   about_event_heading: string;
   about_event_sub_heading: string;

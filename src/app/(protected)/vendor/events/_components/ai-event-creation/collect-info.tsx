@@ -74,7 +74,7 @@ const accent = {
 const labelClass = "text-sm font-medium text-slate-300";
 const formItemClass = "space-y-2";
 const selectTriggerClass =
-  "bg-white/5 border-white/10 text-white h-10 w-full min-h-10";
+  "bg-white/5 border-white/10 text-white h-10 w-full min-h-10 min-w-0";
 
 export default function AIEventCollectInfo({
   onSubmit,
@@ -230,7 +230,7 @@ export default function AIEventCollectInfo({
               />
 
               {/* Category + Event Type — aligned row on larger screens */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-5">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-5 [&>*]:min-w-0">
                 <FormField
                   control={form.control}
                   name="eventCategoryId"
@@ -321,7 +321,7 @@ export default function AIEventCollectInfo({
               />
 
               {/* Guest Count + Price Range */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-5 sm:items-start">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-5 sm:items-start [&>*]:min-w-0">
                 <FormField
                   control={form.control}
                   name="guestCount"

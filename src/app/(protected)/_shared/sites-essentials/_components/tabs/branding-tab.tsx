@@ -497,6 +497,30 @@ export function BrandingTab({
             );
           }}
         />
+
+        <FormField
+          control={form.control}
+          name="banner_heading_accent"
+          render={({ field }) => (
+            <FormItem className="md:col-span-2">
+              <FormLabel>Heading accent phrase (optional)</FormLabel>
+              <FormDescription>
+                For Typography → Accent tail: this exact substring is styled with
+                your brand color. It should appear in the landing heading above,
+                or leave empty to auto-use the last two words.
+              </FormDescription>
+              <FormControl>
+                <Input
+                  placeholder="e.g. Near You"
+                  {...field}
+                  value={field.value || ""}
+                  onChange={(e) => field.onChange(e.target.value)}
+                />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
       </div>
 
       <Separator className="my-4" />

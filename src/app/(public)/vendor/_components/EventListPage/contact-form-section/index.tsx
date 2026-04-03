@@ -35,20 +35,20 @@ export default function ContactFormSection() {
   };
 
   return (
-    <section className="bg-[var(--color-surface)] text-[var(--color-secondary-foreground)] py-12 md:py-16">
+    <section className="bg-[var(--color-surface)] py-12 md:py-16">
       <div className="container mx-auto px-4">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12 items-center">
           {/* Left Side - Text Content */}
           <div className="space-y-4">
             <div className="space-y-2">
-              <h3 className="text-lg font-medium text-[var(--color-secondary-foreground)]/80">
+              <h3 className="text-lg font-medium ">
                 Booking and Event Assistance
               </h3>
               <h2 className="text-4xl md:text-5xl font-bold leading-tight">
                 Need help?
               </h2>
             </div>
-            <p className="text-[var(--color-secondary-foreground)]/80 text-lg leading-relaxed max-w-md">
+            <p className="text-lg leading-relaxed max-w-md">
               Get in touch with our team for any questions about booking events,
               assistance with your account, or general inquiries.
             </p>

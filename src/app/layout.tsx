@@ -19,6 +19,11 @@ import {
   googleFontsHrefFromTheme,
   THEME_GOOGLE_FONTS_LINK_ID,
 } from "@/lib/site-typography-google-fonts";
+import {
+  normalizeCustomFontStylesheetUrls,
+  THEME_CUSTOM_FONT_STYLESHEET_LINK_ID_PREFIX,
+} from "@/lib/site-custom-font-stylesheets";
+import { normalizeHeadingEmphasis } from "@/lib/heading-emphasis";
 
 /**
  * Dynamic metadata — single source of truth for brand name, favicon, and title template.
@@ -93,6 +98,9 @@ export default async function RootLayout({
     : getDefaultThemeCSS();
 
   const themeGoogleFontsHref = googleFontsHrefFromTheme(initialTheme);
+  const themeCustomFontStylesheetUrls = normalizeCustomFontStylesheetUrls(
+    initialTheme?.typography?.customFontStylesheetUrls,
+  );
 
   /**
    * GTM is injected only on the main admin marketing site (website_role === "admin").
@@ -107,7 +115,13 @@ export default async function RootLayout({
   const isAdminSite = initialTheme?.website_role === "admin";
 
   return (
-    <html lang="en" suppressHydrationWarning={true}>
+    <html
+      lang="en"
+      suppressHydrationWarning={true}
+      data-heading-emphasis={normalizeHeadingEmphasis(
+        initialTheme?.typography?.headingEmphasis,
+      )}
+    >
       <head suppressHydrationWarning={true}>
         {/* Preload dynamic favicon so it shows immediately instead of after load */}
         {initialTheme?.favicon && (
@@ -131,6 +145,14 @@ export default async function RootLayout({
             href={themeGoogleFontsHref}
           />
         ) : null}
+        {themeCustomFontStylesheetUrls.map((href, i) => (
+          <link
+            key={href}
+            id={`${THEME_CUSTOM_FONT_STYLESHEET_LINK_ID_PREFIX}${i}`}
+            rel="stylesheet"
+            href={href}
+          />
+        ))}
       </head>
       <body className="antialiased" suppressHydrationWarning={true}>
         <ServerContextProvider value={{ theme: initialTheme, host, subdomain }}>

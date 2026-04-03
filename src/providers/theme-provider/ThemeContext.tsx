@@ -15,8 +15,13 @@ import { Toaster } from "@/components/ui/sonner";
 import { useThemeQuery, themeKeys } from "@/hooks/use-theme-query";
 import { generateThemeCSS } from "@/services/common/theme/constants/theme";
 import { syncDocumentGoogleFontLinkForTheme } from "@/lib/site-typography-google-fonts";
+import {
+  normalizeCustomFontStylesheetUrls,
+  syncDocumentCustomFontStylesheetLinksForTheme,
+} from "@/lib/site-custom-font-stylesheets";
 import { useQueryClient } from "@tanstack/react-query";
 import { resolveCurrencySymbol } from "@/lib/currency-format";
+import { normalizeHeadingEmphasis } from "@/lib/heading-emphasis";
 
 /**
  * Context type definition for theme data and state
@@ -70,6 +75,7 @@ const createDefaultTypography = (): ThemeTypography => ({
     heading: "Montserrat",
     body: "Inter",
   },
+  headingEmphasis: "uniform",
 });
 
 /**
@@ -125,6 +131,12 @@ const mapSchemaToSettings = (
       ...createDefaultTypography().fontFamily,
       ...(schema.typography?.fontFamily || {}),
     },
+    customFontStylesheetUrls: normalizeCustomFontStylesheetUrls(
+      schema.typography?.customFontStylesheetUrls,
+    ),
+    headingEmphasis: normalizeHeadingEmphasis(
+      schema.typography?.headingEmphasis,
+    ),
   };
 
   // Create properly typed contact details
@@ -177,6 +189,12 @@ const applyThemeToDOM = (settings: ThemeSchema): void => {
   });
 
   syncDocumentGoogleFontLinkForTheme(settings);
+  syncDocumentCustomFontStylesheetLinksForTheme(settings);
+
+  root.setAttribute(
+    "data-heading-emphasis",
+    normalizeHeadingEmphasis(settings.typography?.headingEmphasis),
+  );
 
   // Update favicon dynamically so it stays in sync with the theme
   if (settings.favicon) {

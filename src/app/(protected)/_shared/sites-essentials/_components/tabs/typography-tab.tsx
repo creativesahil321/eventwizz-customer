@@ -23,9 +23,12 @@ import {
 } from "@/components/ui/select";
 import { useEffect, useState } from "react";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { SiteEssentialsGoogleFontsLoader } from "@/components/shared/site-essentials-google-fonts-loader";
 import { SITE_ESSENTIALS_GOOGLE_FONTS_UI } from "@/lib/site-typography-google-fonts";
+import { Badge } from "@/components/ui/badge";
+import { cn } from "@/lib/utils";
 
 // Common web-safe fonts
 const webSafeFonts = [
@@ -43,78 +46,38 @@ const webSafeFonts = [
 
 const googleFonts = SITE_ESSENTIALS_GOOGLE_FONTS_UI;
 
+const ALL_PRESET_FONTS = [...webSafeFonts, ...googleFonts];
+
+function isPresetFontStack(stack: string | undefined | null): boolean {
+  if (!stack) return false;
+  return ALL_PRESET_FONTS.some((f) => f.value === stack);
+}
+
+function getPresetFontLabel(stack: string | undefined | null): string | null {
+  if (!stack) return null;
+  return ALL_PRESET_FONTS.find((f) => f.value === stack)?.name ?? null;
+}
+
 export function TypographyTab() {
   const form = useFormContext<SiteEssentialsFormValues>();
 
-  // Track font values in local state for more reliable rendering
-  const [headingFont, setHeadingFont] = useState<string>(
-    form.watch("typography.fontFamily.heading") || "Arial, sans-serif"
-  );
-  const [bodyFont, setBodyFont] = useState<string>(
-    form.watch("typography.fontFamily.body") || "Arial, sans-serif"
-  );
+  const headingStack = form.watch("typography.fontFamily.heading") ?? "";
+  const bodyStack = form.watch("typography.fontFamily.body") ?? "";
+  const headingFont = headingStack || "Arial, sans-serif";
+  const bodyFont = bodyStack || "Arial, sans-serif";
 
-  // Track if using custom font
-  const [useCustomHeadingFont, setUseCustomHeadingFont] =
-    useState<boolean>(false);
-  const [useCustomBodyFont, setUseCustomBodyFont] = useState<boolean>(false);
+  const [headingTab, setHeadingTab] = useState<"preset" | "custom">("preset");
+  const [bodyTab, setBodyTab] = useState<"preset" | "custom">("preset");
 
-  // Track custom font input values
-  const [customHeadingFont, setCustomHeadingFont] = useState<string>("");
-  const [customBodyFont, setCustomBodyFont] = useState<string>("");
-
-  // Update local state when form values change
   useEffect(() => {
-    const subscription = form.watch((value, { name }) => {
-      if (name === "typography.fontFamily.heading" || name === undefined) {
-        const newHeadingFont = form.getValues("typography.fontFamily.heading");
-        setHeadingFont(newHeadingFont || "Arial, sans-serif");
+    if (!headingStack) return;
+    setHeadingTab(isPresetFontStack(headingStack) ? "preset" : "custom");
+  }, [headingStack]);
 
-        // Check if it's not in our predefined lists
-        const isCustomFont = ![...webSafeFonts, ...googleFonts].some(
-          (font) => font.value === newHeadingFont
-        );
-        setUseCustomHeadingFont(isCustomFont);
-        if (isCustomFont) {
-          setCustomHeadingFont(newHeadingFont || "");
-        }
-      }
-      if (name === "typography.fontFamily.body" || name === undefined) {
-        const newBodyFont = form.getValues("typography.fontFamily.body");
-        setBodyFont(newBodyFont || "Arial, sans-serif");
-
-        // Check if it's not in our predefined lists
-        const isCustomFont = ![...webSafeFonts, ...googleFonts].some(
-          (font) => font.value === newBodyFont
-        );
-        setUseCustomBodyFont(isCustomFont);
-        if (isCustomFont) {
-          setCustomBodyFont(newBodyFont || "");
-        }
-      }
-    });
-
-    return () => subscription.unsubscribe();
-  }, [form]);
-
-  // Handle custom font input change
-  const handleCustomHeadingFontChange = (
-    e: React.ChangeEvent<HTMLInputElement>
-  ) => {
-    const value = e.target.value;
-    setCustomHeadingFont(value);
-    form.setValue("typography.fontFamily.heading", value);
-    setHeadingFont(value);
-  };
-
-  const handleCustomBodyFontChange = (
-    e: React.ChangeEvent<HTMLInputElement>
-  ) => {
-    const value = e.target.value;
-    setCustomBodyFont(value);
-    form.setValue("typography.fontFamily.body", value);
-    setBodyFont(value);
-  };
+  useEffect(() => {
+    if (!bodyStack) return;
+    setBodyTab(isPresetFontStack(bodyStack) ? "preset" : "custom");
+  }, [bodyStack]);
 
   return (
     <div className="space-y-6">
@@ -122,6 +85,7 @@ export function TypographyTab() {
         linkId="site-essentials-google-fonts-typography-tab"
         headingStack={headingFont}
         bodyStack={bodyFont}
+        customStylesheetUrls={form.watch("typography.customFontStylesheetUrls")}
       />
       <SectionTitle
         title="Typography"
@@ -129,20 +93,91 @@ export function TypographyTab() {
       />
       <Separator className="my-4" />
 
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div
+          className={cn(
+            "rounded-lg border-2 bg-background p-4 shadow-sm transition-colors",
+            "border-[var(--color-primary)]/40 ring-1 ring-[var(--color-primary)]/10",
+          )}
+        >
+          <div className="mb-2 flex items-center justify-between gap-2">
+            <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              Active heading font
+            </span>
+            <Badge
+              variant={
+                isPresetFontStack(headingStack) ? "secondary" : "outline"
+              }
+            >
+              {isPresetFontStack(headingStack) ? "Preset" : "Custom"}
+            </Badge>
+          </div>
+          <p
+            className="truncate text-xl font-semibold"
+            style={{ fontFamily: headingFont }}
+            title={headingStack || undefined}
+          >
+            {headingStack
+              ? (getPresetFontLabel(headingStack) ?? headingStack)
+              : "—"}
+          </p>
+          <p className="mt-1 break-all font-mono text-xs text-muted-foreground">
+            {headingStack || "—"}
+          </p>
+        </div>
+        <div
+          className={cn(
+            "rounded-lg border-2 bg-background p-4 shadow-sm transition-colors",
+            "border-[var(--color-primary)]/40 ring-1 ring-[var(--color-primary)]/10",
+          )}
+        >
+          <div className="mb-2 flex items-center justify-between gap-2">
+            <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              Active body font
+            </span>
+            <Badge
+              variant={isPresetFontStack(bodyStack) ? "secondary" : "outline"}
+            >
+              {isPresetFontStack(bodyStack) ? "Preset" : "Custom"}
+            </Badge>
+          </div>
+          <p
+            className="truncate text-xl font-semibold"
+            style={{ fontFamily: bodyFont }}
+            title={bodyStack || undefined}
+          >
+            {bodyStack
+              ? (getPresetFontLabel(bodyStack) ?? bodyStack)
+              : "—"}
+          </p>
+          <p className="mt-1 break-all font-mono text-xs text-muted-foreground">
+            {bodyStack || "—"}
+          </p>
+        </div>
+      </div>
+
       <div className="grid gap-6 md:grid-cols-2">
         <FormItem>
           <FormLabel>Heading Font</FormLabel>
           <FormDescription>Font used for headings and titles</FormDescription>
 
           <Tabs
-            defaultValue={useCustomHeadingFont ? "custom" : "preset"}
-            onValueChange={(value) => {
-              setUseCustomHeadingFont(value === "custom");
-            }}
+            value={headingTab}
+            onValueChange={(v) => setHeadingTab(v as "preset" | "custom")}
           >
             <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="preset">Preset Fonts</TabsTrigger>
-              <TabsTrigger value="custom">Custom Font</TabsTrigger>
+              <TabsTrigger
+                value="preset"
+                className="data-[state=active]:ring-2 data-[state=active]:ring-[var(--color-primary)]/40"
+              >
+                Preset Fonts
+              </TabsTrigger>
+              <TabsTrigger
+                value="custom"
+                className="data-[state=active]:ring-2 data-[state=active]:ring-[var(--color-primary)]/40"
+              >
+                Custom Font
+              </TabsTrigger>
             </TabsList>
 
             <TabsContent value="preset" className="mt-2">
@@ -151,15 +186,18 @@ export function TypographyTab() {
                 name="typography.fontFamily.heading"
                 render={({ field }) => (
                   <Select
-                    onValueChange={(value) => {
-                      field.onChange(value);
-                      setHeadingFont(value); // Immediately update local state
-                    }}
+                    onValueChange={field.onChange}
                     defaultValue={field.value}
                     value={field.value || undefined}
                   >
                     <FormControl>
-                      <SelectTrigger>
+                      <SelectTrigger
+                        className={cn(
+                          field.value &&
+                            isPresetFontStack(field.value) &&
+                            "ring-2 ring-[var(--color-primary)]/35",
+                        )}
+                      >
                         <SelectValue placeholder="Select a font" />
                       </SelectTrigger>
                     </FormControl>
@@ -187,21 +225,29 @@ export function TypographyTab() {
             </TabsContent>
 
             <TabsContent value="custom" className="mt-2">
-              <FormItem>
-                <FormDescription className="mb-2">
-                  Enter a custom font family (e.g. &quot;My Font,
-                  sans-serif&quot;)
-                </FormDescription>
-                <Input
-                  placeholder="Enter custom font family"
-                  value={customHeadingFont}
-                  onChange={handleCustomHeadingFontChange}
-                />
-                <FormDescription className="text-xs mt-1">
-                  Note: Custom fonts must be loaded separately in your CSS or
-                  via a CDN
-                </FormDescription>
-              </FormItem>
+              <FormField
+                control={form.control}
+                name="typography.fontFamily.heading"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormDescription className="mb-2">
+                      Enter a custom font family (e.g. &quot;My Font,
+                      sans-serif&quot;)
+                    </FormDescription>
+                    <FormControl>
+                      <Input
+                        placeholder="'My Font', sans-serif"
+                        className="font-mono text-sm ring-2 ring-[var(--color-primary)]/25"
+                        {...field}
+                        value={field.value ?? ""}
+                      />
+                    </FormControl>
+                    <FormDescription className="text-xs mt-1">
+                      Add stylesheet URLs below for fonts not on Google Fonts.
+                    </FormDescription>
+                  </FormItem>
+                )}
+              />
             </TabsContent>
           </Tabs>
           <FormMessage />
@@ -214,14 +260,22 @@ export function TypographyTab() {
           </FormDescription>
 
           <Tabs
-            defaultValue={useCustomBodyFont ? "custom" : "preset"}
-            onValueChange={(value) => {
-              setUseCustomBodyFont(value === "custom");
-            }}
+            value={bodyTab}
+            onValueChange={(v) => setBodyTab(v as "preset" | "custom")}
           >
             <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="preset">Preset Fonts</TabsTrigger>
-              <TabsTrigger value="custom">Custom Font</TabsTrigger>
+              <TabsTrigger
+                value="preset"
+                className="data-[state=active]:ring-2 data-[state=active]:ring-[var(--color-primary)]/40"
+              >
+                Preset Fonts
+              </TabsTrigger>
+              <TabsTrigger
+                value="custom"
+                className="data-[state=active]:ring-2 data-[state=active]:ring-[var(--color-primary)]/40"
+              >
+                Custom Font
+              </TabsTrigger>
             </TabsList>
 
             <TabsContent value="preset" className="mt-2">
@@ -230,15 +284,18 @@ export function TypographyTab() {
                 name="typography.fontFamily.body"
                 render={({ field }) => (
                   <Select
-                    onValueChange={(value) => {
-                      field.onChange(value);
-                      setBodyFont(value); // Immediately update local state
-                    }}
+                    onValueChange={field.onChange}
                     defaultValue={field.value}
                     value={field.value || undefined}
                   >
                     <FormControl>
-                      <SelectTrigger>
+                      <SelectTrigger
+                        className={cn(
+                          field.value &&
+                            isPresetFontStack(field.value) &&
+                            "ring-2 ring-[var(--color-primary)]/35",
+                        )}
+                      >
                         <SelectValue placeholder="Select a font" />
                       </SelectTrigger>
                     </FormControl>
@@ -266,32 +323,83 @@ export function TypographyTab() {
             </TabsContent>
 
             <TabsContent value="custom" className="mt-2">
-              <FormItem>
-                <FormDescription className="mb-2">
-                  Enter a custom font family (e.g. &quot;My Font,
-                  sans-serif&quot;)
-                </FormDescription>
-                <Input
-                  placeholder="Enter custom font family"
-                  value={customBodyFont}
-                  onChange={handleCustomBodyFontChange}
-                />
-                <FormDescription className="text-xs mt-1">
-                  Note: Custom fonts must be loaded separately in your CSS or
-                  via a CDN
-                </FormDescription>
-              </FormItem>
+              <FormField
+                control={form.control}
+                name="typography.fontFamily.body"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormDescription className="mb-2">
+                      Enter a custom font family (e.g. &quot;My Font,
+                      sans-serif&quot;)
+                    </FormDescription>
+                    <FormControl>
+                      <Input
+                        placeholder="'My Font', sans-serif"
+                        className="font-mono text-sm ring-2 ring-[var(--color-primary)]/25"
+                        {...field}
+                        value={field.value ?? ""}
+                      />
+                    </FormControl>
+                    <FormDescription className="text-xs mt-1">
+                      Add stylesheet URLs below for fonts not on Google Fonts.
+                    </FormDescription>
+                  </FormItem>
+                )}
+              />
             </TabsContent>
           </Tabs>
           <FormMessage />
         </FormItem>
       </div>
 
+      <FormField
+        control={form.control}
+        name="typography.customFontStylesheetUrls"
+        render={({ field }) => (
+          <FormItem>
+            <FormLabel>Custom font stylesheets (optional)</FormLabel>
+            <FormDescription>
+              One https:// URL per line for fonts that are not on Google Fonts.
+              Example for Brownhill Script: paste{" "}
+              <span className="whitespace-nowrap font-mono text-xs">
+                https://fonts.cdnfonts.com/css/brownhill-script
+              </span>
+              , then set your heading (or body) custom font to{" "}
+              <span className="whitespace-nowrap font-mono text-xs">
+                &apos;Brownhill Script&apos;, cursive
+              </span>
+              . Respect the font license for your use case.
+            </FormDescription>
+            <FormControl>
+              <Textarea
+                rows={3}
+                placeholder="https://fonts.cdnfonts.com/css/brownhill-script"
+                value={Array.isArray(field.value) ? field.value.join("\n") : ""}
+                onChange={(e) => {
+                  const lines = e.target.value
+                    .split("\n")
+                    .map((l) => l.trim())
+                    .filter(Boolean);
+                  field.onChange(lines);
+                }}
+              />
+            </FormControl>
+            <FormMessage />
+          </FormItem>
+        )}
+      />
+
       <div>
         <h3 className="text-sm font-medium mb-3">Font Preview</h3>
-        <div className="p-4 border rounded-md bg-gray-50 space-y-4">
-          {/* Apply heading font directly to each heading element */}
-          <div>
+        <div className="space-y-4 rounded-md border-2 border-[var(--color-primary)]/25 bg-muted/30 p-4">
+          <div
+            className={cn(
+              "rounded-md border-l-4 border-[var(--color-primary)] bg-background/80 p-3 pl-4",
+            )}
+          >
+            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              Heading (live)
+            </p>
             <h1
               className="text-2xl font-semibold"
               style={{ fontFamily: headingFont }}
@@ -299,36 +407,37 @@ export function TypographyTab() {
               Heading Font Sample (h1)
             </h1>
             <h2
-              className="text-xl font-semibold mt-2"
+              className="mt-2 text-xl font-semibold"
               style={{ fontFamily: headingFont }}
             >
               Heading Font Sample (h2)
             </h2>
             <h3
-              className="text-lg font-semibold mt-2"
+              className="mt-2 text-lg font-semibold"
               style={{ fontFamily: headingFont }}
             >
               Heading Font Sample (h3)
             </h3>
           </div>
 
-          <div style={{ fontFamily: bodyFont }}>
-            <p className="mt-4">
-              Body font sample. This is how your main content will appear on
-              your website. The quick brown fox jumps over the lazy dog. Lorem
-              ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod
-              tempor incididunt ut labore et dolore magna aliqua.
+          <div
+            className={cn(
+              "rounded-md border-l-4 border-[var(--color-primary)] bg-background/80 p-3 pl-4",
+            )}
+          >
+            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              Body (live)
             </p>
+            <div style={{ fontFamily: bodyFont }}>
+              <p>
+                Body font sample. This is how your main content will appear on
+                your website. The quick brown fox jumps over the lazy dog. Lorem
+                ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod
+                tempor incididunt ut labore et dolore magna aliqua.
+              </p>
+            </div>
           </div>
         </div>
-      </div>
-
-      {/* Debug info - can be removed in production */}
-      <div className="text-xs text-gray-500 mt-4">
-        <p>Current heading font: {headingFont}</p>
-        <p>Current body font: {bodyFont}</p>
-        <p>Using custom heading font: {useCustomHeadingFont ? "Yes" : "No"}</p>
-        <p>Using custom body font: {useCustomBodyFont ? "Yes" : "No"}</p>
       </div>
     </div>
   );

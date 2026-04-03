@@ -49,6 +49,8 @@ export const useSiteEssentials = () => {
           heading: "",
           body: "",
         },
+        customFontStylesheetUrls: [],
+        headingEmphasis: "uniform",
       },
 
       socialLinks: {
@@ -68,6 +70,7 @@ export const useSiteEssentials = () => {
       logo: null,
       favicon: null,
       banner_heading: "",
+      banner_heading_accent: "",
       banner_sub_heading: "",
       cover_image: null,
       cover_video: null,
@@ -79,7 +82,24 @@ export const useSiteEssentials = () => {
       event_title_2: "",
       event_gallery_title: "",
     },
-    values: siteEssentials as SiteEssentialsFormValues,
+    values: siteEssentials
+      ? ({
+          ...siteEssentials,
+          typography: {
+            ...siteEssentials.typography,
+            fontFamily: {
+              heading: siteEssentials.typography.fontFamily?.heading ?? "",
+              body: siteEssentials.typography.fontFamily?.body ?? "",
+            },
+            customFontStylesheetUrls:
+              siteEssentials.typography.customFontStylesheetUrls ?? [],
+            headingEmphasis:
+              siteEssentials.typography?.headingEmphasis ?? "uniform",
+          },
+          banner_heading_accent:
+            siteEssentials.banner_heading_accent ?? "",
+        } as SiteEssentialsFormValues)
+      : undefined,
   });
 
   // Handle form submission

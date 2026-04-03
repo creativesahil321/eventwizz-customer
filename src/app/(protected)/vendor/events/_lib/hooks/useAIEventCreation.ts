@@ -10,7 +10,6 @@ export type AIEventStep =
   | "idle"
   | "collecting"
   | "generating"
-  | "reviewing"
   | "applying"
   | "error";
 
@@ -57,7 +56,7 @@ export function useAIEventCreation(): UseAIEventCreationReturn {
         }
 
         setContent(data.content);
-        setStep("reviewing");
+        setStep("applying");
         return data.content;
       } catch (err) {
         const message =

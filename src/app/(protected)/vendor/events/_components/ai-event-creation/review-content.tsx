@@ -6,14 +6,12 @@ import {
   ChevronDown,
   ChevronUp,
   Check,
-  Loader2,
   RefreshCw,
   ArrowLeft,
   Pencil,
   Trash2,
   RotateCcw,
   Sparkles,
-  CheckCircle2,
   Plus,
   X,
 } from "lucide-react";
@@ -29,31 +27,13 @@ import type {
   AIEventTicket,
   AIEventTable,
 } from "@/app/api/ai/generate-event/route";
-import { api } from "@/services/core/api-client";
-import type { ApiResponse } from "@/services/core/api-client";
-import { API_ENDPOINTS } from "@/services/core/endpoints";
-import { eventsService } from "@/services/vendor/events/events.service";
-import type { EventDetailData } from "@/services/vendor/events/type";
-import type { StepOneType } from "@/app/(protected)/vendor/events/_components/tab-event-form/schema";
 import {
   getDummyImages,
   getImagesByCategoryId,
-  urlToImageFile,
-  fetchGalleryFiles,
-  createPlaceholderEventBanner,
-  createPlaceholderPackageImage,
 } from "@/app/(on-boarding)/on-boarding/_lib/constants/dummy-images";
 import { useCurrencySymbol } from "@/hooks/use-currency-format";
-
-const APPLY_STEPS = [
-  { label: "Event details & schedule", icon: "📅" },
-  { label: "Packages", icon: "📦" },
-  { label: "Dates, tickets & tables", icon: "🎟️" },
-  { label: "Catering & menu", icon: "🍽️" },
-  { label: "Other packages", icon: "🥂" },
-  { label: "Location & pricing", icon: "📍" },
-  { label: "FAQs", icon: "❓" },
-] as const;
+import { applyAIGeneratedEventToBackend } from "../../_lib/apply-ai-generated-event";
+import { AIEventApplyOverlay } from "./ai-event-apply-overlay";
 
 const SECTIONS = [
   { id: "stepOne", title: "Event Details & Schedule", icon: "📅" },
@@ -64,14 +44,6 @@ const SECTIONS = [
   { id: "stepSix", title: "Location & Pricing", icon: "📍" },
   { id: "stepSeven", title: "FAQs", icon: "❓" },
 ] as const;
-
-const accent = {
-  text: { color: "var(--color-primary, #3b82f6)" } as React.CSSProperties,
-  loaderBox: {
-    backgroundColor: "color-mix(in srgb, var(--color-primary, #3b82f6) 15%, transparent)",
-    borderColor: "color-mix(in srgb, var(--color-primary, #3b82f6) 30%, transparent)",
-  } as React.CSSProperties,
-};
 
 const inputCls = "bg-white/5 border-white/10 text-white text-xs h-7 placeholder:text-slate-600";
 const selectCls =
@@ -156,256 +128,15 @@ export default function AIEventReviewContent({
       setApplyStep(-1);
       setApplyDone(false);
 
-      const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
-      const s = editedContent;
-
-      const eventType = eventInput.eventType || "other";
-      // Category-based images (API category IDs 1–22): Christmas, New Year, Diwali, etc.
-      // Fall back to event-type match only when no category is selected.
-      const dummyImages =
-        categoryId > 0 ? getImagesByCategoryId(categoryId) : getDummyImages(eventType);
-
-      // Step 0 — Event details (Step 1 API → creates event, returns event_id)
-      setApplyStep(0);
-
-      const bannerFile =
-        (await urlToImageFile(dummyImages.banner, "event-banner")) ??
-        (await createPlaceholderEventBanner(s.stepOne.event_name));
-
-      const schedulerBgUrl = (dummyImages as { scheduler_background?: string }).scheduler_background;
-      const schedulerBgFile = schedulerBgUrl
-        ? (await urlToImageFile(schedulerBgUrl, "event-scheduler-background")) ??
-          (await createPlaceholderEventBanner(`${s.stepOne.event_name} · schedule`))
-        : null;
-
-      const stepOneData: StepOneType = {
-        step: 1 as const,
-        event_category_id: categoryId,
-        event_name: s.stepOne.event_name,
-        event_banner_heading: s.stepOne.event_banner_heading,
-        event_banner_sub_heading: s.stepOne.event_banner_sub_heading,
-        about_event_heading: s.stepOne.about_event_heading,
-        about_event_sub_heading: s.stepOne.about_event_sub_heading,
-        about_event_description: s.stepOne.about_event_description,
-        event_schedular_title: s.stepOne.event_schedular_title,
-        event_schedular: s.stepOne.event_schedular,
-        event_banner_image: bannerFile,
-        event_banner_video: null,
-        event_schedular_background_image: schedulerBgFile ?? undefined,
-      };
-
-      const step1Res = await eventsService.storeStepOneData(stepOneData);
-      const eventId =
-        (step1Res as unknown as { data?: { id?: number; event_id?: number } })?.data?.id ||
-        (step1Res as unknown as { data?: { event_id?: number } })?.data?.event_id;
-
-      if (!eventId) throw new Error("Failed to create event — no event_id returned");
-
-      const detailRes = await api.get<ApiResponse<EventDetailData>>(
-        API_ENDPOINTS.VENDOR.EVENT.GET_EVENT.replace("{eventId}", String(eventId)),
-        { returnFullResponse: true }
-      );
-      const vendorLocationId =
-        detailRes?.data?.vendor_location_id ??
-        detailRes?.data?.stepOne?.vendor_location_id;
-      if (!vendorLocationId || vendorLocationId < 1) {
-        throw new Error(
-          "Could not resolve venue location for this event. Open the event editor and ensure a venue is selected, then try again."
-        );
-      }
-
-      // Step 1 — Packages (with package image + gallery placeholders by event type)
-      setApplyStep(1);
-      const packageImage =
-        (await urlToImageFile(dummyImages.package, "package-image")) ??
-        (await createPlaceholderPackageImage(
-          removedSections.has("stepTwo") ? "Package" : s.stepTwo.package_title
-        ));
-
-      const galleryUrls = dummyImages.gallery ?? [];
-      const galleryFiles =
-        galleryUrls.length > 0
-          ? await fetchGalleryFiles(galleryUrls).then((files) =>
-              files.slice(0, 8)
-            )
-          : [];
-
-      await eventsService.storeStepTwoData({
-        step: 2 as const,
-        event_id: eventId,
-        package_title: removedSections.has("stepTwo") ? "Package" : s.stepTwo.package_title,
-        package_description: removedSections.has("stepTwo") ? "Package details" : s.stepTwo.package_description,
-        package_button_name: removedSections.has("stepTwo") ? "Book Now" : s.stepTwo.package_button_name,
-        package_details: removedSections.has("stepTwo") ? [{ title: "VIP Access" }] : s.stepTwo.package_details,
-        package_image: packageImage,
-        gallery: galleryFiles,
+      const eventId = await applyAIGeneratedEventToBackend({
+        content: editedContent,
+        eventInput,
+        categoryId,
+        removedSections,
+        onProgress: setApplyStep,
       });
-      await sleep(300);
 
-      // Step 2 — Dates / Tickets / Tables
-      setApplyStep(2);
-      if (!removedSections.has("stepThree")) {
-        const rawDates = s.stepThree.dates || [];
-        const sortedUniqueDates = (() => {
-          const sorted = [...rawDates].sort(
-            (a, b) =>
-              new Date(a.event_date + "T00:00:00").getTime() -
-              new Date(b.event_date + "T00:00:00").getTime()
-          );
-          const seen = new Set<string>();
-          return sorted.filter((d) => {
-            if (!d.event_date || seen.has(d.event_date)) return false;
-            seen.add(d.event_date);
-            return true;
-          });
-        })();
-        const dates = sortedUniqueDates.map((d) => {
-          const tickets =
-            d.booking_type !== "tables"
-              ? (d.tickets || []).map((t) => ({
-                  title: t.title,
-                  description: t.description,
-                  total_capacity: parseInt(t.total_capacity) || 100,
-                  price: parseInt(t.price) || 50,
-                  sold_tickets: 0,
-                }))
-              : [];
-
-          const tables =
-            d.booking_type !== "tickets"
-              ? (d.tables || []).map((t) => ({
-                  min_persons: parseInt(t.min_persons) || 2,
-                  max_persons: parseInt(t.max_persons) || 6,
-                  price: parseInt(t.price) || 100,
-                  total_tables: parseInt(t.total_tables) || 10,
-                  sold_tables: 0,
-                }))
-              : [];
-
-          return {
-            event_date: d.event_date,
-            booking_type: d.booking_type,
-            tickets,
-            tables,
-            // Derived from actual array lengths so backend validation passes
-            total_ticket_types: d.booking_type !== "tables" ? tickets.length : 0,
-            total_table_types: d.booking_type !== "tickets" ? tables.length : 0,
-            payment_type: (
-              d.booking_type !== "tickets" ? d.payment_type || "full" : "full"
-            ) as "full" | "deposit",
-            is_deposit_enabled: d.is_deposit_enabled || false,
-            deposit_type: (d.deposit_type || "amount") as "amount" | "percentage",
-            deposit_value: d.deposit_value ? Number(d.deposit_value) : 0,
-            deposit_due_date: d.deposit_due_date || "",
-          };
-        });
-
-        await eventsService.storeStepThreeData({
-          step: 3 as const,
-          event_id: eventId,
-          vendor_location_id: vendorLocationId,
-          dates,
-        });
-      }
-      await sleep(300);
-
-      // Step 3 — Menu (with optional menu background image when catering is enabled)
-      setApplyStep(3);
-      const hasCatering = !removedSections.has("stepFour") && s.stepFour.catering_option === 1;
-      const menuBgUrl = hasCatering
-        ? (dummyImages as { menu_background?: string }).menu_background
-        : null;
-      const menuBgFile = menuBgUrl
-        ? (await urlToImageFile(menuBgUrl, "menu-background")) ??
-          (await createPlaceholderPackageImage(s.stepFour.menu_title || "Menu"))
-        : null;
-      await eventsService.storeStepFourData({
-        step: 4 as const,
-        event_id: eventId,
-        catering_option: removedSections.has("stepFour") ? 0 : s.stepFour.catering_option,
-        menu_title: hasCatering ? s.stepFour.menu_title : undefined,
-        menu_description: hasCatering ? s.stepFour.menu_description : undefined,
-        menus: hasCatering ? s.stepFour.menus : undefined,
-        menu_background_image: menuBgFile ?? undefined,
-      });
-      await sleep(300);
-
-      // Step 4 — Drinks / other packages (API always requires title, description, non-empty packages)
-      setApplyStep(4);
-      const drinksSectionRemoved = removedSections.has("stepFive");
-      const mappedDrinkPackages = (s.stepFive.packages ?? [])
-        .filter((p) => String(p.title ?? "").trim() !== "")
-        .map((p) => ({
-          title: p.title,
-          description: p.description,
-          price: p.price,
-          available_quantity: p.available_quantity,
-        }));
-      const hasUsableDrinksContent =
-        !drinksSectionRemoved &&
-        String(s.stepFive.drink_title ?? "").trim() !== "" &&
-        String(s.stepFive.drink_description ?? "").trim() !== "" &&
-        mappedDrinkPackages.length > 0;
-
-      const placeholderDrinkPackages = [
-        {
-          title: "Standard",
-          description: "Standard package",
-          price: 50,
-          available_quantity: 100,
-        },
-      ];
-
-      await eventsService.storeStepFiveData({
-        step: 5 as const,
-        event_id: eventId,
-        drink_title: hasUsableDrinksContent
-          ? s.stepFive.drink_title.trim()
-          : "Drinks",
-        drink_description: hasUsableDrinksContent
-          ? s.stepFive.drink_description.trim()
-          : "Drink packages",
-        packages: hasUsableDrinksContent ? mappedDrinkPackages : placeholderDrinkPackages,
-      });
-      await sleep(300);
-
-      // Step 5 — Location / pricing
-      setApplyStep(5);
-      if (!removedSections.has("stepSix")) {
-        const stepSixFD = new FormData();
-        stepSixFD.append("step", "6");
-        stepSixFD.append("event_id", String(eventId));
-        stepSixFD.append(
-          "event_address",
-          s.stepSix.event_address || eventInput.venueAddress || ""
-        );
-        stepSixFD.append("price_start_from", s.stepSix.price_start_from || "0");
-        stepSixFD.append(
-          "price_start_from_button_text",
-          s.stepSix.price_start_from_button_text || "Book Now"
-        );
-        // Backend requires lat/long; AI only provides address — use UK center so validation passes; vendor can refine in event editor
-        stepSixFD.append("lat", "51.5074");
-        stepSixFD.append("long", "-0.1278");
-        await eventsService.storeStepSixData(stepSixFD);
-      }
-      await sleep(300);
-
-      // Step 6 — FAQs
-      setApplyStep(6);
-      if (!removedSections.has("stepSeven")) {
-        await eventsService.storeStepSevenData({
-          step: 7 as const,
-          event_id: eventId,
-          faqs: s.stepSeven.faqs,
-        });
-      }
-
-      // Done
-      setApplyStep(APPLY_STEPS.length);
-      await sleep(400);
       setApplyDone(true);
-
       setTimeout(() => onComplete(eventId), 2500);
     } catch (err) {
       console.error("Error applying AI event content:", err);
@@ -416,137 +147,7 @@ export default function AIEventReviewContent({
 
   // --- Applying overlay ---
   if (isApplying) {
-    const totalSteps = APPLY_STEPS.length;
-    const progressPct =
-      applyStep < 0 ? 0 : Math.min(Math.round(((applyStep + 1) / totalSteps) * 100), 100);
-
-    return (
-      <div className="relative z-10 flex items-center justify-center min-h-screen w-full px-3 py-6 sm:px-4 overflow-y-auto">
-        <div className="w-full max-w-sm mx-auto">
-          <AnimatePresence mode="wait">
-            {applyDone ? (
-              <motion.div
-                key="success"
-                initial={{ opacity: 0, scale: 0.92 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ type: "spring", stiffness: 260, damping: 22 }}
-                className="flex flex-col items-center text-center gap-5"
-              >
-                <motion.div
-                  initial={{ scale: 0 }}
-                  animate={{ scale: 1 }}
-                  transition={{ type: "spring", stiffness: 300, damping: 18, delay: 0.1 }}
-                  className="w-20 h-20 rounded-full flex items-center justify-center"
-                  style={{ backgroundColor: "rgba(34,197,94,0.15)" }}
-                >
-                  <CheckCircle2 className="w-10 h-10 text-green-500" />
-                </motion.div>
-                <div>
-                  <h2 className="text-2xl font-bold text-white">Event created! 🎉</h2>
-                  <p className="text-sm text-slate-400 mt-2">Redirecting to your event editor…</p>
-                </div>
-                <div className="w-full h-1 rounded-full bg-white/5 overflow-hidden">
-                  <motion.div
-                    className="h-full rounded-full bg-green-500"
-                    initial={{ width: "0%" }}
-                    animate={{ width: "100%" }}
-                    transition={{ duration: 2.2, ease: "linear" }}
-                  />
-                </div>
-              </motion.div>
-            ) : (
-              <motion.div
-                key="loading"
-                initial={{ opacity: 0, y: 16 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -16 }}
-              >
-                <div className="text-center mb-8">
-                  <motion.div
-                    animate={{ rotate: 360 }}
-                    transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
-                    className="w-14 h-14 rounded-2xl border flex items-center justify-center mx-auto mb-4"
-                    style={accent.loaderBox}
-                  >
-                    <Loader2 className="w-7 h-7" style={accent.text} />
-                  </motion.div>
-                  <h2 className="text-xl font-bold text-white">Building your event</h2>
-                  <p className="text-slate-500 text-xs mt-1">Please don&apos;t close this page</p>
-                </div>
-
-                <div className="mb-6">
-                  <div className="flex justify-between items-center mb-1.5">
-                    <span className="text-xs text-slate-500">Progress</span>
-                    <span className="text-xs font-semibold" style={accent.text}>
-                      {progressPct}%
-                    </span>
-                  </div>
-                  <div className="h-1.5 rounded-full bg-white/5 overflow-hidden">
-                    <motion.div
-                      className="h-full rounded-full"
-                      style={{ background: "var(--color-primary, #3b82f6)" }}
-                      initial={{ width: "0%" }}
-                      animate={{ width: `${progressPct}%` }}
-                      transition={{ duration: 0.4, ease: "easeOut" }}
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  {APPLY_STEPS.map((step, idx) => {
-                    const isDone = idx < applyStep;
-                    const isActive = idx === applyStep;
-                    const isPending = idx > applyStep;
-                    return (
-                      <motion.div
-                        key={idx}
-                        initial={{ opacity: 0, x: -8 }}
-                        animate={{ opacity: isPending ? 0.35 : 1, x: 0 }}
-                        transition={{ delay: idx * 0.04 }}
-                        className={`flex items-center gap-3 px-4 py-2.5 rounded-xl transition-colors ${
-                          isActive ? "bg-white/[0.06] border border-white/10" : "bg-transparent"
-                        }`}
-                      >
-                        <div className="w-6 h-6 flex-shrink-0 flex items-center justify-center">
-                          {isDone ? (
-                            <motion.div
-                              initial={{ scale: 0 }}
-                              animate={{ scale: 1 }}
-                              transition={{ type: "spring", stiffness: 300, damping: 20 }}
-                              className="w-5 h-5 rounded-full flex items-center justify-center"
-                              style={{ backgroundColor: "rgba(34,197,94,0.15)" }}
-                            >
-                              <Check className="w-3 h-3 text-green-400" />
-                            </motion.div>
-                          ) : isActive ? (
-                            <motion.div
-                              animate={{ rotate: 360 }}
-                              transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                            >
-                              <Loader2 className="w-4 h-4" style={accent.text} />
-                            </motion.div>
-                          ) : (
-                            <div className="w-4 h-4 rounded-full border border-white/15" />
-                          )}
-                        </div>
-                        <span className="text-sm mr-1">{step.icon}</span>
-                        <span
-                          className={`text-sm font-medium ${
-                            isDone ? "text-slate-400" : isActive ? "text-white" : "text-slate-600"
-                          }`}
-                        >
-                          {step.label}
-                        </span>
-                      </motion.div>
-                    );
-                  })}
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </div>
-      </div>
-    );
+    return <AIEventApplyOverlay applyStep={applyStep} applyDone={applyDone} />;
   }
 
   // --- Review UI ---

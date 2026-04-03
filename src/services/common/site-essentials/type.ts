@@ -22,6 +22,10 @@ export interface FontFamily {
 
 export interface Typography {
   fontFamily: FontFamily;
+  /** https:// CSS URLs for webfonts not on Google Fonts (max 5). */
+  customFontStylesheetUrls?: string[];
+  /** Public-site heading style; omit = uniform */
+  headingEmphasis?: "uniform" | "accent_tail" | "full_primary";
 }
 
 export interface SocialLinks {
@@ -50,6 +54,8 @@ export interface SiteEssentials {
   domain: string | null;
   website_role: string;
   banner_heading: string | null;
+  /** Optional; omit until API supports it */
+  banner_heading_accent?: string | null;
   banner_sub_heading: string | null;
   about_title: string | null;
   about_description: string | null;

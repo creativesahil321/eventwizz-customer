@@ -93,10 +93,10 @@ export function ColorsTab() {
             // Try to extract gradient parameters
             try {
               const dirMatch = newBackgroundValue.match(
-                /linear-gradient\(([^,]+),/
+                /linear-gradient\(([^,]+),/,
               );
               const colorsMatch = newBackgroundValue.match(
-                /linear-gradient\([^,]+,\s*([^,]+),\s*([^)]+)\)/
+                /linear-gradient\([^,]+,\s*([^,]+),\s*([^)]+)\)/,
               );
 
               if (dirMatch && dirMatch[1]) {
@@ -142,7 +142,8 @@ export function ColorsTab() {
         <div>
           <h2 className="text-2xl font-bold text-gray-900">Color Palette</h2>
           <p className="text-sm text-gray-500 mt-1">
-            Configure your site&apos;s color scheme to match your brand identity
+            Fine-tune every token after a preset, or build your palette from
+            scratch. AI can regenerate colors without changing your fonts.
           </p>
         </div>
         <Button
@@ -383,7 +384,9 @@ export function ColorsTab() {
                 Social Login Colors
               </CardTitle>
               <CardDescription>
-                Customize social login button colors
+                Background colors for Google and Facebook sign-in buttons.
+                Labels stay white — avoid white or very light values or the
+                buttons look empty.
               </CardDescription>
             </div>
           </div>
@@ -500,6 +503,10 @@ export function ColorsTab() {
                 <li>
                   • <strong>Text Dimmed:</strong> Descriptions and secondary
                   text
+                </li>
+                <li>
+                  • <strong>Social login:</strong> Button backgrounds only —
+                  keep them saturated so white labels stay readable.
                 </li>
               </ul>
             </div>

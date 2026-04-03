@@ -148,7 +148,7 @@ export function ColorPicker({ value, onChange, disabled }: ColorPickerProps) {
           <button
             type="button"
             disabled={disabled}
-            className={`w-9 h-9 rounded-md border border-input shadow-sm flex items-center justify-center ${
+            className={`w-9 h-9 rounded-md border border-input shadow-sm ring-1 ring-inset ring-black/[0.08] flex items-center justify-center dark:ring-white/15 ${
               disabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer"
             }`}
             style={{ backgroundColor: color || "#FFFFFF" }}
@@ -179,7 +179,7 @@ export function ColorPicker({ value, onChange, disabled }: ColorPickerProps) {
 
       <div className="flex-1">
         <div
-          className="w-full h-9 rounded-md border border-input"
+          className="w-full h-9 rounded-md border border-input ring-1 ring-inset ring-black/[0.08] dark:ring-white/15"
           style={{ backgroundColor: color || "#FFFFFF" }}
         />
       </div>

@@ -34,7 +34,7 @@ export default function FaqSection({
         </p>
         <section className="w-full flex items-center justify-center">
           <Button
-            variant="event-outline"
+            variant="event-primary"
             onClick={() => {
               setShowMore(!showMore);
             }}

@@ -46,7 +46,12 @@ const extraOptions = [
 export default function PublishTab() {
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
-  const { form: globalForm, save, setActiveField, readOnly } = useEventFormContext();
+  const {
+    form: globalForm,
+    save,
+    setActiveField,
+    readOnly,
+  } = useEventFormContext();
 
   // Get event_id from global form
   const getEventId = (): number => {
@@ -81,7 +86,7 @@ export default function PublishTab() {
     (fieldName: string) => {
       setActiveField?.(fieldName);
     },
-    [setActiveField]
+    [setActiveField],
   );
 
   // Sync local form with global form
@@ -126,7 +131,7 @@ export default function PublishTab() {
 
             // Try to find and focus the field with an error
             const errorElement = document.querySelector(
-              `[name="${errorFields[0]}"]`
+              `[name="${errorFields[0]}"]`,
             );
             if (errorElement) {
               (errorElement as HTMLElement).focus();
@@ -185,7 +190,7 @@ export default function PublishTab() {
         setIsLoading(false);
       }
     },
-    [form, globalForm, save, setActiveField, invalidateCache, router]
+    [form, globalForm, save, setActiveField, invalidateCache, router],
   );
 
   // Check if event is cancelled
@@ -498,9 +503,19 @@ export default function PublishTab() {
                 type="submit"
                 disabled={isLoading || isEventCancelled || readOnly}
                 variant="event-primary"
-                title={readOnly ? "View only" : isEventCancelled ? "Cannot submit cancelled events" : ""}
+                title={
+                  readOnly
+                    ? "View only"
+                    : isEventCancelled
+                      ? "Cannot submit cancelled events"
+                      : ""
+                }
               >
-                {readOnly ? "View only" : isLoading ? "Saving..." : "Submit Event"}
+                {readOnly
+                  ? "View only"
+                  : isLoading
+                    ? "Saving..."
+                    : "Submit Event"}
               </Button>
             </div>
           </form>

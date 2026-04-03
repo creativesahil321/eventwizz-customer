@@ -32,7 +32,7 @@ export default function CreateEventClientWrapper() {
   const router = useRouter();
 
   const handleAIComplete = (eventId: number) => {
-    router.push(`/vendor/events/${eventId}`);
+    router.push(`/preview/event?id=${eventId}`);
   };
 
   if (mode === "manual") {
