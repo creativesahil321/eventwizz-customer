@@ -20,7 +20,6 @@ export default function SubscribeSection() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    console.log("Subscription submitted:", formData);
     setFormData({
       name: "",
       email: "",
@@ -32,25 +31,26 @@ export default function SubscribeSection() {
     "h-12 border-[color:color-mix(in_srgb,var(--color-text)_14%,transparent)] bg-[var(--color-background)]/90 text-[var(--color-text)] placeholder:text-[var(--color-text-dimmed)]";
 
   return (
-    <section className="relative overflow-hidden py-16 md:py-20">
+    <section className="relative overflow-hidden py-16 md:py-24">
+      <div className="absolute inset-0 bg-[var(--color-surface)]" aria-hidden />
       <div
-        className="absolute inset-0 bg-[var(--color-surface)]"
+        className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_80%_50%_at_50%_-20%,color-mix(in_srgb,var(--color-primary)_12%,transparent),transparent)]"
         aria-hidden
       />
       <div className="relative z-10 container mx-auto px-6 text-center">
         <p className="mb-3 text-xs font-semibold uppercase tracking-[0.28em] text-[color:var(--color-primary)]">
-          Stay Updated
+          Stay updated
         </p>
-        <h2 className="mb-4 font-heading text-3xl italic text-[var(--color-on-surface)] md:text-4xl">
-          Subscribe for Exclusive Updates!
+        <h2 className="mb-4 text-3xl font-semibold tracking-tight text-[var(--color-on-surface)] md:text-4xl">
+          Never miss what&apos;s on
         </h2>
-        <p className="mx-auto mb-8 max-w-xl font-heading text-lg italic text-[var(--color-text-dimmed)] md:text-xl">
-          Get exclusive event updates & news — subscribe now!
+        <p className="mx-auto mb-10 max-w-xl text-base text-[var(--color-text-dimmed)] md:text-lg">
+          Get drops for new dates and venues — one short form, no spam.
         </p>
 
         <form
           onSubmit={handleSubmit}
-          className="mx-auto flex max-w-4xl flex-col items-stretch justify-center gap-3 md:flex-row md:flex-wrap md:items-center"
+          className="mx-auto flex max-w-4xl flex-col items-stretch justify-center gap-3 rounded-2xl border border-[color:color-mix(in_srgb,var(--color-text)_8%,transparent)] bg-[color:color-mix(in_srgb,var(--color-text)_3%,var(--color-surface))] p-5 shadow-sm md:flex-row md:flex-wrap md:items-center md:p-6"
         >
           <Input
             type="text"
@@ -81,10 +81,7 @@ export default function SubscribeSection() {
             className={`${fieldClass} w-full md:min-w-[160px] md:flex-1`}
           />
 
-          <Button
-            type="submit"
-            className="h-12 shrink-0 bg-[var(--color-primary)] px-8 font-medium text-[var(--color-primary-foreground)] hover:opacity-95 md:mt-0"
-          >
+          <Button type="submit" variant="event-primary">
             Subscribe
           </Button>
         </form>

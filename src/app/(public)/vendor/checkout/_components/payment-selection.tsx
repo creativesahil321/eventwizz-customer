@@ -68,10 +68,7 @@ export default function PaymentSelection({
     <Card className="w-full">
       <CardHeader className="pb-4">
         <CardTitle className="flex items-center gap-2 text-lg">
-          <CreditCard
-            className="h-5 w-5"
-            style={{ color: "var(--color-primary)" }}
-          />
+          <CreditCard className="h-5 w-5 text-blue-600" />
           Payment Options
         </CardTitle>
       </CardHeader>
@@ -198,10 +195,7 @@ export default function PaymentSelection({
                   ? "Amount to pay:"
                   : "Deposit amount:"}
               </span>
-              <span
-                className="font-semibold text-lg"
-                style={{ color: "var(--color-primary)" }}
-              >
+              <span className="text-lg font-semibold text-blue-600">
                 {formatCurrency(
                   selectedPaymentType === "full" ? totalAmount : depositAmount
                 )}

@@ -1,6 +1,9 @@
 .title-header {
     position: relative;
-    font-family: var(--font-heading);
+    /* Dashboards / admin shell: neutral UI stack. Tenant `--font-heading` is for
+       public marketing (location home, event detail, checkout marketing), not app chrome. */
+    font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+        "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
 
     &::before {
         content: "";

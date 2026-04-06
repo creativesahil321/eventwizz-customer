@@ -14,15 +14,26 @@ export const SITE_ESSENTIALS_GOOGLE_FONT_NAMES = [
   "Nunito",
   "Playfair Display",
   "Merriweather",
+  "Lora",
+  "Inter",
+  "DM Sans",
+  "Libre Baskerville",
+  "Work Sans",
 ] as const;
 
 const GOOGLE_SET = new Set<string>(SITE_ESSENTIALS_GOOGLE_FONT_NAMES);
 
+/** Google families loaded with a serif fallback in CSS stacks */
+const SERIF_GOOGLE_FONT_NAMES = new Set<string>([
+  "Playfair Display",
+  "Merriweather",
+  "Lora",
+  "Libre Baskerville",
+]);
+
 export function siteEssentialsGoogleFontStack(name: string): string {
-  if (name === "Playfair Display" || name === "Merriweather") {
-    return `${name}, serif`;
-  }
-  return `${name}, sans-serif`;
+  const suffix = SERIF_GOOGLE_FONT_NAMES.has(name) ? "serif" : "sans-serif";
+  return `${name}, ${suffix}`;
 }
 
 /** Preset options for the typography form (single source of truth). */

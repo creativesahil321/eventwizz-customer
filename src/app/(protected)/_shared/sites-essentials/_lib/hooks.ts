@@ -71,6 +71,8 @@ export const useSiteEssentials = () => {
       favicon: null,
       banner_heading: "",
       banner_heading_accent: "",
+      banner_heading_align: "center",
+      banner_heading_valign: "center",
       banner_sub_heading: "",
       cover_image: null,
       cover_video: null,
@@ -98,6 +100,10 @@ export const useSiteEssentials = () => {
           },
           banner_heading_accent:
             siteEssentials.banner_heading_accent ?? "",
+          banner_heading_align:
+            siteEssentials.banner_heading_align ?? "center",
+          banner_heading_valign:
+            siteEssentials.banner_heading_valign ?? "center",
         } as SiteEssentialsFormValues)
       : undefined,
   });

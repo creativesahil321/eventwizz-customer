@@ -135,8 +135,12 @@ export interface ThemeSchema {
 
   // Landing page content fields
   banner_heading?: string;
-  /** Substring of banner_heading to style as accent when headingEmphasis is accent_tail */
+  /** Substring of banner_heading for accent tail: heading font + primary when headingEmphasis is accent_tail */
   banner_heading_accent?: string | null;
+  /** Landing hero heading + subheading alignment; omit = center */
+  banner_heading_align?: "left" | "center" | "right";
+  /** Landing hero vertical position; omit = center */
+  banner_heading_valign?: "top" | "center" | "bottom";
   banner_sub_heading?: string;
   cover_image?: string;
   cover_video?: string; // Video URL for landing page banner

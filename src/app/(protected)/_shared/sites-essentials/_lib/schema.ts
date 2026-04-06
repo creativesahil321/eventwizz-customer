@@ -3,7 +3,14 @@ import {
   BANNER_HEADING_MAX_WORDS,
   countWords,
 } from "@/lib/word-count";
+
+/** Hero subline; was 80 — too short for full sentences (often cut mid-word in CMS). */
+export const BANNER_SUB_HEADING_MAX_CHARS = 220;
 import { HEADING_EMPHASIS_VALUES } from "@/lib/heading-emphasis";
+import {
+  BANNER_HEADING_ALIGN_VALUES,
+  BANNER_HEADING_VALIGN_VALUES,
+} from "@/lib/banner-heading-align";
 
 export const SiteEssentialsSchema = z.object({
   header_logo: z.string().min(2, { message: "Header logo is required." }),
@@ -162,7 +169,10 @@ export const siteEssentialsFormSchema = z.object({
     ),
   banner_sub_heading: z
     .string()
-    .max(80, "Banner sub heading must not exceed 80 characters")
+    .max(
+      BANNER_SUB_HEADING_MAX_CHARS,
+      `Banner sub heading must not exceed ${BANNER_SUB_HEADING_MAX_CHARS} characters`,
+    )
     .nullable()
     .optional(),
   banner_heading_accent: z
@@ -170,6 +180,8 @@ export const siteEssentialsFormSchema = z.object({
     .max(120, "Accent phrase must not exceed 120 characters")
     .nullable()
     .optional(),
+  banner_heading_align: z.enum(BANNER_HEADING_ALIGN_VALUES).optional(),
+  banner_heading_valign: z.enum(BANNER_HEADING_VALIGN_VALUES).optional(),
   cover_image: z.any().optional(),
   cover_video: z.any().optional(),
   // Homepage layout fields with updated names

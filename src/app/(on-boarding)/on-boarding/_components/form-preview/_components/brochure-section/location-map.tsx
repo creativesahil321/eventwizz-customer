@@ -10,6 +10,8 @@ interface LocationMapProps {
   latitude?: number | string | null;
   longitude?: number | string | null;
   className?: string;
+  /** Public event pages: show the map immediately. Onboarding preview: false so the map lazy-loads after "Get directions". */
+  showMapImmediately?: boolean;
 }
 
 interface MapLocation {
@@ -23,6 +25,7 @@ export default function LocationMap({
   latitude,
   longitude,
   className = "",
+  showMapImmediately = false,
 }: LocationMapProps) {
   const mapRef = useRef<HTMLDivElement>(null);
   const markerRef = useRef<google.maps.Marker | null>(null);
@@ -33,7 +36,7 @@ export default function LocationMap({
   );
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [mapLoaded, setMapLoaded] = useState(false);
+  const [mapLoaded, setMapLoaded] = useState(showMapImmediately);
   const globalTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const retryCountRef = useRef<number>(0);
   const maxRetries = 3;
@@ -294,31 +297,73 @@ export default function LocationMap({
     }
   }, [address, latitude, longitude, initializeMapWithCenter]);
 
-  // Initialize map only when mapLoaded is true
+  // Initialize map only when mapLoaded is true.
+  // Important: when the Maps script is already on window (e.g. after client navigation), we must still
+  // call initializeMap — the old logic only ran when ref OR google was missing, which skipped init forever.
   useEffect(() => {
     if (!mapLoaded) return;
 
+    let isMounted = true;
+    let retryTimeoutId: NodeJS.Timeout | null = null;
+    let onExistingScriptLoad: (() => void) | null = null;
+    const existingScript = document.querySelector<HTMLScriptElement>(
+      `script[src*="maps.googleapis.com/maps/api/js"]`,
+    );
+
     const initializeMapCallback = () => {
-      initializeMap();
+      if (!isMounted) return;
+
+      const tryInitialize = (attempts = 0) => {
+        if (!isMounted) return;
+
+        if (mapRef.current && window.google?.maps) {
+          initializeMap();
+        } else if (attempts < 15) {
+          retryTimeoutId = setTimeout(() => tryInitialize(attempts + 1), 200);
+        } else {
+          setError("Map container not ready. Please refresh the page.");
+          setIsLoading(false);
+        }
+      };
+
+      tryInitialize();
     };
 
-    if (!mapRef.current || !window.google) {
-      // Load Google Maps API if not already loaded
-      if (!window.google) {
-        const script = document.createElement("script");
-        script.src = `https://maps.googleapis.com/maps/api/js?key=${env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}&libraries=places`;
-        script.async = true;
-        script.defer = true;
-        script.onload = initializeMapCallback;
-        document.head.appendChild(script);
-      } else {
+    if (window.google?.maps) {
+      initializeMapCallback();
+    } else if (existingScript) {
+      if (existingScript.getAttribute("data-loaded") === "true") {
         initializeMapCallback();
+      } else {
+        onExistingScriptLoad = () => {
+          if (isMounted) initializeMapCallback();
+        };
+        existingScript.addEventListener("load", onExistingScriptLoad);
       }
+    } else {
+      const script = document.createElement("script");
+      script.src = `https://maps.googleapis.com/maps/api/js?key=${env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}&libraries=places`;
+      script.async = true;
+      script.defer = true;
+      script.onload = () => {
+        script.setAttribute("data-loaded", "true");
+        if (isMounted) initializeMapCallback();
+      };
+      script.onerror = () => {
+        if (isMounted) {
+          setError("Failed to load Google Maps. Please refresh the page.");
+          setIsLoading(false);
+        }
+      };
+      document.head.appendChild(script);
     }
 
-    // Cleanup function
     return () => {
-      // Clear any pending timeouts
+      isMounted = false;
+      if (retryTimeoutId) clearTimeout(retryTimeoutId);
+      if (onExistingScriptLoad && existingScript) {
+        existingScript.removeEventListener("load", onExistingScriptLoad);
+      }
       if (globalTimeoutRef.current) {
         clearTimeout(globalTimeoutRef.current);
         globalTimeoutRef.current = null;
@@ -334,7 +379,7 @@ export default function LocationMap({
         geocoderRef.current = null;
       }
     };
-  }, [initializeMap, mapLoaded]); // Include mapLoaded in dependencies
+  }, [initializeMap, mapLoaded]);
 
   // Re-initialize map when address or coordinates change
   useEffect(() => {

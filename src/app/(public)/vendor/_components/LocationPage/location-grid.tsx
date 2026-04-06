@@ -59,7 +59,7 @@ export default function LocationGrid({
             className="mx-auto mb-4 opacity-40 text-[color:var(--color-primary)]"
             aria-hidden
           />
-          <h3 className="mb-2 text-2xl font-semibold font-heading">
+          <h3 className="mb-2 text-2xl font-semibold tracking-tight">
             No locations yet
           </h3>
           <p className="text-[var(--color-text-dimmed)]">
@@ -181,7 +181,7 @@ export default function LocationGrid({
                         Location
                       </span>
                     </div>
-                    <h3 className="font-heading text-2xl italic leading-tight text-white drop-shadow-md md:text-3xl">
+                    <h3 className="text-2xl font-semibold leading-tight tracking-tight text-white drop-shadow-md md:text-3xl">
                       {locationName}
                     </h3>
                   </div>

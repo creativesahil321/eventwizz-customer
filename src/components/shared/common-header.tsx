@@ -156,7 +156,9 @@ export default function CommonHeader({
           ),
           textColor: "text-[var(--color-on-header)]",
           borderColor: "border-[color:var(--color-primary)]",
-          hoverColor: "hover:text-[color:var(--color-primary)]",
+          // Base text must use on-header (not primary): white primary on light header was invisible until hover.
+          hoverColor:
+            "hover:opacity-90 hover:underline hover:decoration-2 hover:underline-offset-2 hover:decoration-[color:var(--color-primary)]",
         };
       case "onboarding":
         return {
@@ -174,7 +176,8 @@ export default function CommonHeader({
             : "bg-transparent",
           textColor: "text-[var(--color-on-header)]",
           borderColor: "border-[color:var(--color-primary)]",
-          hoverColor: "hover:text-[color:var(--color-primary)]",
+          hoverColor:
+            "hover:opacity-90 hover:underline hover:decoration-2 hover:underline-offset-2 hover:decoration-[color:var(--color-primary)]",
         };
     }
   };
@@ -199,11 +202,22 @@ export default function CommonHeader({
 
   return (
     <section
-      className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${styles.container} ${styles.textColor} ${headerDarkModeBg} ${className}`}
+      className={cn(
+        "fixed top-0 left-0 right-0 z-50 transition-all duration-300",
+        styles.container,
+        variant !== "default" && styles.textColor,
+        headerDarkModeBg,
+        className,
+      )}
     >
       <div className="container mx-auto">
         {/* Desktop Header */}
-        <div className="hidden md:flex justify-between items-center py-3">
+        <div
+          className={cn(
+            "hidden md:flex justify-between items-center py-3",
+            variant === "default" && styles.textColor,
+          )}
+        >
           <div
             className={`flex items-center gap-3 w-1/3 ${
               variant === "preview" && previewBackButtonOffset
@@ -220,7 +234,12 @@ export default function CommonHeader({
             ) : (
               <Link
                 href={headerData.browseEvent.link}
-                className={`text-sm ${styles.hoverColor} transition-colors border-2 ${styles.borderColor} rounded-lg px-2 py-1`}
+                className={cn(
+                  "text-sm transition-colors border-2 rounded-lg px-2 py-1",
+                  styles.textColor,
+                  styles.hoverColor,
+                  styles.borderColor,
+                )}
               >
                 {headerData.browseEvent.linkText}
               </Link>
@@ -279,7 +298,12 @@ export default function CommonHeader({
             ) : (
               <CartButton
                 size="sm"
-                className={`flex items-center gap-1 ${styles.hoverColor} transition-colors border-2 ${styles.borderColor} rounded-lg px-2 py-1`}
+                className={cn(
+                  "flex items-center gap-1 transition-colors border-2 rounded-lg px-2 py-1",
+                  styles.textColor,
+                  styles.hoverColor,
+                  styles.borderColor,
+                )}
               />
             )}
 
@@ -324,7 +348,12 @@ export default function CommonHeader({
                   key={index}
                   href={link}
                   onClick={handleLinkClick}
-                  className={`flex items-center gap-1 ${styles.hoverColor} transition-colors border-2 ${styles.borderColor} rounded-lg px-1.5 sm:px-2 py-1 whitespace-nowrap`}
+                  className={cn(
+                    "flex items-center gap-1 transition-colors border-2 rounded-lg px-1.5 sm:px-2 py-1 whitespace-nowrap",
+                    styles.textColor,
+                    styles.hoverColor,
+                    styles.borderColor,
+                  )}
                   title={isPhoneNumber ? linkText : undefined}
                 >
                   {IconComponent && (
@@ -353,8 +382,9 @@ export default function CommonHeader({
         {/* Mobile Header */}
         <div className="md:hidden flex justify-between items-center py-3">
           <button
+            type="button"
             onClick={toggleMobileMenu}
-            className="p-2"
+            className={cn("p-2", !isOnboardingMode && styles.textColor)}
             aria-label={mobileMenuOpen ? "Close menu" : "Open menu"}
             disabled={isOnboardingMode}
           >
@@ -410,7 +440,11 @@ export default function CommonHeader({
             ) : (
               <CartButton
                 size="icon"
-                className={`p-2 ${styles.hoverColor} transition-colors`}
+                className={cn(
+                  "p-2 transition-colors",
+                  styles.textColor,
+                  styles.hoverColor,
+                )}
               />
             )}
 
@@ -424,7 +458,11 @@ export default function CommonHeader({
             ) : isAuthenticated ? (
               <Link
                 href={`/${session?.user?.account_type}/dashboard`}
-                className={`p-2 ${styles.hoverColor} transition-colors`}
+                className={cn(
+                  "p-2 transition-colors",
+                  styles.textColor,
+                  styles.hoverColor,
+                )}
                 aria-label="Dashboard"
               >
                 <UserCircle className="h-5 w-5" />
@@ -432,7 +470,11 @@ export default function CommonHeader({
             ) : (
               <Link
                 href="/auth/login"
-                className={`p-2 ${styles.hoverColor} transition-colors`}
+                className={cn(
+                  "p-2 transition-colors",
+                  styles.textColor,
+                  styles.hoverColor,
+                )}
                 aria-label="Log in"
               >
                 <UserCircle className="h-5 w-5" />
@@ -451,13 +493,19 @@ export default function CommonHeader({
 
         {/* Mobile Menu Panel */}
         <div
-          className={`md:hidden fixed top-0 left-0 w-[70%] max-w-xs h-screen bg-[color:var(--color-header)] z-50 transform transition-transform duration-300 ease-in-out ${
-            mobileMenuOpen ? "translate-x-0" : "-translate-x-full"
-          }`}
+          className={cn(
+            "md:hidden fixed top-0 left-0 z-50 flex h-screen w-[70%] max-w-xs transform flex-col bg-[color:var(--color-header)] text-[var(--color-on-header)] transition-transform duration-300 ease-in-out",
+            mobileMenuOpen ? "translate-x-0" : "-translate-x-full",
+          )}
         >
-          <div className="flex justify-between items-center p-4 border-b">
-            <h2 className="font-heading text-lg">Menu</h2>
-            <button onClick={toggleMobileMenu} aria-label="Close menu">
+          <div className="flex items-center justify-between border-b p-4">
+            <h2 className="text-lg font-semibold">Menu</h2>
+            <button
+              type="button"
+              onClick={toggleMobileMenu}
+              aria-label="Close menu"
+              className="p-1"
+            >
               <X className="h-6 w-6" />
             </button>
           </div>
@@ -472,7 +520,7 @@ export default function CommonHeader({
             ) : (
               <Link
                 href={headerData.browseEvent.link}
-                className={`block py-2 ${styles.hoverColor}`}
+                className={cn("block py-2", styles.textColor, styles.hoverColor)}
                 onClick={toggleMobileMenu}
               >
                 {headerData.browseEvent.linkText}
@@ -493,7 +541,11 @@ export default function CommonHeader({
               <div className="py-2" onClick={toggleMobileMenu}>
                 <CartButton
                   size="sm"
-                  className={`flex items-center gap-2 py-2 ${styles.hoverColor}`}
+                  className={cn(
+                    "flex items-center gap-2 py-2",
+                    styles.textColor,
+                    styles.hoverColor,
+                  )}
                 />
               </div>
             )}
@@ -523,7 +575,11 @@ export default function CommonHeader({
                 <Link
                   key={index}
                   href={link}
-                  className={`flex items-center gap-2 py-2 ${styles.hoverColor}`}
+                  className={cn(
+                    "flex items-center gap-2 py-2",
+                    styles.textColor,
+                    styles.hoverColor,
+                  )}
                   onClick={(e) => {
                     if (isOnboardingMode) {
                       e.preventDefault();

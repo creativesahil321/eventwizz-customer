@@ -110,7 +110,7 @@ export default function AuthLayout({
                 Have an account?{" "}
                 <Link
                   href="/auth/login"
-                  className="font-medium text-[var(--color-on-header)] hover:text-[color:var(--color-primary)] hover:underline underline-offset-2"
+                  className="font-medium text-[var(--color-on-header)] hover:opacity-90 hover:underline hover:decoration-2 underline-offset-2 hover:decoration-[color:var(--color-primary)]"
                 >
                   Sign in
                 </Link>
@@ -120,7 +120,7 @@ export default function AuthLayout({
                 Don&apos;t have an account?{" "}
                 <Link
                   href={getRegistrationPath()}
-                  className="font-medium text-[var(--color-on-header)] hover:text-[color:var(--color-primary)] hover:underline underline-offset-2"
+                  className="font-medium text-[var(--color-on-header)] hover:opacity-90 hover:underline hover:decoration-2 underline-offset-2 hover:decoration-[color:var(--color-primary)]"
                 >
                   Sign Up
                 </Link>

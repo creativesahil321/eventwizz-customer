@@ -50,6 +50,8 @@ export interface EventDetailStepOne {
   event_banner_image?: string | null;
   event_banner_video?: string | null;
   event_banner_heading?: string;
+  /** Optional accent tail substring (public event page + preview parity with SiteHeading) */
+  event_banner_heading_accent?: string | null;
   event_banner_sub_heading?: string;
   about_event_heading?: string;
   about_event_sub_heading?: string;

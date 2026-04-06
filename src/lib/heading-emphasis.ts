@@ -30,9 +30,10 @@ export type SplitBannerHeading = {
 };
 
 /**
- * Splits a banner title for accent-tail rendering.
+ * Splits a banner title for accent-tail rendering (`SiteHeading`).
+ * `base` = lead (readable body font + neutral); `accent` = tail (display heading + primary).
  * If `accentHint` is set and appears in `full`, uses the last occurrence.
- * Otherwise uses the last two words (or last word if only two words total).
+ * Otherwise uses the last two words (or the second word if only two words total).
  */
 export function splitBannerHeading(
   full: string,

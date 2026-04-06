@@ -65,7 +65,7 @@ export default function DatesSection({
   let checkAndHandleConflict:
     | ((
         eventSlug: string,
-        eventInfo: { name: string; slug: string; image: string }
+        eventInfo: { name: string; slug: string; image: string },
       ) => boolean)
     | null = null;
 
@@ -82,15 +82,15 @@ export default function DatesSection({
 
   const sessionUser = session?.user as SessionUser | undefined;
   useGetCartData(
-    sessionUser?.account_type === "customer" &&
-      !isOnboarding &&
-      !isPreviewMode
+    sessionUser?.account_type === "customer" && !isOnboarding && !isPreviewMode,
   );
 
   // Get cart data to check if dates are already in cart (for future use)
   // const { data: apiCartData } = useGetCartData();
   const heading = "Book Your Places Now";
   const text = "Already Booked? Log In Here";
+  /** Log-in CTA only for guests; hide when already signed in (still show in onboarding preview). */
+  const showAlreadyBookedLoginCta = isPreviewMode || status !== "authenticated";
   const [isVisible, setIsVisible] = useState(false);
   const [screenSize, setScreenSize] = useState({ width: 0, height: 0 });
   const [isClient, setIsClient] = useState(false);
@@ -150,7 +150,7 @@ export default function DatesSection({
         return false;
       }
     },
-    [eventSlug, getDateData]
+    [eventSlug, getDateData],
   );
 
   // Handle date card click - add to cart and redirect to checkout
@@ -354,16 +354,18 @@ export default function DatesSection({
           <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold mb-4">
             {heading}
           </h2>
-          <Button
-            type="button"
-            variant="outline"
-            className="bg-[#1a1a24] hover:bg-[#26273a] !text-white py-1 sm:py-1.5 px-6 sm:px-8 rounded-md text-xs sm:text-sm border border-white/25 shadow-sm"
-            onClick={() => {
-              if (!isPreviewMode) router.push("/auth/login");
-            }}
-          >
-            {text}
-          </Button>
+          {showAlreadyBookedLoginCta && (
+            <Button
+              type="button"
+              variant="outline"
+              className="bg-[#1a1a24] hover:bg-[#26273a] !text-white py-1 sm:py-1.5 px-6 sm:px-8 rounded-md text-xs sm:text-sm border border-white/25 shadow-sm"
+              onClick={() => {
+                if (!isPreviewMode) router.push("/auth/login");
+              }}
+            >
+              {text}
+            </Button>
+          )}
         </div>
 
         <div className="w-full max-w-5xl mx-auto relative z-10 px-2 sm:px-8 md:px-12">
@@ -404,10 +406,10 @@ export default function DatesSection({
                         isSoldOut
                           ? "border-red-500/60 cursor-not-allowed bg-slate-900/40 backdrop-blur-sm opacity-80 shadow-[0_0_25px_rgba(239,68,68,0.45)]"
                           : isInCart
-                          ? "border-[var(--color-primary)] bg-black/20 backdrop-blur-sm opacity-95 cursor-pointer shadow-[0_0_20px_var(--color-primary)]/30"
-                          : isPending
-                          ? "border-[var(--color-primary)] opacity-50 cursor-not-allowed shadow-[0_0_15px_rgba(60,70,147,0.25)] bg-transparent"
-                          : "border-[var(--color-primary)] cursor-pointer shadow-[0_0_15px_rgba(60,70,147,0.25)] bg-transparent hover:shadow-[0_0_25px_rgba(60,70,147,0.5)] hover:border-[var(--color-primary)] hover:bg-gradient-to-b hover:from-[var(--color-primary)]/10 hover:to-transparent"
+                            ? "border-[var(--color-primary)] bg-black/20 backdrop-blur-sm opacity-95 cursor-pointer shadow-[0_0_20px_var(--color-primary)]/30"
+                            : isPending
+                              ? "border-[var(--color-primary)] opacity-50 cursor-not-allowed shadow-[0_0_15px_rgba(60,70,147,0.25)] bg-transparent"
+                              : "border-[var(--color-primary)] cursor-pointer shadow-[0_0_15px_rgba(60,70,147,0.25)] bg-transparent hover:shadow-[0_0_25px_rgba(60,70,147,0.5)] hover:border-[var(--color-primary)] hover:bg-gradient-to-b hover:from-[var(--color-primary)]/10 hover:to-transparent"
                       }`}
                       key={`first-${index}`}
                       onClick={() => {
@@ -433,15 +435,15 @@ export default function DatesSection({
                           isSoldOut
                             ? "bg-gradient-to-b from-red-600 to-red-800 text-white font-semibold border-t border-red-500/40 tracking-wide"
                             : isInCart
-                            ? "bg-gradient-to-b from-green-500 to-green-700"
-                            : "bg-gradient-to-b from-[var(--color-primary)] to-[#232a61] hover:from-[var(--color-primary)]/90 hover:to-[#232a61]/90 hover:shadow-lg"
+                              ? "bg-gradient-to-b from-green-500 to-green-700"
+                              : "bg-gradient-to-b from-[var(--color-primary)] to-[#232a61] hover:from-[var(--color-primary)]/90 hover:to-[#232a61]/90 hover:shadow-lg"
                         }`}
                       >
                         {isSoldOut
                           ? "SOLD OUT"
                           : isInCart
-                          ? "VIEW CART"
-                          : dateCardPriceFooter(dateInfo)}
+                            ? "VIEW CART"
+                            : dateCardPriceFooter(dateInfo)}
                       </div>
                     </div>
                   );
@@ -453,7 +455,7 @@ export default function DatesSection({
                 {Array.from({
                   length: Math.min(
                     itemsPerRow,
-                    displayDates.length - itemsPerRow
+                    displayDates.length - itemsPerRow,
                   ),
                 }).map((_, i) => {
                   const index = itemsPerRow + i;
@@ -470,10 +472,10 @@ export default function DatesSection({
                         isSoldOut
                           ? "border-red-500/60 cursor-not-allowed bg-slate-900/40 backdrop-blur-sm opacity-80 shadow-[0_0_25px_rgba(239,68,68,0.45)]"
                           : isInCart
-                          ? "border-[var(--color-primary)] bg-black/20 backdrop-blur-sm opacity-95 cursor-pointer shadow-[0_0_20px_var(--color-primary)]/30"
-                          : isPending
-                          ? "border-[var(--color-primary)] opacity-50 cursor-not-allowed shadow-[0_0_15px_rgba(60,70,147,0.25)] bg-transparent"
-                          : "border-[var(--color-primary)] cursor-pointer shadow-[0_0_15px_rgba(60,70,147,0.25)] bg-transparent hover:shadow-[0_0_25px_rgba(60,70,147,0.5)] hover:border-[var(--color-primary)] hover:bg-gradient-to-b hover:from-[var(--color-primary)]/10 hover:to-transparent"
+                            ? "border-[var(--color-primary)] bg-black/20 backdrop-blur-sm opacity-95 cursor-pointer shadow-[0_0_20px_var(--color-primary)]/30"
+                            : isPending
+                              ? "border-[var(--color-primary)] opacity-50 cursor-not-allowed shadow-[0_0_15px_rgba(60,70,147,0.25)] bg-transparent"
+                              : "border-[var(--color-primary)] cursor-pointer shadow-[0_0_15px_rgba(60,70,147,0.25)] bg-transparent hover:shadow-[0_0_25px_rgba(60,70,147,0.5)] hover:border-[var(--color-primary)] hover:bg-gradient-to-b hover:from-[var(--color-primary)]/10 hover:to-transparent"
                       }`}
                       key={`second-${index}`}
                       onClick={() => {
@@ -499,15 +501,15 @@ export default function DatesSection({
                           isSoldOut
                             ? "bg-gradient-to-b from-red-600 to-red-800 text-white font-semibold border-t border-red-500/40 tracking-wide"
                             : isInCart
-                            ? "bg-gradient-to-b from-green-500 to-green-700"
-                            : "bg-gradient-to-b from-[var(--color-primary)] to-[#232a61] hover:from-[var(--color-primary)]/90 hover:to-[#232a61]/90 hover:shadow-lg"
+                              ? "bg-gradient-to-b from-green-500 to-green-700"
+                              : "bg-gradient-to-b from-[var(--color-primary)] to-[#232a61] hover:from-[var(--color-primary)]/90 hover:to-[#232a61]/90 hover:shadow-lg"
                         }`}
                       >
                         {isSoldOut
                           ? "SOLD OUT"
                           : isInCart
-                          ? "VIEW CART"
-                          : dateCardPriceFooter(dateInfo)}
+                            ? "VIEW CART"
+                            : dateCardPriceFooter(dateInfo)}
                       </div>
                     </div>
                   );
@@ -566,16 +568,18 @@ export default function DatesSection({
         <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold mb-4">
           {heading}
         </h2>
-        <Button
-          type="button"
-          variant="outline"
-          className="bg-[#1a1a24] hover:bg-[#26273a] !text-white py-1 sm:py-1.5 px-6 sm:px-8 rounded-md text-xs sm:text-sm border border-white/25 shadow-sm"
-          onClick={() => {
-            if (!isPreviewMode) router.push("/auth/login");
-          }}
-        >
-          {text}
-        </Button>
+        {showAlreadyBookedLoginCta && (
+          <Button
+            type="button"
+            variant="outline"
+            className="bg-[#1a1a24] hover:bg-[#26273a] !text-white py-1 sm:py-1.5 px-6 sm:px-8 rounded-md text-xs sm:text-sm border border-white/25 shadow-sm"
+            onClick={() => {
+              if (!isPreviewMode) router.push("/auth/login");
+            }}
+          >
+            {text}
+          </Button>
+        )}
       </div>
 
       <div className="w-full max-w-5xl mx-auto relative z-10 px-2 sm:px-8 md:px-12">
@@ -621,10 +625,10 @@ export default function DatesSection({
                       isSoldOut
                         ? "border-red-500/60 cursor-not-allowed bg-slate-900/40 backdrop-blur-sm opacity-80 shadow-[0_0_25px_rgba(239,68,68,0.45)]"
                         : isInCart
-                        ? "border-[var(--color-primary)] bg-black/20 backdrop-blur-sm opacity-95 cursor-pointer shadow-[0_0_20px_var(--color-primary)]/30"
-                        : isPending
-                        ? "border-[var(--color-primary)] opacity-50 cursor-not-allowed shadow-[0_0_15px_rgba(60,70,147,0.25)] bg-transparent"
-                        : "border-[var(--color-primary)] cursor-pointer shadow-[0_0_15px_rgba(60,70,147,0.25)] bg-transparent hover:shadow-[0_0_25px_rgba(60,70,147,0.5)] hover:border-[var(--color-primary)] hover:bg-gradient-to-b hover:from-[var(--color-primary)]/10 hover:to-transparent"
+                          ? "border-[var(--color-primary)] bg-black/20 backdrop-blur-sm opacity-95 cursor-pointer shadow-[0_0_20px_var(--color-primary)]/30"
+                          : isPending
+                            ? "border-[var(--color-primary)] opacity-50 cursor-not-allowed shadow-[0_0_15px_rgba(60,70,147,0.25)] bg-transparent"
+                            : "border-[var(--color-primary)] cursor-pointer shadow-[0_0_15px_rgba(60,70,147,0.25)] bg-transparent hover:shadow-[0_0_25px_rgba(60,70,147,0.5)] hover:border-[var(--color-primary)] hover:bg-gradient-to-b hover:from-[var(--color-primary)]/10 hover:to-transparent"
                     }`}
                     key={`first-${index}`}
                     initial={{ opacity: 1, y: 0 }}
@@ -667,15 +671,15 @@ export default function DatesSection({
                         isSoldOut
                           ? "bg-gradient-to-b from-red-600 to-red-800 text-white font-semibold border-t border-red-500/40 tracking-wide"
                           : isInCart
-                          ? "bg-gradient-to-b from-[var(--color-primary)] to-[var(--color-primary)]/80 text-white font-semibold shadow-lg"
-                          : "bg-gradient-to-b from-[var(--color-primary)] to-[#232a61] hover:from-[var(--color-primary)]/90 hover:to-[#232a61]/90 hover:shadow-lg"
+                            ? "bg-gradient-to-b from-[var(--color-primary)] to-[var(--color-primary)]/80 text-white font-semibold shadow-lg"
+                            : "bg-gradient-to-b from-[var(--color-primary)] to-[#232a61] hover:from-[var(--color-primary)]/90 hover:to-[#232a61]/90 hover:shadow-lg"
                       }`}
                     >
                       {isSoldOut
                         ? "SOLD OUT"
                         : isInCart
-                        ? "VIEW CART"
-                        : dateCardPriceFooter(dateInfo)}
+                          ? "VIEW CART"
+                          : dateCardPriceFooter(dateInfo)}
                     </div>
                   </motion.div>
                 );
@@ -687,7 +691,7 @@ export default function DatesSection({
               {Array.from({
                 length: Math.min(
                   itemsPerRow,
-                  displayDates.length - itemsPerRow
+                  displayDates.length - itemsPerRow,
                 ),
               }).map((_, i) => {
                 const index = currentPage * itemsPerRow + itemsPerRow + i;
@@ -704,10 +708,10 @@ export default function DatesSection({
                       isSoldOut
                         ? "border-red-500/60 cursor-not-allowed bg-slate-900/40 backdrop-blur-sm opacity-80 shadow-[0_0_25px_rgba(239,68,68,0.45)]"
                         : isInCart
-                        ? "border-[var(--color-primary)] bg-black/20 backdrop-blur-sm opacity-95 cursor-pointer shadow-[0_0_20px_var(--color-primary)]/30"
-                        : isPending
-                        ? "border-[var(--color-primary)] opacity-50 cursor-not-allowed shadow-[0_0_15px_rgba(60,70,147,0.25)] bg-transparent"
-                        : "border-[var(--color-primary)] cursor-pointer shadow-[0_0_15px_rgba(60,70,147,0.25)] bg-transparent hover:shadow-[0_0_25px_rgba(60,70,147,0.5)] hover:border-[var(--color-primary)] hover:bg-gradient-to-b hover:from-[var(--color-primary)]/10 hover:to-transparent"
+                          ? "border-[var(--color-primary)] bg-black/20 backdrop-blur-sm opacity-95 cursor-pointer shadow-[0_0_20px_var(--color-primary)]/30"
+                          : isPending
+                            ? "border-[var(--color-primary)] opacity-50 cursor-not-allowed shadow-[0_0_15px_rgba(60,70,147,0.25)] bg-transparent"
+                            : "border-[var(--color-primary)] cursor-pointer shadow-[0_0_15px_rgba(60,70,147,0.25)] bg-transparent hover:shadow-[0_0_25px_rgba(60,70,147,0.5)] hover:border-[var(--color-primary)] hover:bg-gradient-to-b hover:from-[var(--color-primary)]/10 hover:to-transparent"
                     }`}
                     key={`second-${index}`}
                     initial={{ opacity: 1, y: 0 }}
@@ -753,15 +757,15 @@ export default function DatesSection({
                         isSoldOut
                           ? "bg-gradient-to-b from-red-600 to-red-800 text-white font-semibold border-t border-red-500/40 tracking-wide"
                           : isInCart
-                          ? "bg-gradient-to-b from-[var(--color-primary)] to-[var(--color-primary)]/80 text-white font-semibold shadow-lg"
-                          : "bg-gradient-to-b from-[var(--color-primary)] to-[#232a61] hover:from-[var(--color-primary)]/90 hover:to-[#232a61]/90 hover:shadow-lg"
+                            ? "bg-gradient-to-b from-[var(--color-primary)] to-[var(--color-primary)]/80 text-white font-semibold shadow-lg"
+                            : "bg-gradient-to-b from-[var(--color-primary)] to-[#232a61] hover:from-[var(--color-primary)]/90 hover:to-[#232a61]/90 hover:shadow-lg"
                       }`}
                     >
                       {isSoldOut
                         ? "SOLD OUT"
                         : isInCart
-                        ? "VIEW CART"
-                        : dateCardPriceFooter(dateInfo)}
+                          ? "VIEW CART"
+                          : dateCardPriceFooter(dateInfo)}
                     </div>
                   </motion.div>
                 );

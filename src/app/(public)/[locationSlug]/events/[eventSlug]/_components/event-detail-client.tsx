@@ -2,7 +2,7 @@
 
 import { useEventDetail } from "../_lib/hooks";
 import { EventDetail } from "@/services/common/events/type";
-import { useRef } from "react";
+import { useContext, useRef } from "react";
 
 // Import event components from onboarding flow
 import AboutEventSec from "@/app/(on-boarding)/on-boarding/_components/form-preview/_components/About-event-sec";
@@ -23,6 +23,17 @@ import { ThemeAnimationManager } from "@/components/theme-animations/theme-anima
 import { CartConflictProvider } from "@/app/(public)/vendor/checkout/_components/cart-conflict-provider";
 import { addCacheBusting } from "@/lib/image-utils";
 import { useCurrencyFormat } from "@/hooks/use-currency-format";
+import { ServerContext } from "@/lib/server-context";
+import { ThemeSchema } from "@/types/theme.types";
+import { normalizeHeadingEmphasis } from "@/lib/heading-emphasis";
+import {
+  heroBandVerticalClass,
+  heroBannerStackClass,
+  heroBannerSubheadingClass,
+  normalizeBannerHeadingAlign,
+  normalizeBannerHeadingValign,
+} from "@/lib/banner-heading-align";
+import { cn } from "@/lib/utils";
 
 interface EventDetailClientProps {
   event: EventDetail;
@@ -44,7 +55,7 @@ export default function EventDetailClient({
   const eventData = data?.data || initialEvent;
 
   // Refs for each section
-  const heroRef = useRef<HTMLDivElement>(null);
+  const heroRef = useRef<HTMLElement>(null);
   const aboutRef = useRef<HTMLDivElement>(null);
   const timelineRef = useRef<HTMLDivElement>(null);
   const packageRef = useRef<HTMLDivElement>(null);
@@ -65,14 +76,23 @@ export default function EventDetailClient({
       ? eventData.event_banner_heading_accent.trim()
       : null;
 
-  // Enhanced hero section styles
+  const { theme: serverTheme } = useContext(ServerContext) || {
+    theme: null,
+  };
+  const vendorTheme = serverTheme as ThemeSchema | null;
+  const bannerAlign = normalizeBannerHeadingAlign(
+    vendorTheme?.banner_heading_align,
+  );
+  const bannerValign = normalizeBannerHeadingValign(
+    vendorTheme?.banner_heading_valign,
+  );
+  const headingEmphasisFromSite =
+    vendorTheme?.typography?.headingEmphasis != null
+      ? normalizeHeadingEmphasis(vendorTheme.typography.headingEmphasis)
+      : undefined;
+
   const heroStyles = {
-    container: "relative w-full h-[100vh] min-h-[500px] overflow-hidden",
-    overlay: "absolute inset-0 bg-black/40 z-10",
-    videoBackground: "absolute inset-0 w-full h-full object-cover",
-    content:
-      "relative z-20 flex flex-col justify-center items-center h-full text-center text-white px-4",
-    subheading: "text-xl md:text-2xl font-medium max-w-3xl mx-auto",
+    videoBackground: "absolute inset-0 h-full w-full object-cover",
   };
 
   return (
@@ -87,54 +107,77 @@ export default function EventDetailClient({
 
         <CommonHeader variant="default" />
 
-        {/* Enhanced Hero Section */}
-        <div ref={heroRef} className={heroStyles.container}>
-          {eventData.event_banner_video ? (
-            <>
-              {/* Preload the banner image as a poster for the video */}
-              {eventData.event_banner_image && (
-                <div
-                  className={`${heroStyles.videoBackground} bg-cover bg-center`}
-                  style={{
-                    backgroundImage: `url(${eventData.event_banner_image})`,
-                  }}
-                />
-              )}
-              <video
-                src={eventData.event_banner_video}
-                poster={eventData.event_banner_image}
-                className={heroStyles.videoBackground}
-                autoPlay
-                muted
-                loop
-                playsInline
-                preload="auto"
-              />
-            </>
-          ) : (
-            eventData.event_banner_image && (
-              <img
-                src={addCacheBusting(eventData.event_banner_image)}
-                alt={eventData.event_name || "Event banner"}
-                className={heroStyles.videoBackground}
-                style={{ objectFit: "cover" }}
-              />
-            )
+        {/* Hero: event copy + Site Essentials align / valign / heading style (vendor theme) */}
+        <section
+          ref={heroRef}
+          className={cn(
+            "relative mx-auto flex h-screen w-full justify-center",
+            heroBandVerticalClass(bannerValign),
           )}
-          <div className={heroStyles.overlay}></div>
-          <div className={heroStyles.content}>
-            <SiteHeading
-              level={1}
-              title={heroTitle}
-              accentHint={heroAccentHint}
-              variant="onDark"
-              className="mb-4 font-bold !text-4xl md:!text-5xl lg:!text-6xl"
-            />
-            <h2 className={heroStyles.subheading}>
-              {eventData.event_banner_sub_heading}
-            </h2>
+          style={{ minHeight: "500px" }}
+        >
+          <div className="absolute inset-0 overflow-hidden">
+            {eventData.event_banner_video ? (
+              <>
+                {eventData.event_banner_image && (
+                  <div
+                    className={`${heroStyles.videoBackground} bg-cover bg-center`}
+                    style={{
+                      backgroundImage: `url(${eventData.event_banner_image})`,
+                    }}
+                  />
+                )}
+                <video
+                  src={eventData.event_banner_video}
+                  poster={eventData.event_banner_image}
+                  className={heroStyles.videoBackground}
+                  autoPlay
+                  muted
+                  loop
+                  playsInline
+                  preload="auto"
+                />
+              </>
+            ) : (
+              eventData.event_banner_image && (
+                <img
+                  src={addCacheBusting(eventData.event_banner_image)}
+                  alt={eventData.event_name || "Event banner"}
+                  className={heroStyles.videoBackground}
+                  style={{ objectFit: "cover" }}
+                />
+              )
+            )}
+            <div className="absolute inset-0 z-10 bg-black/40" aria-hidden />
           </div>
-        </div>
+
+          <div className="relative z-20 container mx-auto w-full overflow-visible px-4">
+            <div
+              className={cn(
+                heroBannerStackClass(bannerAlign),
+                "overflow-visible",
+              )}
+            >
+              <SiteHeading
+                level={1}
+                title={heroTitle}
+                accentHint={heroAccentHint}
+                emphasis={headingEmphasisFromSite}
+                variant="onDark"
+                align={bannerAlign}
+                className="mb-4 font-bold !text-4xl md:!text-5xl lg:!text-6xl"
+              />
+              <h2
+                className={cn(
+                  "text-xl font-medium text-white md:text-2xl",
+                  heroBannerSubheadingClass(bannerAlign),
+                )}
+              >
+                {eventData.event_banner_sub_heading}
+              </h2>
+            </div>
+          </div>
+        </section>
 
         {/* About Section */}
         <div ref={aboutRef}>
@@ -224,6 +267,7 @@ export default function EventDetailClient({
         )}
         <div ref={datesSectionRef}>
           <BrochureSection
+            showMapImmediately
             location={{
               title: "EVENT LOCATION",
               description:

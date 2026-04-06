@@ -53,7 +53,7 @@ export function SitePreview({ formValues }: Readonly<SitePreviewProps>) {
 
   // Helper function to convert File objects to blob URLs for preview
   const getPreviewUrl = (
-    value: string | File | null | undefined
+    value: string | File | null | undefined,
   ): string | undefined => {
     if (!value) return undefined;
     if (typeof value === "string") return value;
@@ -63,9 +63,8 @@ export function SitePreview({ formValues }: Readonly<SitePreviewProps>) {
 
   // ServerContext already provided at layout level - no need to create context value
 
-  const useGradientBg = formValues.colors?.background?.includes(
-    "linear-gradient",
-  );
+  const useGradientBg =
+    formValues.colors?.background?.includes("linear-gradient");
 
   const mainBandStyle = useGradientBg
     ? ({
@@ -75,13 +74,20 @@ export function SitePreview({ formValues }: Readonly<SitePreviewProps>) {
     : previewStyles;
 
   const mainBandClass = useGradientBg
-    ? "bg-none text-[color:var(--color-text)]"
-    : "bg-[color:var(--color-background)] text-[color:var(--color-text)]";
+    ? "bg-none text-[color:var(--color-text)] font-body"
+    : "bg-[color:var(--color-background)] text-[color:var(--color-text)] font-body";
 
   return (
     <div
-      style={previewStyles}
-      className="text-[color:var(--color-text)] font-[var(--font-body)]"
+      style={{
+        ...previewStyles,
+        // Must set font-family here (not only --font-body): descendants inherit
+        // computed font from this subtree. Otherwise plain <p> text walks up past
+        // this div and uses <body>'s global theme font while SiteHeading still
+        // updates via inline var(--font-heading).
+        fontFamily: "var(--font-body)",
+      }}
+      className="text-[color:var(--color-text)] font-body"
     >
       <SiteEssentialsGoogleFontsLoader
         linkId="site-essentials-google-fonts-site-preview"
@@ -101,6 +107,10 @@ export function SitePreview({ formValues }: Readonly<SitePreviewProps>) {
         coverVideo={getPreviewUrl(formValues.cover_video) || null}
         bannerHeading={formValues.banner_heading}
         bannerSubHeading={formValues.banner_sub_heading}
+        bannerHeadingAccent={formValues.banner_heading_accent}
+        headingEmphasis={formValues.typography?.headingEmphasis}
+        bannerHeadingAlign={formValues.banner_heading_align}
+        bannerHeadingValign={formValues.banner_heading_valign}
       />
       <div className={mainBandClass} style={mainBandStyle}>
         <ExperienceSection
@@ -121,7 +131,9 @@ export function SitePreview({ formValues }: Readonly<SitePreviewProps>) {
         />
         <RecentEventsGlimpse
           galleryImages={[]}
-          galleryTitle={formValues.event_gallery_title || "Recent Events Glimpse"}
+          galleryTitle={
+            formValues.event_gallery_title || "Recent Events Glimpse"
+          }
         />
       </div>
       <ContactFormSection

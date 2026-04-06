@@ -1,29 +1,56 @@
 "use client";
 
 import { useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { ArrowLeft, Loader2, Rocket } from "lucide-react";
 import { EventPreview } from "@/app/(protected)/vendor/events/_components/event-preview";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EventDetailData } from "@/services/vendor/events/type";
 import { useEventData } from "@/app/(protected)/vendor/events/_lib/hooks/useEventData";
+import { eventsService } from "@/services/vendor/events/events.service";
+import { stepEightSchema } from "@/app/(protected)/vendor/events/_components/tab-event-form/schema";
 import { useSitePreviewStore } from "@/store/site-preview.store";
 import { PreviewProvider } from "@/contexts/preview-context";
-import { useSiteEssentialsQuery } from "@/app/(protected)/_shared/sites-essentials/_lib/queries";
+import {
+  siteEssentialsKeys,
+  useSiteEssentialsMutation,
+  useSiteEssentialsQuery,
+} from "@/app/(protected)/_shared/sites-essentials/_lib/queries";
 import { SiteEssentialsFormValues } from "@/app/(protected)/_shared/sites-essentials/_lib/schema";
 import { PreviewThemeCustomizer } from "@/components/preview/preview-theme-customizer";
+import { themeKeys } from "@/hooks/use-theme-query";
+import { useToast } from "@/components/ui/use-toast";
 
 export default function EventPreviewPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const eventId = searchParams.get("id");
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+  const { mutateAsync: saveSiteEssentials, isPending: isSavingTheme } =
+    useSiteEssentialsMutation();
 
-  // Use the existing hook to fetch event data
-  const { eventData, isLoading } = useEventData(eventId || undefined);
+  const { eventData, isLoading, invalidateCache } = useEventData(
+    eventId || undefined,
+  );
+
+  const [publishDialogOpen, setPublishDialogOpen] = useState(false);
+  const [isPublishing, setIsPublishing] = useState(false);
 
   // Get site essentials from Zustand store (populated after save or preview click)
-  const { previewData: storeSiteEssentials } = useSitePreviewStore();
+  const { previewData: storeSiteEssentials, setPreviewData } =
+    useSitePreviewStore();
 
   // Fetch from API as a fallback for vendors who haven't interacted with the
   // site essentials form in the current session (store would be empty)
@@ -36,8 +63,9 @@ export default function EventPreviewPage() {
     (apiSiteEssentials as SiteEssentialsFormValues | null) ??
     null;
 
-  const [themeTweak, setThemeTweak] =
-    useState<SiteEssentialsFormValues | null>(null);
+  const [themeTweak, setThemeTweak] = useState<SiteEssentialsFormValues | null>(
+    null,
+  );
 
   const siteEssentials: SiteEssentialsFormValues | null = useMemo(() => {
     return themeTweak ?? baseSiteEssentials;
@@ -47,12 +75,137 @@ export default function EventPreviewPage() {
     setThemeTweak(null);
   }, [eventId]);
 
+  /** Match site preview: persist Try theme tweaks so Site Essentials / site preview stay in sync. */
+  const handleThemeValuesChange = useCallback(
+    (next: SiteEssentialsFormValues) => {
+      setThemeTweak(next);
+      setPreviewData(next);
+    },
+    [setPreviewData],
+  );
+
   const handleGoBack = () => {
     if (eventId && /^\d+$/.test(eventId)) {
       router.push(`/vendor/events/${eventId}`);
       return;
     }
     router.back();
+  };
+
+  /** Persist current preview theme (colors, fonts, hero align) like Site Essentials → Save. */
+  const handleSaveTheme = async () => {
+    if (!siteEssentials) return;
+    try {
+      await saveSiteEssentials({
+        ...siteEssentials,
+        _method: "PATCH",
+      } as Partial<SiteEssentialsFormValues> & { _method: "PATCH" });
+      await queryClient.invalidateQueries({ queryKey: themeKeys.all });
+      await queryClient.invalidateQueries({
+        queryKey: siteEssentialsKeys.details(),
+      });
+      try {
+        setPreviewData(structuredClone(siteEssentials));
+      } catch {
+        setPreviewData(JSON.parse(JSON.stringify(siteEssentials)));
+      }
+      setThemeTweak(null);
+      router.refresh();
+      toast({
+        title: "Theme saved",
+        description:
+          "Site Essentials were updated. Live site and previews will use these colors and fonts.",
+      });
+    } catch {
+      toast({
+        title: "Could not save theme",
+        description:
+          "Open Site Essentials and use Save there, or try again in a moment.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const eventPayloadRoot = eventData?.data as EventDetailData | undefined;
+  const isEventCancelled =
+    eventPayloadRoot &&
+    typeof eventPayloadRoot === "object" &&
+    "status" in eventPayloadRoot &&
+    typeof (eventPayloadRoot as { status: string }).status === "string"
+      ? (eventPayloadRoot as { status: string }).status === "cancelled"
+      : false;
+
+  const handlePublishEvent = async () => {
+    if (!eventId || !/^\d+$/.test(eventId) || !eventPayloadRoot) {
+      toast({
+        title: "Cannot publish",
+        description: "Event data is not loaded. Go back to the editor and try again.",
+        variant: "destructive",
+      });
+      return;
+    }
+    if (isEventCancelled) {
+      toast({
+        title: "Event is cancelled",
+        description: "Cancelled events cannot be published.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const numericId = parseInt(eventId, 10);
+    const stepEventId = eventPayloadRoot.stepOne?.event_id ?? numericId;
+
+    const stepEightPayload = {
+      step: 8 as const,
+      event_id: Number(stepEventId),
+      reminder_email_before_days:
+        eventPayloadRoot.stepEight?.reminder_email_before_days ?? 10,
+      submit_type: "active" as const,
+      is_duplicate: false,
+    };
+
+    const parsed = stepEightSchema.safeParse(stepEightPayload);
+    if (!parsed.success) {
+      toast({
+        title: "Cannot publish from preview",
+        description:
+          "Complete the Publish tab in the event editor (e.g. duplicate location fields) and submit from there.",
+        variant: "destructive",
+      });
+      setPublishDialogOpen(false);
+      return;
+    }
+
+    setIsPublishing(true);
+    try {
+      const response = await eventsService.storeStepEightData(parsed.data);
+      if (response?.status) {
+        invalidateCache?.();
+        setPublishDialogOpen(false);
+        toast({
+          title: "Event published",
+          description: "Your event was submitted as live. Redirecting to events…",
+        });
+        router.push("/vendor/events");
+      } else {
+        toast({
+          title: "Publish failed",
+          description:
+            response?.message ||
+            "Use the Publish tab in the editor to fix any issues and try again.",
+          variant: "destructive",
+        });
+      }
+    } catch {
+      toast({
+        title: "Publish failed",
+        description: "Use the Publish tab in the editor or try again shortly.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsPublishing(false);
+    }
   };
 
   if (isLoading) {
@@ -143,22 +296,80 @@ export default function EventPreviewPage() {
         {siteEssentials ? (
           <PreviewThemeCustomizer
             values={siteEssentials}
-            onValuesChange={setThemeTweak}
+            onValuesChange={handleThemeValuesChange}
             brandName={siteEssentials.name?.trim() || "Event preview"}
+            sheetDescription="Adjust fonts, colors, and hero layout here. Save theme (top bar) writes Site Essentials. Publish event submits this event as live — same as the Publish tab. Event copy still saves in the editor."
           />
         ) : null}
 
-        {/* Preview chrome: Back button in its own layer so it doesn't overlap header */}
-        <div className="fixed top-4 left-4 z-[60] isolate">
+        <AlertDialog open={publishDialogOpen} onOpenChange={setPublishDialogOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Publish this event?</AlertDialogTitle>
+              <AlertDialogDescription>
+                This uses the same action as the editor&apos;s Publish tab: the
+                event will be submitted as{" "}
+                <span className="font-medium text-foreground">live</span>{" "}
+                (reminder email settings from your last saved publish step apply).
+                You can still edit the event later from Events.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={isPublishing}>Cancel</AlertDialogCancel>
+              <Button
+                type="button"
+                variant="event-primary"
+                disabled={isPublishing}
+                onClick={() => void handlePublishEvent()}
+              >
+                {isPublishing ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : null}
+                Publish now
+              </Button>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
+        <div className="pointer-events-none fixed left-4 right-4 top-4 z-[60] flex flex-wrap items-start justify-between gap-2 isolate">
           <Button
             variant="event-primary"
             onClick={handleGoBack}
             size="sm"
-            className="shadow-md ring-1 ring-black/10"
+            className="pointer-events-auto shadow-md ring-1 ring-black/10"
           >
-            <ArrowLeft className="h-4 w-4 mr-2" />
+            <ArrowLeft className="mr-2 h-4 w-4" />
             Back to Editor
           </Button>
+          <div className="pointer-events-auto flex flex-wrap items-center justify-end gap-2">
+            {siteEssentials ? (
+              <Button
+                type="button"
+                size="sm"
+                disabled={isSavingTheme}
+                onClick={() => void handleSaveTheme()}
+                className="border border-slate-200 bg-white font-medium text-slate-900 shadow-md hover:bg-slate-50"
+              >
+                {isSavingTheme ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : null}
+                Save theme
+              </Button>
+            ) : null}
+            <Button
+              type="button"
+              variant="event-primary"
+              size="sm"
+              disabled={
+                !eventPayloadRoot || isEventCancelled || isPublishing
+              }
+              onClick={() => setPublishDialogOpen(true)}
+              className="shadow-md ring-1 ring-black/10"
+            >
+              <Rocket className="mr-2 h-4 w-4" />
+              Publish event
+            </Button>
+          </div>
         </div>
       </div>
     </PreviewProvider>

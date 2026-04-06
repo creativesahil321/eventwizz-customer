@@ -63,8 +63,7 @@ export default function QuantityControls({
               initial={{ scale: 1.2 }}
               animate={{ scale: 1 }}
               transition={{ duration: 0.15 }}
-              className="min-w-[2rem] text-center font-semibold text-lg"
-              style={{ color: "var(--color-primary)" }}
+              className="min-w-[2rem] text-center text-lg font-semibold text-blue-600"
             >
               {quantity}
             </motion.div>
@@ -108,11 +107,11 @@ export default function QuantityControls({
             transition={{ duration: 0.2 }}
           >
             <Button
-              variant="event-outline"
+              variant="outline"
               size={size}
               onClick={onIncrease}
               disabled={!canIncrease}
-              className="transition-all duration-200 hover:scale-105"
+              className="border-slate-300 text-slate-900 transition-all duration-200 hover:scale-105 hover:bg-slate-50"
             >
               <Plus className={`${iconSize} mr-1`} />
               Add

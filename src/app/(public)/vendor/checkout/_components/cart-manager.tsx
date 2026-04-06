@@ -424,10 +424,7 @@ export default function CartManager({}: CartManagerProps) {
         {...ANIMATION_VARIANTS.FADE_IN_UP}
       >
         <div className="flex items-center space-x-3">
-          <ShoppingCart
-            className="h-6 w-6"
-            style={{ color: "var(--color-primary)" }}
-          />
+          <ShoppingCart className="h-6 w-6 text-blue-600" />
           <h2 className="text-2xl font-bold text-black">Your Cart</h2>
         </div>
         <div className="flex items-center space-x-2 flex-wrap">
@@ -437,18 +434,17 @@ export default function CartManager({}: CartManagerProps) {
               <Button
                 variant="outline"
                 size="sm"
-                className="flex items-center gap-2 text-primary hover:text-primary hover:bg-primary/10 border-primary/20"
-                style={{
-                  borderColor: "var(--color-primary)",
-                  color: "var(--color-primary)",
-                }}
+                className="flex items-center gap-2 border-blue-600 text-blue-700 hover:bg-blue-50 hover:text-blue-800"
               >
                 <CalendarPlus className="h-4 w-4" />
                 <span>Add More Dates</span>
               </Button>
             </Link>
           )}
-          <Badge variant="primary" className="px-3 py-1 text-white">
+          <Badge
+            variant="outline"
+            className="border-transparent bg-blue-600 px-3 py-1 text-white"
+          >
             {totalCartItems} {totalCartItems === 1 ? "item" : "items"}
           </Badge>
           {unsavedDatesCount > 0 && (

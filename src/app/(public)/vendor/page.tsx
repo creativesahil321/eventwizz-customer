@@ -11,6 +11,14 @@ import { motion } from "framer-motion";
 import SubscribeSection from "./_components/EventListPage/subscribe";
 import { CheckCircle2, Map, LayoutGrid } from "lucide-react";
 import { SiteHeading } from "@/components/public/site-heading";
+import { normalizeHeadingEmphasis } from "@/lib/heading-emphasis";
+import {
+  heroBandVerticalClass,
+  heroBannerStackClass,
+  vendorHomeSubheroClass,
+  vendorHomeTrustRowClass,
+} from "@/lib/banner-heading-align";
+import { cn } from "@/lib/utils";
 
 export default function VendorSiteHomePage() {
   const router = useRouter();
@@ -43,6 +51,10 @@ export default function VendorSiteHomePage() {
     settings.banner_heading_accent.trim().length > 0
       ? settings.banner_heading_accent.trim()
       : null;
+
+  /** Vendor multi-location home is always centered; align/valign from Site Essentials apply on location + event pages only. */
+  const heroAlign = "center" as const;
+  const heroValign = "center" as const;
 
   useEffect(() => {
     const checkMobile = () => {
@@ -88,48 +100,66 @@ export default function VendorSiteHomePage() {
       />
 
       {/* Hero — contained height, tenant cover or default banner */}
-      <section className="relative flex min-h-[70vh] items-center justify-center overflow-hidden">
-        <Image
-          src={heroImageSrc}
-          alt=""
-          fill
-          className="object-cover"
-          priority
-          sizes="100vw"
-          unoptimized={/^https?:\/\//i.test(heroImageSrc)}
-        />
-        <div
-          className="absolute inset-0 bg-gradient-to-b from-black/70 via-black/45 to-black/80"
-          aria-hidden
-        />
-        <div className="relative z-10 w-full px-6 text-center">
+      <section
+        className={cn(
+          "relative flex min-h-screen w-full justify-center",
+          heroBandVerticalClass(heroValign),
+        )}
+      >
+        <div className="absolute inset-0 overflow-hidden" aria-hidden>
+          <Image
+            src={heroImageSrc}
+            alt=""
+            fill
+            className="object-cover"
+            priority
+            sizes="100vw"
+            unoptimized={/^https?:\/\//i.test(heroImageSrc)}
+          />
+          <div
+            className="absolute inset-0 bg-gradient-to-b from-black/70 via-black/45 to-black/80"
+            aria-hidden
+          />
+        </div>
+        {/* Same horizontal frame as LocationSelectionHeader + HeroBanner (Site Essentials preview) */}
+        <div className="relative z-10 container mx-auto overflow-visible px-4">
           <motion.div
-            initial={{ y: 24, opacity: 0 }}
+            initial={{ y: 28, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
-            transition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
-            className="mx-auto max-w-4xl"
+            transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
+            className={cn(heroBannerStackClass(heroAlign), "overflow-visible")}
           >
+            <p className="mb-4 text-[11px] font-semibold uppercase tracking-[0.32em] text-white/50 sm:text-xs">
+              Curated for your city
+            </p>
             <SiteHeading
               level={1}
               title={heroHeading}
               accentHint={heroAccentHint}
+              emphasis={normalizeHeadingEmphasis(
+                settings?.typography?.headingEmphasis,
+              )}
               variant="onDark"
-              className="mb-6"
+              align={heroAlign}
+              className="mb-6 font-bold !text-4xl md:!text-5xl lg:!text-6xl"
             />
 
-            <p className="mx-auto mb-8 max-w-2xl text-base leading-relaxed text-white/85 md:text-lg">
+            <p className={vendorHomeSubheroClass(heroAlign)}>
               Discover verified venues and curated events in your area. Browse
               by location to find the perfect experience.
             </p>
 
-            <div className="flex flex-wrap items-center justify-center gap-6 text-sm text-white/80 md:gap-8">
+            <div className={vendorHomeTrustRowClass(heroAlign)}>
               {trustItems.map((label) => (
-                <div key={label} className="flex items-center gap-2">
+                <div
+                  key={label}
+                  className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.07] px-4 py-2.5 text-sm text-white/90 shadow-lg shadow-black/20 backdrop-blur-md md:px-5"
+                >
                   <CheckCircle2
                     className="h-4 w-4 shrink-0 text-[color:var(--color-primary)] md:h-[18px] md:w-[18px]"
                     aria-hidden
                   />
-                  <span className="font-medium text-white/95">{label}</span>
+                  <span className="font-medium tracking-tight">{label}</span>
                 </div>
               ))}
             </div>

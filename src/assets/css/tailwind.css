@@ -186,13 +186,34 @@
     background: var(--color-background);
   }
 
+  /* Readable default: structural headings use body stack. Reserve
+     `var(--font-heading)` for marketing lines via `SiteHeading` or `.font-heading`. */
   h1,
   h2,
   h3,
   h4,
   h5,
   h6 {
-    font-family: var(--font-heading);
+    font-family: var(--font-body);
+  }
+
+  /* Consistent pointer on interactive controls (raw <button>, inputs, Radix triggers). */
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]),
+  input[type="button"]:not(:disabled),
+  input[type="submit"]:not(:disabled),
+  input[type="reset"]:not(:disabled),
+  input[type="image"]:not(:disabled) {
+    cursor: pointer;
+  }
+
+  button:disabled,
+  button[disabled],
+  input[type="button"]:disabled,
+  input[type="submit"]:disabled,
+  input[type="reset"]:disabled,
+  input[type="image"]:disabled {
+    cursor: not-allowed;
   }
 }
 

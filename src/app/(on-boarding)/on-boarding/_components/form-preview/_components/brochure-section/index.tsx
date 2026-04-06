@@ -36,12 +36,15 @@ type BrochureSectionProps = {
   location: LocationData;
   downloads?: DownloadItem[];
   price: PriceProps;
+  /** When true, the location map mounts and loads immediately (public event pages). */
+  showMapImmediately?: boolean;
 };
 
 export default function BrochureSection({
   location,
   downloads = [],
   price,
+  showMapImmediately = false,
 }: BrochureSectionProps) {
   const { textColorClass } = useOnboarding();
   const { format: formatMoney } = useCurrencyFormat();
@@ -95,6 +98,7 @@ export default function BrochureSection({
             latitude={location.latitude}
             longitude={location.longitude}
             className="w-full h-full"
+            showMapImmediately={showMapImmediately}
           />
         </section>
 

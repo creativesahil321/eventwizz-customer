@@ -670,7 +670,7 @@ export default function BookingSummary({}: BookingSummaryProps) {
             <div className="space-y-3">
               <Button
                 size="lg"
-                variant="event-primary"
+                variant="outline"
                 onClick={(e) => {
                   // 🛡️ CRITICAL: Prevent double-click immediately
                   if (
@@ -707,7 +707,7 @@ export default function BookingSummary({}: BookingSummaryProps) {
                   processCheckoutMutation.isPending ||
                   !selectedGateway
                 }
-                className="w-full py-3 font-semibold text-white disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                className="w-full cursor-pointer rounded-md border-0 py-3 font-semibold shadow-sm enabled:bg-blue-600 enabled:text-white enabled:hover:bg-blue-700 enabled:hover:text-white disabled:cursor-not-allowed disabled:border disabled:border-slate-300 disabled:bg-slate-200 disabled:text-slate-800 disabled:opacity-100"
               >
                 {isProcessing ||
                 isPending ||

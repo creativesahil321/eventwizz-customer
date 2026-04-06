@@ -341,10 +341,7 @@ export default function DateAccordion({
       >
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex min-w-0 flex-1 items-center gap-2 sm:space-x-3">
-            <Calendar
-              className="h-5 w-5 flex-shrink-0"
-              style={{ color: "var(--color-primary)" }}
-            />
+            <Calendar className="h-5 w-5 flex-shrink-0 text-blue-600" />
             <CardTitle className="truncate text-base font-medium text-black">
               {formatDate(date)}
             </CardTitle>
@@ -430,10 +427,7 @@ export default function DateAccordion({
             {totalAmount > 0 && (
               <div className="text-right shrink-0">
                 <p className="text-sm text-gray-600">Date Total</p>
-                <p
-                  className="font-semibold"
-                  style={{ color: "var(--color-primary)" }}
-                >
+                <p className="font-semibold text-blue-600">
                   {formatMoney(totalAmount)}
                 </p>
               </div>
@@ -479,7 +473,7 @@ export default function DateAccordion({
               {dateData.tables.length > 0 && (
                 <TabsTrigger
                   value="tables"
-                  className="flex items-center justify-center gap-1 sm:gap-2 text-xs sm:text-sm px-1 sm:px-2 min-w-0"
+                  className="flex min-w-0 items-center justify-center gap-1 px-1 text-xs data-[state=active]:!bg-blue-600 data-[state=active]:!text-white sm:gap-2 sm:px-2 sm:text-sm"
                 >
                   <UtensilsCrossed className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
                   <span className="truncate">
@@ -493,7 +487,7 @@ export default function DateAccordion({
               {dateData.tickets.length > 0 && (
                 <TabsTrigger
                   value="tickets"
-                  className="flex items-center justify-center gap-1 sm:gap-2 text-xs sm:text-sm px-1 sm:px-2 min-w-0"
+                  className="flex min-w-0 items-center justify-center gap-1 px-1 text-xs data-[state=active]:!bg-blue-600 data-[state=active]:!text-white sm:gap-2 sm:px-2 sm:text-sm"
                 >
                   <Ticket className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
                   <span className="truncate">
@@ -507,7 +501,7 @@ export default function DateAccordion({
               {dateData.drinks.length > 0 && (
                 <TabsTrigger
                   value="drinks"
-                  className="flex items-center justify-center gap-1 sm:gap-2 text-xs sm:text-sm px-1 sm:px-2 min-w-0"
+                  className="flex min-w-0 items-center justify-center gap-1 px-1 text-xs data-[state=active]:!bg-blue-600 data-[state=active]:!text-white sm:gap-2 sm:px-2 sm:text-sm"
                 >
                   <Wine className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
                   <span className="truncate">

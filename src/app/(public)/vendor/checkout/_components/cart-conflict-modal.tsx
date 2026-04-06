@@ -161,10 +161,10 @@ export default function CartConflictModal({
             </Button>
 
             <Button
-              variant="event-outline"
+              variant="outline"
               onClick={handleContinueWithCurrent}
               disabled={isProcessing}
-              className="w-full"
+              className="w-full border-slate-300 text-slate-900 hover:bg-slate-50"
             >
               {isProcessing && selectedAction === "continue" ? (
                 <>
@@ -183,10 +183,10 @@ export default function CartConflictModal({
 
         <DialogFooter className="pt-2">
           <Button
-            variant="ghost"
+            variant="outline"
             onClick={handleClose}
             disabled={isProcessing}
-            className="w-full text-gray-500 hover:text-gray-700"
+            className="w-full border-slate-300 text-slate-900 hover:bg-slate-50"
           >
             Cancel
           </Button>

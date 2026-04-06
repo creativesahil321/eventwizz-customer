@@ -119,7 +119,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const systemPrompt = `You are an expert event marketing copywriter. Generate professional, engaging content for an event listing on a venue booking platform.
+    const systemPrompt = `You are an expert event venue marketing copywriter. Generate professional, engaging content for a single event listing on a venue booking platform (same quality bar as full venue onboarding).
 
 CRITICAL RULES:
 1. Return ONLY valid JSON, no explanations or markdown
@@ -130,11 +130,18 @@ CRITICAL RULES:
 6. FAQ answers should be helpful and detailed but within limits
 7. Descriptions should be compelling and SEO-friendly
 8. Do NOT include any HTML tags in text fields
-9. IMPORTANT: If the vendor provides specific details about tickets, tables, pricing, seating, food, or capacity in the description, use those EXACT numbers and specifications.
-10. For dates with booking_type "tables" or "both": include payment_type ("full" or "deposit"). If deposit, set is_deposit_enabled true and include deposit_type, deposit_value, and deposit_due_date (YYYY-MM-DD, before event_date).
+9. IMPORTANT: If the vendor provides specific details in "Additional Details" / vendor requirements (tickets, tables, pricing, seating, food, drinks, capacity, dates, deposit rules, inclusions, exclusions, dress code, age limits, etc.), use those EXACT numbers and specifications in stepThree (dates/tickets/tables), stepFour (menu), stepFive (drinks), stepOne copy, stepTwo package_details, and stepSeven FAQs where relevant. Always honor the vendor's stated preferences over generic defaults. Never contradict the vendor requirements.
+10. For dates with booking_type "tables" or "both": include payment_type ("full" or "deposit"). If deposit is used, set is_deposit_enabled true and include deposit_type ("amount" or "percentage"), deposit_value (e.g. "50" for £50 or "25" for 25%), and deposit_due_date (YYYY-MM-DD, before event_date).
 11. stepThree.dates: event_date must be YYYY-MM-DD. List dates in chronological ascending order (earliest first). No duplicate event_dates. Each event_date should be today or in the future.
-12. stepFour (menu) is OPTIONAL: If the event type suggests no food/catering, set catering_option to 0 and menus to an empty array.
-13. stepFive (drinks) is OPTIONAL: If the event type suggests no drinks, set packages to an empty array.`;
+12. stepFour (menu) is OPTIONAL: If the event type or vendor requirements suggest no food/catering, set catering_option to 0 and menus to an empty array []. Keep menu_title/menu_description minimal when skipped.
+13. stepFive (drinks) is OPTIONAL: If the event type or vendor requirements suggest no drink packages, set packages to an empty array []. Keep drink_title/drink_description minimal when skipped.
+14. stepSeven.faqs: When vendor requirements exist, include FAQs that accurately reflect them (pricing, refunds, what's included, accessibility) without inventing policies that contradict the vendor text.`;
+
+    const vendorReq =
+      typeof input.eventDescription === "string"
+        ? input.eventDescription.trim()
+        : "";
+    const hasVendorRequirements = vendorReq.length > 0;
 
     const userPrompt = `Generate complete event content for:
 
@@ -146,7 +153,12 @@ ${input.venueCity ? `- City: "${input.venueCity}"` : ""}
 ${input.venueAddress ? `- Address: "${input.venueAddress}"` : ""}
 ${input.guestCount ? `- Expected Guests: "${input.guestCount}"` : ""}
 ${input.priceRange ? `- Price Range: "${input.priceRange}"` : ""}
-${input.eventDescription ? `\nVENDOR'S REQUIREMENTS (USE THESE SPECS):\n"${input.eventDescription}"` : ""}
+${
+  hasVendorRequirements
+    ? `\nVENDOR'S DETAILED REQUIREMENTS (HARD CONSTRAINTS — USE THESE EXACT SPECS FOR TICKETS/TABLES/MENU/DRINKS/PRICING AND ALL RELEVANT COPY):\n"${vendorReq}"\n`
+    : ""
+}
+Use one object inside stepThree.dates unless the vendor requirements clearly describe multiple distinct event dates (then add more objects, chronological, no duplicate event_date).
 
 Generate this EXACT JSON structure:
 
@@ -182,17 +194,20 @@ Generate this EXACT JSON structure:
     "dates": [
       {
         "event_date": "YYYY-MM-DD (chronological order, no duplicates; today or future)",
-        "booking_type": "both",
+        "booking_type": "tickets | tables | both — MUST match vendor requirements when stated",
         "tickets": [
-          {"title": "string (max 25 chars)", "description": "string (max 160 chars)", "total_capacity": "string (number)", "price": "string"},
+          {"title": "string (max 25 chars)", "description": "string (max 160 chars)", "total_capacity": "string (numeric string only, e.g. 200)", "price": "string (numeric string only, e.g. 45)"},
           {"title": "string", "description": "string", "total_capacity": "string", "price": "string"}
         ],
         "tables": [
           {"min_persons": "string", "max_persons": "string", "price": "string", "total_tables": "string"},
           {"min_persons": "string", "max_persons": "string", "price": "string", "total_tables": "string"}
         ],
-        "payment_type": "full",
-        "is_deposit_enabled": false
+        "payment_type": "full or deposit",
+        "is_deposit_enabled": false,
+        "deposit_type": "amount or percentage (only when payment_type is deposit)",
+        "deposit_value": "string",
+        "deposit_due_date": "YYYY-MM-DD (before event_date when deposit)"
       }
     ]
   },
@@ -233,7 +248,13 @@ Generate this EXACT JSON structure:
   }
 }
 
-Make times chronologically ascending. Make prices realistic for the event type. Return ONLY the JSON.`;
+Make times chronologically ascending. Make prices realistic for the event type and consistent with vendor requirements when provided.
+${
+  hasVendorRequirements
+    ? `\nFINAL CHECK: Every ticket/table/menu/drink/FAQ item must be consistent with the vendor requirements quoted above. Do not invent conflicting prices, capacities, or policies.\n`
+    : ""
+}
+Return ONLY the JSON.`;
 
     const result: FallbackResult = await tryModelsWithFallback(apiKey, {
       messages: [

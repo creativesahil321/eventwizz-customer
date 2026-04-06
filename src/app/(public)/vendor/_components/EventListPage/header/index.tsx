@@ -124,7 +124,7 @@ export default function HeadersSec({
           <div className="flex items-center gap-3 w-1/3 ">
             <Link
               href={headerData.browseEvent.link}
-              className="text-sm hover:text-[color:var(--color-primary)] transition-colors border-2 border-[color:var(--color-primary)] rounded-lg px-2 py-1"
+              className="text-sm text-[var(--color-on-header)] transition-colors border-2 border-[color:var(--color-primary)] rounded-lg px-2 py-1 hover:opacity-90 hover:underline hover:decoration-2 hover:underline-offset-2 hover:decoration-[color:var(--color-primary)]"
             >
               {headerData.browseEvent.linkText}
             </Link>
@@ -147,7 +147,7 @@ export default function HeadersSec({
                 <Link
                   key={index}
                   href={link}
-                  className="flex items-center gap-1 hover:text-[color:var(--color-primary)] transition-colors border-2 border-[color:var(--color-primary)] rounded-lg px-2 py-1"
+                  className="flex items-center gap-1 text-[var(--color-on-header)] transition-colors border-2 border-[color:var(--color-primary)] rounded-lg px-2 py-1 hover:opacity-90 hover:underline hover:decoration-2 hover:underline-offset-2 hover:decoration-[color:var(--color-primary)]"
                 >
                   {IconComponent && <IconComponent size={16} />}
                   {linkText}
@@ -180,14 +180,14 @@ export default function HeadersSec({
           {isAuthenticated ? (
             <Link
               href={`/${session?.user?.account_type}/dashboard`}
-              className="p-2 hover:text-[color:var(--color-primary)] transition-colors"
+              className="p-2 text-[var(--color-on-header)] transition-colors hover:opacity-90 hover:underline hover:decoration-2 hover:underline-offset-2 hover:decoration-[color:var(--color-primary)]"
             >
               <Bookmark className="h-5 w-5" />
             </Link>
           ) : (
             <Link
               href="/auth/login"
-              className="p-2 hover:text-[color:var(--color-primary)] transition-colors"
+              className="p-2 text-[var(--color-on-header)] transition-colors hover:opacity-90 hover:underline hover:decoration-2 hover:underline-offset-2 hover:decoration-[color:var(--color-primary)]"
             >
               <Bookmark className="h-5 w-5" />
             </Link>
@@ -209,7 +209,7 @@ export default function HeadersSec({
           }`}
         >
           <div className="flex justify-between items-center p-4 border-b">
-            <h2 className="font-heading text-lg">Menu</h2>
+            <h2 className="text-lg font-semibold">Menu</h2>
             <button onClick={toggleMobileMenu} aria-label="Close menu">
               <X className="h-6 w-6" />
             </button>
@@ -218,7 +218,7 @@ export default function HeadersSec({
           <div className="p-4 space-y-4">
             <Link
               href={headerData.browseEvent.link}
-              className="block py-2 hover:text-[color:var(--color-primary)]"
+              className="block py-2 text-[var(--color-on-surface)] hover:opacity-90 hover:underline hover:decoration-2 hover:underline-offset-2 hover:decoration-[color:var(--color-primary)]"
               onClick={toggleMobileMenu}
             >
               {headerData.browseEvent.linkText}
@@ -232,7 +232,7 @@ export default function HeadersSec({
                 <Link
                   key={index}
                   href={link}
-                  className="flex items-center gap-2 py-2 hover:text-[color:var(--color-primary)]"
+                  className="flex items-center gap-2 py-2 text-[var(--color-on-surface)] hover:opacity-90 hover:underline hover:decoration-2 hover:underline-offset-2 hover:decoration-[color:var(--color-primary)]"
                   onClick={toggleMobileMenu}
                 >
                   {IconComponent && <IconComponent size={18} />}

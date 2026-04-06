@@ -15,6 +15,7 @@ import { useDomain } from "@/providers/domain-provider/domain-provider";
 import { addCacheBusting } from "@/lib/image-utils";
 import { useSession } from "next-auth/react";
 import { logout } from "@/lib/auth/logout";
+import { cn } from "@/lib/utils";
 
 interface LocationSelectionHeaderProps {
   logo?: string;
@@ -37,9 +38,21 @@ export default function LocationSelectionHeader({
   const allLocations = settings?.locations || [];
   const isLoading = isDomainLoading;
 
-  // Match CommonHeader default variant: on-header text + primary border/hover
-  const headerChromeLinkClass =
-    "text-sm hover:text-[color:var(--color-primary)] transition-colors border-2 border-[color:var(--color-primary)] rounded-lg px-2 py-1 whitespace-nowrap";
+  // Over dark hero the bar is transparent: use light chrome (same idea as CommonHeader default at top).
+  const overDarkHero = !isScrolled;
+  const topBarChromeLinkClass = cn(
+    "text-sm transition-colors border-2 border-[color:var(--color-primary)] rounded-lg px-2 py-1 whitespace-nowrap",
+    overDarkHero
+      ? "hover:text-white/90"
+      : cn(
+          "text-[var(--color-on-header)]",
+          "hover:opacity-90 hover:underline hover:decoration-2 hover:underline-offset-2 hover:decoration-[color:var(--color-primary)]",
+        ),
+  );
+  const menuSurfaceChromeLinkClass = cn(
+    "text-sm text-[var(--color-on-header)] transition-colors border-2 border-[color:var(--color-primary)] rounded-lg px-2 py-1 whitespace-nowrap",
+    "hover:opacity-90 hover:underline hover:decoration-2 hover:underline-offset-2 hover:decoration-[color:var(--color-primary)]",
+  );
 
   // Close mobile menu if user clicks outside
   const handleClickOutside = useCallback(
@@ -81,14 +94,15 @@ export default function LocationSelectionHeader({
 
   return (
     <header
-      className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 text-[var(--color-on-header)] ${
+      className={cn(
+        "fixed top-0 left-0 right-0 z-50 transition-all duration-300",
         isScrolled
-          ? "bg-[color:var(--color-header)] shadow-md"
-          : "bg-transparent"
-      }`}
+          ? "bg-[color:var(--color-header)] shadow-md text-[var(--color-on-header)]"
+          : "bg-transparent",
+      )}
     >
-      {/* Main header */}
-      <div className="py-4">
+      {/* Main header — light text over hero; scrolled state uses theme on-header */}
+      <div className={cn("py-4", overDarkHero && "text-white")}>
         <div className="container mx-auto flex items-center justify-between px-4">
           <motion.div
             className="flex items-center"
@@ -104,7 +118,7 @@ export default function LocationSelectionHeader({
                   alt={name || "EventWizz"}
                 />
               ) : (
-                <span className="text-xl font-bold text-[var(--color-on-header)]">
+                <span className="text-xl font-bold">
                   {name || "EventWizz"}
                 </span>
               )}
@@ -172,12 +186,12 @@ export default function LocationSelectionHeader({
               {sessionStatus !== "loading" &&
                 (isAuthenticated ? (
                   <>
-                    <Link href={dashboardHref} className={headerChromeLinkClass}>
+                    <Link href={dashboardHref} className={topBarChromeLinkClass}>
                       Dashboard
                     </Link>
                     <button
                       type="button"
-                      className={`${headerChromeLinkClass} cursor-pointer bg-transparent text-[var(--color-on-header)] text-left`}
+                      className={`${topBarChromeLinkClass} cursor-pointer bg-transparent text-left`}
                       aria-label="Log out"
                       onClick={() => void logout()}
                     >
@@ -186,10 +200,13 @@ export default function LocationSelectionHeader({
                   </>
                 ) : (
                   <>
-                    <Link href="/auth/login" className={headerChromeLinkClass}>
+                    <Link href="/auth/login" className={topBarChromeLinkClass}>
                       Log In
                     </Link>
-                    <Link href="/auth/register" className={headerChromeLinkClass}>
+                    <Link
+                      href="/auth/register"
+                      className={topBarChromeLinkClass}
+                    >
                       Register
                     </Link>
                   </>
@@ -199,7 +216,7 @@ export default function LocationSelectionHeader({
             {/* Mobile menu button */}
             <button
               type="button"
-              className="md:hidden p-2 rounded-md hover:bg-[var(--color-primary)]/10 transition-colors text-[var(--color-on-header)]"
+              className="md:hidden p-2 rounded-md hover:bg-[var(--color-primary)]/10 transition-colors"
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
               aria-label={mobileMenuOpen ? "Close menu" : "Open menu"}
               aria-expanded={mobileMenuOpen}
@@ -290,14 +307,14 @@ export default function LocationSelectionHeader({
                   <>
                     <Link
                       href={dashboardHref}
-                      className={`${headerChromeLinkClass} inline-flex w-full justify-center text-[var(--color-on-header)]`}
+                      className={`${menuSurfaceChromeLinkClass} inline-flex w-full justify-center`}
                       onClick={() => setMobileMenuOpen(false)}
                     >
                       Dashboard
                     </Link>
                     <button
                       type="button"
-                      className={`${headerChromeLinkClass} w-full cursor-pointer bg-transparent text-center text-[var(--color-on-header)]`}
+                      className={`${menuSurfaceChromeLinkClass} w-full cursor-pointer bg-transparent text-center`}
                       aria-label="Log out"
                       onClick={() => {
                         setMobileMenuOpen(false);
@@ -311,14 +328,14 @@ export default function LocationSelectionHeader({
                   <>
                     <Link
                       href="/auth/login"
-                      className={`${headerChromeLinkClass} inline-flex w-full justify-center text-[var(--color-on-header)]`}
+                      className={`${menuSurfaceChromeLinkClass} inline-flex w-full justify-center`}
                       onClick={() => setMobileMenuOpen(false)}
                     >
                       Log In
                     </Link>
                     <Link
                       href="/auth/register"
-                      className={`${headerChromeLinkClass} inline-flex w-full justify-center text-[var(--color-on-header)]`}
+                      className={`${menuSurfaceChromeLinkClass} inline-flex w-full justify-center`}
                       onClick={() => setMobileMenuOpen(false)}
                     >
                       Register

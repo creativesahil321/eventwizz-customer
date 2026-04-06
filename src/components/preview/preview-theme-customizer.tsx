@@ -1,7 +1,16 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Palette, RotateCcw } from "lucide-react";
+import {
+  AlignCenter,
+  AlignLeft,
+  AlignRight,
+  AlignVerticalJustifyCenter,
+  AlignVerticalJustifyEnd,
+  AlignVerticalJustifyStart,
+  Palette,
+  RotateCcw,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Sheet,
@@ -18,16 +27,30 @@ import {
   PREVIEW_FONT_OPTIONS,
   mergePresetColorsIntoValues,
   mergePresetFontsIntoValues,
+  siteEssentialsFontPairKey,
   type SiteThemePresetId,
 } from "@/app/(protected)/_shared/sites-essentials/_lib/site-theme-presets";
+import {
+  normalizeBannerHeadingAlign,
+  normalizeBannerHeadingValign,
+  type BannerHeadingAlign,
+  type BannerHeadingValign,
+} from "@/lib/banner-heading-align";
+
+const DEFAULT_SHEET_DESCRIPTION =
+  "Tap a font or color to preview. Save from Site Essentials when you are ready to publish.";
 
 type PreviewThemeCustomizerProps = {
   values: SiteEssentialsFormValues;
   onValuesChange: (next: SiteEssentialsFormValues) => void;
   brandName?: string;
+  /** e.g. event preview: clarify Site Essentials vs event editor save targets */
+  sheetDescription?: string;
 };
 
-function presetById(id: SiteThemePresetId): (typeof SITE_THEME_PRESETS)[number] {
+function presetById(
+  id: SiteThemePresetId,
+): (typeof SITE_THEME_PRESETS)[number] {
   const p = SITE_THEME_PRESETS.find((x) => x.id === id);
   if (!p) {
     throw new Error(`Unknown theme preset: ${id}`);
@@ -35,16 +58,11 @@ function presetById(id: SiteThemePresetId): (typeof SITE_THEME_PRESETS)[number] 
   return p;
 }
 
-function fontPairKey(v: SiteEssentialsFormValues) {
-  const h = v.typography?.fontFamily?.heading ?? "";
-  const b = v.typography?.fontFamily?.body ?? "";
-  return `${h}\0${b}`;
-}
-
 export function PreviewThemeCustomizer({
   values,
   onValuesChange,
   brandName = "Preview",
+  sheetDescription,
 }: PreviewThemeCustomizerProps) {
   const [open, setOpen] = useState(false);
   const snapshotRef = useRef<SiteEssentialsFormValues | null>(null);
@@ -67,9 +85,7 @@ export function PreviewThemeCustomizer({
   const applyColors = useCallback(
     (id: SiteThemePresetId) => {
       const preset = presetById(id);
-      onValuesChange(
-        mergePresetColorsIntoValues(valuesRef.current, preset),
-      );
+      onValuesChange(mergePresetColorsIntoValues(valuesRef.current, preset));
     },
     [onValuesChange],
   );
@@ -77,9 +93,27 @@ export function PreviewThemeCustomizer({
   const applyFonts = useCallback(
     (id: SiteThemePresetId) => {
       const preset = presetById(id);
-      onValuesChange(
-        mergePresetFontsIntoValues(valuesRef.current, preset),
-      );
+      onValuesChange(mergePresetFontsIntoValues(valuesRef.current, preset));
+    },
+    [onValuesChange],
+  );
+
+  const applyHeroAlign = useCallback(
+    (align: BannerHeadingAlign) => {
+      onValuesChange({
+        ...valuesRef.current,
+        banner_heading_align: align,
+      });
+    },
+    [onValuesChange],
+  );
+
+  const applyHeroValign = useCallback(
+    (valign: BannerHeadingValign) => {
+      onValuesChange({
+        ...valuesRef.current,
+        banner_heading_valign: valign,
+      });
     },
     [onValuesChange],
   );
@@ -95,7 +129,13 @@ export function PreviewThemeCustomizer({
     }
   };
 
-  const currentFontKey = fontPairKey(values);
+  const currentFontKey = siteEssentialsFontPairKey(values.typography);
+  const currentHeroAlign = normalizeBannerHeadingAlign(
+    values.banner_heading_align,
+  );
+  const currentHeroValign = normalizeBannerHeadingValign(
+    values.banner_heading_valign,
+  );
 
   return (
     <>
@@ -124,16 +164,100 @@ export function PreviewThemeCustomizer({
           onPointerDownOutside={(e) => e.preventDefault()}
         >
           <SheetHeader className="border-b border-slate-100 px-4 pb-4 pt-5 text-left">
-            <SheetTitle className="text-lg text-slate-900">{brandName}</SheetTitle>
+            <SheetTitle className="text-lg text-slate-900">
+              {brandName}
+            </SheetTitle>
             <SheetDescription className="text-xs leading-relaxed text-slate-600">
-              Use your saved Site Essentials as-is, or try fonts and color
-              bundles below. Changes apply to this preview only until you save
-              in Site Essentials.
+              {sheetDescription ?? DEFAULT_SHEET_DESCRIPTION}
             </SheetDescription>
           </SheetHeader>
 
           <ScrollArea className="flex-1 min-h-0">
             <div className="space-y-6 px-4 py-4 pb-8">
+              <div>
+                <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-500">
+                  Hero horizontal
+                </h3>
+                <div
+                  className="inline-flex rounded-lg border border-slate-200 bg-slate-50 p-1"
+                  role="group"
+                  aria-label="Hero text alignment"
+                >
+                  {(
+                    [
+                      { v: "left" as const, Icon: AlignLeft, label: "Left" },
+                      {
+                        v: "center" as const,
+                        Icon: AlignCenter,
+                        label: "Center",
+                      },
+                      { v: "right" as const, Icon: AlignRight, label: "Right" },
+                    ] as const
+                  ).map(({ v, Icon, label }) => (
+                    <button
+                      key={v}
+                      type="button"
+                      onClick={() => applyHeroAlign(v)}
+                      className={cn(
+                        "flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors",
+                        currentHeroAlign === v
+                          ? "bg-white text-slate-900 shadow-sm"
+                          : "text-slate-600 hover:text-slate-900",
+                      )}
+                    >
+                      <Icon className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-500">
+                  Hero vertical
+                </h3>
+                <div
+                  className="inline-flex rounded-lg border border-slate-200 bg-slate-50 p-1"
+                  role="group"
+                  aria-label="Hero vertical position"
+                >
+                  {(
+                    [
+                      {
+                        v: "top" as const,
+                        Icon: AlignVerticalJustifyStart,
+                        label: "Top",
+                      },
+                      {
+                        v: "center" as const,
+                        Icon: AlignVerticalJustifyCenter,
+                        label: "Middle",
+                      },
+                      {
+                        v: "bottom" as const,
+                        Icon: AlignVerticalJustifyEnd,
+                        label: "Bottom",
+                      },
+                    ] as const
+                  ).map(({ v, Icon, label }) => (
+                    <button
+                      key={v}
+                      type="button"
+                      onClick={() => applyHeroValign(v)}
+                      className={cn(
+                        "flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors",
+                        currentHeroValign === v
+                          ? "bg-white text-slate-900 shadow-sm"
+                          : "text-slate-600 hover:text-slate-900",
+                      )}
+                    >
+                      <Icon className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
               <div>
                 <div className="mb-3 flex items-center justify-between">
                   <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-500">
@@ -145,7 +269,7 @@ export function PreviewThemeCustomizer({
                     size="icon"
                     className="h-8 w-8 text-slate-500"
                     onClick={handleReset}
-                    title="Reset to when panel opened"
+                    title="Reset to when you opened this panel"
                   >
                     <RotateCcw className="h-4 w-4" />
                   </Button>
@@ -154,10 +278,15 @@ export function PreviewThemeCustomizer({
                   {PREVIEW_FONT_OPTIONS.map((opt) => {
                     const active =
                       currentFontKey ===
-                      `${opt.headingStack}\0${opt.bodyStack}`;
+                      siteEssentialsFontPairKey({
+                        fontFamily: {
+                          heading: opt.headingStack,
+                          body: opt.bodyStack,
+                        },
+                      });
                     return (
                       <button
-                        key={opt.id}
+                        key={`${opt.headingStack}\0${opt.bodyStack}`}
                         type="button"
                         onClick={() => applyFonts(opt.id)}
                         className={cn(
@@ -190,14 +319,15 @@ export function PreviewThemeCustomizer({
                 <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-slate-500">
                   Try other colors
                 </h3>
-                <div className="grid grid-cols-4 gap-2 sm:grid-cols-4">
+                <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
                   {SITE_THEME_PRESETS.map((preset) => {
                     const [a, b] = [
                       preset.colors.primary,
                       preset.colors.secondary,
                     ];
                     const matchesPrimary =
-                      (values.colors?.primary || "") === (preset.colors.primary || "");
+                      (values.colors?.primary || "") ===
+                      (preset.colors.primary || "");
                     const matchesSecondary =
                       (values.colors?.secondary || "") ===
                       (preset.colors.secondary || "");

@@ -25,6 +25,16 @@ import {
 import { CartConflictProvider } from "@/app/(public)/vendor/checkout/_components/cart-conflict-provider";
 import { addCacheBusting } from "@/lib/image-utils";
 import { useCurrencyFormat } from "@/hooks/use-currency-format";
+import { SiteHeading } from "@/components/public/site-heading";
+import { normalizeHeadingEmphasis } from "@/lib/heading-emphasis";
+import {
+  heroBandVerticalClass,
+  heroBannerStackClass,
+  heroBannerSubheadingClass,
+  normalizeBannerHeadingAlign,
+  normalizeBannerHeadingValign,
+} from "@/lib/banner-heading-align";
+import { cn } from "@/lib/utils";
 
 import "@/app/(public)/[locationSlug]/events/[eventSlug]/event-detail.css";
 
@@ -131,6 +141,25 @@ export function EventPreview({
     data.slug?.trim() ||
     (s1?.event_id != null ? `event-${s1.event_id}` : "preview");
 
+  const bannerAlign = normalizeBannerHeadingAlign(
+    siteEssentials?.banner_heading_align,
+  );
+  const bannerValign = normalizeBannerHeadingValign(
+    siteEssentials?.banner_heading_valign,
+  );
+  const headingEmphasisForHero = siteEssentials
+    ? normalizeHeadingEmphasis(siteEssentials.typography?.headingEmphasis)
+    : undefined;
+
+  const heroTitle =
+    s1?.event_banner_heading?.trim() || s1?.event_name?.trim() || "";
+
+  const heroAccentHint =
+    typeof s1?.event_banner_heading_accent === "string" &&
+    s1.event_banner_heading_accent.trim().length > 0
+      ? s1.event_banner_heading_accent.trim()
+      : null;
+
   const datesForSection =
     s3?.dates?.map((date) => {
       const ticketPrices = (date.tickets ?? [])
@@ -177,19 +206,15 @@ export function EventPreview({
       ? parseFloat(rawPriceFrom.replace(/[^0-9.-]/g, ""))
       : NaN;
   const brochureAmount =
-    rawPriceFrom !== "" && Number.isFinite(parsedFromField) && parsedFromField >= 0
+    rawPriceFrom !== "" &&
+    Number.isFinite(parsedFromField) &&
+    parsedFromField >= 0
       ? parsedFromField
       : brochureFallbackAmount;
   const brochurePriceDescription = `${formatMoney(brochureAmount)} PP exc VAT`;
 
   const heroStyles = {
-    container: "relative w-full h-[100vh] min-h-[500px] overflow-hidden",
-    overlay: "absolute inset-0 bg-black/40 z-10",
-    videoBackground: "absolute inset-0 w-full h-full object-cover",
-    content:
-      "relative z-20 flex flex-col justify-center items-center h-full text-center text-white px-4",
-    heading: "text-4xl md:text-5xl lg:text-6xl font-bold mb-4",
-    subheading: "text-xl md:text-2xl font-medium max-w-3xl mx-auto",
+    videoBackground: "absolute inset-0 h-full w-full object-cover",
   };
 
   const bannerImage = s1?.event_banner_image || "";
@@ -212,11 +237,7 @@ export function EventPreview({
               preview: URL.createObjectURL(image),
             };
           }
-          if (
-            typeof image === "object" &&
-            image !== null &&
-            "url" in image
-          ) {
+          if (typeof image === "object" && image !== null && "url" in image) {
             const galleryItem = image as { id: number; url: string };
             return {
               path: galleryItem.url,
@@ -237,11 +258,15 @@ export function EventPreview({
           themeColors.background?.includes("linear-gradient")
             ? "bg-none"
             : "bg-[color:var(--color-background)]"
-        } text-[color:var(--color-text)] font-[var(--font-body)]`}
+        } text-[color:var(--color-text)] font-body`}
         style={
           themeColors.background?.includes("linear-gradient")
-            ? { ...previewStyles, background: themeColors.background }
-            : previewStyles
+            ? {
+                ...previewStyles,
+                background: themeColors.background,
+                fontFamily: "var(--font-body)",
+              }
+            : { ...previewStyles, fontFamily: "var(--font-body)" }
         }
       >
         <SiteEssentialsGoogleFontsLoader
@@ -261,49 +286,76 @@ export function EventPreview({
           className={embedInShell ? "px-3 sm:px-4 md:px-6" : ""}
         />
 
-        {/* Same hero structure as live `EventDetailClient` */}
-        <div className={heroStyles.container}>
-          {bannerVideo ? (
-            <>
-              {bannerImage && (
-                <div
-                  className={`${heroStyles.videoBackground} bg-cover bg-center`}
-                  style={{
-                    backgroundImage: `url(${bannerImage})`,
-                  }}
-                />
-              )}
-              <video
-                src={bannerVideo}
-                poster={bannerImage || undefined}
-                className={heroStyles.videoBackground}
-                autoPlay
-                muted
-                loop
-                playsInline
-                preload="auto"
-              />
-            </>
-          ) : (
-            bannerImage && (
-              <img
-                src={addCacheBusting(bannerImage)}
-                alt={eventName}
-                className={heroStyles.videoBackground}
-                style={{ objectFit: "cover" }}
-              />
-            )
+        {/* Same hero behavior as live `EventDetailClient` + Site Essentials align / valign / heading style */}
+        <section
+          className={cn(
+            "relative mx-auto flex h-screen w-full justify-center",
+            heroBandVerticalClass(bannerValign),
           )}
-          <div className={heroStyles.overlay} />
-          <div className={heroStyles.content}>
-            <h1 className={heroStyles.heading}>
-              {s1?.event_banner_heading || eventName}
-            </h1>
-            <h2 className={heroStyles.subheading}>
-              {s1?.event_banner_sub_heading || ""}
-            </h2>
+          style={{ minHeight: "500px" }}
+        >
+          <div className="absolute inset-0 overflow-hidden">
+            {bannerVideo ? (
+              <>
+                {bannerImage && (
+                  <div
+                    className={`${heroStyles.videoBackground} bg-cover bg-center`}
+                    style={{
+                      backgroundImage: `url(${bannerImage})`,
+                    }}
+                  />
+                )}
+                <video
+                  src={bannerVideo}
+                  poster={bannerImage || undefined}
+                  className={heroStyles.videoBackground}
+                  autoPlay
+                  muted
+                  loop
+                  playsInline
+                  preload="auto"
+                />
+              </>
+            ) : (
+              bannerImage && (
+                <img
+                  src={addCacheBusting(bannerImage)}
+                  alt={eventName}
+                  className={heroStyles.videoBackground}
+                  style={{ objectFit: "cover" }}
+                />
+              )
+            )}
+            <div className="absolute inset-0 z-10 bg-black/40" aria-hidden />
           </div>
-        </div>
+
+          <div className="relative z-20 container mx-auto w-full overflow-visible px-4">
+            <div
+              className={cn(
+                heroBannerStackClass(bannerAlign),
+                "overflow-visible",
+              )}
+            >
+              <SiteHeading
+                level={1}
+                title={heroTitle || eventName}
+                accentHint={heroAccentHint}
+                emphasis={headingEmphasisForHero}
+                variant="onDark"
+                align={bannerAlign}
+                className="mb-4 font-bold !text-4xl md:!text-5xl lg:!text-6xl"
+              />
+              <h2
+                className={cn(
+                  "text-xl font-medium text-white md:text-2xl",
+                  heroBannerSubheadingClass(bannerAlign),
+                )}
+              >
+                {s1?.event_banner_sub_heading || ""}
+              </h2>
+            </div>
+          </div>
+        </section>
 
         <AboutEventSec
           about_event_heading={s1?.about_event_heading || ""}
@@ -336,9 +388,7 @@ export function EventPreview({
             eventSlug={eventSlug}
             eventName={eventName}
             eventImage={
-              s1?.event_banner_image ||
-              s1?.event_banner_video ||
-              undefined
+              s1?.event_banner_image || s1?.event_banner_video || undefined
             }
           />
         </div>
@@ -363,7 +413,7 @@ export function EventPreview({
             menu_background_image={
               typeof s4?.menu_background_image === "string"
                 ? s4.menu_background_image
-                : s4?.menu_background_image ?? undefined
+                : (s4?.menu_background_image ?? undefined)
             }
           />
         )}
@@ -378,11 +428,11 @@ export function EventPreview({
         )}
 
         <BrochureSection
+          showMapImmediately
           location={{
             title: "EVENT LOCATION",
             description:
-              s6?.event_address ||
-              "Event location will be displayed here",
+              s6?.event_address || "Event location will be displayed here",
             icon: "MapPin",
             latitude: data.lat ?? s8?.latitude ?? null,
             longitude: data.long ?? s8?.longitude ?? null,

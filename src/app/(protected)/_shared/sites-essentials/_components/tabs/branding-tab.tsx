@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useFormContext } from "react-hook-form";
 import { SiteEssentialsFormValues } from "../../_lib/hooks";
+import { BANNER_SUB_HEADING_MAX_CHARS } from "../../_lib/schema";
 import {
   FormField,
   FormItem,
@@ -21,10 +22,7 @@ import { VideoFormatInfo } from "@/components/shared/video-format-info";
 import { addCacheBusting } from "@/lib/image-utils";
 import { LocationIndicator } from "@/components/location-indicator";
 import { MapPin } from "lucide-react";
-import {
-  BANNER_HEADING_MAX_WORDS,
-  countWords,
-} from "@/lib/word-count";
+import { BANNER_HEADING_MAX_WORDS, countWords } from "@/lib/word-count";
 
 interface BrandingTabProps {
   /** Server values from API – source of truth after location switch so UI updates immediately */
@@ -94,7 +92,10 @@ export function BrandingTab({
     if (typeof watchedFavicon === "string" && watchedFavicon) {
       setFaviconFiles([]);
       setFaviconUrl(watchedFavicon);
-    } else if (watchedFavicon !== undefined && !(watchedFavicon instanceof File)) {
+    } else if (
+      watchedFavicon !== undefined &&
+      !(watchedFavicon instanceof File)
+    ) {
       setFaviconFiles([]);
       setFaviconUrl("");
     }
@@ -254,147 +255,147 @@ export function BrandingTab({
             <span>Same across all locations</span>
           </div>
         </div>
-        
+
         <Separator className="my-4" />
 
-      <div className="grid gap-6 md:grid-cols-2">
-        <FormField
-          control={form.control}
-          name="name"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Site Name</FormLabel>
-              <FormControl>
-                <Input
-                  placeholder="EventWizz"
-                  {...field}
-                  disabled
-                  readOnly
-                  className="bg-muted text-muted-foreground cursor-not-allowed"
-                />
-              </FormControl>
-              <FormDescription>
-                Site Name is system-managed and cannot be edited here.
-              </FormDescription>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-
-        <FormField
-          control={form.control}
-          name="copyright"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Copyright Text</FormLabel>
-              <FormControl>
-                <Input
-                  placeholder="© 2023 EventWizz, All Rights Reserved"
-                  {...field}
-                />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-      </div>
-
-      <div className="grid gap-6 md:grid-cols-2">
-        <FormField
-          control={form.control}
-          name="logo"
-          render={() => (
-            <FormItem>
-              <FormLabel>Logo</FormLabel>
-              <FormDescription>
-                Upload your site logo (PNG or JPG, max 2MB). Recommended
-                dimensions: 240×60px. Images will be constrained to a reasonable
-                size on the site.
-              </FormDescription>
-              <FormControl>
-                {logoUrl ? (
-                  <div className="space-y-2">
-                    <img
-                      src={addCacheBusting(logoUrl)}
-                      alt="Logo preview"
-                      className="max-h-40 object-contain mx-auto"
-                    />
-                    <button
-                      type="button"
-                      onClick={handleRemoveLogo}
-                      className="text-red-500 text-sm underline"
-                    >
-                      Remove Logo
-                    </button>
-                  </div>
-                ) : (
-                  <FileUploader
-                    value={logoFiles}
-                    onValueChange={handleLogoFileChange}
-                    maxFileCount={1}
-                    maxSize={2 * 1024 * 1024} // 2MB
-                    onRemove={handleRemoveLogo}
-                    accept={{
-                      "image/png": [],
-                      "image/jpeg": [],
-                      "image/jpg": [],
-                      "image/webp": [],
-                    }}
+        <div className="grid gap-6 md:grid-cols-2">
+          <FormField
+            control={form.control}
+            name="name"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Site Name</FormLabel>
+                <FormControl>
+                  <Input
+                    placeholder="EventWizz"
+                    {...field}
+                    disabled
+                    readOnly
+                    className="bg-muted text-muted-foreground cursor-not-allowed"
                   />
-                )}
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
+                </FormControl>
+                <FormDescription>
+                  Site Name is system-managed and cannot be edited here.
+                </FormDescription>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
 
-        <FormField
-          control={form.control}
-          name="favicon"
-          render={() => (
-            <FormItem>
-              <FormLabel>Favicon</FormLabel>
-              <FormDescription>
-                Upload your site favicon (PNG, max 1MB). Recommended dimensions:
-                32×32px or 64×64px square image.
-              </FormDescription>
-              <FormControl>
-                {faviconUrl ? (
-                  <div className="space-y-2">
-                    <img
-                      src={addCacheBusting(faviconUrl)}
-                      alt="Favicon preview"
-                      className="max-h-16 object-contain mx-auto"
-                    />
-                    <button
-                      type="button"
-                      onClick={handleRemoveFavicon}
-                      className="text-red-500 text-sm underline"
-                    >
-                      Remove Favicon
-                    </button>
-                  </div>
-                ) : (
-                  <FileUploader
-                    value={faviconFiles}
-                    onValueChange={handleFaviconFileChange}
-                    maxFileCount={1}
-                    maxSize={1 * 1024 * 1024} // 1MB
-                    onRemove={handleRemoveFavicon}
-                    accept={{
-                      "image/png": [],
-                      "image/x-icon": [],
-                      "image/ico": [],
-                      "image/webp": [],
-                    }}
+          <FormField
+            control={form.control}
+            name="copyright"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Copyright Text</FormLabel>
+                <FormControl>
+                  <Input
+                    placeholder="© 2023 EventWizz, All Rights Reserved"
+                    {...field}
                   />
-                )}
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-      </div>
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </div>
+
+        <div className="grid gap-6 md:grid-cols-2">
+          <FormField
+            control={form.control}
+            name="logo"
+            render={() => (
+              <FormItem>
+                <FormLabel>Logo</FormLabel>
+                <FormDescription>
+                  Upload your site logo (PNG or JPG, max 2MB). Recommended
+                  dimensions: 240×60px. Images will be constrained to a
+                  reasonable size on the site.
+                </FormDescription>
+                <FormControl>
+                  {logoUrl ? (
+                    <div className="space-y-2">
+                      <img
+                        src={addCacheBusting(logoUrl)}
+                        alt="Logo preview"
+                        className="max-h-40 object-contain mx-auto"
+                      />
+                      <button
+                        type="button"
+                        onClick={handleRemoveLogo}
+                        className="text-red-500 text-sm underline"
+                      >
+                        Remove Logo
+                      </button>
+                    </div>
+                  ) : (
+                    <FileUploader
+                      value={logoFiles}
+                      onValueChange={handleLogoFileChange}
+                      maxFileCount={1}
+                      maxSize={2 * 1024 * 1024} // 2MB
+                      onRemove={handleRemoveLogo}
+                      accept={{
+                        "image/png": [],
+                        "image/jpeg": [],
+                        "image/jpg": [],
+                        "image/webp": [],
+                      }}
+                    />
+                  )}
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          <FormField
+            control={form.control}
+            name="favicon"
+            render={() => (
+              <FormItem>
+                <FormLabel>Favicon</FormLabel>
+                <FormDescription>
+                  Upload your site favicon (PNG, max 1MB). Recommended
+                  dimensions: 32×32px or 64×64px square image.
+                </FormDescription>
+                <FormControl>
+                  {faviconUrl ? (
+                    <div className="space-y-2">
+                      <img
+                        src={addCacheBusting(faviconUrl)}
+                        alt="Favicon preview"
+                        className="max-h-16 object-contain mx-auto"
+                      />
+                      <button
+                        type="button"
+                        onClick={handleRemoveFavicon}
+                        className="text-red-500 text-sm underline"
+                      >
+                        Remove Favicon
+                      </button>
+                    </div>
+                  ) : (
+                    <FileUploader
+                      value={faviconFiles}
+                      onValueChange={handleFaviconFileChange}
+                      maxFileCount={1}
+                      maxSize={1 * 1024 * 1024} // 1MB
+                      onRemove={handleRemoveFavicon}
+                      accept={{
+                        "image/png": [],
+                        "image/x-icon": [],
+                        "image/ico": [],
+                        "image/webp": [],
+                      }}
+                    />
+                  )}
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </div>
       </div>
 
       {/* ============================================ */}
@@ -402,7 +403,10 @@ export function BrandingTab({
       {/* ============================================ */}
       <div className="relative rounded-xl border-2 border-blue-400 dark:border-blue-600 bg-gradient-to-br from-blue-50 to-slate-50 dark:from-blue-950/50 dark:to-slate-900/50 p-0 overflow-hidden shadow-sm">
         {/* Thick left accent */}
-        <div className="absolute left-0 top-0 bottom-0 w-1.5 bg-blue-500 dark:bg-blue-400" aria-hidden />
+        <div
+          className="absolute left-0 top-0 bottom-0 w-1.5 bg-blue-500 dark:bg-blue-400"
+          aria-hidden
+        />
 
         {/* Unmissable top banner */}
         <div className="flex flex-wrap items-center gap-3 px-6 py-4 bg-blue-100/90 dark:bg-blue-900/60 border-b border-blue-200 dark:border-blue-700">
@@ -420,511 +424,494 @@ export function BrandingTab({
             </div>
           </div>
           <div className="flex items-center gap-2 ml-auto rounded-lg bg-white dark:bg-slate-800 px-3 py-2 border border-blue-200 dark:border-blue-700 shadow-sm">
-            <span className="text-xs font-medium text-muted-foreground">Editing:</span>
+            <span className="text-xs font-medium text-muted-foreground">
+              Editing:
+            </span>
             <LocationIndicator variant="light" />
           </div>
         </div>
 
         <div className="p-6 space-y-6">
-      <Separator className="my-0 -mx-6" />
+          <Separator className="my-0 -mx-6" />
 
-      <SectionTitle
-        title="Landing Page Content"
-        description="Configure your website landing page content"
-      />
+          <SectionTitle
+            title="Landing Page Content"
+            description="Heading and subheading copy below. Hero text position (horizontal and vertical) for location pages is set from the Try theme sidebar on the Presets tab preview, or from Try theme on site/event preview — not here."
+          />
 
-      <div className="grid gap-6 md:grid-cols-2">
-        <FormField
-          control={form.control}
-          name="banner_heading"
-          render={({ field }) => {
-            const wc = countWords(field.value || "");
-            return (
-              <FormItem>
-                <FormLabel>Landing Page Heading</FormLabel>
-                <FormControl>
-                  <Input
-                    placeholder="EventWizz Events"
-                    {...field}
-                    value={field.value || ""}
-                    onChange={(e) => field.onChange(e.target.value)}
-                  />
-                </FormControl>
-                <div className="text-xs text-muted-foreground mt-1">
-                  <span
-                    className={
-                      wc > BANNER_HEADING_MAX_WORDS ? "text-destructive" : ""
-                    }
-                  >
-                    {wc}/{BANNER_HEADING_MAX_WORDS} words
-                  </span>
-                </div>
-                <FormMessage />
-              </FormItem>
-            );
-          }}
-        />
-
-        <FormField
-          control={form.control}
-          name="banner_sub_heading"
-          render={({ field }) => {
-            const currentLength = field.value?.length || 0;
-            const maxLength = 80;
-            return (
-              <FormItem>
-                <FormLabel>Landing Page Subheading</FormLabel>
-                <FormControl>
-                  <Input
-                    placeholder="Discover amazing events"
-                    {...field}
-                    value={field.value || ""}
-                    maxLength={maxLength}
-                    onChange={(e) => field.onChange(e.target.value)}
-                  />
-                </FormControl>
-                <div className="text-xs text-muted-foreground mt-1">
-                  <span
-                    className={
-                      currentLength > maxLength ? "text-destructive" : ""
-                    }
-                  >
-                    {currentLength}/{maxLength} characters
-                  </span>
-                </div>
-                <FormMessage />
-              </FormItem>
-            );
-          }}
-        />
-
-        <FormField
-          control={form.control}
-          name="banner_heading_accent"
-          render={({ field }) => (
-            <FormItem className="md:col-span-2">
-              <FormLabel>Heading accent phrase (optional)</FormLabel>
-              <FormDescription>
-                For Typography → Accent tail: this exact substring is styled with
-                your brand color. It should appear in the landing heading above,
-                or leave empty to auto-use the last two words.
-              </FormDescription>
-              <FormControl>
-                <Input
-                  placeholder="e.g. Near You"
-                  {...field}
-                  value={field.value || ""}
-                  onChange={(e) => field.onChange(e.target.value)}
-                />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-      </div>
-
-      <Separator className="my-4" />
-
-      <SectionTitle
-        title="Landing Page Banner"
-        description="Choose how you want to display your landing page banner"
-      />
-
-      <div className="space-y-4">
-        <Tabs
-          value={bannerType}
-          onValueChange={(v) => setBannerType(v as "image" | "video")}
-        >
-          <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="image">Image Banner</TabsTrigger>
-            <TabsTrigger value="video">Video Banner</TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="image">
+          <div className="grid gap-6 md:grid-cols-2">
             <FormField
               control={form.control}
-              name="cover_image"
-              render={() => (
-                <FormItem>
-                  <FormLabel>Banner Image</FormLabel>
-                  <FormDescription>
-                    Upload a static image for your landing page banner
-                    (recommended size: 1200 x 600px)
-                  </FormDescription>
-                  <FormControl>
-                    {landingPageImageUrl ? (
-                      <div className="space-y-2">
-                        <img
-                          src={addCacheBusting(landingPageImageUrl)}
-                          alt="Landing page image preview"
-                          className="max-h-40 object-contain mx-auto"
-                        />
-                        <button
-                          type="button"
-                          onClick={handleRemoveLandingPageImage}
-                          className="text-red-500 text-sm underline"
-                        >
-                          Remove Image
-                        </button>
-                      </div>
-                    ) : (
-                      <FileUploader
-                        value={landingPageImageFiles}
-                        onValueChange={handleLandingPageImageChange}
-                        maxFileCount={1}
-                        maxSize={2 * 1024 * 1024} // 2MB
-                        onRemove={handleRemoveLandingPageImage}
-                        accept={{
-                          "image/png": [],
-                          "image/jpeg": [],
-                          "image/jpg": [],
-                          "image/webp": [],
-                        }}
-                        enableCropping={true}
-                        aspectRatio={16 / 9}
-                        cropConfig={{
-                          maxSizeKB: 500,
-                          quality: 0.9,
-                          maxWidth: 1920,
-                          maxHeight: 1080,
-                        }}
+              name="banner_heading"
+              render={({ field }) => {
+                const wc = countWords(field.value || "");
+                return (
+                  <FormItem>
+                    <FormLabel>Landing Page Heading</FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder="EventWizz Events"
+                        {...field}
+                        value={field.value || ""}
+                        onChange={(e) => field.onChange(e.target.value)}
                       />
-                    )}
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
+                    </FormControl>
+                    <div className="text-xs text-muted-foreground mt-1">
+                      <span
+                        className={
+                          wc > BANNER_HEADING_MAX_WORDS
+                            ? "text-destructive"
+                            : ""
+                        }
+                      >
+                        {wc}/{BANNER_HEADING_MAX_WORDS} words
+                      </span>
+                    </div>
+                    <FormMessage />
+                  </FormItem>
+                );
+              }}
             />
-          </TabsContent>
 
-          <TabsContent value="video">
             <FormField
               control={form.control}
-              name="cover_video"
-              render={() => (
-                <FormItem>
-                  <FormLabel>Banner Video</FormLabel>
-                  <FormDescription>
-                    Upload a video for your landing page banner (MP4 format, max
-                    10MB)
-                  </FormDescription>
-                  <FormControl>
-                    <div className="space-y-4">
-                      {landingPageVideoUrl ? (
-                        <div className="space-y-2" key={landingPageVideoUrl}>
-                          <video
-                            controls
-                            className="w-full h-auto max-h-[200px] object-contain bg-gray-100 rounded-lg"
-                            key={landingPageVideoUrl}
-                          >
-                            <source
-                              src={landingPageVideoUrl}
-                              type="video/mp4"
+              name="banner_sub_heading"
+              render={({ field }) => {
+                const currentLength = field.value?.length || 0;
+                const maxLength = BANNER_SUB_HEADING_MAX_CHARS;
+                return (
+                  <FormItem>
+                    <FormLabel>Landing Page Subheading</FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder="Discover amazing events"
+                        {...field}
+                        value={field.value || ""}
+                        maxLength={maxLength}
+                        onChange={(e) => field.onChange(e.target.value)}
+                      />
+                    </FormControl>
+                    <div className="text-xs text-muted-foreground mt-1">
+                      <span
+                        className={
+                          currentLength > maxLength ? "text-destructive" : ""
+                        }
+                      >
+                        {currentLength}/{maxLength} characters
+                      </span>
+                    </div>
+                    <FormMessage />
+                  </FormItem>
+                );
+              }}
+            />
+          </div>
+
+          <Separator className="my-4" />
+
+          <SectionTitle
+            title="Landing Page Banner"
+            description="Choose how you want to display your landing page banner"
+          />
+
+          <div className="space-y-4">
+            <Tabs
+              value={bannerType}
+              onValueChange={(v) => setBannerType(v as "image" | "video")}
+            >
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="image">Image Banner</TabsTrigger>
+                <TabsTrigger value="video">Video Banner</TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="image">
+                <FormField
+                  control={form.control}
+                  name="cover_image"
+                  render={() => (
+                    <FormItem>
+                      <FormLabel>Banner Image</FormLabel>
+                      <FormDescription>
+                        Upload a static image for your landing page banner
+                        (recommended size: 1200 x 600px)
+                      </FormDescription>
+                      <FormControl>
+                        {landingPageImageUrl ? (
+                          <div className="space-y-2">
+                            <img
+                              src={addCacheBusting(landingPageImageUrl)}
+                              alt="Landing page image preview"
+                              className="max-h-40 object-contain mx-auto"
                             />
-                            Your browser does not support the video tag.
-                          </video>
-                          <button
-                            type="button"
-                            onClick={handleRemoveLandingPageVideo}
-                            className="text-red-500 text-sm underline"
-                          >
-                            Remove Video
-                          </button>
-                        </div>
-                      ) : (
-                        <>
+                            <button
+                              type="button"
+                              onClick={handleRemoveLandingPageImage}
+                              className="text-red-500 text-sm underline"
+                            >
+                              Remove Image
+                            </button>
+                          </div>
+                        ) : (
                           <FileUploader
-                            value={landingPageVideoFiles}
-                            onValueChange={handleLandingPageVideoChange}
+                            value={landingPageImageFiles}
+                            onValueChange={handleLandingPageImageChange}
                             maxFileCount={1}
-                            maxSize={10 * 1024 * 1024} // 10MB for banner video
-                            onRemove={handleRemoveLandingPageVideo}
+                            maxSize={2 * 1024 * 1024} // 2MB
+                            onRemove={handleRemoveLandingPageImage}
                             accept={{
-                              "video/mp4": [],
+                              "image/png": [],
+                              "image/jpeg": [],
+                              "image/jpg": [],
+                              "image/webp": [],
+                            }}
+                            enableCropping={true}
+                            aspectRatio={16 / 9}
+                            cropConfig={{
+                              maxSizeKB: 500,
+                              quality: 0.9,
+                              maxWidth: 1920,
+                              maxHeight: 1080,
                             }}
                           />
+                        )}
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </TabsContent>
 
-                          {/* Format Guide - Show when no video uploaded */}
-                          {landingPageVideoFiles.length === 0 &&
-                            !landingPageVideoUrl && (
-                              <div className="mt-3">
-                                <VideoFormatInfo variant="compact" />
-                              </div>
-                            )}
+              <TabsContent value="video">
+                <FormField
+                  control={form.control}
+                  name="cover_video"
+                  render={() => (
+                    <FormItem>
+                      <FormLabel>Banner Video</FormLabel>
+                      <FormDescription>
+                        Upload a video for your landing page banner (MP4 format,
+                        max 10MB)
+                      </FormDescription>
+                      <FormControl>
+                        <div className="space-y-4">
+                          {landingPageVideoUrl ? (
+                            <div
+                              className="space-y-2"
+                              key={landingPageVideoUrl}
+                            >
+                              <video
+                                controls
+                                className="w-full h-auto max-h-[200px] object-contain bg-gray-100 rounded-lg"
+                                key={landingPageVideoUrl}
+                              >
+                                <source
+                                  src={landingPageVideoUrl}
+                                  type="video/mp4"
+                                />
+                                Your browser does not support the video tag.
+                              </video>
+                              <button
+                                type="button"
+                                onClick={handleRemoveLandingPageVideo}
+                                className="text-red-500 text-sm underline"
+                              >
+                                Remove Video
+                              </button>
+                            </div>
+                          ) : (
+                            <>
+                              <FileUploader
+                                value={landingPageVideoFiles}
+                                onValueChange={handleLandingPageVideoChange}
+                                maxFileCount={1}
+                                maxSize={10 * 1024 * 1024} // 10MB for banner video
+                                onRemove={handleRemoveLandingPageVideo}
+                                accept={{
+                                  "video/mp4": [],
+                                }}
+                              />
 
-                          {/* Video Preview for uploaded files */}
-                          {landingPageVideoFiles.length > 0 &&
-                            landingPageVideoFiles[0] instanceof File && (
-                              <div className="relative mt-4 rounded-lg overflow-hidden border">
-                                <video
-                                  controls
-                                  className="w-full h-auto max-h-[200px] object-contain bg-gray-100"
-                                >
-                                  <source
-                                    src={URL.createObjectURL(
-                                      landingPageVideoFiles[0],
-                                    )}
-                                    type="video/mp4"
-                                  />
-                                  Your browser does not support the video tag.
-                                </video>
-                              </div>
-                            )}
-                        </>
-                      )}
+                              {/* Format Guide - Show when no video uploaded */}
+                              {landingPageVideoFiles.length === 0 &&
+                                !landingPageVideoUrl && (
+                                  <div className="mt-3">
+                                    <VideoFormatInfo variant="compact" />
+                                  </div>
+                                )}
+
+                              {/* Video Preview for uploaded files */}
+                              {landingPageVideoFiles.length > 0 &&
+                                landingPageVideoFiles[0] instanceof File && (
+                                  <div className="relative mt-4 rounded-lg overflow-hidden border">
+                                    <video
+                                      controls
+                                      className="w-full h-auto max-h-[200px] object-contain bg-gray-100"
+                                    >
+                                      <source
+                                        src={URL.createObjectURL(
+                                          landingPageVideoFiles[0],
+                                        )}
+                                        type="video/mp4"
+                                      />
+                                      Your browser does not support the video
+                                      tag.
+                                    </video>
+                                  </div>
+                                )}
+                            </>
+                          )}
+                        </div>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </TabsContent>
+            </Tabs>
+          </div>
+
+          <Separator className="my-4" />
+
+          <SectionTitle
+            title="About Section"
+            description="Configure the about section on your homepage"
+          />
+
+          <Separator className="my-4" />
+
+          <FormField
+            control={form.control}
+            name="about_title"
+            render={({ field }) => {
+              const currentLength = field.value?.length || 0;
+              const maxLength = 40;
+              return (
+                <FormItem>
+                  <FormLabel>About Section Title</FormLabel>
+                  <FormControl>
+                    <Input
+                      placeholder="About Us"
+                      {...field}
+                      value={field.value || ""}
+                      maxLength={maxLength}
+                      onChange={(e) => field.onChange(e.target.value)}
+                    />
+                  </FormControl>
+                  <div className="text-xs text-muted-foreground mt-1">
+                    <span
+                      className={
+                        currentLength > maxLength ? "text-destructive" : ""
+                      }
+                    >
+                      {currentLength}/{maxLength} characters
+                    </span>
+                  </div>
+                  <FormMessage />
+                </FormItem>
+              );
+            }}
+          />
+
+          <FormField
+            control={form.control}
+            name="about_description"
+            render={({ field }) => (
+              <FormItem className="space-y-2">
+                <FormLabel className="text-base font-medium">
+                  About Section Description
+                </FormLabel>
+                <FormControl>
+                  <TiptapEditor
+                    value={field.value || ""}
+                    onChange={field.onChange}
+                    placeholder="Write a compelling description about your business..."
+                    maxLength={340}
+                    maxWords={50}
+                    className="min-h-[120px]"
+                    aiContext={{
+                      title: form.watch("about_title") || undefined,
+                      ctaText: form.watch("about_link_title") || undefined,
+                      ctaUrl: form.watch("about_cta_link") || undefined,
+                    }}
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          <div className="grid gap-6 md:grid-cols-2">
+            <FormField
+              control={form.control}
+              name="about_link_title"
+              render={({ field }) => {
+                const currentLength = field.value?.length || 0;
+                const maxLength = 18;
+                return (
+                  <FormItem>
+                    <FormLabel>About Section CTA Text</FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder="Learn More"
+                        {...field}
+                        value={field.value || ""}
+                        maxLength={maxLength}
+                        onChange={(e) => field.onChange(e.target.value)}
+                      />
+                    </FormControl>
+                    <div className="text-xs text-muted-foreground mt-1">
+                      <span
+                        className={
+                          currentLength > maxLength ? "text-destructive" : ""
+                        }
+                      >
+                        {currentLength}/{maxLength} characters
+                      </span>
                     </div>
+                    <FormMessage />
+                  </FormItem>
+                );
+              }}
+            />
+
+            <FormField
+              control={form.control}
+              name="about_cta_link"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>About Section CTA URL</FormLabel>
+                  <FormControl>
+                    <Input
+                      placeholder="/about"
+                      {...field}
+                      value={field.value || ""}
+                      onChange={(e) => field.onChange(e.target.value)}
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
               )}
             />
-          </TabsContent>
-        </Tabs>
-      </div>
+          </div>
 
-      <Separator className="my-4" />
+          <Separator className="my-4" />
 
-      <SectionTitle
-        title="About Section"
-        description="Configure the about section on your homepage"
-      />
-      
-      <Separator className="my-4" />
+          <SectionTitle
+            title="Event Sections"
+            description="Configure event section titles (location-specific)"
+          />
 
-      <FormField
-        control={form.control}
-        name="about_title"
-        render={({ field }) => {
-          const currentLength = field.value?.length || 0;
-          const maxLength = 40;
-          return (
-            <FormItem>
-              <FormLabel>About Section Title</FormLabel>
-              <FormControl>
-                <Input
-                  placeholder="About Us"
-                  {...field}
-                  value={field.value || ""}
-                  maxLength={maxLength}
-                  onChange={(e) => field.onChange(e.target.value)}
-                />
-              </FormControl>
-              <div className="text-xs text-muted-foreground mt-1">
-                <span
-                  className={
-                    currentLength > maxLength ? "text-destructive" : ""
-                  }
-                >
-                  {currentLength}/{maxLength} characters
-                </span>
-              </div>
-              <FormMessage />
-            </FormItem>
-          );
-        }}
-      />
+          <div className="grid gap-6 md:grid-cols-2">
+            <FormField
+              control={form.control}
+              name="event_title_1"
+              render={({ field }) => {
+                const currentLength = field.value?.length || 0;
+                const maxLength = 40;
+                return (
+                  <FormItem>
+                    <FormLabel>Event Section 1 Title</FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder="Upcoming Events"
+                        {...field}
+                        value={field.value || ""}
+                        maxLength={maxLength}
+                        onChange={(e) => field.onChange(e.target.value)}
+                      />
+                    </FormControl>
+                    <div className="text-xs text-muted-foreground mt-1">
+                      <span
+                        className={
+                          currentLength > maxLength ? "text-destructive" : ""
+                        }
+                      >
+                        {currentLength}/{maxLength} characters
+                      </span>
+                    </div>
+                    <FormMessage />
+                  </FormItem>
+                );
+              }}
+            />
 
-      <FormField
-        control={form.control}
-        name="about_description"
-        render={({ field }) => (
-          <FormItem className="space-y-2">
-            <FormLabel className="text-base font-medium">
-              About Section Description
-            </FormLabel>
-            <FormControl>
-              <TiptapEditor
-                value={field.value || ""}
-                onChange={field.onChange}
-                placeholder="Write a compelling description about your business..."
-                maxLength={340}
-                maxWords={50}
-                className="min-h-[120px]"
-                aiContext={{
-                  title: form.watch("about_title") || undefined,
-                  ctaText: form.watch("about_link_title") || undefined,
-                  ctaUrl: form.watch("about_cta_link") || undefined,
-                }}
-              />
-            </FormControl>
-            <FormMessage />
-          </FormItem>
-        )}
-      />
+            <FormField
+              control={form.control}
+              name="event_title_2"
+              render={({ field }) => {
+                const currentLength = field.value?.length || 0;
+                const maxLength = 40;
+                return (
+                  <FormItem>
+                    <FormLabel>Event Section 2 Title</FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder="Top Picks"
+                        {...field}
+                        value={field.value || ""}
+                        maxLength={maxLength}
+                        onChange={(e) => field.onChange(e.target.value)}
+                      />
+                    </FormControl>
+                    <div className="text-xs text-muted-foreground mt-1">
+                      <span
+                        className={
+                          currentLength > maxLength ? "text-destructive" : ""
+                        }
+                      >
+                        {currentLength}/{maxLength} characters
+                      </span>
+                    </div>
+                    <FormMessage />
+                  </FormItem>
+                );
+              }}
+            />
+          </div>
 
-      <div className="grid gap-6 md:grid-cols-2">
-        <FormField
-          control={form.control}
-          name="about_link_title"
-          render={({ field }) => {
-            const currentLength = field.value?.length || 0;
-            const maxLength = 18;
-            return (
-              <FormItem>
-                <FormLabel>About Section CTA Text</FormLabel>
-                <FormControl>
-                  <Input
-                    placeholder="Learn More"
-                    {...field}
-                    value={field.value || ""}
-                    maxLength={maxLength}
-                    onChange={(e) => field.onChange(e.target.value)}
-                  />
-                </FormControl>
-                <div className="text-xs text-muted-foreground mt-1">
-                  <span
-                    className={
-                      currentLength > maxLength ? "text-destructive" : ""
-                    }
-                  >
-                    {currentLength}/{maxLength} characters
-                  </span>
-                </div>
-                <FormMessage />
-              </FormItem>
-            );
-          }}
-        />
+          <Separator className="my-4" />
 
-        <FormField
-          control={form.control}
-          name="about_cta_link"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>About Section CTA URL</FormLabel>
-              <FormControl>
-                <Input
-                  placeholder="/about"
-                  {...field}
-                  value={field.value || ""}
-                  onChange={(e) => field.onChange(e.target.value)}
-                />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-      </div>
+          <SectionTitle
+            title="Gallery Section"
+            description="Configure the gallery section on your homepage (location-specific)"
+          />
 
-      <Separator className="my-4" />
-
-      <SectionTitle
-        title="Event Sections"
-        description="Configure event section titles (location-specific)"
-      />
-
-      <div className="grid gap-6 md:grid-cols-2">
-        <FormField
-          control={form.control}
-          name="event_title_1"
-          render={({ field }) => {
-            const currentLength = field.value?.length || 0;
-            const maxLength = 40;
-            return (
-              <FormItem>
-                <FormLabel>Event Section 1 Title</FormLabel>
-                <FormControl>
-                  <Input
-                    placeholder="Upcoming Events"
-                    {...field}
-                    value={field.value || ""}
-                    maxLength={maxLength}
-                    onChange={(e) => field.onChange(e.target.value)}
-                  />
-                </FormControl>
-                <div className="text-xs text-muted-foreground mt-1">
-                  <span
-                    className={
-                      currentLength > maxLength ? "text-destructive" : ""
-                    }
-                  >
-                    {currentLength}/{maxLength} characters
-                  </span>
-                </div>
-                <FormMessage />
-              </FormItem>
-            );
-          }}
-        />
-
-        <FormField
-          control={form.control}
-          name="event_title_2"
-          render={({ field }) => {
-            const currentLength = field.value?.length || 0;
-            const maxLength = 40;
-            return (
-              <FormItem>
-                <FormLabel>Event Section 2 Title</FormLabel>
-                <FormControl>
-                  <Input
-                    placeholder="Top Picks"
-                    {...field}
-                    value={field.value || ""}
-                    maxLength={maxLength}
-                    onChange={(e) => field.onChange(e.target.value)}
-                  />
-                </FormControl>
-                <div className="text-xs text-muted-foreground mt-1">
-                  <span
-                    className={
-                      currentLength > maxLength ? "text-destructive" : ""
-                    }
-                  >
-                    {currentLength}/{maxLength} characters
-                  </span>
-                </div>
-                <FormMessage />
-              </FormItem>
-            );
-          }}
-        />
-      </div>
-
-      <Separator className="my-4" />
-
-      <SectionTitle
-        title="Gallery Section"
-        description="Configure the gallery section on your homepage (location-specific)"
-      />
-
-      <div className="grid gap-6">
-        <FormField
-          control={form.control}
-          name="event_gallery_title"
-          render={({ field }) => {
-            const currentLength = field.value?.length || 0;
-            const maxLength = 40;
-            return (
-              <FormItem>
-                <FormLabel>Event Gallery Title</FormLabel>
-                <FormControl>
-                  <Input
-                    placeholder="Event Gallery"
-                    {...field}
-                    value={field.value || ""}
-                    maxLength={maxLength}
-                    onChange={(e) => field.onChange(e.target.value)}
-                  />
-                </FormControl>
-                <div className="text-xs text-muted-foreground mt-1">
-                  <span
-                    className={
-                      currentLength > maxLength ? "text-destructive" : ""
-                    }
-                  >
-                    {currentLength}/{maxLength} characters
-                  </span>
-                </div>
-                <FormMessage />
-              </FormItem>
-            );
-          }}
-        />
-      </div>
+          <div className="grid gap-6">
+            <FormField
+              control={form.control}
+              name="event_gallery_title"
+              render={({ field }) => {
+                const currentLength = field.value?.length || 0;
+                const maxLength = 40;
+                return (
+                  <FormItem>
+                    <FormLabel>Event Gallery Title</FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder="Event Gallery"
+                        {...field}
+                        value={field.value || ""}
+                        maxLength={maxLength}
+                        onChange={(e) => field.onChange(e.target.value)}
+                      />
+                    </FormControl>
+                    <div className="text-xs text-muted-foreground mt-1">
+                      <span
+                        className={
+                          currentLength > maxLength ? "text-destructive" : ""
+                        }
+                      >
+                        {currentLength}/{maxLength} characters
+                      </span>
+                    </div>
+                    <FormMessage />
+                  </FormItem>
+                );
+              }}
+            />
+          </div>
         </div>
       </div>
-
     </div>
   );
 }

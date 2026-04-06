@@ -156,10 +156,11 @@ export default function AIEventCollectInfo({
 
   const handleFormSubmit = (data: CollectInfoForm) => {
     const addr = data.venueAddress.trim();
+    const desc = data.eventDescription?.trim();
     const payload: AIEventInput = {
       eventName: data.eventName,
       eventType: data.eventType,
-      eventDescription: data.eventDescription,
+      eventDescription: desc && desc.length > 0 ? desc : undefined,
       guestCount: data.guestCount,
       priceRange: data.priceRange,
       venueName: venueInfo?.name,

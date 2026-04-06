@@ -56,6 +56,10 @@ export interface SiteEssentials {
   banner_heading: string | null;
   /** Optional; omit until API supports it */
   banner_heading_accent?: string | null;
+  /** Hero heading + subheading alignment; omit = center */
+  banner_heading_align?: "left" | "center" | "right";
+  /** Hero block vertical position in band; omit = center */
+  banner_heading_valign?: "top" | "center" | "bottom";
   banner_sub_heading: string | null;
   about_title: string | null;
   about_description: string | null;

@@ -315,7 +315,7 @@ export default function GuestAllocationModal({
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col p-0 [&>button]:hidden">
         {/* Header */}
-        <div className="bg-[var(--color-primary)] text-white p-4 relative">
+        <div className="relative bg-blue-600 p-4 text-white">
           <div className="flex items-center justify-between pr-12">
             <div className="flex items-center gap-3">
               <div className="p-1.5 bg-white/20 rounded-lg">
@@ -434,9 +434,11 @@ export default function GuestAllocationModal({
           {/* Action Buttons */}
           <div className="flex items-center gap-2">
             <Button
+              type="button"
               onClick={handleAutoArrange}
               disabled={isAutoArranging}
-              className="bg-[var(--color-primary)] text-white px-4 py-2 rounded-lg font-medium transition-all duration-200 shadow-lg hover:shadow-xl text-sm"
+              variant="ghost"
+              className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-lg transition-all duration-200 hover:bg-blue-700 hover:text-white hover:shadow-xl"
             >
               {isAutoArranging ? (
                 <>
@@ -453,8 +455,8 @@ export default function GuestAllocationModal({
 
             <Button
               onClick={handleReset}
-              variant="event-outline"
-              className="border-gray-300 hover:bg-gray-50 px-4 py-2 rounded-lg font-medium transition-all duration-200 text-sm"
+              variant="outline"
+              className="rounded-lg border-gray-300 px-4 py-2 text-sm font-medium text-slate-900 transition-all duration-200 hover:bg-gray-50"
             >
               <RotateCcw className="h-3 w-3 mr-2" />
               Reset
@@ -642,20 +644,20 @@ export default function GuestAllocationModal({
         <div className="border-t bg-gray-50 px-4 py-3">
           <div className="flex items-center justify-between">
             <Button
-              variant="event-outline"
+              variant="outline"
               onClick={onClose}
-              className="px-6 py-2 rounded-lg font-medium text-sm"
+              className="rounded-lg border-gray-300 px-6 py-2 text-sm font-medium text-slate-900"
             >
               Cancel
             </Button>
             <Button
               onClick={handleConfirm}
               disabled={!validation.isValid}
-              variant="event-primary"
-              className={`px-6 py-2 rounded-lg font-medium transition-all duration-200 text-sm ${
+              variant="outline"
+              className={`rounded-lg border-0 px-6 py-2 text-sm font-medium transition-all duration-200 ${
                 validation.isValid
-                  ? "bg-green-600 hover:bg-green-700 text-white shadow-lg hover:shadow-xl"
-                  : "bg-gray-300 text-gray-500 cursor-not-allowed"
+                  ? "bg-green-600 text-white shadow-lg hover:bg-green-700 hover:text-white hover:shadow-xl"
+                  : "cursor-not-allowed bg-gray-300 text-gray-500"
               }`}
             >
               {validation.isValid ? (

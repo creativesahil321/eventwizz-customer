@@ -1,5 +1,6 @@
 "use client";
 
+import { cn } from "@/lib/utils";
 import { useDomain } from "@/providers/domain-provider/domain-provider";
 import CheckoutHeader from "./_components/checkout-header";
 import CartManager from "./_components/cart-manager";
@@ -26,8 +27,11 @@ export default function CheckoutPage({}: CheckoutPageProps) {
     <div className="min-h-screen bg-gray-50 flex items-center justify-center">
       <div className="text-center">
         <div
-          className={`animate-spin rounded-full h-32 w-32 border-b-2 border-${color}-600 mx-auto`}
-        ></div>
+          className={cn(
+            "mx-auto h-32 w-32 animate-spin rounded-full border-b-2",
+            color === "red" ? "border-red-600" : "border-blue-600",
+          )}
+        />
         <p className="mt-4 text-gray-600">{message}</p>
       </div>
     </div>

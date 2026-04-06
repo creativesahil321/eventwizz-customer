@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft } from "lucide-react";
@@ -13,7 +13,7 @@ import { PreviewThemeCustomizer } from "@/components/preview/preview-theme-custo
 
 export default function SitePreviewPage() {
   const router = useRouter();
-  const { previewData } = useSitePreviewStore();
+  const { previewData, setPreviewData } = useSitePreviewStore();
   const [isLoading, setIsLoading] = useState(true);
   const [formData, setFormData] = useState<SiteEssentialsFormValues | null>(
     null
@@ -51,6 +51,15 @@ export default function SitePreviewPage() {
       isMounted = false;
     };
   }, [previewData]);
+
+  /** Keep Zustand in sync so “Back to Editor” + Save persists Try theme tweaks. */
+  const handlePreviewValuesChange = useCallback(
+    (next: SiteEssentialsFormValues) => {
+      setFormData(next);
+      setPreviewData(next);
+    },
+    [setPreviewData],
+  );
 
   const handleGoBack = () => {
     router.back();
@@ -141,7 +150,7 @@ export default function SitePreviewPage() {
 
         <PreviewThemeCustomizer
           values={formData}
-          onValuesChange={setFormData}
+          onValuesChange={handlePreviewValuesChange}
           brandName={formData.name?.trim() || "Site preview"}
         />
 
