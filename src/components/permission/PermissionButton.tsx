@@ -77,7 +77,7 @@ export function PermissionButton({
 
   return (
     <Button
-      className="bg-[var(--color-primary)] hover:bg-[var(--color-primary-hover)] text-[var(--color-text)] border-[var(--color-primary)] hover:scale-[1.03] transition-all duration-200 shadow-sm hover:shadow-md cursor-pointer"
+      className="border-[var(--color-primary)] bg-[var(--color-primary)] text-[var(--color-primary-foreground)] shadow-sm transition-all duration-200 hover:scale-[1.03] hover:bg-[var(--color-primary-hover)] hover:shadow-md cursor-pointer"
       {...rest}
       disabled={!hasPermission || disabled}
     >

@@ -89,15 +89,21 @@ export default function Timeline({
     );
   };
 
-  // Check overflow on mount and when content changes
+  // Check overflow on mount and when content changes (after layout so widths are correct)
   useEffect(() => {
-    checkScrollability();
+    const run = () => checkScrollability();
+    const id = requestAnimationFrame(() => {
+      run();
+      requestAnimationFrame(run);
+    });
 
-    // Recheck on window resize
-    const handleResize = () => checkScrollability();
+    const handleResize = () => run();
     window.addEventListener("resize", handleResize);
 
-    return () => window.removeEventListener("resize", handleResize);
+    return () => {
+      cancelAnimationFrame(id);
+      window.removeEventListener("resize", handleResize);
+    };
   }, [displaySchedules]);
 
   // Mouse wheel horizontal scroll support
@@ -178,20 +184,21 @@ export default function Timeline({
   };
 
   return (
-    <section className="w-full py-10 sm:py-16 px-2 sm:px-4 relative overflow-hidden bg-[var(--color-secondary)]">
+    <section className="relative w-full overflow-x-visible overflow-y-hidden bg-[var(--color-secondary)] px-2 py-10 sm:px-4 sm:py-16">
       {eventSchedularBackgroundImage && (
-        <div className="w-full h-full absolute top-0 left-0">
+        <div className="absolute left-0 top-0 h-full w-full">
           <img
             src={addCacheBusting(eventSchedularBackgroundImage)}
             alt="Event Scheduler Background Image"
-            className="absolute inset-0 w-full h-full object-cover opacity-30 z-0"
+            className="absolute inset-0 z-0 h-full w-full object-cover opacity-30"
           />
         </div>
       )}
 
-      <div className="relative max-w-7xl mx-auto overflow-hidden">
-        <div className="text-center mb-8 sm:mb-16 z-10">
-          <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold ">
+      {/* Do not use overflow-hidden here — it clips the horizontal timeline scroll */}
+      <div className="relative z-10 mx-auto max-w-7xl">
+        <div className="z-10 mb-8 text-center sm:mb-16">
+          <h2 className="text-3xl font-bold text-[var(--color-secondary-foreground)] sm:text-4xl md:text-5xl drop-shadow-sm">
             {eventSchedularTitle || "The Night"}
           </h2>
         </div>
@@ -202,10 +209,10 @@ export default function Timeline({
               type="button"
               onClick={() => scroll("left")}
               disabled={!canScrollLeft}
-              className={`absolute left-0 z-40 sm:-left-8 md:-left-16 top-1/2 -translate-y-1/2 flex items-center justify-center transition-all duration-200 ${
+              className={`absolute left-0 top-1/2 z-40 flex -translate-y-1/2 items-center justify-center transition-all duration-200 sm:-left-8 md:-left-16 ${
                 canScrollLeft
-                  ? "text-[var(--color-text)] hover:text-[var(--color-text-dimmed)] hover:scale-110 cursor-pointer opacity-100"
-                  : "text-[var(--color-text-dimmed)] cursor-not-allowed opacity-50"
+                  ? "cursor-pointer text-[var(--color-secondary-foreground)] opacity-100 hover:scale-110 hover:opacity-80"
+                  : "cursor-not-allowed text-[var(--color-secondary-foreground)] opacity-40"
               }`}
               aria-label="Scroll left"
             >
@@ -220,16 +227,16 @@ export default function Timeline({
           {/* Timeline Container - Native Scroll (below arrow controls) */}
           <div className="relative z-10 w-full min-w-0">
             {/* Timeline line with tick marks - visible on all screens */}
-            <div className="absolute top-[30px] sm:top-10 left-14 right-14 z-10 pointer-events-none">
-              {/* Main horizontal line */}
-              <div className="w-full h-[2px] bg-[var(--color-text)] opacity-70"></div>
+            <div className="pointer-events-none absolute left-14 right-14 top-[30px] z-10 sm:top-10">
+              {/* Main horizontal line — ink for secondary band */}
+              <div className="h-[2px] w-full bg-[var(--color-secondary-foreground)] opacity-60" />
 
               {/* Elegant tick marks - cleaner pattern */}
               <div className="absolute inset-0">
                 {Array.from({ length: 12 }).map((_, i) => (
                   <div
                     key={i}
-                    className="absolute w-[2px] h-3 bg-[var(--color-text)] opacity-50"
+                    className="absolute h-3 w-[2px] bg-[var(--color-secondary-foreground)] opacity-45"
                     style={{
                       left: `${(i * 100) / 11}%`,
                       top: "-5px",
@@ -242,7 +249,7 @@ export default function Timeline({
             {/* Scrollable Timeline Items - center when content doesn't overflow */}
             <div
               ref={scrollContainerRef}
-              className={`relative z-10 flex min-w-0 cursor-grab select-none items-start gap-4 overflow-x-auto overflow-y-visible scroll-smooth px-4 py-2 no-scrollbar sm:gap-6 sm:px-8 md:gap-8 md:px-14 ${!showArrows ? "justify-center" : ""}`}
+              className={`relative z-10 flex min-w-0 cursor-grab select-none items-start gap-4 overflow-x-auto overflow-y-visible scroll-smooth py-2 pl-4 pr-8 no-scrollbar sm:gap-6 sm:pl-8 sm:pr-10 md:gap-8 md:pl-14 md:pr-14 ${!showArrows ? "justify-center" : ""}`}
               onMouseDown={handleMouseDown}
               onMouseLeave={handleMouseLeave}
               onMouseUp={handleMouseUp}
@@ -257,8 +264,8 @@ export default function Timeline({
                     maxWidth: "180px",
                   }}
                 >
-                  {/* Time Circle */}
-                  <div className="relative z-10 flex h-14 w-14 flex-shrink-0 items-center justify-center rounded-full bg-[var(--color-background)] text-[var(--color-text)] shadow-lg mb-4 sm:mb-6 sm:h-16 sm:w-16 md:h-20 md:w-20">
+                  {/* Time Circle — surface token so times stay readable on any secondary hue */}
+                  <div className="relative z-10 mb-4 flex h-14 w-14 flex-shrink-0 items-center justify-center rounded-full bg-[var(--color-surface)] text-[var(--color-on-surface)] shadow-lg sm:mb-6 sm:h-16 sm:w-16 md:h-20 md:w-20">
                     <div className="text-center px-1">
                       <div className="text-xs sm:text-sm md:text-base font-bold leading-tight break-words">
                         {formatTime(item.time).split(" ")[0]}
@@ -269,8 +276,8 @@ export default function Timeline({
                     </div>
                   </div>
 
-                  {/* Title */}
-                  <p className="text-[var(--color-text)] text-xs sm:text-sm leading-tight font-medium break-words line-clamp-3 px-1 w-full">
+                  {/* Title on secondary band — not body text */}
+                  <p className="w-full px-1 text-xs font-medium leading-tight text-[var(--color-secondary-foreground)] [text-shadow:0_1px_2px_rgb(0_0_0/35%)] line-clamp-3 sm:text-sm">
                     {item.title}
                   </p>
                 </div>
@@ -284,10 +291,10 @@ export default function Timeline({
               type="button"
               onClick={() => scroll("right")}
               disabled={!canScrollRight}
-              className={`absolute right-0 z-40 sm:-right-8 md:-right-16 top-1/2 -translate-y-1/2 flex items-center justify-center transition-all duration-200 ${
+              className={`absolute right-0 top-1/2 z-40 flex -translate-y-1/2 items-center justify-center transition-all duration-200 sm:-right-8 md:-right-16 ${
                 canScrollRight
-                  ? "text-[var(--color-text)] hover:text-[var(--color-text-dimmed)] hover:scale-110 cursor-pointer opacity-100"
-                  : "text-[var(--color-text-dimmed)] cursor-not-allowed opacity-50"
+                  ? "cursor-pointer text-[var(--color-secondary-foreground)] opacity-100 hover:scale-110 hover:opacity-80"
+                  : "cursor-not-allowed text-[var(--color-secondary-foreground)] opacity-40"
               }`}
               aria-label="Scroll right"
             >

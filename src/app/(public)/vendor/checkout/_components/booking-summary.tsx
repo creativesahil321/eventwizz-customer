@@ -320,6 +320,9 @@ export default function BookingSummary({}: BookingSummaryProps) {
   }
 
   const finalTotal = totalToday;
+  const bookingGrandTotal = totalToday + totalLater;
+  /** Avoid showing $0.00 as if it were a real quote before any priced selection. */
+  const hasPayableTotal = bookingGrandTotal > 0;
 
   // Additional safety check for TypeScript
   if (!currentEventApiData) {
@@ -600,13 +603,19 @@ export default function BookingSummary({}: BookingSummaryProps) {
               <span className="text-sm font-medium text-gray-700">
                 Booking Total
               </span>
-              <span className="text-lg font-bold text-gray-900">
-                {formatMoney(totalToday + totalLater)}
-              </span>
+              {hasPayableTotal ? (
+                <span className="text-lg font-bold text-gray-900">
+                  {formatMoney(bookingGrandTotal)}
+                </span>
+              ) : (
+                <span className="max-w-[55%] text-right text-sm font-medium text-gray-500">
+                  Add selections to calculate
+                </span>
+              )}
             </div>
 
             {/* Show payment split info only if deposit selected */}
-            {totalLater > 0 && (
+            {hasPayableTotal && totalLater > 0 && (
               <div className="text-xs text-gray-500">
                 Split payment: {formatMoney(totalToday)} today +{" "}
                 {formatMoney(totalLater)} later
@@ -640,28 +649,40 @@ export default function BookingSummary({}: BookingSummaryProps) {
 
           <Separator />
 
-          {/* Amount to Pay Today - Clear and Actionable */}
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-            <div className="flex justify-between items-center">
-              <span className="text-sm font-semibold text-gray-900">
-                Amount to Pay Today
-              </span>
-              <span className="text-2xl font-bold text-blue-600">
-                {formatMoney(finalTotal)}
-              </span>
-            </div>
-
-            {totalLater > 0 && (
-              <div className="text-xs text-gray-600 mt-2 pt-2 border-t border-blue-200">
-                Balance of {formatMoney(totalLater)} due before event date
+          {/* Amount to pay today — only show money + SSL callout once there is a payable total */}
+          {hasPayableTotal ? (
+            <div className="rounded-lg border border-blue-200 bg-blue-50 p-3">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-semibold text-gray-900">
+                  Amount to Pay Today
+                </span>
+                <span className="text-2xl font-bold text-blue-600">
+                  {formatMoney(finalTotal)}
+                </span>
               </div>
-            )}
 
-            <div className="flex items-center gap-1.5 text-xs text-green-700 mt-2">
-              <Shield className="h-3 w-3" />
-              <span>Secure SSL encrypted</span>
+              {totalLater > 0 && (
+                <div className="mt-2 border-t border-blue-200 pt-2 text-xs text-gray-600">
+                  Balance of {formatMoney(totalLater)} due before event date
+                </div>
+              )}
+
+              <div className="mt-2 flex items-center gap-1.5 text-xs text-green-700">
+                <Shield className="h-3 w-3" />
+                <span>Secure SSL encrypted</span>
+              </div>
             </div>
-          </div>
+          ) : (
+            <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
+              <p className="text-sm font-medium text-gray-800">
+                Amount to pay today
+              </p>
+              <p className="mt-1 text-xs leading-relaxed text-gray-600">
+                Choose tables, tickets, or add-ons for your dates — your total
+                and today&apos;s payment will appear here.
+              </p>
+            </div>
+          )}
 
           <Separator />
 
@@ -750,13 +771,20 @@ export default function BookingSummary({}: BookingSummaryProps) {
                 </div>
               )}
 
-              {/* Security Note */}
+              {/* Status: do not imply "ready to pay" when the cart total is still $0 */}
               {!isPaymentBlocked && !isProcessing && !isPending && (
                 <div className="text-center">
-                  <p className="text-xs text-green-600 bg-green-50 px-3 py-2 rounded-md border border-green-200">
-                    <span className="font-medium">✓ Ready for Payment:</span>{" "}
-                    All changes saved and validated
-                  </p>
+                  {hasPayableTotal ? (
+                    <p className="rounded-md border border-green-200 bg-green-50 px-3 py-2 text-xs text-green-600">
+                      <span className="font-medium">✓ Ready for Payment:</span>{" "}
+                      All changes saved and validated
+                    </p>
+                  ) : (
+                    <p className="rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-xs text-gray-600">
+                      <span className="font-medium">Next step:</span> Add priced
+                      items to your cart to see totals and pay securely.
+                    </p>
+                  )}
                 </div>
               )}
             </div>

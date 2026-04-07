@@ -57,7 +57,7 @@ export default function NewsSection() {
                   sizes="(max-width: 768px) 100vw, 33vw"
                 />
                 {/* Category pill */}
-                <div className="absolute top-3 left-3 bg-[color:var(--color-primary)] text-[color:var(--color-text)] text-xs font-semibold px-3 py-1 rounded-full shadow">
+                <div className="absolute top-3 left-3 bg-[color:var(--color-primary)] text-[color:var(--color-primary-foreground)] text-xs font-semibold px-3 py-1 rounded-full shadow">
                   {article.category}
                 </div>
               </div>

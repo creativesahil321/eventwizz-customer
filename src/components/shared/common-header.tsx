@@ -173,16 +173,23 @@ export default function CommonHeader({
             ? "hover:text-white/80"
             : "hover:text-black/80",
         };
-      default:
+      default: {
+        // Transparent bar sits over hero (event + location pages): on-header is derived from
+        // solid header fill, so dark-on-dark when the bar is clear. Match location-selection-header.
+        const overDarkHero = !isScrolled;
         return {
           container: isScrolled
             ? "bg-[color:var(--color-header)] shadow-md"
             : "bg-transparent",
-          textColor: "text-[var(--color-on-header)]",
+          textColor: overDarkHero
+            ? "text-white [text-shadow:0_1px_3px_rgba(0,0,0,0.55)]"
+            : "text-[var(--color-on-header)]",
           borderColor: "border-[color:var(--color-primary)]",
-          hoverColor:
-            "hover:opacity-90 hover:underline hover:decoration-2 hover:underline-offset-2 hover:decoration-[color:var(--color-primary)]",
+          hoverColor: overDarkHero
+            ? "hover:text-white/90 hover:underline hover:decoration-2 hover:underline-offset-2 hover:decoration-[color:var(--color-primary)]"
+            : "hover:opacity-90 hover:underline hover:decoration-2 hover:underline-offset-2 hover:decoration-[color:var(--color-primary)]",
         };
+      }
     }
   };
 

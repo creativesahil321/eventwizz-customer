@@ -53,7 +53,7 @@ export default function MenuSection({
   };
 
   return (
-    <section className="w-full px-5 py-5 relative relative">
+    <section className="relative w-full bg-[var(--color-background)] px-5 py-5">
       {/* Background */}
       <div className="absolute inset-0 z-0">
         <img
@@ -75,8 +75,8 @@ export default function MenuSection({
         />
       </div>
 
-      {/* Foreground content */}
-      <div className="relative z-10 text-[var(--color-secondary-foreground)]">
+      {/* Foreground: use body text tokens — secondary-foreground is only for text ON secondary fills */}
+      <div className="relative z-10 text-[var(--color-text)]">
         <div className="w-full text-center py-5">
           <h2 className="text-3xl font-bold py-5 max-w-6xl mx-auto">
             {menu_title || "Heading e.g. Menu"}
@@ -137,7 +137,7 @@ export default function MenuSection({
                       </span>
                     </h4>
                     <div
-                      className="text-sm sm:text-base pl-4 sm:pl-6 break-words whitespace-normal overflow-hidden w-full text-[var(--color-secondary-foreground)]/90"
+                      className="w-full overflow-hidden whitespace-normal break-words pl-4 text-sm text-[var(--color-text-dimmed)] sm:pl-6 sm:text-base"
                       style={{
                         wordBreak: "break-word",
                         overflowWrap: "break-word",

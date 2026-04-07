@@ -34,8 +34,12 @@ export default function PackageSection({
   buttonLink,
   packageDetails,
 }: PackageSectionProps) {
-  const { textColorClass } = useOnboarding();
+  const { isOnboarding, textColorClass } = useOnboarding();
   const currencySymbol = useCurrencySymbol();
+  /** Vendor/live pages use theme tokens; onboarding builder keeps explicit black for the preview canvas. */
+  const bodyTextClass = isOnboarding
+    ? textColorClass
+    : "text-[var(--color-text)]";
 
   const getImageSrc = (image: PackageImage | File | null | string) => {
     if (typeof image === "string") return image;
@@ -45,13 +49,13 @@ export default function PackageSection({
     return "/assets/images/gallery-image.png";
   };
   return (
-    <section className="w-full max-w-6xl mx-auto px-6 py-12">
-      <div className="flex flex-col md:flex-row gap-10 items-start">
+    <section className="mx-auto w-full max-w-6xl bg-[var(--color-background)] px-6 py-12">
+      <div className="flex flex-col items-start gap-10 md:flex-row">
         {/* LEFT: Package Image Card */}
         <div className="w-full md:w-1/2">
-          <div className="bg-white rounded-lg shadow-md overflow-hidden border">
+          <div className="overflow-hidden rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] shadow-md">
             {image ? (
-              <div className="relative p-4 w-full bg-gray-50 flex items-center justify-center">
+              <div className="relative flex w-full items-center justify-center bg-muted p-4">
                 <img
                   src={addCacheBusting(getImageSrc(image))}
                   alt="Package Image"
@@ -61,20 +65,20 @@ export default function PackageSection({
                 />
               </div>
             ) : (
-              <div className="bg-gray-50 flex items-center justify-center h-80">
-                <ImageIcon className="w-16 h-16 text-gray-400" />
+              <div className="flex h-80 items-center justify-center bg-muted">
+                <ImageIcon className="h-16 w-16 text-[var(--color-text-dimmed)]" />
               </div>
             )}
           </div>
         </div>
 
         {/* RIGHT: Package Details */}
-        <div className="w-full md:w-1/2 overflow-hidden">
-          <h2 className={`text-2xl font-bold break-words ${textColorClass}`}>
+        <div className="w-full overflow-hidden md:w-1/2">
+          <h2 className={`break-words text-2xl font-bold ${bodyTextClass}`}>
             {heading || "The Package"}
           </h2>
           <p
-            className={`text-sm mt-1 break-words whitespace-normal overflow-hidden max-w-full ${textColorClass}`}
+            className={`mt-1 max-w-full overflow-hidden whitespace-normal break-words text-sm ${bodyTextClass}`}
             style={{
               wordBreak: "break-word",
               overflowWrap: "break-word",
@@ -90,10 +94,10 @@ export default function PackageSection({
               : Array(10).fill({ title: "Package Info" })
             ).map((item, i) => (
               <li key={i} className="flex items-start gap-3">
-                <div className="bg-black w-5 h-5 rounded-full flex items-center justify-center mt-1">
+                <div className="mt-1 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[var(--color-primary)]">
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
-                    className="w-2.5 h-2.5 text-white"
+                    className="h-2.5 w-2.5 text-[var(--color-primary-foreground)]"
                     viewBox="0 0 20 20"
                     fill="currentColor"
                   >
@@ -104,7 +108,7 @@ export default function PackageSection({
                     />
                   </svg>
                 </div>
-                <p className={`text-sm font-medium ${textColorClass}`}>
+                <p className={`text-sm font-medium ${bodyTextClass}`}>
                   {item.title}
                 </p>
               </li>
@@ -116,7 +120,9 @@ export default function PackageSection({
             {buttonLink?.startsWith("#") ? (
               <Button
                 type="button"
-                className="px-6 py-2 bg-black hover:bg-gray-800 transition rounded-lg"
+                variant="event-primary"
+                size="lg"
+                className="rounded-lg px-6"
                 onClick={() => {
                   const id = buttonLink.slice(1);
                   const el = id ? document.getElementById(id) : null;
@@ -128,7 +134,9 @@ export default function PackageSection({
             ) : (
               <Button
                 asChild
-                className="px-6 py-2 bg-black hover:bg-gray-800 transition rounded-lg"
+                variant="event-primary"
+                size="lg"
+                className="rounded-lg px-6"
               >
                 <a
                   href={buttonLink || "#"}
