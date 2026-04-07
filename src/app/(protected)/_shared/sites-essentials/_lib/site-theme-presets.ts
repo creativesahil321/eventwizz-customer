@@ -1,6 +1,10 @@
 import type { UseFormGetValues, UseFormSetValue } from "react-hook-form";
 import type { SiteEssentialsFormValues } from "./schema";
-import { siteEssentialsGoogleFontStack } from "@/lib/site-typography-google-fonts";
+import { normalizeCustomFontStylesheetUrls } from "@/lib/site-custom-font-stylesheets";
+import {
+  collectSiteEssentialsGoogleFamilies,
+  siteEssentialsGoogleFontStack,
+} from "@/lib/site-typography-google-fonts";
 
 /**
  * OAuth buttons use these hex values as full button backgrounds with white label
@@ -453,6 +457,331 @@ const PRESET_SHELLS: readonly PresetShell[] = [
 export const SITE_THEME_PRESETS: SiteThemePreset[] =
   PRESET_SHELLS.map(withTypography);
 
+/**
+ * Unique https CDN stylesheet URLs from all presets (e.g. cdnfonts.com).
+ * Used to preload @font-face before "Apply" so preset grid previews match applied typography.
+ */
+export function allPresetGridCdnStylesheetUrls(): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const p of SITE_THEME_PRESETS) {
+    for (const href of normalizeCustomFontStylesheetUrls(
+      p.typography.customFontStylesheetUrls,
+    )) {
+      if (seen.has(href)) continue;
+      seen.add(href);
+      out.push(href);
+    }
+  }
+  return out;
+}
+
+/**
+ * Curated Google-only pairs for Try theme (beyond full color presets). Deduped
+ * against preset pairs when building {@link TRY_THEME_FONT_GRID_OPTIONS}.
+ */
+export const TRY_THEME_EXTRA_FONT_PAIRS: ReadonlyArray<{
+  key: string;
+  headingFontLabel: string;
+  bodyFontLabel: string;
+  headingStack: string;
+  bodyStack: string;
+  tagline: string;
+}> = [
+  {
+    key: "cinzel-outfit",
+    headingFontLabel: "Cinzel",
+    bodyFontLabel: "Outfit",
+    headingStack: siteEssentialsGoogleFontStack("Cinzel"),
+    bodyStack: siteEssentialsGoogleFontStack("Outfit"),
+    tagline: "Roman luxury headlines with a clean geometric body",
+  },
+  {
+    key: "cormorant-plus-jakarta",
+    headingFontLabel: "Cormorant Garamond",
+    bodyFontLabel: "Plus Jakarta Sans",
+    headingStack: siteEssentialsGoogleFontStack("Cormorant Garamond"),
+    bodyStack: siteEssentialsGoogleFontStack("Plus Jakarta Sans"),
+    tagline: "Editorial serif meets modern startup polish",
+  },
+  {
+    key: "fraunces-sora",
+    headingFontLabel: "Fraunces",
+    bodyFontLabel: "Sora",
+    headingStack: siteEssentialsGoogleFontStack("Fraunces"),
+    bodyStack: siteEssentialsGoogleFontStack("Sora"),
+    tagline: "Expressive display with a soft, futuristic body",
+  },
+  {
+    key: "dm-serif-instrument",
+    headingFontLabel: "DM Serif Display",
+    bodyFontLabel: "Instrument Sans",
+    headingStack: siteEssentialsGoogleFontStack("DM Serif Display"),
+    bodyStack: siteEssentialsGoogleFontStack("Instrument Sans"),
+    tagline: "High-contrast editorial titles, neutral reading text",
+  },
+  {
+    key: "eb-garamond-space",
+    headingFontLabel: "EB Garamond",
+    bodyFontLabel: "Space Grotesk",
+    headingStack: siteEssentialsGoogleFontStack("EB Garamond"),
+    bodyStack: siteEssentialsGoogleFontStack("Space Grotesk"),
+    tagline: "Classic book typography with tech-forward UI body",
+  },
+  {
+    key: "crimson-dm-sans",
+    headingFontLabel: "Crimson Text",
+    bodyFontLabel: "DM Sans",
+    headingStack: siteEssentialsGoogleFontStack("Crimson Text"),
+    bodyStack: siteEssentialsGoogleFontStack("DM Sans"),
+    tagline: "Readable long-form serif with a friendly sans companion",
+  },
+  {
+    key: "syne-inter",
+    headingFontLabel: "Syne",
+    bodyFontLabel: "Inter",
+    headingStack: siteEssentialsGoogleFontStack("Syne"),
+    bodyStack: siteEssentialsGoogleFontStack("Inter"),
+    tagline: "Bold gallery-style headings and neutral interface copy",
+  },
+];
+
+/**
+ * Color-only palettes for Try theme (beyond full SITE_THEME_PRESETS). Deduped
+ * against preset palettes when building {@link TRY_THEME_COLOR_GRID_OPTIONS}.
+ */
+export const TRY_THEME_EXTRA_COLOR_PALETTES: ReadonlyArray<{
+  key: string;
+  name: string;
+  tagline: string;
+  swatch: [string, string, string];
+  colors: SiteEssentialsFormValues["colors"];
+}> = [
+  {
+    key: "teal-abyss",
+    name: "Teal Abyss",
+    tagline: "Spa retreats, dive bars, and coastal nightlife",
+    swatch: ["#031a18", "#2dd4bf", "#ecfdf5"],
+    colors: {
+      primary: "#2dd4bf",
+      secondary: "#115e59",
+      header: "#042f2e",
+      footer: "#021c1a",
+      background: "#031a18",
+      surface: "#134e4a",
+      text: "#ecfdf5",
+      textDimmed: "#5eead4",
+      socialLogin: { ...SOCIAL_LOGIN_DARK },
+    },
+  },
+  {
+    key: "fuchsia-velvet",
+    name: "Fuchsia Velvet",
+    tagline: "DJ sets, drag brunches, and bold beauty brands",
+    swatch: ["#18081f", "#e879f9", "#fdf4ff"],
+    colors: {
+      primary: "#e879f9",
+      secondary: "#86198f",
+      header: "#1f0a28",
+      footer: "#120618",
+      background: "#18081f",
+      surface: "#2d1a35",
+      text: "#fdf4ff",
+      textDimmed: "#f0abfc",
+      socialLogin: { ...SOCIAL_LOGIN_DARK },
+    },
+  },
+  {
+    key: "copper-patina",
+    name: "Copper Patina",
+    tagline: "Whiskey tastings, steampunk fairs, and craft makers",
+    swatch: ["#1a120a", "#d97706", "#fffbeb"],
+    colors: {
+      primary: "#d97706",
+      secondary: "#92400e",
+      header: "#22160c",
+      footer: "#140e08",
+      background: "#1a120a",
+      surface: "#3d2810",
+      text: "#fffbeb",
+      textDimmed: "#fcd34d",
+      socialLogin: { ...SOCIAL_LOGIN_DARK },
+    },
+  },
+  {
+    key: "lilac-studio",
+    name: "Lilac Studio",
+    tagline: "Design studios, podcasts, and creative collectives",
+    swatch: ["#16131f", "#a5b4fc", "#eef2ff"],
+    colors: {
+      primary: "#a5b4fc",
+      secondary: "#4338ca",
+      header: "#1e1b2e",
+      footer: "#12101c",
+      background: "#16131f",
+      surface: "#252136",
+      text: "#eef2ff",
+      textDimmed: "#c7d2fe",
+      socialLogin: { ...SOCIAL_LOGIN_DARK },
+    },
+  },
+  {
+    key: "jade-noir",
+    name: "Jade Noir",
+    tagline: "Plant shops, yoga immersions, and eco product launches",
+    swatch: ["#071512", "#4ade80", "#f0fdf4"],
+    colors: {
+      primary: "#4ade80",
+      secondary: "#166534",
+      header: "#0c1f16",
+      footer: "#050f0c",
+      background: "#071512",
+      surface: "#14532d",
+      text: "#f0fdf4",
+      textDimmed: "#86efac",
+      socialLogin: { ...SOCIAL_LOGIN_DARK },
+    },
+  },
+  {
+    key: "amber-district",
+    name: "Amber District",
+    tagline: "Street food nights, jazz lounges, and golden-hour weddings",
+    swatch: ["#17130a", "#fbbf24", "#fffbeb"],
+    colors: {
+      primary: "#fbbf24",
+      secondary: "#b45309",
+      header: "#1f170c",
+      footer: "#0f0c06",
+      background: "#17130a",
+      surface: "#2d2212",
+      text: "#fffbeb",
+      textDimmed: "#fde68a",
+      socialLogin: { ...SOCIAL_LOGIN_DARK },
+    },
+  },
+  {
+    key: "deep-indigo",
+    name: "Deep Indigo",
+    tagline: "Dev conferences, SaaS launches, and midnight hackathons",
+    swatch: ["#0f0f23", "#818cf8", "#eef2ff"],
+    colors: {
+      primary: "#818cf8",
+      secondary: "#3730a3",
+      header: "#14142b",
+      footer: "#0a0a18",
+      background: "#0f0f23",
+      surface: "#1e1b4b",
+      text: "#eef2ff",
+      textDimmed: "#a5b4fc",
+      socialLogin: { ...SOCIAL_LOGIN_DARK },
+    },
+  },
+  {
+    key: "crimson-eclipse",
+    name: "Crimson Eclipse",
+    tagline: "Valentine galas, burlesque revues, and runway afterparties",
+    swatch: ["#1a0508", "#f43f5e", "#fff1f2"],
+    colors: {
+      primary: "#f43f5e",
+      secondary: "#881337",
+      header: "#240a0f",
+      footer: "#140508",
+      background: "#1a0508",
+      surface: "#3f0d18",
+      text: "#fff1f2",
+      textDimmed: "#fda4af",
+      socialLogin: { ...SOCIAL_LOGIN_DARK },
+    },
+  },
+  {
+    key: "peach-cream",
+    name: "Peach Cream",
+    tagline: "Brunch pop-ups, baby showers, and sunny farmers markets",
+    swatch: ["#fffbeb", "#ea580c", "#1c1917"],
+    colors: {
+      primary: "#ea580c",
+      secondary: "#c2410c",
+      header: "#ffffff",
+      footer: "#fef3c7",
+      background: "#fffbeb",
+      surface: "#ffffff",
+      text: "#1c1917",
+      textDimmed: "#78716c",
+      socialLogin: { ...SOCIAL_LOGIN_LIGHT },
+    },
+  },
+  {
+    key: "slate-editorial",
+    name: "Slate Editorial",
+    tagline: "Magazine sites, speaker series, and minimalist portfolios",
+    swatch: ["#f8fafc", "#475569", "#0f172a"],
+    colors: {
+      primary: "#475569",
+      secondary: "#334155",
+      header: "#ffffff",
+      footer: "#f1f5f9",
+      background: "#f8fafc",
+      surface: "#ffffff",
+      text: "#0f172a",
+      textDimmed: "#64748b",
+      socialLogin: { ...SOCIAL_LOGIN_LIGHT },
+    },
+  },
+  {
+    key: "rose-clay",
+    name: "Rose Clay",
+    tagline: "Bridal fairs, florists, and romantic workshop series",
+    swatch: ["#fff1f2", "#e11d48", "#1f2937"],
+    colors: {
+      primary: "#e11d48",
+      secondary: "#9f1239",
+      header: "#ffffff",
+      footer: "#ffe4e6",
+      background: "#fff1f2",
+      surface: "#ffffff",
+      text: "#1f2937",
+      textDimmed: "#9ca3af",
+      socialLogin: { ...SOCIAL_LOGIN_LIGHT },
+    },
+  },
+  {
+    key: "mint-breeze",
+    name: "Mint Breeze",
+    tagline: "Dental open houses, med-spa promos, and clean beauty",
+    swatch: ["#f0fdfa", "#0d9488", "#134e4a"],
+    colors: {
+      primary: "#0d9488",
+      secondary: "#0f766e",
+      header: "#ffffff",
+      footer: "#ccfbf1",
+      background: "#f0fdfa",
+      surface: "#ffffff",
+      text: "#134e4a",
+      textDimmed: "#5eead4",
+      socialLogin: { ...SOCIAL_LOGIN_LIGHT },
+    },
+  },
+];
+
+/**
+ * Every Site Essentials Google family needed for preset cards + Try theme grid.
+ */
+export function allPresetGridGoogleFontFamilies(): string[] {
+  const seen = new Set<string>();
+  const addStacks = (heading?: string, body?: string) => {
+    for (const name of collectSiteEssentialsGoogleFamilies(heading, body)) {
+      seen.add(name);
+    }
+  };
+  for (const p of SITE_THEME_PRESETS) {
+    addStacks(p.typography.fontFamily.heading, p.typography.fontFamily.body);
+  }
+  for (const x of TRY_THEME_EXTRA_FONT_PAIRS) {
+    addStacks(x.headingStack, x.bodyStack);
+  }
+  return [...seen];
+}
+
 /** True when the preset injects at least one https custom font stylesheet. */
 export function presetIncludesCdnStylesheets(preset: SiteThemePreset): boolean {
   return (preset.typography.customFontStylesheetUrls?.length ?? 0) > 0;
@@ -472,35 +801,58 @@ export function siteEssentialsFontPairKey(
   return `${h}\0${b}`;
 }
 
-function colorsMatch(
+function normColor(v: string | undefined): string {
+  return (v ?? "").trim().toLowerCase();
+}
+
+/** Full palette equality (preview grid active state, dedupe). */
+export function siteEssentialsColorsMatch(
   a: SiteEssentialsFormValues["colors"],
   b: SiteEssentialsFormValues["colors"],
 ): boolean {
   return (
-    (a.primary || "") === (b.primary || "") &&
-    (a.secondary || "") === (b.secondary || "") &&
-    (a.header || "") === (b.header || "") &&
-    (a.footer || "") === (b.footer || "") &&
-    (a.background || "") === (b.background || "") &&
-    (a.surface || "") === (b.surface || "") &&
-    (a.text || "") === (b.text || "") &&
-    (a.textDimmed || "") === (b.textDimmed || "") &&
-    (a.socialLogin?.google || "") === (b.socialLogin?.google || "") &&
-    (a.socialLogin?.microsoft || "") === (b.socialLogin?.microsoft || "")
+    normColor(a.primary) === normColor(b.primary) &&
+    normColor(a.secondary) === normColor(b.secondary) &&
+    normColor(a.header) === normColor(b.header) &&
+    normColor(a.footer) === normColor(b.footer) &&
+    normColor(a.background) === normColor(b.background) &&
+    normColor(a.surface) === normColor(b.surface) &&
+    normColor(a.text) === normColor(b.text) &&
+    normColor(a.textDimmed) === normColor(b.textDimmed) &&
+    normColor(a.socialLogin?.google) === normColor(b.socialLogin?.google) &&
+    normColor(a.socialLogin?.microsoft) ===
+      normColor(b.socialLogin?.microsoft)
   );
+}
+
+function normFontStack(v: string | undefined): string {
+  return (v ?? "").trim().replace(/\s+/g, " ");
+}
+
+/** Same URLs regardless of order (API / form may reorder). */
+function normalizedStylesheetUrls(urls: unknown): string[] {
+  if (!Array.isArray(urls)) return [];
+  const out = new Set<string>();
+  for (const item of urls) {
+    if (typeof item !== "string") continue;
+    const t = item.trim();
+    if (t) out.add(t);
+  }
+  return [...out].sort();
 }
 
 function typographyMatch(
   a: SiteEssentialsFormValues["typography"],
   b: SiteEssentialsFormValues["typography"],
 ): boolean {
-  const urlsA = a.customFontStylesheetUrls ?? [];
-  const urlsB = b.customFontStylesheetUrls ?? [];
+  const urlsA = normalizedStylesheetUrls(a.customFontStylesheetUrls);
+  const urlsB = normalizedStylesheetUrls(b.customFontStylesheetUrls);
   if (urlsA.length !== urlsB.length) return false;
   if (!urlsA.every((u, i) => u === urlsB[i])) return false;
   return (
-    (a.fontFamily?.heading || "") === (b.fontFamily?.heading || "") &&
-    (a.fontFamily?.body || "") === (b.fontFamily?.body || "")
+    normFontStack(a.fontFamily?.heading) ===
+      normFontStack(b.fontFamily?.heading) &&
+    normFontStack(a.fontFamily?.body) === normFontStack(b.fontFamily?.body)
   );
 }
 
@@ -509,7 +861,7 @@ export function getMatchingSiteThemePresetId(
 ): SiteThemePresetId | null {
   for (const p of SITE_THEME_PRESETS) {
     if (
-      colorsMatch(values.colors, p.colors) &&
+      siteEssentialsColorsMatch(values.colors, p.colors) &&
       typographyMatch(values.typography, p.typography)
     ) {
       return p.id;
@@ -570,14 +922,144 @@ export const PREVIEW_FONT_OPTIONS: Array<{
   return out;
 })();
 
+export type TryThemeFontGridOption =
+  | {
+      source: "preset";
+      id: SiteThemePresetId;
+      headingFontLabel: string;
+      bodyFontLabel: string;
+      headingStack: string;
+      bodyStack: string;
+      tagline: string;
+    }
+  | {
+      source: "extra";
+      key: string;
+      headingFontLabel: string;
+      bodyFontLabel: string;
+      headingStack: string;
+      bodyStack: string;
+      tagline: string;
+    };
+
+/** Preset pairs + premium extra pairs for Try theme / preview sidebar (deduped). */
+export const TRY_THEME_FONT_GRID_OPTIONS: TryThemeFontGridOption[] = (() => {
+  const seen = new Set<string>();
+  const out: TryThemeFontGridOption[] = [];
+  const stackKey = (h: string, b: string) => `${h}\0${b}`;
+  for (const p of PREVIEW_FONT_OPTIONS) {
+    const k = stackKey(p.headingStack, p.bodyStack);
+    if (seen.has(k)) continue;
+    seen.add(k);
+    const presetRow = SITE_THEME_PRESETS.find((pr) => pr.id === p.id);
+    out.push({
+      source: "preset",
+      id: p.id,
+      headingFontLabel: p.headingFontLabel,
+      bodyFontLabel: p.bodyFontLabel,
+      headingStack: p.headingStack,
+      bodyStack: p.bodyStack,
+      tagline: presetRow?.tagline ?? "",
+    });
+  }
+  for (const x of TRY_THEME_EXTRA_FONT_PAIRS) {
+    const k = stackKey(x.headingStack, x.bodyStack);
+    if (seen.has(k)) continue;
+    seen.add(k);
+    out.push({
+      source: "extra",
+      key: x.key,
+      headingFontLabel: x.headingFontLabel,
+      bodyFontLabel: x.bodyFontLabel,
+      headingStack: x.headingStack,
+      bodyStack: x.bodyStack,
+      tagline: x.tagline,
+    });
+  }
+  return out;
+})();
+
+export type TryThemeColorGridOption =
+  | {
+      source: "preset";
+      id: SiteThemePresetId;
+      name: string;
+      tagline: string;
+      swatch: [string, string, string];
+      colors: SiteEssentialsFormValues["colors"];
+    }
+  | {
+      source: "extra";
+      key: string;
+      name: string;
+      tagline: string;
+      swatch: [string, string, string];
+      colors: SiteEssentialsFormValues["colors"];
+    };
+
+/** Preset palettes + extra color-only options for Try theme (deduped by full palette). */
+export const TRY_THEME_COLOR_GRID_OPTIONS: TryThemeColorGridOption[] = (() => {
+  const out: TryThemeColorGridOption[] = [];
+  const pushUnique = (opt: TryThemeColorGridOption) => {
+    for (const existing of out) {
+      if (siteEssentialsColorsMatch(existing.colors, opt.colors)) return;
+    }
+    out.push(opt);
+  };
+  for (const p of SITE_THEME_PRESETS) {
+    pushUnique({
+      source: "preset",
+      id: p.id,
+      name: p.name,
+      tagline: p.tagline,
+      swatch: p.swatch,
+      colors: p.colors,
+    });
+  }
+  for (const x of TRY_THEME_EXTRA_COLOR_PALETTES) {
+    pushUnique({
+      source: "extra",
+      key: x.key,
+      name: x.name,
+      tagline: x.tagline,
+      swatch: x.swatch,
+      colors: x.colors,
+    });
+  }
+  return out;
+})();
+
+/** Apply Google heading/body only (clears CDN stylesheets — use after script presets). */
+export function mergeGoogleOnlyFontsIntoValues(
+  values: SiteEssentialsFormValues,
+  headingStack: string,
+  bodyStack: string,
+): SiteEssentialsFormValues {
+  return {
+    ...values,
+    typography: {
+      ...values.typography,
+      fontFamily: { heading: headingStack, body: bodyStack },
+      customFontStylesheetUrls: [],
+    },
+  };
+}
+
+export function mergeColorPaletteIntoValues(
+  values: SiteEssentialsFormValues,
+  colors: SiteEssentialsFormValues["colors"],
+): SiteEssentialsFormValues {
+  return {
+    ...values,
+    colors: { ...colors },
+  };
+}
+
 export function mergePresetColorsIntoValues(
   values: SiteEssentialsFormValues,
   preset: SiteThemePreset,
 ): SiteEssentialsFormValues {
-  return {
-    ...values,
-    colors: { ...preset.colors },
-  };
+  return mergeColorPaletteIntoValues(values, preset.colors);
 }
 
 export function mergePresetFontsIntoValues(
@@ -594,4 +1076,16 @@ export function mergePresetFontsIntoValues(
       ],
     },
   };
+}
+
+export function tryThemeFontGridOptionStorageKey(
+  opt: TryThemeFontGridOption,
+): string {
+  return opt.source === "preset" ? `preset:${opt.id}` : `extra:${opt.key}`;
+}
+
+export function tryThemeColorGridOptionStorageKey(
+  opt: TryThemeColorGridOption,
+): string {
+  return opt.source === "preset" ? `preset:${opt.id}` : `extra:${opt.key}`;
 }

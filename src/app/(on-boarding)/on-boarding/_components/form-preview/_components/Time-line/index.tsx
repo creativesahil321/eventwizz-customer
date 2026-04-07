@@ -195,13 +195,14 @@ export default function Timeline({
             {eventSchedularTitle || "The Night"}
           </h2>
         </div>
-        <div className="flex items-center justify-center relative">
+        <div className="relative flex items-center justify-center">
           {/* Left Arrow - Only show if content overflows */}
           {showArrows && (
             <button
+              type="button"
               onClick={() => scroll("left")}
               disabled={!canScrollLeft}
-              className={`absolute left-0 sm:-left-8 md:-left-16 top-1/2 transform -translate-y-1/2 z-20 flex items-center justify-center transition-all duration-200 ${
+              className={`absolute left-0 z-40 sm:-left-8 md:-left-16 top-1/2 -translate-y-1/2 flex items-center justify-center transition-all duration-200 ${
                 canScrollLeft
                   ? "text-[var(--color-text)] hover:text-[var(--color-text-dimmed)] hover:scale-110 cursor-pointer opacity-100"
                   : "text-[var(--color-text-dimmed)] cursor-not-allowed opacity-50"
@@ -216,8 +217,8 @@ export default function Timeline({
             </button>
           )}
 
-          {/* Timeline Container - Native Scroll */}
-          <div className="relative w-full">
+          {/* Timeline Container - Native Scroll (below arrow controls) */}
+          <div className="relative z-10 w-full min-w-0">
             {/* Timeline line with tick marks - visible on all screens */}
             <div className="absolute top-[30px] sm:top-10 left-14 right-14 z-10 pointer-events-none">
               {/* Main horizontal line */}
@@ -241,7 +242,7 @@ export default function Timeline({
             {/* Scrollable Timeline Items - center when content doesn't overflow */}
             <div
               ref={scrollContainerRef}
-              className={`flex items-start gap-4 sm:gap-6 md:gap-8 overflow-x-auto scroll-smooth px-4 sm:px-8 md:px-14 py-2 no-scrollbar relative z-20 overflow-y-visible cursor-grab select-none ${!showArrows ? "justify-center" : ""}`}
+              className={`relative z-10 flex min-w-0 cursor-grab select-none items-start gap-4 overflow-x-auto overflow-y-visible scroll-smooth px-4 py-2 no-scrollbar sm:gap-6 sm:px-8 md:gap-8 md:px-14 ${!showArrows ? "justify-center" : ""}`}
               onMouseDown={handleMouseDown}
               onMouseLeave={handleMouseLeave}
               onMouseUp={handleMouseUp}
@@ -257,7 +258,7 @@ export default function Timeline({
                   }}
                 >
                   {/* Time Circle */}
-                  <div className="w-14 h-14 sm:w-16 sm:h-16 md:w-20 md:h-20 rounded-full bg-[var(--color-background)] text-[var(--color-text)] flex items-center justify-center shadow-lg mb-4 sm:mb-6 relative z-30 flex-shrink-0">
+                  <div className="relative z-10 flex h-14 w-14 flex-shrink-0 items-center justify-center rounded-full bg-[var(--color-background)] text-[var(--color-text)] shadow-lg mb-4 sm:mb-6 sm:h-16 sm:w-16 md:h-20 md:w-20">
                     <div className="text-center px-1">
                       <div className="text-xs sm:text-sm md:text-base font-bold leading-tight break-words">
                         {formatTime(item.time).split(" ")[0]}
@@ -280,9 +281,10 @@ export default function Timeline({
           {/* Right Arrow - Only show if content overflows */}
           {showArrows && (
             <button
+              type="button"
               onClick={() => scroll("right")}
               disabled={!canScrollRight}
-              className={`absolute right-0 sm:-right-8 md:-right-16 top-1/2 transform -translate-y-1/2 z-20 flex items-center justify-center transition-all duration-200 ${
+              className={`absolute right-0 z-40 sm:-right-8 md:-right-16 top-1/2 -translate-y-1/2 flex items-center justify-center transition-all duration-200 ${
                 canScrollRight
                   ? "text-[var(--color-text)] hover:text-[var(--color-text-dimmed)] hover:scale-110 cursor-pointer opacity-100"
                   : "text-[var(--color-text-dimmed)] cursor-not-allowed opacity-50"

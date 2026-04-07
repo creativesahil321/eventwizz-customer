@@ -7,6 +7,10 @@ import {
   X,
   ImageIcon,
   ShoppingCart,
+  Calendar,
+  LayoutDashboard,
+  LogIn,
+  UserPlus,
 } from "lucide-react";
 import Link from "next/link";
 import { useContext, useState, useEffect } from "react";
@@ -184,6 +188,18 @@ export default function CommonHeader({
 
   const styles = getVariantStyles();
   const isOnboardingMode = variant === "onboarding";
+
+  const mobileContactLink = headerData.navLinks.find(
+    (item) => item.icon === "phone",
+  );
+  const mobileAccountLinks = headerData.navLinks.filter(
+    (item) => item.icon !== "phone",
+  );
+
+  const mobileNavRowClass =
+    "flex min-h-12 items-center gap-3 text-[15px] font-medium font-sans text-[var(--color-on-header)]";
+  const mobileNavIconWrap =
+    "flex h-5 w-5 shrink-0 items-center justify-center [&_svg]:h-5 [&_svg]:w-5";
 
   // Prevent navigation during onboarding
   const handleLinkClick = (e: React.MouseEvent) => {
@@ -498,102 +514,167 @@ export default function CommonHeader({
             mobileMenuOpen ? "translate-x-0" : "-translate-x-full",
           )}
         >
-          <div className="flex items-center justify-between border-b p-4">
-            <h2 className="text-lg font-semibold">Menu</h2>
+          <div className="flex items-center justify-between border-b border-[var(--color-on-header)]/20 px-4 py-4">
+            <h2 className="font-sans text-xs font-semibold uppercase tracking-wider text-[var(--color-on-header)]/80">
+              Menu
+            </h2>
             <button
               type="button"
               onClick={toggleMobileMenu}
               aria-label="Close menu"
-              className="p-1"
+              className="p-1 text-[var(--color-on-header)]"
             >
               <X className="h-6 w-6" />
             </button>
           </div>
 
-          <div className="p-4 space-y-4">
-            {isOnboardingMode ? (
-              <div
-                className={`block py-2 ${styles.textColor} opacity-60 cursor-not-allowed`}
-              >
-                {headerData.browseEvent.linkText}
-              </div>
-            ) : (
-              <Link
-                href={headerData.browseEvent.link}
-                className={cn("block py-2", styles.textColor, styles.hoverColor)}
-                onClick={toggleMobileMenu}
-              >
-                {headerData.browseEvent.linkText}
-              </Link>
-            )}
-
-            {/* Mobile Cart Button */}
-            {isOnboardingMode ? (
-              <div className="py-2">
+          <nav
+            className="flex flex-1 flex-col overflow-y-auto px-4 pb-8 font-sans"
+            aria-label="Main navigation"
+          >
+            <div className="flex flex-col divide-y divide-[var(--color-on-header)]/15">
+              {isOnboardingMode ? (
                 <div
-                  className={`flex items-center gap-2 py-2 ${styles.textColor} opacity-60 cursor-not-allowed`}
-                >
-                  <ShoppingCart size={18} />
-                  <span>Cart</span>
-                </div>
-              </div>
-            ) : (
-              <div className="py-2" onClick={toggleMobileMenu}>
-                <CartButton
-                  size="sm"
                   className={cn(
-                    "flex items-center gap-2 py-2",
-                    styles.textColor,
-                    styles.hoverColor,
+                    mobileNavRowClass,
+                    "cursor-not-allowed opacity-60",
                   )}
-                />
+                >
+                  <span className={mobileNavIconWrap} aria-hidden>
+                    <Calendar />
+                  </span>
+                  {headerData.browseEvent.linkText}
+                </div>
+              ) : (
+                <Link
+                  href={headerData.browseEvent.link}
+                  className={cn(
+                    mobileNavRowClass,
+                    styles.hoverColor,
+                    "transition-colors",
+                  )}
+                  onClick={toggleMobileMenu}
+                >
+                  <span className={mobileNavIconWrap} aria-hidden>
+                    <Calendar />
+                  </span>
+                  {headerData.browseEvent.linkText}
+                </Link>
+              )}
+
+              {isOnboardingMode ? (
+                <div
+                  className={cn(
+                    mobileNavRowClass,
+                    "cursor-not-allowed opacity-60",
+                  )}
+                >
+                  <span className={mobileNavIconWrap} aria-hidden>
+                    <ShoppingCart />
+                  </span>
+                  Cart
+                </div>
+              ) : (
+                <div onClick={toggleMobileMenu}>
+                  <CartButton
+                    size="sm"
+                    showBadge={false}
+                    fullWidth
+                    className={cn(
+                      mobileNavRowClass,
+                      styles.hoverColor,
+                      "justify-start rounded-none py-0",
+                    )}
+                  />
+                </div>
+              )}
+
+              {mobileAccountLinks.map(({ link, linkText }, index) => {
+                const shouldAllowNavigation =
+                  isOnboardingMode && !link.startsWith("tel:");
+
+                const AccountIcon =
+                  linkText === "Dashboard"
+                    ? LayoutDashboard
+                    : linkText === "Log In"
+                      ? LogIn
+                      : linkText === "Register"
+                        ? UserPlus
+                        : null;
+
+                if (shouldAllowNavigation) {
+                  return (
+                    <div
+                      key={`${link}-${index}`}
+                      className={cn(
+                        mobileNavRowClass,
+                        "cursor-not-allowed opacity-60",
+                      )}
+                    >
+                      <span className={mobileNavIconWrap} aria-hidden>
+                        {AccountIcon ? (
+                          <AccountIcon />
+                        ) : (
+                          <span className="block h-5 w-5" />
+                        )}
+                      </span>
+                      {linkText}
+                    </div>
+                  );
+                }
+
+                return (
+                  <Link
+                    key={`${link}-${index}`}
+                    href={link}
+                    className={cn(
+                      mobileNavRowClass,
+                      styles.hoverColor,
+                      "transition-colors",
+                    )}
+                    onClick={(e) => {
+                      handleLinkClick(e);
+                      toggleMobileMenu();
+                    }}
+                  >
+                    <span className={mobileNavIconWrap} aria-hidden>
+                      {AccountIcon ? (
+                        <AccountIcon />
+                      ) : (
+                        <span className="block h-5 w-5" />
+                      )}
+                    </span>
+                    {linkText}
+                  </Link>
+                );
+              })}
+            </div>
+
+            {mobileContactLink && (
+              <div className="mt-6 border-t border-[var(--color-on-header)]/20 pt-4">
+                <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-[var(--color-on-header)]/55">
+                  Contact
+                </p>
+                <a
+                  href={mobileContactLink.link}
+                  className={cn(
+                    mobileNavRowClass,
+                    "min-h-0 py-1",
+                    styles.hoverColor,
+                    "transition-colors",
+                  )}
+                  onClick={toggleMobileMenu}
+                >
+                  <span className={mobileNavIconWrap} aria-hidden>
+                    <Phone />
+                  </span>
+                  <span className="min-w-0 break-words">
+                    {mobileContactLink.linkText}
+                  </span>
+                </a>
               </div>
             )}
-
-            <hr className="border-gray-200" />
-
-            {headerData.navLinks.map(({ icon, link, linkText }, index) => {
-              const IconComponent = icon ? iconComponents[icon] : null;
-
-              // Allow phone links even in onboarding mode (tel: links are safe)
-              const shouldAllowNavigation =
-                isOnboardingMode && !link.startsWith("tel:");
-
-              if (shouldAllowNavigation) {
-                return (
-                  <div
-                    key={index}
-                    className={`flex items-center gap-2 py-2 ${styles.textColor} opacity-60 cursor-not-allowed`}
-                  >
-                    {IconComponent && <IconComponent size={18} />}
-                    {linkText}
-                  </div>
-                );
-              }
-
-              return (
-                <Link
-                  key={index}
-                  href={link}
-                  className={cn(
-                    "flex items-center gap-2 py-2",
-                    styles.textColor,
-                    styles.hoverColor,
-                  )}
-                  onClick={(e) => {
-                    if (isOnboardingMode) {
-                      e.preventDefault();
-                      return;
-                    }
-                    toggleMobileMenu();
-                  }}
-                >
-                  {IconComponent && <IconComponent size={18} />}
-                  {linkText}
-                </Link>
-              );
-            })}
-          </div>
+          </nav>
         </div>
       </div>
     </section>

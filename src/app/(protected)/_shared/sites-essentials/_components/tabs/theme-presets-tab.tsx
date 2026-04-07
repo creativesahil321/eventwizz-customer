@@ -1,20 +1,26 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useSession } from "next-auth/react";
 import { useFormContext } from "react-hook-form";
-import { Check, Sparkles } from "lucide-react";
+import { Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { SiteEssentialsFormValues } from "../../_lib/schema";
+import {
+  readLastAppliedSiteThemePresetId,
+  writeLastAppliedSiteThemePresetId,
+} from "../../_lib/site-theme-preset-local-cache";
 import {
   SITE_THEME_PRESETS,
   applySiteThemePreset,
   getMatchingSiteThemePresetId,
   presetIncludesCdnStylesheets,
+  type SiteThemePresetId,
 } from "../../_lib/site-theme-presets";
 import { SectionTitle } from "../ui/section-title";
 import { cn } from "@/lib/utils";
-import { AIColorThemeModal } from "../ai-color-theme-modal";
 import { SiteEssentialsGoogleFontsLoader } from "@/components/shared/site-essentials-google-fonts-loader";
+import { useSiteEssentialsPresetFontsPreload } from "@/hooks/use-site-essentials-preset-fonts-preload";
 import { useToast } from "@/components/ui/use-toast";
 import {
   FormField,
@@ -45,10 +51,18 @@ export function ThemePresetsTab({
   onGoToTypography,
   onGoToBranding,
 }: ThemePresetsTabProps) {
+  useSiteEssentialsPresetFontsPreload();
+  const { data: session, status: sessionStatus } = useSession();
+  /** Stable per-account cache key (id may be absent on some session shapes). */
+  const presetCacheUserKey =
+    session?.user?.email?.trim() ||
+    (session?.user as { id?: string })?.id ||
+    session?.user?.uuid ||
+    undefined;
+
   const form = useFormContext<SiteEssentialsFormValues>();
   const { setValue, watch, getValues } = form;
   const { toast } = useToast();
-  const [showAIModal, setShowAIModal] = useState(false);
 
   const colors = watch("colors");
   const typography = watch("typography");
@@ -86,7 +100,7 @@ export function ThemePresetsTab({
     [colors?.primary, headingStack, bodyStack],
   );
 
-  const activePresetId = useMemo(
+  const matchedPresetId = useMemo(
     () =>
       getMatchingSiteThemePresetId({
         colors,
@@ -95,8 +109,26 @@ export function ThemePresetsTab({
     [colors, typography],
   );
 
+  const [lastAppliedPresetId, setLastAppliedPresetId] =
+    useState<SiteThemePresetId | null>(null);
+
+  useEffect(() => {
+    if (sessionStatus === "loading") return;
+    setLastAppliedPresetId(readLastAppliedSiteThemePresetId(presetCacheUserKey));
+  }, [presetCacheUserKey, sessionStatus]);
+
+  useEffect(() => {
+    if (matchedPresetId) {
+      setLastAppliedPresetId(matchedPresetId);
+      writeLastAppliedSiteThemePresetId(presetCacheUserKey, matchedPresetId);
+    }
+  }, [matchedPresetId, presetCacheUserKey]);
+
+  /** Exact form match, else last “Apply preset” on this browser (localStorage). */
+  const activePresetId = matchedPresetId ?? lastAppliedPresetId;
+
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       <SiteEssentialsGoogleFontsLoader
         linkId="site-essentials-google-fonts-presets-tab"
         headingStack={headingStack || "Arial, sans-serif"}
@@ -104,22 +136,10 @@ export function ThemePresetsTab({
         customStylesheetUrls={typography?.customFontStylesheetUrls}
       />
 
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <SectionTitle
-          title="Theme presets"
-          description="Apply a palette and fonts, then adjust other tabs as needed. Your copy and images stay as they are."
-        />
-        <Button
-          type="button"
-          variant="default"
-          size="sm"
-          onClick={() => setShowAIModal(true)}
-          className="flex shrink-0 items-center gap-1.5 bg-gradient-to-r from-violet-600 to-blue-600 text-white hover:from-violet-700 hover:to-blue-700"
-        >
-          <Sparkles className="h-3.5 w-3.5" />
-          AI colors
-        </Button>
-      </div>
+      <SectionTitle
+        title="Theme presets"
+        description="Apply a palette and fonts, then adjust other tabs as needed. Your copy and images stay as they are."
+      />
 
       <p className="text-xs text-muted-foreground">
         <span className="text-foreground/70">More control:</span>{" "}
@@ -148,8 +168,8 @@ export function ThemePresetsTab({
         </button>
       </p>
 
-      <div className="rounded-lg border border-border/70 bg-muted/15 p-3 sm:p-4">
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 lg:gap-6 lg:items-stretch">
+      <div className="rounded-lg border border-border/70 bg-muted/15 p-2.5 sm:p-3">
+        <div className="grid grid-cols-1 gap-3 lg:grid-cols-2 lg:gap-4 lg:items-stretch">
           <div className="min-w-0">
             <h3 className="text-sm font-semibold text-foreground">
               Customer site headings
@@ -249,7 +269,7 @@ export function ThemePresetsTab({
                   emphasis={headingEmphasisWatch}
                   variant="onDark"
                   align={bannerAlignWatch}
-                  className="!text-2xl sm:!text-3xl md:!text-4xl"
+                  className="!text-xl sm:!text-2xl md:!text-3xl"
                 />
               </div>
             </div>
@@ -257,7 +277,7 @@ export function ThemePresetsTab({
         </div>
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
         {SITE_THEME_PRESETS.map((preset) => {
           const selected = activePresetId === preset.id;
           const [c1, c2, c3] = preset.swatch;
@@ -266,47 +286,47 @@ export function ThemePresetsTab({
             <div
               key={preset.id}
               className={cn(
-                "relative flex flex-col overflow-hidden rounded-lg border bg-white shadow-sm transition-shadow",
+                "relative flex flex-col overflow-hidden rounded-md border bg-white shadow-sm transition-shadow",
                 selected
                   ? "border-[var(--color-primary)] ring-1 ring-[var(--color-primary)]/20"
                   : "border-slate-200/90 hover:border-slate-300 hover:shadow",
               )}
             >
               <div
-                className="flex h-11 w-full"
+                className="flex h-7 w-full sm:h-8"
                 style={{
                   background: `linear-gradient(110deg, ${c1} 0%, ${c1} 42%, ${c2} 42%, ${c2} 68%, ${c3} 68%, ${c3} 100%)`,
                 }}
                 aria-hidden
               />
-              <div className="flex flex-1 flex-col gap-2 p-3">
-                <div>
-                  <div className="flex flex-wrap items-center gap-1.5">
-                    <h3 className="text-sm font-semibold text-gray-900">
+              <div className="flex flex-1 flex-col gap-1.5 p-2 sm:p-2.5">
+                <div className="min-h-0">
+                  <div className="flex flex-wrap items-center gap-1">
+                    <h3 className="text-xs font-semibold leading-tight text-gray-900">
                       {preset.name}
                     </h3>
                     {presetIncludesCdnStylesheets(preset) ? (
                       <Badge
                         variant="secondary"
-                        className="px-1.5 py-0 text-[9px] font-medium uppercase tracking-wide"
+                        className="px-1 py-0 text-[8px] font-medium uppercase leading-none tracking-wide"
                       >
-                        CDN font
+                        CDN
                       </Badge>
                     ) : null}
                   </div>
-                  <p className="mt-0.5 line-clamp-2 text-[11px] leading-snug text-gray-500">
+                  <p className="mt-0.5 line-clamp-2 text-[10px] leading-snug text-gray-500">
                     {preset.tagline}
                   </p>
                 </div>
-                <div className="rounded border border-slate-100 bg-slate-50/80 px-2.5 py-1.5">
+                <div className="rounded border border-slate-100 bg-slate-50/80 px-2 py-1">
                   <p
-                    className="text-sm font-semibold leading-tight text-gray-900"
+                    className="text-xs font-semibold leading-tight text-gray-900"
                     style={{ fontFamily: preset.typography.fontFamily.heading }}
                   >
                     Sample heading
                   </p>
                   <p
-                    className="mt-0.5 text-[10px] text-gray-600"
+                    className="mt-0.5 line-clamp-1 text-[9px] leading-tight text-gray-600"
                     style={{ fontFamily: preset.typography.fontFamily.body }}
                   >
                     {preset.headingFontLabel} · {preset.bodyFontLabel}
@@ -316,9 +336,14 @@ export function ThemePresetsTab({
                   type="button"
                   size="sm"
                   variant={selected ? "event-secondary" : "event-primary"}
-                  className="mt-auto h-8 w-full text-xs"
+                  className="mt-auto h-7 w-full px-2 text-[11px]"
                   onClick={() => {
                     applySiteThemePreset(preset, setValue, getValues);
+                    writeLastAppliedSiteThemePresetId(
+                      presetCacheUserKey,
+                      preset.id,
+                    );
+                    setLastAppliedPresetId(preset.id);
                     toast({
                       title: "Preset applied",
                       description: presetIncludesCdnStylesheets(preset)
@@ -329,11 +354,11 @@ export function ThemePresetsTab({
                 >
                   {selected ? (
                     <>
-                      <Check className="mr-1.5 h-3.5 w-3.5" />
+                      <Check className="mr-1 h-3 w-3 shrink-0" />
                       Applied
                     </>
                   ) : (
-                    "Apply preset"
+                    "Apply"
                   )}
                 </Button>
               </div>
@@ -342,13 +367,14 @@ export function ThemePresetsTab({
         })}
       </div>
 
-      <p className="text-[11px] leading-relaxed text-muted-foreground">
+      <p className="text-[10px] leading-relaxed text-muted-foreground sm:text-[11px]">
         <span className="font-medium text-foreground/70">CDN font</span> presets
-        add a stylesheet link (editable under Typography). AI adjusts colors
-        only.
+        add a stylesheet link (editable under Typography).{" "}
+        <span className="text-foreground/60">
+          The highlighted preset is remembered in this browser (refresh / Reset)
+          until you apply another or the form exactly matches a different preset.
+        </span>
       </p>
-
-      <AIColorThemeModal open={showAIModal} onOpenChange={setShowAIModal} />
     </div>
   );
 }

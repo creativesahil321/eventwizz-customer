@@ -44,7 +44,7 @@ export default function EventTypes() {
     <section className="py-20 bg-[color:var(--color-background)]">
       <div className="container mx-auto px-4">
         <div className="text-center mb-12">
-          <h2 className="text-3xl md:text-4xl font-bold text-[color:var(--color-text)] mb-3">
+          <h2 className="font-heading mb-3 text-3xl font-bold text-[color:var(--color-text)] md:text-4xl">
             Who Is Event Wizz For?
           </h2>
           <p className="text-[color:var(--color-text-dimmed)] max-w-2xl mx-auto">

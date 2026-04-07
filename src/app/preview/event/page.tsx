@@ -298,7 +298,9 @@ export default function EventPreviewPage() {
             values={siteEssentials}
             onValuesChange={handleThemeValuesChange}
             brandName={siteEssentials.name?.trim() || "Event preview"}
-            sheetDescription="Adjust fonts, colors, and hero layout here. Save theme (top bar) writes Site Essentials. Publish event submits this event as live — same as the Publish tab. Event copy still saves in the editor."
+            sheetDescription="Open Try theme to adjust fonts, colors, and hero layout. Save theme in that panel writes Site Essentials. Use Publish event (top right) to go live — same as the Publish tab. Event copy still saves in the editor."
+            onSaveTheme={handleSaveTheme}
+            isSavingTheme={isSavingTheme}
           />
         ) : null}
 
@@ -331,31 +333,17 @@ export default function EventPreviewPage() {
           </AlertDialogContent>
         </AlertDialog>
 
-        <div className="pointer-events-none fixed left-4 right-4 top-4 z-[60] flex flex-wrap items-start justify-between gap-2 isolate">
+        <div className="pointer-events-none fixed left-4 right-4 top-4 z-[60] flex flex-wrap items-start justify-between gap-3 isolate sm:right-6 sm:left-6">
           <Button
             variant="event-primary"
             onClick={handleGoBack}
             size="sm"
-            className="pointer-events-auto shadow-md ring-1 ring-black/10"
+            className="pointer-events-auto shrink-0 shadow-md ring-1 ring-black/10"
           >
             <ArrowLeft className="mr-2 h-4 w-4" />
             Back to Editor
           </Button>
-          <div className="pointer-events-auto flex flex-wrap items-center justify-end gap-2">
-            {siteEssentials ? (
-              <Button
-                type="button"
-                size="sm"
-                disabled={isSavingTheme}
-                onClick={() => void handleSaveTheme()}
-                className="border border-slate-200 bg-white font-medium text-slate-900 shadow-md hover:bg-slate-50"
-              >
-                {isSavingTheme ? (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                ) : null}
-                Save theme
-              </Button>
-            ) : null}
+          <div className="pointer-events-auto flex shrink-0 items-center justify-end">
             <Button
               type="button"
               variant="event-primary"

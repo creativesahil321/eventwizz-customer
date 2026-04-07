@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   AlignCenter,
   AlignLeft,
@@ -8,6 +8,9 @@ import {
   AlignVerticalJustifyCenter,
   AlignVerticalJustifyEnd,
   AlignVerticalJustifyStart,
+  AlertTriangle,
+  Check,
+  Loader2,
   Palette,
   RotateCcw,
 } from "lucide-react";
@@ -24,11 +27,18 @@ import { cn } from "@/lib/utils";
 import type { SiteEssentialsFormValues } from "@/app/(protected)/_shared/sites-essentials/_lib/schema";
 import {
   SITE_THEME_PRESETS,
-  PREVIEW_FONT_OPTIONS,
-  mergePresetColorsIntoValues,
+  TRY_THEME_COLOR_GRID_OPTIONS,
+  TRY_THEME_FONT_GRID_OPTIONS,
+  mergeColorPaletteIntoValues,
+  mergeGoogleOnlyFontsIntoValues,
   mergePresetFontsIntoValues,
+  siteEssentialsColorsMatch,
   siteEssentialsFontPairKey,
+  tryThemeColorGridOptionStorageKey,
+  tryThemeFontGridOptionStorageKey,
   type SiteThemePresetId,
+  type TryThemeColorGridOption,
+  type TryThemeFontGridOption,
 } from "@/app/(protected)/_shared/sites-essentials/_lib/site-theme-presets";
 import {
   normalizeBannerHeadingAlign,
@@ -36,9 +46,33 @@ import {
   type BannerHeadingAlign,
   type BannerHeadingValign,
 } from "@/lib/banner-heading-align";
+import { useSiteEssentialsPresetFontsPreload } from "@/hooks/use-site-essentials-preset-fonts-preload";
+import {
+  isLightUiBackground,
+  paletteAccessibilityFlags,
+} from "@/lib/wcag-color-contrast";
+
+const PREVIEW_TRY_THEME_LAST_FONT_KEY =
+  "eventwizz:preview-try-theme:last-font";
+const PREVIEW_TRY_THEME_LAST_COLOR_KEY =
+  "eventwizz:preview-try-theme:last-color";
 
 const DEFAULT_SHEET_DESCRIPTION =
-  "Tap a font or color to preview. Save from Site Essentials when you are ready to publish.";
+  "Tap a font or color to preview. Bonus palettes and pairs live here first—publish from Site Essentials when you are ready.";
+
+function sortTryThemeOptionsFirst<T>(
+  items: readonly T[],
+  pinnedKey: string | null,
+  keyOf: (item: T) => string,
+): T[] {
+  if (!pinnedKey) return [...items];
+  const head: T[] = [];
+  const tail: T[] = [];
+  for (const item of items) {
+    (keyOf(item) === pinnedKey ? head : tail).push(item);
+  }
+  return [...head, ...tail];
+}
 
 type PreviewThemeCustomizerProps = {
   values: SiteEssentialsFormValues;
@@ -46,6 +80,9 @@ type PreviewThemeCustomizerProps = {
   brandName?: string;
   /** e.g. event preview: clarify Site Essentials vs event editor save targets */
   sheetDescription?: string;
+  /** Event preview: write Try theme → Site Essentials (API). Renders “Save theme” in this panel. */
+  onSaveTheme?: () => void | Promise<void>;
+  isSavingTheme?: boolean;
 };
 
 function presetById(
@@ -63,13 +100,33 @@ export function PreviewThemeCustomizer({
   onValuesChange,
   brandName = "Preview",
   sheetDescription,
+  onSaveTheme,
+  isSavingTheme = false,
 }: PreviewThemeCustomizerProps) {
+  useSiteEssentialsPresetFontsPreload();
   const [open, setOpen] = useState(false);
+  const [colorFilter, setColorFilter] = useState<"all" | "dark" | "light">(
+    "all",
+  );
+  const [lastFontKey, setLastFontKey] = useState<string | null>(null);
+  const [lastColorKey, setLastColorKey] = useState<string | null>(null);
   const snapshotRef = useRef<SiteEssentialsFormValues | null>(null);
   const valuesRef = useRef(values);
   useEffect(() => {
     valuesRef.current = values;
   }, [values]);
+
+  useEffect(() => {
+    if (!open || typeof window === "undefined") return;
+    try {
+      setLastFontKey(sessionStorage.getItem(PREVIEW_TRY_THEME_LAST_FONT_KEY));
+      setLastColorKey(
+        sessionStorage.getItem(PREVIEW_TRY_THEME_LAST_COLOR_KEY),
+      );
+    } catch {
+      /* private mode */
+    }
+  }, [open]);
 
   const handleOpenChange = (next: boolean) => {
     if (next) {
@@ -82,10 +139,18 @@ export function PreviewThemeCustomizer({
     setOpen(next);
   };
 
-  const applyColors = useCallback(
-    (id: SiteThemePresetId) => {
-      const preset = presetById(id);
-      onValuesChange(mergePresetColorsIntoValues(valuesRef.current, preset));
+  const applyColorGridOption = useCallback(
+    (opt: TryThemeColorGridOption) => {
+      onValuesChange(
+        mergeColorPaletteIntoValues(valuesRef.current, opt.colors),
+      );
+      const k = tryThemeColorGridOptionStorageKey(opt);
+      setLastColorKey(k);
+      try {
+        sessionStorage.setItem(PREVIEW_TRY_THEME_LAST_COLOR_KEY, k);
+      } catch {
+        /* private mode */
+      }
     },
     [onValuesChange],
   );
@@ -96,6 +161,30 @@ export function PreviewThemeCustomizer({
       onValuesChange(mergePresetFontsIntoValues(valuesRef.current, preset));
     },
     [onValuesChange],
+  );
+
+  const applyFontGridOption = useCallback(
+    (opt: TryThemeFontGridOption) => {
+      if (opt.source === "preset") {
+        applyFonts(opt.id);
+      } else {
+        onValuesChange(
+          mergeGoogleOnlyFontsIntoValues(
+            valuesRef.current,
+            opt.headingStack,
+            opt.bodyStack,
+          ),
+        );
+      }
+      const k = tryThemeFontGridOptionStorageKey(opt);
+      setLastFontKey(k);
+      try {
+        sessionStorage.setItem(PREVIEW_TRY_THEME_LAST_FONT_KEY, k);
+      } catch {
+        /* private mode */
+      }
+    },
+    [applyFonts, onValuesChange],
   );
 
   const applyHeroAlign = useCallback(
@@ -130,6 +219,33 @@ export function PreviewThemeCustomizer({
   };
 
   const currentFontKey = siteEssentialsFontPairKey(values.typography);
+
+  const orderedFontGridOptions = useMemo(
+    () =>
+      sortTryThemeOptionsFirst(
+        TRY_THEME_FONT_GRID_OPTIONS,
+        lastFontKey,
+        tryThemeFontGridOptionStorageKey,
+      ),
+    [lastFontKey],
+  );
+
+  const orderedColorGridOptions = useMemo(() => {
+    let list = TRY_THEME_COLOR_GRID_OPTIONS;
+    if (colorFilter === "dark") {
+      list = list.filter(
+        (o) => !isLightUiBackground(o.colors.background),
+      );
+    } else if (colorFilter === "light") {
+      list = list.filter((o) => isLightUiBackground(o.colors.background));
+    }
+    return sortTryThemeOptionsFirst(
+      list,
+      lastColorKey,
+      tryThemeColorGridOptionStorageKey,
+    );
+  }, [colorFilter, lastColorKey]);
+
   const currentHeroAlign = normalizeBannerHeadingAlign(
     values.banner_heading_align,
   );
@@ -142,15 +258,25 @@ export function PreviewThemeCustomizer({
       <button
         type="button"
         onClick={() => handleOpenChange(true)}
-        className={cn(
-          "fixed right-0 top-1/2 z-[70] flex -translate-y-1/2 items-center gap-2 rounded-l-xl border border-r-0 border-slate-200 bg-white py-3 pl-3 pr-2 text-sm font-medium text-slate-800 shadow-lg transition hover:bg-slate-50",
-          open && "pointer-events-none opacity-0",
-        )}
+        aria-label="Open Try theme panel"
         aria-expanded={open}
         aria-controls="preview-theme-customizer-sheet"
+        className={cn(
+          "group fixed right-0 top-1/2 z-[70] flex -translate-y-1/2 flex-row-reverse items-center gap-2.5",
+          "rounded-l-xl border border-r-0 border-slate-200 bg-white py-2.5 pl-4 pr-2.5",
+          "text-sm font-semibold text-slate-800 shadow-md",
+          "translate-x-[calc(100%-2.875rem)] transition-[transform,box-shadow,background-color] duration-300 ease-out",
+          "hover:translate-x-0 hover:bg-slate-50 hover:shadow-lg",
+          "focus-visible:translate-x-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-2",
+          "motion-reduce:translate-x-0",
+          open && "pointer-events-none opacity-0",
+        )}
       >
-        <Palette className="h-4 w-4 text-[var(--color-primary,#0f172a)]" />
-        <span className="hidden max-w-[4.5rem] text-left text-xs leading-tight sm:inline">
+        <Palette
+          className="h-5 w-5 shrink-0 text-slate-700 transition-transform duration-300 ease-out group-hover:scale-110 motion-reduce:group-hover:scale-100"
+          aria-hidden
+        />
+        <span className="whitespace-nowrap text-right text-xs leading-none sm:text-sm">
           Try theme
         </span>
       </button>
@@ -171,6 +297,26 @@ export function PreviewThemeCustomizer({
               {sheetDescription ?? DEFAULT_SHEET_DESCRIPTION}
             </SheetDescription>
           </SheetHeader>
+
+          {onSaveTheme ? (
+            <div className="shrink-0 border-b border-slate-100 px-4 py-3">
+              <Button
+                type="button"
+                className="w-full border border-slate-200 bg-white font-medium text-slate-900 shadow-sm hover:bg-slate-50"
+                disabled={isSavingTheme}
+                onClick={() => void onSaveTheme()}
+              >
+                {isSavingTheme ? (
+                  <Loader2 className="mr-2 h-4 w-4 shrink-0 animate-spin" />
+                ) : null}
+                Save theme
+              </Button>
+              <p className="mt-2 text-[10px] leading-snug text-slate-500">
+                Writes colors, fonts, and hero layout to Site Essentials (same
+                as Save on the Site Essentials page).
+              </p>
+            </div>
+          ) : null}
 
           <ScrollArea className="flex-1 min-h-0">
             <div className="space-y-6 px-4 py-4 pb-8">
@@ -275,7 +421,7 @@ export function PreviewThemeCustomizer({
                   </Button>
                 </div>
                 <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
-                  {PREVIEW_FONT_OPTIONS.map((opt) => {
+                  {orderedFontGridOptions.map((opt) => {
                     const active =
                       currentFontKey ===
                       siteEssentialsFontPairKey({
@@ -284,19 +430,49 @@ export function PreviewThemeCustomizer({
                           body: opt.bodyStack,
                         },
                       });
+                    const pinned =
+                      tryThemeFontGridOptionStorageKey(opt) === lastFontKey;
+                    const showRecent = pinned && !active;
                     return (
                       <button
-                        key={`${opt.headingStack}\0${opt.bodyStack}`}
+                        key={
+                          opt.source === "preset"
+                            ? opt.id
+                            : `extra-${opt.key}`
+                        }
                         type="button"
-                        onClick={() => applyFonts(opt.id)}
+                        aria-current={active ? "true" : undefined}
+                        onClick={() => applyFontGridOption(opt)}
                         className={cn(
-                          "flex aspect-square flex-col items-center justify-center rounded-lg border bg-slate-50 p-1 text-center transition hover:border-[var(--color-primary)] hover:bg-white",
+                          "relative flex min-h-[5.75rem] flex-col items-center justify-center rounded-xl border p-2 text-center transition-all duration-200",
+                          active ? "pt-6" : "",
                           active
-                            ? "border-2 border-[var(--color-primary)] ring-1 ring-[var(--color-primary)]/20"
-                            : "border-slate-200",
+                            ? "border-slate-300/90 bg-white shadow-[0_8px_28px_-10px_rgba(15,23,42,0.2),0_0_0_1px_rgba(15,23,42,0.05)] before:pointer-events-none before:absolute before:inset-y-3 before:left-0 before:w-[3px] before:rounded-r-full before:bg-slate-800 before:content-[''] hover:border-slate-400"
+                            : "border-slate-200/90 bg-slate-50/80 hover:border-slate-300 hover:bg-white hover:shadow-sm",
                         )}
-                        title={`${opt.headingFontLabel} / ${opt.bodyFontLabel}`}
+                        title={
+                          opt.tagline
+                            ? `${opt.headingFontLabel} / ${opt.bodyFontLabel}\n\n${opt.tagline}`
+                            : `${opt.headingFontLabel} / ${opt.bodyFontLabel}`
+                        }
                       >
+                        {active ? (
+                          <span className="absolute left-1/2 top-1.5 z-10 flex -translate-x-1/2 items-center gap-1 rounded-full border border-slate-200/80 bg-white/95 px-2 py-0.5 text-[9px] font-medium text-slate-700 shadow-[0_1px_2px_rgba(15,23,42,0.06)] backdrop-blur-sm">
+                            <span
+                              className="h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500 shadow-[0_0_0_1px_rgba(255,255,255,0.9)]"
+                              aria-hidden
+                            />
+                            In use
+                          </span>
+                        ) : null}
+                        {showRecent ? (
+                          <span
+                            className="absolute right-1 top-1 z-10 rounded-full border border-slate-200/90 bg-white px-1.5 py-0.5 text-[8px] font-medium text-slate-500 shadow-sm"
+                            title="Last picked this session"
+                          >
+                            Recent
+                          </span>
+                        ) : null}
                         <span
                           className="text-lg font-semibold leading-none text-slate-800"
                           style={{ fontFamily: opt.headingStack }}
@@ -304,11 +480,16 @@ export function PreviewThemeCustomizer({
                           Aa
                         </span>
                         <span
-                          className="mt-1 line-clamp-2 px-0.5 text-[9px] text-slate-500"
+                          className="mt-1 line-clamp-1 px-0.5 text-[9px] font-medium text-slate-600"
                           style={{ fontFamily: opt.bodyStack }}
                         >
                           {opt.bodyFontLabel}
                         </span>
+                        {opt.tagline ? (
+                          <span className="mt-0.5 line-clamp-2 px-0.5 text-[7px] leading-tight text-slate-400">
+                            {opt.tagline}
+                          </span>
+                        ) : null}
                       </button>
                     );
                   })}
@@ -316,47 +497,128 @@ export function PreviewThemeCustomizer({
               </div>
 
               <div>
-                <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-slate-500">
-                  Try other colors
-                </h3>
+                <div className="mb-2 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                  <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+                    Try other colors
+                  </h3>
+                  <div
+                    className="flex flex-wrap gap-1"
+                    role="group"
+                    aria-label="Filter palettes by brightness"
+                  >
+                    {(
+                      [
+                        { id: "all" as const, label: "All" },
+                        { id: "dark" as const, label: "Dark" },
+                        { id: "light" as const, label: "Light" },
+                      ] as const
+                    ).map(({ id, label }) => (
+                      <button
+                        key={id}
+                        type="button"
+                        aria-pressed={colorFilter === id}
+                        onClick={() => setColorFilter(id)}
+                        className={cn(
+                          "rounded-full border px-2.5 py-0.5 text-[10px] font-medium transition-colors",
+                          colorFilter === id
+                            ? "border-slate-900 bg-slate-900 text-white"
+                            : "border-slate-200 bg-white text-slate-600 hover:border-slate-300",
+                        )}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <p className="mb-3 text-[10px] leading-snug text-slate-500">
+                  Three dots: page background, primary accent, and a key tone
+                  (usually body text). Checkmark = body-on-background AA plus
+                  primary-on-surface for cards; triangle = double-check in Site
+                  Essentials.
+                </p>
                 <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
-                  {SITE_THEME_PRESETS.map((preset) => {
-                    const [a, b] = [
-                      preset.colors.primary,
-                      preset.colors.secondary,
-                    ];
-                    const matchesPrimary =
-                      (values.colors?.primary || "") ===
-                      (preset.colors.primary || "");
-                    const matchesSecondary =
-                      (values.colors?.secondary || "") ===
-                      (preset.colors.secondary || "");
-                    const active = matchesPrimary && matchesSecondary;
+                  {orderedColorGridOptions.map((opt) => {
+                    const [a, b, c] = opt.swatch;
+                    const active = siteEssentialsColorsMatch(
+                      values.colors,
+                      opt.colors,
+                    );
+                    const pinned =
+                      tryThemeColorGridOptionStorageKey(opt) === lastColorKey;
+                    const showRecent = pinned && !active;
+                    const acc = paletteAccessibilityFlags(opt.colors);
+                    const contrastOk = acc.bodyTextAa && acc.primaryOnSurfaceUi;
                     return (
                       <button
-                        key={preset.id}
+                        key={
+                          opt.source === "preset" ? opt.id : `extra-${opt.key}`
+                        }
                         type="button"
-                        onClick={() => applyColors(preset.id)}
+                        aria-current={active ? "true" : undefined}
+                        onClick={() => applyColorGridOption(opt)}
                         className={cn(
-                          "flex flex-col items-center gap-1.5 rounded-lg border p-2 transition hover:border-[var(--color-primary)]",
+                          "relative flex flex-col items-center gap-1 rounded-xl border p-2 pt-2.5 transition-all duration-200",
                           active
-                            ? "border-2 border-[var(--color-primary)] ring-1 ring-[var(--color-primary)]/20"
-                            : "border-slate-200 bg-white",
+                            ? "border-slate-300/90 bg-white shadow-[0_8px_28px_-10px_rgba(15,23,42,0.2),0_0_0_1px_rgba(15,23,42,0.05)] before:pointer-events-none before:absolute before:inset-y-3 before:left-0 before:w-[3px] before:rounded-r-full before:bg-slate-800 before:content-[''] hover:border-slate-400"
+                            : "border-slate-200/90 bg-white hover:border-slate-300 hover:shadow-sm",
                         )}
-                        title={preset.name}
+                        title={`${opt.name}\n\n${opt.tagline}`}
                       >
-                        <div className="flex gap-1">
+                        {active ? (
+                          <span className="absolute right-1.5 top-1.5 z-10 flex items-center gap-1 rounded-full border border-slate-200/80 bg-white/95 px-1.5 py-0.5 text-[8px] font-medium text-slate-700 shadow-[0_1px_2px_rgba(15,23,42,0.06)] backdrop-blur-sm">
+                            <span
+                              className="h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500 shadow-[0_0_0_1px_rgba(255,255,255,0.9)]"
+                              aria-hidden
+                            />
+                            In use
+                          </span>
+                        ) : null}
+                        {showRecent ? (
                           <span
-                            className="h-6 w-6 rounded-full border border-black/10 shadow-inner"
+                            className="absolute right-1.5 top-1.5 z-10 rounded-full border border-slate-200/90 bg-white px-1.5 py-0.5 text-[8px] font-medium text-slate-500 shadow-sm"
+                            title="Last picked this session"
+                          >
+                            Recent
+                          </span>
+                        ) : null}
+                        <span
+                          className={cn(
+                            "absolute left-1.5 top-1.5 z-[1] flex h-4 w-4 items-center justify-center rounded-full border shadow-sm",
+                            contrastOk
+                              ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                              : "border-amber-200 bg-amber-50 text-amber-700",
+                          )}
+                          title={
+                            contrastOk
+                              ? "Body text and primary on surface meet common WCAG targets"
+                              : "Contrast may be tight — verify in Site Essentials"
+                          }
+                        >
+                          {contrastOk ? (
+                            <Check className="h-2.5 w-2.5" strokeWidth={3} />
+                          ) : (
+                            <AlertTriangle className="h-2.5 w-2.5" />
+                          )}
+                        </span>
+                        <div className="mt-2 flex gap-0.5">
+                          <span
+                            className="h-5 w-5 rounded-full border border-black/10 shadow-inner"
                             style={{ backgroundColor: a }}
                           />
                           <span
-                            className="h-6 w-6 rounded-full border border-black/10 shadow-inner"
+                            className="h-5 w-5 rounded-full border border-black/10 shadow-inner"
                             style={{ backgroundColor: b }}
                           />
+                          <span
+                            className="h-5 w-5 rounded-full border border-black/10 shadow-inner"
+                            style={{ backgroundColor: c }}
+                          />
                         </div>
-                        <span className="line-clamp-1 w-full text-center text-[9px] font-medium text-slate-600">
-                          {preset.name}
+                        <span className="line-clamp-1 w-full text-center text-[9px] font-medium text-slate-700">
+                          {opt.name}
+                        </span>
+                        <span className="line-clamp-2 w-full text-center text-[8px] leading-snug text-slate-500">
+                          {opt.tagline}
                         </span>
                       </button>
                     );

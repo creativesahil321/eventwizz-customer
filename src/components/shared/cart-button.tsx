@@ -22,18 +22,24 @@ import { CART_METADATA_KEYS_SET } from "@/lib/constants/cart-meta-keys";
 interface CartButtonProps {
   className?: string;
   size?: "default" | "sm" | "lg" | "icon";
+  /** When false, hides the item-count badge (e.g. mobile drawer where count is redundant). */
+  showBadge?: boolean;
+  /** Stretch the control to full row width (mobile menu rows). */
+  fullWidth?: boolean;
 }
 
 export default function CartButton({
   className = "",
   size = "default",
+  showBadge = true,
+  fullWidth = false,
 }: CartButtonProps) {
   const isPreviewMode = useIsPreviewMode();
   const { data: session } = useSession();
 
   // Fetch cart data to show item count - only for authenticated customers and not in preview mode
   const { data: apiCartData, isLoading } = useGetCartData(
-    session?.user?.account_type === "customer" && !isPreviewMode
+    session?.user?.account_type === "customer" && !isPreviewMode,
   );
 
   // Get editing state from Zustand store
@@ -65,7 +71,7 @@ export default function CartButton({
     eventsArray.forEach((event: ApiEventCartData) => {
       // Get date keys only (exclude all metadata: event_slug, drink_title, drinks, etc.)
       const dateKeys = Object.keys(event).filter(
-        (key) => !CART_METADATA_KEYS_SET.has(key)
+        (key) => !CART_METADATA_KEYS_SET.has(key),
       );
 
       // Simply count all date keys (no heavy calculations)
@@ -93,7 +99,10 @@ export default function CartButton({
     // Step 3: Use API data as base, but show editing data if it has MORE dates (unsaved additions)
     // This ensures the badge is accurate with the backend state
     const finalTotalDates = Math.max(totalDatesFromAPI, totalDatesFromEditing);
-    const finalTotalEvents = Math.max(totalEventsFromAPI, totalEventsFromEditing);
+    const finalTotalEvents = Math.max(
+      totalEventsFromAPI,
+      totalEventsFromEditing,
+    );
 
     console.log("🛒 Cart Button Sync:", {
       apiDates: totalDatesFromAPI,
@@ -106,7 +115,7 @@ export default function CartButton({
     // ⚠️ CRITICAL FIX: If API is empty but Zustand has data, Zustand is stale
     if (totalDatesFromAPI === 0 && totalDatesFromEditing > 0) {
       console.warn(
-        "🚨 Zustand cart is stale! API is empty but Zustand has data. This will be cleared on next cart sync."
+        "🚨 Zustand cart is stale! API is empty but Zustand has data. This will be cleared on next cart sync.",
       );
       // Return API state (empty) as source of truth
       return {
@@ -133,7 +142,10 @@ export default function CartButton({
     <TooltipProvider>
       <Tooltip>
         <TooltipTrigger asChild>
-          <Link href={checkoutUrl} className="relative">
+          <Link
+            href={checkoutUrl}
+            className={fullWidth ? "relative block w-full" : "relative"}
+          >
             <div
               className={`flex items-center gap-1 transition-colors ${className}`}
               style={{ cursor: isLoading ? "not-allowed" : "pointer" }}
@@ -142,7 +154,7 @@ export default function CartButton({
               {size !== "icon" && <span className="inline">Cart</span>}
 
               {/* Cart date count badge */}
-              {cartSummary.hasItems && (
+              {cartSummary.hasItems && showBadge && (
                 <Badge
                   variant="destructive"
                   className="absolute -top-2 -right-2 h-5 w-5 flex items-center justify-center p-0 text-xs font-bold"

@@ -19,6 +19,19 @@ export const SITE_ESSENTIALS_GOOGLE_FONT_NAMES = [
   "DM Sans",
   "Libre Baskerville",
   "Work Sans",
+  /* Premium / display — events & venues (Try theme + Typography) */
+  "Cinzel",
+  "Cormorant Garamond",
+  "Fraunces",
+  "DM Serif Display",
+  "Crimson Text",
+  "EB Garamond",
+  "Outfit",
+  "Plus Jakarta Sans",
+  "Sora",
+  "Space Grotesk",
+  "Syne",
+  "Instrument Sans",
 ] as const;
 
 const GOOGLE_SET = new Set<string>(SITE_ESSENTIALS_GOOGLE_FONT_NAMES);
@@ -29,6 +42,12 @@ const SERIF_GOOGLE_FONT_NAMES = new Set<string>([
   "Merriweather",
   "Lora",
   "Libre Baskerville",
+  "Cinzel",
+  "Cormorant Garamond",
+  "Fraunces",
+  "DM Serif Display",
+  "Crimson Text",
+  "EB Garamond",
 ]);
 
 export function siteEssentialsGoogleFontStack(name: string): string {
