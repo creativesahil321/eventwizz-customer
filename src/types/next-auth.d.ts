@@ -17,6 +17,7 @@ declare module "next-auth" {
       vendor_location_id?: number | string;
       event_id?: number | string;
       on_boarding_step?: number;
+      last_completed_step?: number;
       default_venue_location?: VenueLocation;
       venue_locations?: VenueLocation[];
     } & DefaultSession["user"];
@@ -29,6 +30,7 @@ declare module "next-auth" {
     vendor_location_id?: number | string;
     event_id?: number | string;
     on_boarding_step?: number;
+    last_completed_step?: number;
     default_venue_location?: VenueLocation;
     venue_locations?: VenueLocation[];
   }
@@ -40,6 +42,7 @@ declare module "next-auth" {
     vendor_location_id?: number | string;
     event_id?: number | string;
     on_boarding_step?: number;
+    last_completed_step?: number;
     default_venue_location?: VenueLocation;
     venue_locations?: VenueLocation[];
   }

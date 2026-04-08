@@ -7,6 +7,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { PasswordInput } from "@/components/ui/password-input";
 import { Label } from "@/components/ui/typography";
 import { toast } from "sonner";
 import { authService } from "@/services/common/auth/auth.service";
@@ -30,8 +31,6 @@ export function CompleteRegistrationForm() {
   const [loading, setLoading] = useState(false);
   const [redirecting, setRedirecting] = useState(false);
   const [redirectAccountType, setRedirectAccountType] = useState<"vendor" | "customer" | "admin" | null>(null);
-  const [showPassword, setShowPassword] = useState(false);
-
   const email = searchParams?.get("email") || "";
 
   const {
@@ -63,10 +62,6 @@ export function CompleteRegistrationForm() {
       router.replace("/auth/register");
     }
   }, [router, setValue]);
-
-  const togglePasswordVisibility = () => {
-    setShowPassword(!showPassword);
-  };
 
   const onSubmit = async (data: RegisterFormValues) => {
     setLoading(true);
@@ -308,19 +303,9 @@ export function CompleteRegistrationForm() {
         </div>
 
         <div className="space-y-2">
-          <div className="flex justify-between items-center">
-            <Label>Password</Label>
-            <Button
-              variant="event-ghost"
-              type="button"
-              onClick={togglePasswordVisibility}
-            >
-              {showPassword ? "Hide" : "Show"}
-            </Button>
-          </div>
-          <Input
+          <Label>Password</Label>
+          <PasswordInput
             id="password"
-            type={showPassword ? "text" : "password"}
             className={`h-10 ${errors.password ? "border-red-500" : ""}`}
             placeholder="Create a password"
             {...register("password")}
@@ -332,9 +317,9 @@ export function CompleteRegistrationForm() {
 
         <div className="space-y-2">
           <Label>Confirm Password</Label>
-          <Input
+          <PasswordInput
             id="confirmPassword"
-            type="password"
+            ariaPasswordField="confirm password"
             className={`h-10 ${errors.confirmPassword ? "border-red-500" : ""}`}
             placeholder="Confirm your password"
             {...register("confirmPassword")}

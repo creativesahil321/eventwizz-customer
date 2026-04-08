@@ -3,6 +3,7 @@
 import { Button } from "@/components/ui/button";
 // import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
+import { PasswordInput } from "@/components/ui/password-input";
 import Link from "next/link";
 import React from "react";
 import { useForm } from "react-hook-form";
@@ -20,7 +21,6 @@ import {
   LoginResponse,
 } from "@/types/auth.types";
 import { AuthRedirectingSkeleton } from "@/app/(auth)/_components/auth-redirecting-skeleton";
-import { Eye, EyeOff } from "lucide-react";
 import { useDomain } from "@/providers/domain-provider/domain-provider";
 import { OAuthErrorBoundary } from "@/components/auth/OAuthErrorBoundary";
 import { OAuthSkeleton } from "@/components/auth/OAuthSkeleton";
@@ -209,12 +209,6 @@ export default function LoginForm() {
     }
   };
 
-  const [showPassword, setShowPassword] = React.useState(false);
-
-  const handleShowPassword = () => {
-    setShowPassword(!showPassword);
-  };
-
   // Show fullscreen loader when redirecting
   if (redirecting) {
     return <AuthRedirectingSkeleton />;
@@ -288,31 +282,17 @@ export default function LoginForm() {
                     Forgot password?
                   </Link>
                 </div>
-                <div className="relative">
-                  <Input
-                    id="password"
-                    placeholder="••••••••"
-                    type={showPassword ? "text" : "password"}
-                    autoCapitalize="none"
-                    autoComplete="current-password"
-                    autoCorrect="off"
-                    className={`h-11 px-3 border-0 border-b-2 border-[var(--color-primary,#019ead)] focus:border-[var(--color-primary-dark,#018795)] focus:outline-none focus:ring-0 ${
-                      errors.password ? "border-red-500" : ""
-                    }`}
-                    {...register("password")}
-                  />
-                  <button
-                    type="button"
-                    onClick={handleShowPassword}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--color-text-muted,#6b7280)]"
-                  >
-                    {showPassword ? (
-                      <EyeOff className="h-4 w-4 cursor-pointer" />
-                    ) : (
-                      <Eye className="h-4 w-4 text-[var(--color-primary)] cursor-pointer" />
-                    )}
-                  </button>
-                </div>
+                <PasswordInput
+                  id="password"
+                  placeholder="••••••••"
+                  autoCapitalize="none"
+                  autoComplete="current-password"
+                  autoCorrect="off"
+                  className={`h-11 px-3 border-0 border-b-2 border-[var(--color-primary,#019ead)] focus:border-[var(--color-primary-dark,#018795)] focus:outline-none focus:ring-0 ${
+                    errors.password ? "border-red-500" : ""
+                  }`}
+                  {...register("password")}
+                />
                 {errors.password && (
                   <p className="text-sm text-red-500">
                     {errors.password.message}

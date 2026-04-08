@@ -89,8 +89,14 @@ const centeredSteps = new Set([1, 6, 11, 10]);
 const fullScreenCenteredSteps = new Set([4]); // Remove step 1 from full screen centered
 
 const SplitLayout = React.memo(
-  ({ step: Step }: { step: React.ComponentType }) => {
-    const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  ({
+    step: Step,
+    defaultCollapsed = false,
+  }: {
+    step: React.ComponentType;
+    defaultCollapsed?: boolean;
+  }) => {
+    const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(defaultCollapsed);
     const { activeStep } = useFormContext();
 
     const toggleSidebar = () => {
@@ -207,7 +213,11 @@ const FullLayout = React.memo(
 );
 FullLayout.displayName = "FullLayout";
 
-const FormLayoutProvider = () => {
+const FormLayoutProvider = ({
+  defaultSidebarCollapsed = false,
+}: {
+  defaultSidebarCollapsed?: boolean;
+}) => {
   const isMobile = useMediaQuery("(max-width: 768px)");
   const isMediumScreen = useMediaQuery("(max-width: 1280px)");
 
@@ -219,11 +229,19 @@ const FormLayoutProvider = () => {
     if (!StepComponent) return <div>Unknown step</div>;
 
     if (isMediumScreen && splitLayoutSteps.has(activeStep)) {
-      return <SplitLayout step={StepComponent as React.ComponentType} />;
+      return (
+        <SplitLayout
+          step={StepComponent as React.ComponentType}
+          defaultCollapsed={defaultSidebarCollapsed}
+        />
+      );
     }
 
     return splitLayoutSteps.has(activeStep) ? (
-      <SplitLayout step={StepComponent as React.ComponentType} />
+      <SplitLayout
+        step={StepComponent as React.ComponentType}
+        defaultCollapsed={defaultSidebarCollapsed}
+      />
     ) : (
       <FullLayout
         activeStep={activeStep}
@@ -231,7 +249,7 @@ const FormLayoutProvider = () => {
         centered={centeredSteps.has(activeStep)}
       />
     );
-  }, [activeStep, StepComponent, isMediumScreen]);
+  }, [activeStep, StepComponent, isMediumScreen, defaultSidebarCollapsed]);
 
   if (isMobile) {
     return (

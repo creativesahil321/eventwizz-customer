@@ -3,17 +3,11 @@
 import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { PasswordInput } from "@/components/ui/password-input";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import {
-  Shield,
-  Eye,
-  EyeOff,
-  CheckCircle2,
-  AlertTriangle,
-  Info,
-} from "lucide-react";
+import { Shield, CheckCircle2, AlertTriangle, Info } from "lucide-react";
 import { UseFormReturn } from "react-hook-form";
 import { StepTenType } from "../../form-provider/schema";
 import { cn } from "@/lib/utils";
@@ -29,7 +23,6 @@ export function WorldPayConfig({
   onVerify,
   className,
 }: WorldPayConfigProps) {
-  const [showServiceKey, setShowServiceKey] = useState(false);
   const [isVerifying, setIsVerifying] = useState(false);
   const [isVerified, setIsVerified] = useState(false);
 
@@ -169,28 +162,13 @@ export function WorldPayConfig({
           <Label htmlFor="worldpay-service-key" className="text-sm font-medium">
             Service Key <span className="text-red-500">*</span>
           </Label>
-          <div className="relative">
-            <Input
-              id="worldpay-service-key"
-              {...form.register("payment_providers.worldpay_service_key")}
-              type={showServiceKey ? "text" : "password"}
-              placeholder="Enter your WorldPay service key"
-              className="h-12 bg-white/5 border-white/10 pr-12"
-            />
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              className="absolute right-0 top-0 h-12 px-3 hover:bg-transparent"
-              onClick={() => setShowServiceKey(!showServiceKey)}
-            >
-              {showServiceKey ? (
-                <EyeOff className="w-4 h-4 text-gray-500" />
-              ) : (
-                <Eye className="w-4 h-4 text-gray-500" />
-              )}
-            </Button>
-          </div>
+          <PasswordInput
+            id="worldpay-service-key"
+            {...form.register("payment_providers.worldpay_service_key")}
+            placeholder="Enter your WorldPay service key"
+            ariaPasswordField="WorldPay service key"
+            className="h-12 bg-white/5 border-white/10 pr-12"
+          />
           {form.formState.errors.payment_providers?.worldpay_service_key && (
             <p className="text-xs text-red-500">
               {

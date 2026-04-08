@@ -40,7 +40,7 @@ export default function EventGallery({ gallery }: PackageSectionProps) {
   ];
 
   return (
-    <section className="w-full bg-[#fffdf7] py-8 px-3">
+    <section className="w-full bg-[color:var(--color-background)] py-8 px-3">
       <div className="max-100 mx-auto px-6">
         {/* Display gallery images in two rows */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">

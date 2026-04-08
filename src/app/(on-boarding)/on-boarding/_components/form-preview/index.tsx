@@ -3,24 +3,36 @@ import React, {
   useEffect,
   useState,
   useMemo,
+  useCallback,
   lazy,
   Suspense,
   useRef,
+  useContext,
 } from "react";
 import { useFormContext } from "../form-provider";
-import {
-  OnboardingFormData,
-  type StepFiveType,
-} from "../form-provider/schema";
+import { OnboardingFormData, type StepFiveType } from "../form-provider/schema";
 import { Skeleton } from "@/components/ui/skeleton";
 import { PreviewProvider } from "@/contexts/preview-context";
 import CommonHeader from "@/components/shared/common-header";
+import { ServerContext } from "@/lib/server-context";
+import { ThemeSchema } from "@/types/theme.types";
+import type { SiteEssentialsFormValues } from "@/app/(protected)/_shared/sites-essentials/_lib/schema";
+import {
+  buildOnboardingStepTwoSiteEssentialsValues,
+  siteEssentialsToPreviewRootStyle,
+} from "../../_lib/onboarding-site-essentials-bridge";
+import { SiteEssentialsGoogleFontsLoader } from "@/components/shared/site-essentials-google-fonts-loader";
+import { PreviewThemeCustomizer } from "@/components/preview/preview-theme-customizer";
+import VendorEventFooter from "@/app/(public)/vendor/_components/EventListPage/footer";
+import ExperienceSection from "@/app/(public)/vendor/_components/EventListPage/experience";
+import { SitePreviewDummyEventSection } from "@/app/(public)/vendor/_components/EventListPage/site-preview-dummy-events";
+
+import "@/app/(public)/[locationSlug]/events/[eventSlug]/event-detail.css";
 
 // Lazy load components - only import what's actually used
 const BrochureSection = lazy(() => import("./_components/brochure-section"));
 const DrinkSection = lazy(() => import("./_components/drink-section"));
 const FaqSection = lazy(() => import("./_components/faq-section"));
-const FooterSection = lazy(() => import("./_components/footer"));
 const AboutEventSec = lazy(() => import("./_components/About-event-sec"));
 const EventHeroSec = lazy(() => import("./_components/Event-hero-sec"));
 const MenuSection = lazy(() => import("./_components/menu-section"));
@@ -28,7 +40,6 @@ const Timeline = lazy(() => import("./_components/Time-line"));
 const PackageSection = lazy(() => import("./_components/package-sec"));
 const DatesSection = lazy(() => import("./_components/Dates-section"));
 const HomepageHeroSec = lazy(() => import("./_components/Homepage-hero-sec"));
-const AboutHeroSection = lazy(() => import("./_components/About-hero-sec"));
 const EventGallery = lazy(() => import("./_components/Event-gallery"));
 
 // Component loaders
@@ -43,9 +54,7 @@ const SectionLoader = () => (
 );
 
 /** Lowest ticket/table price per date for customer-facing date cards (preview). */
-function minPriceFromStepFiveDate(
-  d: StepFiveType["dates"][number],
-): number {
+function minPriceFromStepFiveDate(d: StepFiveType["dates"][number]): number {
   const nums: number[] = [];
   for (const t of d.tickets ?? []) {
     const n = Number(t.price);
@@ -69,13 +78,92 @@ function buildDatesPreviewFromStepFive(
   }));
 }
 
+/** String URL for vendor footer override (matches CommonHeader logo resolution). */
+function resolveOnboardingLogoUrl(
+  logo: string | File | null | undefined,
+): string | null {
+  if (logo == null) return null;
+  if (typeof logo === "string") return logo;
+  if (
+    typeof logo === "object" &&
+    "preview" in logo &&
+    typeof (logo as { preview?: string }).preview === "string"
+  ) {
+    return (logo as { preview: string }).preview;
+  }
+  return null;
+}
+
+/** Same steps as `form-layout` `splitLayoutSteps` — sidebar + live preview (Try theme applies here). */
+const ONBOARDING_THEME_PREVIEW_STEPS = new Set([2, 3, 4, 5, 6, 7, 8, 9]);
+
 // Only load components needed for the current step
 export default function FormPreview() {
   const { form, activeStep, activeField } = useFormContext();
+  const { theme } = useContext(ServerContext);
+  const userAdjustedTryThemeRef = useRef(false);
+  const [trySiteValues, setTrySiteValues] =
+    useState<SiteEssentialsFormValues | null>(null);
 
   const [formState, setFormState] = useState<OnboardingFormData>(
-    form.getValues()
+    form.getValues(),
   );
+
+  const handleTryThemeValuesChange = useCallback(
+    (next: SiteEssentialsFormValues) => {
+      userAdjustedTryThemeRef.current = true;
+      setTrySiteValues(next);
+    },
+    [],
+  );
+
+  useEffect(() => {
+    if (!ONBOARDING_THEME_PREVIEW_STEPS.has(activeStep)) return;
+    const fresh = buildOnboardingStepTwoSiteEssentialsValues(
+      formState,
+      theme as ThemeSchema | null | undefined,
+    );
+    setTrySiteValues((prev) => {
+      if (!userAdjustedTryThemeRef.current || !prev) return fresh;
+      return {
+        ...fresh,
+        colors: prev.colors,
+        typography: prev.typography,
+        banner_heading_align: prev.banner_heading_align,
+        banner_heading_valign: prev.banner_heading_valign,
+        banner_heading_accent: prev.banner_heading_accent,
+      };
+    });
+  }, [activeStep, formState.stepOne, formState.stepTwo, theme]);
+
+  const tryThemePreviewValues = useMemo((): SiteEssentialsFormValues | null => {
+    if (!ONBOARDING_THEME_PREVIEW_STEPS.has(activeStep)) return null;
+    return (
+      trySiteValues ??
+      buildOnboardingStepTwoSiteEssentialsValues(
+        formState,
+        theme as ThemeSchema | null | undefined,
+      )
+    );
+  }, [activeStep, trySiteValues, formState.stepOne, formState.stepTwo, theme]);
+
+  const tryHeroPreviewProps = useMemo(() => {
+    if (
+      !tryThemePreviewValues ||
+      !ONBOARDING_THEME_PREVIEW_STEPS.has(activeStep)
+    ) {
+      return null;
+    }
+    const accent = tryThemePreviewValues.banner_heading_accent;
+    return {
+      bannerHeadingAlign: tryThemePreviewValues.banner_heading_align ?? null,
+      bannerHeadingValign: tryThemePreviewValues.banner_heading_valign ?? null,
+      bannerHeadingAccent:
+        typeof accent === "string" && accent.trim() ? accent.trim() : null,
+      headingEmphasis:
+        tryThemePreviewValues.typography?.headingEmphasis ?? null,
+    };
+  }, [tryThemePreviewValues, activeStep]);
 
   // Build downloads array for preview
   const buildDownloadsArray = (): Array<{
@@ -102,8 +190,8 @@ export default function FormPreview() {
                 ? URL.createObjectURL(download.pdf)
                 : download.download_link?.[0] || "#",
             ],
-          })
-        )
+          }),
+        ),
       );
     }
 
@@ -342,11 +430,11 @@ export default function FormPreview() {
     [formState.stepFive?.dates],
   );
 
-  // Render only site preview components for step 2
+  // Render homepage preview (step 2) — mirrors the real vendor public site layout
   const renderStepTwoPreview = () => {
     return (
-      <>
-        {/* Site Header */}
+      <div className="event-detail-page">
+        {/* Site Header — onboarding variant (non-interactive) */}
         <CommonHeader
           contact_number={formState.stepOne?.contact_number || ""}
           logo={formState.stepTwo?.logo || null}
@@ -354,6 +442,7 @@ export default function FormPreview() {
           hasBackgroundImage={Boolean(formState.stepTwo?.cover_image)}
         />
 
+        {/* Homepage Hero */}
         <div
           ref={heroRef}
           className={`transition-all duration-300 ${
@@ -372,10 +461,12 @@ export default function FormPreview() {
               sub_heading={formState.stepTwo?.banner_sub_heading || ""}
               contact_number={formState.stepOne?.contact_number || ""}
               logo={formState.stepTwo?.logo || null}
+              {...(tryHeroPreviewProps ?? {})}
             />
           </Suspense>
         </div>
 
+        {/* About / Experience section — same component as the live vendor site */}
         <div
           ref={aboutRef}
           className={`transition-all duration-300 ${
@@ -387,15 +478,28 @@ export default function FormPreview() {
               : ""
           }`}
         >
-          <Suspense fallback={<SectionLoader />}>
-            <AboutHeroSection
-              title={formState.stepTwo?.about_title || ""}
-              description={formState.stepTwo?.about_description || ""}
-              link_title={formState.stepTwo?.about_link_title || ""}
-            />
-          </Suspense>
+          <ExperienceSection
+            aboutTitle={formState.stepTwo?.about_title || ""}
+            aboutDescription={formState.stepTwo?.about_description || ""}
+            aboutLinkTitle={formState.stepTwo?.about_link_title || ""}
+          />
         </div>
-      </>
+
+        {/* Dummy events — shows vendors how the events grid/carousel will look */}
+        <SitePreviewDummyEventSection
+          sectionTitle="Latest Events"
+          band="secondary"
+        />
+        <SitePreviewDummyEventSection
+          sectionTitle="Popular Events"
+          band="background"
+        />
+
+        {/* Footer */}
+        <VendorEventFooter
+          logo={resolveOnboardingLogoUrl(formState.stepTwo?.logo)}
+        />
+      </div>
     );
   };
 
@@ -410,14 +514,23 @@ export default function FormPreview() {
 
   // Always render the full site preview for other steps
   const renderFullSitePreview = () => {
+    const eventBannerImageStr =
+      typeof formState.stepThree?.event_banner_image === "string"
+        ? formState.stepThree.event_banner_image
+        : undefined;
+    const eventBannerVideoStr =
+      typeof formState.stepThree?.event_banner_video === "string"
+        ? formState.stepThree.event_banner_video
+        : undefined;
+    const datesEventImage = eventBannerImageStr ?? eventBannerVideoStr;
+
     return (
-      <>
-        {/* Site Header */}
+      <div className="event-detail-page">
+        {/* Same header chrome as live event detail (`EventDetailClient`); non-interactive when inside PreviewProvider. */}
         <CommonHeader
           contact_number={formState.stepOne?.contact_number || ""}
           logo={formState.stepTwo?.logo || null}
-          variant="onboarding"
-          hasBackgroundImage={Boolean(formState.stepThree?.event_banner_image)}
+          variant="default"
         />
 
         {/* Event Hero with Floating Header */}
@@ -425,12 +538,16 @@ export default function FormPreview() {
           ref={eventHeroRef}
           className={`transition-all duration-300 ${getHighlightClass(
             3,
-            "banner"
+            "banner",
           )}`}
         >
           <Suspense fallback={<BannerLoader />}>
             <EventHeroSec
-              heading={formState.stepThree?.event_banner_heading || ""}
+              heading={
+                formState.stepThree?.event_banner_heading?.trim() ||
+                formState.stepThree?.event_name?.trim() ||
+                ""
+              }
               image={formState.stepThree?.event_banner_image || null}
               video={formState.stepThree?.event_banner_video || null}
               banner_sub_heading={
@@ -438,6 +555,7 @@ export default function FormPreview() {
               }
               contact_number={formState.stepOne?.contact_number || ""}
               logo={formState.stepTwo?.logo || null}
+              {...(tryHeroPreviewProps ?? {})}
             />
           </Suspense>
         </div>
@@ -447,7 +565,7 @@ export default function FormPreview() {
           ref={aboutEventRef}
           className={`transition-all duration-300 ${getHighlightClass(
             3,
-            "about_event"
+            "about_event",
           )}`}
         >
           <Suspense fallback={<SectionLoader />}>
@@ -461,6 +579,13 @@ export default function FormPreview() {
               about_event_description={
                 formState.stepThree?.about_event_description || ""
               }
+              headingEmphasis={tryHeroPreviewProps?.headingEmphasis ?? undefined}
+              aboutHeadingAccentHint={
+                tryHeroPreviewProps?.bannerHeadingAccent ?? null
+              }
+              aboutHeadingAlign={
+                tryHeroPreviewProps?.bannerHeadingAlign ?? undefined
+              }
             />
           </Suspense>
         </div>
@@ -470,7 +595,7 @@ export default function FormPreview() {
           ref={timelineRef}
           className={`transition-all duration-300 ${getHighlightClass(
             3,
-            "event_schedular"
+            "event_schedular",
           )}`}
         >
           <Suspense fallback={<SectionLoader />}>
@@ -488,7 +613,7 @@ export default function FormPreview() {
           ref={packageRef}
           className={`transition-all duration-300 ${getHighlightClass(
             4,
-            "package"
+            "package",
           )}`}
         >
           <Suspense fallback={<SectionLoader />}>
@@ -510,7 +635,9 @@ export default function FormPreview() {
                   description: detail.title || "", // Use title as description since it's not in the schema
                 })) || []
               }
-              buttonLink={formState.stepFour?.package_button_name ? "#" : ""}
+              buttonLink={
+                formState.stepFour?.package_button_name ? "#booking" : ""
+              }
               buttonName={formState.stepFour?.package_button_name || ""}
             />
           </Suspense>
@@ -518,16 +645,18 @@ export default function FormPreview() {
 
         {/* Event Dates */}
         <div
+          id="booking"
           ref={datesRef}
           className={`transition-all duration-300 ${getHighlightClass(
             5,
-            "dates"
+            "dates",
           )}`}
         >
           <Suspense fallback={<SectionLoader />}>
             <DatesSection
               dates={datesPreviewItems}
               eventName={formState.stepThree?.event_name || undefined}
+              eventImage={datesEventImage}
             />
           </Suspense>
         </div>
@@ -537,7 +666,7 @@ export default function FormPreview() {
           ref={galleryRef}
           className={`transition-all duration-300 ${getHighlightClass(
             4,
-            "gallery"
+            "gallery",
           )}`}
         >
           <Suspense fallback={<SectionLoader />}>
@@ -545,19 +674,21 @@ export default function FormPreview() {
           </Suspense>
         </div>
 
-        {/* Catering Options */}
+        {/* Catering Options — same visibility rule as live event page */}
         <div
           ref={menuRef}
           className={`transition-all duration-300 ${getHighlightClass(6, "")}`}
         >
-          <Suspense fallback={<SectionLoader />}>
-            <MenuSection
-              menu_title={formState.stepSix?.menu_title || ""}
-              menu_description={formState.stepSix?.menu_description || ""}
-              catering_option={formState.stepSix?.catering_option ?? 0}
-              menus={formState.stepSix?.menus || []}
-            />
-          </Suspense>
+          {(formState.stepSix?.menus?.length ?? 0) > 0 && (
+            <Suspense fallback={<SectionLoader />}>
+              <MenuSection
+                menu_title={formState.stepSix?.menu_title || ""}
+                menu_description={formState.stepSix?.menu_description || ""}
+                catering_option={formState.stepSix?.catering_option ?? 1}
+                menus={formState.stepSix?.menus || []}
+              />
+            </Suspense>
+          )}
         </div>
 
         {/* Other Packages */}
@@ -565,23 +696,25 @@ export default function FormPreview() {
           ref={drinkRef}
           className={`transition-all duration-300 ${getHighlightClass(
             7,
-            "other-packages"
+            "other-packages",
           )}`}
         >
-          <Suspense fallback={<SectionLoader />}>
-            <DrinkSection
-              title={formState.stepSeven?.drink_title || ""}
-              description={formState.stepSeven?.drink_description || ""}
-              packages={
-                formState.stepSeven?.packages.map((pkg) => ({
-                  title: pkg.title,
-                  description: pkg.description,
-                  price: Number(pkg.price),
-                })) || []
-              }
-              defaultExpanded
-            />
-          </Suspense>
+          {(formState.stepSeven?.packages?.length ?? 0) > 0 && (
+            <Suspense fallback={<SectionLoader />}>
+              <DrinkSection
+                title={formState.stepSeven?.drink_title || ""}
+                description={formState.stepSeven?.drink_description || ""}
+                packages={
+                  formState.stepSeven?.packages.map((pkg) => ({
+                    title: pkg.title,
+                    description: pkg.description,
+                    price: Number(pkg.price),
+                  })) || []
+                }
+                defaultExpanded
+              />
+            </Suspense>
+          )}
         </div>
 
         {/*more_info and faqs */}
@@ -589,7 +722,7 @@ export default function FormPreview() {
           ref={moreInfoRef}
           className={`transition-all duration-300 ${getHighlightClass(
             8,
-            "more_info"
+            "more_info",
           )}`}
         >
           <BrochureSection
@@ -611,46 +744,79 @@ export default function FormPreview() {
           />
         </div>
 
-        {/* faqs */}
+        {/* FAQs — same visibility rule as live event page */}
         <div
           ref={faqRef}
           className={`transition-all duration-300 ${getHighlightClass(
             9,
-            "faqs"
+            "faqs",
           )}`}
         >
-          <Suspense fallback={<SectionLoader />}>
-            <FaqSection
-              faqs={formState.stepNine?.faqs || []}
-              defaultExpanded
-            />
-          </Suspense>
+          {(formState.stepNine?.faqs?.length ?? 0) > 0 && (
+            <Suspense fallback={<SectionLoader />}>
+              <FaqSection
+                faqs={formState.stepNine?.faqs || []}
+                defaultExpanded
+              />
+            </Suspense>
+          )}
         </div>
 
-        {/* Footer */}
-        <Suspense fallback={<SectionLoader />}>
-          <FooterSection
-            logo={formState.stepTwo?.logo || null}
-            details={formState.stepOne || {}}
-          />
-        </Suspense>
-      </>
+        <VendorEventFooter
+          logo={resolveOnboardingLogoUrl(formState.stepTwo?.logo)}
+        />
+      </div>
     );
   };
 
   return (
     <PreviewProvider isPreviewMode={true}>
-      <section className="bg-background w-full h-full overflow-hidden flex flex-col">
+      <section className="relative isolate bg-background flex h-full w-full flex-col overflow-hidden">
         <div
           ref={previewContainerRef}
-          className="max-w-full h-[calc(100vh-120px)] overflow-y-auto overflow-x-hidden scroll-smooth flex-1"
+          className="max-w-full h-[calc(100vh-120px)] flex-1 overflow-y-auto overflow-x-hidden scroll-smooth"
         >
+          {/* No transform here — Tailwind `scale-*` sets `transform` and traps `position:fixed` (Try theme tab) inside this box. */}
           <div className="w-full max-w-full scale-100 origin-top overflow-x-hidden">
-            {activeStep === 2
-              ? renderStepTwoPreview()
-              : renderFullSitePreview()}
+            {ONBOARDING_THEME_PREVIEW_STEPS.has(activeStep) &&
+            tryThemePreviewValues ? (
+              <div
+                style={siteEssentialsToPreviewRootStyle(tryThemePreviewValues)}
+                className="relative w-full min-h-0 bg-[color:var(--color-background)] text-[color:var(--color-text)] font-body"
+              >
+                <SiteEssentialsGoogleFontsLoader
+                  linkId="onboarding-google-fonts-try-theme"
+                  headingStack={
+                    tryThemePreviewValues.typography?.fontFamily?.heading
+                  }
+                  bodyStack={tryThemePreviewValues.typography?.fontFamily?.body}
+                  customStylesheetUrls={
+                    tryThemePreviewValues.typography?.customFontStylesheetUrls
+                  }
+                />
+                {activeStep === 2
+                  ? renderStepTwoPreview()
+                  : renderFullSitePreview()}
+              </div>
+            ) : (
+              renderFullSitePreview()
+            )}
           </div>
         </div>
+        {/* Outside scroll + no transformed ancestors so `fixed` in Try theme pins to the viewport (whole preview column), not the content width. */}
+        {ONBOARDING_THEME_PREVIEW_STEPS.has(activeStep) &&
+          tryThemePreviewValues && (
+            <PreviewThemeCustomizer
+              values={tryThemePreviewValues}
+              onValuesChange={handleTryThemeValuesChange}
+              brandName={
+                formState.stepOne?.name?.trim() ||
+                (theme as ThemeSchema | null | undefined)?.name?.trim() ||
+                "Your site"
+              }
+              sheetDescription="Tap colors or fonts — your preview updates live. Same Try theme flow as Site Essentials; save permanently there after onboarding."
+            />
+          )}
       </section>
     </PreviewProvider>
   );

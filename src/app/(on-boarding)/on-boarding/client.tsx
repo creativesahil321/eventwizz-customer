@@ -79,10 +79,25 @@ export default function OnboardingClientWrapper() {
     sessionStorage.setItem(MODE_STORAGE_KEY, selected);
   };
 
+  // True only for the very first render after the AI wizard finishes —
+  // collapses the sidebar so the vendor sees the populated preview first.
+  // Reset to false immediately after that first render so step-to-step
+  // transitions don't keep re-collapsing the sidebar.
+  const [sidebarCollapsedAfterAI, setSidebarCollapsedAfterAI] = useState(false);
+
+  useEffect(() => {
+    if (sidebarCollapsedAfterAI) {
+      // React has already committed the first paint with the sidebar closed;
+      // flip back to false so future SplitLayout remounts start open.
+      setSidebarCollapsedAfterAI(false);
+    }
+  }, [sidebarCollapsedAfterAI]);
+
   const handleAIComplete = () => {
     // AI flow is complete, switch to manual onboarding UI.
     // Mode is already persisted via step payloads.
     sessionStorage.setItem(MODE_STORAGE_KEY, "manual");
+    setSidebarCollapsedAfterAI(true);
     setMode("manual");
   };
 
@@ -109,7 +124,7 @@ export default function OnboardingClientWrapper() {
           onSwitchToManual={handleSwitchToManual}
         />
       ) : (
-        <FormLayoutProvider />
+        <FormLayoutProvider defaultSidebarCollapsed={sidebarCollapsedAfterAI} />
       )}
     </FormProvider>
   );

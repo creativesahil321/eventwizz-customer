@@ -1,8 +1,8 @@
 "use client";
 
 import { useMemo } from "react";
+import { Calendar } from "lucide-react";
 import { addCacheBusting } from "@/lib/image-utils";
-import { Button } from "@/components/ui/button";
 import { useCurrencyFormat } from "@/hooks/use-currency-format";
 
 const PREVIEW_IMAGES = [
@@ -67,17 +67,17 @@ export function SitePreviewDummyEventSection({
   return (
     <section className={sectionClass}>
       <div className="container mx-auto px-4">
-        <div className="w-full text-center mb-6">
+        <div className="mb-6 w-full text-left">
           {isSecondary ? (
-            <span className="inline-block mb-2 text-xs font-semibold tracking-[0.18em] uppercase text-[var(--color-secondary-foreground)]/75">
+            <span className="mb-1 block text-xs font-bold uppercase tracking-[0.2em] text-[color:var(--color-primary)]">
               Featured right now
             </span>
           ) : null}
-          <h2 className={`text-3xl md:text-4xl font-bold ${headingClass}`}>
+          <h2 className={`text-2xl font-black tracking-tight md:text-3xl ${headingClass}`}>
             {sectionTitle}
           </h2>
           <p
-            className={`mt-4 max-w-2xl mx-auto text-sm md:text-base leading-relaxed ${noteClass}`}
+            className={`mt-3 max-w-2xl text-left text-sm leading-relaxed md:text-base ${noteClass}`}
           >
             <span className="font-semibold text-[var(--color-primary)]">
               Preview only — sample events.
@@ -88,45 +88,45 @@ export function SitePreviewDummyEventSection({
           </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-5xl mx-auto pt-2">
+        <div className="grid max-w-7xl grid-cols-1 gap-5 pt-2 sm:grid-cols-2 lg:grid-cols-4">
           {dummyEvents.map((event, index) => (
-            <div key={index} className="relative p-1">
+            <div key={index} className="relative">
               <span
-                className="absolute top-4 right-4 z-20 rounded-md bg-amber-600 text-white text-[10px] font-bold uppercase tracking-wider px-2 py-1 shadow-md ring-2 ring-white/90"
+                className="absolute right-3 top-3 z-20 rounded-md bg-amber-600 px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-white shadow-md ring-2 ring-white/90"
                 title="Dummy data for preview"
               >
                 Sample
               </span>
-              <div
-                className={`overflow-hidden bg-[var(--color-surface)] text-[var(--color-on-surface)] rounded-xl border shadow-sm h-full flex flex-col ${badgeBorder}`}
+              <article
+                className={`pointer-events-none relative overflow-hidden rounded-xl border border-white/10 bg-zinc-950 opacity-95 ${badgeBorder}`}
               >
-                <div className="relative aspect-[3/4] w-full overflow-hidden flex-shrink-0">
+                <div className="relative aspect-[4/3] w-full overflow-hidden bg-zinc-900">
                   <img
                     src={addCacheBusting(event.image)}
                     alt={`${event.title} — sample image for site preview only`}
-                    className="w-full h-full object-cover"
+                    className="h-full w-full object-cover"
                   />
-                </div>
-                <div className="p-4 flex-1 flex flex-col text-[var(--color-on-surface)]">
-                  <h3 className="pb-2 text-base font-bold line-clamp-2 min-h-[2.5rem]">
-                    {event.title}
-                  </h3>
-                  <p className="font-medium mb-3 text-sm text-[var(--color-on-surface)]/80 min-h-[1.25rem]">
+                  <div
+                    className="pointer-events-none absolute inset-x-0 bottom-0 h-2/5 bg-gradient-to-t from-black/75 via-black/25 to-transparent"
+                    aria-hidden
+                  />
+                  <div className="absolute right-2.5 top-2.5 z-[1] rounded-full bg-[var(--color-primary)] px-2.5 py-1 text-[11px] font-bold leading-none text-[var(--color-primary-foreground)] shadow-md">
                     {event.price}
-                  </p>
-                  <div className="mt-auto">
-                    <Button
-                      type="button"
-                      variant="event-outline"
-                      className="w-full pointer-events-none opacity-95"
-                      disabled
-                      aria-disabled
-                    >
-                      Dummy card — not bookable
-                    </Button>
+                  </div>
+                  <div className="absolute bottom-2.5 left-2.5 z-[1] flex items-center gap-1 text-[11px] font-semibold text-white">
+                    <Calendar className="h-3.5 w-3.5 shrink-0 opacity-95" aria-hidden />
+                    Jun 20
                   </div>
                 </div>
-              </div>
+                <div className="border-t border-white/[0.06] bg-zinc-950 px-3 py-2.5">
+                  <h3 className="line-clamp-2 text-left text-sm font-bold text-white">
+                    {event.title}
+                  </h3>
+                  <p className="mt-1 text-[10px] font-medium text-white/45">
+                    Preview only — not bookable
+                  </p>
+                </div>
+              </article>
             </div>
           ))}
         </div>

@@ -21,7 +21,7 @@ import { ThemeSchema } from "@/types/theme.types";
 import CartButton from "./cart-button";
 import { addCacheBusting } from "@/lib/image-utils";
 import { cn } from "@/lib/utils";
-// import { useIsPreviewMode } from "@/contexts/preview-context"; // Available for future use
+import { useIsPreviewModeFromProvider } from "@/contexts/preview-context";
 
 // Define icon mapping with proper typing
 type IconKey = "phone" | "profile";
@@ -59,6 +59,7 @@ export default function CommonHeader({
   previewBackButtonOffset = true,
 }: CommonHeaderProps) {
   const { theme } = useContext(ServerContext);
+  const isPreviewFromProvider = useIsPreviewModeFromProvider();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
   const { data: session, status } = useSession();
@@ -194,7 +195,10 @@ export default function CommonHeader({
   };
 
   const styles = getVariantStyles();
-  const isOnboardingMode = variant === "onboarding";
+  /** Live look (`default`) but no real navigation — e.g. onboarding form preview inside PreviewProvider. */
+  const useNonInteractiveChrome =
+    variant === "onboarding" ||
+    (variant === "default" && isPreviewFromProvider);
 
   const mobileContactLink = headerData.navLinks.find(
     (item) => item.icon === "phone",
@@ -208,9 +212,8 @@ export default function CommonHeader({
   const mobileNavIconWrap =
     "flex h-5 w-5 shrink-0 items-center justify-center [&_svg]:h-5 [&_svg]:w-5";
 
-  // Prevent navigation during onboarding
   const handleLinkClick = (e: React.MouseEvent) => {
-    if (isOnboardingMode) {
+    if (useNonInteractiveChrome) {
       e.preventDefault();
       e.stopPropagation();
     }
@@ -248,7 +251,7 @@ export default function CommonHeader({
                 : ""
             }`}
           >
-            {isOnboardingMode ? (
+            {useNonInteractiveChrome ? (
               <div
                 className={`text-sm ${styles.textColor} opacity-60 border-2 ${styles.borderColor} rounded-lg px-2 py-1 cursor-not-allowed`}
               >
@@ -269,7 +272,7 @@ export default function CommonHeader({
             )}
           </div>
           <div className="w-1/3 text-center">
-            {isOnboardingMode ? (
+            {useNonInteractiveChrome ? (
               <div className="h-14 flex items-center justify-center cursor-default">
                 {logoPath ? (
                   <img
@@ -311,7 +314,7 @@ export default function CommonHeader({
             className={`flex items-center gap-2 sm:gap-3 w-1/3 justify-end text-xs sm:text-sm`}
           >
             {/* Cart Button */}
-            {isOnboardingMode ? (
+            {useNonInteractiveChrome ? (
               <div
                 className={`flex items-center gap-1 ${styles.textColor} opacity-60 transition-colors border-2 ${styles.borderColor} rounded-lg px-2 py-1 cursor-not-allowed`}
               >
@@ -334,11 +337,10 @@ export default function CommonHeader({
               const IconComponent = icon ? iconComponents[icon] : null;
               const isPhoneNumber = icon === "phone";
 
-              // Allow phone links even in onboarding mode (tel: links are safe)
-              const shouldAllowNavigation =
-                isOnboardingMode && !link.startsWith("tel:");
+              const useDisabledNavLink =
+                useNonInteractiveChrome && !link.startsWith("tel:");
 
-              if (shouldAllowNavigation) {
+              if (useDisabledNavLink) {
                 return (
                   <div
                     key={index}
@@ -407,14 +409,14 @@ export default function CommonHeader({
           <button
             type="button"
             onClick={toggleMobileMenu}
-            className={cn("p-2", !isOnboardingMode && styles.textColor)}
+            className={cn("p-2", !useNonInteractiveChrome && styles.textColor)}
             aria-label={mobileMenuOpen ? "Close menu" : "Open menu"}
-            disabled={isOnboardingMode}
+            disabled={useNonInteractiveChrome}
           >
             <Menu className="h-6 w-6" />
           </button>
           <div className="text-center">
-            {isOnboardingMode ? (
+            {useNonInteractiveChrome ? (
               <div className="h-10 flex items-center justify-center cursor-default">
                 {logoPath ? (
                   <img
@@ -454,7 +456,7 @@ export default function CommonHeader({
           </div>
           <div className="flex items-center gap-2">
             {/* Mobile Cart Button */}
-            {isOnboardingMode ? (
+            {useNonInteractiveChrome ? (
               <div
                 className={`p-2 ${styles.textColor} opacity-60 transition-colors cursor-not-allowed`}
               >
@@ -471,7 +473,7 @@ export default function CommonHeader({
               />
             )}
 
-            {isOnboardingMode ? (
+            {useNonInteractiveChrome ? (
               <div
                 className={`p-2 ${styles.textColor} opacity-60 cursor-not-allowed`}
                 aria-label="Profile"
@@ -540,7 +542,7 @@ export default function CommonHeader({
             aria-label="Main navigation"
           >
             <div className="flex flex-col divide-y divide-[var(--color-on-header)]/15">
-              {isOnboardingMode ? (
+              {useNonInteractiveChrome ? (
                 <div
                   className={cn(
                     mobileNavRowClass,
@@ -569,7 +571,7 @@ export default function CommonHeader({
                 </Link>
               )}
 
-              {isOnboardingMode ? (
+              {useNonInteractiveChrome ? (
                 <div
                   className={cn(
                     mobileNavRowClass,
@@ -597,8 +599,8 @@ export default function CommonHeader({
               )}
 
               {mobileAccountLinks.map(({ link, linkText }, index) => {
-                const shouldAllowNavigation =
-                  isOnboardingMode && !link.startsWith("tel:");
+                const useDisabledAccountLink =
+                  useNonInteractiveChrome && !link.startsWith("tel:");
 
                 const AccountIcon =
                   linkText === "Dashboard"
@@ -609,7 +611,7 @@ export default function CommonHeader({
                         ? UserPlus
                         : null;
 
-                if (shouldAllowNavigation) {
+                if (useDisabledAccountLink) {
                   return (
                     <div
                       key={`${link}-${index}`}

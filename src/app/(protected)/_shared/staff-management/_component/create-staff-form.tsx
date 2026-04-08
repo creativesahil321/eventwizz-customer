@@ -13,6 +13,7 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import { PasswordInput } from "@/components/ui/password-input";
 import {
   Select,
   SelectContent,
@@ -29,7 +30,6 @@ import { useCreateStaff } from "../_lib/queries";
 import { useRoles } from "@/app/(protected)/_shared/manage-roles/_lib/queries";
 import { CreateStaffPayload } from "@/services/common/staff-management/type";
 import { Role } from "@/services/common/manage-roles/type";
-import { useState } from "react";
 import { createStaffSchema, CreateStaffFormValues } from "../_lib/schemas";
 import { useVendorLocationsList } from "@/app/(protected)/vendor/venue-locations/_lib/queries";
 
@@ -42,8 +42,6 @@ export default function CreateStaffForm({
   hideLocationSelection = false,
 }: CreateStaffFormProps) {
   const router = useRouter();
-  const [showPassword, setShowPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   // Fetch roles from the API
   const { data: rolesData, isLoading: isLoadingRoles } = useRoles();
@@ -262,21 +260,7 @@ export default function CreateStaffForm({
                   <FormItem>
                     <FormLabel>Password</FormLabel>
                     <FormControl>
-                      <div className="relative">
-                        <Input
-                          type={showPassword ? "text" : "password"}
-                          placeholder="********"
-                          {...field}
-                        />
-                        <Button
-                          type="button"
-                          variant="event-ghost"
-                          className="absolute right-0 top-1 h-10 px-3 text-xs font-medium text-red-500"
-                          onClick={() => setShowPassword(!showPassword)}
-                        >
-                          {showPassword ? "Hide" : "Show"}
-                        </Button>
-                      </div>
+                      <PasswordInput placeholder="********" {...field} />
                     </FormControl>
                     <FormDescription>
                       Password must be at least 8 characters.
@@ -293,23 +277,11 @@ export default function CreateStaffForm({
                   <FormItem>
                     <FormLabel>Confirm Password</FormLabel>
                     <FormControl>
-                      <div className="relative">
-                        <Input
-                          type={showConfirmPassword ? "text" : "password"}
-                          placeholder="********"
-                          {...field}
-                        />
-                        <Button
-                          type="button"
-                          variant="event-ghost"
-                          className="absolute right-0 top-1 h-10 px-3 text-xs font-medium text-red-500"
-                          onClick={() =>
-                            setShowConfirmPassword(!showConfirmPassword)
-                          }
-                        >
-                          {showConfirmPassword ? "Hide" : "Show"}
-                        </Button>
-                      </div>
+                      <PasswordInput
+                        placeholder="********"
+                        ariaPasswordField="confirm password"
+                        {...field}
+                      />
                     </FormControl>
                     <FormDescription>
                       Re-enter the password to confirm.

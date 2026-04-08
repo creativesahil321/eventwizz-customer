@@ -108,7 +108,9 @@ function parseLastCompletedStepFromPayload(
   const raw = dataAny.last_completed_step ?? dataAny.lastCompletedStep;
   if (raw !== undefined && raw !== null && raw !== "") {
     const n = Number(raw);
-    if (!Number.isNaN(n) && n >= 0) return n;
+    // Never return a value lower than the known active step — if the user
+    // is already on step N they must have completed steps 1…N.
+    if (!Number.isNaN(n) && n >= 0) return Math.max(n, stepFromData);
   }
   if (stepFromData > 0) return Math.max(stepFromData, 1);
   return 1;
@@ -204,7 +206,11 @@ export function FormProvider({
           dataAny,
           stepFromData,
         );
-        setLastCompletedStep(lastCompleted >= 0 ? lastCompleted : 1);
+        // Use a functional updater so we never go *backwards* from a value
+        // that was already seeded by the session effect.
+        setLastCompletedStep((prev) =>
+          Math.max(prev, lastCompleted >= 0 ? lastCompleted : 1),
+        );
       }
     }
   }, [serverData, form]);
@@ -218,6 +224,15 @@ export function FormProvider({
           const stepFromSession = Number(session.user.on_boarding_step);
           if (!isNaN(stepFromSession) && stepFromSession > 0) {
             setActiveStep(stepFromSession);
+            // Also seed lastCompletedStep so the stepper doesn't disable earlier steps.
+            // Prefer the session's own last_completed_step; fall back to the active step.
+            const sessionLastCompleted = session.user.last_completed_step
+              ? Number(session.user.last_completed_step)
+              : stepFromSession;
+            const safeLastCompleted = !isNaN(sessionLastCompleted) && sessionLastCompleted > 0
+              ? Math.max(sessionLastCompleted, stepFromSession)
+              : stepFromSession;
+            setLastCompletedStep(safeLastCompleted);
             return;
           }
         }

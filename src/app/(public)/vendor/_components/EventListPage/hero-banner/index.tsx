@@ -112,22 +112,28 @@ export default function HeroBanner({
       : vendorTheme?.banner_heading_valign,
   );
   const stackClass = heroBannerStackClass(textAlign);
-  const subClass = cn(
-    "text-xl text-white/80",
-    heroBannerSubheadingClass(textAlign),
-  );
 
   return (
     <section
+      id="hero"
       className={cn(
-        "relative mx-auto flex h-screen w-full justify-center",
+        "relative mx-auto flex w-full justify-center overflow-hidden",
+        /* Lovable-style band ~60–70% viewport, capped (not full screen) */
+        "h-[min(68dvh,720px)] min-h-[380px] max-h-[760px]",
         heroBandVerticalClass(heroValign),
+        /*
+         * Left + center: stretch cross-axis so the block is full-width (row flex-col hero
+         * would otherwise shrink-wrap and center the column). Do NOT stretch for top/bottom
+         * valign — that overrides items-start/items-end and pins copy to the top of a tall box.
+         */
+        textAlign === "left" &&
+          heroValign === "center" &&
+          "!items-stretch !justify-end !pb-10 pt-20 md:!pb-16 md:pt-24",
       )}
-      style={{ minHeight: "500px" }}
     >
       {/* Video background if video URL exists and should be used */}
       {useVideo && (
-        <div className="absolute inset-0 w-full h-full overflow-hidden">
+        <div className="absolute inset-0 h-full w-full overflow-hidden">
           <video
             autoPlay
             muted
@@ -135,32 +141,60 @@ export default function HeroBanner({
             playsInline
             preload="auto"
             poster={finalImageUrl || undefined}
-            className="absolute inset-0 w-full h-full object-cover"
+            className="absolute inset-0 h-full w-full scale-105 object-cover"
           >
             <source src={finalVideoUrl || undefined} type="video/mp4" />
             Your browser does not support the video tag.
           </video>
-          <div className="absolute inset-0 bg-black/50"></div>
+          <div className="absolute inset-0 bg-gradient-to-b from-black/70 via-black/40 to-black" />
         </div>
       )}
 
-      {/* Image background if no video */}
+      {/* Image background — Lovable-style scaled cover */}
       {!useVideo && (
-        <div
-          className="absolute inset-0 bg-cover bg-center"
-          style={{
-            backgroundImage: `linear-gradient(to right, rgba(0,0,0,0.8), rgba(0,0,0,0.4)), url(${finalImageUrl})`,
-          }}
-        />
+        <div className="absolute inset-0 overflow-hidden">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={finalImageUrl}
+            alt=""
+            className="absolute inset-0 h-full w-full scale-105 object-cover"
+          />
+          <div className="absolute inset-0 bg-gradient-to-b from-black/70 via-black/40 to-black" />
+        </div>
       )}
 
-      <div className="relative z-10 container mx-auto overflow-visible px-4">
+      {/* Soft brand orbs (Lovable hero) */}
+      <div
+        className="pointer-events-none absolute left-1/4 top-20 h-96 w-96 rounded-full bg-[color:color-mix(in_srgb,var(--color-primary)_22%,transparent)] blur-[120px]"
+        aria-hidden
+      />
+      <div
+        className="pointer-events-none absolute bottom-20 right-1/4 h-96 w-96 rounded-full bg-[color:color-mix(in_srgb,var(--color-primary)_12%,transparent)] blur-[100px]"
+        aria-hidden
+      />
+
+      <div
+        className={cn(
+          "relative z-10 container mx-auto overflow-visible px-4",
+          textAlign === "center" && "py-12 md:py-16",
+        )}
+      >
         <motion.div
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.8 }}
           className={cn(stackClass, "overflow-visible")}
         >
+          {locationName ? (
+            <p
+              className={cn(
+                "mb-4 text-[11px] font-bold uppercase tracking-[0.28em] text-white/75",
+                textAlign === "center" && "mx-auto max-w-3xl",
+              )}
+            >
+              {`Welcome to ${locationName}`}
+            </p>
+          ) : null}
           <SiteHeading
             level={1}
             title={bannerHeading}
@@ -168,10 +202,27 @@ export default function HeroBanner({
             emphasis={headingEmphasis}
             variant="onDark"
             align={textAlign}
-            className="mb-6 font-bold !text-4xl md:!text-5xl lg:!text-6xl"
+            className="mb-6 max-w-4xl font-black !text-4xl !leading-[0.95] tracking-tight md:!text-6xl lg:!text-7xl"
           />
 
-          <p className={subClass}>{bannerSubheading}</p>
+          <p
+            className={cn(
+              "text-lg text-white/80 sm:text-xl",
+              heroBannerSubheadingClass(textAlign),
+            )}
+          >
+            {bannerSubheading}
+          </p>
+
+          <a
+            href="#latest-events"
+            className={cn(
+              "mt-10 inline-flex items-center justify-center rounded-full bg-white px-8 py-3 text-sm font-bold tracking-wide text-neutral-900 shadow-lg transition hover:bg-white/95",
+              textAlign === "center" && "mx-auto",
+            )}
+          >
+            Explore now
+          </a>
         </motion.div>
       </div>
     </section>

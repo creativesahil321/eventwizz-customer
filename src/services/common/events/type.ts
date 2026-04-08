@@ -15,6 +15,11 @@ export interface Event {
   slug: string;
   banner_image: string;
   lowest_price: number;
+  /** Human-readable date for marketing cards when API provides it */
+  event_date?: string | null;
+  formatted_date?: string | null;
+  date?: string | null;
+  start_date?: string | null;
 }
 
 /**

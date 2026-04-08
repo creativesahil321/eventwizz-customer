@@ -53,7 +53,7 @@ export default function MenuSection({
   };
 
   return (
-    <section className="relative w-full bg-[var(--color-background)] px-5 py-5">
+    <section className="relative w-full bg-[color:var(--color-background)] px-5 py-5">
       {/* Background */}
       <div className="absolute inset-0 z-0">
         <img

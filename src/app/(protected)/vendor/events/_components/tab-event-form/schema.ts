@@ -106,30 +106,30 @@ export const stepOneSchema = z
     const imageRemoved = data.remove_event_banner_image === true;
     const videoRemoved = data.remove_event_banner_video === true;
 
-      // Require either image OR video, but not both
+    // Require either image OR video, but not both
     // Don't count removed images/videos as valid
-      const hasImage =
+    const hasImage =
       !imageRemoved &&
-        data.event_banner_image &&
-        (data.event_banner_image instanceof File ||
-          (typeof data.event_banner_image === "string" &&
-            data.event_banner_image.length > 0 &&
-            data.event_banner_image !== "null" &&
-            data.event_banner_image !== "undefined"));
-      const hasVideo =
+      data.event_banner_image &&
+      (data.event_banner_image instanceof File ||
+        (typeof data.event_banner_image === "string" &&
+          data.event_banner_image.length > 0 &&
+          data.event_banner_image !== "null" &&
+          data.event_banner_image !== "undefined"));
+    const hasVideo =
       !videoRemoved &&
-        data.event_banner_video &&
-        (data.event_banner_video instanceof File ||
-          (typeof data.event_banner_video === "string" &&
-            data.event_banner_video.length > 0 &&
-            data.event_banner_video !== "null" &&
-            data.event_banner_video !== "undefined"));
+      data.event_banner_video &&
+      (data.event_banner_video instanceof File ||
+        (typeof data.event_banner_video === "string" &&
+          data.event_banner_video.length > 0 &&
+          data.event_banner_video !== "null" &&
+          data.event_banner_video !== "undefined"));
 
     if (!hasImage && !hasVideo) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-      message: "Either a banner image or video is required",
-      path: ["event_banner_image"],
+        message: "Either a banner image or video is required",
+        path: ["event_banner_image"],
       });
     }
   });

@@ -207,24 +207,36 @@ export default function VendorSiteHomePage() {
 
       <section className="bg-[var(--color-background)] pb-16 md:pb-20">
         <motion.div
-          className="container mx-auto px-6"
+          className="container mx-auto max-w-7xl px-4 sm:px-6"
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.45, delay: 0.12 }}
         >
+          {viewMode === "grid" || isMobile ? (
+            <div className="mb-10 text-center md:mb-12">
+              <span className="mb-2 block text-xs font-bold uppercase tracking-widest text-[color:var(--color-primary)]">
+                Explore cities
+              </span>
+              <h2 className="mb-3 text-3xl font-black tracking-tight text-[var(--color-text)] sm:text-4xl">
+                Choose Your City
+              </h2>
+              <p className="text-[var(--color-text-dimmed)]">
+                Tap a city to see all upcoming events
+              </p>
+            </div>
+          ) : null}
+
           {viewMode === "map" && !isMobile ? (
             <GoogleLocationMap
               locations={allLocations}
               onSelect={handleLocationSelect}
             />
           ) : (
-            <div className="mx-auto max-w-6xl">
-              <LocationGrid
-                locations={allLocations}
-                isLoading={isLoading || isDomainLoading}
-                onSelect={handleLocationSelect}
-              />
-            </div>
+            <LocationGrid
+              locations={allLocations}
+              isLoading={isLoading || isDomainLoading}
+              onSelect={handleLocationSelect}
+            />
           )}
         </motion.div>
       </section>

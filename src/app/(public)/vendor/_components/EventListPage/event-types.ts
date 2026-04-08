@@ -4,6 +4,8 @@ export interface EventComponentProps {
   events?: Event[];
   sectionTitle?: string;
   locationSlug?: string;
+  /** City / venue label for cards (Lovable-style MapPin row) */
+  locationLabel?: string | null;
 }
 
 export interface GalleryComponentProps {

@@ -8,6 +8,7 @@ import { LucideIcon } from "lucide-react";
 import { useSession } from "next-auth/react";
 import { ThemeSchema } from "@/types/theme.types";
 import { addCacheBusting } from "@/lib/image-utils";
+import { cn } from "@/lib/utils";
 
 // Define icon mapping with proper typing
 type IconKey = "phone" | "bookmarks";
@@ -110,13 +111,24 @@ export default function HeadersSec({
     setMobileMenuOpen(!mobileMenuOpen);
   };
 
+  // Match CommonHeader: transparent bar over hero must not use --color-on-header (tied to solid header).
+  const overDarkHero = !isScrolled;
+  const barTextClass = overDarkHero
+    ? "text-white [text-shadow:0_1px_3px_rgba(0,0,0,0.55)]"
+    : "text-[var(--color-on-header)]";
+  const barLinkHoverClass = overDarkHero
+    ? "hover:text-white/90 hover:underline hover:decoration-2 hover:underline-offset-2 hover:decoration-[color:var(--color-primary)]"
+    : "hover:opacity-90 hover:underline hover:decoration-2 hover:underline-offset-2 hover:decoration-[color:var(--color-primary)]";
+
   return (
     <section
-      className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
+      className={cn(
+        "fixed top-0 left-0 right-0 z-50 transition-all duration-300 dark:bg-background",
         isScrolled
           ? "bg-[color:var(--color-header)] shadow-md"
-          : "bg-transparent"
-      } text-[var(--color-on-header)] dark:bg-background`}
+          : "bg-transparent",
+        barTextClass,
+      )}
     >
       <div className="container mx-auto">
         {/* Desktop Header */}
@@ -124,7 +136,10 @@ export default function HeadersSec({
           <div className="flex items-center gap-3 w-1/3 ">
             <Link
               href={headerData.browseEvent.link}
-              className="text-sm text-[var(--color-on-header)] transition-colors border-2 border-[color:var(--color-primary)] rounded-lg px-2 py-1 hover:opacity-90 hover:underline hover:decoration-2 hover:underline-offset-2 hover:decoration-[color:var(--color-primary)]"
+              className={cn(
+                "text-sm transition-colors border-2 border-[color:var(--color-primary)] rounded-lg px-2 py-1",
+                barLinkHoverClass,
+              )}
             >
               {headerData.browseEvent.linkText}
             </Link>
@@ -147,7 +162,10 @@ export default function HeadersSec({
                 <Link
                   key={index}
                   href={link}
-                  className="flex items-center gap-1 text-[var(--color-on-header)] transition-colors border-2 border-[color:var(--color-primary)] rounded-lg px-2 py-1 hover:opacity-90 hover:underline hover:decoration-2 hover:underline-offset-2 hover:decoration-[color:var(--color-primary)]"
+                  className={cn(
+                    "flex items-center gap-1 transition-colors border-2 border-[color:var(--color-primary)] rounded-lg px-2 py-1",
+                    barLinkHoverClass,
+                  )}
                 >
                   {IconComponent && <IconComponent size={16} />}
                   {linkText}
@@ -161,7 +179,7 @@ export default function HeadersSec({
         <div className="md:hidden flex justify-between items-center py-3">
           <button
             onClick={toggleMobileMenu}
-            className="p-2"
+            className={cn("p-2", barTextClass)}
             aria-label={mobileMenuOpen ? "Close menu" : "Open menu"}
           >
             <Menu className="h-6 w-6" />
@@ -180,14 +198,14 @@ export default function HeadersSec({
           {isAuthenticated ? (
             <Link
               href={`/${session?.user?.account_type}/dashboard`}
-              className="p-2 text-[var(--color-on-header)] transition-colors hover:opacity-90 hover:underline hover:decoration-2 hover:underline-offset-2 hover:decoration-[color:var(--color-primary)]"
+              className={cn("p-2 transition-colors", barLinkHoverClass)}
             >
               <Bookmark className="h-5 w-5" />
             </Link>
           ) : (
             <Link
               href="/auth/login"
-              className="p-2 text-[var(--color-on-header)] transition-colors hover:opacity-90 hover:underline hover:decoration-2 hover:underline-offset-2 hover:decoration-[color:var(--color-primary)]"
+              className={cn("p-2 transition-colors", barLinkHoverClass)}
             >
               <Bookmark className="h-5 w-5" />
             </Link>

@@ -46,19 +46,43 @@ import {
   type BannerHeadingAlign,
   type BannerHeadingValign,
 } from "@/lib/banner-heading-align";
+import type { HeadingEmphasis } from "@/lib/heading-emphasis";
+import { normalizeHeadingEmphasis } from "@/lib/heading-emphasis";
 import { useSiteEssentialsPresetFontsPreload } from "@/hooks/use-site-essentials-preset-fonts-preload";
 import {
   isLightUiBackground,
   paletteAccessibilityFlags,
 } from "@/lib/wcag-color-contrast";
 
-const PREVIEW_TRY_THEME_LAST_FONT_KEY =
-  "eventwizz:preview-try-theme:last-font";
+const PREVIEW_TRY_THEME_LAST_FONT_KEY = "eventwizz:preview-try-theme:last-font";
 const PREVIEW_TRY_THEME_LAST_COLOR_KEY =
   "eventwizz:preview-try-theme:last-color";
 
 const DEFAULT_SHEET_DESCRIPTION =
   "Tap a font or color to preview. Bonus palettes and pairs live here first—publish from Site Essentials when you are ready.";
+
+const HEADING_STYLE_OPTIONS: {
+  id: HeadingEmphasis;
+  label: string;
+  description: string;
+}[] = [
+  {
+    id: "uniform",
+    label: "Uniform",
+    description: "Whole line in display font + one color.",
+  },
+  {
+    id: "accent_tail",
+    label: "Trailing accent",
+    description:
+      "Last words of the title in brand color + display font (auto split).",
+  },
+  {
+    id: "full_primary",
+    label: "Full primary",
+    description: "Entire heading in brand color.",
+  },
+];
 
 function sortTryThemeOptionsFirst<T>(
   items: readonly T[],
@@ -120,9 +144,7 @@ export function PreviewThemeCustomizer({
     if (!open || typeof window === "undefined") return;
     try {
       setLastFontKey(sessionStorage.getItem(PREVIEW_TRY_THEME_LAST_FONT_KEY));
-      setLastColorKey(
-        sessionStorage.getItem(PREVIEW_TRY_THEME_LAST_COLOR_KEY),
-      );
+      setLastColorKey(sessionStorage.getItem(PREVIEW_TRY_THEME_LAST_COLOR_KEY));
     } catch {
       /* private mode */
     }
@@ -207,6 +229,20 @@ export function PreviewThemeCustomizer({
     [onValuesChange],
   );
 
+  const applyHeadingEmphasisStyle = useCallback(
+    (emphasis: HeadingEmphasis) => {
+      const cur = valuesRef.current;
+      onValuesChange({
+        ...cur,
+        typography: {
+          ...cur.typography,
+          headingEmphasis: emphasis,
+        },
+      });
+    },
+    [onValuesChange],
+  );
+
   const handleReset = () => {
     const snap = snapshotRef.current;
     if (snap) {
@@ -233,9 +269,7 @@ export function PreviewThemeCustomizer({
   const orderedColorGridOptions = useMemo(() => {
     let list = TRY_THEME_COLOR_GRID_OPTIONS;
     if (colorFilter === "dark") {
-      list = list.filter(
-        (o) => !isLightUiBackground(o.colors.background),
-      );
+      list = list.filter((o) => !isLightUiBackground(o.colors.background));
     } else if (colorFilter === "light") {
       list = list.filter((o) => isLightUiBackground(o.colors.background));
     }
@@ -251,6 +285,10 @@ export function PreviewThemeCustomizer({
   );
   const currentHeroValign = normalizeBannerHeadingValign(
     values.banner_heading_valign,
+  );
+
+  const currentHeadingEmphasis = normalizeHeadingEmphasis(
+    values.typography?.headingEmphasis,
   );
 
   return (
@@ -405,6 +443,45 @@ export function PreviewThemeCustomizer({
               </div>
 
               <div>
+                <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-500">
+                  Heading style
+                </h3>
+                <p className="mb-2 text-[10px] leading-snug text-slate-500">
+                  Trailing accent uses the last words of your banner title
+                  automatically (same idea as Site Essentials). Set a custom
+                  phrase there if you need an exact match.
+                </p>
+                <div className="flex flex-col gap-1.5">
+                  {HEADING_STYLE_OPTIONS.map(({ id, label, description }) => (
+                    <button
+                      key={id}
+                      type="button"
+                      aria-pressed={currentHeadingEmphasis === id}
+                      onClick={() => applyHeadingEmphasisStyle(id)}
+                      className={cn(
+                        "rounded-lg border px-3 py-2 text-left text-xs transition-colors",
+                        currentHeadingEmphasis === id
+                          ? "border-slate-900 bg-slate-900 text-white shadow-sm"
+                          : "border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50",
+                      )}
+                    >
+                      <span className="font-semibold">{label}</span>
+                      <span
+                        className={cn(
+                          "mt-0.5 block text-[10px] leading-snug",
+                          currentHeadingEmphasis === id
+                            ? "text-white/85"
+                            : "text-slate-500",
+                        )}
+                      >
+                        {description}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
                 <div className="mb-3 flex items-center justify-between">
                   <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-500">
                     Try other fonts
@@ -436,9 +513,7 @@ export function PreviewThemeCustomizer({
                     return (
                       <button
                         key={
-                          opt.source === "preset"
-                            ? opt.id
-                            : `extra-${opt.key}`
+                          opt.source === "preset" ? opt.id : `extra-${opt.key}`
                         }
                         type="button"
                         aria-current={active ? "true" : undefined}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -14,6 +14,7 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import { PasswordInput } from "@/components/ui/password-input";
 import {
   Select,
   SelectContent,
@@ -45,8 +46,6 @@ export default function EditStaffForm({
   hideLocationSelection = false,
 }: EditStaffFormProps) {
   const router = useRouter();
-  const [showPassword, setShowPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   // Fetch roles from the API
   const { data: rolesData, isLoading: isLoadingRoles } = useRoles();
@@ -531,21 +530,11 @@ export default function EditStaffForm({
                     <FormItem>
                       <FormLabel>New Password</FormLabel>
                       <FormControl>
-                        <div className="relative">
-                          <Input
-                            type={showPassword ? "text" : "password"}
-                            placeholder="Leave blank to keep current password"
-                            {...field}
-                          />
-                          <Button
-                            type="button"
-                            variant="event-ghost"
-                            className="absolute right-0 top-1 h-10 px-3 text-xs font-medium text-red-500"
-                            onClick={() => setShowPassword(!showPassword)}
-                          >
-                            {showPassword ? "Hide" : "Show"}
-                          </Button>
-                        </div>
+                        <PasswordInput
+                          placeholder="Leave blank to keep current password"
+                          ariaPasswordField="new password"
+                          {...field}
+                        />
                       </FormControl>
                       <FormDescription>
                         Must be at least 8 characters if provided.
@@ -562,23 +551,11 @@ export default function EditStaffForm({
                     <FormItem>
                       <FormLabel>Confirm New Password</FormLabel>
                       <FormControl>
-                        <div className="relative">
-                          <Input
-                            type={showConfirmPassword ? "text" : "password"}
-                            placeholder="Leave blank to keep current password"
-                            {...field}
-                          />
-                          <Button
-                            type="button"
-                            variant="event-ghost"
-                            className="absolute right-0 top-1 h-10 px-3 text-xs font-medium text-red-500"
-                            onClick={() =>
-                              setShowConfirmPassword(!showConfirmPassword)
-                            }
-                          >
-                            {showConfirmPassword ? "Hide" : "Show"}
-                          </Button>
-                        </div>
+                        <PasswordInput
+                          placeholder="Leave blank to keep current password"
+                          ariaPasswordField="confirm new password"
+                          {...field}
+                        />
                       </FormControl>
                       <FormDescription>
                         Re-enter the password to confirm.

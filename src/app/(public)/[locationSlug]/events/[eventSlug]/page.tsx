@@ -93,7 +93,12 @@ export default async function EventDetailPage(props: {
 
   return (
     <Hydrate state={dehydratedState}>
-      <EventDetailClient event={eventData} eventSlug={eventSlug} host={host} />
+      <EventDetailClient
+        event={eventData}
+        eventSlug={eventSlug}
+        host={host}
+        locationSlug={locationSlug}
+      />
     </Hydrate>
   );
 }

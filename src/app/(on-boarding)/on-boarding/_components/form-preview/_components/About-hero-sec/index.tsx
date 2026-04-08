@@ -1,4 +1,5 @@
 import { Button } from "@/components/ui/button";
+import { ArrowRight, Link } from "lucide-react";
 import React, { useState } from "react";
 
 type AboutHeroSectionProps = {
@@ -22,8 +23,8 @@ function AboutHeroSection({
   }, []);
   // Apply a CSS class based on loading state
   const containerClass = isLoaded
-    ? "w-full py-10 text-black transition-opacity duration-300 opacity-100"
-    : "w-full py-10 text-black opacity-0";
+    ? "w-full py-10 bg-[color:var(--color-background)] text-[color:var(--color-text)] transition-opacity duration-300 opacity-100"
+    : "w-full py-10 bg-[color:var(--color-background)] text-[color:var(--color-text)] opacity-0";
 
   return (
     <section className={containerClass}>
@@ -36,22 +37,22 @@ function AboutHeroSection({
             {title || "e.g. Experience more Stock Brook Events"}
           </h2>
         </div>
-        <div className="w-full md:w-1/2 px-4 md:px-10">
-          <div
-            className="text-sm prose prose-sm max-w-full break-words whitespace-normal overflow-hidden mb-4"
-            style={{ wordBreak: "break-word", overflowWrap: "break-word" }}
+        <div className="w-full flex flex-col gap-6">
+          <p
+            className="text-base md:text-lg text-[var(--color-text-dimmed)]"
             dangerouslySetInnerHTML={{
               __html:
                 description ||
                 "<p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Vestibulum ullamcorper feugiat fringilla.</p>",
             }}
           />
-          <Button
-            data-link={link || ""}
-            className="mt-4 mb-3 inline-block border border-foreground text-sm rounded-full px-4 py-2"
+          <Link
+            href={link || ""}
+            className="inline-flex items-center font-medium border-b border-[var(--color-text)]/35 pb-1 hover:text-[color:var(--color-primary)] hover:border-[color:var(--color-primary)] transition-colors w-fit"
           >
-            {link_title ? link_title : "View all our events"}
-          </Button>
+            {link_title ? link_title : "e.g. Learn more"}
+            <ArrowRight className="ml-2 h-4 w-4" />
+          </Link>
         </div>
       </div>
     </section>

@@ -33,12 +33,13 @@ function shouldShowSectionEdit(
   sectionIndex: number,
   sectionId: string,
 ) {
+  // When all sections are approved the form is fully unlocked for direct editing —
+  // an explicit Edit button adds no value and creates confusion.
+  if (guided.allSectionsApproved) return false;
   const isApproved = guided.approvedSections.has(sectionId);
   const isActive = guided.currentSectionIndex === sectionIndex;
-  return (
-    isApproved &&
-    (!isActive || guided.allSectionsApproved)
-  );
+  // Show only for approved sections that are NOT the current active one.
+  return isApproved && !isActive;
 }
 
 /** Icon + label control only (e.g. align with an existing title row). */

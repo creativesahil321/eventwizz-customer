@@ -1,6 +1,7 @@
 "use client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { PasswordInput } from "@/components/ui/password-input";
 import { Label, Small } from "@/components/ui/typography";
 import { ChevronRight } from "lucide-react";
 import React, { useEffect } from "react";
@@ -20,7 +21,6 @@ export default function ResetPasswordForm() {
   const searchParams = useSearchParams();
   const [loading, setLoading] = React.useState(false);
   const [token, setToken] = React.useState<string | null>(null);
-
   const {
     register,
     handleSubmit,
@@ -102,10 +102,10 @@ export default function ResetPasswordForm() {
 
             <div className="flex flex-col justify-start space-y-2 mb-4">
               <Label className="text-left">Password</Label>
-              <Input
+              <PasswordInput
                 id="password"
-                type="password"
                 placeholder="******"
+                autoComplete="new-password"
                 {...register("password")}
                 className="border border-gray-400 rounded-sm"
               />
@@ -118,10 +118,11 @@ export default function ResetPasswordForm() {
 
             <div className="flex flex-col justify-start space-y-2 mb-4">
               <Label className="text-left">Confirm Password</Label>
-              <Input
+              <PasswordInput
                 id="confirm_password"
-                type="password"
                 placeholder="******"
+                autoComplete="new-password"
+                ariaPasswordField="confirm password"
                 {...register("confirm_password")}
                 className="border border-gray-400 rounded-sm"
               />

@@ -8,15 +8,13 @@ import {
   CarouselNext,
 } from "@/components/ui/carousel";
 
-import Link from "next/link";
-import { ChevronRight, Loader2 } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { getEventCardDateLabel } from "../event-card-utils";
+import { LocationEventCard } from "../location-event-card";
 import { useMemo, useContext, useState } from "react";
 import { cn } from "@/lib/utils";
 import { ServerContext } from "@/lib/server-context";
 import { ThemeSchema } from "@/types/theme.types";
 import { Event } from "@/services/common/events/type";
-import { addCacheBusting } from "@/lib/image-utils";
 
 // Sample event data - using local image assets
 const eventImages = [
@@ -33,11 +31,13 @@ import {
   formatMoneyCompact,
   resolveCurrencySymbol,
 } from "@/lib/currency-format";
+import { eventCarouselNavButtonClass } from "../event-carousel-classes";
 
 export default function UpcomingEvents({
   events: apiEvents,
   sectionTitle,
   locationSlug,
+  locationLabel,
 }: EventComponentProps) {
   const [pendingEventSlug, setPendingEventSlug] = useState<string | null>(null);
   const isSitePreview = useIsPreviewMode();
@@ -56,49 +56,46 @@ export default function UpcomingEvents({
     return apiEvents.map((event) => ({
       title: event.name || "",
       price:
-        event.lowest_price != null && event.lowest_price !== ""
+        event.lowest_price != null && !Number.isNaN(Number(event.lowest_price))
           ? formatMoneyCompact(Number(event.lowest_price), currencySym)
           : null,
-      buttonText: "View Event",
+      dateLabel: getEventCardDateLabel(event),
       image: event.banner_image || eventImages[0],
       slug: event.slug || "",
     }));
   }
 
   // Calculate responsive layout based on event count
-  const { itemsPerView, itemWidth, showNavigationDesktop } = useMemo(() => {
+  const { itemsPerView, showNavigationDesktop } = useMemo(() => {
     const count = events.length;
 
-    // Default configuration for 5+ events
     let config = {
-      itemsPerView: "md:basis-1/2 lg:basis-1/4",
-      itemWidth: "w-full",
+      itemsPerView:
+        "shrink-0 basis-[min(100%,11rem)] pl-4 sm:basis-[47%] md:basis-[31%] lg:basis-[22.5%]",
       showNavigationDesktop: true,
     };
 
     if (count === 1) {
       config = {
-        itemsPerView: "basis-full",
-        itemWidth: "max-w-md mx-auto w-full",
+        itemsPerView: "basis-full pl-4",
         showNavigationDesktop: false,
       };
     } else if (count === 2) {
       config = {
-        itemsPerView: "md:basis-1/2",
-        itemWidth: "w-full max-w-md mx-auto",
-        showNavigationDesktop: false, // Hide navigation for 2 events on desktop
+        itemsPerView: "shrink-0 basis-full pl-4 sm:basis-[48%]",
+        showNavigationDesktop: false,
       };
     } else if (count === 3) {
       config = {
-        itemsPerView: "md:basis-1/3",
-        itemWidth: "w-full max-w-sm mx-auto",
-        showNavigationDesktop: false, // Hide navigation for 3 events on desktop
+        itemsPerView:
+          "shrink-0 basis-full pl-4 sm:basis-[48%] md:basis-[31%]",
+        showNavigationDesktop: false,
       };
     } else if (count === 4) {
       config = {
-        itemsPerView: "md:basis-1/2 lg:basis-1/4",
-        itemWidth: "w-full",
-        showNavigationDesktop: false, // Hide navigation for 4 events on desktop
+        itemsPerView:
+          "shrink-0 basis-[min(100%,11rem)] pl-4 sm:basis-[48%] lg:basis-1/4",
+        showNavigationDesktop: false,
       };
     }
 
@@ -117,10 +114,10 @@ export default function UpcomingEvents({
     }
 
     return (
-      <section className="w-full py-20 bg-transparent">
-        <div className="container mx-auto px-4">
-          <div className="w-full text-center mb-8">
-            <h2 className="text-3xl md:text-4xl font-bold">
+      <section className="w-full bg-transparent py-20 text-[var(--color-text)]">
+        <div className="container mx-auto max-w-7xl px-4">
+          <div className="mb-8 w-full text-left">
+            <h2 className="text-2xl font-black tracking-tight md:text-3xl">
               {sectionTitleText}
             </h2>
           </div>
@@ -195,62 +192,31 @@ export default function UpcomingEvents({
     );
   }
 
-  // Special horizontal layout for single event
   if (events.length === 1) {
     const event = events[0];
     return (
-      <section className="w-full py-12 bg-transparent">
-        <div className="container mx-auto px-4">
-          <div className="flex flex-col items-center mb-8">
-            <h2 className="text-3xl md:text-4xl font-bold mb-4">
+      <section
+        id="upcoming-events"
+        className="w-full bg-transparent py-20 text-[var(--color-text)]"
+      >
+        <div className="container mx-auto max-w-7xl px-4">
+          <div className="mb-8 w-full text-left">
+            <span className="mb-1 block text-xs font-bold uppercase tracking-[0.2em] text-[color:var(--color-primary)]">
+              Plan ahead
+            </span>
+            <h2 className="text-2xl font-black tracking-tight text-[var(--color-text)] md:text-3xl">
               {sectionTitleText}
             </h2>
-            <div className="w-full flex justify-end">
-              <a
-                href="#"
-                className="text-sm font-medium flex items-center text-[var(--color-text)] hover:text-[var(--color-primary)]"
-              >
-                View all events <ChevronRight className="h-4 w-4 ml-1" />
-              </a>
-            </div>
           </div>
-
-          <div className="bg-[var(--color-surface)] text-[var(--color-on-surface)] rounded-2xl shadow-sm border border-[var(--color-on-surface)]/10 overflow-hidden">
-            <div className="flex flex-col md:flex-row">
-              {/* Image section - takes 40% on desktop */}
-              <div className="md:w-2/5 relative">
-                <div className="aspect-[4/3] md:aspect-auto md:h-full w-full">
-                  <img
-                    src={addCacheBusting(event.image)}
-                    alt={event.title}
-                    className="w-full h-full object-cover"
-                  />
-                </div>
-              </div>
-
-              {/* Content */}
-              <div className="p-8 md:w-3/5">
-                <h3 className="text-3xl font-bold text-[var(--color-on-surface)]">
-                  {event.title}
-                </h3>
-                <p className="text-transparent bg-clip-text bg-gradient-to-r from-[var(--color-primary)] to-[var(--color-primary)] text-2xl font-extrabold mt-2">
-                  {event.price === null ? "Price revealed soon" : event.price}
-                </p>
-                <p className="text-[var(--color-on-surface)]/85 mt-4">
-                  Join us for this amazing event! Experience the excitement and
-                  fun with friends and family. Don&apos;t miss out on this
-                  opportunity to create lasting memories.
-                </p>
-                <Link href={`/${locationSlug}/events/${event.slug}`} passHref>
-                  <Button
-                    variant="event-primary"
-                    className="mt-6 px-6 py-3 rounded-full"
-                  >
-                    {event.buttonText}
-                  </Button>
-                </Link>
-              </div>
-            </div>
+          <div className="max-w-[13rem] sm:max-w-[14rem]">
+            <LocationEventCard
+              event={event}
+              locationSlug={locationSlug || ""}
+              locationLabel={locationLabel}
+              isPending={pendingEventSlug === event.slug}
+              onNavigateStart={() => setPendingEventSlug(event.slug)}
+              imageFallback={eventImages[0]}
+            />
           </div>
         </div>
       </section>
@@ -258,118 +224,63 @@ export default function UpcomingEvents({
   }
 
   return (
-    <section className="w-full py-20 bg-transparent">
-      <div
-        className={cn(
-          "container mx-auto px-4",
-          events.length === 2 && "max-w-5xl", // Constrain container width for 2 cards
-          events.length === 3 && "max-w-6xl", // Constrain container width for 3 cards
-        )}
-      >
-        <div className="w-full text-center mb-10">
-          <span className="inline-block mb-2 text-xs font-semibold tracking-[0.18em] uppercase text-[var(--color-text-dimmed)]">
+    <section
+      id="upcoming-events"
+      className="w-full bg-transparent py-20 text-[var(--color-text)]"
+    >
+      <div className="container mx-auto max-w-7xl px-4">
+        <div className="mb-8 w-full text-left">
+          <span className="mb-1 block text-xs font-bold uppercase tracking-[0.2em] text-[color:var(--color-primary)]">
             Plan ahead
           </span>
-          <h2 className="text-3xl md:text-4xl font-bold">{sectionTitleText}</h2>
+          <h2 className="text-2xl font-black tracking-tight text-[var(--color-text)] md:text-3xl">
+            {sectionTitleText}
+          </h2>
         </div>
-        <div
-          className={cn(
-            "w-full relative",
-            events.length === 2 ? "max-w-4xl mx-auto px-4" : "",
-            events.length === 3 ? "max-w-5xl mx-auto px-2" : "",
-            events.length === 1 && "max-w-lg mx-auto",
-          )}
-        >
-          <Carousel className="relative">
+        <div className="relative w-full">
+          <Carousel
+            opts={{ align: "start", loop: false }}
+            className="relative w-full"
+          >
             <CarouselPrevious
-              className={cn(
-                "absolute top-1/2 transform -translate-y-1/2 z-10 bg-white shadow-lg rounded-full border-2 border-gray-300 flex items-center justify-center",
-                events.length === 2 ? "-left-3 md:-left-6" : "",
-                events.length === 3 ? "-left-3 md:-left-5" : "",
-                events.length >= 4 && "-left-5 md:-left-10",
-                // Always show on mobile, conditionally hide on desktop based on event count
-                !showNavigationDesktop && "md:hidden",
+              className={eventCarouselNavButtonClass(
+                cn(
+                  "absolute top-1/2 z-10 -translate-y-1/2",
+                  events.length === 2 ? "-left-1 md:-left-2" : "",
+                  events.length === 3 ? "-left-1 md:-left-2" : "",
+                  events.length >= 4 && "-left-1 md:-left-3",
+                  !showNavigationDesktop && "md:hidden",
+                ),
               )}
             />
-            <CarouselContent
-              className={cn(
-                "-ml-4",
-                events.length === 2 ? "md:pl-2 md:pr-2" : "",
-                events.length === 3
-                  ? "md:pl-1 md:pr-1 flex justify-between"
-                  : "",
-              )}
-            >
+            <CarouselContent className="-ml-4 flex">
               {events.map((data, index) => (
                 <CarouselItem
-                  className={cn(
-                    "pl-4",
-                    itemsPerView,
-                    events.length === 2 ? "md:basis-1/2 px-1 md:px-3" : "",
-                    events.length === 3 ? "md:basis-1/3 px-1 md:px-2" : "",
-                  )}
+                  className={cn(itemsPerView)}
                   key={index}
                 >
-                  <div className={cn("p-2 h-full", itemWidth)}>
-                    <div className="overflow-hidden bg-[var(--color-surface)] text-[var(--color-on-surface)] rounded-xl border border-[var(--color-secondary-foreground)]/15 shadow-sm hover:shadow-md transition-shadow duration-300 h-full flex flex-col">
-                      <div className="relative aspect-[3/4] w-full overflow-hidden flex-shrink-0">
-                        <img
-                          src={addCacheBusting(data.image)}
-                          alt={data.title}
-                          className="w-full h-full object-cover transition-transform duration-300 hover:scale-105"
-                          onError={(e) => {
-                            const target = e.currentTarget;
-                            if (target.dataset.fallbackApplied === "true")
-                              return;
-                            target.dataset.fallbackApplied = "true";
-                            target.src =
-                              eventImages[index % eventImages.length];
-                          }}
-                        />
-                      </div>
-                      <div className="p-4 relative text-[var(--color-on-surface)] flex-1 flex flex-col">
-                        <h3 className="pb-2 text-base font-bold line-clamp-2 min-h-[2.5rem]">
-                          {data.title}
-                        </h3>
-                        <p className="font-medium mb-3 text-sm min-h-[1.25rem]">
-                          {data.price}
-                        </p>
-                        <div className="mt-auto">
-                          <Link
-                            href={`/${locationSlug}/events/${data.slug}`}
-                            passHref
-                            onClick={() => setPendingEventSlug(data.slug)}
-                          >
-                            <Button
-                              variant="event-outline"
-                              className="w-full"
-                              disabled={pendingEventSlug === data.slug}
-                            >
-                              {pendingEventSlug === data.slug ? (
-                                <>
-                                  <Loader2 className="h-4 w-4 animate-spin" />
-                                  Opening...
-                                </>
-                              ) : (
-                                data.buttonText
-                              )}
-                            </Button>
-                          </Link>
-                        </div>
-                      </div>
-                    </div>
+                  <div className="h-full w-full pb-1 pt-0.5">
+                    <LocationEventCard
+                      event={data}
+                      locationSlug={locationSlug || ""}
+                      locationLabel={locationLabel}
+                      isPending={pendingEventSlug === data.slug}
+                      onNavigateStart={() => setPendingEventSlug(data.slug)}
+                      imageFallback={eventImages[index % eventImages.length]}
+                    />
                   </div>
                 </CarouselItem>
               ))}
             </CarouselContent>
             <CarouselNext
-              className={cn(
-                "absolute top-1/2 transform -translate-y-1/2 z-10 bg-white shadow-lg rounded-full border-2 border-gray-300 flex items-center justify-center",
-                events.length === 2 ? "-right-3 md:-right-6" : "",
-                events.length === 3 ? "-right-3 md:-right-5" : "",
-                events.length >= 4 && "-right-5 md:-right-10",
-                // Always show on mobile, conditionally hide on desktop based on event count
-                !showNavigationDesktop && "md:hidden",
+              className={eventCarouselNavButtonClass(
+                cn(
+                  "absolute top-1/2 z-10 -translate-y-1/2",
+                  events.length === 2 ? "-right-1 md:-right-2" : "",
+                  events.length === 3 ? "-right-1 md:-right-2" : "",
+                  events.length >= 4 && "-right-1 md:-right-3",
+                  !showNavigationDesktop && "md:hidden",
+                ),
               )}
             />
           </Carousel>

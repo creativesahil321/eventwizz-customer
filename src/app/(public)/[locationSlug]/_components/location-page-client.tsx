@@ -56,11 +56,13 @@ export default function LocationPageClient({
           events={latestEvents}
           sectionTitle={locationData.event_title_1 || "Popular Events"}
           locationSlug={locationSlug}
+          locationLabel={locationData.city ?? null}
         />
         <UpcomingEvents
           events={upcomingEvents}
           sectionTitle={locationData.event_title_2 || "Upcoming Events"}
           locationSlug={locationSlug}
+          locationLabel={locationData.city ?? null}
         />
         <RecentEventsGlimpse
           galleryImages={locationData.event_gallery || []}
@@ -69,11 +71,7 @@ export default function LocationPageClient({
           }
         />
       </div>
-      <ContactFormSection
-        locationAddress={locationData.address || ""}
-        longitude={Number(locationData.longitude) || 0}
-        latitude={Number(locationData.latitude) || 0}
-      />
+      <ContactFormSection />
       <FooterSection />
     </>
   );

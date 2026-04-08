@@ -361,6 +361,9 @@ export function EventPreview({
           about_event_heading={s1?.about_event_heading || ""}
           about_event_sub_heading={s1?.about_event_sub_heading || ""}
           about_event_description={s1?.about_event_description || ""}
+          headingEmphasis={headingEmphasisForHero}
+          aboutHeadingAccentHint={heroAccentHint}
+          aboutHeadingAlign={bannerAlign}
         />
 
         <Timeline

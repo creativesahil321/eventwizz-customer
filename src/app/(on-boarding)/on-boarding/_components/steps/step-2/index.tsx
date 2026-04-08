@@ -25,10 +25,7 @@ import { TiptapEditor } from "@/components/ui/tiptap-editor";
 import { useSession } from "next-auth/react";
 import { addCacheBusting } from "@/lib/image-utils";
 import { cn } from "@/lib/utils";
-import {
-  BANNER_HEADING_MAX_WORDS,
-  countWords,
-} from "@/lib/word-count";
+import { BANNER_HEADING_MAX_WORDS, countWords } from "@/lib/word-count";
 import { useGuidedOnboardingSections } from "../../../_lib/hooks/use-guided-onboarding-sections";
 import type { GuidedSectionConfig } from "../../../_lib/hooks/use-guided-onboarding-sections";
 import { GuidedMultiSectionBottomActions } from "../../guided-section-chips";
@@ -122,15 +119,15 @@ export default function StepTwo() {
           const cv = form.getValues("cover_image");
           const hasLogo = Boolean(
             logoUrl ||
-              logoFiles.length > 0 ||
-              lg instanceof File ||
-              (typeof lg === "string" && lg.length > 0),
+            logoFiles.length > 0 ||
+            lg instanceof File ||
+            (typeof lg === "string" && lg.length > 0),
           );
           const hasCover = Boolean(
             coverUrl ||
-              coverFiles.length > 0 ||
-              cv instanceof File ||
-              (typeof cv === "string" && cv.length > 0),
+            coverFiles.length > 0 ||
+            cv instanceof File ||
+            (typeof cv === "string" && cv.length > 0),
           );
           if (!hasLogo || !hasCover) {
             toast.error("Please upload both a logo and a landing page image.");
@@ -159,15 +156,15 @@ export default function StepTwo() {
     const cv = form.getValues("cover_image");
     const hasLogo = Boolean(
       logoUrl ||
-        logoFiles.length > 0 ||
-        lg instanceof File ||
-        (typeof lg === "string" && lg.length > 0),
+      logoFiles.length > 0 ||
+      lg instanceof File ||
+      (typeof lg === "string" && lg.length > 0),
     );
     const hasCover = Boolean(
       coverUrl ||
-        coverFiles.length > 0 ||
-        cv instanceof File ||
-        (typeof cv === "string" && cv.length > 0),
+      coverFiles.length > 0 ||
+      cv instanceof File ||
+      (typeof cv === "string" && cv.length > 0),
     );
     if (!hasLogo || !hasCover) {
       toast.error("Please upload both a logo and a landing page image.");
@@ -187,7 +184,7 @@ export default function StepTwo() {
 
   const handleLogoFileChange = (
     files: File[],
-    onChange: (file: File | undefined) => void
+    onChange: (file: File | undefined) => void,
   ) => {
     if (!files.length) return;
 
@@ -212,7 +209,7 @@ export default function StepTwo() {
 
   const handleCoverFileChange = (
     files: File[],
-    onChange: (file: File | undefined) => void
+    onChange: (file: File | undefined) => void,
   ) => {
     if (!files.length) return;
 
@@ -344,12 +341,11 @@ export default function StepTwo() {
 
         setActiveStep(3);
 
-        Promise.all([
-          updateSession({ on_boarding_step: 3 }),
-          save(),
-        ]).catch((error) => {
-          console.error("Background save error:", error);
-        });
+        Promise.all([updateSession({ on_boarding_step: 3 }), save()]).catch(
+          (error) => {
+            console.error("Background save error:", error);
+          },
+        );
       }
     } catch {
       console.error("An error occurred. Please try again.");
@@ -411,114 +407,122 @@ export default function StepTwo() {
                       "pointer-events-none",
                   )}
                 >
-              <FormField
-                control={form.control}
-                name="logo"
-                render={({ field }) => (
-                  <FormItem>
-                    <OnboardingFieldGroupTitle>
-                      Upload Your Logo
-                    </OnboardingFieldGroupTitle>
-                    <FormControl>
-                      <div
-                        className="flex flex-col justify-center items-center h-full space-y-2 bg-white/5 p-4 rounded-lg border border-white/10"
-                        onClick={() => handleFieldFocus("logo")}
-                      >
-                        {logoUrl ? (
-                          <div className="relative w-full">
-                            <img
-                              src={addCacheBusting(logoUrl)}
-                              alt="Logo"
-                              className="max-h-40 object-contain mx-auto mb-2"
-                              width={100}
-                              height={100}
-                            />
-                            <Button
-                              type="button"
-                              variant="destructive"
-                              size="sm"
-                              onClick={() => handleRemoveLogo(field.onChange)}
-                              className="mt-2"
-                            >
-                              Remove
-                            </Button>
+                  <FormField
+                    control={form.control}
+                    name="logo"
+                    render={({ field }) => (
+                      <FormItem>
+                        <OnboardingFieldGroupTitle>
+                          Upload Your Logo
+                        </OnboardingFieldGroupTitle>
+                        <FormControl>
+                          <div
+                            className="flex flex-col justify-center items-center h-full space-y-2 bg-white/5 p-4 rounded-lg border border-white/10"
+                            onClick={() => handleFieldFocus("logo")}
+                          >
+                            {logoUrl ? (
+                              <div className="relative w-full">
+                                <img
+                                  src={addCacheBusting(logoUrl)}
+                                  alt="Logo"
+                                  className="max-h-40 object-contain mx-auto mb-2"
+                                  width={100}
+                                  height={100}
+                                />
+                                <Button
+                                  type="button"
+                                  variant="destructive"
+                                  size="sm"
+                                  onClick={() =>
+                                    handleRemoveLogo(field.onChange)
+                                  }
+                                  className="mt-2"
+                                >
+                                  Remove
+                                </Button>
+                              </div>
+                            ) : (
+                              <FileUploader
+                                value={logoFiles}
+                                onValueChange={(files) =>
+                                  handleLogoFileChange(files, field.onChange)
+                                }
+                                maxFileCount={1}
+                                maxSize={1 * 1024 * 1024}
+                                onRemove={() =>
+                                  handleRemoveLogo(field.onChange)
+                                }
+                                className="border-dashed"
+                              />
+                            )}
                           </div>
-                        ) : (
-                          <FileUploader
-                            value={logoFiles}
-                            onValueChange={(files) =>
-                              handleLogoFileChange(files, field.onChange)
-                            }
-                            maxFileCount={1}
-                            maxSize={1 * 1024 * 1024}
-                            onRemove={() => handleRemoveLogo(field.onChange)}
-                            className="border-dashed"
-                          />
-                        )}
-                      </div>
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="cover_image"
-                render={({ field }) => (
-                  <FormItem>
-                    <OnboardingFieldGroupTitle>
-                      Landing Page Image
-                    </OnboardingFieldGroupTitle>
-                    <FormControl>
-                      <div
-                        className="flex flex-col justify-center items-center h-full space-y-2 bg-white/5 p-4 rounded-lg border border-white/10"
-                        onClick={() => handleFieldFocus("cover_image")}
-                      >
-                        {coverUrl ? (
-                          <div className="relative w-full">
-                            <img
-                              src={addCacheBusting(coverUrl)}
-                              alt="Cover Image"
-                              className="max-h-40 object-contain mx-auto mb-2"
-                              width={100}
-                              height={100}
-                            />
-                            <Button
-                              type="button"
-                              variant="destructive"
-                              size="sm"
-                              onClick={() => handleRemoveCover(field.onChange)}
-                              className="mt-2"
-                            >
-                              Remove
-                            </Button>
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="cover_image"
+                    render={({ field }) => (
+                      <FormItem>
+                        <OnboardingFieldGroupTitle>
+                          Landing Page Image
+                        </OnboardingFieldGroupTitle>
+                        <FormControl>
+                          <div
+                            className="flex flex-col justify-center items-center h-full space-y-2 bg-white/5 p-4 rounded-lg border border-white/10"
+                            onClick={() => handleFieldFocus("cover_image")}
+                          >
+                            {coverUrl ? (
+                              <div className="relative w-full">
+                                <img
+                                  src={addCacheBusting(coverUrl)}
+                                  alt="Cover Image"
+                                  className="max-h-40 object-contain mx-auto mb-2"
+                                  width={100}
+                                  height={100}
+                                />
+                                <Button
+                                  type="button"
+                                  variant="destructive"
+                                  size="sm"
+                                  onClick={() =>
+                                    handleRemoveCover(field.onChange)
+                                  }
+                                  className="mt-2"
+                                >
+                                  Remove
+                                </Button>
+                              </div>
+                            ) : (
+                              <FileUploader
+                                value={coverFiles}
+                                onValueChange={(files) =>
+                                  handleCoverFileChange(files, field.onChange)
+                                }
+                                maxFileCount={1}
+                                maxSize={1 * 1024 * 1024}
+                                onRemove={() =>
+                                  handleRemoveCover(field.onChange)
+                                }
+                                className="border-dashed"
+                                enableCropping={true}
+                                aspectRatio={16 / 9}
+                                cropConfig={{
+                                  maxSizeKB: 500,
+                                  quality: 0.9,
+                                  maxWidth: 1920,
+                                  maxHeight: 1080,
+                                }}
+                              />
+                            )}
                           </div>
-                        ) : (
-                          <FileUploader
-                            value={coverFiles}
-                            onValueChange={(files) =>
-                              handleCoverFileChange(files, field.onChange)
-                            }
-                            maxFileCount={1}
-                            maxSize={1 * 1024 * 1024}
-                            onRemove={() => handleRemoveCover(field.onChange)}
-                            className="border-dashed"
-                            enableCropping={true}
-                            aspectRatio={16 / 9}
-                            cropConfig={{
-                              maxSizeKB: 500,
-                              quality: 0.9,
-                              maxWidth: 1920,
-                              maxHeight: 1080,
-                            }}
-                          />
-                        )}
-                      </div>
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
                   <GuidedSectionActionFooter
                     isActive={guided.currentSectionIndex === 0}
                     hideSectionMeta
@@ -555,92 +559,95 @@ export default function StepTwo() {
                       "pointer-events-none",
                   )}
                 >
-              <FormField
-                control={form.control}
-                name="banner_heading"
-                render={({ field }) => {
-                  const text = typeof field.value === "string" ? field.value : "";
-                  const wordCount = countWords(text);
-                  return (
-                    <FormItem>
-                      <OnboardingFieldGroupTitle>
-                        Add a Banner Heading
-                      </OnboardingFieldGroupTitle>
-                      <FormControl>
-                        <Input
-                          placeholder="Landing Page Banner Heading"
-                          {...field}
-                          onFocus={() => handleFieldFocus("banner_heading")}
-                          onChange={(e) => {
-                            field.onChange(e);
-                            globalForm.setValue(
-                              "stepTwo.banner_heading",
-                              e.target.value
-                            );
-                          }}
-                        />
-                      </FormControl>
-                      <div className="text-xs text-muted-foreground mt-1">
-                        <span
-                          className={
-                            wordCount > BANNER_HEADING_MAX_WORDS
-                              ? "text-destructive"
-                              : ""
-                          }
-                        >
-                          {wordCount}/{BANNER_HEADING_MAX_WORDS} words
-                        </span>
-                      </div>
-                      <FormMessage />
-                    </FormItem>
-                  );
-                }}
-              />
-              <FormField
-                control={form.control}
-                name="banner_sub_heading"
-                render={({ field }) => {
-                  const currentLength = field.value?.length || 0;
-                  const maxLength = 80;
-                  return (
-                    <FormItem>
-                      <OnboardingFieldGroupTitle>
-                        Add a Banner Sub-Heading
-                      </OnboardingFieldGroupTitle>
-                      <FormControl>
-                        <Input
-                          placeholder="e.g. Experience more Stock Brook Events"
-                          {...field}
-                          maxLength={maxLength}
-                          onFocus={() => handleFieldFocus("banner_sub_heading")}
-                          onChange={(e) => {
-                            field.onChange(e);
-                            globalForm.setValue(
-                              "stepTwo.banner_sub_heading",
-                              e.target.value
-                            );
-                          }}
-                        />
-                      </FormControl>
-                      <div className="text-xs text-muted-foreground mt-1">
-                        <span
-                          className={
-                            currentLength > maxLength ? "text-destructive" : ""
-                          }
-                        >
-                          {currentLength}/{maxLength} characters
-                        </span>
-                      </div>
-                      <FormMessage />
-                    </FormItem>
-                  );
-                }}
-              />
+                  <FormField
+                    control={form.control}
+                    name="banner_heading"
+                    render={({ field }) => {
+                      const text =
+                        typeof field.value === "string" ? field.value : "";
+                      const wordCount = countWords(text);
+                      return (
+                        <FormItem>
+                          <OnboardingFieldGroupTitle>
+                            Add a Banner Heading
+                          </OnboardingFieldGroupTitle>
+                          <FormControl>
+                            <Input
+                              placeholder="Landing Page Banner Heading"
+                              {...field}
+                              onFocus={() => handleFieldFocus("banner_heading")}
+                              onChange={(e) => {
+                                field.onChange(e);
+                                globalForm.setValue(
+                                  "stepTwo.banner_heading",
+                                  e.target.value,
+                                );
+                              }}
+                            />
+                          </FormControl>
+                          <div className="text-xs text-muted-foreground mt-1">
+                            <span
+                              className={
+                                wordCount > BANNER_HEADING_MAX_WORDS
+                                  ? "text-destructive"
+                                  : ""
+                              }
+                            >
+                              {wordCount}/{BANNER_HEADING_MAX_WORDS} words
+                            </span>
+                          </div>
+                          <FormMessage />
+                        </FormItem>
+                      );
+                    }}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="banner_sub_heading"
+                    render={({ field }) => {
+                      const currentLength = field.value?.length || 0;
+                      const maxLength = 80;
+                      return (
+                        <FormItem>
+                          <OnboardingFieldGroupTitle>
+                            Add a Banner Sub-Heading
+                          </OnboardingFieldGroupTitle>
+                          <FormControl>
+                            <Input
+                              placeholder="e.g. Experience more Stock Brook Events"
+                              {...field}
+                              maxLength={maxLength}
+                              onFocus={() =>
+                                handleFieldFocus("banner_sub_heading")
+                              }
+                              onChange={(e) => {
+                                field.onChange(e);
+                                globalForm.setValue(
+                                  "stepTwo.banner_sub_heading",
+                                  e.target.value,
+                                );
+                              }}
+                            />
+                          </FormControl>
+                          <div className="text-xs text-muted-foreground mt-1">
+                            <span
+                              className={
+                                currentLength > maxLength
+                                  ? "text-destructive"
+                                  : ""
+                              }
+                            >
+                              {currentLength}/{maxLength} characters
+                            </span>
+                          </div>
+                          <FormMessage />
+                        </FormItem>
+                      );
+                    }}
+                  />
                   <GuidedSectionActionFooter
                     isActive={guided.currentSectionIndex === 1}
-                    sectionLabel={
-                      guided.sectionFlow[1]?.label ?? "Banner"
-                    }
+                    sectionLabel={guided.sectionFlow[1]?.label ?? "Banner"}
                     sectionProgress={`2 / ${guided.sectionFlow.length}`}
                   >
                     <GuidedSectionCoreActions guided={guided} />
@@ -675,126 +682,133 @@ export default function StepTwo() {
                       "pointer-events-none",
                   )}
                 >
-              <FormField
-                control={form.control}
-                name="about_title"
-                render={({ field }) => {
-                  const currentLength = field.value?.length || 0;
-                  const maxLength = 40;
-                  return (
-                    <FormItem>
-                      <OnboardingFieldGroupTitle>
-                        Add a Title for Your Page
-                      </OnboardingFieldGroupTitle>
-                      <FormControl>
-                        <Input
-                          placeholder="e.g. Experience more Stock Brook Events or Stock Brook Events"
-                          {...field}
-                          maxLength={maxLength}
-                          onFocus={() => handleFieldFocus("about_title")}
-                          onChange={(e) => {
-                            field.onChange(e);
-                            globalForm.setValue(
-                              "stepTwo.about_title",
-                              e.target.value
-                            );
-                          }}
-                        />
-                      </FormControl>
-                      <div className="text-xs text-muted-foreground mt-1">
-                        <span
-                          className={
-                            currentLength > maxLength ? "text-destructive" : ""
-                          }
-                        >
-                          {currentLength}/{maxLength} characters
-                        </span>
-                      </div>
-                      <FormMessage />
-                    </FormItem>
-                  );
-                }}
-              />
-              <FormField
-                control={form.control}
-                name="about_description"
-                render={({ field }) => (
-                  <FormItem>
-                    <div className="flex items-center justify-between">
-                      <OnboardingFieldGroupTitle>
-                        Write a Short Description
-                      </OnboardingFieldGroupTitle>
-                    </div>
-                    <FormControl>
-                      <TiptapEditor
-                        value={field.value}
-                        onChange={(value) => {
-                          field.onChange(value);
-                          globalForm.setValue(
-                            "stepTwo.about_description",
-                            value
-                          );
-                        }}
-                        placeholder="Write a compelling description about your business..."
-                        maxLength={340}
-                        maxWords={50}
-                        className="min-h-[120px] w-full overflow-hidden max-w-[300px]"
-                        showAIButton={true}
-                        wrapText={true}
-                        aiContext={{
-                          banner_heading:
-                            form.watch("banner_heading") || undefined,
-                          banner_sub_heading:
-                            form.watch("banner_sub_heading") || undefined,
-                          title: form.watch("about_title") || undefined,
-                          ctaText: form.watch("about_link_title") || undefined,
-                        }}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="about_link_title"
-                render={({ field }) => {
-                  const currentLength = field.value?.length || 0;
-                  const maxLength = 18;
-                  return (
-                    <FormItem>
-                      <OnboardingFieldGroupTitle>
-                        Button Text
-                      </OnboardingFieldGroupTitle>
-                      <FormControl>
-                        <Input
-                          placeholder="Explore Link Text"
-                          {...field}
-                          maxLength={maxLength}
-                          onFocus={() => handleFieldFocus("about_link_title")}
-                          onChange={(e) => {
-                            field.onChange(e);
-                            globalForm.setValue(
-                              "stepTwo.about_link_title",
-                              e.target.value
-                            );
-                          }}
-                        />
-                      </FormControl>
-                      <div className="text-xs text-muted-foreground mt-1">
-                        <span
-                          className={
-                            currentLength > maxLength ? "text-destructive" : ""
-                          }
-                        >
-                          {currentLength}/{maxLength} characters
-                        </span>
-                      </div>
-                      <FormMessage />
-                    </FormItem>
-                  );
-                }}
-              />
+                  <FormField
+                    control={form.control}
+                    name="about_title"
+                    render={({ field }) => {
+                      const currentLength = field.value?.length || 0;
+                      const maxLength = 40;
+                      return (
+                        <FormItem>
+                          <OnboardingFieldGroupTitle>
+                            Add a Title for Your Page
+                          </OnboardingFieldGroupTitle>
+                          <FormControl>
+                            <Input
+                              placeholder="e.g. Experience more Stock Brook Events or Stock Brook Events"
+                              {...field}
+                              maxLength={maxLength}
+                              onFocus={() => handleFieldFocus("about_title")}
+                              onChange={(e) => {
+                                field.onChange(e);
+                                globalForm.setValue(
+                                  "stepTwo.about_title",
+                                  e.target.value,
+                                );
+                              }}
+                            />
+                          </FormControl>
+                          <div className="text-xs text-muted-foreground mt-1">
+                            <span
+                              className={
+                                currentLength > maxLength
+                                  ? "text-destructive"
+                                  : ""
+                              }
+                            >
+                              {currentLength}/{maxLength} characters
+                            </span>
+                          </div>
+                          <FormMessage />
+                        </FormItem>
+                      );
+                    }}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="about_description"
+                    render={({ field }) => (
+                      <FormItem>
+                        <div className="flex items-center justify-between">
+                          <OnboardingFieldGroupTitle>
+                            Write a Short Description
+                          </OnboardingFieldGroupTitle>
+                        </div>
+                        <FormControl>
+                          <TiptapEditor
+                            value={field.value}
+                            onChange={(value) => {
+                              field.onChange(value);
+                              globalForm.setValue(
+                                "stepTwo.about_description",
+                                value,
+                              );
+                            }}
+                            placeholder="Write a compelling description about your business..."
+                            maxLength={340}
+                            maxWords={50}
+                            className="min-h-[120px] w-full overflow-hidden max-w-[300px]"
+                            showAIButton={true}
+                            wrapText={true}
+                            aiContext={{
+                              banner_heading:
+                                form.watch("banner_heading") || undefined,
+                              banner_sub_heading:
+                                form.watch("banner_sub_heading") || undefined,
+                              title: form.watch("about_title") || undefined,
+                              ctaText:
+                                form.watch("about_link_title") || undefined,
+                            }}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="about_link_title"
+                    render={({ field }) => {
+                      const currentLength = field.value?.length || 0;
+                      const maxLength = 18;
+                      return (
+                        <FormItem>
+                          <OnboardingFieldGroupTitle>
+                            Button Text
+                          </OnboardingFieldGroupTitle>
+                          <FormControl>
+                            <Input
+                              placeholder="Explore Link Text"
+                              {...field}
+                              maxLength={maxLength}
+                              onFocus={() =>
+                                handleFieldFocus("about_link_title")
+                              }
+                              onChange={(e) => {
+                                field.onChange(e);
+                                globalForm.setValue(
+                                  "stepTwo.about_link_title",
+                                  e.target.value,
+                                );
+                              }}
+                            />
+                          </FormControl>
+                          <div className="text-xs text-muted-foreground mt-1">
+                            <span
+                              className={
+                                currentLength > maxLength
+                                  ? "text-destructive"
+                                  : ""
+                              }
+                            >
+                              {currentLength}/{maxLength} characters
+                            </span>
+                          </div>
+                          <FormMessage />
+                        </FormItem>
+                      );
+                    }}
+                  />
                   <GuidedSectionActionFooter
                     isActive={guided.currentSectionIndex === 2}
                     hideSectionMeta

@@ -1427,52 +1427,55 @@ export default function StepFive() {
       if (!isValid || hasErrors) {
         const errors = form.formState.errors;
 
-        // Handle validation errors - consolidate into single toast
         const errorMessages: string[] = [];
 
         if (errors.dates) {
+          const FIELD_LABELS: Record<string, string> = {
+            event_date: "event date",
+            booking_type: "booking type",
+            payment_type: "payment type",
+            deposit_type: "deposit type",
+            deposit_value: "deposit amount",
+            deposit_due_date: "balance due date",
+            tickets: "ticket info",
+            tables: "table info",
+          };
+
           const dateErrors: string[] = [];
 
-          // Check if dates has array errors
           if (Array.isArray(errors.dates)) {
             errors.dates.forEach((dateError, index) => {
-              if (dateError) {
-                // Get all field errors in this date
-                Object.keys(dateError).forEach((fieldName) => {
-                  dateErrors.push(
-                    `Date ${index + 1}: ${fieldName.replace("_", " ")}`
-                  );
-                });
+              if (!dateError || typeof dateError !== "object") return;
+
+              const de = dateError as Record<string, unknown>;
+              const badFields = Object.keys(de)
+                .filter((k) => de[k] !== undefined && de[k] !== null)
+                .map((k) => FIELD_LABELS[k] ?? k.replace(/_/g, " "));
+
+              if (badFields.length > 0) {
+                const shown = badFields.slice(0, 3).join(", ");
+                const extra = badFields.length > 3 ? ` +${badFields.length - 3} more` : "";
+                dateErrors.push(`Date ${index + 1}: ${shown}${extra}`);
+              } else {
+                dateErrors.push(`Date ${index + 1}: incomplete`);
               }
             });
           }
 
-          // If there are specific date field errors, add them
-          if (dateErrors.length > 0) {
-            errorMessages.push(
-              `Please fix the following: ${dateErrors.join(", ")}`
-            );
-          } else {
-            // Generic dates error
-            errorMessages.push(
-              "Please check all date entries and ensure they are complete"
-            );
-          }
-        }
-
-        // Add other top-level field errors
-        const otherErrorFields = Object.keys(errors).filter(
-          (key) => key !== "dates"
-        );
-        if (otherErrorFields.length > 0) {
           errorMessages.push(
-            `Please correct the highlighted fields: ${otherErrorFields.join(
-              ", "
-            )}`
+            dateErrors.length > 0
+              ? `Please fix — ${dateErrors.join(" | ")}`
+              : "Please complete all date entries before saving"
           );
         }
 
-        // Show single consolidated error message
+        const otherErrorFields = Object.keys(errors).filter((k) => k !== "dates");
+        if (otherErrorFields.length > 0) {
+          errorMessages.push(
+            `Please correct: ${otherErrorFields.join(", ")}`
+          );
+        }
+
         if (errorMessages.length > 0) {
           toast.error(errorMessages.join("; "));
         }

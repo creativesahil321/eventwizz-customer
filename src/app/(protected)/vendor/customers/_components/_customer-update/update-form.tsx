@@ -14,6 +14,7 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import { PasswordInput } from "@/components/ui/password-input";
 import {
   Select,
   SelectContent,
@@ -282,9 +283,9 @@ export function UpdateCustomerForm({
                   New Password
                 </FormLabel>
                 <FormControl>
-                  <Input
-                    type="password"
+                  <PasswordInput
                     placeholder="••••••••"
+                    ariaPasswordField="new password"
                     {...field}
                     className={apiErrors.password ? "border-red-500" : ""}
                   />
@@ -308,9 +309,9 @@ export function UpdateCustomerForm({
                   Confirm New Password
                 </FormLabel>
                 <FormControl>
-                  <Input
-                    type="password"
+                  <PasswordInput
                     placeholder="••••••••"
+                    ariaPasswordField="confirm new password"
                     {...field}
                     className={
                       apiErrors.password_confirmation ? "border-red-500" : ""

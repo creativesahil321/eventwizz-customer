@@ -3,6 +3,41 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { FieldValues, Path, UseFormReturn } from "react-hook-form";
 
+/**
+ * After `form.trigger()` commits `aria-invalid` / error-message paragraphs to the
+ * DOM, scroll the first offending field into the visible sidebar area.
+ *
+ * We use `requestAnimationFrame` so React has already painted the error state
+ * before we query the DOM. `scrollIntoView` works with ANY overflow container
+ * (including shadcn ScrollArea) — unlike `element.focus()` which only scrolls
+ * the document viewport.
+ */
+function scrollToFirstError(): void {
+  requestAnimationFrame(() => {
+    // 1. Native inputs / components that forward aria-invalid (most fields)
+    let target = document.querySelector<HTMLElement>('[aria-invalid="true"]');
+
+    if (!target) {
+      // 2. Custom components (file-uploader, address autocomplete, …) that don't
+      //    propagate aria-invalid: find the first non-empty FormMessage paragraph.
+      //    FormMessage renders <p class="…text-destructive…">; character counters
+      //    use <span class="text-destructive"> so the `p` selector is safe.
+      const paragraphs =
+        document.querySelectorAll<HTMLElement>("p.text-destructive");
+      for (const p of paragraphs) {
+        if (p.textContent?.trim()) {
+          target = p;
+          break;
+        }
+      }
+    }
+
+    if (target) {
+      target.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+  });
+}
+
 export type GuidedSectionConfig<T extends FieldValues> = {
   id: string;
   label: string;
@@ -122,13 +157,18 @@ export function useGuidedOnboardingSections<T extends FieldValues>({
     if (!currentSection) return false;
     if (currentSection.validate) {
       const extra = await Promise.resolve(currentSection.validate());
-      if (!extra) return false;
+      if (!extra) {
+        scrollToFirstError();
+        return false;
+      }
     }
     if (currentSection.fields.length === 0) return true;
-    return form.trigger(
+    const ok = await form.trigger(
       currentSection.fields as Path<T>[],
       { shouldFocus: true },
     );
+    if (!ok) scrollToFirstError();
+    return ok;
   }, [currentSection, form]);
 
   const handleApproveSection = useCallback(async () => {
@@ -163,6 +203,7 @@ export function useGuidedOnboardingSections<T extends FieldValues>({
       setCurrentSectionIndex(
         Math.max(0, Math.min(idx, sectionFlow.length - 1)),
       );
+      scrollToFirstError();
       return false;
     }
 
@@ -180,6 +221,7 @@ export function useGuidedOnboardingSections<T extends FieldValues>({
       setCurrentSectionIndex(
         Math.max(0, Math.min(idx, sectionFlow.length - 1)),
       );
+      scrollToFirstError();
       return false;
     }
     const errorKeys = Object.keys(form.formState.errors);
@@ -187,6 +229,7 @@ export function useGuidedOnboardingSections<T extends FieldValues>({
     setCurrentSectionIndex(
       Math.max(0, Math.min(idx, sectionFlow.length - 1)),
     );
+    scrollToFirstError();
     return false;
   }, [
     form,

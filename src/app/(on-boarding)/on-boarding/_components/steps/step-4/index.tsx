@@ -557,10 +557,14 @@ const StepFour = () => {
                     title="Image & button"
                   />
                   <fieldset
-                    disabled={guided.currentSectionIndex !== 1}
+                    disabled={
+                      !guided.allSectionsApproved &&
+                      guided.currentSectionIndex !== 1
+                    }
                     className={cn(
                       "min-w-0 border-0 p-0 m-0 space-y-6",
-                      guided.currentSectionIndex !== 1 &&
+                      !guided.allSectionsApproved &&
+                        guided.currentSectionIndex !== 1 &&
                         "pointer-events-none",
                     )}
                   >

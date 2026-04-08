@@ -1166,10 +1166,15 @@ export default function StepThree() {
                   title="About the event"
                 />
                 <fieldset
-                  disabled={guided.currentSectionIndex !== 2}
+                  disabled={
+                    !guided.allSectionsApproved &&
+                    guided.currentSectionIndex !== 2
+                  }
                   className={cn(
                     "min-w-0 border-0 p-0 m-0 space-y-4",
-                    guided.currentSectionIndex !== 2 && "pointer-events-none",
+                    !guided.allSectionsApproved &&
+                      guided.currentSectionIndex !== 2 &&
+                      "pointer-events-none",
                   )}
                 >
                   <p className="-mt-2 mb-4 text-sm text-muted-foreground">

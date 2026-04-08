@@ -4,6 +4,7 @@ import React, { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { PasswordInput } from "@/components/ui/password-input";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Form, FormLabel } from "@/components/ui/form";
@@ -169,15 +170,8 @@ export default function ProfilePage() {
     }
   };
 
-  // Setup state for loading and password visibility
   const isProfileLoading = updateProfileMutation.isPending;
   const isPasswordLoading = updatePasswordMutation.isPending;
-  const [showPassword, setShowPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-
-  const togglePasswordVisibility = () => setShowPassword((prev) => !prev);
-  const toggleConfirmPasswordVisibility = () =>
-    setShowConfirmPassword((prev) => !prev);
 
   // Show loading state while fetching profile data
   if (profileDataLoading) {
@@ -425,15 +419,12 @@ export default function ProfilePage() {
                 </div>
 
                 <div>
-                  <div className="flex justify-between items-center">
-                    <FormLabel htmlFor="currentPassword" className="block mb-2">
-                      Current Password
-                    </FormLabel>
-                    <div className="h-8 px-2 text-xs"></div>
-                  </div>
-                  <Input
+                  <FormLabel htmlFor="currentPassword" className="block mb-2">
+                    Current Password
+                  </FormLabel>
+                  <PasswordInput
                     id="currentPassword"
-                    type="password"
+                    ariaPasswordField="current password"
                     {...passwordForm.register("currentPassword")}
                     className="bg-gray-50 h-11 w-full"
                   />
@@ -445,22 +436,12 @@ export default function ProfilePage() {
                 </div>
 
                 <div>
-                  <div className="flex justify-between items-center">
-                    <FormLabel htmlFor="password" className="block mb-2">
-                      New Password
-                    </FormLabel>
-                    <Button
-                      type="button"
-                      variant="event-ghost"
-                      onClick={togglePasswordVisibility}
-                      className="h-8 px-2 text-xs"
-                    >
-                      {showPassword ? "Hide" : "Show"}
-                    </Button>
-                  </div>
-                  <Input
+                  <FormLabel htmlFor="password" className="block mb-2">
+                    New Password
+                  </FormLabel>
+                  <PasswordInput
                     id="password"
-                    type={showPassword ? "text" : "password"}
+                    ariaPasswordField="new password"
                     {...passwordForm.register("password")}
                     className="bg-gray-50 h-11 w-full"
                   />
@@ -472,25 +453,15 @@ export default function ProfilePage() {
                 </div>
 
                 <div>
-                  <div className="flex justify-between items-center">
-                    <FormLabel
-                      htmlFor="password_confirmation"
-                      className="block mb-2"
-                    >
-                      Confirm New Password
-                    </FormLabel>
-                    <Button
-                      type="button"
-                      variant="event-ghost"
-                      onClick={toggleConfirmPasswordVisibility}
-                      className="h-8 px-2 text-xs"
-                    >
-                      {showConfirmPassword ? "Hide" : "Show"}
-                    </Button>
-                  </div>
-                  <Input
+                  <FormLabel
+                    htmlFor="password_confirmation"
+                    className="block mb-2"
+                  >
+                    Confirm New Password
+                  </FormLabel>
+                  <PasswordInput
                     id="password_confirmation"
-                    type={showConfirmPassword ? "text" : "password"}
+                    ariaPasswordField="confirm new password"
                     {...passwordForm.register("password_confirmation")}
                     className="bg-gray-50 h-11 w-full"
                   />

@@ -3,17 +3,11 @@
 import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { PasswordInput } from "@/components/ui/password-input";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import {
-  Shield,
-  Eye,
-  EyeOff,
-  CheckCircle2,
-  AlertTriangle,
-  Info,
-} from "lucide-react";
+import { Shield, CheckCircle2, AlertTriangle, Info } from "lucide-react";
 import { UseFormReturn } from "react-hook-form";
 import { StepTenType } from "../../form-provider/schema";
 import { cn } from "@/lib/utils";
@@ -29,7 +23,6 @@ export function KlarnaConfig({
   onVerify,
   className,
 }: KlarnaConfigProps) {
-  const [showPassword, setShowPassword] = useState(false);
   const [isVerifying, setIsVerifying] = useState(false);
   const [isVerified, setIsVerified] = useState(false);
 
@@ -166,28 +159,13 @@ export function KlarnaConfig({
           <Label htmlFor="klarna-api-password" className="text-sm font-medium">
             API Password <span className="text-red-500">*</span>
           </Label>
-          <div className="relative">
-            <Input
-              id="klarna-api-password"
-              {...form.register("payment_providers.klarna_api_password")}
-              type={showPassword ? "text" : "password"}
-              placeholder="Enter your Klarna API password"
-              className="h-12 bg-white/5 border-white/10 pr-12"
-            />
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              className="absolute right-0 top-0 h-12 px-3 hover:bg-transparent"
-              onClick={() => setShowPassword(!showPassword)}
-            >
-              {showPassword ? (
-                <EyeOff className="w-4 h-4 text-gray-500" />
-              ) : (
-                <Eye className="w-4 h-4 text-gray-500" />
-              )}
-            </Button>
-          </div>
+          <PasswordInput
+            id="klarna-api-password"
+            {...form.register("payment_providers.klarna_api_password")}
+            placeholder="Enter your Klarna API password"
+            ariaPasswordField="Klarna API password"
+            className="h-12 bg-white/5 border-white/10 pr-12"
+          />
           {form.formState.errors.payment_providers?.klarna_api_password && (
             <p className="text-xs text-red-500">
               {

@@ -14,6 +14,7 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import { PasswordInput } from "@/components/ui/password-input";
 import { UserSchema, UserType } from "./schema";
 import { useCreateCustomer } from "../../_lib/queries";
 import { useState, useEffect } from "react";
@@ -199,8 +200,7 @@ export function CreateUserForm({
             <FormItem>
               <FormLabel>Password</FormLabel>
               <FormControl>
-                <Input
-                  type="password"
+                <PasswordInput
                   placeholder="••••••••"
                   {...field}
                   className={apiErrors.password ? "border-red-500" : ""}
@@ -221,9 +221,9 @@ export function CreateUserForm({
             <FormItem>
               <FormLabel>Confirm Password</FormLabel>
               <FormControl>
-                <Input
-                  type="password"
+                <PasswordInput
                   placeholder="••••••••"
+                  ariaPasswordField="confirm password"
                   {...field}
                   className={
                     apiErrors.password_confirmation ? "border-red-500" : ""

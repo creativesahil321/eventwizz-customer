@@ -3,9 +3,9 @@
 import Link from "next/link";
 import * as Icons from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useOnboarding } from "@/hooks/use-onboarding";
 import LocationMap from "./location-map";
 import { useCurrencyFormat } from "@/hooks/use-currency-format";
+import { cn } from "@/lib/utils";
 
 type LucideIconName = keyof typeof Icons;
 
@@ -38,6 +38,8 @@ type BrochureSectionProps = {
   price: PriceProps;
   /** When true, the location map mounts and loads immediately (public event pages). */
   showMapImmediately?: boolean;
+  /** Hide the price tile (e.g. when prices are shown in About on the public event page). */
+  omitPricePanel?: boolean;
 };
 
 export default function BrochureSection({
@@ -45,8 +47,8 @@ export default function BrochureSection({
   downloads = [],
   price,
   showMapImmediately = false,
+  omitPricePanel = false,
 }: BrochureSectionProps) {
-  const { textColorClass } = useOnboarding();
   const { format: formatMoney } = useCurrencyFormat();
 
   const renderIcon = (iconName?: string, size = 24) => {
@@ -81,39 +83,44 @@ export default function BrochureSection({
   );
 
   return (
-    <section className="p-5 text-center">
+    <section className="p-5 text-center bg-[color:var(--color-background)]">
       <section className="w-full mb-5">
-        <h2
-          className={`text-xl sm:text-2xl md:text-3xl font-bold max-w-4xl mx-auto pb-5 px-2 ${textColorClass}`}
-        >
+        <h2 className="text-xl sm:text-2xl md:text-3xl font-bold max-w-4xl mx-auto pb-5 px-2 text-[var(--color-text)]">
           Check Out The Latest Dates To Be Released
           <br className="hidden sm:inline" /> But Get In Quick As These Dates
           Will Soon Go
         </h2>
       </section>
-      <section className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 my-5 px-2 sm:px-5">
-        <section className="w-full rounded-md overflow-hidden">
+      <section
+        className={cn(
+          "my-5 grid grid-cols-1 gap-4 px-2 sm:px-5",
+          omitPricePanel
+            ? "sm:grid-cols-2"
+            : "sm:grid-cols-2 md:grid-cols-3",
+        )}
+      >
+        <section className="w-full overflow-hidden rounded-md">
           <LocationMap
             address={defaultLocation.description}
             latitude={location.latitude}
             longitude={location.longitude}
-            className="w-full h-full"
+            className="h-full w-full"
             showMapImmediately={showMapImmediately}
           />
         </section>
 
-        <section className="w-full bg-[var(--color-surface)] text-[var(--color-text)] flex flex-col justify-center items-center py-5 px-2 rounded-md">
+        <section className="flex w-full flex-col items-center justify-center rounded-md bg-[var(--color-surface)] px-2 py-5 text-[var(--color-text)]">
           {renderIcon("Download", 24)}
-          <h2 className="text-base sm:text-lg font-bold py-2 sm:py-3 uppercase">
+          <h2 className="py-2 text-base font-bold uppercase sm:py-3 sm:text-lg">
             DOWNLOADS
           </h2>
           {validDownloads.length > 0 ? (
             validDownloads.map((item, idx) => (
-              <div key={idx} className="flex items-center gap-1 mb-1">
+              <div key={idx} className="mb-1 flex items-center gap-1">
                 {renderIcon("FileText", 16)}
                 <Link
                   href={item.download_link[0]}
-                  className="text-[var(--color-text)] text-xs sm:text-sm underline break-all"
+                  className="break-all text-xs text-[var(--color-text)] underline sm:text-sm"
                   target="_blank"
                   rel="noopener noreferrer"
                   onClick={(e) => {
@@ -134,45 +141,47 @@ export default function BrochureSection({
               </div>
             ))
           ) : (
-            <p className="text-xs sm:text-sm text-[var(--color-text-dimmed)]">
+            <p className="text-xs text-[var(--color-text-dimmed)] sm:text-sm">
               No downloads available
             </p>
           )}
         </section>
 
-        <section className="w-full bg-[var(--color-surface)]  text-[var(--color-text)] flex flex-col justify-center items-center py-5 px-2 rounded-md sm:col-span-2 md:col-span-1">
-          {renderIcon(defaultPrice.icon, 24)}
-          <h2 className="text-base sm:text-lg font-bold py-2 sm:py-3 uppercase break-words max-w-full px-2">
-            {defaultPrice.title}
-          </h2>
-          <p
-            className="text-xs sm:text-sm break-words whitespace-normal overflow-hidden max-w-full px-2"
-            style={{ wordBreak: "break-word", overflowWrap: "break-word" }}
-          >
-            {defaultPrice.description}
-          </p>
-          <Button
-            variant="event-outline"
-            type="button"
-            className="mt-3"
-            asChild
-          >
-            {defaultPrice.link?.startsWith("#") ? (
-              <button
-                type="button"
-                onClick={() => {
-                  const id = defaultPrice.link!.slice(1);
-                  const el = id ? document.getElementById(id) : null;
-                  el?.scrollIntoView({ behavior: "smooth", block: "start" });
-                }}
-              >
-                {defaultPrice.price_title}
-              </button>
-            ) : (
-              <Link href={defaultPrice.link}>{defaultPrice.price_title}</Link>
-            )}
-          </Button>
-        </section>
+        {!omitPricePanel ? (
+          <section className="flex w-full flex-col items-center justify-center rounded-md bg-[var(--color-surface)] px-2 py-5 text-[var(--color-text)] sm:col-span-2 md:col-span-1">
+            {renderIcon(defaultPrice.icon, 24)}
+            <h2 className="max-w-full break-words px-2 py-2 text-base font-bold uppercase sm:py-3 sm:text-lg">
+              {defaultPrice.title}
+            </h2>
+            <p
+              className="max-w-full overflow-hidden px-2 text-xs break-words whitespace-normal sm:text-sm"
+              style={{ wordBreak: "break-word", overflowWrap: "break-word" }}
+            >
+              {defaultPrice.description}
+            </p>
+            <Button
+              variant="event-outline"
+              type="button"
+              className="mt-3"
+              asChild
+            >
+              {defaultPrice.link?.startsWith("#") ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const id = defaultPrice.link!.slice(1);
+                    const el = id ? document.getElementById(id) : null;
+                    el?.scrollIntoView({ behavior: "smooth", block: "start" });
+                  }}
+                >
+                  {defaultPrice.price_title}
+                </button>
+              ) : (
+                <Link href={defaultPrice.link}>{defaultPrice.price_title}</Link>
+              )}
+            </Button>
+          </section>
+        ) : null}
       </section>
     </section>
   );
