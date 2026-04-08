@@ -136,11 +136,7 @@ export function SitePreview({ formValues }: Readonly<SitePreviewProps>) {
           }
         />
       </div>
-      <ContactFormSection
-        locationAddress={formValues.name || ""}
-        longitude={0}
-        latitude={0}
-      />
+      <ContactFormSection />
       <FooterSection
         copyright={formValues.copyright}
         logo={getPreviewUrl(formValues.logo) || null}

@@ -50,7 +50,7 @@ export default function EventHeroSec({
   const [videoUrl, setVideoUrl] = useState<string>("");
   const [isLoading, setIsLoading] = useState(true);
 
-  const align = normalizeBannerHeadingAlign(bannerHeadingAlign ?? "center");
+  const align = normalizeBannerHeadingAlign(bannerHeadingAlign ?? "left");
   const valign = normalizeBannerHeadingValign(bannerHeadingValign ?? "center");
   const emphasis = normalizeHeadingEmphasis(headingEmphasis ?? undefined);
 
@@ -100,23 +100,27 @@ export default function EventHeroSec({
 
   const hasMedia = Boolean(bgImage || videoUrl);
   const heroTitle = (heading || "Event Banner Heading").trim();
-  const heroSub = banner_sub_heading || "Event Banner Sub-Heading";
+  const heroSub = banner_sub_heading || "";
 
   return (
     <section
       className={cn(
-        "relative mx-auto flex h-screen w-full justify-center",
+        "relative mx-auto flex w-full justify-center overflow-hidden",
+        /* Lovable-style band — same as live event-detail-client */
+        "h-[min(70dvh,760px)] min-h-[400px] max-h-[820px]",
         heroBandVerticalClass(valign),
+        align === "left" &&
+          valign === "center" &&
+          "!items-stretch !justify-end !pb-10 pt-20 md:!pb-16 md:pt-24",
       )}
-      style={{ minHeight: "500px" }}
     >
-      {/* Background layer: image or video — mirrors EventDetailClient */}
+      {/* Background layer */}
       <div className="absolute inset-0 overflow-hidden">
         {videoUrl ? (
           <>
             {bgImage && (
               <div
-                className="absolute inset-0 bg-cover bg-center"
+                className="absolute inset-0 scale-105 bg-cover bg-center"
                 style={{ backgroundImage: `url(${bgImage})` }}
               />
             )}
@@ -127,7 +131,7 @@ export default function EventHeroSec({
               playsInline
               preload="auto"
               poster={bgImage || undefined}
-              className="absolute inset-0 w-full h-full object-cover"
+              className="absolute inset-0 h-full w-full scale-105 object-cover"
             >
               <source src={videoUrl} type="video/mp4" />
             </video>
@@ -135,16 +139,33 @@ export default function EventHeroSec({
         ) : bgImage ? (
           <img
             src={bgImage}
-            alt="Event banner"
-            className="absolute inset-0 w-full h-full object-cover"
+            alt=""
+            className="absolute inset-0 h-full w-full scale-105 object-cover"
           />
         ) : isLoading ? (
-          <div className="absolute inset-0 animate-pulse bg-gray-200" />
-        ) : null}
-        <div className="absolute inset-0 z-10 bg-black/40" aria-hidden />
+          <div className="absolute inset-0 animate-pulse bg-gray-300" />
+        ) : (
+          <div className="absolute inset-0 bg-gradient-to-br from-zinc-800 via-zinc-700 to-zinc-900" />
+        )}
+        {/* Same gradient scrim as live page: dark top, slight mid, fades to background */}
+        <div
+          className="pointer-events-none absolute inset-0 z-[1] bg-gradient-to-b from-black/60 via-black/35 to-[color:var(--color-background)]"
+          aria-hidden
+        />
       </div>
 
-      <div className="relative z-20 container mx-auto w-full overflow-visible px-4 pt-20">
+      {/* Primary orbs (Lovable hero atmosphere) */}
+      <div
+        className="pointer-events-none absolute left-1/4 top-16 z-[2] h-72 w-72 rounded-full bg-[color:color-mix(in_srgb,var(--color-primary)_18%,transparent)] blur-[100px] md:h-96 md:w-96 md:blur-[120px]"
+        aria-hidden
+      />
+      <div
+        className="pointer-events-none absolute bottom-24 right-1/4 z-[2] h-64 w-64 rounded-full bg-[color:color-mix(in_srgb,var(--color-primary)_10%,transparent)] blur-[90px]"
+        aria-hidden
+      />
+
+      {/* Copy — vertical band from Site Essentials / Try theme */}
+      <div className="relative z-20 max-w-7xl mx-auto w-full overflow-visible px-4 pb-12 pt-24 md:pb-16 md:pt-28">
         <div className={cn(heroBannerStackClass(align), "overflow-visible")}>
           <SiteHeading
             level={1}
@@ -153,21 +174,23 @@ export default function EventHeroSec({
             emphasis={emphasis}
             variant="onDark"
             align={align}
-            className="mb-4 font-bold !text-4xl md:!text-5xl lg:!text-6xl"
+            className="mb-4 max-w-4xl font-black !text-4xl !leading-[0.95] tracking-tight md:!text-5xl lg:!text-6xl"
           />
-          <h2
-            className={cn(
-              "text-xl font-medium text-white md:text-2xl",
-              heroBannerSubheadingClass(align),
-            )}
-          >
-            {heroSub}
-          </h2>
+          {heroSub ? (
+            <p
+              className={cn(
+                "max-w-2xl text-base leading-relaxed text-white/85 sm:text-lg md:text-xl",
+                heroBannerSubheadingClass(align),
+              )}
+            >
+              {heroSub}
+            </p>
+          ) : null}
 
           {!hasMedia && (
             <div className="mt-6 flex flex-col items-center gap-2">
-              <ImageIcon size={40} className="text-gray-400" />
-              <span className="text-sm text-white/80">Cover Image</span>
+              <ImageIcon size={40} className="text-white/40" />
+              <span className="text-sm text-white/60">Add a cover image or video above</span>
             </div>
           )}
         </div>

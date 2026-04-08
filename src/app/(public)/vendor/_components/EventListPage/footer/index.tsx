@@ -101,8 +101,8 @@ export default function FooterSection({
   ];
 
   return (
-    <section className="px-4 sm:px-6 md:p-10 py-8 md:py-10 bg-[color:var(--color-footer)] text-[var(--color-on-footer)]">
-      <div className="container mx-auto border-b border-[var(--color-on-footer)]/20 text-center pb-6">
+    <section className="px-4 py-10 bg-[color:var(--color-footer)] text-[var(--color-on-footer)]">
+      <div className="max-w-7xl mx-auto border-b border-[var(--color-on-footer)]/20 text-center pb-6">
         <Link href="/">
           <div className="h-20 flex items-center justify-center">
             <img
@@ -128,7 +128,7 @@ export default function FooterSection({
           </div>
         )}
       </div>
-      <div className="container mx-auto py-8 grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-8">
+      <div className="max-w-7xl mx-auto py-8 grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-8">
         {contactSections.map(
           (
             { icon: Icon, heading, link, linkText, textOne, textTwo },
@@ -169,7 +169,7 @@ export default function FooterSection({
           )
         )}
       </div>
-      <div className="container mx-auto pt-6 px-4 md:px-0 text-center text-[var(--color-on-footer)]/75">
+      <div className="max-w-7xl mx-auto pt-6 text-center text-[var(--color-on-footer)]/75">
         <p className="text-sm md:text-base">
           {copyright ||
             vendorTheme?.copyright ||

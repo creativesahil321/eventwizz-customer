@@ -83,17 +83,16 @@ export default function BrochureSection({
   );
 
   return (
-    <section className="p-5 text-center bg-[color:var(--color-background)]">
-      <section className="w-full mb-5">
-        <h2 className="text-xl sm:text-2xl md:text-3xl font-bold max-w-4xl mx-auto pb-5 px-2 text-[var(--color-text)]">
-          Check Out The Latest Dates To Be Released
-          <br className="hidden sm:inline" /> But Get In Quick As These Dates
-          Will Soon Go
+    <section className="py-16 px-4 bg-[color:var(--color-background)]">
+      <div className="max-w-7xl mx-auto">
+      <div className="text-center mb-8">
+        <h2 className="text-2xl font-black tracking-tight text-[var(--color-text)] md:text-3xl max-w-4xl mx-auto">
+          Check Out The Latest Dates To Be Released — Get In Quick!
         </h2>
-      </section>
+      </div>
       <section
         className={cn(
-          "my-5 grid grid-cols-1 gap-4 px-2 sm:px-5",
+          "grid grid-cols-1 gap-4",
           omitPricePanel
             ? "sm:grid-cols-2"
             : "sm:grid-cols-2 md:grid-cols-3",
@@ -183,6 +182,7 @@ export default function BrochureSection({
           </section>
         ) : null}
       </section>
+      </div>
     </section>
   );
 }

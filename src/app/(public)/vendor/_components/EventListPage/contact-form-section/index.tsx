@@ -1,102 +1,77 @@
 "use client";
 
-import { useState } from "react";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
+import { MessageSquare, Phone, Mail, MapPin } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useContext } from "react";
+import { ServerContext } from "@/lib/server-context";
+import { ThemeSchema } from "@/types/theme.types";
 
 export default function ContactFormSection() {
-  const [formData, setFormData] = useState({
-    name: "",
-    email: "",
-    phone: "",
-    message: "",
-  });
-
-  const handleChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
-  ) => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value,
-    });
+  const { theme } = useContext(ServerContext);
+  const vendorTheme = theme as ThemeSchema & {
+    contactDetails?: {
+      phoneNumber?: string;
+      email?: string;
+      address?: string;
+    };
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    console.log("Form submitted:", formData);
-    // TODO: Implement actual form submission
-    setFormData({
-      name: "",
-      email: "",
-      phone: "",
-      message: "",
-    });
-  };
+  const phone = vendorTheme?.contactDetails?.phoneNumber || "+1 (123) 456-7890";
+  const email = vendorTheme?.contactDetails?.email || "info@eventwizz.com";
+  const address = vendorTheme?.contactDetails?.address || "123 Main St, City, Country";
+
+  const contactItems = [
+    { Icon: Phone, label: phone, href: `tel:${phone}` },
+    { Icon: Mail, label: email, href: `mailto:${email}` },
+    { Icon: MapPin, label: address, href: undefined },
+  ];
 
   return (
-    <section className="bg-[var(--color-surface)] py-12 md:py-16">
-      <div className="container mx-auto px-4">
-        <div className="grid grid-cols-1 items-center gap-8 lg:grid-cols-2 lg:gap-12">
-          {/* Left Side - Text Content */}
-          <div className="space-y-4 text-[var(--color-text)]">
-            <div className="space-y-2">
-              <h3 className="text-lg font-medium text-[var(--color-text-dimmed)]">
-                Booking and Event Assistance
-              </h3>
-              <h2 className="text-4xl font-bold leading-tight md:text-5xl">
-                Need help?
-              </h2>
-            </div>
-            <p className="max-w-md text-lg leading-relaxed text-[var(--color-text-dimmed)]">
+    <section className="py-16 px-4 bg-[var(--color-background)]">
+      <div className="max-w-4xl mx-auto">
+        <div className="rounded-3xl bg-[color:color-mix(in_srgb,var(--color-primary)_8%,var(--color-surface))] border border-[color:color-mix(in_srgb,var(--color-primary)_18%,transparent)] px-8 py-10 sm:px-12 sm:py-14 relative overflow-hidden">
+          {/* subtle orb */}
+          <div
+            className="pointer-events-none absolute -top-10 right-10 h-52 w-52 rounded-full bg-[color:color-mix(in_srgb,var(--color-primary)_10%,transparent)] blur-[80px]"
+            aria-hidden
+          />
+
+          <div className="relative z-10">
+            <p className="mb-2 text-[11px] font-bold uppercase tracking-[0.28em] text-[color:var(--color-primary)]">
+              Booking and Event Assistance
+            </p>
+            <h2 className="mb-3 text-3xl font-black tracking-tight text-[var(--color-text)] md:text-4xl">
+              Need Help?
+            </h2>
+            <p className="mb-8 max-w-md text-base leading-relaxed text-[var(--color-text-dimmed)]">
               Get in touch with our team for any questions about booking events,
               assistance with your account, or general inquiries.
             </p>
-          </div>
 
-          {/* Right Side - Contact Form (neutral card; brand only on submit) */}
-          <div className="rounded-xl border border-[color:color-mix(in_srgb,var(--color-text)_12%,transparent)] bg-[var(--color-background)] p-6 shadow-sm md:p-8">
-            <form onSubmit={handleSubmit} className="space-y-5">
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                <Input
-                  type="text"
-                  name="name"
-                  placeholder="Your Name"
-                  value={formData.name}
-                  onChange={handleChange}
-                  required
-                  className="h-11 rounded-lg border-input bg-background"
-                />
-                <Input
-                  type="email"
-                  name="email"
-                  placeholder="Email Address"
-                  value={formData.email}
-                  onChange={handleChange}
-                  required
-                  className="h-11 rounded-lg border-input bg-background"
-                />
-              </div>
-              <Input
-                type="tel"
-                name="phone"
-                placeholder="Phone Number"
-                value={formData.phone}
-                onChange={handleChange}
-                className="h-11 rounded-lg border-input bg-background"
-              />
-              <Textarea
-                name="message"
-                placeholder="Tell us how we can help you..."
-                value={formData.message}
-                onChange={handleChange}
-                required
-                className="min-h-28 resize-none rounded-lg border-input bg-background"
-              />
-              <Button type="submit" variant="event-primary">
-                Send Message
-              </Button>
-            </form>
+            <div className="mb-8 flex flex-wrap gap-6">
+              {contactItems.map(({ Icon, label, href }) => (
+                <div key={label} className="flex items-center gap-3">
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[color:color-mix(in_srgb,var(--color-primary)_14%,transparent)]">
+                    <Icon className="h-4 w-4 text-[color:var(--color-primary)]" />
+                  </div>
+                  {href ? (
+                    <a
+                      href={href}
+                      className="text-sm text-[var(--color-text)] hover:text-[color:var(--color-primary)] transition-colors"
+                    >
+                      {label}
+                    </a>
+                  ) : (
+                    <span className="text-sm text-[var(--color-text)]">{label}</span>
+                  )}
+                </div>
+              ))}
+            </div>
+
+            <Button variant="event-primary" className="gap-2 rounded-full px-7">
+              <MessageSquare className="h-4 w-4" />
+              Send Message
+            </Button>
           </div>
         </div>
       </div>

@@ -70,11 +70,14 @@ export default function HomepageHeroSec({
       className={cn(
         "relative mx-auto flex min-h-[min(70vh,560px)] w-full justify-center overflow-hidden bg-[#F3F4F6] bg-cover bg-center bg-no-repeat",
         heroBandVerticalClass(valign),
+        align === "left" &&
+          valign === "center" &&
+          "!items-stretch !justify-end !pb-10 pt-20 md:!pb-16 md:pt-24",
       )}
       style={bgImage ? { backgroundImage: bgImage } : undefined}
     >
       <div className="absolute inset-0 bg-black/40" aria-hidden />
-      <div className="relative z-10 container mx-auto w-full overflow-visible px-4 pt-20">
+      <div className="relative z-10 max-w-7xl mx-auto w-full overflow-visible px-4 pt-20">
         <div className={cn(heroBannerStackClass(align), "overflow-visible")}>
           <SiteHeading
             level={1}

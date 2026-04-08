@@ -122,7 +122,7 @@ export default function VendorSiteHomePage() {
           />
         </div>
         {/* Same horizontal frame as LocationSelectionHeader + HeroBanner (Site Essentials preview) */}
-        <div className="relative z-10 container mx-auto overflow-visible px-4">
+        <div className="relative z-10 max-w-7xl mx-auto w-full overflow-visible px-4">
           <motion.div
             initial={{ y: 28, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}

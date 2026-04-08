@@ -175,7 +175,7 @@ export default function HeroBanner({
 
       <div
         className={cn(
-          "relative z-10 container mx-auto overflow-visible px-4",
+          "relative z-10 max-w-7xl mx-auto w-full overflow-visible px-4",
           textAlign === "center" && "py-12 md:py-16",
         )}
       >

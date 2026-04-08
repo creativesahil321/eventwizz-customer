@@ -286,29 +286,31 @@ export function EventPreview({
           className={embedInShell ? "px-3 sm:px-4 md:px-6" : ""}
         />
 
-        {/* Same hero behavior as live `EventDetailClient` + Site Essentials align / valign / heading style */}
+        {/* Hero — mirrors live event-detail-client: band height, gradient fade, orbs, theme vertical placement */}
         <section
           className={cn(
-            "relative mx-auto flex h-screen w-full justify-center",
+            "relative mx-auto flex w-full justify-center overflow-hidden",
+            /* Same band dimensions as live event page */
+            "h-[min(70dvh,760px)] min-h-[400px] max-h-[820px]",
             heroBandVerticalClass(bannerValign),
+            bannerAlign === "left" &&
+              bannerValign === "center" &&
+              "!items-stretch !justify-end !pb-10 pt-20 md:!pb-16 md:pt-24",
           )}
-          style={{ minHeight: "500px" }}
         >
           <div className="absolute inset-0 overflow-hidden">
             {bannerVideo ? (
               <>
                 {bannerImage && (
                   <div
-                    className={`${heroStyles.videoBackground} bg-cover bg-center`}
-                    style={{
-                      backgroundImage: `url(${bannerImage})`,
-                    }}
+                    className={`${heroStyles.videoBackground} scale-105 bg-cover bg-center`}
+                    style={{ backgroundImage: `url(${bannerImage})` }}
                   />
                 )}
                 <video
                   src={bannerVideo}
                   poster={bannerImage || undefined}
-                  className={heroStyles.videoBackground}
+                  className={cn(heroStyles.videoBackground, "scale-105")}
                   autoPlay
                   muted
                   loop
@@ -316,26 +318,34 @@ export function EventPreview({
                   preload="auto"
                 />
               </>
+            ) : bannerImage ? (
+              <img
+                src={addCacheBusting(bannerImage)}
+                alt={eventName}
+                className={cn(heroStyles.videoBackground, "scale-105")}
+              />
             ) : (
-              bannerImage && (
-                <img
-                  src={addCacheBusting(bannerImage)}
-                  alt={eventName}
-                  className={heroStyles.videoBackground}
-                  style={{ objectFit: "cover" }}
-                />
-              )
+              <div className="absolute inset-0 bg-gradient-to-br from-zinc-800 via-zinc-700 to-zinc-900" />
             )}
-            <div className="absolute inset-0 z-10 bg-black/40" aria-hidden />
+            {/* Gradient scrim: dark top → fade to page background (same as live) */}
+            <div
+              className="pointer-events-none absolute inset-0 z-[1] bg-gradient-to-b from-black/60 via-black/35 to-[color:var(--color-background)]"
+              aria-hidden
+            />
           </div>
 
-          <div className="relative z-20 container mx-auto w-full overflow-visible px-4">
-            <div
-              className={cn(
-                heroBannerStackClass(bannerAlign),
-                "overflow-visible",
-              )}
-            >
+          {/* Primary glow orbs */}
+          <div
+            className="pointer-events-none absolute left-1/4 top-16 z-[2] h-72 w-72 rounded-full bg-[color:color-mix(in_srgb,var(--color-primary)_18%,transparent)] blur-[100px] md:h-96 md:w-96 md:blur-[120px]"
+            aria-hidden
+          />
+          <div
+            className="pointer-events-none absolute bottom-24 right-1/4 z-[2] h-64 w-64 rounded-full bg-[color:color-mix(in_srgb,var(--color-primary)_10%,transparent)] blur-[90px]"
+            aria-hidden
+          />
+
+          <div className="relative z-20 max-w-7xl mx-auto w-full overflow-visible px-4 pb-12 pt-24 md:pb-16 md:pt-28">
+            <div className={cn(heroBannerStackClass(bannerAlign), "overflow-visible")}>
               <SiteHeading
                 level={1}
                 title={heroTitle || eventName}
@@ -343,16 +353,18 @@ export function EventPreview({
                 emphasis={headingEmphasisForHero}
                 variant="onDark"
                 align={bannerAlign}
-                className="mb-4 font-bold !text-4xl md:!text-5xl lg:!text-6xl"
+                className="mb-4 max-w-4xl font-black !text-4xl !leading-[0.95] tracking-tight md:!text-5xl lg:!text-6xl"
               />
-              <h2
-                className={cn(
-                  "text-xl font-medium text-white md:text-2xl",
-                  heroBannerSubheadingClass(bannerAlign),
-                )}
-              >
-                {s1?.event_banner_sub_heading || ""}
-              </h2>
+              {s1?.event_banner_sub_heading ? (
+                <p
+                  className={cn(
+                    "max-w-2xl text-base leading-relaxed text-white/85 sm:text-lg md:text-xl",
+                    heroBannerSubheadingClass(bannerAlign),
+                  )}
+                >
+                  {s1.event_banner_sub_heading}
+                </p>
+              ) : null}
             </div>
           </div>
         </section>
@@ -363,7 +375,6 @@ export function EventPreview({
           about_event_description={s1?.about_event_description || ""}
           headingEmphasis={headingEmphasisForHero}
           aboutHeadingAccentHint={heroAccentHint}
-          aboutHeadingAlign={bannerAlign}
         />
 
         <Timeline

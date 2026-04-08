@@ -75,9 +75,13 @@ export default function RecentEventsGlimpse({
   }, [images.length]);
 
   return (
-    <section className="py-14 bg-transparent">
-      <div className="text-center mb-6">
-        <h2 className="text-3xl md:text-4xl font-bold">{galleryTitle}</h2>
+    <section className="py-16 px-4 bg-transparent">
+      <div className="max-w-7xl mx-auto">
+      <div className="text-center mb-8">
+        <span className="mb-1 block text-xs font-bold uppercase tracking-[0.2em] text-[color:var(--color-primary)]">
+          Glimpse
+        </span>
+        <h2 className="text-2xl font-black tracking-tight text-[var(--color-text)] md:text-3xl">{galleryTitle}</h2>
       </div>
 
       {images.length === 0 ? (
@@ -169,8 +173,7 @@ export default function RecentEventsGlimpse({
           <Carousel className="relative">
             <CarouselPrevious
               className={cn(
-                "absolute left-8 top-1/2 transform -translate-y-1/2 z-20 bg-white shadow-lg rounded-full border-2 border-gray-300 flex items-center justify-center",
-                // Always show on mobile, conditionally hide on desktop based on image count
+                "absolute left-8 top-1/2 -translate-y-1/2 z-20 size-9 rounded-full border-0 shadow-md bg-[var(--color-primary)] text-[var(--color-primary-foreground)] hover:opacity-90 active:scale-95 transition-[opacity,transform] [&_svg]:size-4 [&_svg]:stroke-[2.5]",
                 !showNavigationDesktop && "md:hidden",
               )}
             />
@@ -201,14 +204,14 @@ export default function RecentEventsGlimpse({
 
             <CarouselNext
               className={cn(
-                "absolute right-8 top-1/2 transform -translate-y-1/2 z-20 bg-white shadow-lg rounded-full border-2 border-gray-300 flex items-center justify-center",
-                // Always show on mobile, conditionally hide on desktop based on image count
+                "absolute right-8 top-1/2 -translate-y-1/2 z-20 size-9 rounded-full border-0 shadow-md bg-[var(--color-primary)] text-[var(--color-primary-foreground)] hover:opacity-90 active:scale-95 transition-[opacity,transform] [&_svg]:size-4 [&_svg]:stroke-[2.5]",
                 !showNavigationDesktop && "md:hidden",
               )}
             />
           </Carousel>
         </div>
       )}
+      </div>
     </section>
   );
 }

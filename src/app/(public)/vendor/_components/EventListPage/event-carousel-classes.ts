@@ -1,12 +1,16 @@
 import { cn } from "@/lib/utils";
 
-/** Lovable-style dark glass circular prev/next on event sliders */
+/**
+ * Circular nav arrow button for event card sliders.
+ * Uses the vendor's --color-primary so arrows always match the active theme.
+ */
 export function eventCarouselNavButtonClass(extra?: string) {
   return cn(
-    "size-9 border-0 bg-black/45 text-white shadow-md backdrop-blur-md",
-    "hover:bg-black/60 hover:text-white",
+    "size-9 rounded-full border-0 shadow-md",
+    "bg-[var(--color-primary)] text-[var(--color-primary-foreground)]",
+    "hover:opacity-90 active:scale-95 transition-[opacity,transform]",
     "disabled:pointer-events-none disabled:opacity-25",
-    "[&_svg]:size-4 [&_svg]:text-white [&_svg]:stroke-[2.5]",
+    "[&_svg]:size-4 [&_svg]:stroke-[2.5]",
     extra,
   );
 }

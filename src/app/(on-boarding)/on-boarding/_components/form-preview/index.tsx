@@ -583,9 +583,6 @@ export default function FormPreview() {
               aboutHeadingAccentHint={
                 tryHeroPreviewProps?.bannerHeadingAccent ?? null
               }
-              aboutHeadingAlign={
-                tryHeroPreviewProps?.bannerHeadingAlign ?? undefined
-              }
             />
           </Suspense>
         </div>

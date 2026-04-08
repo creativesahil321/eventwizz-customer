@@ -33,6 +33,7 @@ import {
   heroBannerStackClass,
   heroBannerSubheadingClass,
   normalizeBannerHeadingAlign,
+  normalizeBannerHeadingValign,
 } from "@/lib/banner-heading-align";
 import { cn } from "@/lib/utils";
 
@@ -92,8 +93,9 @@ export default function EventDetailClient({
   const bannerAlign = normalizeBannerHeadingAlign(
     vendorTheme?.banner_heading_align,
   );
-  /** Event pages read best with copy anchored to the bottom band (Lovable / EventWizz). */
-  const bannerValign = "bottom" as const;
+  const bannerValign = normalizeBannerHeadingValign(
+    vendorTheme?.banner_heading_valign,
+  );
   const headingEmphasisFromSite =
     vendorTheme?.typography?.headingEmphasis != null
       ? normalizeHeadingEmphasis(vendorTheme.typography.headingEmphasis)
@@ -122,6 +124,9 @@ export default function EventDetailClient({
             "relative mx-auto flex w-full justify-center overflow-hidden",
             "h-[min(70dvh,760px)] min-h-[400px] max-h-[820px]",
             heroBandVerticalClass(bannerValign),
+            bannerAlign === "left" &&
+              bannerValign === "center" &&
+              "!items-stretch !justify-end !pb-10 pt-20 md:!pb-16 md:pt-24",
           )}
         >
           <div className="absolute inset-0 overflow-hidden">
@@ -174,7 +179,7 @@ export default function EventDetailClient({
             aria-hidden
           />
 
-          <div className="relative z-20 container mx-auto w-full overflow-visible px-4 pb-12 pt-24 md:pb-16 md:pt-28">
+          <div className="relative z-20 max-w-7xl mx-auto w-full overflow-visible px-4 pb-12 pt-24 md:pb-16 md:pt-28">
             <div
               className={cn(
                 heroBannerStackClass(bannerAlign),
@@ -224,15 +229,6 @@ export default function EventDetailClient({
             about_event_description={eventData.about_event_description}
             headingEmphasis={headingEmphasisFromSite}
             aboutHeadingAccentHint={eventData.event_banner_heading_accent}
-            aboutHeadingAlign={bannerAlign}
-            priceCard={{
-              fromLabel: "PRICES FROM",
-              amount: formatPriceUnit(
-                Number(eventData.packages?.[0]?.price) || 45,
-              ),
-              suffix: "PP exc VAT",
-              ctaLabel: "Book Now",
-            }}
           />
         </div>
 
@@ -316,7 +312,6 @@ export default function EventDetailClient({
         <div ref={datesSectionRef}>
           <BrochureSection
             showMapImmediately
-            omitPricePanel
             location={{
               title: "EVENT LOCATION",
               description:

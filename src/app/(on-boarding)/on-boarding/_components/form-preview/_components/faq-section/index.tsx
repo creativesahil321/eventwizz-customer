@@ -33,17 +33,20 @@ export default function FaqSection({
 
   return (
     <section
-      className="w-full scroll-mt-24 bg-[var(--color-secondary)] px-4 text-center text-[var(--color-secondary-foreground)] pt-24 pb-16 sm:px-6 sm:scroll-mt-28 md:py-20"
+      className="w-full scroll-mt-20 bg-[var(--color-background)] px-4 text-center text-[var(--color-text)] py-16 sm:scroll-mt-24"
       aria-labelledby="faq-section-heading"
     >
       <div className="mx-auto w-full max-w-2xl">
+        <span className="mb-1 block text-xs font-bold uppercase tracking-[0.28em] text-[color:var(--color-primary)]">
+          FAQs
+        </span>
         <h2
           id="faq-section-heading"
-          className="text-2xl font-bold sm:text-3xl"
+          className="text-2xl font-black tracking-tight text-[var(--color-text)] md:text-3xl"
         >
-          FAQS
+          Frequently Asked Questions
         </h2>
-        <p className="px-1 py-2 text-sm sm:text-base">
+        <p className="mt-2 px-1 text-sm text-[var(--color-text-dimmed)] sm:text-base">
           Some of the most frequently asked questions we receive
         </p>
         <div className="flex w-full justify-center pb-2 pt-1">

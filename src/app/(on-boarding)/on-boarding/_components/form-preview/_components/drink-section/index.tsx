@@ -92,13 +92,16 @@ export default function DrinkSection({
   };
 
   return (
-    <section className="bg-[var(--color-secondary)] text-[var(--color-secondary-foreground)] py-6 sm:py-10 px-4 sm:px-6 w-full overflow-hidden">
+    <section className="bg-[var(--color-background)] text-[var(--color-text)] py-16 px-4 w-full overflow-hidden">
       <section className="w-full text-center max-w-5xl mx-auto">
-        <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold px-2 break-words">
+        <span className="mb-1 block text-xs font-bold uppercase tracking-[0.28em] text-[color:var(--color-primary)]">
+          Packages
+        </span>
+        <h2 className="text-2xl font-black tracking-tight text-[var(--color-text)] md:text-3xl px-2 break-words">
           {title || "Other Packages"}
         </h2>
         <p
-          className="py-4 sm:py-5 text-sm sm:text-base px-2 break-words whitespace-normal overflow-hidden max-w-full"
+          className="py-4 sm:py-5 text-sm sm:text-base px-2 break-words whitespace-normal overflow-hidden max-w-full text-[var(--color-text-dimmed)]"
           style={{
             wordBreak: "break-word",
             overflowWrap: "break-word",

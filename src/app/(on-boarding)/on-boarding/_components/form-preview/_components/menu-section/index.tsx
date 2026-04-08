@@ -53,7 +53,7 @@ export default function MenuSection({
   };
 
   return (
-    <section className="relative w-full bg-[color:var(--color-background)] px-5 py-5">
+    <section className="relative w-full bg-[color:var(--color-background)] px-4 py-16">
       {/* Background */}
       <div className="absolute inset-0 z-0">
         <img
@@ -76,13 +76,16 @@ export default function MenuSection({
       </div>
 
       {/* Foreground: use body text tokens — secondary-foreground is only for text ON secondary fills */}
-      <div className="relative z-10 text-[var(--color-text)]">
-        <div className="w-full text-center py-5">
-          <h2 className="text-3xl font-bold py-5 max-w-6xl mx-auto">
+      <div className="relative z-10 max-w-7xl mx-auto text-[var(--color-text)]">
+        <div className="w-full text-center mb-8">
+          <span className="mb-1 block text-xs font-bold uppercase tracking-[0.28em] text-[color:var(--color-primary)]">
+            Catering Options
+          </span>
+          <h2 className="text-2xl font-black tracking-tight md:text-3xl max-w-7xl mx-auto">
             {menu_title || "Heading e.g. Menu"}
           </h2>
           <p
-            className="max-w-6xl mx-auto px-4 break-words whitespace-normal overflow-hidden"
+            className="max-w-2xl mx-auto break-words whitespace-normal overflow-hidden text-[var(--color-text-dimmed)]"
             style={{
               wordBreak: "break-word",
               overflowWrap: "break-word",
@@ -94,7 +97,7 @@ export default function MenuSection({
         </div>
 
         <div
-          className={`grid ${getGridCols()} py-5 gap-5 max-w-6xl mx-auto ${
+          className={`grid ${getGridCols()} gap-5 ${
             filteredMenus.length === 1 ? "justify-items-center" : ""
           }`}
         >
