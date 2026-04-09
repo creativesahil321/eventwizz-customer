@@ -1,16 +1,8 @@
 "use client";
 
-import {
-  Carousel,
-  CarouselContent,
-  CarouselItem,
-  CarouselPrevious,
-  CarouselNext,
-} from "@/components/ui/carousel";
-
 import { getEventCardDateLabel } from "../event-card-utils";
 import { LocationEventCard } from "../location-event-card";
-import { useMemo, useContext, useState } from "react";
+import { useContext, useState, useMemo } from "react";
 import { cn } from "@/lib/utils";
 import { ServerContext } from "@/lib/server-context";
 import { ThemeSchema } from "@/types/theme.types";
@@ -31,7 +23,12 @@ import {
   formatMoneyCompact,
   resolveCurrencySymbol,
 } from "@/lib/currency-format";
-import { eventCarouselNavButtonClass } from "../event-carousel-classes";
+import {
+  eventCarouselNavButtonClass,
+  eventListingManyScrollItemClass,
+  mobileEventRowPeekScrollItemClass,
+} from "../event-carousel-classes";
+import { EventListingHorizontalScroll } from "../event-listing-horizontal-scroll";
 
 export default function PopularEvents({
   events: apiEvents,
@@ -65,41 +62,10 @@ export default function PopularEvents({
     }));
   }
 
-  // Calculate responsive layout based on event count
-  const { itemsPerView, showNavigationDesktop } = useMemo(() => {
-    const count = events.length;
-    /** Match Lovable `grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5` slide widths */
-    let config = {
-      itemsPerView:
-        "shrink-0 basis-[min(100%,11rem)] pl-4 sm:basis-[47%] md:basis-[31%] lg:basis-[22.5%]",
-      showNavigationDesktop: true,
-    };
-
-    if (count === 1) {
-      config = {
-        itemsPerView: "basis-full pl-4",
-        showNavigationDesktop: false,
-      };
-    } else if (count === 2) {
-      config = {
-        itemsPerView: "shrink-0 basis-full pl-4 sm:basis-[48%]",
-        showNavigationDesktop: false,
-      };
-    } else if (count === 3) {
-      config = {
-        itemsPerView: "shrink-0 basis-full pl-4 sm:basis-[48%] md:basis-[31%]",
-        showNavigationDesktop: false,
-      };
-    } else if (count === 4) {
-      config = {
-        itemsPerView:
-          "shrink-0 basis-[min(100%,11rem)] pl-4 sm:basis-[48%] lg:basis-1/4",
-        showNavigationDesktop: false,
-      };
-    }
-
-    return config;
-  }, [events.length]);
+  const scrollWatchKey = useMemo(
+    () => events.map((e) => e.slug).join("|"),
+    [events],
+  );
 
   // Empty state: Site Essentials preview shows labeled dummy cards; live site keeps coming soon
   if (events.length === 0) {
@@ -207,7 +173,7 @@ export default function PopularEvents({
               {sectionTitleText}
             </h2>
           </div>
-          <div className="max-w-[13rem] sm:max-w-[14rem]">
+          <div className="mx-auto max-w-[16rem] sm:max-w-[18rem]">
             <LocationEventCard
               event={event}
               locationSlug={locationSlug || ""}
@@ -216,6 +182,78 @@ export default function PopularEvents({
               onNavigateStart={() => setPendingEventSlug(event.slug)}
               imageFallback={eventImages[0]}
             />
+          </div>
+        </div>
+      </section>
+    );
+  }
+
+  // 2–4 events: horizontal carousel on small screens; grid from md breakpoint up
+  if (events.length > 1 && events.length <= 4) {
+    return (
+      <section
+        id="latest-events"
+        className="w-full bg-transparent py-16 text-[var(--color-text)]"
+      >
+        <div className="container mx-auto max-w-7xl px-4">
+          <div className="mb-8 w-full text-left">
+            <span className="mb-1 block text-xs font-bold uppercase tracking-[0.2em] text-[color:var(--color-primary)]">
+              Featured right now
+            </span>
+            <h2 className="text-2xl font-black tracking-tight text-[var(--color-text)] md:text-3xl">
+              {sectionTitleText}
+            </h2>
+          </div>
+
+          <div className="relative w-full md:hidden">
+            <EventListingHorizontalScroll
+              watchKey={scrollWatchKey}
+              leftButtonClassName={eventCarouselNavButtonClass(
+                "absolute left-0 top-1/2 -translate-y-1/2 sm:left-0",
+              )}
+              rightButtonClassName={eventCarouselNavButtonClass(
+                "absolute right-0 top-1/2 -translate-y-1/2 sm:right-0",
+              )}
+            >
+              {events.map((event, index) => (
+                <div
+                  key={event.slug || index}
+                  className={mobileEventRowPeekScrollItemClass}
+                >
+                  <div className="h-full w-full pb-1 pt-0.5">
+                    <LocationEventCard
+                      event={event}
+                      locationSlug={locationSlug || ""}
+                      locationLabel={locationLabel}
+                      isPending={pendingEventSlug === event.slug}
+                      onNavigateStart={() => setPendingEventSlug(event.slug)}
+                      imageFallback={eventImages[index % eventImages.length]}
+                    />
+                  </div>
+                </div>
+              ))}
+            </EventListingHorizontalScroll>
+          </div>
+
+          <div
+            className={cn(
+              "hidden gap-5 md:grid",
+              events.length === 2 && "md:grid-cols-2",
+              events.length === 3 && "md:grid-cols-2 lg:grid-cols-3",
+              events.length === 4 && "md:grid-cols-2 lg:grid-cols-4",
+            )}
+          >
+            {events.map((event, index) => (
+              <LocationEventCard
+                key={event.slug || index}
+                event={event}
+                locationSlug={locationSlug || ""}
+                locationLabel={locationLabel}
+                isPending={pendingEventSlug === event.slug}
+                onNavigateStart={() => setPendingEventSlug(event.slug)}
+                imageFallback={eventImages[index % eventImages.length]}
+              />
+            ))}
           </div>
         </div>
       </section>
@@ -237,49 +275,30 @@ export default function PopularEvents({
           </h2>
         </div>
         <div className="relative w-full">
-          <Carousel
-            opts={{ align: "start", loop: false }}
-            className="relative w-full"
+          <EventListingHorizontalScroll
+            watchKey={scrollWatchKey}
+            leftButtonClassName={eventCarouselNavButtonClass(
+              "absolute left-0 top-1/2 -translate-y-1/2 md:-left-1 lg:-left-2",
+            )}
+            rightButtonClassName={eventCarouselNavButtonClass(
+              "absolute right-0 top-1/2 -translate-y-1/2 md:-right-1 lg:-right-2",
+            )}
           >
-            <CarouselPrevious
-              className={eventCarouselNavButtonClass(
-                cn(
-                  "absolute top-1/2 z-10 -translate-y-1/2",
-                  events.length === 2 ? "-left-1 md:-left-2" : "",
-                  events.length === 3 ? "-left-1 md:-left-2" : "",
-                  events.length >= 4 && "-left-1 md:-left-3",
-                  !showNavigationDesktop && "md:hidden",
-                ),
-              )}
-            />
-            <CarouselContent className="-ml-4 flex">
-              {events.map((data, index) => (
-                <CarouselItem className={cn(itemsPerView)} key={index}>
-                  <div className="h-full w-full pb-1 pt-0.5">
-                    <LocationEventCard
-                      event={data}
-                      locationSlug={locationSlug || ""}
-                      locationLabel={locationLabel}
-                      isPending={pendingEventSlug === data.slug}
-                      onNavigateStart={() => setPendingEventSlug(data.slug)}
-                      imageFallback={eventImages[index % eventImages.length]}
-                    />
-                  </div>
-                </CarouselItem>
-              ))}
-            </CarouselContent>
-            <CarouselNext
-              className={eventCarouselNavButtonClass(
-                cn(
-                  "absolute top-1/2 z-10 -translate-y-1/2",
-                  events.length === 2 ? "-right-1 md:-right-2" : "",
-                  events.length === 3 ? "-right-1 md:-right-2" : "",
-                  events.length >= 4 && "-right-1 md:-right-3",
-                  !showNavigationDesktop && "md:hidden",
-                ),
-              )}
-            />
-          </Carousel>
+            {events.map((data, index) => (
+              <div key={data.slug || index} className={eventListingManyScrollItemClass}>
+                <div className="h-full w-full pb-1 pt-0.5">
+                  <LocationEventCard
+                    event={data}
+                    locationSlug={locationSlug || ""}
+                    locationLabel={locationLabel}
+                    isPending={pendingEventSlug === data.slug}
+                    onNavigateStart={() => setPendingEventSlug(data.slug)}
+                    imageFallback={eventImages[index % eventImages.length]}
+                  />
+                </div>
+              </div>
+            ))}
+          </EventListingHorizontalScroll>
         </div>
       </div>
     </section>

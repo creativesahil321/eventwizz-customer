@@ -195,6 +195,29 @@ export default function CommonHeader({
   };
 
   const styles = getVariantStyles();
+  /** Glass pills over imagery: live location/event pages + onboarding homepage with cover. */
+  const pillGlassOnHero =
+    (variant === "default" && !isScrolled) ||
+    (variant === "onboarding" && hasBackgroundImage);
+  const topBarPillClass = cn(
+    "rounded-full border px-3 py-1 text-sm transition-colors whitespace-nowrap backdrop-blur-md",
+    pillGlassOnHero
+      ? cn(
+          "bg-white/10 hover:bg-white/15",
+          "border-[color:color-mix(in_srgb,var(--color-primary)_55%,white_18%)]",
+          "shadow-[0_10px_30px_-18px_rgba(0,0,0,0.55)]",
+        )
+      : cn(
+          // Keep pill-shaped controls after scroll (no square fallback).
+          "bg-[color:color-mix(in_srgb,var(--color-header)_72%,transparent)] hover:bg-[color:color-mix(in_srgb,var(--color-header)_82%,transparent)]",
+          "border-[color:color-mix(in_srgb,var(--color-primary)_28%,var(--color-on-header)_16%)]",
+          "shadow-[0_12px_28px_-18px_rgba(15,23,42,0.22)]",
+        ),
+  );
+  const topBarPillDisabledClass = cn(
+    topBarPillClass,
+    "cursor-not-allowed opacity-60",
+  );
   /** Live look (`default`) but no real navigation — e.g. onboarding form preview inside PreviewProvider. */
   const useNonInteractiveChrome =
     variant === "onboarding" ||
@@ -253,7 +276,7 @@ export default function CommonHeader({
           >
             {useNonInteractiveChrome ? (
               <div
-                className={`text-sm ${styles.textColor} opacity-60 border-2 ${styles.borderColor} rounded-lg px-2 py-1 cursor-not-allowed`}
+                className={cn(topBarPillDisabledClass, styles.textColor)}
               >
                 {headerData.browseEvent.linkText}
               </div>
@@ -261,10 +284,9 @@ export default function CommonHeader({
               <Link
                 href={headerData.browseEvent.link}
                 className={cn(
-                  "text-sm transition-colors border-2 rounded-lg px-2 py-1",
+                  topBarPillClass,
                   styles.textColor,
                   styles.hoverColor,
-                  styles.borderColor,
                 )}
               >
                 {headerData.browseEvent.linkText}
@@ -316,7 +338,11 @@ export default function CommonHeader({
             {/* Cart Button */}
             {useNonInteractiveChrome ? (
               <div
-                className={`flex items-center gap-1 ${styles.textColor} opacity-60 transition-colors border-2 ${styles.borderColor} rounded-lg px-2 py-1 cursor-not-allowed`}
+                className={cn(
+                  "flex items-center gap-1",
+                  topBarPillDisabledClass,
+                  styles.textColor,
+                )}
               >
                 <ShoppingCart size={16} />
                 <span>Cart</span>
@@ -325,10 +351,10 @@ export default function CommonHeader({
               <CartButton
                 size="sm"
                 className={cn(
-                  "flex items-center gap-1 transition-colors border-2 rounded-lg px-2 py-1",
+                  "flex items-center gap-1",
+                  topBarPillClass,
                   styles.textColor,
                   styles.hoverColor,
-                  styles.borderColor,
                 )}
               />
             )}
@@ -344,7 +370,12 @@ export default function CommonHeader({
                 return (
                   <div
                     key={index}
-                    className={`flex items-center gap-1 ${styles.textColor} opacity-60 border-2 ${styles.borderColor} rounded-lg px-1.5 sm:px-2 py-1 whitespace-nowrap cursor-not-allowed`}
+                    className={cn(
+                      "flex items-center gap-1",
+                      topBarPillDisabledClass,
+                      "px-2 sm:px-3",
+                      styles.textColor,
+                    )}
                     title={isPhoneNumber ? linkText : undefined}
                   >
                     {IconComponent && (
@@ -374,10 +405,11 @@ export default function CommonHeader({
                   href={link}
                   onClick={handleLinkClick}
                   className={cn(
-                    "flex items-center gap-1 transition-colors border-2 rounded-lg px-1.5 sm:px-2 py-1 whitespace-nowrap",
+                    "flex items-center gap-1",
+                    topBarPillClass,
+                    "px-2 sm:px-3",
                     styles.textColor,
                     styles.hoverColor,
-                    styles.borderColor,
                   )}
                   title={isPhoneNumber ? linkText : undefined}
                 >

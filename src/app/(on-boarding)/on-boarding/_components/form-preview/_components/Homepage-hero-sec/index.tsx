@@ -70,14 +70,17 @@ export default function HomepageHeroSec({
       className={cn(
         "relative mx-auto flex min-h-[min(70vh,560px)] w-full justify-center overflow-hidden bg-[#F3F4F6] bg-cover bg-center bg-no-repeat",
         heroBandVerticalClass(valign),
-        align === "left" &&
-          valign === "center" &&
-          "!items-stretch !justify-end !pb-10 pt-20 md:!pb-16 md:pt-24",
+        align === "left" && valign === "center" && "!items-stretch",
       )}
       style={bgImage ? { backgroundImage: bgImage } : undefined}
     >
-      <div className="absolute inset-0 bg-black/40" aria-hidden />
-      <div className="relative z-10 max-w-7xl mx-auto w-full overflow-visible px-4 pt-20">
+      {bgImage ? (
+        <div
+          className="absolute inset-0 bg-gradient-to-b from-black/60 via-black/30 to-black/85"
+          aria-hidden
+        />
+      ) : null}
+      <div className="relative z-10 mx-auto w-full max-w-7xl overflow-visible px-4 pt-28 sm:pt-32 md:pt-36">
         <div className={cn(heroBannerStackClass(align), "overflow-visible")}>
           <SiteHeading
             level={1}
@@ -86,7 +89,12 @@ export default function HomepageHeroSec({
             emphasis={emphasis}
             variant="onDark"
             align={align}
-            className="mb-4 font-bold !text-3xl md:!text-4xl lg:!text-5xl"
+            className={cn(
+              "mb-4 font-bold !text-3xl !leading-[0.98] sm:!text-4xl md:!text-5xl lg:!text-6xl",
+              align === "left"
+                ? "max-w-[min(100%,28rem)] sm:max-w-xl md:max-w-2xl lg:max-w-3xl"
+                : "max-w-4xl",
+            )}
           />
           <p
             className={cn(

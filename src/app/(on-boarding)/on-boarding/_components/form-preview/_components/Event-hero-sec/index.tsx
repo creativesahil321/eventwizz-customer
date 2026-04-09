@@ -5,6 +5,7 @@ import { SiteHeading } from "@/components/public/site-heading";
 import type { HeadingEmphasis } from "@/lib/heading-emphasis";
 import { normalizeHeadingEmphasis } from "@/lib/heading-emphasis";
 import {
+  heroBandContentPadClass,
   heroBandVerticalClass,
   heroBannerStackClass,
   heroBannerSubheadingClass,
@@ -106,12 +107,10 @@ export default function EventHeroSec({
     <section
       className={cn(
         "relative mx-auto flex w-full justify-center overflow-hidden",
-        /* Lovable-style band — same as live event-detail-client */
+        /* Hero band — aligned with live event detail page */
         "h-[min(70dvh,760px)] min-h-[400px] max-h-[820px]",
         heroBandVerticalClass(valign),
-        align === "left" &&
-          valign === "center" &&
-          "!items-stretch !justify-end !pb-10 pt-20 md:!pb-16 md:pt-24",
+        align === "left" && valign === "center" && "!items-stretch",
       )}
     >
       {/* Background layer */}
@@ -154,7 +153,7 @@ export default function EventHeroSec({
         />
       </div>
 
-      {/* Primary orbs (Lovable hero atmosphere) */}
+      {/* Primary brand atmosphere orbs */}
       <div
         className="pointer-events-none absolute left-1/4 top-16 z-[2] h-72 w-72 rounded-full bg-[color:color-mix(in_srgb,var(--color-primary)_18%,transparent)] blur-[100px] md:h-96 md:w-96 md:blur-[120px]"
         aria-hidden
@@ -165,7 +164,12 @@ export default function EventHeroSec({
       />
 
       {/* Copy — vertical band from Site Essentials / Try theme */}
-      <div className="relative z-20 max-w-7xl mx-auto w-full overflow-visible px-4 pb-12 pt-24 md:pb-16 md:pt-28">
+      <div
+        className={cn(
+          "relative z-20 max-w-7xl mx-auto w-full overflow-visible px-4",
+          heroBandContentPadClass(valign),
+        )}
+      >
         <div className={cn(heroBannerStackClass(align), "overflow-visible")}>
           <SiteHeading
             level={1}
@@ -174,7 +178,12 @@ export default function EventHeroSec({
             emphasis={emphasis}
             variant="onDark"
             align={align}
-            className="mb-4 max-w-4xl font-black !text-4xl !leading-[0.95] tracking-tight md:!text-5xl lg:!text-6xl"
+            className={cn(
+              "mb-4 font-black !text-3xl !leading-[0.98] tracking-tight sm:!text-4xl md:!text-5xl lg:!text-6xl",
+              align === "left"
+                ? "max-w-[min(100%,28rem)] sm:max-w-xl md:max-w-2xl lg:max-w-3xl"
+                : "max-w-4xl",
+            )}
           />
           {heroSub ? (
             <p
@@ -190,7 +199,9 @@ export default function EventHeroSec({
           {!hasMedia && (
             <div className="mt-6 flex flex-col items-center gap-2">
               <ImageIcon size={40} className="text-white/40" />
-              <span className="text-sm text-white/60">Add a cover image or video above</span>
+              <span className="text-sm text-white/60">
+                Add a cover image or video above
+              </span>
             </div>
           )}
         </div>

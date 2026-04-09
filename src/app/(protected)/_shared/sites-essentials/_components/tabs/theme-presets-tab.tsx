@@ -39,6 +39,13 @@ import {
   normalizeBannerHeadingValign,
 } from "@/lib/banner-heading-align";
 import { Badge } from "@/components/ui/badge";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
+import { isLightUiBackground } from "@/lib/wcag-color-contrast";
 
 type ThemePresetsTabProps = {
   onGoToColors: () => void;
@@ -126,6 +133,36 @@ export function ThemePresetsTab({
 
   /** Exact form match, else last “Apply preset” on this browser (localStorage). */
   const activePresetId = matchedPresetId ?? lastAppliedPresetId;
+
+  const groupedPresets = useMemo(() => {
+    const groups: Record<
+      string,
+      { key: string; label: string; items: typeof SITE_THEME_PRESETS }
+    > = {
+      "modern-dark": { key: "modern-dark", label: "Marketing · Dark", items: [] },
+      "modern-light": {
+        key: "modern-light",
+        label: "Marketing · Light",
+        items: [],
+      },
+      "classic-dark": { key: "classic-dark", label: "Core · Dark", items: [] },
+      "classic-light": {
+        key: "classic-light",
+        label: "Core · Light",
+        items: [],
+      },
+    };
+
+    for (const preset of SITE_THEME_PRESETS) {
+      const family = preset.id.startsWith("lovable-") ? "modern" : "classic";
+      const brightness = isLightUiBackground(preset.colors.background)
+        ? "light"
+        : "dark";
+      groups[`${family}-${brightness}`].items.push(preset);
+    }
+
+    return Object.values(groups).filter((g) => g.items.length > 0);
+  }, []);
 
   return (
     <div className="space-y-3">
@@ -277,95 +314,119 @@ export function ThemePresetsTab({
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
-        {SITE_THEME_PRESETS.map((preset) => {
-          const selected = activePresetId === preset.id;
-          const [c1, c2, c3] = preset.swatch;
+      <Accordion
+        type="multiple"
+        defaultValue={["modern-dark", "modern-light"]}
+        className="w-full"
+      >
+        {groupedPresets.map((group) => (
+          <AccordionItem key={group.key} value={group.key}>
+            <AccordionTrigger className="py-2 text-sm hover:no-underline">
+              <span className="flex w-full items-center justify-between gap-3">
+                <span className="font-semibold">{group.label}</span>
+                <span className="shrink-0 text-xs font-medium text-muted-foreground">
+                  {group.items.length}
+                </span>
+              </span>
+            </AccordionTrigger>
+            <AccordionContent className="pt-0 pb-2">
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
+                {group.items.map((preset) => {
+                  const selected = activePresetId === preset.id;
+                  const [c1, c2, c3] = preset.swatch;
 
-          return (
-            <div
-              key={preset.id}
-              className={cn(
-                "relative flex flex-col overflow-hidden rounded-md border bg-white shadow-sm transition-shadow",
-                selected
-                  ? "border-[var(--color-primary)] ring-1 ring-[var(--color-primary)]/20"
-                  : "border-slate-200/90 hover:border-slate-300 hover:shadow",
-              )}
-            >
-              <div
-                className="flex h-7 w-full sm:h-8"
-                style={{
-                  background: `linear-gradient(110deg, ${c1} 0%, ${c1} 42%, ${c2} 42%, ${c2} 68%, ${c3} 68%, ${c3} 100%)`,
-                }}
-                aria-hidden
-              />
-              <div className="flex flex-1 flex-col gap-1.5 p-2 sm:p-2.5">
-                <div className="min-h-0">
-                  <div className="flex flex-wrap items-center gap-1">
-                    <h3 className="text-xs font-semibold leading-tight text-gray-900">
-                      {preset.name}
-                    </h3>
-                    {presetIncludesCdnStylesheets(preset) ? (
-                      <Badge
-                        variant="secondary"
-                        className="px-1 py-0 text-[8px] font-medium uppercase leading-none tracking-wide"
-                      >
-                        CDN
-                      </Badge>
-                    ) : null}
-                  </div>
-                  <p className="mt-0.5 line-clamp-2 text-[10px] leading-snug text-gray-500">
-                    {preset.tagline}
-                  </p>
-                </div>
-                <div className="rounded border border-slate-100 bg-slate-50/80 px-2 py-1">
-                  <p
-                    className="text-xs font-semibold leading-tight text-gray-900"
-                    style={{ fontFamily: preset.typography.fontFamily.heading }}
-                  >
-                    Sample heading
-                  </p>
-                  <p
-                    className="mt-0.5 line-clamp-1 text-[9px] leading-tight text-gray-600"
-                    style={{ fontFamily: preset.typography.fontFamily.body }}
-                  >
-                    {preset.headingFontLabel} · {preset.bodyFontLabel}
-                  </p>
-                </div>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant={selected ? "event-secondary" : "event-primary"}
-                  className="mt-auto h-7 w-full px-2 text-[11px]"
-                  onClick={() => {
-                    applySiteThemePreset(preset, setValue, getValues);
-                    writeLastAppliedSiteThemePresetId(
-                      presetCacheUserKey,
-                      preset.id,
-                    );
-                    setLastAppliedPresetId(preset.id);
-                    toast({
-                      title: "Preset applied",
-                      description: presetIncludesCdnStylesheets(preset)
-                        ? "Colors, fonts, and CDN stylesheet link added — see Typography → Custom font stylesheets if you want to edit."
-                        : "Colors and fonts updated — check the heading preview above.",
-                    });
-                  }}
-                >
-                  {selected ? (
-                    <>
-                      <Check className="mr-1 h-3 w-3 shrink-0" />
-                      Applied
-                    </>
-                  ) : (
-                    "Apply"
-                  )}
-                </Button>
+                  return (
+                    <div
+                      key={preset.id}
+                      className={cn(
+                        "relative flex flex-col overflow-hidden rounded-md border bg-white shadow-sm transition-shadow",
+                        selected
+                          ? "border-[var(--color-primary)] ring-1 ring-[var(--color-primary)]/20"
+                          : "border-slate-200/90 hover:border-slate-300 hover:shadow",
+                      )}
+                    >
+                      <div
+                        className="flex h-7 w-full sm:h-8"
+                        style={{
+                          background: `linear-gradient(110deg, ${c1} 0%, ${c1} 42%, ${c2} 42%, ${c2} 68%, ${c3} 68%, ${c3} 100%)`,
+                        }}
+                        aria-hidden
+                      />
+                      <div className="flex flex-1 flex-col gap-1.5 p-2 sm:p-2.5">
+                        <div className="min-h-0">
+                          <div className="flex flex-wrap items-center gap-1">
+                            <h3 className="text-xs font-semibold leading-tight text-gray-900">
+                              {preset.name}
+                            </h3>
+                            {presetIncludesCdnStylesheets(preset) ? (
+                              <Badge
+                                variant="secondary"
+                                className="px-1 py-0 text-[8px] font-medium uppercase leading-none tracking-wide"
+                              >
+                                CDN
+                              </Badge>
+                            ) : null}
+                          </div>
+                          <p className="mt-0.5 line-clamp-2 text-[10px] leading-snug text-gray-500">
+                            {preset.tagline}
+                          </p>
+                        </div>
+                        <div className="rounded border border-slate-100 bg-slate-50/80 px-2 py-1">
+                          <p
+                            className="text-xs font-semibold leading-tight text-gray-900"
+                            style={{
+                              fontFamily: preset.typography.fontFamily.heading,
+                            }}
+                          >
+                            Sample heading
+                          </p>
+                          <p
+                            className="mt-0.5 line-clamp-1 text-[9px] leading-tight text-gray-600"
+                            style={{
+                              fontFamily: preset.typography.fontFamily.body,
+                            }}
+                          >
+                            {preset.headingFontLabel} · {preset.bodyFontLabel}
+                          </p>
+                        </div>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant={selected ? "event-secondary" : "event-primary"}
+                          className="mt-auto h-7 w-full px-2 text-[11px]"
+                          onClick={() => {
+                            applySiteThemePreset(preset, setValue, getValues);
+                            writeLastAppliedSiteThemePresetId(
+                              presetCacheUserKey,
+                              preset.id,
+                            );
+                            setLastAppliedPresetId(preset.id);
+                            toast({
+                              title: "Preset applied",
+                              description: presetIncludesCdnStylesheets(preset)
+                                ? "Colors, fonts, and CDN stylesheet link added — see Typography → Custom font stylesheets if you want to edit."
+                                : "Colors and fonts updated — check the heading preview above.",
+                            });
+                          }}
+                        >
+                          {selected ? (
+                            <>
+                              <Check className="mr-1 h-3 w-3 shrink-0" />
+                              Applied
+                            </>
+                          ) : (
+                            "Apply"
+                          )}
+                        </Button>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
-            </div>
-          );
-        })}
-      </div>
+            </AccordionContent>
+          </AccordionItem>
+        ))}
+      </Accordion>
 
       <p className="text-[10px] leading-relaxed text-muted-foreground sm:text-[11px]">
         <span className="font-medium text-foreground/70">CDN font</span> presets

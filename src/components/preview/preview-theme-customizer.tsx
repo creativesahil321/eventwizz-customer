@@ -23,6 +23,12 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
 import { cn } from "@/lib/utils";
 import type { SiteEssentialsFormValues } from "@/app/(protected)/_shared/sites-essentials/_lib/schema";
 import {
@@ -117,6 +123,11 @@ function presetById(
     throw new Error(`Unknown theme preset: ${id}`);
   }
   return p;
+}
+
+/** Preset ids prefixed `lovable-` are legacy internal keys; UI groups use neutral labels. */
+function presetGroupKeyFromId(id: SiteThemePresetId) {
+  return id.startsWith("lovable-") ? "modern" : "classic";
 }
 
 export function PreviewThemeCustomizer({
@@ -266,6 +277,28 @@ export function PreviewThemeCustomizer({
     [lastFontKey],
   );
 
+  const groupedFontGridOptions = useMemo(() => {
+    const groups: Record<
+      string,
+      { key: string; label: string; items: typeof orderedFontGridOptions }
+    > = {
+      modern: { key: "modern", label: "Marketing font pairs", items: [] },
+      classic: { key: "classic", label: "Core font pairs", items: [] },
+      extra: { key: "extra", label: "Extra font pairs", items: [] },
+    };
+
+    for (const opt of orderedFontGridOptions) {
+      if (opt.source === "preset") {
+        const k = presetGroupKeyFromId(opt.id);
+        groups[k].items.push(opt);
+      } else {
+        groups.extra.items.push(opt);
+      }
+    }
+
+    return Object.values(groups).filter((g) => g.items.length > 0);
+  }, [orderedFontGridOptions]);
+
   const orderedColorGridOptions = useMemo(() => {
     let list = TRY_THEME_COLOR_GRID_OPTIONS;
     if (colorFilter === "dark") {
@@ -279,6 +312,32 @@ export function PreviewThemeCustomizer({
       tryThemeColorGridOptionStorageKey,
     );
   }, [colorFilter, lastColorKey]);
+
+  const groupedColorGridOptions = useMemo(() => {
+    const groups: Record<
+      string,
+      {
+        key: string;
+        label: string;
+        items: typeof orderedColorGridOptions;
+      }
+    > = {
+      modern: { key: "modern", label: "Marketing palettes", items: [] },
+      classic: { key: "classic", label: "Core palettes", items: [] },
+      extra: { key: "extra", label: "Extra palettes", items: [] },
+    };
+
+    for (const opt of orderedColorGridOptions) {
+      if (opt.source === "preset") {
+        const k = presetGroupKeyFromId(opt.id);
+        groups[k].items.push(opt);
+      } else {
+        groups.extra.items.push(opt);
+      }
+    }
+
+    return Object.values(groups).filter((g) => g.items.length > 0);
+  }, [orderedColorGridOptions]);
 
   const currentHeroAlign = normalizeBannerHeadingAlign(
     values.banner_heading_align,
@@ -497,78 +556,105 @@ export function PreviewThemeCustomizer({
                     <RotateCcw className="h-4 w-4" />
                   </Button>
                 </div>
-                <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
-                  {orderedFontGridOptions.map((opt) => {
-                    const active =
-                      currentFontKey ===
-                      siteEssentialsFontPairKey({
-                        fontFamily: {
-                          heading: opt.headingStack,
-                          body: opt.bodyStack,
-                        },
-                      });
-                    const pinned =
-                      tryThemeFontGridOptionStorageKey(opt) === lastFontKey;
-                    const showRecent = pinned && !active;
-                    return (
-                      <button
-                        key={
-                          opt.source === "preset" ? opt.id : `extra-${opt.key}`
-                        }
-                        type="button"
-                        aria-current={active ? "true" : undefined}
-                        onClick={() => applyFontGridOption(opt)}
-                        className={cn(
-                          "relative flex min-h-[5.75rem] flex-col items-center justify-center rounded-xl border p-2 text-center transition-all duration-200",
-                          active ? "pt-6" : "",
-                          active
-                            ? "border-slate-300/90 bg-white shadow-[0_8px_28px_-10px_rgba(15,23,42,0.2),0_0_0_1px_rgba(15,23,42,0.05)] before:pointer-events-none before:absolute before:inset-y-3 before:left-0 before:w-[3px] before:rounded-r-full before:bg-slate-800 before:content-[''] hover:border-slate-400"
-                            : "border-slate-200/90 bg-slate-50/80 hover:border-slate-300 hover:bg-white hover:shadow-sm",
-                        )}
-                        title={
-                          opt.tagline
-                            ? `${opt.headingFontLabel} / ${opt.bodyFontLabel}\n\n${opt.tagline}`
-                            : `${opt.headingFontLabel} / ${opt.bodyFontLabel}`
-                        }
-                      >
-                        {active ? (
-                          <span className="absolute left-1/2 top-1.5 z-10 flex -translate-x-1/2 items-center gap-1 rounded-full border border-slate-200/80 bg-white/95 px-2 py-0.5 text-[9px] font-medium text-slate-700 shadow-[0_1px_2px_rgba(15,23,42,0.06)] backdrop-blur-sm">
-                            <span
-                              className="h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500 shadow-[0_0_0_1px_rgba(255,255,255,0.9)]"
-                              aria-hidden
-                            />
-                            In use
+                <Accordion
+                  type="multiple"
+                  defaultValue={["modern", "classic"]}
+                  className="w-full"
+                >
+                  {groupedFontGridOptions.map((group) => (
+                    <AccordionItem
+                      key={group.key}
+                      value={group.key}
+                      className="border-slate-200/80"
+                    >
+                      <AccordionTrigger className="py-2 text-xs text-slate-700 hover:no-underline">
+                        <span className="flex w-full items-center justify-between gap-3">
+                          <span className="font-semibold">{group.label}</span>
+                          <span className="shrink-0 text-[10px] font-medium text-slate-500">
+                            {group.items.length}
                           </span>
-                        ) : null}
-                        {showRecent ? (
-                          <span
-                            className="absolute right-1 top-1 z-10 rounded-full border border-slate-200/90 bg-white px-1.5 py-0.5 text-[8px] font-medium text-slate-500 shadow-sm"
-                            title="Last picked this session"
-                          >
-                            Recent
-                          </span>
-                        ) : null}
-                        <span
-                          className="text-lg font-semibold leading-none text-slate-800"
-                          style={{ fontFamily: opt.headingStack }}
-                        >
-                          Aa
                         </span>
-                        <span
-                          className="mt-1 line-clamp-1 px-0.5 text-[9px] font-medium text-slate-600"
-                          style={{ fontFamily: opt.bodyStack }}
-                        >
-                          {opt.bodyFontLabel}
-                        </span>
-                        {opt.tagline ? (
-                          <span className="mt-0.5 line-clamp-2 px-0.5 text-[7px] leading-tight text-slate-400">
-                            {opt.tagline}
-                          </span>
-                        ) : null}
-                      </button>
-                    );
-                  })}
-                </div>
+                      </AccordionTrigger>
+                      <AccordionContent className="pt-0 pb-3">
+                        <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
+                          {group.items.map((opt) => {
+                            const active =
+                              currentFontKey ===
+                              siteEssentialsFontPairKey({
+                                fontFamily: {
+                                  heading: opt.headingStack,
+                                  body: opt.bodyStack,
+                                },
+                              });
+                            const pinned =
+                              tryThemeFontGridOptionStorageKey(opt) ===
+                              lastFontKey;
+                            const showRecent = pinned && !active;
+                            return (
+                              <button
+                                key={
+                                  opt.source === "preset"
+                                    ? opt.id
+                                    : `extra-${opt.key}`
+                                }
+                                type="button"
+                                aria-current={active ? "true" : undefined}
+                                onClick={() => applyFontGridOption(opt)}
+                                className={cn(
+                                  "relative flex min-h-[5.75rem] flex-col items-center justify-center rounded-xl border p-2 text-center transition-all duration-200",
+                                  active ? "pt-6" : "",
+                                  active
+                                    ? "border-slate-300/90 bg-white shadow-[0_8px_28px_-10px_rgba(15,23,42,0.2),0_0_0_1px_rgba(15,23,42,0.05)] before:pointer-events-none before:absolute before:inset-y-3 before:left-0 before:w-[3px] before:rounded-r-full before:bg-slate-800 before:content-[''] hover:border-slate-400"
+                                    : "border-slate-200/90 bg-slate-50/80 hover:border-slate-300 hover:bg-white hover:shadow-sm",
+                                )}
+                                title={
+                                  opt.tagline
+                                    ? `${opt.headingFontLabel} / ${opt.bodyFontLabel}\n\n${opt.tagline}`
+                                    : `${opt.headingFontLabel} / ${opt.bodyFontLabel}`
+                                }
+                              >
+                                {active ? (
+                                  <span className="absolute left-1/2 top-1.5 z-10 flex -translate-x-1/2 items-center gap-1 rounded-full border border-slate-200/80 bg-white/95 px-2 py-0.5 text-[9px] font-medium text-slate-700 shadow-[0_1px_2px_rgba(15,23,42,0.06)] backdrop-blur-sm">
+                                    <span
+                                      className="h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500 shadow-[0_0_0_1px_rgba(255,255,255,0.9)]"
+                                      aria-hidden
+                                    />
+                                    In use
+                                  </span>
+                                ) : null}
+                                {showRecent ? (
+                                  <span
+                                    className="absolute right-1 top-1 z-10 rounded-full border border-slate-200/90 bg-white px-1.5 py-0.5 text-[8px] font-medium text-slate-500 shadow-sm"
+                                    title="Last picked this session"
+                                  >
+                                    Recent
+                                  </span>
+                                ) : null}
+                                <span
+                                  className="text-lg font-semibold leading-none text-slate-800"
+                                  style={{ fontFamily: opt.headingStack }}
+                                >
+                                  Aa
+                                </span>
+                                <span
+                                  className="mt-1 line-clamp-1 px-0.5 text-[9px] font-medium text-slate-600"
+                                  style={{ fontFamily: opt.bodyStack }}
+                                >
+                                  {opt.bodyFontLabel}
+                                </span>
+                                {opt.tagline ? (
+                                  <span className="mt-0.5 line-clamp-2 px-0.5 text-[7px] leading-tight text-slate-400">
+                                    {opt.tagline}
+                                  </span>
+                                ) : null}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </AccordionContent>
+                    </AccordionItem>
+                  ))}
+                </Accordion>
               </div>
 
               <div>
@@ -611,94 +697,125 @@ export function PreviewThemeCustomizer({
                   primary-on-surface for cards; triangle = double-check in Site
                   Essentials.
                 </p>
-                <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
-                  {orderedColorGridOptions.map((opt) => {
-                    const [a, b, c] = opt.swatch;
-                    const active = siteEssentialsColorsMatch(
-                      values.colors,
-                      opt.colors,
-                    );
-                    const pinned =
-                      tryThemeColorGridOptionStorageKey(opt) === lastColorKey;
-                    const showRecent = pinned && !active;
-                    const acc = paletteAccessibilityFlags(opt.colors);
-                    const contrastOk = acc.bodyTextAa && acc.primaryOnSurfaceUi;
-                    return (
-                      <button
-                        key={
-                          opt.source === "preset" ? opt.id : `extra-${opt.key}`
-                        }
-                        type="button"
-                        aria-current={active ? "true" : undefined}
-                        onClick={() => applyColorGridOption(opt)}
-                        className={cn(
-                          "relative flex flex-col items-center gap-1 rounded-xl border p-2 pt-2.5 transition-all duration-200",
-                          active
-                            ? "border-slate-300/90 bg-white shadow-[0_8px_28px_-10px_rgba(15,23,42,0.2),0_0_0_1px_rgba(15,23,42,0.05)] before:pointer-events-none before:absolute before:inset-y-3 before:left-0 before:w-[3px] before:rounded-r-full before:bg-slate-800 before:content-[''] hover:border-slate-400"
-                            : "border-slate-200/90 bg-white hover:border-slate-300 hover:shadow-sm",
-                        )}
-                        title={`${opt.name}\n\n${opt.tagline}`}
-                      >
-                        {active ? (
-                          <span className="absolute right-1.5 top-1.5 z-10 flex items-center gap-1 rounded-full border border-slate-200/80 bg-white/95 px-1.5 py-0.5 text-[8px] font-medium text-slate-700 shadow-[0_1px_2px_rgba(15,23,42,0.06)] backdrop-blur-sm">
-                            <span
-                              className="h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500 shadow-[0_0_0_1px_rgba(255,255,255,0.9)]"
-                              aria-hidden
-                            />
-                            In use
+                <Accordion
+                  type="multiple"
+                  defaultValue={["modern", "classic"]}
+                  className="w-full"
+                >
+                  {groupedColorGridOptions.map((group) => (
+                    <AccordionItem
+                      key={group.key}
+                      value={group.key}
+                      className="border-slate-200/80"
+                    >
+                      <AccordionTrigger className="py-2 text-xs text-slate-700 hover:no-underline">
+                        <span className="flex w-full items-center justify-between gap-3">
+                          <span className="font-semibold">{group.label}</span>
+                          <span className="shrink-0 text-[10px] font-medium text-slate-500">
+                            {group.items.length}
                           </span>
-                        ) : null}
-                        {showRecent ? (
-                          <span
-                            className="absolute right-1.5 top-1.5 z-10 rounded-full border border-slate-200/90 bg-white px-1.5 py-0.5 text-[8px] font-medium text-slate-500 shadow-sm"
-                            title="Last picked this session"
-                          >
-                            Recent
-                          </span>
-                        ) : null}
-                        <span
-                          className={cn(
-                            "absolute left-1.5 top-1.5 z-[1] flex h-4 w-4 items-center justify-center rounded-full border shadow-sm",
-                            contrastOk
-                              ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-                              : "border-amber-200 bg-amber-50 text-amber-700",
-                          )}
-                          title={
-                            contrastOk
-                              ? "Body text and primary on surface meet common WCAG targets"
-                              : "Contrast may be tight — verify in Site Essentials"
-                          }
-                        >
-                          {contrastOk ? (
-                            <Check className="h-2.5 w-2.5" strokeWidth={3} />
-                          ) : (
-                            <AlertTriangle className="h-2.5 w-2.5" />
-                          )}
                         </span>
-                        <div className="mt-2 flex gap-0.5">
-                          <span
-                            className="h-5 w-5 rounded-full border border-black/10 shadow-inner"
-                            style={{ backgroundColor: a }}
-                          />
-                          <span
-                            className="h-5 w-5 rounded-full border border-black/10 shadow-inner"
-                            style={{ backgroundColor: b }}
-                          />
-                          <span
-                            className="h-5 w-5 rounded-full border border-black/10 shadow-inner"
-                            style={{ backgroundColor: c }}
-                          />
+                      </AccordionTrigger>
+                      <AccordionContent className="pt-0 pb-3">
+                        <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
+                          {group.items.map((opt) => {
+                            const [a, b, c] = opt.swatch;
+                            const active = siteEssentialsColorsMatch(
+                              values.colors,
+                              opt.colors,
+                            );
+                            const pinned =
+                              tryThemeColorGridOptionStorageKey(opt) ===
+                              lastColorKey;
+                            const showRecent = pinned && !active;
+                            const acc = paletteAccessibilityFlags(opt.colors);
+                            const contrastOk =
+                              acc.bodyTextAa && acc.primaryOnSurfaceUi;
+                            return (
+                              <button
+                                key={
+                                  opt.source === "preset"
+                                    ? opt.id
+                                    : `extra-${opt.key}`
+                                }
+                                type="button"
+                                aria-current={active ? "true" : undefined}
+                                onClick={() => applyColorGridOption(opt)}
+                                className={cn(
+                                  "relative flex flex-col items-center gap-1 rounded-xl border p-2 pt-2.5 transition-all duration-200",
+                                  active
+                                    ? "border-slate-300/90 bg-white shadow-[0_8px_28px_-10px_rgba(15,23,42,0.2),0_0_0_1px_rgba(15,23,42,0.05)] before:pointer-events-none before:absolute before:inset-y-3 before:left-0 before:w-[3px] before:rounded-r-full before:bg-slate-800 before:content-[''] hover:border-slate-400"
+                                    : "border-slate-200/90 bg-white hover:border-slate-300 hover:shadow-sm",
+                                )}
+                                title={`${opt.name}\n\n${opt.tagline}`}
+                              >
+                                {active ? (
+                                  <span className="absolute right-1.5 top-1.5 z-10 flex items-center gap-1 rounded-full border border-slate-200/80 bg-white/95 px-1.5 py-0.5 text-[8px] font-medium text-slate-700 shadow-[0_1px_2px_rgba(15,23,42,0.06)] backdrop-blur-sm">
+                                    <span
+                                      className="h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500 shadow-[0_0_0_1px_rgba(255,255,255,0.9)]"
+                                      aria-hidden
+                                    />
+                                    In use
+                                  </span>
+                                ) : null}
+                                {showRecent ? (
+                                  <span
+                                    className="absolute right-1.5 top-1.5 z-10 rounded-full border border-slate-200/90 bg-white px-1.5 py-0.5 text-[8px] font-medium text-slate-500 shadow-sm"
+                                    title="Last picked this session"
+                                  >
+                                    Recent
+                                  </span>
+                                ) : null}
+                                <span
+                                  className={cn(
+                                    "absolute left-1.5 top-1.5 z-[1] flex h-4 w-4 items-center justify-center rounded-full border shadow-sm",
+                                    contrastOk
+                                      ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                                      : "border-amber-200 bg-amber-50 text-amber-700",
+                                  )}
+                                  title={
+                                    contrastOk
+                                      ? "Body text and primary on surface meet common WCAG targets"
+                                      : "Contrast may be tight — verify in Site Essentials"
+                                  }
+                                >
+                                  {contrastOk ? (
+                                    <Check
+                                      className="h-2.5 w-2.5"
+                                      strokeWidth={3}
+                                    />
+                                  ) : (
+                                    <AlertTriangle className="h-2.5 w-2.5" />
+                                  )}
+                                </span>
+                                <div className="mt-2 flex gap-0.5">
+                                  <span
+                                    className="h-5 w-5 rounded-full border border-black/10 shadow-inner"
+                                    style={{ backgroundColor: a }}
+                                  />
+                                  <span
+                                    className="h-5 w-5 rounded-full border border-black/10 shadow-inner"
+                                    style={{ backgroundColor: b }}
+                                  />
+                                  <span
+                                    className="h-5 w-5 rounded-full border border-black/10 shadow-inner"
+                                    style={{ backgroundColor: c }}
+                                  />
+                                </div>
+                                <span className="line-clamp-1 w-full text-center text-[9px] font-medium text-slate-700">
+                                  {opt.name}
+                                </span>
+                                <span className="line-clamp-2 w-full text-center text-[8px] leading-snug text-slate-500">
+                                  {opt.tagline}
+                                </span>
+                              </button>
+                            );
+                          })}
                         </div>
-                        <span className="line-clamp-1 w-full text-center text-[9px] font-medium text-slate-700">
-                          {opt.name}
-                        </span>
-                        <span className="line-clamp-2 w-full text-center text-[8px] leading-snug text-slate-500">
-                          {opt.tagline}
-                        </span>
-                      </button>
-                    );
-                  })}
-                </div>
+                      </AccordionContent>
+                    </AccordionItem>
+                  ))}
+                </Accordion>
               </div>
             </div>
           </ScrollArea>

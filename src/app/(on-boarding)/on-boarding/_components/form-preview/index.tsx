@@ -636,6 +636,8 @@ export default function FormPreview() {
                 formState.stepFour?.package_button_name ? "#booking" : ""
               }
               buttonName={formState.stepFour?.package_button_name || ""}
+              headingEmphasis={tryHeroPreviewProps?.headingEmphasis ?? undefined}
+              headingAccentHint="Packages"
             />
           </Suspense>
         </div>

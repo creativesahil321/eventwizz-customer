@@ -28,6 +28,7 @@ import { useCurrencyFormat } from "@/hooks/use-currency-format";
 import { SiteHeading } from "@/components/public/site-heading";
 import { normalizeHeadingEmphasis } from "@/lib/heading-emphasis";
 import {
+  heroBandContentPadClass,
   heroBandVerticalClass,
   heroBannerStackClass,
   heroBannerSubheadingClass,
@@ -295,7 +296,7 @@ export function EventPreview({
             heroBandVerticalClass(bannerValign),
             bannerAlign === "left" &&
               bannerValign === "center" &&
-              "!items-stretch !justify-end !pb-10 pt-20 md:!pb-16 md:pt-24",
+              "!items-stretch",
           )}
         >
           <div className="absolute inset-0 overflow-hidden">
@@ -344,8 +345,18 @@ export function EventPreview({
             aria-hidden
           />
 
-          <div className="relative z-20 max-w-7xl mx-auto w-full overflow-visible px-4 pb-12 pt-24 md:pb-16 md:pt-28">
-            <div className={cn(heroBannerStackClass(bannerAlign), "overflow-visible")}>
+          <div
+            className={cn(
+              "relative z-20 max-w-7xl mx-auto w-full overflow-visible px-4",
+              heroBandContentPadClass(bannerValign),
+            )}
+          >
+            <div
+              className={cn(
+                heroBannerStackClass(bannerAlign),
+                "overflow-visible",
+              )}
+            >
               <SiteHeading
                 level={1}
                 title={heroTitle || eventName}
@@ -353,7 +364,12 @@ export function EventPreview({
                 emphasis={headingEmphasisForHero}
                 variant="onDark"
                 align={bannerAlign}
-                className="mb-4 max-w-4xl font-black !text-4xl !leading-[0.95] tracking-tight md:!text-5xl lg:!text-6xl"
+                className={cn(
+                  "mb-4 font-black !text-3xl !leading-[0.98] tracking-tight sm:!text-4xl md:!text-5xl lg:!text-6xl",
+                  bannerAlign === "left"
+                    ? "max-w-[min(100%,28rem)] sm:max-w-xl md:max-w-2xl lg:max-w-3xl"
+                    : "max-w-4xl",
+                )}
               />
               {s1?.event_banner_sub_heading ? (
                 <p
@@ -394,6 +410,8 @@ export function EventPreview({
           buttonLink="#booking"
           image={s2?.package_image || null}
           packageDetails={s2?.package_details || []}
+          headingEmphasis={headingEmphasisForHero}
+          headingAccentHint="Packages"
         />
 
         <div id="booking">

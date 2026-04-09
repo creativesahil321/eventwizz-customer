@@ -6,6 +6,8 @@ import { Button } from "@/components/ui/button";
 import { addCacheBusting } from "@/lib/image-utils";
 import { useCurrencySymbol } from "@/hooks/use-currency-format";
 import { cn } from "@/lib/utils";
+import { SiteHeading } from "@/components/public/site-heading";
+import type { HeadingEmphasis } from "@/lib/heading-emphasis";
 
 type PackageDetail = {
   title: string;
@@ -25,6 +27,10 @@ type PackageSectionProps = {
   buttonName: string;
   buttonLink: string;
   packageDetails: PackageDetail[];
+  /** Same as vendor theme `typography.headingEmphasis` (e.g. accent_tail) */
+  headingEmphasis?: HeadingEmphasis | null;
+  /** Optional substring of heading to style as trailing accent */
+  headingAccentHint?: string | null;
 };
 
 function highlightPricesInText(
@@ -67,6 +73,8 @@ export default function PackageSection({
   buttonName,
   buttonLink,
   packageDetails,
+  headingEmphasis,
+  headingAccentHint,
 }: PackageSectionProps) {
   const currencySymbol = useCurrencySymbol();
 
@@ -78,8 +86,10 @@ export default function PackageSection({
     return "/assets/images/gallery-image.png";
   };
 
-  const details =
-    packageDetails?.length > 0 ? packageDetails : [];
+  const details = packageDetails?.length > 0 ? packageDetails : [];
+  /** Keep tall lists compact next to the hero image (2 cols from md, 3 from lg). */
+  const useMultiColumnList = details.length >= 6;
+  const useThreeColumns = details.length >= 12;
 
   const cta = (
     <>
@@ -116,7 +126,12 @@ export default function PackageSection({
   return (
     <section className="w-full bg-[var(--color-background)] px-4 py-14 md:py-20">
       <div className="container mx-auto max-w-7xl">
-        <div className="flex flex-col gap-10 md:flex-row md:items-center md:gap-12 lg:gap-16">
+        <div
+          className={cn(
+            "flex flex-col gap-10 md:flex-row md:gap-12 lg:gap-16",
+            useMultiColumnList ? "md:items-start" : "md:items-center",
+          )}
+        >
           <div className="w-full shrink-0 md:w-[46%] lg:w-[48%]">
             <div className="overflow-hidden rounded-3xl bg-[var(--color-surface)] shadow-[0_24px_60px_-28px_rgba(0,0,0,0.22)] ring-1 ring-[color:color-mix(in_srgb,var(--color-text)_6%,transparent)]">
               {image ? (
@@ -138,9 +153,17 @@ export default function PackageSection({
             <p className="mb-3 text-[11px] font-bold uppercase tracking-[0.28em] text-[color:var(--color-primary)]">
               Packages
             </p>
-            <h2 className="text-2xl font-black tracking-tight text-[var(--color-text)] md:text-3xl lg:text-4xl">
-              {heading || "The Package"}
-            </h2>
+            <SiteHeading
+              level={2}
+              title={heading || "Event Packages"}
+              accentHint={
+                headingAccentHint ??
+                ((heading || "").includes("Packages") ? "Packages" : null)
+              }
+              emphasis={headingEmphasis ?? undefined}
+              variant="onSurface"
+              className="max-w-3xl font-black !text-2xl !leading-[1.02] md:!text-3xl lg:!text-4xl"
+            />
             <p className="mt-2 text-base font-semibold leading-snug text-[var(--color-text)] md:text-lg">
               {highlightPricesInText(
                 subHeading ||
@@ -154,7 +177,13 @@ export default function PackageSection({
                 <p className="mb-3 mt-6 text-xs font-medium text-[var(--color-text-dimmed)]">
                   Include:
                 </p>
-                <ul className="space-y-3">
+                <ul
+                  className={cn(
+                    "m-0 grid list-none gap-x-8 gap-y-3 p-0",
+                    useMultiColumnList && "sm:grid-cols-2",
+                    useThreeColumns && "lg:grid-cols-3",
+                  )}
+                >
                   {details.map((item, i) => (
                     <li key={i} className="flex items-start gap-3">
                       <span

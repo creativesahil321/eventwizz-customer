@@ -25,20 +25,12 @@ export type SiteHeadingProps = {
   /** onDark: hero over imagery; onSurface: page body */
   variant?: SiteHeadingVariant;
   /**
-   * Match hero column alignment (`heroBannerStackClass`). Required for `accent_tail`:
-   * the heading is `inline-flex`; on narrow screens it can grow to full width, and
-   * without this, flex defaults to `justify-start` so lines look left-aligned.
+   * Match hero column alignment (`heroBannerStackClass`). Used for `accent_tail`
+   * via `text-left` / `text-center` / `text-right` so wrapped lines align with the hero.
    */
   align?: BannerHeadingAlign;
   className?: string;
 };
-
-function headingFlexJustifyClass(align: BannerHeadingAlign | undefined) {
-  if (align === "right") return "justify-end";
-  if (align === "left") return "justify-start";
-  if (align === "center") return "justify-center";
-  return "justify-start";
-}
 
 const levelClass: Record<SiteHeadingLevel, string> = {
   1: "text-4xl font-semibold tracking-tight md:text-6xl lg:text-7xl",
@@ -52,9 +44,9 @@ const headingLine =
 const headingBox = "inline-block max-w-full overflow-visible";
 /** Extra right padding: script tails (e.g. “UK”) often extend past the em-box; bg-clip-text clips without it. */
 const accentTailScriptPad =
-  "inline-block tracking-normal pl-[0.06em] pr-[0.5em] py-[0.06em]";
+  "inline-block  pl-[0.06em] pr-[0.5em] py-[0.06em]";
 
-/** Soft bloom behind accent text (Lovable / “Welcome To Stock” trail) */
+/** Soft bloom behind accent tail text */
 function AccentTailTrail({ variant }: { variant: SiteHeadingVariant }) {
   const isDark = variant === "onDark";
   return (
@@ -157,16 +149,18 @@ export function SiteHeading({
     );
   }
 
-  /* accent_tail — lead: body + neutral; tail: heading + primary (display/script
-   * only on the tail). Flex + items-baseline aligns sans lead with script tail;
-   * tail padding avoids bg-clip-text slicing swashes (e.g. “K” in “UK”). */
+  /* accent_tail — lead: body + neutral; tail: heading + primary. Inline text flow
+   * (not flex-wrap) keeps the tail on the same line as the last base words when
+   * width allows; flex-wrap was forcing the tail onto its own row after a full-width
+   * base block. Tail padding avoids bg-clip-text slicing swashes. */
 
   return (
     <Tag
       className={cn(
-        /* items-center: mixed body + display fonts align optically vs uneven baselines */
-        "inline-flex max-w-full flex-wrap items-center gap-x-[0.2em] gap-y-1 overflow-visible",
-        headingFlexJustifyClass(align),
+        "block w-full max-w-full overflow-visible",
+        align === "right" && "text-right",
+        align === "center" && "text-center",
+        align !== "right" && align !== "center" && "text-left",
         headingLine,
         levelClass[level],
         "px-[0.12em] py-[0.12em]",
@@ -184,19 +178,22 @@ export function SiteHeading({
         {base}
       </span>
       {accent ? (
-        <span className="relative inline-block max-w-full shrink-0">
-          <AccentTailTrail variant={variant} />
-          <span
-            className={cn(
-              "relative z-[1] italic leading-none",
-              accentTailScriptPad,
-              variant === "onDark" ? accentGradient : accentSolidPrimary,
-            )}
-            style={{ fontFamily: headingFamily }}
-          >
-            {accent}
+        <>
+          {" "}
+          <span className="relative inline-block max-w-full align-baseline">
+            <AccentTailTrail variant={variant} />
+            <span
+              className={cn(
+                "relative z-[1] italic leading-none align-baseline",
+                accentTailScriptPad,
+                variant === "onDark" ? accentGradient : accentSolidPrimary,
+              )}
+              style={{ fontFamily: headingFamily }}
+            >
+              {accent}
+            </span>
           </span>
-        </span>
+        </>
       ) : null}
     </Tag>
   );

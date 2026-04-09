@@ -8,6 +8,7 @@ import { ThemeSchema } from "@/types/theme.types";
 import { SiteHeading } from "@/components/public/site-heading";
 import type { HeadingEmphasis } from "@/lib/heading-emphasis";
 import {
+  heroBandContentPadClass,
   heroBandVerticalClass,
   heroBannerStackClass,
   heroBannerSubheadingClass,
@@ -118,7 +119,7 @@ export default function HeroBanner({
       id="hero"
       className={cn(
         "relative mx-auto flex w-full justify-center overflow-hidden",
-        /* Lovable-style band ~60–70% viewport, capped (not full screen) */
+        /* Hero band ~60–70% viewport height, capped (not full screen) */
         "h-[min(68dvh,720px)] min-h-[380px] max-h-[760px]",
         heroBandVerticalClass(heroValign),
         /*
@@ -126,9 +127,7 @@ export default function HeroBanner({
          * would otherwise shrink-wrap and center the column). Do NOT stretch for top/bottom
          * valign — that overrides items-start/items-end and pins copy to the top of a tall box.
          */
-        textAlign === "left" &&
-          heroValign === "center" &&
-          "!items-stretch !justify-end !pb-10 pt-20 md:!pb-16 md:pt-24",
+        textAlign === "left" && heroValign === "center" && "!items-stretch",
       )}
     >
       {/* Video background if video URL exists and should be used */}
@@ -146,11 +145,11 @@ export default function HeroBanner({
             <source src={finalVideoUrl || undefined} type="video/mp4" />
             Your browser does not support the video tag.
           </video>
-          <div className="absolute inset-0 bg-gradient-to-b from-black/70 via-black/40 to-black" />
+          <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-black/30 to-black/85" />
         </div>
       )}
 
-      {/* Image background — Lovable-style scaled cover */}
+      {/* Image background — slight scale for edge bleed */}
       {!useVideo && (
         <div className="absolute inset-0 overflow-hidden">
           {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -159,11 +158,11 @@ export default function HeroBanner({
             alt=""
             className="absolute inset-0 h-full w-full scale-105 object-cover"
           />
-          <div className="absolute inset-0 bg-gradient-to-b from-black/70 via-black/40 to-black" />
+          <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-black/30 to-black/85" />
         </div>
       )}
 
-      {/* Soft brand orbs (Lovable hero) */}
+      {/* Soft brand gradient orbs */}
       <div
         className="pointer-events-none absolute left-1/4 top-20 h-96 w-96 rounded-full bg-[color:color-mix(in_srgb,var(--color-primary)_22%,transparent)] blur-[120px]"
         aria-hidden
@@ -176,11 +175,11 @@ export default function HeroBanner({
       <div
         className={cn(
           "relative z-10 max-w-7xl mx-auto w-full overflow-visible px-4",
-          textAlign === "center" && "py-12 md:py-16",
+          heroBandContentPadClass(heroValign),
         )}
       >
         <motion.div
-          initial={{ opacity: 0, y: -20 }}
+          initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.8 }}
           className={cn(stackClass, "overflow-visible")}
@@ -195,6 +194,7 @@ export default function HeroBanner({
               {`Welcome to ${locationName}`}
             </p>
           ) : null}
+
           <SiteHeading
             level={1}
             title={bannerHeading}
@@ -202,27 +202,26 @@ export default function HeroBanner({
             emphasis={headingEmphasis}
             variant="onDark"
             align={textAlign}
-            className="mb-6 max-w-4xl font-black !text-4xl !leading-[0.95] tracking-tight md:!text-6xl lg:!text-7xl"
+            className={cn(
+              "mb-4 font-black !text-3xl !leading-[0.95] tracking-tight sm:!text-4xl md:!text-5xl lg:!text-6xl",
+              textAlign === "left"
+                ? "max-w-[min(100%,30rem)] sm:max-w-xl md:max-w-2xl lg:max-w-3xl"
+                : "max-w-4xl",
+            )}
           />
 
-          <p
-            className={cn(
-              "text-lg text-white/80 sm:text-xl",
-              heroBannerSubheadingClass(textAlign),
-            )}
-          >
-            {bannerSubheading}
-          </p>
-
-          <a
-            href="#latest-events"
-            className={cn(
-              "mt-10 inline-flex items-center justify-center rounded-full bg-white px-8 py-3 text-sm font-bold tracking-wide text-neutral-900 shadow-lg transition hover:bg-white/95",
-              textAlign === "center" && "mx-auto",
-            )}
-          >
-            Explore now
-          </a>
+          {/* Sub-heading: wide-tracking small caps */}
+          {bannerSubheading ? (
+            <p
+              className={cn(
+                "text-[11px] font-semibold uppercase tracking-[0.22em] text-white/65 sm:text-xs",
+                heroBannerSubheadingClass(textAlign),
+                "max-w-sm sm:max-w-md",
+              )}
+            >
+              {bannerSubheading}
+            </p>
+          ) : null}
         </motion.div>
       </div>
     </section>

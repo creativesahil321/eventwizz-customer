@@ -38,21 +38,39 @@ export default function LocationSelectionHeader({
   const allLocations = settings?.locations || [];
   const isLoading = isDomainLoading;
 
-  // Over dark hero the bar is transparent: use light chrome (same idea as CommonHeader default at top).
-  const overDarkHero = !isScrolled;
+  // Match CommonHeader: glass pills over hero; same pill family after scroll.
+  const pillGlassOnHero = !isScrolled;
+  const overDarkHero = pillGlassOnHero;
   const topBarChromeLinkClass = cn(
-    "text-sm transition-colors border-2 border-[color:var(--color-primary)] rounded-lg px-2 py-1 whitespace-nowrap",
-    overDarkHero
-      ? "hover:text-white/90"
+    "inline-flex items-center justify-center rounded-full border text-sm font-medium transition-colors whitespace-nowrap backdrop-blur-md px-3 py-1.5",
+    pillGlassOnHero
+      ? cn(
+          "border-[color:color-mix(in_srgb,var(--color-primary)_55%,white_18%)]",
+          "bg-white/10 hover:bg-white/15 text-white [text-shadow:0_1px_3px_rgba(0,0,0,0.55)]",
+          "shadow-[0_10px_30px_-18px_rgba(0,0,0,0.55)]",
+        )
       : cn(
+          "border-[color:color-mix(in_srgb,var(--color-primary)_28%,var(--color-on-header)_16%)]",
+          "bg-[color:color-mix(in_srgb,var(--color-header)_72%,transparent)] hover:bg-[color:color-mix(in_srgb,var(--color-header)_82%,transparent)]",
           "text-[var(--color-on-header)]",
-          "hover:opacity-90 hover:underline hover:decoration-2 hover:underline-offset-2 hover:decoration-[color:var(--color-primary)]",
+          "shadow-[0_12px_28px_-18px_rgba(15,23,42,0.22)]",
+          "hover:opacity-95 hover:underline hover:decoration-2 hover:underline-offset-2 hover:decoration-[color:var(--color-primary)]",
         ),
   );
   const menuSurfaceChromeLinkClass = cn(
-    "text-sm text-[var(--color-on-header)] transition-colors border-2 border-[color:var(--color-primary)] rounded-lg px-2 py-1 whitespace-nowrap",
-    "hover:opacity-90 hover:underline hover:decoration-2 hover:underline-offset-2 hover:decoration-[color:var(--color-primary)]",
+    "inline-flex items-center justify-center rounded-full border text-sm font-medium text-[var(--color-on-header)] transition-colors whitespace-nowrap px-4 py-2 backdrop-blur-sm",
+    "border-[color:color-mix(in_srgb,var(--color-primary)_28%,var(--color-on-header)_16%)]",
+    "bg-[color:color-mix(in_srgb,var(--color-header)_55%,transparent)] hover:bg-[color:color-mix(in_srgb,var(--color-header)_70%,transparent)]",
+    "hover:opacity-95 hover:underline hover:decoration-2 hover:underline-offset-2 hover:decoration-[color:var(--color-primary)]",
   );
+  const bookNowPillClass = cn(
+    "!rounded-full h-9 gap-1 border-0 px-4 font-semibold backdrop-blur-sm",
+    pillGlassOnHero &&
+      "shadow-[0_10px_30px_-18px_rgba(0,0,0,0.55)] ring-1 ring-white/25",
+  );
+  /** Drawer sits on solid header surface — keep primary solid, still rounded-full. */
+  const bookNowMobilePillClass =
+    "!rounded-full h-9 gap-1 border-0 px-4 font-semibold shadow-sm";
 
   // Close mobile menu if user clicks outside
   const handleClickOutside = useCallback(
@@ -131,7 +149,11 @@ export default function LocationSelectionHeader({
               <div className="flex items-center gap-2">
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <Button size="sm" variant="event-primary">
+                    <Button
+                      size="sm"
+                      variant="event-primary"
+                      className={bookNowPillClass}
+                    >
                       <span>Book Now</span>
                       <ChevronDown size={14} />
                     </Button>
@@ -191,7 +213,7 @@ export default function LocationSelectionHeader({
                     </Link>
                     <button
                       type="button"
-                      className={`${topBarChromeLinkClass} cursor-pointer bg-transparent text-left`}
+                      className={cn(topBarChromeLinkClass, "cursor-pointer")}
                       aria-label="Log out"
                       onClick={() => void logout()}
                     >
@@ -216,7 +238,12 @@ export default function LocationSelectionHeader({
             {/* Mobile menu button */}
             <button
               type="button"
-              className="md:hidden p-2 rounded-md hover:bg-[var(--color-primary)]/10 transition-colors"
+              className={cn(
+                "md:hidden rounded-full p-2 transition-colors",
+                pillGlassOnHero
+                  ? "border border-[color:color-mix(in_srgb,var(--color-primary)_55%,white_18%)] bg-white/10 text-white backdrop-blur-md hover:bg-white/15 [text-shadow:0_1px_3px_rgba(0,0,0,0.55)]"
+                  : "text-[var(--color-on-header)] hover:bg-[var(--color-primary)]/10",
+              )}
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
               aria-label={mobileMenuOpen ? "Close menu" : "Open menu"}
               aria-expanded={mobileMenuOpen}
@@ -242,7 +269,11 @@ export default function LocationSelectionHeader({
                 <DropdownMenuTrigger asChild>
                   <Button
                     size="sm"
-                    className="flex items-center gap-2 px-4 py-2 bg-[var(--color-primary)] text-[var(--color-primary-foreground)] font-medium border border-[var(--color-primary)] rounded-lg hover:opacity-90 transition-opacity book-now-btn"
+                    variant="event-primary"
+                    className={cn(
+                      "book-now-btn flex w-full items-center justify-center gap-2 font-medium",
+                      bookNowMobilePillClass,
+                    )}
                     onClick={(e) => {
                       e.stopPropagation();
                       setDropdownOpen(!dropdownOpen);
@@ -314,7 +345,10 @@ export default function LocationSelectionHeader({
                     </Link>
                     <button
                       type="button"
-                      className={`${menuSurfaceChromeLinkClass} w-full cursor-pointer bg-transparent text-center`}
+                      className={cn(
+                        menuSurfaceChromeLinkClass,
+                        "w-full cursor-pointer justify-center text-center",
+                      )}
                       aria-label="Log out"
                       onClick={() => {
                         setMobileMenuOpen(false);

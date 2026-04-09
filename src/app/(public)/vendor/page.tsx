@@ -13,6 +13,7 @@ import { CheckCircle2, Map, LayoutGrid } from "lucide-react";
 import { SiteHeading } from "@/components/public/site-heading";
 import { normalizeHeadingEmphasis } from "@/lib/heading-emphasis";
 import {
+  heroBandContentPadClass,
   heroBandVerticalClass,
   heroBannerStackClass,
   vendorHomeSubheroClass,
@@ -121,13 +122,21 @@ export default function VendorSiteHomePage() {
             aria-hidden
           />
         </div>
-        {/* Same horizontal frame as LocationSelectionHeader + HeroBanner (Site Essentials preview) */}
-        <div className="relative z-10 max-w-7xl mx-auto w-full overflow-visible px-4">
+        {/* Same horizontal frame + top pad as HeroBanner so copy clears fixed header */}
+        <div
+          className={cn(
+            "relative z-10 mx-auto w-full min-w-0 max-w-7xl overflow-visible px-4",
+            heroBandContentPadClass(heroValign),
+          )}
+        >
           <motion.div
             initial={{ y: 28, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
             transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
-            className={cn(heroBannerStackClass(heroAlign), "overflow-visible")}
+            className={cn(
+              heroBannerStackClass(heroAlign),
+              "w-full min-w-0 overflow-visible",
+            )}
           >
             <p className="mb-4 text-[11px] font-semibold uppercase tracking-[0.32em] text-white/50 sm:text-xs">
               Curated for your city
@@ -141,7 +150,7 @@ export default function VendorSiteHomePage() {
               )}
               variant="onDark"
               align={heroAlign}
-              className="mb-6 font-bold !text-4xl md:!text-5xl lg:!text-6xl"
+              className="mb-6 w-full min-w-0 max-w-full font-bold !text-3xl !leading-[0.98] sm:!text-4xl md:!text-5xl md:max-w-5xl lg:!text-6xl"
             />
 
             <p className={vendorHomeSubheroClass(heroAlign)}>
@@ -153,7 +162,7 @@ export default function VendorSiteHomePage() {
               {trustItems.map((label) => (
                 <div
                   key={label}
-                  className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.07] px-4 py-2.5 text-sm text-white/90 shadow-lg shadow-black/20 backdrop-blur-md md:px-5"
+                  className="inline-flex w-full items-center justify-center gap-2 rounded-full border border-white/10 bg-white/[0.07] px-4 py-2.5 text-sm text-white/90 shadow-lg shadow-black/20 backdrop-blur-md sm:inline-flex sm:w-auto sm:justify-start md:px-5"
                 >
                   <CheckCircle2
                     className="h-4 w-4 shrink-0 text-[color:var(--color-primary)] md:h-[18px] md:w-[18px]"
@@ -205,7 +214,13 @@ export default function VendorSiteHomePage() {
         </section>
       )}
 
-      <section className="bg-[var(--color-background)] pb-16 md:pb-20">
+      <section
+        className={cn(
+          "bg-[var(--color-background)] pb-16 md:pb-20",
+          /* Mobile skips map/grid strip — pull heading off the hero edge */
+          isMobile ? "pt-10 sm:pt-12" : "pt-6 md:pt-8",
+        )}
+      >
         <motion.div
           className="container mx-auto max-w-7xl px-4 sm:px-6"
           initial={{ opacity: 0, y: 20 }}

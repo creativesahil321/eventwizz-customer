@@ -46,10 +46,12 @@ export function vendorHomeSubheroClass(align: BannerHeadingAlign): string {
 
 export function vendorHomeTrustRowClass(align: BannerHeadingAlign): string {
   return cn(
-    "flex flex-wrap gap-3 md:gap-4",
-    align === "center" && "justify-center",
-    align === "left" && "justify-start",
-    align === "right" && "justify-end",
+    /* Narrow: single column so pills don’t wrap 2+1; sm+: row + wrap */
+    "flex w-full flex-col gap-3 sm:flex-row sm:flex-wrap md:gap-4",
+    align === "center" &&
+      "mx-auto max-w-md items-stretch sm:max-w-none sm:items-center sm:justify-center",
+    align === "left" && "items-stretch sm:items-center sm:justify-start",
+    align === "right" && "items-stretch sm:items-center sm:justify-end",
   );
 }
 
@@ -71,20 +73,32 @@ export function normalizeBannerHeadingValign(v: unknown): BannerHeadingValign {
 }
 
 /**
- * Flex placement for full-width hero sections (single main content column).
- * Top/bottom: row flex + cross-axis align (horizontal center via parent `justify-center`).
- * Center: `flex-col` + `justify-center` so vertical centering runs in the band *below* the
- * fixed header — row + `items-center` alone centers in full 100vh, which sits too low
- * visually when a `fixed top-0` nav overlays the top of the hero.
+ * Flex placement for full-width hero sections — alignment ONLY, NO padding.
+ * Each hero component adds `heroBandContentPadClass(v)` to its inner content
+ * wrapper. This guarantees the heading always clears the fixed header (~72 px)
+ * regardless of flex axis or alignment direction.
  */
 export function heroBandVerticalClass(v: BannerHeadingValign): string {
   return cn(
-    v === "top" &&
-    "items-start pt-16 pb-10 sm:pt-20 sm:pb-12 md:pt-24 md:pb-14",
-    v === "center" &&
-    "flex-col justify-center items-center pt-16 sm:pt-20 md:pt-24 pb-[max(0.75rem,env(safe-area-inset-bottom))]",
-    v === "bottom" &&
-    "items-end pb-16 pt-10 sm:pb-20 sm:pt-12 md:pb-24 md:pt-14",
+    v === "top" && "items-start",
+    v === "center" && "flex-col items-center justify-center",
+    v === "bottom" && "items-end",
+  );
+}
+
+/**
+ * Padding for the INNER content wrapper inside any hero section.
+ * Always clears the fixed header (~72 px, "pt-[4.5rem]") and adds
+ * appropriate breathing room per valign position.
+ * Apply this alongside "relative z-* max-w-7xl mx-auto w-full px-4".
+ */
+export function heroBandContentPadClass(v: BannerHeadingValign): string {
+  return cn(
+    v === "top" && "pt-20 pb-10 sm:pt-24 sm:pb-12 md:pt-28 md:pb-14",
+    // Center: modest top so section justify-center handles visual centering.
+    // Too much padding would push the perceived center downward.
+    v === "center" && "pt-20 pb-8 sm:pt-24 sm:pb-10",
+    v === "bottom" && "pt-[4.5rem] pb-16 sm:pb-20 md:pb-24",
   );
 }
 

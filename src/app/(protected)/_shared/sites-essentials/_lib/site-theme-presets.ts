@@ -58,7 +58,19 @@ export type SiteThemePresetId =
   | "spa-mint"
   | "golden-amber"
   | "forest-jade"
-  | "lilac-atelier";
+  | "lilac-atelier"
+  | "lovable-purple-magenta"
+  | "lovable-ocean-blue"
+  | "lovable-golden-fire"
+  | "lovable-emerald-night"
+  | "lovable-red-rose"
+  | "lovable-midnight-indigo"
+  | "lovable-lavender-light"
+  | "lovable-sky-breeze"
+  | "lovable-warm-sand"
+  | "lovable-mint-fresh"
+  | "lovable-rose-petal"
+  | "lovable-clean-white";
 
 export interface SiteThemePreset {
   id: SiteThemePresetId;
@@ -84,6 +96,50 @@ type PresetShell = Omit<SiteThemePreset, "typography"> & {
   bodyFontStack?: string;
   customFontStylesheetUrls?: readonly string[];
 };
+
+function clamp01(n: number): number {
+  return Math.min(1, Math.max(0, n));
+}
+
+function hslToHex(h: number, s: number, l: number): string {
+  const hh = ((h % 360) + 360) % 360;
+  const ss = clamp01(s / 100);
+  const ll = clamp01(l / 100);
+
+  const c = (1 - Math.abs(2 * ll - 1)) * ss;
+  const x = c * (1 - Math.abs(((hh / 60) % 2) - 1));
+  const m = ll - c / 2;
+
+  let r = 0;
+  let g = 0;
+  let b = 0;
+  if (hh < 60) [r, g, b] = [c, x, 0];
+  else if (hh < 120) [r, g, b] = [x, c, 0];
+  else if (hh < 180) [r, g, b] = [0, c, x];
+  else if (hh < 240) [r, g, b] = [0, x, c];
+  else if (hh < 300) [r, g, b] = [x, 0, c];
+  else [r, g, b] = [c, 0, x];
+
+  const toHex = (v: number) =>
+    Math.round((v + m) * 255)
+      .toString(16)
+      .padStart(2, "0");
+
+  return `#${toHex(r)}${toHex(g)}${toHex(b)}`.toLowerCase();
+}
+
+function hslTokenToHex(token: string): string {
+  // expected: "280 100% 65%"
+  const t = token.trim().replace(/\s+/g, " ");
+  const [hRaw, sRaw, lRaw] = t.split(" ");
+  const h = parseFloat(hRaw);
+  const s = parseFloat((sRaw ?? "").replace("%", ""));
+  const l = parseFloat((lRaw ?? "").replace("%", ""));
+  if (![h, s, l].every((n) => Number.isFinite(n))) {
+    throw new Error(`Invalid HSL token: "${token}"`);
+  }
+  return hslToHex(h, s, l);
+}
 
 function withTypography(shell: PresetShell): SiteThemePreset {
   const {
@@ -692,6 +748,283 @@ const PRESET_SHELLS: readonly PresetShell[] = [
       text: "#eef2ff",
       textDimmed: "#c4b5fd",
       socialLogin: { ...SOCIAL_LOGIN_DARK },
+    },
+  },
+  /* ---- High-impact marketing presets (mode-based); ids unchanged for stored selections ---- */
+  {
+    id: "lovable-purple-magenta",
+    name: "Purple Magenta",
+    tagline: "Dark: neon purple + magenta accents",
+    headingFontLabel: "Space Grotesk",
+    bodyFontLabel: "Inter",
+    swatch: [
+      hslTokenToHex("260 20% 5%"),
+      hslTokenToHex("280 100% 65%"),
+      hslTokenToHex("0 0% 97%"),
+    ],
+    colors: {
+      primary: hslTokenToHex("280 100% 65%"),
+      secondary: hslTokenToHex("260 15% 14%"),
+      header: hslTokenToHex("260 20% 5%"),
+      footer: hslTokenToHex("260 20% 5%"),
+      background: hslTokenToHex("260 20% 5%"),
+      surface: hslTokenToHex("260 20% 8%"),
+      text: hslTokenToHex("0 0% 97%"),
+      textDimmed: hslTokenToHex("260 10% 55%"),
+      socialLogin: { ...SOCIAL_LOGIN_DARK },
+    },
+  },
+  {
+    id: "lovable-ocean-blue",
+    name: "Ocean Blue",
+    tagline: "Dark: electric blue + cyan",
+    headingFontLabel: "Space Grotesk",
+    bodyFontLabel: "Inter",
+    swatch: [
+      hslTokenToHex("220 25% 5%"),
+      hslTokenToHex("210 100% 60%"),
+      hslTokenToHex("0 0% 97%"),
+    ],
+    colors: {
+      primary: hslTokenToHex("210 100% 60%"),
+      secondary: hslTokenToHex("220 15% 14%"),
+      header: hslTokenToHex("220 25% 5%"),
+      footer: hslTokenToHex("220 25% 5%"),
+      background: hslTokenToHex("220 25% 5%"),
+      surface: hslTokenToHex("220 25% 8%"),
+      text: hslTokenToHex("0 0% 97%"),
+      textDimmed: hslTokenToHex("220 10% 55%"),
+      socialLogin: { ...SOCIAL_LOGIN_DARK },
+    },
+  },
+  {
+    id: "lovable-golden-fire",
+    name: "Golden Fire",
+    tagline: "Dark: warm gold + orange accents",
+    headingFontLabel: "Poppins",
+    bodyFontLabel: "DM Sans",
+    swatch: [
+      hslTokenToHex("25 20% 5%"),
+      hslTokenToHex("38 100% 55%"),
+      hslTokenToHex("0 0% 97%"),
+    ],
+    colors: {
+      primary: hslTokenToHex("38 100% 55%"),
+      secondary: hslTokenToHex("25 15% 14%"),
+      header: hslTokenToHex("25 20% 5%"),
+      footer: hslTokenToHex("25 20% 5%"),
+      background: hslTokenToHex("25 20% 5%"),
+      surface: hslTokenToHex("25 20% 8%"),
+      text: hslTokenToHex("0 0% 97%"),
+      textDimmed: hslTokenToHex("25 10% 55%"),
+      socialLogin: { ...SOCIAL_LOGIN_DARK },
+    },
+  },
+  {
+    id: "lovable-emerald-night",
+    name: "Emerald Night",
+    tagline: "Dark: emerald + fresh green accents",
+    headingFontLabel: "Outfit",
+    bodyFontLabel: "Plus Jakarta Sans",
+    swatch: [
+      hslTokenToHex("170 25% 4%"),
+      hslTokenToHex("160 100% 45%"),
+      hslTokenToHex("0 0% 97%"),
+    ],
+    colors: {
+      primary: hslTokenToHex("160 100% 45%"),
+      secondary: hslTokenToHex("170 15% 13%"),
+      header: hslTokenToHex("170 25% 4%"),
+      footer: hslTokenToHex("170 25% 4%"),
+      background: hslTokenToHex("170 25% 4%"),
+      surface: hslTokenToHex("170 25% 7%"),
+      text: hslTokenToHex("0 0% 97%"),
+      textDimmed: hslTokenToHex("170 10% 50%"),
+      socialLogin: { ...SOCIAL_LOGIN_DARK },
+    },
+  },
+  {
+    id: "lovable-red-rose",
+    name: "Red Rose",
+    tagline: "Dark: rose primary + pink accent",
+    headingFontLabel: "Montserrat",
+    bodyFontLabel: "Lato",
+    swatch: [
+      hslTokenToHex("345 20% 5%"),
+      hslTokenToHex("350 90% 55%"),
+      hslTokenToHex("0 0% 97%"),
+    ],
+    colors: {
+      primary: hslTokenToHex("350 90% 55%"),
+      secondary: hslTokenToHex("345 15% 14%"),
+      header: hslTokenToHex("345 20% 5%"),
+      footer: hslTokenToHex("345 20% 5%"),
+      background: hslTokenToHex("345 20% 5%"),
+      surface: hslTokenToHex("345 20% 8%"),
+      text: hslTokenToHex("0 0% 97%"),
+      textDimmed: hslTokenToHex("345 10% 50%"),
+      socialLogin: { ...SOCIAL_LOGIN_DARK },
+    },
+  },
+  {
+    id: "lovable-midnight-indigo",
+    name: "Midnight Indigo",
+    tagline: "Dark: indigo primary + violet accent",
+    headingFontLabel: "Sora",
+    bodyFontLabel: "Nunito Sans",
+    swatch: [
+      hslTokenToHex("240 25% 5%"),
+      hslTokenToHex("245 90% 65%"),
+      hslTokenToHex("0 0% 97%"),
+    ],
+    colors: {
+      primary: hslTokenToHex("245 90% 65%"),
+      secondary: hslTokenToHex("240 15% 14%"),
+      header: hslTokenToHex("240 25% 5%"),
+      footer: hslTokenToHex("240 25% 5%"),
+      background: hslTokenToHex("240 25% 5%"),
+      surface: hslTokenToHex("240 25% 8%"),
+      text: hslTokenToHex("0 0% 97%"),
+      textDimmed: hslTokenToHex("240 10% 55%"),
+      socialLogin: { ...SOCIAL_LOGIN_DARK },
+    },
+  },
+  {
+    id: "lovable-lavender-light",
+    name: "Lavender Light",
+    tagline: "Light: lavender base + magenta accent",
+    headingFontLabel: "Space Grotesk",
+    bodyFontLabel: "Inter",
+    swatch: [
+      hslTokenToHex("270 20% 98%"),
+      hslTokenToHex("280 80% 55%"),
+      hslTokenToHex("260 25% 12%"),
+    ],
+    colors: {
+      primary: hslTokenToHex("280 80% 55%"),
+      secondary: hslTokenToHex("270 15% 94%"),
+      header: hslTokenToHex("0 0% 100%"),
+      footer: hslTokenToHex("270 15% 94%"),
+      background: hslTokenToHex("270 20% 98%"),
+      surface: hslTokenToHex("0 0% 100%"),
+      text: hslTokenToHex("260 25% 12%"),
+      textDimmed: hslTokenToHex("260 10% 45%"),
+      socialLogin: { ...SOCIAL_LOGIN_LIGHT },
+    },
+  },
+  {
+    id: "lovable-sky-breeze",
+    name: "Sky Breeze",
+    tagline: "Light: sky blue + crisp neutrals",
+    headingFontLabel: "Poppins",
+    bodyFontLabel: "DM Sans",
+    swatch: [
+      hslTokenToHex("210 30% 98%"),
+      hslTokenToHex("210 90% 50%"),
+      hslTokenToHex("220 30% 10%"),
+    ],
+    colors: {
+      primary: hslTokenToHex("210 90% 50%"),
+      secondary: hslTokenToHex("210 15% 94%"),
+      header: hslTokenToHex("0 0% 100%"),
+      footer: hslTokenToHex("210 15% 94%"),
+      background: hslTokenToHex("210 30% 98%"),
+      surface: hslTokenToHex("0 0% 100%"),
+      text: hslTokenToHex("220 30% 10%"),
+      textDimmed: hslTokenToHex("220 10% 45%"),
+      socialLogin: { ...SOCIAL_LOGIN_LIGHT },
+    },
+  },
+  {
+    id: "lovable-warm-sand",
+    name: "Warm Sand",
+    tagline: "Light: warm neutrals + orange accent",
+    headingFontLabel: "Outfit",
+    bodyFontLabel: "Plus Jakarta Sans",
+    swatch: [
+      hslTokenToHex("35 30% 97%"),
+      hslTokenToHex("25 90% 50%"),
+      hslTokenToHex("25 30% 12%"),
+    ],
+    colors: {
+      primary: hslTokenToHex("25 90% 50%"),
+      secondary: hslTokenToHex("30 15% 93%"),
+      header: hslTokenToHex("30 20% 100%"),
+      footer: hslTokenToHex("30 15% 93%"),
+      background: hslTokenToHex("35 30% 97%"),
+      surface: hslTokenToHex("30 20% 100%"),
+      text: hslTokenToHex("25 30% 12%"),
+      textDimmed: hslTokenToHex("25 10% 45%"),
+      socialLogin: { ...SOCIAL_LOGIN_LIGHT },
+    },
+  },
+  {
+    id: "lovable-mint-fresh",
+    name: "Mint Fresh",
+    tagline: "Light: mint base + green accent",
+    headingFontLabel: "Montserrat",
+    bodyFontLabel: "Lato",
+    swatch: [
+      hslTokenToHex("150 20% 97%"),
+      hslTokenToHex("160 80% 40%"),
+      hslTokenToHex("160 30% 10%"),
+    ],
+    colors: {
+      primary: hslTokenToHex("160 80% 40%"),
+      secondary: hslTokenToHex("150 15% 93%"),
+      header: hslTokenToHex("0 0% 100%"),
+      footer: hslTokenToHex("150 15% 93%"),
+      background: hslTokenToHex("150 20% 97%"),
+      surface: hslTokenToHex("0 0% 100%"),
+      text: hslTokenToHex("160 30% 10%"),
+      textDimmed: hslTokenToHex("160 10% 45%"),
+      socialLogin: { ...SOCIAL_LOGIN_LIGHT },
+    },
+  },
+  {
+    id: "lovable-rose-petal",
+    name: "Rose Petal",
+    tagline: "Light: rose base + warm accents",
+    headingFontLabel: "Raleway",
+    bodyFontLabel: "Open Sans",
+    swatch: [
+      hslTokenToHex("350 25% 97%"),
+      hslTokenToHex("340 75% 55%"),
+      hslTokenToHex("345 25% 12%"),
+    ],
+    colors: {
+      primary: hslTokenToHex("340 75% 55%"),
+      secondary: hslTokenToHex("350 15% 93%"),
+      header: hslTokenToHex("0 0% 100%"),
+      footer: hslTokenToHex("350 15% 93%"),
+      background: hslTokenToHex("350 25% 97%"),
+      surface: hslTokenToHex("0 0% 100%"),
+      text: hslTokenToHex("345 25% 12%"),
+      textDimmed: hslTokenToHex("345 10% 45%"),
+      socialLogin: { ...SOCIAL_LOGIN_LIGHT },
+    },
+  },
+  {
+    id: "lovable-clean-white",
+    name: "Clean White",
+    tagline: "Light: clean white base + cool accents",
+    headingFontLabel: "Space Grotesk",
+    bodyFontLabel: "Inter",
+    swatch: [
+      hslTokenToHex("0 0% 100%"),
+      hslTokenToHex("240 60% 55%"),
+      hslTokenToHex("240 10% 10%"),
+    ],
+    colors: {
+      primary: hslTokenToHex("240 60% 55%"),
+      secondary: hslTokenToHex("240 5% 96%"),
+      header: hslTokenToHex("0 0% 100%"),
+      footer: hslTokenToHex("240 5% 96%"),
+      background: hslTokenToHex("0 0% 100%"),
+      surface: hslTokenToHex("0 0% 100%"),
+      text: hslTokenToHex("240 10% 10%"),
+      textDimmed: hslTokenToHex("240 4% 46%"),
+      socialLogin: { ...SOCIAL_LOGIN_LIGHT },
     },
   },
 ];

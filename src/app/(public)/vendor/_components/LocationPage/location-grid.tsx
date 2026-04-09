@@ -15,7 +15,7 @@ interface LocationGridProps {
   onSelect: (slug: string) => void;
 }
 
-/** Lovable-style hover tints (Tailwind must see full class strings). */
+/** Gradient hover tints per card (Tailwind must see full class strings). */
 const HOVER_GRADIENTS = [
   "from-purple-600 to-pink-600",
   "from-blue-600 to-purple-600",

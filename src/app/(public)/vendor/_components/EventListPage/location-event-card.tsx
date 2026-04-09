@@ -16,7 +16,7 @@ export type LocationEventCardModel = {
 type LocationEventCardProps = {
   event: LocationEventCardModel;
   locationSlug: string;
-  /** Kept for API compatibility; Lovable dark cards omit location row */
+  /** Kept for API compatibility; public cards omit location row in the UI */
   locationLabel?: string | null;
   isPending: boolean;
   onNavigateStart: () => void;
@@ -24,7 +24,7 @@ type LocationEventCardProps = {
 };
 
 /**
- * Lovable “Latest events” dark card: ~4/3 image, price pill top-right, date bottom-left on image,
+ * Public event card: ~4/3 image, price pill top-right, date bottom-left on image,
  * dark footer with title; hover = primary ring + title shifts to primary (image slight zoom).
  */
 export function LocationEventCard({
