@@ -25,6 +25,11 @@ import { EventMenuCategory } from "@/services/vendor/events/type";
 import MenuCategoryDropdown from "@/app/(on-boarding)/on-boarding/_components/steps/step-6/menu-category-dropdown";
 import { FileUploader } from "@/components/ui/file-uploader";
 import { addCacheBusting } from "@/lib/image-utils";
+import { RICH_DESCRIPTION_MAX_CHARS } from "@/lib/event-form-limits";
+
+const MENU_TITLE_MAX = 40;
+const MENU_DESCRIPTION_MAX = RICH_DESCRIPTION_MAX_CHARS;
+const MENU_ITEM_TITLE_MAX = 40;
 
 export default function CateringTab() {
   const [isLoading, setIsLoading] = useState(false);
@@ -97,6 +102,41 @@ export default function CateringTab() {
   useEffect(() => {
     setShowMenuSection(cateringOption === 1);
   }, [cateringOption]);
+
+  // Clamp menu copy loaded from API (controlled inputs can show values longer than maxLength until edited).
+  useEffect(() => {
+    const rawTitle = form.getValues("menu_title") || "";
+    if (rawTitle.length > MENU_TITLE_MAX) {
+      form.setValue("menu_title", rawTitle.slice(0, MENU_TITLE_MAX));
+    }
+    const rawMenuDesc = form.getValues("menu_description") || "";
+    if (rawMenuDesc.length > MENU_DESCRIPTION_MAX) {
+      form.setValue(
+        "menu_description",
+        rawMenuDesc.slice(0, MENU_DESCRIPTION_MAX)
+      );
+    }
+    const menus = form.getValues("menus");
+    if (!menus?.length) return;
+    const next = menus.map((m) => ({
+      ...m,
+      items: m.items.map((it) => ({
+        ...it,
+        title: (it.title || "").slice(0, MENU_ITEM_TITLE_MAX),
+        description: (it.description || "").slice(0, MENU_DESCRIPTION_MAX),
+      })),
+    }));
+    const changed = menus.some((m, mi) =>
+      m.items.some(
+        (it, ii) =>
+          it.title !== next[mi].items[ii].title ||
+          it.description !== next[mi].items[ii].description
+      )
+    );
+    if (changed) {
+      form.setValue("menus", next);
+    }
+  }, [eventId, form]);
 
   // Setup field array for menus
   const {
@@ -338,6 +378,10 @@ export default function CateringTab() {
                         const numValue = Number(value);
                         field.onChange(numValue);
                         setShowMenuSection(numValue === 1);
+                        if (numValue === 0) {
+                          setValue("menus", []);
+                          globalForm.setValue("stepFour.menus", []);
+                        }
                       }}
                       defaultValue={String(field.value)}
                       className="flex mt-4 space-x-6"
@@ -379,42 +423,68 @@ export default function CateringTab() {
                   <FormField
                     control={control}
                     name="menu_title"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel className="text-sm font-medium">
-                          Menu Title <span className="text-red-500">*</span>
-                        </FormLabel>
-                        <FormControl>
-                          <Input
-                            {...field}
-                            placeholder="e.g., The Menus"
-                            className="h-11 bg-[#F9FAFB] border-[#E5E7EB]"
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
+                    render={({ field }) => {
+                      const v = field.value || "";
+                      return (
+                        <FormItem>
+                          <FormLabel className="text-sm font-medium">
+                            Menu Title <span className="text-red-500">*</span>
+                          </FormLabel>
+                          <FormControl>
+                            <Input
+                              {...field}
+                              placeholder="e.g., The Menus"
+                              className="h-11 bg-[#F9FAFB] border-[#E5E7EB]"
+                              maxLength={MENU_TITLE_MAX}
+                              value={v}
+                              onChange={(e) =>
+                                field.onChange(
+                                  e.target.value.slice(0, MENU_TITLE_MAX)
+                                )
+                              }
+                            />
+                          </FormControl>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            {v.length}/{MENU_TITLE_MAX} characters
+                          </p>
+                          <FormMessage />
+                        </FormItem>
+                      );
+                    }}
                   />
 
                   <FormField
                     control={control}
                     name="menu_description"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel className="text-sm font-medium">
-                          Menu Description{" "}
-                          <span className="text-red-500">*</span>
-                        </FormLabel>
-                        <FormControl>
-                          <Input
-                            {...field}
-                            placeholder="e.g., Select The Menus"
-                            className="h-11 bg-[#F9FAFB] border-[#E5E7EB]"
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
+                    render={({ field }) => {
+                      const v = field.value || "";
+                      return (
+                        <FormItem>
+                          <FormLabel className="text-sm font-medium">
+                            Menu Description{" "}
+                            <span className="text-red-500">*</span>
+                          </FormLabel>
+                          <FormControl>
+                            <Input
+                              {...field}
+                              placeholder="e.g., Select The Menus"
+                              className="h-11 bg-[#F9FAFB] border-[#E5E7EB]"
+                              maxLength={MENU_DESCRIPTION_MAX}
+                              value={v}
+                              onChange={(e) =>
+                                field.onChange(
+                                  e.target.value.slice(0, MENU_DESCRIPTION_MAX)
+                                )
+                              }
+                            />
+                          </FormControl>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            {v.length}/{MENU_DESCRIPTION_MAX} characters
+                          </p>
+                          <FormMessage />
+                        </FormItem>
+                      );
+                    }}
                   />
                 </div>
 
@@ -516,41 +586,74 @@ export default function CateringTab() {
                                 <FormField
                                   control={control}
                                   name={`menus.${menuIndex}.items.${itemIndex}.title`}
-                                  render={({ field }) => (
-                                    <FormItem>
-                                      <FormLabel className="text-sm font-medium">
-                                        Item Title
-                                      </FormLabel>
-                                      <FormControl>
-                                        <Input
-                                          {...field}
-                                          placeholder="e.g., Chicken Curry"
-                                          className="h-10 bg-[#F9FAFB] border-[#E5E7EB]"
-                                        />
-                                      </FormControl>
-                                      <FormMessage />
-                                    </FormItem>
-                                  )}
+                                  render={({ field }) => {
+                                    const v = field.value || "";
+                                    return (
+                                      <FormItem>
+                                        <FormLabel className="text-sm font-medium">
+                                          Item Title
+                                        </FormLabel>
+                                        <FormControl>
+                                          <Input
+                                            {...field}
+                                            placeholder="e.g., Chicken Curry"
+                                            className="h-10 bg-[#F9FAFB] border-[#E5E7EB]"
+                                            maxLength={MENU_ITEM_TITLE_MAX}
+                                            value={v}
+                                            onChange={(e) =>
+                                              field.onChange(
+                                                e.target.value.slice(
+                                                  0,
+                                                  MENU_ITEM_TITLE_MAX
+                                                )
+                                              )
+                                            }
+                                          />
+                                        </FormControl>
+                                        <p className="text-xs text-muted-foreground mt-1">
+                                          {v.length}/{MENU_ITEM_TITLE_MAX}{" "}
+                                          characters
+                                        </p>
+                                        <FormMessage />
+                                      </FormItem>
+                                    );
+                                  }}
                                 />
                                 <FormField
                                   control={control}
                                   name={`menus.${menuIndex}.items.${itemIndex}.description`}
-                                  render={({ field }) => (
-                                    <FormItem>
-                                      <FormLabel className="text-sm font-medium">
-                                        Description
-                                      </FormLabel>
-                                      <FormControl>
-                                        <Input
-                                          {...field}
-                                          placeholder="e.g., Spicy, with rice"
-                                          className="h-10 bg-[#F9FAFB] border-[#E5E7EB]"
-                                          maxLength={160}
-                                        />
-                                      </FormControl>
-                                      <FormMessage />
-                                    </FormItem>
-                                  )}
+                                  render={({ field }) => {
+                                    const v = field.value || "";
+                                    return (
+                                      <FormItem>
+                                        <FormLabel className="text-sm font-medium">
+                                          Description
+                                        </FormLabel>
+                                        <FormControl>
+                                          <Input
+                                            {...field}
+                                            placeholder="e.g., Spicy, with rice"
+                                            className="h-10 bg-[#F9FAFB] border-[#E5E7EB]"
+                                            maxLength={MENU_DESCRIPTION_MAX}
+                                            value={v}
+                                            onChange={(e) =>
+                                              field.onChange(
+                                                e.target.value.slice(
+                                                  0,
+                                                  MENU_DESCRIPTION_MAX
+                                                )
+                                              )
+                                            }
+                                          />
+                                        </FormControl>
+                                        <p className="text-xs text-muted-foreground mt-1">
+                                          {v.length}/{MENU_DESCRIPTION_MAX}{" "}
+                                          characters
+                                        </p>
+                                        <FormMessage />
+                                      </FormItem>
+                                    );
+                                  }}
                                 />
                               </div>
                             )

@@ -22,7 +22,11 @@ import { VideoFormatInfo } from "@/components/shared/video-format-info";
 import { addCacheBusting } from "@/lib/image-utils";
 import { LocationIndicator } from "@/components/location-indicator";
 import { MapPin } from "lucide-react";
-import { BANNER_HEADING_MAX_WORDS, countWords } from "@/lib/word-count";
+import {
+  BANNER_HEADING_MAX_WORDS,
+  countWords,
+  truncateToMaxWords,
+} from "@/lib/word-count";
 
 interface BrandingTabProps {
   /** Server values from API – source of truth after location switch so UI updates immediately */
@@ -453,17 +457,18 @@ export function BrandingTab({
                         placeholder="EventWizz Events"
                         {...field}
                         value={field.value || ""}
-                        onChange={(e) => field.onChange(e.target.value)}
+                        onChange={(e) =>
+                          field.onChange(
+                            truncateToMaxWords(
+                              e.target.value,
+                              BANNER_HEADING_MAX_WORDS
+                            )
+                          )
+                        }
                       />
                     </FormControl>
                     <div className="text-xs text-muted-foreground mt-1">
-                      <span
-                        className={
-                          wc > BANNER_HEADING_MAX_WORDS
-                            ? "text-destructive"
-                            : ""
-                        }
-                      >
+                      <span>
                         {wc}/{BANNER_HEADING_MAX_WORDS} words
                       </span>
                     </div>

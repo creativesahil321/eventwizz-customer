@@ -87,7 +87,8 @@ export default function DatesSection({
 
   // Get cart data to check if dates are already in cart (for future use)
   // const { data: apiCartData } = useGetCartData();
-  const heading = "Book Your Places Now";
+  const sectionLabel = "Book Your Places Now";
+  const heading = "Select a Date";
   const text = "Already Booked? Log In Here";
   /** Log-in CTA only for guests; hide when already signed in (still show in onboarding preview). */
   const showAlreadyBookedLoginCta = isPreviewMode || status !== "authenticated";
@@ -95,6 +96,8 @@ export default function DatesSection({
   const [screenSize, setScreenSize] = useState({ width: 0, height: 0 });
   const [isClient, setIsClient] = useState(false);
   const [currentPage, setCurrentPage] = useState(0);
+  const [datesBackgroundImageFailed, setDatesBackgroundImageFailed] =
+    useState(false);
   // Professional API-only approach - no conflict modal needed
   const itemsPerRow = 5; // Number of items to display per row
   const datesPerPage = itemsPerRow * 2; // Total dates visible per page (2 rows)
@@ -349,9 +352,12 @@ export default function DatesSection({
   // Simple non-animated fallback for SSR that matches the client layout
   if (!isClient) {
     return (
-      <section className="w-full py-8 sm:py-10 text-white rounded-lg overflow-hidden relative bg-black transition-all duration-200">
-        <div className="w-full text-center relative z-10 mb-4 sm:mb-6 px-4">
-          <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold mb-4">
+      <section className="w-full py-12 sm:py-16 text-white rounded-3xl overflow-hidden relative bg-gradient-to-br from-[color:color-mix(in_srgb,var(--color-primary)_30%,#0a0014)] via-[color:color-mix(in_srgb,var(--color-primary)_15%,#0a0014)] to-[#0a0014] transition-all duration-200">
+        <div className="w-full text-center relative z-10 mb-6 sm:mb-8 px-4">
+          <p className="mb-3 text-xs font-semibold uppercase tracking-[0.2em] text-[color:var(--color-primary)]">
+            {sectionLabel}
+          </p>
+          <h2 className="text-3xl sm:text-4xl md:text-5xl font-black mb-4">
             {heading}
           </h2>
           {showAlreadyBookedLoginCta && (
@@ -402,7 +408,7 @@ export default function DatesSection({
 
                   return (
                     <div
-                      className={`border rounded-sm overflow-hidden text-center w-[85px] sm:w-[100px] md:w-[120px] flex-shrink-0 transition-all duration-300 ${
+                      className={`border rounded-2xl overflow-hidden text-center w-[85px] sm:w-[100px] md:w-[120px] flex-shrink-0 transition-all duration-300 ${
                         isSoldOut
                           ? "border-red-500/60 cursor-not-allowed bg-slate-900/40 backdrop-blur-sm opacity-80 shadow-[0_0_25px_rgba(239,68,68,0.45)]"
                           : isInCart
@@ -468,7 +474,7 @@ export default function DatesSection({
 
                   return (
                     <div
-                      className={`border rounded-sm overflow-hidden text-center w-[85px] sm:w-[100px] md:w-[120px] flex-shrink-0 transition-all duration-300 ${
+                      className={`border rounded-2xl overflow-hidden text-center w-[85px] sm:w-[100px] md:w-[120px] flex-shrink-0 transition-all duration-300 ${
                         isSoldOut
                           ? "border-red-500/60 cursor-not-allowed bg-slate-900/40 backdrop-blur-sm opacity-80 shadow-[0_0_25px_rgba(239,68,68,0.45)]"
                           : isInCart
@@ -540,18 +546,22 @@ export default function DatesSection({
   // Full animated version for client-side
   return (
     <motion.section
-      className="w-full py-8 sm:py-10 text-white overflow-hidden relative transition-all duration-200"
+      className="w-full py-12 sm:py-16 text-white rounded-3xl overflow-hidden relative bg-gradient-to-br from-[color:color-mix(in_srgb,var(--color-primary)_30%,#0a0014)] via-[color:color-mix(in_srgb,var(--color-primary)_15%,#0a0014)] to-[#0a0014] transition-all duration-200"
       initial={{ opacity: 1 }}
       animate={{ opacity: 1 }}
       transition={{ duration: 0.2 }}
     >
-      {/* Background - completely black with subtle pattern */}
+      {/* Background — decorative; empty alt + onError avoids visible alt on broken asset */}
       <div className="absolute inset-0 z-0">
-        <img
-          src={addCacheBusting("/assets/images/events/event-date-banner.jpg")}
-          alt="Event background"
-          className="absolute inset-0 w-full h-full object-cover"
-        />
+        {!datesBackgroundImageFailed ? (
+          <img
+            src={addCacheBusting("/assets/images/events/event-date-banner.jpg")}
+            alt=""
+            aria-hidden
+            onError={() => setDatesBackgroundImageFailed(true)}
+            className="absolute inset-0 h-full w-full object-cover rounded-3xl opacity-40"
+          />
+        ) : null}
         <div
           className="absolute inset-0 opacity-20"
           style={{
@@ -564,8 +574,11 @@ export default function DatesSection({
         <AnimatePresence>{isVisible && particles}</AnimatePresence>
       </div>
 
-      <div className="w-full text-center relative z-10 mb-4 sm:mb-6 px-4">
-        <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold mb-4">
+      <div className="w-full text-center relative z-10 mb-6 sm:mb-8 px-4">
+        <p className="mb-3 text-xs font-semibold uppercase tracking-[0.2em] text-[color:var(--color-primary)]">
+          {sectionLabel}
+        </p>
+        <h2 className="text-3xl sm:text-4xl md:text-5xl font-black mb-4">
           {heading}
         </h2>
         {showAlreadyBookedLoginCta && (
@@ -621,7 +634,7 @@ export default function DatesSection({
 
                 return (
                   <motion.div
-                    className={`border rounded-sm overflow-hidden text-center w-[85px] sm:w-[100px] md:w-[120px] flex-shrink-0 transition-all duration-300 ${
+                    className={`border rounded-2xl overflow-hidden text-center w-[85px] sm:w-[100px] md:w-[120px] flex-shrink-0 transition-all duration-300 ${
                       isSoldOut
                         ? "border-red-500/60 cursor-not-allowed bg-slate-900/40 backdrop-blur-sm opacity-80 shadow-[0_0_25px_rgba(239,68,68,0.45)]"
                         : isInCart
@@ -704,7 +717,7 @@ export default function DatesSection({
 
                 return (
                   <motion.div
-                    className={`border rounded-sm overflow-hidden text-center w-[85px] sm:w-[100px] md:w-[120px] flex-shrink-0 transition-all duration-300 ${
+                    className={`border rounded-2xl overflow-hidden text-center w-[85px] sm:w-[100px] md:w-[120px] flex-shrink-0 transition-all duration-300 ${
                       isSoldOut
                         ? "border-red-500/60 cursor-not-allowed bg-slate-900/40 backdrop-blur-sm opacity-80 shadow-[0_0_25px_rgba(239,68,68,0.45)]"
                         : isInCart

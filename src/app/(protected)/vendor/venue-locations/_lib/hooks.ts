@@ -3,6 +3,7 @@ import { locationService } from "@/services/vendor/locations/locations.service";
 import { useSession } from "next-auth/react";
 import { VenueLocation } from "@/types/api.types";
 import { useSitePreviewStore } from "@/store/site-preview.store";
+import { useLocationStore } from "@/store/location.store";
 import { LocationsQueryData, LOCATION_DEPENDENT_QUERY_KEYS } from "./queries";
 
 /**
@@ -51,6 +52,7 @@ export function useSwitchLocation() {
 
       // Update NextAuth session with the new location ID
       if (default_venue_location?.id) {
+        useLocationStore.getState().setSelectedLocation(default_venue_location);
         try {
           await updateSession({
             vendor_location_id: String(default_venue_location.id),

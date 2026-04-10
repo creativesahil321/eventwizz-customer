@@ -23,6 +23,12 @@ import { StepTwoType, stepTwoSchema } from "../schema";
 import { eventsService } from "@/services/vendor/events/events.service";
 import { addCacheBusting } from "@/lib/image-utils";
 import { useCurrencySymbol } from "@/hooks/use-currency-format";
+import {
+  EVENT_PACKAGE_MAIN_HEADING_MAX_CHARS,
+  EVENT_PACKAGE_SUB_HEADING_MAX_CHARS,
+  PACKAGE_BUTTON_NAME_MAX_CHARS,
+  PACKAGE_DETAIL_LINE_MAX_CHARS,
+} from "@/lib/event-form-limits";
 
 // Define interfaces for gallery items and files with preview
 interface FileWithPreview extends File {
@@ -346,56 +352,69 @@ export default function PackageTab() {
               <FormField
                 control={form.control}
                 name="package_title"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-sm font-medium">
-                      Event Package Heading{" "}
-                      <span className="text-red-500">*</span>
-                    </FormLabel>
-                    <FormControl>
-                      <Input
-                        {...field}
-                        placeholder="e.g., The Package"
-                        className="h-11 bg-[#F9FAFB] border-[#E5E7EB]"
-                        onFocus={() => handleFieldFocus("package_title")}
-                        onChange={(e) => {
-                          field.onChange(e);
-                          globalForm.setValue(
-                            "stepTwo.package_title",
-                            e.target.value
-                          );
-                        }}
-                        onBlur={field.onBlur}
-                        value={
-                          typeof field.value === "string" ? field.value : ""
-                        }
-                      />
-                    </FormControl>
-                    <FormMessage className="text-red-500 font-semibold mt-1" />
-                  </FormItem>
-                )}
+                render={({ field }) => {
+                  const v = typeof field.value === "string" ? field.value : "";
+                  const maxLength = EVENT_PACKAGE_MAIN_HEADING_MAX_CHARS;
+                  return (
+                    <FormItem>
+                      <FormLabel className="text-sm font-medium">
+                        Event Package Heading{" "}
+                        <span className="text-red-500">*</span>
+                      </FormLabel>
+                      <FormControl>
+                        <Input
+                          {...field}
+                          placeholder="e.g., The Package"
+                          className="h-11 bg-[#F9FAFB] border-[#E5E7EB]"
+                          maxLength={maxLength}
+                          onFocus={() => handleFieldFocus("package_title")}
+                          onChange={(e) => {
+                            field.onChange(e);
+                            globalForm.setValue(
+                              "stepTwo.package_title",
+                              e.target.value
+                            );
+                          }}
+                          onBlur={field.onBlur}
+                          value={v}
+                        />
+                      </FormControl>
+                      <div className="text-xs text-gray-500 mt-1">
+                        {v.length}/{maxLength} characters
+                      </div>
+                      <FormMessage className="text-red-500 font-semibold mt-1" />
+                    </FormItem>
+                  );
+                }}
               />
 
               {/* Package Description */}
               <FormField
                 control={form.control}
                 name="package_description"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-sm font-medium">
-                      Sub Heading <span className="text-red-500">*</span>
-                    </FormLabel>
-                    <FormControl>
-                      <Input
-                        {...field}
-                        placeholder={`e.g., Prices From ${currencySymbol}65 Plus VAT Include:`}
-                        className="h-10 bg-[#F9FAFB] border-[#E5E7EB]"
-                        maxLength={160}
-                      />
-                    </FormControl>
-                    <FormMessage className="text-red-500 font-semibold mt-1" />
-                  </FormItem>
-                )}
+                render={({ field }) => {
+                  const v = typeof field.value === "string" ? field.value : "";
+                  const maxLength = EVENT_PACKAGE_SUB_HEADING_MAX_CHARS;
+                  return (
+                    <FormItem>
+                      <FormLabel className="text-sm font-medium">
+                        Sub Heading <span className="text-red-500">*</span>
+                      </FormLabel>
+                      <FormControl>
+                        <Input
+                          {...field}
+                          placeholder={`e.g., Prices From ${currencySymbol}65 Plus VAT Include:`}
+                          className="h-10 bg-[#F9FAFB] border-[#E5E7EB]"
+                          maxLength={maxLength}
+                        />
+                      </FormControl>
+                      <div className="text-xs text-gray-500 mt-1">
+                        {v.length}/{maxLength} characters
+                      </div>
+                      <FormMessage className="text-red-500 font-semibold mt-1" />
+                    </FormItem>
+                  );
+                }}
               />
             </div>
           </div>
@@ -472,31 +491,39 @@ export default function PackageTab() {
             <FormField
               control={form.control}
               name="package_button_name"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel className="text-base font-medium">
-                    Button Name <span className="text-red-500">*</span>
-                  </FormLabel>
-                  <FormControl>
-                    <Input
-                      {...field}
-                      placeholder="e.g., Choose Now"
-                      className="h-11 bg-[#F9FAFB] border-[#E5E7EB]"
-                      onFocus={() => handleFieldFocus("package_button_name")}
-                      onChange={(e) => {
-                        field.onChange(e);
-                        globalForm.setValue(
-                          "stepTwo.package_button_name",
-                          e.target.value
-                        );
-                      }}
-                      onBlur={field.onBlur}
-                      value={typeof field.value === "string" ? field.value : ""}
-                    />
-                  </FormControl>
-                  <FormMessage className="text-red-500 font-semibold mt-1" />
-                </FormItem>
-              )}
+              render={({ field }) => {
+                const v = typeof field.value === "string" ? field.value : "";
+                const maxLength = PACKAGE_BUTTON_NAME_MAX_CHARS;
+                return (
+                  <FormItem>
+                    <FormLabel className="text-base font-medium">
+                      Button Name <span className="text-red-500">*</span>
+                    </FormLabel>
+                    <FormControl>
+                      <Input
+                        {...field}
+                        placeholder="e.g., Choose Now"
+                        className="h-11 bg-[#F9FAFB] border-[#E5E7EB]"
+                        maxLength={maxLength}
+                        onFocus={() => handleFieldFocus("package_button_name")}
+                        onChange={(e) => {
+                          field.onChange(e);
+                          globalForm.setValue(
+                            "stepTwo.package_button_name",
+                            e.target.value
+                          );
+                        }}
+                        onBlur={field.onBlur}
+                        value={v}
+                      />
+                    </FormControl>
+                    <div className="text-xs text-gray-500 mt-1">
+                      {v.length}/{maxLength} characters
+                    </div>
+                    <FormMessage className="text-red-500 font-semibold mt-1" />
+                  </FormItem>
+                );
+              }}
             />
           </div>
 
@@ -540,39 +567,50 @@ export default function PackageTab() {
                   <FormField
                     control={form.control}
                     name={`package_details.${index}.title`}
-                    render={({ field }) => (
-                      <FormItem className="flex-1">
-                        <FormControl>
-                          <Input
-                            {...field}
-                            placeholder="e.g.- VIP entrance with photo opportunities"
-                            className="h-11 bg-[#F9FAFB] border-[#E5E7EB]"
-                            onFocus={() =>
-                              handleFieldFocus(`package_details.${index}.title`)
-                            }
-                            onChange={(e) => {
-                              field.onChange(e);
-
-                              // Sync with global form
-                              const currentDetails = [
-                                ...(globalForm.getValues().stepTwo
-                                  ?.package_details || []),
-                              ];
-                              if (currentDetails[index]) {
-                                currentDetails[index].title = e.target.value;
-                                globalForm.setValue(
-                                  "stepTwo.package_details",
-                                  currentDetails
-                                );
-                              }
-                            }}
-                            onBlur={field.onBlur}
-                            value={field.value || ""}
-                          />
-                        </FormControl>
-                        <FormMessage className="text-red-500 font-semibold mt-1" />
-                      </FormItem>
-                    )}
+                    render={({ field }) => {
+                      const val = field.value || "";
+                      const maxLength = PACKAGE_DETAIL_LINE_MAX_CHARS;
+                      return (
+                        <FormItem className="flex-1">
+                          <FormControl>
+                            <div className="w-full">
+                              <Input
+                                {...field}
+                                placeholder="e.g.- VIP entrance with photo opportunities"
+                                className="h-11 bg-[#F9FAFB] border-[#E5E7EB]"
+                                maxLength={maxLength}
+                                onFocus={() =>
+                                  handleFieldFocus(
+                                    `package_details.${index}.title`
+                                  )
+                                }
+                                onChange={(e) => {
+                                  field.onChange(e);
+                                  const currentDetails = [
+                                    ...(globalForm.getValues().stepTwo
+                                      ?.package_details || []),
+                                  ];
+                                  if (currentDetails[index]) {
+                                    currentDetails[index].title =
+                                      e.target.value;
+                                    globalForm.setValue(
+                                      "stepTwo.package_details",
+                                      currentDetails
+                                    );
+                                  }
+                                }}
+                                onBlur={field.onBlur}
+                                value={val}
+                              />
+                              <div className="text-xs text-gray-500 mt-1">
+                                {val.length}/{maxLength} characters
+                              </div>
+                            </div>
+                          </FormControl>
+                          <FormMessage className="text-red-500 font-semibold mt-1" />
+                        </FormItem>
+                      );
+                    }}
                   />
 
                   <Button

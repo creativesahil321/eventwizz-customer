@@ -14,10 +14,9 @@ interface AboutEventSecProps {
 }
 
 /**
- * About copy is always centered in a narrow column — independent of Site Essentials
- * `banner_heading_align`, which only controls the hero heading.
+ * About copy is left-aligned to match the clean, editorial Lovable layout.
  */
-const ABOUT_SECTION_ALIGN = "center" as const;
+const ABOUT_SECTION_ALIGN = "left" as const;
 
 export default function AboutEventSec({
   about_event_heading,
@@ -30,17 +29,12 @@ export default function AboutEventSec({
     "<p>If you are looking for a great ladies fun night out, with all the entertainment, Cosmopolitan reception drink, prosecco, three-course dinner and dancing till 1am, then you need look no further! Stock Brook Country Club has the perfect answer for a great night out with the girls.</p><p>Check out the latest dates to be released, but get in quick as these dates will soon go!!</p>";
 
   return (
-    <section className="w-full bg-[color:var(--color-background)] py-16">
-      <div className="mx-auto w-full max-w-3xl px-4 text-center">
-        <div className="space-y-4 md:space-y-5">
-          <p className="text-[11px] font-bold uppercase tracking-[0.28em] text-[color:var(--color-primary)]">
-            About the event
+    <section className="w-full bg-[color:var(--color-background)] py-20 md:py-28">
+      <div className="mx-auto w-full max-w-4xl px-4 text-left">
+        <div className="space-y-3 md:space-y-4">
+          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[color:var(--color-primary)]">
+            {about_event_sub_heading || "About the Event"}
           </p>
-          {about_event_sub_heading ? (
-            <p className="text-sm font-medium italic text-[var(--color-text-dimmed)] md:text-base">
-              {about_event_sub_heading}
-            </p>
-          ) : null}
           <SiteHeading
             level={2}
             title={
@@ -51,11 +45,11 @@ export default function AboutEventSec({
             emphasis={headingEmphasis ?? undefined}
             variant="onSurface"
             align={ABOUT_SECTION_ALIGN}
-            className="!text-3xl !font-bold !tracking-tight !leading-[1.15] md:!text-4xl"
+            className="!text-3xl !font-black !tracking-tight !leading-[1.15] md:!text-4xl"
           />
         </div>
         <div
-          className="prose prose-sm mx-auto mt-6 max-w-none text-[var(--color-text)] prose-headings:text-[var(--color-text)] prose-p:text-center prose-p:text-[var(--color-text)] prose-strong:text-[var(--color-text)] prose-p:leading-relaxed md:prose-base"
+          className="prose prose-sm mt-6 max-w-none text-[var(--color-text)] prose-headings:text-[var(--color-text)] prose-p:text-left prose-p:text-[var(--color-text)] prose-strong:text-[var(--color-text)] prose-p:leading-relaxed md:prose-base"
           style={{ wordBreak: "break-word", overflowWrap: "break-word" }}
           dangerouslySetInnerHTML={{
             __html: about_event_description || defaultDescription,

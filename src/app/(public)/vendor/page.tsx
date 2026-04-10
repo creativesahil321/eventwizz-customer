@@ -138,9 +138,6 @@ export default function VendorSiteHomePage() {
               "w-full min-w-0 overflow-visible",
             )}
           >
-            <p className="mb-4 text-[11px] font-semibold uppercase tracking-[0.32em] text-white/50 sm:text-xs">
-              Curated for your city
-            </p>
             <SiteHeading
               level={1}
               title={heroHeading}

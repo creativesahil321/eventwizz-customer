@@ -19,6 +19,16 @@ import {
 import { Input } from "@/components/ui/input";
 import { X, PlusCircle } from "lucide-react";
 import { useCurrencySymbol } from "@/hooks/use-currency-format";
+import {
+  DRINK_PACKAGE_ITEM_TITLE_MAX_CHARS,
+  DRINK_SECTION_DESCRIPTION_MAX_CHARS,
+  DRINK_SECTION_TITLE_MAX_CHARS,
+  RICH_DESCRIPTION_MAX_CHARS,
+  clampDrinkPackagePrice,
+  clampDrinkPackageQuantity,
+  DRINK_PACKAGE_PRICE_MAX,
+  DRINK_PACKAGE_QTY_MAX,
+} from "@/lib/event-form-limits";
 
 export default function DrinksTab() {
   const currencySymbol = useCurrencySymbol();
@@ -179,43 +189,63 @@ export default function DrinksTab() {
               <FormField
                 control={control}
                 name="drink_title"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-sm font-medium">
-                      Title <span className="text-red-500">*</span>
-                    </FormLabel>
-                    <FormControl>
-                      <Input
-                        {...field}
-                        placeholder="e.g. VIP Packages, Premium Access, etc."
-                        className="h-11 bg-[#F9FAFB] border-[#E5E7EB]"
-                        onFocus={() => handleFieldFocus("drink_title")}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
+                render={({ field }) => {
+                  const currentLength = field.value?.length || 0;
+                  const maxLength = DRINK_SECTION_TITLE_MAX_CHARS;
+                  return (
+                    <FormItem>
+                      <FormLabel className="text-sm font-medium">
+                        Title <span className="text-red-500">*</span>
+                      </FormLabel>
+                      <FormControl>
+                        <Input
+                          {...field}
+                          placeholder="e.g. VIP Packages, Premium Access, etc."
+                          className="h-11 bg-[#F9FAFB] border-[#E5E7EB]"
+                          maxLength={maxLength}
+                          onFocus={() => handleFieldFocus("drink_title")}
+                        />
+                      </FormControl>
+                      <div className="text-xs text-gray-500 mt-1">
+                        <span className={currentLength > maxLength ? "text-red-500" : ""}>
+                          {currentLength}/{maxLength} characters
+                        </span>
+                      </div>
+                      <FormMessage />
+                    </FormItem>
+                  );
+                }}
               />
 
               <FormField
                 control={control}
                 name="drink_description"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-sm font-medium">
-                      Description <span className="text-red-500">*</span>
-                    </FormLabel>
-                    <FormControl>
-                      <Input
-                        {...field}
-                        placeholder="e.g. Please note: Special terms and conditions apply..."
-                        className="h-11 bg-[#F9FAFB] border-[#E5E7EB]"
-                        onFocus={() => handleFieldFocus("drink_description")}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
+                render={({ field }) => {
+                  const currentLength = field.value?.length || 0;
+                  const maxLength = DRINK_SECTION_DESCRIPTION_MAX_CHARS;
+                  return (
+                    <FormItem>
+                      <FormLabel className="text-sm font-medium">
+                        Description <span className="text-red-500">*</span>
+                      </FormLabel>
+                      <FormControl>
+                        <Input
+                          {...field}
+                          placeholder="e.g. Please note: Special terms and conditions apply..."
+                          className="h-11 bg-[#F9FAFB] border-[#E5E7EB]"
+                          maxLength={maxLength}
+                          onFocus={() => handleFieldFocus("drink_description")}
+                        />
+                      </FormControl>
+                      <div className="text-xs text-gray-500 mt-1">
+                        <span className={currentLength > maxLength ? "text-red-500" : ""}>
+                          {currentLength}/{maxLength} characters
+                        </span>
+                      </div>
+                      <FormMessage />
+                    </FormItem>
+                  );
+                }}
               />
             </div>
           </div>
@@ -275,45 +305,64 @@ export default function DrinksTab() {
                   <FormField
                     control={control}
                     name={`packages.${index}.title`}
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel className="text-sm font-medium">
-                          Package Heading
-                        </FormLabel>
-                        <FormControl>
-                          <Input
-                            {...field}
-                            placeholder="e.g. Premium Package A"
-                            className="h-10 bg-[#F9FAFB] border-[#E5E7EB]"
-                            onFocus={() =>
-                              handleFieldFocus(`packages.${index}.title`)
-                            }
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
+                    render={({ field }) => {
+                      const currentLength = field.value?.length || 0;
+                      const maxLength = DRINK_PACKAGE_ITEM_TITLE_MAX_CHARS;
+                      return (
+                        <FormItem>
+                          <FormLabel className="text-sm font-medium">
+                            Package Heading
+                          </FormLabel>
+                          <FormControl>
+                            <Input
+                              {...field}
+                              placeholder="e.g. Premium Package A"
+                              className="h-10 bg-[#F9FAFB] border-[#E5E7EB]"
+                              maxLength={maxLength}
+                              onFocus={() =>
+                                handleFieldFocus(`packages.${index}.title`)
+                              }
+                            />
+                          </FormControl>
+                          <div className="text-xs text-gray-500 mt-1">
+                            <span className={currentLength > maxLength ? "text-red-500" : ""}>
+                              {currentLength}/{maxLength} characters
+                            </span>
+                          </div>
+                          <FormMessage />
+                        </FormItem>
+                      );
+                    }}
                   />
 
                   <FormField
                     control={control}
                     name={`packages.${index}.description`}
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel className="text-sm font-medium">
-                          Package Description
-                        </FormLabel>
-                        <FormControl>
-                          <Input
-                            {...field}
-                            placeholder="e.g. Includes premium access, special amenities..."
-                            className="h-10 bg-[#F9FAFB] border-[#E5E7EB]"
-                            maxLength={160}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
+                    render={({ field }) => {
+                      const currentLength = field.value?.length || 0;
+                      const maxLength = RICH_DESCRIPTION_MAX_CHARS;
+                      return (
+                        <FormItem>
+                          <FormLabel className="text-sm font-medium">
+                            Package Description
+                          </FormLabel>
+                          <FormControl>
+                            <Input
+                              {...field}
+                              placeholder="e.g. Includes premium access, special amenities..."
+                              className="h-10 bg-[#F9FAFB] border-[#E5E7EB]"
+                              maxLength={maxLength}
+                            />
+                          </FormControl>
+                          <div className="text-xs text-gray-500 mt-1">
+                            <span className={currentLength > maxLength ? "text-red-500" : ""}>
+                              {currentLength}/{maxLength} characters
+                            </span>
+                          </div>
+                          <FormMessage />
+                        </FormItem>
+                      );
+                    }}
                   />
 
                   <FormField
@@ -335,17 +384,15 @@ export default function DrinksTab() {
                             }
                             onChange={(e) => {
                               const value = e.target.value;
-                              // Allow empty string while typing
                               if (value === "" || value === null) {
                                 field.onChange("");
                                 return;
                               }
-
                               const numValue = Number.parseFloat(value);
-                              if (!Number.isNaN(numValue) && numValue > 0) {
-                                field.onChange(numValue);
-                              }
+                              if (!Number.isFinite(numValue)) return;
+                              field.onChange(clampDrinkPackagePrice(numValue));
                             }}
+                            max={DRINK_PACKAGE_PRICE_MAX}
                             onBlur={() => {
                               // Keep empty string on blur - validation will catch it
                               field.onBlur();
@@ -373,15 +420,21 @@ export default function DrinksTab() {
                             className="h-10 bg-[#F9FAFB] border-[#E5E7EB]"
                             placeholder="e.g. 100"
                             min="1"
-                            max="500"
+                            max={DRINK_PACKAGE_QTY_MAX}
                             onFocus={() =>
                               handleFieldFocus(
                                 `packages.${index}.available_quantity`
                               )
                             }
                             onChange={(e) => {
-                              const numValue = Number(e.target.value);
-                              field.onChange(numValue);
+                              const v = e.target.value;
+                              if (v === "") {
+                                field.onChange("" as unknown as number);
+                                return;
+                              }
+                              const n = Number(v);
+                              if (!Number.isFinite(n)) return;
+                              field.onChange(clampDrinkPackageQuantity(n));
                             }}
                           />
                         </FormControl>

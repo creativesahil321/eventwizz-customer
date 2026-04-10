@@ -184,17 +184,6 @@ export default function HeroBanner({
           transition={{ duration: 0.8 }}
           className={cn(stackClass, "overflow-visible")}
         >
-          {locationName ? (
-            <p
-              className={cn(
-                "mb-4 text-[11px] font-bold uppercase tracking-[0.28em] text-white/75",
-                textAlign === "center" && "mx-auto max-w-3xl",
-              )}
-            >
-              {`Welcome to ${locationName}`}
-            </p>
-          ) : null}
-
           <SiteHeading
             level={1}
             title={bannerHeading}

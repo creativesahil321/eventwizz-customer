@@ -185,7 +185,7 @@ const UniversalSearch = () => {
                 {results.map((result) => (
                   <button
                     key={result.id}
-                    className="w-full text-left px-4 py-3 hover:bg-gray-50 flex flex-col"
+                    className="w-full text-left px-4 py-3 hover:bg-gray-50 flex flex-col text-black"
                     onClick={() => {
                       router.push(
                         `/search?q=${encodeURIComponent(query)}&type=${

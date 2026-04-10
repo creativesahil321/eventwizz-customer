@@ -202,9 +202,6 @@ export default function Timeline({
       {/* Do not use overflow-hidden here — it clips the horizontal timeline scroll */}
       <div className="relative z-10 mx-auto max-w-7xl">
         <div className="z-10 mb-8 text-center sm:mb-16">
-          <span className="mb-1 block text-xs font-bold uppercase tracking-[0.28em] text-[color:var(--color-primary)]">
-            Event Schedule
-          </span>
           <h2 className="text-2xl font-black tracking-tight text-[var(--color-text)] md:text-3xl">
             {eventSchedularTitle || "What to Expect"}
           </h2>

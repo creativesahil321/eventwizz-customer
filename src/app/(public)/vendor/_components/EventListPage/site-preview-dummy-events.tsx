@@ -48,9 +48,11 @@ export function SitePreviewDummyEventSection({
   );
   const isSecondary = band === "secondary";
 
+  /** Same rhythm as live `PopularEvents` / `UpcomingEvents` sections — no border-y/shadow
+   *  so preview stacks flush like the customer site (borders were read as stray “lines”). */
   const sectionClass = isSecondary
-    ? "w-full py-16 bg-[var(--color-secondary)] text-[var(--color-secondary-foreground)] border-t border-[var(--color-secondary-foreground)]/15"
-    : "w-full py-20 bg-[var(--color-background)] border-y border-[var(--color-on-background)]/10 shadow-inner text-[var(--color-text)]";
+    ? "w-full py-16 bg-[var(--color-secondary)] text-[var(--color-secondary-foreground)]"
+    : "w-full py-16 bg-transparent text-[var(--color-text)]";
 
   const headingClass = isSecondary
     ? "text-[var(--color-secondary-foreground)]"
@@ -60,19 +62,10 @@ export function SitePreviewDummyEventSection({
     ? "text-[var(--color-secondary-foreground)]/85"
     : "text-[var(--color-text-dimmed)]";
 
-  const badgeBorder = isSecondary
-    ? "border-[var(--color-secondary-foreground)]/25"
-    : "border-[var(--color-on-background)]/20";
-
   return (
     <section className={sectionClass}>
-      <div className="container mx-auto px-4">
+      <div className="container mx-auto max-w-7xl px-4">
         <div className="mb-6 w-full text-left">
-          {isSecondary ? (
-            <span className="mb-1 block text-xs font-bold uppercase tracking-[0.2em] text-[color:var(--color-primary)]">
-              Featured right now
-            </span>
-          ) : null}
           <h2 className={`text-2xl font-black tracking-tight md:text-3xl ${headingClass}`}>
             {sectionTitle}
           </h2>
@@ -98,7 +91,7 @@ export function SitePreviewDummyEventSection({
                 Sample
               </span>
               <article
-                className={`pointer-events-none relative overflow-hidden rounded-xl border border-white/10 bg-zinc-950 opacity-95 ${badgeBorder}`}
+                className="pointer-events-none relative overflow-hidden rounded-xl border border-white/10 bg-zinc-950 opacity-95 shadow-sm"
               >
                 <div className="relative aspect-[4/3] w-full overflow-hidden bg-zinc-900">
                   <img

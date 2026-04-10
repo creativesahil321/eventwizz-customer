@@ -75,13 +75,15 @@ export default function RecentEventsGlimpse({
   }, [images.length]);
 
   return (
-    <section className="py-16 px-4 bg-transparent">
+    <section className="py-20 md:py-28 px-4 bg-transparent">
       <div className="max-w-7xl mx-auto">
-      <div className="text-center mb-8">
-        <span className="mb-1 block text-xs font-bold uppercase tracking-[0.2em] text-[color:var(--color-primary)]">
-          Glimpse
-        </span>
-        <h2 className="text-2xl font-black tracking-tight text-[var(--color-text)] md:text-3xl">{galleryTitle}</h2>
+      <div className="text-center mb-8 space-y-3">
+        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[color:var(--color-primary)]">
+          Latest Memories
+        </p>
+        <h2 className="text-3xl font-black tracking-tight text-[var(--color-text)] md:text-4xl">
+          {galleryTitle}
+        </h2>
       </div>
 
       {images.length === 0 ? (

@@ -79,10 +79,13 @@ export default function PopularEvents({
     }
 
     return (
-      <section className="w-full py-16 bg-transparent text-[var(--color-text)]">
+      <section className="w-full py-20 md:py-28 bg-transparent text-[var(--color-text)]">
         <div className="container mx-auto max-w-7xl px-4">
-          <div className="mb-8 w-full text-left">
-            <h2 className="text-2xl font-black tracking-tight md:text-3xl">
+          <div className="mb-8 w-full text-left space-y-3">
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[color:var(--color-primary)]">
+              Popular Events
+            </p>
+            <h2 className="text-3xl font-black tracking-tight text-[var(--color-text)] md:text-4xl">
               {sectionTitleText}
             </h2>
           </div>
@@ -162,14 +165,14 @@ export default function PopularEvents({
     return (
       <section
         id="latest-events"
-        className="w-full bg-transparent py-16 text-[var(--color-text)]"
+        className="w-full bg-transparent py-20 md:py-28 text-[var(--color-text)]"
       >
         <div className="container mx-auto max-w-7xl px-4">
-          <div className="mb-8 w-full text-left">
-            <span className="mb-1 block text-xs font-bold uppercase tracking-[0.2em] text-[color:var(--color-primary)]">
-              Featured right now
-            </span>
-            <h2 className="text-2xl font-black tracking-tight text-[var(--color-text)] md:text-3xl">
+          <div className="mb-8 w-full text-left space-y-3">
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[color:var(--color-primary)]">
+              Popular Events
+            </p>
+            <h2 className="text-3xl font-black tracking-tight text-[var(--color-text)] md:text-4xl">
               {sectionTitleText}
             </h2>
           </div>
@@ -193,14 +196,14 @@ export default function PopularEvents({
     return (
       <section
         id="latest-events"
-        className="w-full bg-transparent py-16 text-[var(--color-text)]"
+        className="w-full bg-transparent py-20 md:py-28 text-[var(--color-text)]"
       >
         <div className="container mx-auto max-w-7xl px-4">
-          <div className="mb-8 w-full text-left">
-            <span className="mb-1 block text-xs font-bold uppercase tracking-[0.2em] text-[color:var(--color-primary)]">
-              Featured right now
-            </span>
-            <h2 className="text-2xl font-black tracking-tight text-[var(--color-text)] md:text-3xl">
+          <div className="mb-8 w-full text-left space-y-3">
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[color:var(--color-primary)]">
+              Popular Events
+            </p>
+            <h2 className="text-3xl font-black tracking-tight text-[var(--color-text)] md:text-4xl">
               {sectionTitleText}
             </h2>
           </div>
@@ -263,14 +266,14 @@ export default function PopularEvents({
   return (
     <section
       id="latest-events"
-      className="w-full bg-transparent py-16 text-[var(--color-text)]"
+      className="w-full bg-transparent py-20 md:py-28 text-[var(--color-text)]"
     >
       <div className="container mx-auto max-w-7xl px-4">
-        <div className="mb-8 w-full text-left">
-          <span className="mb-1 block text-xs font-bold uppercase tracking-[0.2em] text-[color:var(--color-primary)]">
-            Featured right now
-          </span>
-          <h2 className="text-2xl font-black tracking-tight text-[var(--color-text)] md:text-3xl">
+        <div className="mb-8 w-full text-left space-y-3">
+          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[color:var(--color-primary)]">
+            Popular Events
+          </p>
+          <h2 className="text-3xl font-black tracking-tight text-[var(--color-text)] md:text-4xl">
             {sectionTitleText}
           </h2>
         </div>

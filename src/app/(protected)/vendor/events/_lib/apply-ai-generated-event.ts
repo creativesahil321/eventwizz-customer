@@ -8,6 +8,7 @@ import { API_ENDPOINTS } from "@/services/core/endpoints";
 import { eventsService } from "@/services/vendor/events/events.service";
 import type { EventDetailData } from "@/services/vendor/events/type";
 import type { StepOneType } from "@/app/(protected)/vendor/events/_components/tab-event-form/schema";
+import { STEP_NINE_MAX_FAQS } from "@/app/(on-boarding)/on-boarding/_components/form-provider/schema";
 import {
   getDummyImages,
   getImagesByCategoryId,
@@ -260,7 +261,7 @@ export async function applyAIGeneratedEventToBackend(params: {
     await eventsService.storeStepSevenData({
       step: 7 as const,
       event_id: eventId,
-      faqs: s.stepSeven.faqs,
+      faqs: s.stepSeven.faqs.slice(0, STEP_NINE_MAX_FAQS),
     });
   }
 

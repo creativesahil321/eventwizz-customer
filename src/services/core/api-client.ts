@@ -8,9 +8,9 @@ import { toast } from "sonner";
 import { ApiError } from "@/types/api.types";
 import { env } from "@/env";
 import { useAuthStore } from "@/store/auth.store";
-import { getSession } from "next-auth/react";
 import { useDomainStore } from "@/store/domain.store";
 import { getImpersonationStatus } from "@/store/impersonation.store";
+import { useLocationStore } from "@/store/location.store";
 import {
   getCorrectRedirectUrl,
   validateDomainAccess,
@@ -112,46 +112,20 @@ const clearSecurityViolations = (): void => {
 };
 
 // Function to get session token from NextAuth
-const getNextAuthToken = async (): Promise<string | null> => {
-  if (isBrowser) {
-    try {
-      const session = await getSession();
-      if (session?.user?.token) {
-        return session.user.token;
-      }
-    } catch (e) {
-      console.error("Error accessing NextAuth session:", e);
-    }
-  }
-  return null;
-};
-
 // Safe function to get token that works on both client and server
 const getToken = async (): Promise<string | null> => {
-  // First try to get token from NextAuth session (most secure)
-  const sessionToken = await getNextAuthToken();
-  if (sessionToken) {
-    return sessionToken;
-  }
-
-  // Only try to access Zustand or localStorage in browser environment
+  // Only try to access Zustand/localStorage in browser environment
   if (isBrowser) {
     try {
       // Try Zustand store (memory)
       const store = useAuthStore.getState();
-
-      // Verify the session is still valid before using the token
-      const isSessionValid = await store.verifySession();
-
-      if (isSessionValid && store.token) {
-        return store.token;
-      }
+      const tokenExpiry = store.tokenExpiry;
+      const token = store.token;
+      if (token && (!tokenExpiry || Date.now() < tokenExpiry)) return token;
 
       // Fall back to localStorage if needed (for backward compatibility)
-      const token = localStorage.getItem("token");
-      if (token) {
-        return token;
-      }
+      const legacyToken = localStorage.getItem("token");
+      if (legacyToken) return legacyToken;
 
       // Final fallback - check auth-storage in localStorage
       const authStorage = localStorage.getItem("auth-storage");
@@ -232,12 +206,26 @@ apiClient.interceptors.request.use(
           console.warn(`[API Client] No domain available in domain store`);
         }
 
-        // Get location ID from NextAuth session (secure method)
-        const session = await getSession();
-        if (session?.user?.vendor_location_id) {
-          config.headers["X-Venue-Location-Id"] = String(
-            session.user.vendor_location_id
-          );
+        // Location ID should not require a NextAuth session request per Axios call.
+        // Order: location store (explicit selection) → auth store (synced from NextAuth in SessionValidator) → legacy localStorage.
+        const locationIdFromStore = useLocationStore.getState().getLocationId();
+        const locationIdFromAuth =
+          useAuthStore.getState().vendor_location_id ?? null;
+        const locationId =
+          locationIdFromStore ??
+          locationIdFromAuth ??
+          (() => {
+            try {
+              const legacy = localStorage.getItem("vendor_location_id");
+              const n = legacy ? Number(legacy) : NaN;
+              return Number.isFinite(n) ? n : null;
+            } catch {
+              return null;
+            }
+          })();
+
+        if (locationId) {
+          config.headers["X-Venue-Location-Id"] = String(locationId);
         }
 
         // Attach impersonation header so backend can tag audit logs

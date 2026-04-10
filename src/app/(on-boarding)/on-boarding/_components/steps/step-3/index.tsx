@@ -33,7 +33,11 @@ import { setEventIdInForm } from "../../../_lib/hooks/useEventId";
 import { VideoFormatInfo } from "@/components/shared/video-format-info";
 import { addCacheBusting } from "@/lib/image-utils";
 import { cn } from "@/lib/utils";
-import { BANNER_HEADING_MAX_WORDS, countWords } from "@/lib/word-count";
+import {
+  BANNER_HEADING_MAX_WORDS,
+  countWords,
+  truncateToMaxWords,
+} from "@/lib/word-count";
 import { useGuidedOnboardingSections } from "../../../_lib/hooks/use-guided-onboarding-sections";
 import type { GuidedSectionConfig } from "../../../_lib/hooks/use-guided-onboarding-sections";
 import { GuidedMultiSectionBottomActions } from "../../guided-section-chips";
@@ -1065,22 +1069,20 @@ export default function StepThree() {
                                 handleFieldFocus("event_banner_heading")
                               }
                               onChange={(e) => {
-                                field.onChange(e);
+                                const next = truncateToMaxWords(
+                                  e.target.value,
+                                  BANNER_HEADING_MAX_WORDS,
+                                );
+                                field.onChange(next);
                                 globalForm.setValue(
                                   "stepThree.event_banner_heading",
-                                  e.target.value,
+                                  next,
                                 );
                               }}
                             />
                           </FormControl>
                           <div className="text-xs text-muted-foreground mt-1">
-                            <span
-                              className={
-                                headingWordCount > BANNER_HEADING_MAX_WORDS
-                                  ? "text-destructive"
-                                  : ""
-                              }
-                            >
+                            <span>
                               {headingWordCount}/{BANNER_HEADING_MAX_WORDS}{" "}
                               words
                             </span>

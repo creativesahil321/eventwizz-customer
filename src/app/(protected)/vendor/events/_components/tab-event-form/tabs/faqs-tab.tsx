@@ -6,6 +6,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { eventsService } from "@/services/vendor/events/events.service";
 import { Button } from "@/components/ui/button";
 import { Form } from "@/components/ui/form";
+import { STEP_NINE_MAX_FAQS } from "@/app/(on-boarding)/on-boarding/_components/form-provider/schema";
 import { StepSevenType, stepSevenSchema } from "../schema";
 import { useEventFormContext } from "../../events-form-provider";
 import { toast } from "sonner";
@@ -23,9 +24,6 @@ import { Trash2 } from "lucide-react";
 export default function FaqsTab() {
   const [isLoading, setIsLoading] = useState(false);
   const { form: globalForm, save, setActiveField, readOnly } = useEventFormContext();
-
-  // Add a constant for max FAQs allowed
-  const MAX_FAQS = 5;
 
   // Get event_id from global form
   const getEventId = (): number => {
@@ -83,13 +81,11 @@ export default function FaqsTab() {
     return () => subscription.unsubscribe();
   }, [form, globalForm]);
 
-  // Update handleAppend to check against MAX_FAQS
   const handleAppend = async () => {
     const currentFaqs = form.getValues("faqs");
 
-    // Check if we've reached the max allowed FAQs
-    if (currentFaqs.length >= MAX_FAQS) {
-      toast.error(`You can add a maximum of ${MAX_FAQS} FAQs`);
+    if (currentFaqs.length >= STEP_NINE_MAX_FAQS) {
+      toast.error(`You can add a maximum of ${STEP_NINE_MAX_FAQS} FAQs`);
       return;
     }
 
@@ -275,6 +271,7 @@ export default function FaqsTab() {
                 <Button
                   type="button"
                   onClick={handleAppend}
+                  disabled={readOnly || faqFields.length >= STEP_NINE_MAX_FAQS}
                   className="bg-[#F9FAFB] hover:bg-gray-100 text-gray-700 border border-[#E5E7EB]"
                 >
                   <span className="mr-1">+</span> Add Another FAQ

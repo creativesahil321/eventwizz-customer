@@ -48,9 +48,6 @@ export default function EventGallery({ gallery, galleryTitle }: PackageSectionPr
       <div className="max-w-7xl mx-auto">
         {/* Section header */}
         <div className="text-center mb-8">
-          <span className="mb-1 block text-xs font-bold uppercase tracking-[0.28em] text-[color:var(--color-primary)]">
-            Event Gallery
-          </span>
           <h2 className="text-2xl font-black tracking-tight text-[var(--color-text)] md:text-3xl">
             {title}
           </h2>

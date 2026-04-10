@@ -112,7 +112,7 @@ export default function EventDetailClient({
         {/* Theme Animations */}
         <ThemeAnimationManager
           eventData={eventData}
-          enabled={false}
+          enabled={true}
           intensity="medium"
         />
 
@@ -195,7 +195,10 @@ export default function EventDetailClient({
               <Link
                 href={`/${locationSlug}`}
                 className={cn(
-                  "mb-6 inline-flex items-center gap-1.5 text-sm font-medium text-white/80 transition-colors hover:text-white",
+                  "mb-6 inline-flex items-center gap-1.5 text-sm font-medium transition-all duration-200",
+                  "rounded-full px-3 py-1.5 text-white/80", // Transparent by default, slightly smaller padding
+                  "hover:bg-[var(--color-primary)] hover:text-[var(--color-primary-foreground)] hover:scale-[1.02] hover:shadow-md", // Solid hover style
+                  bannerAlign === "left" && "-ml-3", // Offset left padding for left alignment
                   bannerAlign === "center" && "mx-auto",
                   bannerAlign === "right" && "ml-auto",
                 )}
@@ -260,17 +263,24 @@ export default function EventDetailClient({
         <div ref={packageRef}>
           <PackageSec
             heading={eventData.package_title}
-            subHeading={eventData.package_sub_title}
+            subHeading={(
+              eventData.package_description ??
+              eventData.package_sub_title ??
+              ""
+            ).trim()}
             image={eventData.package_image}
             buttonName={eventData.package_button_name || "Book Now"}
             buttonLink="#booking"
             packageDetails={eventData.package_details}
             headingEmphasis={headingEmphasisFromSite}
-            headingAccentHint="Packages"
           />
         </div>
         {/* Booking Section */}
-        <div ref={bookingRef} id="booking">
+        <div
+          ref={bookingRef}
+          id="booking"
+          className="mx-auto max-w-7xl px-4 py-8 md:py-12"
+        >
           <DatesSection
             dates={eventData.dates}
             eventSlug={eventSlug}
@@ -314,7 +324,7 @@ export default function EventDetailClient({
             <DrinkSection
               title={eventData.drink_title}
               description={eventData.drink_description}
-              packages={eventData.packages.map((pkg) => ({
+              packages={(eventData.packages ?? []).map((pkg) => ({
                 ...pkg,
                 price: parseFloat(pkg.price) || 0,
               }))}

@@ -4,6 +4,7 @@ import { ReactNode, useEffect, useState, useRef } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { useAuthStore } from "@/store/auth.store";
+import { AuthRedirectingSkeleton } from "@/app/(auth)/_components/auth-redirecting-skeleton";
 
 interface LocationGuardProps {
   children: ReactNode;
@@ -91,7 +92,7 @@ export function LocationGuard({
 
   // Only show loading on very first mount, not on session updates
   if (!hasInitiallyLoaded) {
-    return null;
+    return <AuthRedirectingSkeleton />;
   }
 
   // If we should bypass, not a vendor, or have a location, render children

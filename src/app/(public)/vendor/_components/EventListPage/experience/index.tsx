@@ -5,6 +5,7 @@ import { ArrowRight } from "lucide-react";
 import { useContext } from "react";
 import { ServerContext } from "@/lib/server-context";
 import { ThemeSchema } from "@/types/theme.types";
+import { useIsPreviewMode } from "@/contexts/preview-context";
 
 interface ExperienceSectionProps {
   aboutTitle?: string | null;
@@ -21,6 +22,7 @@ export default function ExperienceSection({
 }: ExperienceSectionProps) {
   const { theme } = useContext(ServerContext);
   const vendorTheme = theme as ThemeSchema;
+  const isPreviewMode = useIsPreviewMode();
 
   const venueName = vendorTheme?.name || "EventWizz";
 
@@ -39,15 +41,12 @@ export default function ExperienceSection({
   };
 
   return (
-    <section className="w-full bg-[color:var(--color-background)] py-16 px-4">
+    <section className="w-full bg-[color:var(--color-background)] py-20 px-4 md:py-28">
       <div className="max-w-7xl mx-auto">
         <div className="grid grid-cols-1 items-start gap-8 text-[var(--color-text)] md:grid-cols-2 md:gap-16">
           <div className="w-full">
-            <p className="mb-3 text-[11px] font-bold uppercase tracking-[0.28em] text-[color:var(--color-primary)]">
-              About the venue
-            </p>
             <h2
-              className="text-3xl font-black leading-tight tracking-tight md:text-5xl"
+              className="mt-2 text-3xl font-black leading-tight tracking-tight md:text-5xl"
               dangerouslySetInnerHTML={{ __html: experienceData.title }}
             />
           </div>
@@ -57,13 +56,25 @@ export default function ExperienceSection({
               dangerouslySetInnerHTML={{ __html: experienceData.description }}
             />
             <div className="inline-flex w-fit">
-              <Link
-                href={experienceData.buttonLink}
-                className="inline-flex items-center gap-2 rounded-full bg-[var(--color-primary)] px-8 py-3.5 text-sm font-bold tracking-wide text-[var(--color-primary-foreground,white)] shadow-md transition-[filter,box-shadow,transform] duration-300 hover:brightness-105 active:scale-[0.98]"
-              >
-                {experienceData.buttonText}
-                <ArrowRight className="h-4 w-4 shrink-0" aria-hidden />
-              </Link>
+              {isPreviewMode ? (
+                <button
+                  type="button"
+                  disabled
+                  aria-disabled="true"
+                  className="inline-flex items-center gap-2 rounded-full bg-[var(--color-primary)] px-8 py-3.5 text-sm font-bold tracking-wide text-[var(--color-primary-foreground,white)] opacity-90 shadow-md"
+                >
+                  {experienceData.buttonText}
+                  <ArrowRight className="h-4 w-4 shrink-0" aria-hidden />
+                </button>
+              ) : (
+                <Link
+                  href={experienceData.buttonLink}
+                  className="inline-flex items-center gap-2 rounded-full bg-[var(--color-primary)] px-8 py-3.5 text-sm font-bold tracking-wide text-[var(--color-primary-foreground,white)] shadow-md transition-[filter,box-shadow,transform] duration-300 hover:brightness-105 active:scale-[0.98]"
+                >
+                  {experienceData.buttonText}
+                  <ArrowRight className="h-4 w-4 shrink-0" aria-hidden />
+                </Link>
+              )}
             </div>
           </div>
         </div>

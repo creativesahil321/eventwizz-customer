@@ -34,6 +34,7 @@ import { GuidedWholeStepBottomActions } from "../../guided-section-chips";
 import MenuCategoryDropdown from "./menu-category-dropdown";
 import { useEventMenuCategories } from "@/services/vendor/events/query";
 import { EventMenuCategory } from "@/services/vendor/events/type";
+import { RICH_DESCRIPTION_MAX_CHARS } from "@/lib/event-form-limits";
 
 // Define a type for the menu structure based on the schema
 type MenuType = {
@@ -575,10 +576,14 @@ export default function StepSix() {
                                       className="h-10 bg-white/5 border-white/10"
                                       maxLength={maxLength}
                                       onChange={(e) => {
-                                        field.onChange(e);
+                                        const next = e.target.value.slice(
+                                          0,
+                                          maxLength,
+                                        );
+                                        field.onChange(next);
                                         globalForm.setValue(
                                           "stepSix.menu_title",
-                                          e.target.value,
+                                          next,
                                         );
                                       }}
                                       onFocus={() =>
@@ -621,10 +626,14 @@ export default function StepSix() {
                                       className="h-10 bg-white/5 border-white/10"
                                       maxLength={maxLength}
                                       onChange={(e) => {
-                                        field.onChange(e);
+                                        const next = e.target.value.slice(
+                                          0,
+                                          maxLength,
+                                        );
+                                        field.onChange(next);
                                         globalForm.setValue(
                                           "stepSix.menu_description",
-                                          e.target.value,
+                                          next,
                                         );
                                       }}
                                       onFocus={() =>
@@ -772,8 +781,12 @@ export default function StepSix() {
                                                         className="h-10 bg-white/5 border-white/10"
                                                         maxLength={maxLength}
                                                         onChange={(e) => {
-                                                          field.onChange(e);
-                                                          // Update global form immediately
+                                                          const next =
+                                                            e.target.value.slice(
+                                                              0,
+                                                              maxLength,
+                                                            );
+                                                          field.onChange(next);
                                                           const currentMenus =
                                                             form.getValues(
                                                               "menus",
@@ -789,8 +802,7 @@ export default function StepSix() {
                                                               menuIndex
                                                             ].items[
                                                               itemIndex
-                                                            ].title =
-                                                              e.target.value;
+                                                            ].title = next;
                                                             globalForm.setValue(
                                                               "stepSix.menus",
                                                               updatedMenus,
@@ -847,47 +859,64 @@ export default function StepSix() {
                                           <FormField
                                             control={form.control}
                                             name={`menus.${menuIndex}.items.${itemIndex}.description`}
-                                            render={({ field }) => (
-                                              <FormItem>
-                                                <FormLabel className="text-sm font-medium">
-                                                  Description
-                                                </FormLabel>
-                                                <FormControl>
-                                                  <Input
-                                                    {...field}
-                                                    placeholder="e.g., Spicy chicken with basmati rice"
-                                                    className="h-10 bg-white/5 border-white/10"
-                                                    maxLength={160}
-                                                    onChange={(e) => {
-                                                      field.onChange(e);
-                                                      // Update global form immediately
-                                                      const currentMenus =
-                                                        form.getValues("menus");
-                                                      if (
-                                                        currentMenus &&
-                                                        currentMenus.length >
-                                                          menuIndex
-                                                      ) {
-                                                        const updatedMenus = [
-                                                          ...currentMenus,
-                                                        ];
-                                                        updatedMenus[
-                                                          menuIndex
-                                                        ].items[
-                                                          itemIndex
-                                                        ].description =
-                                                          e.target.value;
-                                                        globalForm.setValue(
-                                                          "stepSix.menus",
-                                                          updatedMenus,
-                                                        );
-                                                      }
-                                                    }}
-                                                  />
-                                                </FormControl>
-                                                <FormMessage />
-                                              </FormItem>
-                                            )}
+                                            render={({ field }) => {
+                                              const v = field.value || "";
+                                              const maxLen =
+                                                RICH_DESCRIPTION_MAX_CHARS;
+                                              const len = v.length;
+                                              return (
+                                                <FormItem>
+                                                  <FormLabel className="text-sm font-medium">
+                                                    Description
+                                                  </FormLabel>
+                                                  <FormControl>
+                                                    <Input
+                                                      {...field}
+                                                      placeholder="e.g., Spicy chicken with basmati rice"
+                                                      className="h-10 bg-white/5 border-white/10"
+                                                      maxLength={maxLen}
+                                                      value={v}
+                                                      onChange={(e) => {
+                                                        const next =
+                                                          e.target.value.slice(
+                                                            0,
+                                                            maxLen,
+                                                          );
+                                                        field.onChange(next);
+                                                        const currentMenus =
+                                                          form.getValues(
+                                                            "menus",
+                                                          );
+                                                        if (
+                                                          currentMenus &&
+                                                          currentMenus.length >
+                                                            menuIndex
+                                                        ) {
+                                                          const updatedMenus = [
+                                                            ...currentMenus,
+                                                          ];
+                                                          updatedMenus[
+                                                            menuIndex
+                                                          ].items[
+                                                            itemIndex
+                                                          ].description = next;
+                                                          globalForm.setValue(
+                                                            "stepSix.menus",
+                                                            updatedMenus,
+                                                          );
+                                                        }
+                                                      }}
+                                                    />
+                                                  </FormControl>
+                                                  <div className="flex justify-end mt-1">
+                                                    <span className="text-xs text-muted-foreground">
+                                                      {len}/{maxLen} characters
+                                                    </span>
+                                                  </div>
+                                                  <FormMessage />
+                                                </FormItem>
+                                              );
+                                            }}
                                           />
                                         </div>
                                       ))}

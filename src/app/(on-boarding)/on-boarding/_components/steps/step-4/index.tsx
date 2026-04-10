@@ -43,6 +43,12 @@ import {
 import { guidedSectionSurfaceClass } from "../../guided-section-surface";
 import { GuidedSectionTitleBar } from "../../guided-section-title-bar";
 import { useCurrencySymbol } from "@/hooks/use-currency-format";
+import {
+  EVENT_PACKAGE_MAIN_HEADING_MAX_CHARS,
+  EVENT_PACKAGE_SUB_HEADING_MAX_CHARS,
+  PACKAGE_BUTTON_NAME_MAX_CHARS,
+  PACKAGE_DETAIL_LINE_MAX_CHARS,
+} from "@/lib/event-form-limits";
 
 function resolveStepFourErrorIndex(keys: string[]) {
   if (keys.some((k) => k === "__extra_validation__")) return 1;
@@ -445,7 +451,7 @@ const StepFour = () => {
                       name="package_title"
                       render={({ field }) => {
                         const currentLength = field.value?.length || 0;
-                        const maxLength = 40;
+                        const maxLength = EVENT_PACKAGE_MAIN_HEADING_MAX_CHARS;
                         return (
                           <FormItem className="mb-4">
                             <FormLabel className="text-base font-medium">
@@ -491,7 +497,7 @@ const StepFour = () => {
                       name="package_description"
                       render={({ field }) => {
                         const currentLength = field.value?.length || 0;
-                        const maxLength = 160;
+                        const maxLength = EVENT_PACKAGE_SUB_HEADING_MAX_CHARS;
                         return (
                           <FormItem className="mb-4">
                             <FormLabel className="text-base font-medium">
@@ -642,7 +648,7 @@ const StepFour = () => {
                     name="package_button_name"
                     render={({ field }) => {
                       const currentLength = field.value?.length || 0;
-                      const maxLength = 18;
+                      const maxLength = PACKAGE_BUTTON_NAME_MAX_CHARS;
                       return (
                         <FormItem>
                           <FormLabel className="text-base font-medium">
@@ -756,7 +762,7 @@ const StepFour = () => {
                           name={`package_details.${index}.title`}
                           render={({ field }) => {
                             const currentLength = field.value?.length || 0;
-                            const maxLength = 40;
+                            const maxLength = PACKAGE_DETAIL_LINE_MAX_CHARS;
                             return (
                               <FormItem className="flex-1">
                                 <FormControl>

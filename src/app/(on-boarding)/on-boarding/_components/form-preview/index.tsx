@@ -8,6 +8,7 @@ import React, {
   Suspense,
   useRef,
   useContext,
+  type CSSProperties,
 } from "react";
 import { useFormContext } from "../form-provider";
 import { OnboardingFormData, type StepFiveType } from "../form-provider/schema";
@@ -23,11 +24,17 @@ import {
 } from "../../_lib/onboarding-site-essentials-bridge";
 import { SiteEssentialsGoogleFontsLoader } from "@/components/shared/site-essentials-google-fonts-loader";
 import { PreviewThemeCustomizer } from "@/components/preview/preview-theme-customizer";
-import VendorEventFooter from "@/app/(public)/vendor/_components/EventListPage/footer";
+import FooterSection from "@/app/(public)/vendor/_components/EventListPage/footer";
+import HeroBanner from "@/app/(public)/vendor/_components/EventListPage/hero-banner";
 import ExperienceSection from "@/app/(public)/vendor/_components/EventListPage/experience";
-import { SitePreviewDummyEventSection } from "@/app/(public)/vendor/_components/EventListPage/site-preview-dummy-events";
+import PopularEvents from "@/app/(public)/vendor/_components/EventListPage/popular-event";
+import UpcomingEvents from "@/app/(public)/vendor/_components/EventListPage/upcoming-event";
+import RecentEventsGlimpse from "@/app/(public)/vendor/_components/EventListPage/recent-event";
+import ContactFormSection from "@/app/(public)/vendor/_components/EventListPage/contact-form-section";
 
 import "@/app/(public)/[locationSlug]/events/[eventSlug]/event-detail.css";
+import { ThemeAnimationManager } from "@/components/theme-animations/theme-animation-manager";
+import { themeDetectionFromOnboardingStepThree } from "@/lib/theme-detection-source";
 
 // Lazy load components - only import what's actually used
 const BrochureSection = lazy(() => import("./_components/brochure-section"));
@@ -39,7 +46,6 @@ const MenuSection = lazy(() => import("./_components/menu-section"));
 const Timeline = lazy(() => import("./_components/Time-line"));
 const PackageSection = lazy(() => import("./_components/package-sec"));
 const DatesSection = lazy(() => import("./_components/Dates-section"));
-const HomepageHeroSec = lazy(() => import("./_components/Homepage-hero-sec"));
 const EventGallery = lazy(() => import("./_components/Event-gallery"));
 
 // Component loaders
@@ -430,19 +436,55 @@ export default function FormPreview() {
     [formState.stepFive?.dates],
   );
 
-  // Render homepage preview (step 2) — mirrors the real vendor public site layout
+  // Render homepage preview (step 2) — same structure as `/[locationSlug]` + Site Essentials preview
   const renderStepTwoPreview = () => {
+    const tv = tryThemePreviewValues;
+    if (!tv) return null;
+
+    const useGradientBg = Boolean(
+      tv.colors?.background?.includes("linear-gradient"),
+    );
+    const mainBandStyle: CSSProperties = useGradientBg
+      ? { background: tv.colors?.background }
+      : {};
+    const mainBandClass = useGradientBg
+      ? "bg-none text-[var(--color-text)] font-body"
+      : "bg-[var(--color-background)] text-[var(--color-text)] font-body";
+
+    const themeTyped = theme as ThemeSchema | null | undefined;
+    const sectionPopular =
+      (typeof tv.event_title_1 === "string" && tv.event_title_1.trim()) ||
+      themeTyped?.event_title_1?.trim() ||
+      "Popular Events";
+    const sectionUpcoming =
+      (typeof tv.event_title_2 === "string" && tv.event_title_2.trim()) ||
+      themeTyped?.event_title_2?.trim() ||
+      "Upcoming Events";
+    const galleryTitle =
+      (typeof tv.event_gallery_title === "string" &&
+        tv.event_gallery_title.trim()) ||
+      themeTyped?.event_gallery_title?.trim() ||
+      "Recent Events Glimpse";
+
+    const getMediaPreviewUrl = (
+      value: string | File | null | undefined,
+    ): string | null => {
+      if (!value) return null;
+      if (typeof value === "string") return value;
+      if (value instanceof File) return URL.createObjectURL(value);
+      return null;
+    };
+
+    const venueLabel = formState.stepOne?.name?.trim() || null;
+
     return (
       <div className="event-detail-page">
-        {/* Site Header — onboarding variant (non-interactive) */}
         <CommonHeader
           contact_number={formState.stepOne?.contact_number || ""}
           logo={formState.stepTwo?.logo || null}
-          variant="onboarding"
-          hasBackgroundImage={Boolean(formState.stepTwo?.cover_image)}
+          variant="default"
         />
 
-        {/* Homepage Hero */}
         <div
           ref={heroRef}
           className={`transition-all duration-300 ${
@@ -454,49 +496,65 @@ export default function FormPreview() {
               : ""
           }`}
         >
-          <Suspense fallback={<BannerLoader />}>
-            <HomepageHeroSec
-              coverImage={formState.stepTwo?.cover_image || null}
-              heading={formState.stepTwo?.banner_heading || ""}
-              sub_heading={formState.stepTwo?.banner_sub_heading || ""}
-              contact_number={formState.stepOne?.contact_number || ""}
-              logo={formState.stepTwo?.logo || null}
-              {...(tryHeroPreviewProps ?? {})}
-            />
-          </Suspense>
-        </div>
-
-        {/* About / Experience section — same component as the live vendor site */}
-        <div
-          ref={aboutRef}
-          className={`transition-all duration-300 ${
-            activeField &&
-            (activeField.includes("about_title") ||
-              activeField.includes("about_description") ||
-              activeField.includes("about_link_title"))
-              ? "ring-2 ring-primary ring-opacity-50"
-              : ""
-          }`}
-        >
-          <ExperienceSection
-            aboutTitle={formState.stepTwo?.about_title || ""}
-            aboutDescription={formState.stepTwo?.about_description || ""}
-            aboutLinkTitle={formState.stepTwo?.about_link_title || ""}
+          <HeroBanner
+            locationName={venueLabel || undefined}
+            coverImage={getMediaPreviewUrl(formState.stepTwo?.cover_image)}
+            coverVideo={null}
+            bannerHeading={formState.stepTwo?.banner_heading ?? undefined}
+            bannerSubHeading={formState.stepTwo?.banner_sub_heading ?? undefined}
+            bannerHeadingAccent={tryHeroPreviewProps?.bannerHeadingAccent}
+            headingEmphasis={tryHeroPreviewProps?.headingEmphasis ?? undefined}
+            bannerHeadingAlign={tryHeroPreviewProps?.bannerHeadingAlign ?? undefined}
+            bannerHeadingValign={tryHeroPreviewProps?.bannerHeadingValign ?? undefined}
           />
         </div>
 
-        {/* Dummy events — shows vendors how the events grid/carousel will look */}
-        <SitePreviewDummyEventSection
-          sectionTitle="Latest Events"
-          band="secondary"
-        />
-        <SitePreviewDummyEventSection
-          sectionTitle="Popular Events"
-          band="background"
-        />
+        <div className={mainBandClass} style={mainBandStyle}>
+          <div
+            ref={aboutRef}
+            className={`transition-all duration-300 ${
+              activeField &&
+              (activeField.includes("about_title") ||
+                activeField.includes("about_description") ||
+                activeField.includes("about_link_title"))
+                ? "ring-2 ring-primary ring-opacity-50"
+                : ""
+            }`}
+          >
+            <ExperienceSection
+              aboutTitle={formState.stepTwo?.about_title || ""}
+              aboutDescription={formState.stepTwo?.about_description || ""}
+              aboutLinkTitle={formState.stepTwo?.about_link_title || ""}
+              aboutCtaLink={
+                tv.about_cta_link?.trim() ||
+                themeTyped?.about_cta_link?.trim() ||
+                null
+              }
+            />
+          </div>
 
-        {/* Footer */}
-        <VendorEventFooter
+          <PopularEvents
+            events={[]}
+            sectionTitle={sectionPopular}
+            locationSlug=""
+            locationLabel={venueLabel}
+          />
+          <UpcomingEvents
+            events={[]}
+            sectionTitle={sectionUpcoming}
+            locationSlug=""
+            locationLabel={venueLabel}
+          />
+          <RecentEventsGlimpse
+            galleryImages={[]}
+            galleryTitle={galleryTitle}
+          />
+        </div>
+
+        <ContactFormSection />
+
+        <FooterSection
+          copyright={tv.copyright}
           logo={resolveOnboardingLogoUrl(formState.stepTwo?.logo)}
         />
       </div>
@@ -526,6 +584,13 @@ export default function FormPreview() {
 
     return (
       <div className="event-detail-page">
+        <ThemeAnimationManager
+          themeDetectionSource={themeDetectionFromOnboardingStepThree(
+            formState.stepThree,
+          )}
+          enabled={true}
+          intensity="medium"
+        />
         {/* Same header chrome as live event detail (`EventDetailClient`); non-interactive when inside PreviewProvider. */}
         <CommonHeader
           contact_number={formState.stepOne?.contact_number || ""}
@@ -637,7 +702,6 @@ export default function FormPreview() {
               }
               buttonName={formState.stepFour?.package_button_name || ""}
               headingEmphasis={tryHeroPreviewProps?.headingEmphasis ?? undefined}
-              headingAccentHint="Packages"
             />
           </Suspense>
         </div>
@@ -761,8 +825,9 @@ export default function FormPreview() {
           )}
         </div>
 
-        <VendorEventFooter
+        <FooterSection
           logo={resolveOnboardingLogoUrl(formState.stepTwo?.logo)}
+          copyright={tryThemePreviewValues?.copyright ?? undefined}
         />
       </div>
     );

@@ -12,6 +12,7 @@ import PackageSection from "@/app/(on-boarding)/on-boarding/_components/form-pre
 import Timeline from "@/app/(on-boarding)/on-boarding/_components/form-preview/_components/Time-line";
 import CommonHeader from "@/components/shared/common-header";
 import FooterSection from "@/app/(public)/vendor/_components/EventListPage/footer";
+import { themeDetectionFromVendorEventData } from "@/lib/theme-detection-source";
 import { EventDetailData } from "@/services/vendor/events/type";
 
 import EventGallery from "@/app/(on-boarding)/on-boarding/_components/form-preview/_components/Event-gallery";
@@ -23,6 +24,7 @@ import {
   relativeLuminance,
 } from "@/lib/color-contrast";
 import { CartConflictProvider } from "@/app/(public)/vendor/checkout/_components/cart-conflict-provider";
+import { ThemeAnimationManager } from "@/components/theme-animations/theme-animation-manager";
 import { addCacheBusting } from "@/lib/image-utils";
 import { useCurrencyFormat } from "@/hooks/use-currency-format";
 import { SiteHeading } from "@/components/public/site-heading";
@@ -270,6 +272,12 @@ export function EventPreview({
             : { ...previewStyles, fontFamily: "var(--font-body)" }
         }
       >
+        {/* Theme FX: vendor payload is step-based — map stepOne copy for keyword detection like the live page */}
+        <ThemeAnimationManager
+          themeDetectionSource={themeDetectionFromVendorEventData(data)}
+          enabled={true}
+          intensity="medium"
+        />
         <SiteEssentialsGoogleFontsLoader
           linkId="site-essentials-google-fonts-event-preview"
           headingStack={headingFont}
@@ -326,7 +334,10 @@ export function EventPreview({
                 className={cn(heroStyles.videoBackground, "scale-105")}
               />
             ) : (
-              <div className="absolute inset-0 bg-gradient-to-br from-zinc-800 via-zinc-700 to-zinc-900" />
+              <div
+                className="absolute inset-0 bg-gradient-to-br from-[var(--color-surface)] via-[var(--color-background)] to-[color:color-mix(in_srgb,var(--color-primary)_12%,var(--color-background))]"
+                aria-hidden
+              />
             )}
             {/* Gradient scrim: dark top → fade to page background (same as live) */}
             <div
@@ -411,7 +422,6 @@ export function EventPreview({
           image={s2?.package_image || null}
           packageDetails={s2?.package_details || []}
           headingEmphasis={headingEmphasisForHero}
-          headingAccentHint="Packages"
         />
 
         <div id="booking">

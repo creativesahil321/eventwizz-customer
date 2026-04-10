@@ -56,7 +56,7 @@ export default function AdminHeader() {
             ))}
           </nav>
 
-          <div className="hidden md:flex items-center space-x-4">
+          <div className="hidden md:flex items-center gap-3">
             <Button
               variant="event-primary"
               size="sm"
@@ -74,12 +74,22 @@ export default function AdminHeader() {
                 Dashboard
               </Link>
             ) : (
-              <Link
-                href="/auth/login"
-                className="text-sm font-medium hover:text-[color:var(--color-primary)] transition-colors"
-              >
-                Log in
-              </Link>
+              <div className="flex items-center gap-3">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="rounded-full border-[color:var(--color-on-header)]/45 bg-transparent px-5 text-[color:var(--color-on-header)] shadow-none hover:bg-[color:var(--color-on-header)]/12 hover:text-[color:var(--color-on-header)]"
+                  asChild
+                >
+                  <Link href="/auth/register">Register</Link>
+                </Button>
+                <Link
+                  href="/auth/login"
+                  className="text-sm font-medium hover:text-[color:var(--color-primary)] transition-colors"
+                >
+                  Log in
+                </Link>
+              </div>
             )}
           </div>
 
@@ -132,11 +142,21 @@ export default function AdminHeader() {
                     </Button>
                   </Link>
                 ) : (
-                  <Link href="/auth/login">
-                    <Button variant="event-primary" className="w-full">
-                      Log in
-                    </Button>
-                  </Link>
+                  <>
+                    <Link href="/auth/register" onClick={() => setMobileMenuOpen(false)}>
+                      <Button
+                        variant="outline"
+                        className="w-full rounded-full border-[color:var(--color-on-header)]/45 bg-transparent text-[color:var(--color-on-header)] shadow-none hover:bg-[color:var(--color-on-header)]/12 hover:text-[color:var(--color-on-header)]"
+                      >
+                        Register
+                      </Button>
+                    </Link>
+                    <Link href="/auth/login" onClick={() => setMobileMenuOpen(false)}>
+                      <Button variant="event-primary" className="w-full rounded-full">
+                        Log in
+                      </Button>
+                    </Link>
+                  </>
                 )}
               </div>
             </div>

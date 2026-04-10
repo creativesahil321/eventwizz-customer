@@ -1,10 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
+import { STEP_NINE_MAX_FAQS } from "@/app/(on-boarding)/on-boarding/_components/form-provider/schema";
 import { tryModelsWithFallback, type FallbackResult } from "../lib/utils";
 import { env } from "@/env";
 import {
   BANNER_HEADING_MAX_WORDS,
   truncateToMaxWords,
 } from "@/lib/word-count";
+import {
+  DRINK_PACKAGE_ITEM_TITLE_MAX_CHARS,
+  DRINK_PACKAGE_PRICE_MAX,
+  DRINK_PACKAGE_QTY_MAX,
+  DRINK_SECTION_DESCRIPTION_MAX_CHARS,
+  DRINK_SECTION_TITLE_MAX_CHARS,
+  RICH_DESCRIPTION_MAX_CHARS,
+} from "@/lib/event-form-limits";
 
 export interface AIEventInput {
   eventName: string;
@@ -430,15 +439,33 @@ Return ONLY the JSON.`;
       }
 
       if (content.stepFive) {
-        content.stepFive.drink_title = truncate(content.stepFive.drink_title, 40);
-        content.stepFive.drink_description = truncate(content.stepFive.drink_description, 160);
+        content.stepFive.drink_title = truncate(
+          content.stepFive.drink_title,
+          DRINK_SECTION_TITLE_MAX_CHARS
+        );
+        content.stepFive.drink_description = truncate(
+          content.stepFive.drink_description,
+          DRINK_SECTION_DESCRIPTION_MAX_CHARS
+        );
         const rawPkgs = content.stepFive.packages;
         content.stepFive.packages = Array.isArray(rawPkgs) && rawPkgs.length > 0
           ? rawPkgs.map((p) => ({
-              title: truncate(p.title, 25),
-              description: truncate(p.description, 160),
-              price: Math.max(1, Math.min(999999, Math.round(Number(p.price) || 50))),
-              available_quantity: Math.max(1, Math.min(500, Math.round(Number(p.available_quantity) || 100))),
+              title: truncate(p.title, DRINK_PACKAGE_ITEM_TITLE_MAX_CHARS),
+              description: truncate(p.description, RICH_DESCRIPTION_MAX_CHARS),
+              price: Math.max(
+                1,
+                Math.min(
+                  DRINK_PACKAGE_PRICE_MAX,
+                  Math.round(Number(p.price) || 50)
+                )
+              ),
+              available_quantity: Math.max(
+                1,
+                Math.min(
+                  DRINK_PACKAGE_QTY_MAX,
+                  Math.round(Number(p.available_quantity) || 100)
+                )
+              ),
             }))
           : [];
       } else {
@@ -446,10 +473,12 @@ Return ONLY the JSON.`;
       }
 
       if (content.stepSeven?.faqs) {
-        content.stepSeven.faqs = content.stepSeven.faqs.map((f) => ({
-          question: truncate(f.question, 160),
-          answer: truncate(f.answer, 500),
-        }));
+        content.stepSeven.faqs = content.stepSeven.faqs
+          .slice(0, STEP_NINE_MAX_FAQS)
+          .map((f) => ({
+            question: truncate(f.question, 160),
+            answer: truncate(f.answer, 500),
+          }));
       }
 
       return NextResponse.json({

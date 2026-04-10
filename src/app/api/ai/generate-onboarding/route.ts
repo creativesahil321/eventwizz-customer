@@ -6,6 +6,16 @@ import {
   BANNER_HEADING_MAX_WORDS,
   truncateToMaxWords,
 } from "@/lib/word-count";
+import {
+  DRINK_PACKAGE_ITEM_TITLE_MAX_CHARS,
+  DRINK_PACKAGE_PRICE_MAX,
+  DRINK_PACKAGE_QTY_MAX,
+  EVENT_PACKAGE_MAIN_HEADING_MAX_CHARS,
+  EVENT_PACKAGE_SUB_HEADING_MAX_CHARS,
+  PACKAGE_BUTTON_NAME_MAX_CHARS,
+  PACKAGE_DETAIL_LINE_MAX_CHARS,
+  RICH_DESCRIPTION_MAX_CHARS,
+} from "@/lib/event-form-limits";
 
 export interface AIOnboardingInput {
   venueName: string;
@@ -357,13 +367,24 @@ Make times chronologically ascending. Make prices realistic for the venue type a
       }
 
       if (content.stepFour) {
-        content.stepFour.package_title = truncate(content.stepFour.package_title, 40);
-        content.stepFour.package_description = truncate(content.stepFour.package_description, 160);
-        content.stepFour.package_button_name = truncate(content.stepFour.package_button_name, 18);
+        content.stepFour.package_title = truncate(
+          content.stepFour.package_title,
+          EVENT_PACKAGE_MAIN_HEADING_MAX_CHARS
+        );
+        content.stepFour.package_description = truncate(
+          content.stepFour.package_description,
+          EVENT_PACKAGE_SUB_HEADING_MAX_CHARS
+        );
+        content.stepFour.package_button_name = truncate(
+          content.stepFour.package_button_name,
+          PACKAGE_BUTTON_NAME_MAX_CHARS
+        );
         if (content.stepFour.package_details) {
-          content.stepFour.package_details = content.stepFour.package_details.map((d) => ({
-            title: truncate(d.title, 40),
-          }));
+          content.stepFour.package_details = content.stepFour.package_details.map(
+            (d) => ({
+              title: truncate(d.title, PACKAGE_DETAIL_LINE_MAX_CHARS),
+            })
+          );
         }
       }
 
@@ -479,10 +500,22 @@ Make times chronologically ascending. Make prices realistic for the venue type a
         const rawPackages = content.stepSeven.packages;
         content.stepSeven.packages = Array.isArray(rawPackages) && rawPackages.length > 0
           ? rawPackages.map((p) => ({
-            title: truncate(p.title, 25),
-            description: truncate(p.description, 160),
-            price: Math.max(1, Math.min(999999, Math.round(Number(p.price) || 50))),
-            available_quantity: Math.max(1, Math.min(500, Math.round(Number(p.available_quantity) || 100))),
+            title: truncate(p.title, DRINK_PACKAGE_ITEM_TITLE_MAX_CHARS),
+            description: truncate(p.description, RICH_DESCRIPTION_MAX_CHARS),
+            price: Math.max(
+              1,
+              Math.min(
+                DRINK_PACKAGE_PRICE_MAX,
+                Math.round(Number(p.price) || 50)
+              )
+            ),
+            available_quantity: Math.max(
+              1,
+              Math.min(
+                DRINK_PACKAGE_QTY_MAX,
+                Math.round(Number(p.available_quantity) || 100)
+              )
+            ),
           }))
           : [];
       } else {

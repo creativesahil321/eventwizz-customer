@@ -32,8 +32,27 @@ import {
   getImagesByCategoryId,
 } from "@/app/(on-boarding)/on-boarding/_lib/constants/dummy-images";
 import { useCurrencySymbol } from "@/hooks/use-currency-format";
+import { STEP_NINE_MAX_FAQS } from "@/app/(on-boarding)/on-boarding/_components/form-provider/schema";
 import { applyAIGeneratedEventToBackend } from "../../_lib/apply-ai-generated-event";
 import { AIEventApplyOverlay } from "./ai-event-apply-overlay";
+import { toast } from "sonner";
+import {
+  BANNER_HEADING_MAX_WORDS,
+  countWords,
+  truncateToMaxWords,
+} from "@/lib/word-count";
+import {
+  DRINK_PACKAGE_ITEM_TITLE_MAX_CHARS,
+  DRINK_SECTION_DESCRIPTION_MAX_CHARS,
+  DRINK_SECTION_TITLE_MAX_CHARS,
+  RICH_DESCRIPTION_MAX_CHARS,
+  clampDrinkPackagePrice,
+  clampDrinkPackageQuantity,
+  DRINK_PACKAGE_PRICE_MAX,
+  DRINK_PACKAGE_PRICE_MIN,
+  DRINK_PACKAGE_QTY_MAX,
+  DRINK_PACKAGE_QTY_MIN,
+} from "@/lib/event-form-limits";
 
 const SECTIONS = [
   { id: "stepOne", title: "Event Details & Schedule", icon: "📅" },
@@ -340,15 +359,27 @@ function EditableField({
   value,
   onChange,
   maxLength,
+  maxWords,
   multiline,
 }: {
   label: string;
   value: string;
   onChange: (v: string) => void;
   maxLength?: number;
+  /** When set, input is clamped to this many words (same as vendor / onboarding banner rules). */
+  maxWords?: number;
   multiline?: boolean;
 }) {
   const [editing, setEditing] = useState(false);
+
+  const applyLimits = (raw: string) =>
+    maxWords != null
+      ? truncateToMaxWords(raw, maxWords)
+      : maxLength != null && raw.length > maxLength
+        ? raw.slice(0, maxLength)
+        : raw;
+
+  const charCap = maxWords != null ? undefined : maxLength;
 
   return (
     <div>
@@ -358,8 +389,8 @@ function EditableField({
           {multiline ? (
             <Textarea
               value={value}
-              onChange={(e) => onChange(e.target.value)}
-              maxLength={maxLength}
+              onChange={(e) => onChange(applyLimits(e.target.value))}
+              maxLength={charCap}
               rows={3}
               className="bg-white/5 border-white/10 text-white text-sm resize-none"
               onBlur={() => setEditing(false)}
@@ -368,8 +399,8 @@ function EditableField({
           ) : (
             <Input
               value={value}
-              onChange={(e) => onChange(e.target.value)}
-              maxLength={maxLength}
+              onChange={(e) => onChange(applyLimits(e.target.value))}
+              maxLength={charCap}
               className="bg-white/5 border-white/10 text-white text-sm h-8"
               onBlur={() => setEditing(false)}
               autoFocus
@@ -388,16 +419,33 @@ function EditableField({
           <Pencil className="w-3 h-3 text-slate-600 group-hover:text-slate-300 transition-colors mt-1 flex-shrink-0" />
         </button>
       )}
+      {maxWords != null ? (
+        <span className="text-[10px] text-slate-500 mt-0.5 block">
+          {countWords(value)}/{maxWords} words
+        </span>
+      ) : null}
     </div>
   );
 }
 
-function AddRowButton({ label, onClick }: { label: string; onClick: () => void }) {
+function AddRowButton({
+  label,
+  onClick,
+  disabled,
+  title,
+}: {
+  label: string;
+  onClick: () => void;
+  disabled?: boolean;
+  title?: string;
+}) {
   return (
     <button
       type="button"
       onClick={onClick}
-      className="w-full text-xs text-slate-500 hover:text-white border border-dashed border-white/10 hover:border-white/25 rounded-lg py-2 flex items-center justify-center gap-1.5 transition-colors touch-manipulation"
+      disabled={disabled}
+      title={title}
+      className="w-full text-xs text-slate-500 hover:text-white border border-dashed border-white/10 hover:border-white/25 rounded-lg py-2 flex items-center justify-center gap-1.5 transition-colors touch-manipulation disabled:pointer-events-none disabled:opacity-40"
     >
       <Plus className="w-3 h-3" />
       {label}
@@ -456,7 +504,7 @@ function StepOneEditor({
         label="Banner Heading"
         value={content.event_banner_heading}
         onChange={(v) => onChange("event_banner_heading", v)}
-        maxLength={50}
+        maxWords={BANNER_HEADING_MAX_WORDS}
       />
       <EditableField
         label="Banner Sub-heading"
@@ -1250,13 +1298,13 @@ function StepFiveEditor({
         label="Section Title"
         value={content.drink_title}
         onChange={(v) => onChange({ ...content, drink_title: v })}
-        maxLength={40}
+        maxLength={DRINK_SECTION_TITLE_MAX_CHARS}
       />
       <EditableField
         label="Section Description"
         value={content.drink_description}
         onChange={(v) => onChange({ ...content, drink_description: v })}
-        maxLength={160}
+        maxLength={DRINK_SECTION_DESCRIPTION_MAX_CHARS}
         multiline
       />
 
@@ -1281,9 +1329,12 @@ function StepFiveEditor({
               <div className="flex items-center gap-1.5">
                 <Input
                   value={pkg.title}
-                  onChange={(e) => updatePackageField(i, "title", e.target.value)}
+                  onChange={(e) =>
+                    updatePackageField(i, "title", e.target.value)
+                  }
                   placeholder="Package name"
                   className={`${inputCls} flex-1`}
+                  maxLength={DRINK_PACKAGE_ITEM_TITLE_MAX_CHARS}
                 />
                 {content.packages.length > 1 && (
                   <button
@@ -1297,9 +1348,12 @@ function StepFiveEditor({
               </div>
               <Input
                 value={pkg.description}
-                onChange={(e) => updatePackageField(i, "description", e.target.value)}
+                onChange={(e) =>
+                  updatePackageField(i, "description", e.target.value)
+                }
                 placeholder="Description"
                 className={`${inputCls} w-full`}
+                maxLength={RICH_DESCRIPTION_MAX_CHARS}
               />
               <div className="flex gap-1.5">
                 <div className="flex-1">
@@ -1309,9 +1363,19 @@ function StepFiveEditor({
                   <Input
                     type="number"
                     value={pkg.price}
-                    onChange={(e) => updatePackageField(i, "price", Number(e.target.value))}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      if (v === "") {
+                        updatePackageField(i, "price", 0);
+                        return;
+                      }
+                      const n = Number.parseFloat(v);
+                      if (!Number.isFinite(n)) return;
+                      updatePackageField(i, "price", clampDrinkPackagePrice(n));
+                    }}
                     placeholder="0"
-                    min={0}
+                    min={DRINK_PACKAGE_PRICE_MIN}
+                    max={DRINK_PACKAGE_PRICE_MAX}
                     className={`${inputCls} w-full`}
                   />
                 </div>
@@ -1320,11 +1384,27 @@ function StepFiveEditor({
                   <Input
                     type="number"
                     value={pkg.available_quantity}
-                    onChange={(e) =>
-                      updatePackageField(i, "available_quantity", Number(e.target.value))
-                    }
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      if (v === "") {
+                        updatePackageField(
+                          i,
+                          "available_quantity",
+                          DRINK_PACKAGE_QTY_MIN
+                        );
+                        return;
+                      }
+                      const n = Number(v);
+                      if (!Number.isFinite(n)) return;
+                      updatePackageField(
+                        i,
+                        "available_quantity",
+                        clampDrinkPackageQuantity(n)
+                      );
+                    }}
                     placeholder="50"
-                    min={1}
+                    min={DRINK_PACKAGE_QTY_MIN}
+                    max={DRINK_PACKAGE_QTY_MAX}
                     className={`${inputCls} w-full`}
                   />
                 </div>
@@ -1399,12 +1479,18 @@ function StepSevenEditor({
   };
 
   const addFaq = () => {
+    if (faqs.length >= STEP_NINE_MAX_FAQS) {
+      toast.error(`You can add a maximum of ${STEP_NINE_MAX_FAQS} FAQs`);
+      return;
+    }
     onChange({ ...content, faqs: [...faqs, { question: "", answer: "" }] });
   };
 
   const removeFaq = (idx: number) => {
     onChange({ ...content, faqs: faqs.filter((_, i) => i !== idx) });
   };
+
+  const atFaqCap = faqs.length >= STEP_NINE_MAX_FAQS;
 
   return (
     <div className="space-y-2">
@@ -1419,6 +1505,7 @@ function StepSevenEditor({
               value={faq.question}
               onChange={(e) => updateFaq(i, "question", e.target.value)}
               placeholder="Question"
+              maxLength={160}
               className={`${inputCls} flex-1`}
             />
             {faqs.length > 1 && (
@@ -1438,12 +1525,27 @@ function StepSevenEditor({
               onChange={(e) => updateFaq(i, "answer", e.target.value)}
               placeholder="Answer"
               rows={2}
+              maxLength={500}
               className="bg-white/5 border-white/10 text-white text-xs resize-none flex-1 placeholder:text-slate-600"
             />
           </div>
         </div>
       ))}
-      <AddRowButton label="Add FAQ" onClick={addFaq} />
+      <AddRowButton
+        label="Add FAQ"
+        onClick={addFaq}
+        disabled={atFaqCap}
+        title={
+          atFaqCap
+            ? `Maximum ${STEP_NINE_MAX_FAQS} FAQs per event`
+            : undefined
+        }
+      />
+      {atFaqCap && (
+        <p className="text-[10px] text-slate-500 text-center">
+          Maximum {STEP_NINE_MAX_FAQS} FAQs per event.
+        </p>
+      )}
     </div>
   );
 }

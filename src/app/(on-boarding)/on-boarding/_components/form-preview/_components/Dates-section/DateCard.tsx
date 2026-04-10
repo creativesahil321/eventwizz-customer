@@ -28,7 +28,7 @@ export const DateCard = ({
 
   return (
     <motion.div
-      className="cursor-pointer border border-[var(--color-primary)] rounded-sm overflow-hidden text-center w-[85px] sm:w-[100px] md:w-[120px] flex-shrink-0 shadow-[0_0_15px_rgba(60,70,147,0.25)] bg-transparent transition-all duration-300 hover:shadow-[0_0_25px_rgba(60,70,147,0.5)] hover:border-[var(--color-primary)] hover:bg-gradient-to-b hover:from-[var(--color-primary)]/10 hover:to-transparent"
+      className="cursor-pointer border border-[var(--color-primary)] rounded-2xl overflow-hidden text-center w-[85px] sm:w-[100px] md:w-[120px] flex-shrink-0 shadow-[0_0_15px_rgba(60,70,147,0.25)] bg-transparent transition-all duration-300 hover:shadow-[0_0_25px_rgba(60,70,147,0.5)] hover:border-[var(--color-primary)] hover:bg-gradient-to-b hover:from-[var(--color-primary)]/10 hover:to-transparent"
       key={`${isFirstRow ? "first" : "second"}-${index}`}
       initial={{ opacity: 1, y: 0 }}
       animate={{ opacity: 1, y: 0 }}

@@ -699,7 +699,12 @@ export default function MoreInfoTab() {
                         {...field}
                         placeholder="e.g. 50"
                         className="h-10 bg-[#F9FAFB] border-[#E5E7EB]"
+                        type="text"
                         onFocus={() => handleFieldFocus("price_start_from")}
+                        onChange={(e) => {
+                          const val = e.target.value.replace(/[^0-9.]/g, "");
+                          field.onChange(val);
+                        }}
                       />
                     </FormControl>
                     <FormMessage />
@@ -710,28 +715,44 @@ export default function MoreInfoTab() {
                 )}
               />
 
-              <FormField
-                control={control}
-                name="price_start_from_button_text"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-sm font-medium">
-                      Button Text
-                    </FormLabel>
-                    <FormControl>
-                      <Input
-                        {...field}
-                        placeholder="e.g. Book Now"
-                        className="h-10 bg-[#F9FAFB] border-[#E5E7EB]"
-                        onFocus={() =>
-                          handleFieldFocus("price_start_from_button_text")
-                        }
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+                <FormField
+                  control={control}
+                  name="price_start_from_button_text"
+                  render={({ field }) => {
+                    const currentLength = field.value?.length || 0;
+                    const maxLength = 18;
+                    return (
+                      <FormItem>
+                        <FormLabel className="text-sm font-medium">
+                          Button Text
+                        </FormLabel>
+                        <FormControl>
+                          <Input
+                            {...field}
+                            placeholder="e.g. Book Now"
+                            className="h-10 bg-[#F9FAFB] border-[#E5E7EB]"
+                            maxLength={maxLength}
+                            onFocus={() =>
+                              handleFieldFocus("price_start_from_button_text")
+                            }
+                          />
+                        </FormControl>
+                        <div className="text-xs text-gray-500 mt-1">
+                          <span
+                            className={
+                              currentLength > maxLength
+                                ? "text-red-500"
+                                : ""
+                            }
+                          >
+                            {currentLength}/{maxLength} characters
+                          </span>
+                        </div>
+                        <FormMessage />
+                      </FormItem>
+                    );
+                  }}
+                />
             </div>
           </div>
 

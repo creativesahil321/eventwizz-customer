@@ -116,7 +116,6 @@ export function SiteHeading({
       <Tag
         className={cn(
           headingBox,
-          "italic",
           headingLine,
           levelClass[level],
           variant === "onDark" ? baseOnDark : baseOnSurface,
@@ -135,7 +134,6 @@ export function SiteHeading({
       <Tag
         className={cn(
           headingBox,
-          "italic",
           headingLine,
           levelClass[level],
           variant === "onDark" ? accentGradient : accentSolidPrimary,
@@ -170,7 +168,7 @@ export function SiteHeading({
     >
       <span
         className={cn(
-          "italic leading-none",
+          "leading-none",
           variant === "onDark" ? baseOnDark : baseOnSurface,
         )}
         style={{ fontFamily: bodyFamily }}
@@ -184,7 +182,7 @@ export function SiteHeading({
             <AccentTailTrail variant={variant} />
             <span
               className={cn(
-                "relative z-[1] italic leading-none align-baseline",
+                "relative z-[1] font-black leading-none align-baseline",
                 accentTailScriptPad,
                 variant === "onDark" ? accentGradient : accentSolidPrimary,
               )}

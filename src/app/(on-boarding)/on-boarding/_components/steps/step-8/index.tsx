@@ -860,22 +860,23 @@ export default function StepEight() {
                             <Input
                               {...field}
                               placeholder="e.g. 50"
-                              type="number"
+                              type="text"
                               className="h-10 bg-white/5 border-white/10"
                               min="0"
                               max="999999"
                               maxLength={10}
                               onChange={(e) => {
-                                field.onChange(e);
+                                const val = e.target.value.replace(/[^0-9.]/g, "");
+                                field.onChange(val);
                                 // Update price for preview
                                 const currentStepEight =
                                   globalForm.getValues("stepEight") || {};
                                 globalForm.setValue("stepEight", {
                                   ...currentStepEight,
-                                  price_start_from: e.target.value,
+                                  price_start_from: val,
                                   price: {
                                     title: "PRICES FROM",
-                                    description: `${currencySymbol}${e.target.value} PP exc VAT`,
+                                    description: `${currencySymbol}${val} PP exc VAT`,
                                     link: "#",
                                     icon: "Tag",
                                     price_title:

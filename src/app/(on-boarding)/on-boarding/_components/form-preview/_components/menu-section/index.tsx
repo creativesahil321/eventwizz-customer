@@ -1,3 +1,6 @@
+"use client";
+
+import { useState, useEffect } from "react";
 import { Navigation2 } from "lucide-react";
 import { addCacheBusting } from "@/lib/image-utils";
 
@@ -26,12 +29,20 @@ export default function MenuSection({
   catering_option,
   menu_background_image,
 }: MenuSectionProps) {
+  const [menuBgImageFailed, setMenuBgImageFailed] = useState(false);
+
+  useEffect(() => {
+    setMenuBgImageFailed(false);
+  }, [menu_background_image]);
+
   if (catering_option === 0) return null;
 
-  const filteredMenus = menus
+  const safeMenus = Array.isArray(menus) ? menus : [];
+
+  const filteredMenus = safeMenus
     .map((menu) => ({
       ...menu,
-      items: menu.items.filter(
+      items: (menu.items ?? []).filter(
         (item) => item.title.trim() !== "" || item.description?.trim() !== "",
       ),
     }))
@@ -54,15 +65,19 @@ export default function MenuSection({
 
   return (
     <section className="relative w-full bg-[color:var(--color-background)] px-4 py-16">
-      {/* Background */}
+      {/* Background — decorative; empty alt + onError so broken URLs never show alt text */}
       <div className="absolute inset-0 z-0">
-        <img
-          src={addCacheBusting(
-            menu_background_image || "/assets/images/events/menus.webp",
-          )}
-          alt="Event background"
-          className="absolute inset-0 w-full h-full object-cover opacity-30"
-        />
+        {!menuBgImageFailed ? (
+          <img
+            src={addCacheBusting(
+              menu_background_image || "/assets/images/events/menus.webp",
+            )}
+            alt=""
+            aria-hidden
+            onError={() => setMenuBgImageFailed(true)}
+            className="absolute inset-0 h-full w-full object-cover opacity-30"
+          />
+        ) : null}
         {/* Dark overlay */}
         <div className="absolute inset-0 " />
         {/* Optional texture overlay */}
@@ -78,9 +93,6 @@ export default function MenuSection({
       {/* Foreground: use body text tokens — secondary-foreground is only for text ON secondary fills */}
       <div className="relative z-10 max-w-7xl mx-auto text-[var(--color-text)]">
         <div className="w-full text-center mb-8">
-          <span className="mb-1 block text-xs font-bold uppercase tracking-[0.28em] text-[color:var(--color-primary)]">
-            Catering Options
-          </span>
           <h2 className="text-2xl font-black tracking-tight md:text-3xl max-w-7xl mx-auto">
             {menu_title || "Heading e.g. Menu"}
           </h2>
@@ -121,7 +133,7 @@ export default function MenuSection({
                   {menu.name}
                 </h3>
 
-                {menu.items.map((item, idx) => (
+                {(menu.items ?? []).map((item, idx) => (
                   <div className="w-full mb-4 overflow-hidden px-2" key={idx}>
                     <h4 className="text-base sm:text-lg font-bold flex items-start break-words overflow-hidden">
                       <Navigation2

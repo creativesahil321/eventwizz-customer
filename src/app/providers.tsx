@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect } from "react";
+import React, { useEffect, useLayoutEffect } from "react";
 import { SessionProvider, useSession } from "next-auth/react";
 import { Session } from "next-auth";
 import { RootQueryProvider } from "@/providers/query-provider";
@@ -33,6 +33,15 @@ export function Providers({
   initialTheme,
 }: Readonly<ProvidersProps>) {
   const verifySession = useAuthStore((state) => state.verifySession);
+
+  // Prime Zustand (token + vendor_location_id) before child useEffects run,
+  // so the first Axios calls (e.g. vendor dashboard) always see session-derived state.
+  useLayoutEffect(() => {
+    if (typeof window === "undefined") return;
+    if (session?.user) {
+      useAuthStore.getState().setSession(session);
+    }
+  }, [session]);
 
   useEffect(() => {
     // Verify session on initial load

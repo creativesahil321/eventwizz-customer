@@ -1,4 +1,20 @@
 import * as z from "zod";
+import { STEP_NINE_MAX_FAQS } from "@/app/(on-boarding)/on-boarding/_components/form-provider/schema";
+import {
+  DRINK_PACKAGE_ITEM_TITLE_MAX_CHARS,
+  DRINK_PACKAGE_PRICE_MAX,
+  DRINK_PACKAGE_QTY_MAX,
+  DRINK_SECTION_DESCRIPTION_MAX_CHARS,
+  DRINK_SECTION_TITLE_MAX_CHARS,
+  EVENT_PACKAGE_MAIN_HEADING_MAX_CHARS,
+  EVENT_PACKAGE_SUB_HEADING_MAX_CHARS,
+  PACKAGE_BUTTON_NAME_MAX_CHARS,
+  PACKAGE_DETAIL_LINE_MAX_CHARS,
+} from "@/lib/event-form-limits";
+import {
+  plainTextCharCount,
+  RICH_DESCRIPTION_MAX_CHARS,
+} from "@/lib/plain-text-length";
 import {
   BANNER_HEADING_MAX_WORDS,
   countWords,
@@ -147,19 +163,34 @@ export const stepTwoSchema = z
     package_title: z
       .string()
       .min(1, "Event main heading is required")
-      .max(40, "Event main heading must not exceed 40 characters"),
-    package_description: z.string().min(1, "Event sub-heading is required"),
+      .max(
+        EVENT_PACKAGE_MAIN_HEADING_MAX_CHARS,
+        `Event main heading must not exceed ${EVENT_PACKAGE_MAIN_HEADING_MAX_CHARS} characters`
+      ),
+    package_description: z
+      .string()
+      .min(1, "Event sub-heading is required")
+      .max(
+        EVENT_PACKAGE_SUB_HEADING_MAX_CHARS,
+        `Event sub-heading must not exceed ${EVENT_PACKAGE_SUB_HEADING_MAX_CHARS} characters`
+      ),
     package_button_name: z
       .string()
       .min(1, "Button name is required")
-      .max(18, "Button name must not exceed 18 characters"),
+      .max(
+        PACKAGE_BUTTON_NAME_MAX_CHARS,
+        `Button name must not exceed ${PACKAGE_BUTTON_NAME_MAX_CHARS} characters`
+      ),
     package_details: z
       .array(
         z.object({
           title: z
             .string()
             .min(1, "Title is required")
-            .max(40, "Package detail title must not exceed 40 characters"),
+            .max(
+              PACKAGE_DETAIL_LINE_MAX_CHARS,
+              `Package detail title must not exceed ${PACKAGE_DETAIL_LINE_MAX_CHARS} characters`
+            ),
         })
       )
       .min(1, "At least one package detail is required"),
@@ -664,8 +695,11 @@ export const stepFourSchema = z
                   .max(40, "Item title must not exceed 40 characters"),
                 description: z
                   .string()
-                  .max(160, "Description must not exceed 160 characters")
-                  .optional(),
+                  .min(1, "Description is required")
+                  .max(
+                    RICH_DESCRIPTION_MAX_CHARS,
+                    `Item description must not exceed ${RICH_DESCRIPTION_MAX_CHARS} characters`
+                  ),
               })
             )
             .min(1, "At least one item is required")
@@ -715,11 +749,17 @@ export const stepFiveSchema = z.object({
   drink_title: z
     .string()
     .min(1, "The drink title field is required")
-    .max(40, "Drink title must not exceed 40 characters"),
+    .max(
+      DRINK_SECTION_TITLE_MAX_CHARS,
+      `Drink title must not exceed ${DRINK_SECTION_TITLE_MAX_CHARS} characters`
+    ),
   drink_description: z
     .string()
     .min(1, "The drink description field is required")
-    .max(160, "Drink description must not exceed 160 characters"),
+    .max(
+      DRINK_SECTION_DESCRIPTION_MAX_CHARS,
+      `Drink description must not exceed ${DRINK_SECTION_DESCRIPTION_MAX_CHARS} characters`
+    ),
   packages: z
     .array(
       z.object({
@@ -727,11 +767,20 @@ export const stepFiveSchema = z.object({
         title: z
           .string()
           .min(1, "Package title is required")
-          .max(25, "Package title must not exceed 25 characters"),
+          .max(
+            DRINK_PACKAGE_ITEM_TITLE_MAX_CHARS,
+            `Package title must not exceed ${DRINK_PACKAGE_ITEM_TITLE_MAX_CHARS} characters`
+          ),
         description: z
           .string()
           .min(1, "Package description is required")
-          .max(160, "Package description must not exceed 160 characters"),
+          .refine(
+            (val) =>
+              plainTextCharCount(val) <= RICH_DESCRIPTION_MAX_CHARS,
+            {
+              message: `Package description must not exceed ${RICH_DESCRIPTION_MAX_CHARS} characters`,
+            }
+          ),
         price: z.union([z.number(), z.string()]).refine(
           (val) => {
             // Check if value is empty, null, or undefined
@@ -739,11 +788,12 @@ export const stepFiveSchema = z.object({
               return false;
             }
             const num = typeof val === "string" ? Number.parseFloat(val) : val;
-            return !Number.isNaN(num) && num > 0 && num <= 999999;
+            return (
+              !Number.isNaN(num) && num > 0 && num <= DRINK_PACKAGE_PRICE_MAX
+            );
           },
           {
-            message:
-              "Package price is required and must be between 1 and 999999",
+            message: `Package price is required and must be between 1 and ${DRINK_PACKAGE_PRICE_MAX}`,
           }
         ),
         available_quantity: z
@@ -762,8 +812,8 @@ export const stepFiveSchema = z.object({
           .refine((val) => val >= 1, {
             message: "Available quantity must be at least 1",
           })
-          .refine((val) => val <= 500, {
-            message: "Available quantity cannot exceed 500",
+          .refine((val) => val <= DRINK_PACKAGE_QTY_MAX, {
+            message: `Available quantity cannot exceed ${DRINK_PACKAGE_QTY_MAX}`,
           }),
         sold_quantity: z.number().optional(), // Read-only from API
       })
@@ -891,19 +941,24 @@ export type StepSixType = z.infer<typeof stepSixSchema>;
 export const stepSevenSchema = z.object({
   step: z.literal(7),
   event_id: z.number(),
-  faqs: z.array(
-    z.object({
-      id: z.number().optional(),
-      question: z
-        .string()
-        .min(1, "Question is required")
-        .max(160, "Question must not exceed 160 characters"),
-      answer: z
-        .string()
-        .min(1, "Answer is required")
-        .max(500, "Answer must not exceed 500 characters"),
-    })
-  ),
+  faqs: z
+    .array(
+      z.object({
+        id: z.number().optional(),
+        question: z
+          .string()
+          .min(1, "Question is required")
+          .max(160, "Question must not exceed 160 characters"),
+        answer: z
+          .string()
+          .min(1, "Answer is required")
+          .max(500, "Answer must not exceed 500 characters"),
+      })
+    )
+    .max(
+      STEP_NINE_MAX_FAQS,
+      `You can add at most ${STEP_NINE_MAX_FAQS} FAQs`
+    ),
   deleted_faq_ids: z.array(z.number()).optional(),
 });
 export type StepSevenType = z.infer<typeof stepSevenSchema>;

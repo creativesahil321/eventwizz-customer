@@ -102,7 +102,7 @@ export default function FooterSection({
 
   return (
     <section className="px-4 py-10 bg-[color:var(--color-footer)] text-[var(--color-on-footer)]">
-      <div className="max-w-7xl mx-auto border-b border-[var(--color-on-footer)]/20 text-center pb-6">
+      <div className="max-w-7xl mx-auto text-center pb-6">
         <Link href="/">
           <div className="h-20 flex items-center justify-center">
             <img

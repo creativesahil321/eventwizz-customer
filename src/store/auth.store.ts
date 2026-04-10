@@ -31,6 +31,8 @@ interface AuthState {
   isAuthenticated: boolean;
   account_type: UserType | null; // Renamed from userType
   active_role: StaffRole | string | null; // Renamed from userRole
+  /** Mirrors NextAuth session `user.vendor_location_id` for API headers (no per-request getSession). */
+  vendor_location_id: number | null;
   loading: boolean;
   error: string | null;
   isSessionChecked: boolean;
@@ -121,6 +123,7 @@ export const useAuthStore = create<AuthState>()(
       isAuthenticated: false,
       account_type: null, // Renamed from userType
       active_role: null, // Renamed from userRole
+      vendor_location_id: null,
       loading: false,
       error: null,
       isSessionChecked: false,
@@ -137,6 +140,7 @@ export const useAuthStore = create<AuthState>()(
             state.isAuthenticated = false;
             state.account_type = null; // Renamed from userType
             state.active_role = null; // Renamed from userRole
+            state.vendor_location_id = null;
             state.tokenExpiry = null;
           });
           return;
@@ -160,6 +164,15 @@ export const useAuthStore = create<AuthState>()(
             }
           : null;
 
+        const rawLocId = session.user?.vendor_location_id;
+        const parsedLocId =
+          rawLocId !== undefined && rawLocId !== null && rawLocId !== ""
+            ? Number(rawLocId)
+            : NaN;
+        const vendorLocationId = Number.isFinite(parsedLocId)
+          ? parsedLocId
+          : null;
+
         set((state) => {
           state.user = userData;
           state.token = session.user?.token || null;
@@ -169,11 +182,23 @@ export const useAuthStore = create<AuthState>()(
             ((session.user as AuthUser).account_type as UserType) || null;
           // Safely access role using type assertion
           state.active_role = (session.user as AuthUser).active_role || null;
+          state.vendor_location_id = vendorLocationId;
           state.tokenExpiry = expiryTime;
         });
 
-        // Location data is now handled by TanStack Query and Zustand location store
-        // No need to handle location data in auth store
+        if (
+          typeof window !== "undefined" &&
+          vendorLocationId !== null
+        ) {
+          try {
+            localStorage.setItem(
+              "vendor_location_id",
+              String(vendorLocationId),
+            );
+          } catch {
+            // ignore
+          }
+        }
       },
 
       /**
@@ -319,6 +344,7 @@ export const useAuthStore = create<AuthState>()(
           state.isAuthenticated = false;
           state.account_type = null;
           state.active_role = null;
+          state.vendor_location_id = null;
           state.loading = false;
           state.error = null;
           state.tokenExpiry = null;
@@ -362,6 +388,7 @@ export const useAuthStore = create<AuthState>()(
         isAuthenticated: state.isAuthenticated,
         account_type: state.account_type, // Renamed from userType
         active_role: state.active_role, // Renamed from userRole
+        vendor_location_id: state.vendor_location_id,
         tokenExpiry: state.tokenExpiry,
       }),
     }

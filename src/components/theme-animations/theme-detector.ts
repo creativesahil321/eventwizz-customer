@@ -1,325 +1,611 @@
 /**
  * Theme Detection Utility
- * Detects themes from event data and returns appropriate animations
+ * Detects event category themes and returns appropriate animation configurations.
+ * Supports 22 event categories with unique visual effects per theme.
  */
 
 export type ThemeType =
   | "christmas"
-  | "spiderman"
-  | "birthday"
-  | "wedding"
+  | "new_year"
   | "halloween"
-  | "winter"
-  | "summer"
-  | "spring"
-  | "autumn"
-  | "ocean"
-  | "galaxy"
-  | "vintage"
-  | "minimalist"
-  | "luxury"
-  | "sports"
-  | "music"
-  | "art"
-  | "corporate"
+  | "valentines"
+  | "easter"
+  | "bottomless_brunch"
+  | "lipstick_powder_paint"
+  | "live_music"
+  | "dj_club"
+  | "comedy"
+  | "drag_shows"
+  | "themed_parties"
+  | "food_drink"
+  | "street_food"
+  | "pride"
+  | "afrobeats"
+  | "day_raves"
+  | "open_mic"
+  | "networking"
+  | "workshops"
+  | "diwali"
+  | "eid"
   | "none";
 
-export interface ThemeAnimation {
-  decorations: string[];
-  effects: string[];
-  particles: string[];
-  backgrounds: string[];
+// ThemeAnimation interface removed — animation configs are now in ./theme-configs.ts
+
+/** Display metadata for each theme — used in admin settings dropdown */
+export interface ThemeOption {
+  value: ThemeType;
+  label: string;
+  emoji: string;
+  description: string;
 }
 
-export const THEME_ANIMATIONS: Record<ThemeType, ThemeAnimation> = {
-  christmas: {
-    decorations: [
-      "snowflakes",
-      "santa-hat",
-      "christmas-tree",
-      "gift-box",
-      "reindeer",
-    ],
-    effects: ["snow-fall", "twinkling-lights", "sparkles"],
-    particles: ["snow", "stars", "gifts"],
-    backgrounds: ["snowy-landscape", "christmas-lights"],
-  },
-  spiderman: {
-    decorations: ["web-pattern", "spider-logo", "city-skyline", "web-swing"],
-    effects: ["web-swing", "city-lights", "spider-sense"],
-    particles: ["webs", "sparks", "city-dust"],
-    backgrounds: ["city-skyline", "web-pattern"],
-  },
-  birthday: {
-    decorations: ["balloons", "confetti", "party-hat", "cake", "gift"],
-    effects: ["confetti-burst", "balloon-float", "sparkles"],
-    particles: ["confetti", "balloons", "stars"],
-    backgrounds: ["party-lights", "celebration"],
-  },
-  wedding: {
-    decorations: ["hearts", "flowers", "rings", "dove", "champagne"],
-    effects: ["floating-hearts", "petal-fall", "sparkles"],
-    particles: ["hearts", "petals", "sparkles"],
-    backgrounds: ["romantic-lights", "flower-pattern"],
-  },
-  halloween: {
-    decorations: ["pumpkin", "ghost", "bat", "spider", "witch-hat"],
-    effects: ["fog", "flickering-lights", "spooky-float"],
-    particles: ["bats", "spiders", "ghost-mist"],
-    backgrounds: ["haunted-house", "spooky-forest"],
-  },
-  winter: {
-    decorations: ["snowflakes", "ice-crystals", "winter-tree", "snowman"],
-    effects: ["snow-fall", "ice-shimmer", "cold-breeze"],
-    particles: ["snow", "ice", "frost"],
-    backgrounds: ["winter-landscape", "ice-pattern"],
-  },
-  summer: {
-    decorations: ["sun", "palm-tree", "beach-ball", "waves", "sunset"],
-    effects: ["wave-motion", "sun-shine", "beach-breeze"],
-    particles: ["sand", "waves", "sun-rays"],
-    backgrounds: ["beach-scene", "sunset-sky"],
-  },
-  spring: {
-    decorations: ["flowers", "butterfly", "rainbow", "bird", "leaf"],
-    effects: ["flower-bloom", "butterfly-flight", "gentle-rain"],
-    particles: ["petals", "butterflies", "raindrops"],
-    backgrounds: ["flower-field", "spring-garden"],
-  },
-  autumn: {
-    decorations: ["falling-leaves", "pumpkin", "acorn", "tree", "harvest"],
-    effects: ["leaf-fall", "autumn-breeze", "warm-glow"],
-    particles: ["leaves", "acorns", "harvest-items"],
-    backgrounds: ["autumn-forest", "harvest-scene"],
-  },
-  ocean: {
-    decorations: ["wave", "fish", "coral", "shell", "anchor"],
-    effects: ["wave-motion", "bubble-rise", "ocean-current"],
-    particles: ["bubbles", "fish", "sea-foam"],
-    backgrounds: ["ocean-depths", "coral-reef"],
-  },
-  galaxy: {
-    decorations: ["star", "planet", "comet", "nebula", "spaceship"],
-    effects: ["star-twinkle", "planet-rotation", "comet-trail"],
-    particles: ["stars", "meteors", "cosmic-dust"],
-    backgrounds: ["space-scene", "nebula-cloud"],
-  },
-  vintage: {
-    decorations: ["old-camera", "vinyl-record", "typewriter", "vintage-car"],
-    effects: ["film-grain", "vintage-filter", "retro-glow"],
-    particles: ["dust", "film-strips", "vintage-elements"],
-    backgrounds: ["vintage-pattern", "retro-scene"],
-  },
-  minimalist: {
-    decorations: ["geometric-shapes", "clean-lines", "simple-dots"],
-    effects: ["subtle-fade", "clean-transition", "minimal-motion"],
-    particles: ["dots", "lines", "geometric-shapes"],
-    backgrounds: ["clean-gradient", "minimal-pattern"],
-  },
-  luxury: {
-    decorations: ["gold-accent", "diamond", "crown", "champagne", "luxury-car"],
-    effects: ["gold-shimmer", "diamond-sparkle", "elegant-float"],
-    particles: ["gold-dust", "diamonds", "luxury-elements"],
-    backgrounds: ["luxury-pattern", "elegant-scene"],
-  },
-  sports: {
-    decorations: ["trophy", "medal", "sports-ball", "stadium", "jersey"],
-    effects: ["trophy-shine", "victory-sparkle", "stadium-lights"],
-    particles: ["confetti", "trophy-particles", "victory-elements"],
-    backgrounds: ["stadium-scene", "sports-pattern"],
-  },
-  music: {
-    decorations: ["music-note", "guitar", "microphone", "headphones", "vinyl"],
-    effects: ["sound-waves", "music-pulse", "rhythm-beat"],
-    particles: ["music-notes", "sound-waves", "rhythm-elements"],
-    backgrounds: ["concert-scene", "music-pattern"],
-  },
-  art: {
-    decorations: ["paintbrush", "palette", "canvas", "sculpture", "gallery"],
-    effects: ["paint-splash", "artistic-brush", "creative-flow"],
-    particles: ["paint-drops", "artistic-elements", "creative-sparks"],
-    backgrounds: ["art-studio", "gallery-scene"],
-  },
-  corporate: {
-    decorations: [
-      "briefcase",
-      "chart",
-      "building",
-      "handshake",
-      "presentation",
-    ],
-    effects: ["professional-glow", "business-pulse", "corporate-shine"],
-    particles: ["charts", "business-elements", "professional-sparks"],
-    backgrounds: ["office-scene", "corporate-pattern"],
-  },
-  none: {
-    decorations: [],
-    effects: [],
-    particles: [],
-    backgrounds: [],
-  },
-};
+// ---------------------------------------------------------------------------
+// Admin-facing theme options (dropdown / preview)
+// ---------------------------------------------------------------------------
 
-/**
- * Detects theme from event data
- */
-export function detectTheme(eventData: {
+export const THEME_OPTIONS: ThemeOption[] = [
+  {
+    value: "christmas",
+    label: "Christmas Events",
+    emoji: "🎄",
+    description: "Snowfall, twinkling lights, Santa & gift decorations",
+  },
+  {
+    value: "new_year",
+    label: "New Year Parties",
+    emoji: "🎆",
+    description: "Fireworks, champagne bubbles, countdown sparkles",
+  },
+  {
+    value: "halloween",
+    label: "Halloween Events",
+    emoji: "🎃",
+    description: "Fog effects, spooky floats, flickering jack-o-lanterns",
+  },
+  {
+    value: "valentines",
+    label: "Valentine's Day Specials",
+    emoji: "💕",
+    description: "Floating hearts, rose petals, romantic sparkles",
+  },
+  {
+    value: "easter",
+    label: "Easter Events",
+    emoji: "🐰",
+    description: "Pastel confetti, spring flowers, egg decorations",
+  },
+  {
+    value: "bottomless_brunch",
+    label: "Bottomless Brunch",
+    emoji: "🥂",
+    description: "Champagne bubbles, brunch vibes, golden shimmer",
+  },
+  {
+    value: "lipstick_powder_paint",
+    label: "Lipstick Powder & Paint",
+    emoji: "💄",
+    description: "Glitter particles, glamour shimmer, sparkle dust",
+  },
+  {
+    value: "live_music",
+    label: "Live Music & Gigs",
+    emoji: "🎸",
+    description: "Sound wave pulses, floating music notes, stage lights",
+  },
+  {
+    value: "dj_club",
+    label: "DJ Nights & Club Events",
+    emoji: "🎧",
+    description: "Neon laser beams, beat pulses, strobe flashes",
+  },
+  {
+    value: "comedy",
+    label: "Comedy Shows",
+    emoji: "😂",
+    description: "Spotlight effects, theatre masks, star bursts",
+  },
+  {
+    value: "drag_shows",
+    label: "Drag Shows & Brunches",
+    emoji: "👠",
+    description: "Rainbow glitter, sparkle rain, glamour shimmer",
+  },
+  {
+    value: "themed_parties",
+    label: "Themed Parties",
+    emoji: "🎭",
+    description: "Confetti bursts, party streamers, celebration sparkles",
+  },
+  {
+    value: "food_drink",
+    label: "Food & Drink Festivals",
+    emoji: "🍻",
+    description: "Steam wisps, golden bubbles, festive confetti",
+  },
+  {
+    value: "street_food",
+    label: "Street Food Markets",
+    emoji: "🌮",
+    description: "Warm glow particles, market lights, steam effects",
+  },
+  {
+    value: "pride",
+    label: "Pride Events",
+    emoji: "🏳️‍🌈",
+    description: "Rainbow gradient particles, pride confetti, sparkle rain",
+  },
+  {
+    value: "afrobeats",
+    label: "Afrobeats / Bashment Nights",
+    emoji: "🥁",
+    description: "Fire energy particles, beat pulses, warm glow",
+  },
+  {
+    value: "day_raves",
+    label: "Day Raves / Outdoor Parties",
+    emoji: "☀️",
+    description: "Sun ray beams, energy particles, neon confetti",
+  },
+  {
+    value: "open_mic",
+    label: "Open Mic & Spoken Word",
+    emoji: "🎤",
+    description: "Spotlight glow, word particles, soft sparkles",
+  },
+  {
+    value: "networking",
+    label: "Networking & Business Events",
+    emoji: "💼",
+    description: "Professional glow, connection lines, subtle sparkles",
+  },
+  {
+    value: "workshops",
+    label: "Workshops & Masterclasses",
+    emoji: "📚",
+    description: "Light bulb glow, creative sparks, idea particles",
+  },
+  {
+    value: "diwali",
+    label: "Diwali",
+    emoji: "🪔",
+    description: "Diya flame flickers, firework bursts, rangoli sparkles",
+  },
+  {
+    value: "eid",
+    label: "Eid",
+    emoji: "🌙",
+    description: "Crescent moon glow, star twinkle, lantern shimmer",
+  },
+  {
+    value: "none",
+    label: "No Theme",
+    emoji: "🚫",
+    description: "No animations",
+  },
+];
+
+// ---------------------------------------------------------------------------
+// Keyword detection rules — ORDER MATTERS.
+// More-specific multi-word phrases are checked first so they aren't swallowed
+// by a later, broader single-word rule.
+// ---------------------------------------------------------------------------
+
+const THEME_DETECTION_RULES: { theme: ThemeType; keywords: string[] }[] = [
+  /* ── Highly specific multi-word names ─────────────────────────────── */
+  {
+    theme: "lipstick_powder_paint",
+    keywords: [
+      "lipstick powder",
+      "lipstick powder & paint",
+      "lipstick powder and paint",
+      "lipstick-powder",
+      "powder & paint",
+      "powder and paint",
+    ],
+  },
+  {
+    theme: "bottomless_brunch",
+    keywords: [
+      "bottomless brunch",
+      "bottomless-brunch",
+      "bottomless prosecco",
+      "bottomless mimosa",
+      "bottomless cocktail",
+      "boozy brunch",
+      "brunch party",
+    ],
+  },
+  {
+    theme: "drag_shows",
+    keywords: [
+      "drag show",
+      "drag brunch",
+      "drag queen",
+      "drag king",
+      "drag night",
+      "drag bingo",
+      "drag-show",
+      "drag-brunch",
+      "rupaul",
+    ],
+  },
+  {
+    theme: "street_food",
+    keywords: [
+      "street food",
+      "street-food",
+      "food market",
+      "food-market",
+      "night market",
+      "market stall",
+      "food truck",
+    ],
+  },
+  {
+    theme: "open_mic",
+    keywords: [
+      "open mic",
+      "open-mic",
+      "spoken word",
+      "spoken-word",
+      "poetry night",
+      "poetry slam",
+      "mic night",
+    ],
+  },
+  {
+    theme: "day_raves",
+    keywords: [
+      "day rave",
+      "day-rave",
+      "outdoor party",
+      "outdoor rave",
+      "outdoor-party",
+      "day party",
+      "daylight rave",
+      "garden party",
+      "rooftop party",
+      "pool party",
+    ],
+  },
+  {
+    theme: "afrobeats",
+    keywords: [
+      "afrobeats",
+      "afro beats",
+      "afro-beats",
+      "bashment",
+      "dancehall",
+      "soca",
+      "afro house",
+      "afrohouse",
+      "amapiano",
+      "afro night",
+    ],
+  },
+
+  /* ── Music / Entertainment (multi-word) ──────────────────────────── */
+  {
+    theme: "dj_club",
+    keywords: [
+      "dj night",
+      "dj-night",
+      "club night",
+      "club event",
+      "club-night",
+      "nightclub",
+      "house music",
+      "techno night",
+      "drum and bass",
+      "dnb night",
+      "rave night",
+      "dance night",
+      "edm night",
+      "disco night",
+    ],
+  },
+  {
+    theme: "live_music",
+    keywords: [
+      "live music",
+      "live-music",
+      "live gig",
+      "live band",
+      "live performance",
+      "concert",
+      "gig night",
+      "acoustic",
+      "live session",
+      "music gig",
+      "gigs",
+    ],
+  },
+  {
+    theme: "food_drink",
+    keywords: [
+      "food festival",
+      "food-festival",
+      "drink festival",
+      "beer festival",
+      "wine tasting",
+      "gin festival",
+      "food & drink",
+      "food and drink",
+      "craft beer",
+      "cocktail festival",
+      "tasting event",
+    ],
+  },
+  {
+    theme: "networking",
+    keywords: [
+      "networking",
+      "business event",
+      "business networking",
+      "professional event",
+      "conference",
+      "summit",
+      "business meet",
+      "industry event",
+      "corporate event",
+    ],
+  },
+  {
+    theme: "workshops",
+    keywords: [
+      "workshop",
+      "masterclass",
+      "master class",
+      "training session",
+      "bootcamp",
+      "seminar",
+      "tutorial",
+      "learning event",
+      "skill share",
+    ],
+  },
+  {
+    theme: "themed_parties",
+    keywords: [
+      "themed party",
+      "themed-party",
+      "costume party",
+      "fancy dress",
+      "masquerade",
+      "theme night",
+      "retro party",
+      "neon party",
+      "glow party",
+      "80s party",
+      "90s party",
+      "themed event",
+    ],
+  },
+  {
+    theme: "comedy",
+    keywords: [
+      "comedy show",
+      "comedy night",
+      "comedy club",
+      "comedy-show",
+      "stand up",
+      "stand-up",
+      "standup",
+      "comedian",
+      "comedy",
+      "improv",
+      "sketch show",
+    ],
+  },
+
+  /* ── Seasonal / Holiday events ───────────────────────────────────── */
+  {
+    theme: "christmas",
+    keywords: [
+      "christmas",
+      "xmas",
+      "x-mas",
+      "festive",
+      "santa",
+      "advent",
+      "carol",
+      "winter wonderland",
+      "jingle",
+      "noel",
+      "yuletide",
+    ],
+  },
+  {
+    theme: "new_year",
+    keywords: [
+      "new year",
+      "new-year",
+      "nye",
+      "new years eve",
+      "new year's",
+      "countdown",
+      "hogmanay",
+    ],
+  },
+  {
+    theme: "halloween",
+    keywords: [
+      "halloween",
+      "spooky",
+      "haunted",
+      "trick or treat",
+      "fright night",
+      "scary",
+      "horror night",
+      "zombie",
+    ],
+  },
+  {
+    theme: "valentines",
+    keywords: [
+      "valentine",
+      "valentines",
+      "valentine's",
+      "galentine",
+      "romantic night",
+      "love night",
+      "couples night",
+    ],
+  },
+  {
+    theme: "easter",
+    keywords: [
+      "easter",
+      "egg hunt",
+      "easter bunny",
+      "spring celebration",
+      "good friday",
+      "easter brunch",
+    ],
+  },
+
+  /* ── Cultural / Identity ─────────────────────────────────────────── */
+  {
+    theme: "pride",
+    keywords: [
+      "pride",
+      "lgbtq",
+      "lgbt",
+      "queer",
+      "pride month",
+      "pride parade",
+      "pride party",
+    ],
+  },
+  {
+    theme: "diwali",
+    keywords: [
+      "diwali",
+      "deepavali",
+      "deepawali",
+      "festival of lights",
+      "rangoli",
+      "diya",
+      "lakshmi puja",
+    ],
+  },
+  {
+    theme: "eid",
+    keywords: [
+      "eid",
+      "eid mubarak",
+      "eid al fitr",
+      "eid al adha",
+      "eid-ul-fitr",
+      "eid-ul-adha",
+      "ramadan",
+      "iftar",
+    ],
+  },
+];
+
+// NOTE: Animation configurations have been moved to ./theme-configs.ts
+// The THEME_ANIMATIONS record and ThemeAnimation interface are no longer needed here.
+
+// ---------------------------------------------------------------------------
+// Detection
+// ---------------------------------------------------------------------------
+
+/** Fields used for keyword + admin theme detection (public API + previews). */
+export type ThemeDetectionInput = {
   event_name?: string;
   event_banner_heading?: string;
   event_banner_sub_heading?: string;
   about_event_description?: string;
   detected_theme?: string;
-}): ThemeType {
-  // If theme is already detected and stored, use it
-  if (eventData.detected_theme) {
-    return eventData.detected_theme as ThemeType;
+  slug?: string;
+};
+
+/**
+ * Detects theme from event data by analysing text content against keyword
+ * patterns.  Priority: Admin override → Keyword match → "none".
+ */
+export function detectTheme(
+  eventData: ThemeDetectionInput | null | undefined,
+): ThemeType {
+  if (eventData == null) {
+    return "none";
   }
 
-  // Combine all text fields for theme detection
+  // 1. Admin override — highest priority
+  if (eventData.detected_theme && eventData.detected_theme !== "none") {
+    const validThemes = THEME_OPTIONS.map((o) => o.value);
+    if (validThemes.includes(eventData.detected_theme as ThemeType)) {
+      return eventData.detected_theme as ThemeType;
+    }
+  }
+
+  // 2. Combine all text fields for analysis (including slug)
   const textToAnalyze = [
     eventData.event_name,
     eventData.event_banner_heading,
     eventData.event_banner_sub_heading,
     eventData.about_event_description,
+    // Normalise slug: replace hyphens / underscores / ampersands with spaces
+    eventData.slug?.replace(/[-_&]+/g, " "),
   ]
     .filter(Boolean)
     .join(" ")
-    .toLowerCase();
+    .toLowerCase()
+    .trim();
 
-  // Theme detection logic
-  if (
-    textToAnalyze.includes("christmas") ||
-    textToAnalyze.includes("holiday") ||
-    textToAnalyze.includes("xmas")
-  ) {
-    return "christmas";
-  }
-  if (
-    textToAnalyze.includes("spiderman") ||
-    textToAnalyze.includes("spider-man") ||
-    textToAnalyze.includes("spider man")
-  ) {
-    return "spiderman";
-  }
-  if (
-    textToAnalyze.includes("birthday") ||
-    textToAnalyze.includes("party") ||
-    textToAnalyze.includes("celebration")
-  ) {
-    return "birthday";
-  }
-  if (
-    textToAnalyze.includes("wedding") ||
-    textToAnalyze.includes("bridal") ||
-    textToAnalyze.includes("marriage")
-  ) {
-    return "wedding";
-  }
-  if (
-    textToAnalyze.includes("halloween") ||
-    textToAnalyze.includes("spooky") ||
-    textToAnalyze.includes("haunted")
-  ) {
-    return "halloween";
-  }
-  if (
-    textToAnalyze.includes("winter") ||
-    textToAnalyze.includes("snow") ||
-    textToAnalyze.includes("cold")
-  ) {
-    return "winter";
-  }
-  if (
-    textToAnalyze.includes("summer") ||
-    textToAnalyze.includes("beach") ||
-    textToAnalyze.includes("sunny")
-  ) {
-    return "summer";
-  }
-  if (
-    textToAnalyze.includes("spring") ||
-    textToAnalyze.includes("bloom") ||
-    textToAnalyze.includes("fresh")
-  ) {
-    return "spring";
-  }
-  if (
-    textToAnalyze.includes("autumn") ||
-    textToAnalyze.includes("fall") ||
-    textToAnalyze.includes("harvest")
-  ) {
-    return "autumn";
-  }
-  if (
-    textToAnalyze.includes("ocean") ||
-    textToAnalyze.includes("sea") ||
-    textToAnalyze.includes("underwater")
-  ) {
-    return "ocean";
-  }
-  if (
-    textToAnalyze.includes("galaxy") ||
-    textToAnalyze.includes("space") ||
-    textToAnalyze.includes("cosmic")
-  ) {
-    return "galaxy";
-  }
-  if (
-    textToAnalyze.includes("vintage") ||
-    textToAnalyze.includes("retro") ||
-    textToAnalyze.includes("classic")
-  ) {
-    return "vintage";
-  }
-  if (
-    textToAnalyze.includes("minimalist") ||
-    textToAnalyze.includes("minimal") ||
-    textToAnalyze.includes("clean")
-  ) {
-    return "minimalist";
-  }
-  if (
-    textToAnalyze.includes("luxury") ||
-    textToAnalyze.includes("premium") ||
-    textToAnalyze.includes("elegant")
-  ) {
-    return "luxury";
-  }
-  if (
-    textToAnalyze.includes("sports") ||
-    textToAnalyze.includes("athletic") ||
-    textToAnalyze.includes("game")
-  ) {
-    return "sports";
-  }
-  if (
-    textToAnalyze.includes("music") ||
-    textToAnalyze.includes("concert") ||
-    textToAnalyze.includes("band")
-  ) {
-    return "music";
-  }
-  if (
-    textToAnalyze.includes("art") ||
-    textToAnalyze.includes("creative") ||
-    textToAnalyze.includes("gallery")
-  ) {
-    return "art";
-  }
-  if (
-    textToAnalyze.includes("corporate") ||
-    textToAnalyze.includes("business") ||
-    textToAnalyze.includes("professional")
-  ) {
-    return "corporate";
+  if (!textToAnalyze) return "none";
+
+  // 3. Walk detection rules in priority order
+  for (const rule of THEME_DETECTION_RULES) {
+    for (const keyword of rule.keywords) {
+      if (textToAnalyze.includes(keyword.toLowerCase())) {
+        return rule.theme;
+      }
+    }
   }
 
   return "none";
 }
 
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+// getThemeAnimations removed — use THEME_CONFIGS from ./theme-configs.ts instead
+
 /**
- * Gets theme animations for a detected theme
+ * Gets the display option for a theme (label, emoji, description).
  */
-export function getThemeAnimations(theme: ThemeType): ThemeAnimation {
-  return THEME_ANIMATIONS[theme] || THEME_ANIMATIONS.none;
+export function getThemeOption(theme: ThemeType): ThemeOption | undefined {
+  return THEME_OPTIONS.find((opt) => opt.value === theme);
+}
+
+/**
+ * Debug utility: logs detection analysis for troubleshooting.
+ */
+export function debugThemeDetection(eventData: ThemeDetectionInput) {
+  const textToAnalyze = [
+    eventData.event_name,
+    eventData.event_banner_heading,
+    eventData.event_banner_sub_heading,
+    eventData.about_event_description,
+    eventData.slug?.replace(/[-_&]+/g, " "),
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+
+  const detected = detectTheme(eventData);
+  const option = getThemeOption(detected);
+
+  console.group("🎨 Theme Detection Debug");
+  console.log("Event data:", eventData);
+  console.log("Text analysed:", textToAnalyze);
+  console.log("Detected theme:", detected);
+  console.log("Theme label:", option?.label || "None");
+  console.log("Theme emoji:", option?.emoji || "🚫");
+  console.groupEnd();
+
+  return { detected, textToAnalyze, option };
 }

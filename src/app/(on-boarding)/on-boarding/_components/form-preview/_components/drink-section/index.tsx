@@ -20,7 +20,7 @@ type DrinkSectionProps = {
   description: string;
   packages: DrinkPackage[];
   eventSlug?: string; // Optional for backward compatibility
-  /** Onboarding preview: show package list without an extra click */
+  /** Show package list without an extra click (default: open on public + preview). */
   defaultExpanded?: boolean;
 };
 
@@ -29,7 +29,7 @@ export default function DrinkSection({
   description,
   packages,
   eventSlug,
-  defaultExpanded = false,
+  defaultExpanded = true,
 }: DrinkSectionProps) {
   const { format: formatMoney } = useCurrencyFormat();
   const [showMore, setShowMore] = useState(defaultExpanded);
@@ -50,7 +50,9 @@ export default function DrinkSection({
     }
   }, [eventSlug, isHydrated, setCurrentEvent]);
 
-  const filteredPackages = packages.filter(
+  const safePackages = Array.isArray(packages) ? packages : [];
+
+  const filteredPackages = safePackages.filter(
     (pkg) =>
       pkg.title.trim() !== "" || pkg.description.trim() !== "" || pkg.price > 0,
   );
@@ -94,9 +96,6 @@ export default function DrinkSection({
   return (
     <section className="bg-[var(--color-background)] text-[var(--color-text)] py-16 px-4 w-full overflow-hidden">
       <section className="w-full text-center max-w-5xl mx-auto">
-        <span className="mb-1 block text-xs font-bold uppercase tracking-[0.28em] text-[color:var(--color-primary)]">
-          Packages
-        </span>
         <h2 className="text-2xl font-black tracking-tight text-[var(--color-text)] md:text-3xl px-2 break-words">
           {title || "Other Packages"}
         </h2>

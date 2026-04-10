@@ -23,6 +23,8 @@ import { Badge } from "@/components/ui/badge";
 import {
   detectTheme,
   ThemeType,
+  THEME_OPTIONS,
+  getThemeOption,
 } from "@/components/theme-animations/theme-detector";
 import { SiteEssentialsFormValues } from "../_lib/hooks";
 import { SectionTitle } from "./ui/section-title";
@@ -46,27 +48,8 @@ export function ThemeAnimationSettings({
 
   const [previewTheme, setPreviewTheme] = useState<ThemeType>(detectedTheme);
 
-  const themeOptions: { value: ThemeType; label: string; emoji: string }[] = [
-    { value: "christmas", label: "Christmas", emoji: "🎄" },
-    { value: "spiderman", label: "Spider-Man", emoji: "🕷️" },
-    { value: "birthday", label: "Birthday Party", emoji: "🎂" },
-    { value: "wedding", label: "Wedding", emoji: "💒" },
-    { value: "halloween", label: "Halloween", emoji: "🎃" },
-    { value: "winter", label: "Winter", emoji: "❄️" },
-    { value: "summer", label: "Summer", emoji: "☀️" },
-    { value: "spring", label: "Spring", emoji: "🌸" },
-    { value: "autumn", label: "Autumn", emoji: "🍂" },
-    { value: "ocean", label: "Ocean", emoji: "🌊" },
-    { value: "galaxy", label: "Galaxy", emoji: "🌌" },
-    { value: "vintage", label: "Vintage", emoji: "📷" },
-    { value: "minimalist", label: "Minimalist", emoji: "⚪" },
-    { value: "luxury", label: "Luxury", emoji: "💎" },
-    { value: "sports", label: "Sports", emoji: "⚽" },
-    { value: "music", label: "Music", emoji: "🎵" },
-    { value: "art", label: "Art", emoji: "🎨" },
-    { value: "corporate", label: "Corporate", emoji: "💼" },
-    { value: "none", label: "No Theme", emoji: "🚫" },
-  ];
+  const detectedOption = getThemeOption(detectedTheme);
+  const previewOption = getThemeOption(previewTheme);
 
   return (
     <div className="space-y-6">
@@ -77,15 +60,14 @@ export function ThemeAnimationSettings({
       <Separator className="my-4" />
 
       {/* Detected Theme Display */}
-      {eventData && detectedTheme !== "none" && (
+      {eventData && detectedTheme !== "none" && detectedOption && (
         <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
           <div className="flex items-center gap-2 mb-2">
             <span className="text-sm font-medium text-blue-800">
               Auto-Detected Theme:
             </span>
             <Badge variant="secondary" className="bg-blue-100 text-blue-800">
-              {themeOptions.find((t) => t.value === detectedTheme)?.emoji}{" "}
-              {themeOptions.find((t) => t.value === detectedTheme)?.label}
+              {detectedOption.emoji} {detectedOption.label}
             </Badge>
           </div>
           <p className="text-xs text-blue-600">
@@ -118,7 +100,7 @@ export function ThemeAnimationSettings({
                 </SelectTrigger>
               </FormControl>
               <SelectContent>
-                {themeOptions.map((option) => (
+                {THEME_OPTIONS.map((option) => (
                   <SelectItem key={option.value} value={option.value}>
                     <div className="flex items-center gap-2">
                       <span>{option.emoji}</span>
@@ -187,21 +169,17 @@ export function ThemeAnimationSettings({
       </div>
 
       {/* Theme Preview */}
-      {previewTheme !== "none" && (
+      {previewTheme !== "none" && previewOption && (
         <div className="p-4 bg-gray-50 rounded-lg border">
           <h4 className="text-sm font-medium mb-2">Theme Preview</h4>
           <div className="flex items-center gap-2">
-            <span className="text-2xl">
-              {themeOptions.find((t) => t.value === previewTheme)?.emoji}
-            </span>
+            <span className="text-2xl">{previewOption.emoji}</span>
             <div>
               <p className="text-sm font-medium">
-                {themeOptions.find((t) => t.value === previewTheme)?.label}{" "}
-                Theme
+                {previewOption.label} Theme
               </p>
               <p className="text-xs text-gray-600">
-                This theme will show animated decorations and effects on your
-                event pages
+                {previewOption.description}
               </p>
             </div>
           </div>
@@ -219,20 +197,27 @@ export function ThemeAnimationSettings({
             animation
           </p>
           <p>
-            <strong>Spider-Man:</strong> Web swinging effects, city lights,
-            spider-sense warnings
-          </p>
-          <p>
-            <strong>Birthday:</strong> Confetti bursts, floating balloons, party
-            decorations
-          </p>
-          <p>
-            <strong>Wedding:</strong> Floating hearts, petal fall, romantic
+            <strong>New Year:</strong> Fireworks, champagne bubbles, countdown
             sparkles
           </p>
           <p>
             <strong>Halloween:</strong> Fog effects, spooky floating elements,
             flickering lights
+          </p>
+          <p>
+            <strong>Valentine&apos;s:</strong> Floating hearts, petal fall,
+            romantic sparkles
+          </p>
+          <p>
+            <strong>Diwali:</strong> Diya flames, firework bursts, golden
+            shimmer
+          </p>
+          <p>
+            <strong>DJ &amp; Club:</strong> Neon lasers, beat pulses, strobe
+            effects
+          </p>
+          <p>
+            <strong>Pride:</strong> Rainbow gradient particles, pride confetti
           </p>
         </div>
       </div>

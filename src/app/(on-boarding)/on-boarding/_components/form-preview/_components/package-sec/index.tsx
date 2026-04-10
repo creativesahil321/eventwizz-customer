@@ -20,6 +20,20 @@ type PackageImage = {
   preview: string;
 };
 
+function resolvePackageAccentHint(
+  heading: string,
+  headingAccentHint: string | null | undefined,
+): string | null {
+  if (headingAccentHint === null) return null;
+  if (typeof headingAccentHint === "string" && headingAccentHint.trim() !== "") {
+    return headingAccentHint.trim();
+  }
+  const h = (heading || "").trim();
+  if (!h) return null;
+  if (h.toLowerCase() === "packages") return null;
+  return h.includes("Packages") ? "Packages" : null;
+}
+
 type PackageSectionProps = {
   heading: string;
   subHeading: string;
@@ -77,6 +91,8 @@ export default function PackageSection({
   headingAccentHint,
 }: PackageSectionProps) {
   const currencySymbol = useCurrencySymbol();
+  const subTrim = (subHeading || "").trim();
+  const listIntroRedundant = /include\s*:?\s*$/i.test(subTrim);
 
   const getImageSrc = (img: PackageImage | File | null | string) => {
     if (typeof img === "string") return img;
@@ -124,7 +140,7 @@ export default function PackageSection({
   );
 
   return (
-    <section className="w-full bg-[var(--color-background)] px-4 py-14 md:py-20">
+    <section className="w-full bg-[var(--color-background)] px-4 py-20 md:py-28">
       <div className="container mx-auto max-w-7xl">
         <div
           className={cn(
@@ -150,42 +166,40 @@ export default function PackageSection({
           </div>
 
           <div className="flex min-w-0 flex-1 flex-col justify-center">
-            <p className="mb-3 text-[11px] font-bold uppercase tracking-[0.28em] text-[color:var(--color-primary)]">
+            <p className="mb-3 text-xs font-semibold uppercase tracking-[0.2em] text-[color:var(--color-primary)]">
               Packages
             </p>
             <SiteHeading
               level={2}
               title={heading || "Event Packages"}
-              accentHint={
-                headingAccentHint ??
-                ((heading || "").includes("Packages") ? "Packages" : null)
-              }
+              accentHint={resolvePackageAccentHint(heading, headingAccentHint)}
               emphasis={headingEmphasis ?? undefined}
               variant="onSurface"
-              className="max-w-3xl font-black !text-2xl !leading-[1.02] md:!text-3xl lg:!text-4xl"
+              className="max-w-3xl min-w-0 !font-black !text-2xl !leading-[1.02] break-words [overflow-wrap:anywhere] md:!text-3xl lg:!text-4xl"
             />
-            <p className="mt-2 text-base font-semibold leading-snug text-[var(--color-text)] md:text-lg">
-              {highlightPricesInText(
-                subHeading ||
-                  `Prices From ${currencySymbol}65 Plus VAT Include:`,
-                currencySymbol,
-              )}
-            </p>
+            {subTrim ? (
+              <p className="mt-2 max-w-full min-w-0 break-words text-base font-semibold leading-snug text-[var(--color-text)] [overflow-wrap:anywhere] md:text-lg">
+                {highlightPricesInText(subTrim, currencySymbol)}
+              </p>
+            ) : null}
 
             {details.length > 0 ? (
               <>
-                <p className="mb-3 mt-6 text-xs font-medium text-[var(--color-text-dimmed)]">
-                  Include:
-                </p>
+                {!listIntroRedundant ? (
+                  <p className="mb-3 mt-6 text-xs font-medium text-[var(--color-text-dimmed)]">
+                    Include:
+                  </p>
+                ) : null}
                 <ul
                   className={cn(
                     "m-0 grid list-none gap-x-8 gap-y-3 p-0",
+                    listIntroRedundant && "mt-6",
                     useMultiColumnList && "sm:grid-cols-2",
                     useThreeColumns && "lg:grid-cols-3",
                   )}
                 >
                   {details.map((item, i) => (
-                    <li key={i} className="flex items-start gap-3">
+                    <li key={i} className="flex min-w-0 items-start gap-3">
                       <span
                         className={cn(
                           "mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full",
@@ -198,7 +212,7 @@ export default function PackageSection({
                           aria-hidden
                         />
                       </span>
-                      <span className="text-sm font-medium leading-snug text-[var(--color-text)] md:text-base">
+                      <span className="min-w-0 max-w-full break-words text-sm font-medium leading-snug text-[var(--color-text)] [overflow-wrap:anywhere] md:text-base">
                         {item.title}
                       </span>
                     </li>

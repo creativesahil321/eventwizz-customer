@@ -36,6 +36,7 @@ import { addCacheBusting } from "@/lib/image-utils";
 import {
   BANNER_HEADING_MAX_WORDS,
   countWords,
+  truncateToMaxWords,
 } from "@/lib/word-count";
 
 export default function EventNameTab() {
@@ -1045,23 +1046,21 @@ export default function EventNameTab() {
                               handleFieldFocus("event_banner_heading")
                             }
                             onChange={(e) => {
-                              field.onChange(e);
+                              const next = truncateToMaxWords(
+                                e.target.value,
+                                BANNER_HEADING_MAX_WORDS
+                              );
+                              field.onChange(next);
                               globalForm.setValue(
                                 "stepOne.event_banner_heading",
-                                e.target.value
+                                next
                               );
                             }}
                             onBlur={field.onBlur}
                           />
                         </FormControl>
                         <p className="text-xs text-muted-foreground mt-1">
-                          <span
-                            className={
-                              wc > BANNER_HEADING_MAX_WORDS
-                                ? "text-destructive"
-                                : ""
-                            }
-                          >
+                          <span>
                             {wc}/{BANNER_HEADING_MAX_WORDS} words
                           </span>
                         </p>

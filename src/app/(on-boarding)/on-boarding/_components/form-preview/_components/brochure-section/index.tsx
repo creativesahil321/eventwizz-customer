@@ -81,6 +81,23 @@ export default function BrochureSection({
   const validDownloads = downloads.filter(
     (item) => item.download_link && item.download_link.length > 0,
   );
+  const showDownloads = validDownloads.length > 0;
+
+  const gridClass = cn(
+    "grid grid-cols-1 gap-4",
+    omitPricePanel
+      ? showDownloads
+        ? "sm:grid-cols-2"
+        : ""
+      : showDownloads
+        ? "sm:grid-cols-2 md:grid-cols-3"
+        : "sm:grid-cols-2",
+  );
+
+  const pricePanelClass = cn(
+    "flex w-full flex-col items-center justify-center rounded-md bg-[var(--color-surface)] px-2 py-5 text-[var(--color-text)]",
+    showDownloads && !omitPricePanel && "sm:col-span-2 md:col-span-1",
+  );
 
   return (
     <section className="py-16 px-4 bg-[color:var(--color-background)]">
@@ -90,14 +107,7 @@ export default function BrochureSection({
           Check Out The Latest Dates To Be Released — Get In Quick!
         </h2>
       </div>
-      <section
-        className={cn(
-          "grid grid-cols-1 gap-4",
-          omitPricePanel
-            ? "sm:grid-cols-2"
-            : "sm:grid-cols-2 md:grid-cols-3",
-        )}
-      >
+      <section className={gridClass}>
         <section className="w-full overflow-hidden rounded-md">
           <LocationMap
             address={defaultLocation.description}
@@ -108,13 +118,13 @@ export default function BrochureSection({
           />
         </section>
 
-        <section className="flex w-full flex-col items-center justify-center rounded-md bg-[var(--color-surface)] px-2 py-5 text-[var(--color-text)]">
-          {renderIcon("Download", 24)}
-          <h2 className="py-2 text-base font-bold uppercase sm:py-3 sm:text-lg">
-            DOWNLOADS
-          </h2>
-          {validDownloads.length > 0 ? (
-            validDownloads.map((item, idx) => (
+        {showDownloads ? (
+          <section className="flex w-full flex-col items-center justify-center rounded-md bg-[var(--color-surface)] px-2 py-5 text-[var(--color-text)]">
+            {renderIcon("Download", 24)}
+            <h2 className="py-2 text-base font-bold uppercase sm:py-3 sm:text-lg">
+              DOWNLOADS
+            </h2>
+            {validDownloads.map((item, idx) => (
               <div key={idx} className="mb-1 flex items-center gap-1">
                 {renderIcon("FileText", 16)}
                 <Link
@@ -138,16 +148,12 @@ export default function BrochureSection({
                   {item.title}
                 </Link>
               </div>
-            ))
-          ) : (
-            <p className="text-xs text-[var(--color-text-dimmed)] sm:text-sm">
-              No downloads available
-            </p>
-          )}
-        </section>
+            ))}
+          </section>
+        ) : null}
 
         {!omitPricePanel ? (
-          <section className="flex w-full flex-col items-center justify-center rounded-md bg-[var(--color-surface)] px-2 py-5 text-[var(--color-text)] sm:col-span-2 md:col-span-1">
+          <section className={pricePanelClass}>
             {renderIcon(defaultPrice.icon, 24)}
             <h2 className="max-w-full break-words px-2 py-2 text-base font-bold uppercase sm:py-3 sm:text-lg">
               {defaultPrice.title}

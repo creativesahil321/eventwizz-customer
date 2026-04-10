@@ -30,6 +30,16 @@ import { guidedInsetSectionSurfaceClass } from "../../guided-section-surface";
 import { guidedOnboardingSkipButtonClass } from "../../guided-sticky-approval-bar";
 import { GuidedWholeStepBottomActions } from "../../guided-section-chips";
 import { useCurrencySymbol } from "@/hooks/use-currency-format";
+import {
+  DRINK_PACKAGE_ITEM_TITLE_MAX_CHARS,
+  DRINK_SECTION_DESCRIPTION_MAX_CHARS,
+  DRINK_SECTION_TITLE_MAX_CHARS,
+  RICH_DESCRIPTION_MAX_CHARS,
+  clampDrinkPackagePrice,
+  clampDrinkPackageQuantity,
+  DRINK_PACKAGE_PRICE_MAX,
+  DRINK_PACKAGE_QTY_MAX,
+} from "@/lib/event-form-limits";
 
 export default function StepSeven() {
   const currencySymbol = useCurrencySymbol();
@@ -228,7 +238,7 @@ export default function StepSeven() {
                       name="drink_title"
                       render={({ field }) => {
                         const currentLength = field.value?.length || 0;
-                        const maxLength = 40;
+                        const maxLength = DRINK_SECTION_TITLE_MAX_CHARS;
                         return (
                           <FormItem className="mt-2">
                             <FormControl>
@@ -274,7 +284,7 @@ export default function StepSeven() {
                       name="drink_description"
                       render={({ field }) => {
                         const currentLength = field.value?.length || 0;
-                        const maxLength = 160;
+                        const maxLength = DRINK_SECTION_DESCRIPTION_MAX_CHARS;
                         return (
                           <FormItem className="mt-2">
                             <FormControl>
@@ -329,7 +339,7 @@ export default function StepSeven() {
                             name={`packages.${index}.title`}
                             render={({ field }) => {
                               const currentLength = field.value?.length || 0;
-                              const maxLength = 25;
+                              const maxLength = DRINK_PACKAGE_ITEM_TITLE_MAX_CHARS;
                               return (
                                 <FormItem>
                                   <FormLabel className="text-sm font-medium">
@@ -387,37 +397,52 @@ export default function StepSeven() {
                           <FormField
                             control={form.control}
                             name={`packages.${index}.description`}
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormLabel className="text-sm font-medium">
-                                  Package Description
-                                </FormLabel>
-                                <FormControl>
-                                  <Input
-                                    {...field}
-                                    placeholder="e.g. Includes premium access, special amenities..."
-                                    className="h-10 bg-white/5 border-white/10"
-                                    maxLength={160}
-                                    onChange={(e) => {
-                                      field.onChange(e);
-                                      // Update global form immediately
-                                      const currentPackages =
-                                        form.getValues("packages");
-                                      const updatedPackages = [
-                                        ...currentPackages,
-                                      ];
-                                      updatedPackages[index].description =
-                                        e.target.value;
-                                      globalForm.setValue(
-                                        "stepSeven.packages",
-                                        updatedPackages as StepSevenType["packages"]
-                                      );
-                                    }}
-                                  />
-                                </FormControl>
-                                <FormMessage />
-                              </FormItem>
-                            )}
+                            render={({ field }) => {
+                              const currentLength = field.value?.length || 0;
+                              const maxLength = RICH_DESCRIPTION_MAX_CHARS;
+                              return (
+                                <FormItem>
+                                  <FormLabel className="text-sm font-medium">
+                                    Package Description
+                                  </FormLabel>
+                                  <FormControl>
+                                    <Input
+                                      {...field}
+                                      placeholder="e.g. Includes premium access, special amenities..."
+                                      className="h-10 bg-white/5 border-white/10"
+                                      maxLength={maxLength}
+                                      onChange={(e) => {
+                                        field.onChange(e);
+                                        // Update global form immediately
+                                        const currentPackages =
+                                          form.getValues("packages");
+                                        const updatedPackages = [
+                                          ...currentPackages,
+                                        ];
+                                        updatedPackages[index].description =
+                                          e.target.value;
+                                        globalForm.setValue(
+                                          "stepSeven.packages",
+                                          updatedPackages as StepSevenType["packages"]
+                                        );
+                                      }}
+                                    />
+                                  </FormControl>
+                                  <div className="text-xs text-muted-foreground mt-1">
+                                    <span
+                                      className={
+                                        currentLength > maxLength
+                                          ? "text-destructive"
+                                          : ""
+                                      }
+                                    >
+                                      {currentLength}/{maxLength} characters
+                                    </span>
+                                  </div>
+                                  <FormMessage />
+                                </FormItem>
+                              );
+                            }}
                           />
 
                           <FormField
@@ -434,7 +459,7 @@ export default function StepSeven() {
                                     type="number"
                                     className="h-10 bg-white/5 border-white/10"
                                     min="0"
-                                    max="999999"
+                                    max={DRINK_PACKAGE_PRICE_MAX}
                                     maxLength={10}
                                     step="0.01"
                                     value={
@@ -461,22 +486,24 @@ export default function StepSeven() {
 
                                       const numValue = Number.parseFloat(value);
                                       if (
-                                        !Number.isNaN(numValue) &&
-                                        numValue > 0
+                                        !Number.isFinite(numValue) ||
+                                        numValue <= 0
                                       ) {
-                                        field.onChange(numValue);
-                                        // Update global form immediately
-                                        const currentPackages =
-                                          form.getValues("packages");
-                                        const updatedPackages = [
-                                          ...currentPackages,
-                                        ];
-                                        updatedPackages[index].price = numValue;
-                                        globalForm.setValue(
-                                          "stepSeven.packages",
-                                          updatedPackages as StepSevenType["packages"]
-                                        );
+                                        return;
                                       }
+                                      const capped =
+                                        clampDrinkPackagePrice(numValue);
+                                      field.onChange(capped);
+                                      const currentPackages =
+                                        form.getValues("packages");
+                                      const updatedPackages = [
+                                        ...currentPackages,
+                                      ];
+                                      updatedPackages[index].price = capped;
+                                      globalForm.setValue(
+                                        "stepSeven.packages",
+                                        updatedPackages as StepSevenType["packages"]
+                                      );
                                     }}
                                     onBlur={() => {
                                       // Keep empty string on blur - validation will catch it
@@ -512,20 +539,32 @@ export default function StepSeven() {
                                     value={field.value as number}
                                     className="h-10 bg-white/5 border-white/10"
                                     min={1}
-                                    max={500}
+                                    max={DRINK_PACKAGE_QTY_MAX}
                                     placeholder="e.g. 100"
                                     onChange={(e) => {
                                       const value = e.target.value;
-                                      // Convert to number if valid, otherwise set to NaN to trigger validation
-                                      const numValue =
-                                        value === "" || value === null
-                                          ? Number.NaN
-                                          : Number(value);
-
-                                      // Update the field value
-                                      field.onChange(numValue);
-
-                                      // Update global form immediately
+                                      if (value === "" || value === null) {
+                                        field.onChange(Number.NaN);
+                                        const currentPackages =
+                                          form.getValues("packages");
+                                        const updatedPackages = [
+                                          ...currentPackages,
+                                        ];
+                                        updatedPackages[
+                                          index
+                                        ].available_quantity =
+                                          undefined as unknown as number;
+                                        globalForm.setValue(
+                                          "stepSeven.packages",
+                                          updatedPackages as StepSevenType["packages"]
+                                        );
+                                        return;
+                                      }
+                                      const numValue = Number(value);
+                                      if (!Number.isFinite(numValue)) return;
+                                      const capped =
+                                        clampDrinkPackageQuantity(numValue);
+                                      field.onChange(capped);
                                       const currentPackages =
                                         form.getValues("packages");
                                       const updatedPackages = [
@@ -533,11 +572,7 @@ export default function StepSeven() {
                                       ];
                                       updatedPackages[
                                         index
-                                      ].available_quantity = Number.isNaN(
-                                        numValue
-                                      )
-                                        ? (undefined as unknown as number)
-                                        : numValue;
+                                      ].available_quantity = capped;
                                       globalForm.setValue(
                                         "stepSeven.packages",
                                         updatedPackages as StepSevenType["packages"]

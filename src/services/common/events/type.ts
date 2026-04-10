@@ -162,7 +162,9 @@ export interface EventDetail {
   phone: string;
   email: string;
   package_title: string;
+  /** Legacy / alternate API key; prefer `package_description` (matches vendor + onboarding). */
   package_sub_title: string;
+  package_description?: string | null;
   dates: DatesSectionType | undefined;
   logo: string | File | null | undefined;
   event_name: string;
