@@ -251,6 +251,11 @@ export const API_ENDPOINTS = {
       GET: "/admin/site-essentials",
       UPDATE: "/admin/site-essentials/update",
     },
+    /** Default platform commission; per-venue overrides live on venue detail (PUT /admin/venues/{id}). */
+    PAYMENT_SETTINGS: {
+      GET_COMMISSION: "/admin/payment-settings/commission",
+      UPDATE_COMMISSION: "/admin/payment-settings/commission",
+    },
     VENUES: {
       ALL: "/admin/venues?status={status}&search={search}",
       GET_BY_ID: "/admin/venues/{id}",

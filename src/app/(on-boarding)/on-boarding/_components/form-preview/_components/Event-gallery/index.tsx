@@ -66,6 +66,9 @@ export default function EventGallery({ gallery, galleryTitle }: PackageSectionPr
                 )}
                 alt={`Event Gallery Image ${i + 1}`}
                 className="w-full h-full object-cover transition-transform duration-300 hover:scale-105"
+                decoding="async"
+                fetchPriority="low"
+                loading={i < 2 ? "eager" : "lazy"}
               />
             </div>
           ))}
@@ -85,6 +88,9 @@ export default function EventGallery({ gallery, galleryTitle }: PackageSectionPr
                   )}
                   alt={`Event Gallery Image ${i + 5}`}
                   className="w-full h-full object-cover transition-transform duration-300 hover:scale-105"
+                  decoding="async"
+                  fetchPriority="low"
+                  loading="lazy"
                 />
               </div>
             ))}

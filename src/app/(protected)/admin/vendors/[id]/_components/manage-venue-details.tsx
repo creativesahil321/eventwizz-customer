@@ -53,6 +53,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { adminEventsService } from "@/services/admin/events/admin-events.service";
 import { useCurrencyFormat } from "@/hooks/use-currency-format";
+import { VenueCommissionCard } from "./venue-commission-card";
 
 /** Permission key for impersonation — must match backend (e.g. impersonate-vendor). */
 const IMPERSONATE_VENDOR_PERMISSION = "impersonate-vendor";
@@ -383,9 +384,9 @@ export function ManageVenueDetails({ venue }: ManageVenueDetailsProps) {
       </Card>
 
       {/* ── 2. Two columns: consolidated left cards, right card ── */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start lg:items-stretch">
         {/* Left: Contact & Business + Events & Notes (2 merged cards) */}
-        <div className="lg:col-span-2 space-y-6">
+        <div className="lg:col-span-2 space-y-6 lg:min-h-0">
           <Card className="bg-white border-[var(--color-border)] shadow-sm">
             <CardHeader className="pb-4">
               <CardTitle className="text-base title-header font-semibold text-left">
@@ -684,9 +685,9 @@ export function ManageVenueDetails({ venue }: ManageVenueDetailsProps) {
           </Card>
         </div>
 
-        {/* Right: Location + Financial Summary (single card, already merged) */}
-        <div className="space-y-0">
-          <Card className="bg-white border-[var(--color-border)] shadow-sm overflow-hidden ">
+        {/* Right: match column height to left; spacer fills gap below cards (no empty card stretch) */}
+        <div className="flex min-h-0 flex-col gap-4 lg:h-full">
+          <Card className="shrink-0 bg-white border-[var(--color-border)] shadow-sm overflow-hidden">
             {/* Event Location Address section */}
             <CardHeader className="space-y-0 pb-5">
               <CardTitle className="text-lg title-header font-semibold text-left">
@@ -791,6 +792,15 @@ export function ManageVenueDetails({ venue }: ManageVenueDetailsProps) {
               </CardContent>
             </div>
           </Card>
+
+          {/* Grows on large screens so Venue commission lines up with the bottom of the left column */}
+          <div
+            className="hidden min-h-0 flex-1 basis-0 lg:block"
+            aria-hidden
+          />
+          <div className="shrink-0">
+            <VenueCommissionCard venue={venue} />
+          </div>
         </div>
       </div>
 

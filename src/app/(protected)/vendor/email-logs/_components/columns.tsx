@@ -212,11 +212,12 @@ export function getColumns({
                 <Trash size={16} />
               </Button>
             </PermissionGuard>
-            <PermissionGuard permissionKey="update-email-log">
+            <PermissionGuard permissionKey="resend-email-log">
               <Button
                 variant="event-primary"
                 onClick={() => setRowAction({ row, type: "resend" })}
                 title="Resend email"
+                aria-label="Resend email"
               >
                 <RotateCw size={16} />
               </Button>
@@ -226,9 +227,9 @@ export function getColumns({
       },
       enableSorting: false,
       enableHiding: false,
-      size: 140,
-      minSize: 120,
-      maxSize: 160,
+      size: 160,
+      minSize: 140,
+      maxSize: 200,
     },
     {
       id: "body",

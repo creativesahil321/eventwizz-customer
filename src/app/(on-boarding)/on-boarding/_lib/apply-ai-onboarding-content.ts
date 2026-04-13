@@ -122,6 +122,8 @@ export async function applyAIGeneratedOnboardingContent({
     about_title: editedContent.stepTwo.about_title,
     about_description: editedContent.stepTwo.about_description,
     about_link_title: editedContent.stepTwo.about_link_title,
+    about_cta_link:
+      editedContent.stepTwo.about_cta_link?.trim() || "#",
     logo: logoFile,
     cover_image: coverFile,
   };

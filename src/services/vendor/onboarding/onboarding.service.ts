@@ -218,6 +218,7 @@ export const onboardingService = {
     formData.append("about_title", data.about_title);
     formData.append("about_description", data.about_description);
     formData.append("about_link_title", data.about_link_title);
+    formData.append("about_cta_link", data.about_cta_link);
 
     // Add logo and cover_image if they exist
     // Check for both File and Blob (cropped images might be Blob)

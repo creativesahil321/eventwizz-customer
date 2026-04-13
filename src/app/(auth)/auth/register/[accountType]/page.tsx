@@ -4,10 +4,13 @@ import { useParams, useRouter } from "next/navigation";
 import { UnifiedRegisterForm } from "@/app/(auth)/auth/register/_components/UnifiedRegisterForm";
 import { useEffect } from "react";
 import { appConfig } from "@/config/app";
+import { useDomain } from "@/providers/domain-provider/domain-provider";
 
 export default function RegisterPage() {
   const params = useParams();
   const router = useRouter();
+  const { settings } = useDomain();
+  const siteName = settings?.name || appConfig.name;
   const accountType = params.accountType as string;
 
   // Validate account type is supported
@@ -33,8 +36,8 @@ export default function RegisterPage() {
         </h1>
         <p className="text-sm text-black">
           {accountType === "vendor"
-            ? `Start offering your services on ${appConfig.name}`
-            : `Join ${appConfig.name} to find and book amazing events`}
+            ? `Start offering your services on ${siteName}`
+            : `Join ${siteName} to find and book amazing events`}
         </p>
       </div>
 

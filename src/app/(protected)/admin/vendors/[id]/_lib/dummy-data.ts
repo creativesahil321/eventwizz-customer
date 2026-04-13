@@ -102,5 +102,10 @@ export function getVenueDetailDummy(id: string): VenueDetail | null {
       payoutReleased: 1125000,
     },
     lastLogin: "10 Apr 2024, 12:45 PM",
+    commissionSettings: {
+      useCustomCommission: false,
+      commissionPercentage: null,
+      commissionFlatFee: null,
+    },
   };
 }

@@ -117,6 +117,12 @@ export interface VenueEventCancellationRequest {
   };
 }
 
+export interface VenueCommissionSettings {
+  useCustomCommission: boolean;
+  commissionPercentage: number | null;
+  commissionFlatFee: number | null;
+}
+
 export interface VenueDetail {
   id: number;
   /** Backend user/vendor id — use this for impersonation API, not id (venue pk) */
@@ -151,4 +157,5 @@ export interface VenueDetail {
     requestedDomain: string;
     status: "pending" | "approved" | "rejected";
   };
+  commissionSettings: VenueCommissionSettings;
 }

@@ -25,6 +25,7 @@ export const defaultValues: OnboardingFormData = {
     about_title: "",
     about_description: "",
     about_link_title: "",
+    about_cta_link: "",
   },
   stepThree: {
     isApproved: false,

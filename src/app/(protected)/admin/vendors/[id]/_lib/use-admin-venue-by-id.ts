@@ -146,6 +146,27 @@ function mapApiToVenueDetail(data: AdminVenueByIdData): VenueDetail {
         status,
       };
     })(),
+    commissionSettings: (() => {
+      const c = data.commission_settings;
+      if (c == null) {
+        return {
+          useCustomCommission: false,
+          commissionPercentage: null,
+          commissionFlatFee: null,
+        };
+      }
+      return {
+        useCustomCommission: c.use_custom_commission === true,
+        commissionPercentage:
+          typeof c.commission_percentage === "number"
+            ? c.commission_percentage
+            : null,
+        commissionFlatFee:
+          typeof c.commission_flat_fee === "number"
+            ? c.commission_flat_fee
+            : null,
+      };
+    })(),
   };
 }
 

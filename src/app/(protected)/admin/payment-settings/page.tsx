@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
+import Link from "next/link";
 import {
   CheckCircle2,
   AlertCircle,
@@ -18,6 +19,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { cn } from "@/lib/utils";
+import { PlatformCommissionDefaults } from "./_components/platform-commission-defaults";
 
 /* ─────────────────────────────────────────────────────
    Dummy state for platform-level gateway connections.
@@ -261,12 +263,17 @@ export default function AdminPaymentSettingsPage() {
                   <span className="font-medium text-foreground">
                     Commission splits
                   </span>{" "}
-                  are configured per venue on the{" "}
-                  <span className="text-primary font-medium cursor-pointer hover:underline">
+                  use the platform default commission percentage unless a venue
+                  has custom commission enabled on its detail page.
+                  Track totals on the{" "}
+                  <Link
+                    href="/admin/commission-overview"
+                    className="text-primary font-medium hover:underline"
+                  >
                     Commission Overview
-                  </span>{" "}
-                  page and applied automatically at checkout via Stripe
-                  Connect&apos;s application fee mechanism.
+                  </Link>{" "}
+                  page. Fees apply at checkout via Stripe Connect application
+                  fees.
                 </div>
               </div>
             </div>
@@ -418,6 +425,8 @@ export default function AdminPaymentSettingsPage() {
                 </Alert>
               </div>
             </div>
+
+            <PlatformCommissionDefaults />
           </div>
         </Shell>
       </section>

@@ -41,8 +41,10 @@ export async function generateMetadata(
 // Server component that wraps the client component
 export default function Page() {
   return (
-    <Suspense fallback={<OnboardingFormSkeleton layout="full" />}>
-      <OnboardingClientWrapper />
-    </Suspense>
+    <div className="flex h-full min-h-0 w-full flex-1 flex-col">
+      <Suspense fallback={<OnboardingFormSkeleton layout="full" />}>
+        <OnboardingClientWrapper />
+      </Suspense>
+    </div>
   );
 }

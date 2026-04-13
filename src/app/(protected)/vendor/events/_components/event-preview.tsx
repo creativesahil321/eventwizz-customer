@@ -2,20 +2,22 @@
 
 import React from "react";
 
+import type { DownloadItem } from "@/app/(on-boarding)/on-boarding/_components/form-preview/_components/brochure-section";
 import AboutEventSec from "@/app/(on-boarding)/on-boarding/_components/form-preview/_components/About-event-sec";
 import DatesSection from "@/app/(on-boarding)/on-boarding/_components/form-preview/_components/Dates-section";
-import BrochureSection from "@/app/(on-boarding)/on-boarding/_components/form-preview/_components/brochure-section";
-import DrinkSection from "@/app/(on-boarding)/on-boarding/_components/form-preview/_components/drink-section";
-import FaqSection from "@/app/(on-boarding)/on-boarding/_components/form-preview/_components/faq-section";
-import MenuSection from "@/app/(on-boarding)/on-boarding/_components/form-preview/_components/menu-section";
-import PackageSection from "@/app/(on-boarding)/on-boarding/_components/form-preview/_components/package-sec";
+import EventGallery from "@/app/(on-boarding)/on-boarding/_components/form-preview/_components/Event-gallery";
+import PackageSec from "@/app/(on-boarding)/on-boarding/_components/form-preview/_components/package-sec";
 import Timeline from "@/app/(on-boarding)/on-boarding/_components/form-preview/_components/Time-line";
 import CommonHeader from "@/components/shared/common-header";
 import FooterSection from "@/app/(public)/vendor/_components/EventListPage/footer";
 import { themeDetectionFromVendorEventData } from "@/lib/theme-detection-source";
 import { EventDetailData } from "@/services/vendor/events/type";
-
-import EventGallery from "@/app/(on-boarding)/on-boarding/_components/form-preview/_components/Event-gallery";
+import {
+  LazyBrochureSection,
+  LazyDrinkSection,
+  LazyFaqSection,
+  LazyMenuSection,
+} from "@/components/public/event-detail-lazy-sections";
 import { SiteEssentialsFormValues } from "@/app/(protected)/_shared/sites-essentials/_lib/schema";
 import { SiteEssentialsGoogleFontsLoader } from "@/components/shared/site-essentials-google-fonts-loader";
 import {
@@ -25,19 +27,11 @@ import {
 } from "@/lib/color-contrast";
 import { CartConflictProvider } from "@/app/(public)/vendor/checkout/_components/cart-conflict-provider";
 import { ThemeAnimationManager } from "@/components/theme-animations/theme-animation-manager";
-import { addCacheBusting } from "@/lib/image-utils";
 import { useCurrencyFormat } from "@/hooks/use-currency-format";
-import { SiteHeading } from "@/components/public/site-heading";
+import { EventHeroBand } from "@/components/public/event-hero-band";
 import { normalizeHeadingEmphasis } from "@/lib/heading-emphasis";
-import {
-  heroBandContentPadClass,
-  heroBandVerticalClass,
-  heroBannerStackClass,
-  heroBannerSubheadingClass,
-  normalizeBannerHeadingAlign,
-  normalizeBannerHeadingValign,
-} from "@/lib/banner-heading-align";
-import { cn } from "@/lib/utils";
+import { headerLinksFromDownloadItems } from "@/lib/event-header-downloads";
+import { EVENT_BOOKING_SECTION_CLASSNAME } from "@/lib/event-booking-section-layout";
 
 import "@/app/(public)/[locationSlug]/events/[eventSlug]/event-detail.css";
 
@@ -139,17 +133,33 @@ export function EventPreview({
   const s7 = data.stepSeven;
   const s8 = data.stepEight;
 
+  /** Same rows as `BrochureSection` so header (single link vs menu) stays in sync with the page. */
+  const eventBrochureDownloads = React.useMemo(
+    () =>
+      [
+        ...(s6?.brochure_pdf
+          ? [{ title: "Event brochure", download_link: [s6.brochure_pdf] }]
+          : []),
+        ...(s6?.faq_pdf
+          ? [{ title: "FAQ Details", download_link: [s6.faq_pdf] }]
+          : []),
+        ...(s6?.brochure_pdf_2
+          ? [{ title: "Event Flayer", download_link: [s6.brochure_pdf_2] }]
+          : []),
+      ] as DownloadItem[],
+    [s6?.brochure_pdf, s6?.faq_pdf, s6?.brochure_pdf_2],
+  );
+
+  const headerDownloads = React.useMemo(
+    () => headerLinksFromDownloadItems(eventBrochureDownloads),
+    [eventBrochureDownloads],
+  );
+
   const eventName = s1?.event_name || s1?.event_banner_heading || "Event";
   const eventSlug =
     data.slug?.trim() ||
     (s1?.event_id != null ? `event-${s1.event_id}` : "preview");
 
-  const bannerAlign = normalizeBannerHeadingAlign(
-    siteEssentials?.banner_heading_align,
-  );
-  const bannerValign = normalizeBannerHeadingValign(
-    siteEssentials?.banner_heading_valign,
-  );
   const headingEmphasisForHero = siteEssentials
     ? normalizeHeadingEmphasis(siteEssentials.typography?.headingEmphasis)
     : undefined;
@@ -215,10 +225,6 @@ export function EventPreview({
       ? parsedFromField
       : brochureFallbackAmount;
   const brochurePriceDescription = `${formatMoney(brochureAmount)} PP exc VAT`;
-
-  const heroStyles = {
-    videoBackground: "absolute inset-0 h-full w-full object-cover",
-  };
 
   const bannerImage = s1?.event_banner_image || "";
   const bannerVideo = s1?.event_banner_video || null;
@@ -293,108 +299,21 @@ export function EventPreview({
           variant="preview"
           previewBackButtonOffset={!embedInShell}
           className={embedInShell ? "px-3 sm:px-4 md:px-6" : ""}
+          headerDownloads={headerDownloads}
         />
 
-        {/* Hero — mirrors live event-detail-client: band height, gradient fade, orbs, theme vertical placement */}
-        <section
-          className={cn(
-            "relative mx-auto flex w-full justify-center overflow-hidden",
-            /* Same band dimensions as live event page */
-            "h-[min(70dvh,760px)] min-h-[400px] max-h-[820px]",
-            heroBandVerticalClass(bannerValign),
-            bannerAlign === "left" &&
-              bannerValign === "center" &&
-              "!items-stretch",
-          )}
-        >
-          <div className="absolute inset-0 overflow-hidden">
-            {bannerVideo ? (
-              <>
-                {bannerImage && (
-                  <div
-                    className={`${heroStyles.videoBackground} scale-105 bg-cover bg-center`}
-                    style={{ backgroundImage: `url(${bannerImage})` }}
-                  />
-                )}
-                <video
-                  src={bannerVideo}
-                  poster={bannerImage || undefined}
-                  className={cn(heroStyles.videoBackground, "scale-105")}
-                  autoPlay
-                  muted
-                  loop
-                  playsInline
-                  preload="auto"
-                />
-              </>
-            ) : bannerImage ? (
-              <img
-                src={addCacheBusting(bannerImage)}
-                alt={eventName}
-                className={cn(heroStyles.videoBackground, "scale-105")}
-              />
-            ) : (
-              <div
-                className="absolute inset-0 bg-gradient-to-br from-[var(--color-surface)] via-[var(--color-background)] to-[color:color-mix(in_srgb,var(--color-primary)_12%,var(--color-background))]"
-                aria-hidden
-              />
-            )}
-            {/* Gradient scrim: dark top → fade to page background (same as live) */}
-            <div
-              className="pointer-events-none absolute inset-0 z-[1] bg-gradient-to-b from-black/60 via-black/35 to-[color:var(--color-background)]"
-              aria-hidden
-            />
-          </div>
-
-          {/* Primary glow orbs */}
-          <div
-            className="pointer-events-none absolute left-1/4 top-16 z-[2] h-72 w-72 rounded-full bg-[color:color-mix(in_srgb,var(--color-primary)_18%,transparent)] blur-[100px] md:h-96 md:w-96 md:blur-[120px]"
-            aria-hidden
-          />
-          <div
-            className="pointer-events-none absolute bottom-24 right-1/4 z-[2] h-64 w-64 rounded-full bg-[color:color-mix(in_srgb,var(--color-primary)_10%,transparent)] blur-[90px]"
-            aria-hidden
-          />
-
-          <div
-            className={cn(
-              "relative z-20 max-w-7xl mx-auto w-full overflow-visible px-4",
-              heroBandContentPadClass(bannerValign),
-            )}
-          >
-            <div
-              className={cn(
-                heroBannerStackClass(bannerAlign),
-                "overflow-visible",
-              )}
-            >
-              <SiteHeading
-                level={1}
-                title={heroTitle || eventName}
-                accentHint={heroAccentHint}
-                emphasis={headingEmphasisForHero}
-                variant="onDark"
-                align={bannerAlign}
-                className={cn(
-                  "mb-4 font-black !text-3xl !leading-[0.98] tracking-tight sm:!text-4xl md:!text-5xl lg:!text-6xl",
-                  bannerAlign === "left"
-                    ? "max-w-[min(100%,28rem)] sm:max-w-xl md:max-w-2xl lg:max-w-3xl"
-                    : "max-w-4xl",
-                )}
-              />
-              {s1?.event_banner_sub_heading ? (
-                <p
-                  className={cn(
-                    "max-w-2xl text-base leading-relaxed text-white/85 sm:text-lg md:text-xl",
-                    heroBannerSubheadingClass(bannerAlign),
-                  )}
-                >
-                  {s1.event_banner_sub_heading}
-                </p>
-              ) : null}
-            </div>
-          </div>
-        </section>
+        <EventHeroBand
+          title={heroTitle || eventName}
+          subHeading={s1?.event_banner_sub_heading || null}
+          accentHint={heroAccentHint}
+          headingEmphasis={headingEmphasisForHero}
+          bannerHeadingAlign={siteEssentials?.banner_heading_align ?? null}
+          bannerHeadingValign={siteEssentials?.banner_heading_valign ?? null}
+          bannerImage={bannerImage || null}
+          bannerVideo={bannerVideo}
+          cacheBustImage
+          imageAlt={eventName}
+        />
 
         <AboutEventSec
           about_event_heading={s1?.about_event_heading || ""}
@@ -414,7 +333,7 @@ export function EventPreview({
           }
         />
 
-        <PackageSection
+        <PackageSec
           heading={s2?.package_title || ""}
           subHeading={s2?.package_description || ""}
           buttonName={s2?.package_button_name || "Book Now"}
@@ -424,7 +343,7 @@ export function EventPreview({
           headingEmphasis={headingEmphasisForHero}
         />
 
-        <div id="booking">
+        <div id="booking" className={EVENT_BOOKING_SECTION_CLASSNAME}>
           <DatesSection
             dates={datesForSection}
             eventSlug={eventSlug}
@@ -438,16 +357,16 @@ export function EventPreview({
         <EventGallery
           gallery={
             galleryImages ??
-            Array(8).fill({
+            Array.from({ length: 8 }, () => ({
               path: "/assets/images/gallery-image.png",
               relativePath: "/assets/images/gallery-image.png",
               preview: "/assets/images/gallery-image.png",
-            })
+            }))
           }
         />
 
         {showMenu && (
-          <MenuSection
+          <LazyMenuSection
             menu_title={s4?.menu_title || ""}
             menu_description={s4?.menu_description || ""}
             menus={menus}
@@ -461,7 +380,7 @@ export function EventPreview({
         )}
 
         {showDrinks && (
-          <DrinkSection
+          <LazyDrinkSection
             title={s5?.drink_title || ""}
             description={s5?.drink_description || ""}
             packages={drinkPackages}
@@ -469,7 +388,7 @@ export function EventPreview({
           />
         )}
 
-        <BrochureSection
+        <LazyBrochureSection
           showMapImmediately
           location={{
             title: "EVENT LOCATION",
@@ -479,32 +398,7 @@ export function EventPreview({
             latitude: data.lat ?? s8?.latitude ?? null,
             longitude: data.long ?? s8?.longitude ?? null,
           }}
-          downloads={[
-            ...(s6?.brochure_pdf
-              ? [
-                  {
-                    title: "Event Details",
-                    download_link: [s6.brochure_pdf],
-                  },
-                ]
-              : []),
-            ...(s6?.faq_pdf
-              ? [
-                  {
-                    title: "FAQ Details",
-                    download_link: [s6.faq_pdf],
-                  },
-                ]
-              : []),
-            ...(s6?.brochure_pdf_2
-              ? [
-                  {
-                    title: "Event Flayer",
-                    download_link: [s6.brochure_pdf_2],
-                  },
-                ]
-              : []),
-          ]}
+          downloads={eventBrochureDownloads}
           price={{
             title: "PRICES FROM",
             description: brochurePriceDescription,
@@ -513,7 +407,7 @@ export function EventPreview({
           }}
         />
 
-        {showFaqs && <FaqSection faqs={faqs} />}
+        {showFaqs && <LazyFaqSection faqs={faqs} />}
 
         <FooterSection logo={siteEssentials?.logo || data.logo || undefined} />
       </div>

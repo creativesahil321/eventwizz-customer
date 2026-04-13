@@ -66,6 +66,8 @@ export interface AIGeneratedContent {
     about_title: string;
     about_description: string;
     about_link_title: string;
+    /** URL or path for the landing CTA; optional for older cached responses */
+    about_cta_link?: string;
   };
   stepThree: {
     event_name: string;
@@ -178,7 +180,8 @@ Generate this EXACT JSON structure:
     "banner_sub_heading": "string (max 80 chars, engaging tagline)",
     "about_title": "string (max 40 chars, title for about section)",
     "about_description": "string (max 340 chars / 50 words, professional about text, no HTML)",
-    "about_link_title": "string (max 18 chars, CTA button text like 'Explore Events')"
+    "about_link_title": "string (max 18 chars, CTA button text like 'Explore Events')",
+    "about_cta_link": "string (max 2048 chars, full URL or site path for that CTA, e.g. https://example.com/events or /events)"
   },
   "stepThree": {
     "event_name": "string (max 40 chars, name for the main event)",
@@ -339,6 +342,12 @@ Make times chronologically ascending. Make prices realistic for the venue type a
         content.stepTwo.about_title = truncate(content.stepTwo.about_title, 40);
         content.stepTwo.about_description = truncate(content.stepTwo.about_description, 340);
         content.stepTwo.about_link_title = truncate(content.stepTwo.about_link_title, 18);
+        if (content.stepTwo.about_cta_link) {
+          content.stepTwo.about_cta_link = truncate(
+            content.stepTwo.about_cta_link,
+            2048,
+          );
+        }
       }
 
       if (content.stepThree) {

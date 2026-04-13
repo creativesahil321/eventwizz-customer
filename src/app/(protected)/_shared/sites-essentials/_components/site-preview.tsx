@@ -5,12 +5,10 @@ import { SiteEssentialsFormValues } from "../_lib/schema";
 
 import CommonHeader from "@/components/shared/common-header";
 import HeroBanner from "@/app/(public)/vendor/_components/EventListPage/hero-banner";
-import PopularEvents from "@/app/(public)/vendor/_components/EventListPage/popular-event";
 import ExperienceSection from "@/app/(public)/vendor/_components/EventListPage/experience";
-import RecentEventsGlimpse from "@/app/(public)/vendor/_components/EventListPage/recent-event";
 import ContactFormSection from "@/app/(public)/vendor/_components/EventListPage/contact-form-section";
-import UpcomingEvents from "@/app/(public)/vendor/_components/EventListPage/upcoming-event";
 import FooterSection from "@/app/(public)/vendor/_components/EventListPage/footer";
+import { LocationMarketingBody } from "@/components/public/location-marketing-sections";
 import { pickReadableForeground } from "@/lib/color-contrast";
 import { SiteEssentialsGoogleFontsLoader } from "@/components/shared/site-essentials-google-fonts-loader";
 // ServerContext removed - already provided at layout level
@@ -112,30 +110,28 @@ export function SitePreview({ formValues }: Readonly<SitePreviewProps>) {
         bannerHeadingAlign={formValues.banner_heading_align}
         bannerHeadingValign={formValues.banner_heading_valign}
       />
-      <div className={mainBandClass} style={mainBandStyle}>
-        <ExperienceSection
-          aboutTitle={formValues.about_title || null}
-          aboutDescription={formValues.about_description || null}
-          aboutLinkTitle={formValues.about_link_title || null}
-          aboutCtaLink={formValues.about_cta_link || null}
-        />
-        <PopularEvents
-          events={[]}
-          sectionTitle={formValues.event_title_1 || "Popular Events"}
-          locationSlug=""
-        />
-        <UpcomingEvents
-          events={[]}
-          sectionTitle={formValues.event_title_2 || "Upcoming Events"}
-          locationSlug=""
-        />
-        <RecentEventsGlimpse
-          galleryImages={[]}
-          galleryTitle={
-            formValues.event_gallery_title || "Recent Events Glimpse"
-          }
-        />
-      </div>
+      <LocationMarketingBody
+        className={mainBandClass}
+        style={mainBandStyle}
+        experience={
+          <ExperienceSection
+            aboutTitle={formValues.about_title || null}
+            aboutDescription={formValues.about_description || null}
+            aboutLinkTitle={formValues.about_link_title || null}
+            aboutCtaLink={formValues.about_cta_link || null}
+          />
+        }
+        latestEvents={[]}
+        upcomingEvents={[]}
+        popularSectionTitle={formValues.event_title_1 || "Popular Events"}
+        upcomingSectionTitle={formValues.event_title_2 || "Upcoming Events"}
+        galleryTitle={
+          formValues.event_gallery_title || "Recent Events Glimpse"
+        }
+        galleryImages={[]}
+        locationSlug=""
+        locationLabel={null}
+      />
       <ContactFormSection />
       <FooterSection
         copyright={formValues.copyright}

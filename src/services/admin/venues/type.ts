@@ -131,6 +131,13 @@ export interface AdminVenueByIdLoginSecurity {
   last_login: string | null;
 }
 
+/** Optional until backend ships; used for Stripe Connect application fee defaults per venue. */
+export interface AdminVenueByIdCommissionSettings {
+  use_custom_commission: boolean;
+  commission_percentage: number | null;
+  commission_flat_fee: number | null;
+}
+
 export interface AdminVenueByIdCancellationRequestActions {
   can_approve: boolean;
   can_disapprove: boolean;
@@ -168,6 +175,7 @@ export interface AdminVenueByIdData {
   event_cancellation_requests?: AdminVenueByIdCancellationRequest[];
   login_security: AdminVenueByIdLoginSecurity;
   domain_approval_request?: AdminVenueByIdDomainApproval;
+  commission_settings?: AdminVenueByIdCommissionSettings;
 }
 
 export interface AdminVenueByIdResponse {
@@ -188,6 +196,9 @@ export interface AdminVenueUpdatePayload {
   business_documents?: { document_url?: string };
   /** Exact values only (case-sensitive): "active" | "inactive" */
   domain_status?: "active" | "inactive";
+  use_custom_commission?: boolean;
+  commission_percentage?: number | null;
+  commission_flat_fee?: number | null;
 }
 
 export interface AdminVenueUpdateResponse {

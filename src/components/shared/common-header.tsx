@@ -11,6 +11,8 @@ import {
   LayoutDashboard,
   LogIn,
   UserPlus,
+  Download,
+  FileText,
 } from "lucide-react";
 import Link from "next/link";
 import { useContext, useState, useEffect } from "react";
@@ -22,6 +24,15 @@ import CartButton from "./cart-button";
 import { addCacheBusting } from "@/lib/image-utils";
 import { cn } from "@/lib/utils";
 import { useIsPreviewModeFromProvider } from "@/contexts/preview-context";
+import type { HeaderDownloadLink } from "@/lib/event-header-downloads";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 // Define icon mapping with proper typing
 type IconKey = "phone" | "profile";
@@ -48,6 +59,14 @@ interface CommonHeaderProps {
    * Set false for embedded previews (e.g. admin event approval) where that button is not shown.
    */
   previewBackButtonOffset?: boolean;
+  /** Event PDFs (brochure / FAQ): one icon + dropdown so the bar stays compact */
+  headerDownloads?: HeaderDownloadLink[];
+  /** Hide “Browse Events” (e.g. event page already has back-to-location in the hero). */
+  hideBrowseEvents?: boolean;
+  /** Omit the phone pill on desktop only; phone stays under Contact in the mobile drawer. */
+  hideHeaderPhone?: boolean;
+  /** One “Account” control instead of separate Log in + Register pills (desktop). */
+  compactGuestAuth?: boolean;
 }
 
 export default function CommonHeader({
@@ -57,6 +76,10 @@ export default function CommonHeader({
   className = "",
   hasBackgroundImage = false,
   previewBackButtonOffset = true,
+  headerDownloads,
+  hideBrowseEvents = false,
+  hideHeaderPhone = false,
+  compactGuestAuth = false,
 }: CommonHeaderProps) {
   const { theme } = useContext(ServerContext);
   const isPreviewFromProvider = useIsPreviewModeFromProvider();
@@ -143,6 +166,20 @@ export default function CommonHeader({
         : []),
     ] as NavLink[],
   };
+
+  const desktopNavLinkEntries = headerData.navLinks.filter((l) => {
+    if (l.icon === "phone" && hideHeaderPhone) return false;
+    if (
+      compactGuestAuth &&
+      !isAuthenticated &&
+      (l.linkText === "Log In" || l.linkText === "Register")
+    ) {
+      return false;
+    }
+    return true;
+  });
+
+  const showGuestAccountMenu = compactGuestAuth && !isAuthenticated;
 
   const toggleMobileMenu = () => {
     setMobileMenuOpen(!mobileMenuOpen);
@@ -242,6 +279,59 @@ export default function CommonHeader({
     }
   };
 
+  const hasHeaderDownloads =
+    Array.isArray(headerDownloads) && headerDownloads.length > 0;
+  const headerDownloadsList = headerDownloads ?? [];
+  const singleHeaderDownload =
+    headerDownloadsList.length === 1 ? headerDownloadsList[0] : null;
+  const multipleHeaderDownloads = headerDownloadsList.length > 1;
+
+  /** Match glass header pills over hero; solid bar + on-header text when scrolled / preview. */
+  const downloadsMenuGlass = pillGlassOnHero;
+  const downloadsDropdownContentClass = cn(
+    "z-[60] min-w-[13.5rem] overflow-hidden rounded-xl border p-0 py-1 shadow-xl",
+    downloadsMenuGlass
+      ? cn(
+          "border-[color:color-mix(in_srgb,var(--color-primary)_50%,white_24%)]",
+          "bg-black/48 text-white ring-1 ring-inset ring-white/10",
+          "backdrop-blur-xl backdrop-saturate-150",
+          "shadow-[0_24px_56px_-12px_rgba(0,0,0,0.72)]",
+        )
+      : cn(
+          "border-[color:color-mix(in_srgb,var(--color-primary)_32%,var(--color-on-header)_12%)]",
+          "bg-[color:color-mix(in_srgb,var(--color-header)_100%,transparent)]",
+          "text-[var(--color-on-header)] ring-1 ring-inset ring-[color:color-mix(in_srgb,var(--color-on-header)_08%,transparent)]",
+          "shadow-[0_20px_44px_-18px_rgba(15,23,42,0.38)]",
+        ),
+  );
+  const downloadsDropdownLabelClass = cn(
+    "px-3 pt-2 pb-1 font-sans text-[10px] font-semibold uppercase tracking-[0.14em]",
+    downloadsMenuGlass ? "text-white/55" : "text-[var(--color-on-header)]/55",
+  );
+  const downloadsDropdownSeparatorClass = cn(
+    "mx-2 my-1.5 h-px",
+    downloadsMenuGlass ? "bg-white/12" : "bg-[var(--color-on-header)]/12",
+  );
+  const downloadsDropdownItemClass = cn(
+    "mx-1 cursor-pointer gap-2.5 rounded-lg px-2.5 py-2 text-sm font-medium outline-none",
+    downloadsMenuGlass
+      ? cn(
+          "text-white/95",
+          "focus:bg-white/14 focus:text-white",
+          "data-[highlighted]:bg-white/14 data-[highlighted]:text-white",
+        )
+      : cn(
+          "text-[var(--color-on-header)]",
+          "focus:bg-[color:color-mix(in_srgb,var(--color-primary)_18%,transparent)] focus:text-[var(--color-on-header)]",
+          "data-[highlighted]:bg-[color:color-mix(in_srgb,var(--color-primary)_18%,transparent)] data-[highlighted]:text-[var(--color-on-header)]",
+        ),
+  );
+  const downloadsFileIconClass = cn(
+    "size-4 shrink-0",
+    "text-[color:var(--color-primary)]",
+    downloadsMenuGlass ? "drop-shadow-[0_0_10px_color-mix(in_srgb,var(--color-primary)_55%,transparent)]" : "opacity-90",
+  );
+
   // Avoid dark:bg-background here: it overrides vendor --color-header and causes dark-on-dark
   // chrome when the app shell is in dark mode (e.g. admin event review iframe preview).
   const headerDarkModeBg =
@@ -274,24 +364,25 @@ export default function CommonHeader({
                 : ""
             }`}
           >
-            {useNonInteractiveChrome ? (
-              <div
-                className={cn(topBarPillDisabledClass, styles.textColor)}
-              >
-                {headerData.browseEvent.linkText}
-              </div>
-            ) : (
-              <Link
-                href={headerData.browseEvent.link}
-                className={cn(
-                  topBarPillClass,
-                  styles.textColor,
-                  styles.hoverColor,
-                )}
-              >
-                {headerData.browseEvent.linkText}
-              </Link>
-            )}
+            {!hideBrowseEvents &&
+              (useNonInteractiveChrome ? (
+                <div
+                  className={cn(topBarPillDisabledClass, styles.textColor)}
+                >
+                  {headerData.browseEvent.linkText}
+                </div>
+              ) : (
+                <Link
+                  href={headerData.browseEvent.link}
+                  className={cn(
+                    topBarPillClass,
+                    styles.textColor,
+                    styles.hoverColor,
+                  )}
+                >
+                  {headerData.browseEvent.linkText}
+                </Link>
+              ))}
           </div>
           <div className="w-1/3 text-center">
             {useNonInteractiveChrome ? (
@@ -359,7 +450,102 @@ export default function CommonHeader({
               />
             )}
 
-            {headerData.navLinks.map(({ icon, link, linkText }, index) => {
+            {hasHeaderDownloads &&
+              (useNonInteractiveChrome ? (
+                singleHeaderDownload ? (
+                  <div
+                    className={cn(
+                      "flex max-w-[min(100%,15rem)] shrink-0 items-center gap-1",
+                      topBarPillDisabledClass,
+                      styles.textColor,
+                    )}
+                    aria-hidden
+                  >
+                    <FileText size={16} className="shrink-0" />
+                    <span className="truncate">{singleHeaderDownload.title}</span>
+                  </div>
+                ) : (
+                  <div
+                    className={cn(
+                      "flex shrink-0 items-center gap-1",
+                      topBarPillDisabledClass,
+                      styles.textColor,
+                    )}
+                    aria-hidden
+                  >
+                    <Download size={16} className="shrink-0" />
+                    <span>Downloads</span>
+                  </div>
+                )
+              ) : singleHeaderDownload ? (
+                <a
+                  href={singleHeaderDownload.href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className={cn(
+                    "flex max-w-[min(100%,15rem)] shrink-0 items-center gap-1",
+                    topBarPillClass,
+                    styles.textColor,
+                    styles.hoverColor,
+                  )}
+                  onClick={handleLinkClick}
+                >
+                  <FileText
+                    size={16}
+                    className={cn("shrink-0", downloadsFileIconClass)}
+                  />
+                  <span className="truncate">{singleHeaderDownload.title}</span>
+                </a>
+              ) : multipleHeaderDownloads ? (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button
+                      type="button"
+                      className={cn(
+                        "flex shrink-0 items-center gap-1",
+                        topBarPillClass,
+                        styles.textColor,
+                        styles.hoverColor,
+                      )}
+                      aria-label="Downloads"
+                    >
+                      <Download size={16} className="shrink-0" />
+                      <span>Downloads</span>
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent
+                    align="end"
+                    sideOffset={8}
+                    className={downloadsDropdownContentClass}
+                  >
+                    <DropdownMenuLabel className={downloadsDropdownLabelClass}>
+                      Downloads
+                    </DropdownMenuLabel>
+                    <DropdownMenuSeparator
+                      className={downloadsDropdownSeparatorClass}
+                    />
+                    {headerDownloadsList.map((item, idx) => (
+                      <DropdownMenuItem
+                        key={`${item.title}-${idx}`}
+                        asChild
+                        className={downloadsDropdownItemClass}
+                      >
+                        <a
+                          href={item.href}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex cursor-pointer items-center"
+                        >
+                          <FileText className={downloadsFileIconClass} />
+                          <span className="min-w-0 flex-1">{item.title}</span>
+                        </a>
+                      </DropdownMenuItem>
+                    ))}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              ) : null)}
+
+            {desktopNavLinkEntries.map(({ icon, link, linkText }, index) => {
               const IconComponent = icon ? iconComponents[icon] : null;
               const isPhoneNumber = icon === "phone";
 
@@ -433,6 +619,64 @@ export default function CommonHeader({
                 </Link>
               );
             })}
+
+            {showGuestAccountMenu &&
+              (useNonInteractiveChrome ? (
+                <div
+                  className={cn(
+                    "flex items-center gap-1.5",
+                    topBarPillDisabledClass,
+                    styles.textColor,
+                  )}
+                  aria-hidden
+                >
+                  <UserCircle size={16} className="shrink-0" />
+                  <span>Account</span>
+                </div>
+              ) : (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button
+                      type="button"
+                      className={cn(
+                        "flex items-center gap-1.5",
+                        topBarPillClass,
+                        styles.textColor,
+                        styles.hoverColor,
+                      )}
+                      aria-label="Account menu"
+                      aria-haspopup="menu"
+                    >
+                      <UserCircle size={16} className="shrink-0" />
+                      <span>Account</span>
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent
+                    align="end"
+                    sideOffset={8}
+                    className={downloadsDropdownContentClass}
+                  >
+                    <DropdownMenuItem asChild className={downloadsDropdownItemClass}>
+                      <Link
+                        href="/auth/login"
+                        className="flex cursor-pointer items-center gap-2.5"
+                      >
+                        <LogIn className={downloadsFileIconClass} />
+                        Log in
+                      </Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem asChild className={downloadsDropdownItemClass}>
+                      <Link
+                        href="/auth/register"
+                        className="flex cursor-pointer items-center gap-2.5"
+                      >
+                        <UserPlus className={downloadsFileIconClass} />
+                        Register
+                      </Link>
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              ))}
           </div>
         </div>
 
@@ -505,6 +749,111 @@ export default function CommonHeader({
               />
             )}
 
+            {hasHeaderDownloads &&
+              (useNonInteractiveChrome ? (
+                singleHeaderDownload ? (
+                  <div
+                    className={cn(
+                      "flex max-w-[10rem] shrink-0 items-center gap-1 opacity-60",
+                      topBarPillDisabledClass,
+                      styles.textColor,
+                      "cursor-not-allowed",
+                    )}
+                    aria-hidden
+                  >
+                    <FileText size={16} className="shrink-0" />
+                    <span className="truncate text-xs sm:text-sm">
+                      {singleHeaderDownload.title}
+                    </span>
+                  </div>
+                ) : (
+                  <div
+                    className={cn(
+                      "flex max-w-[9rem] shrink-0 items-center gap-1 opacity-60",
+                      topBarPillDisabledClass,
+                      styles.textColor,
+                      "cursor-not-allowed",
+                    )}
+                    aria-hidden
+                  >
+                    <Download size={16} className="shrink-0" />
+                    <span className="truncate text-xs sm:text-sm">
+                      Downloads
+                    </span>
+                  </div>
+                )
+              ) : singleHeaderDownload ? (
+                <a
+                  href={singleHeaderDownload.href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className={cn(
+                    "flex max-w-[min(100%,11rem)] shrink-0 items-center gap-1 sm:max-w-[15rem]",
+                    topBarPillClass,
+                    styles.textColor,
+                    styles.hoverColor,
+                  )}
+                  onClick={handleLinkClick}
+                >
+                  <FileText
+                    size={16}
+                    className={cn("shrink-0", downloadsFileIconClass)}
+                  />
+                  <span className="truncate text-xs sm:text-sm">
+                    {singleHeaderDownload.title}
+                  </span>
+                </a>
+              ) : multipleHeaderDownloads ? (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button
+                      type="button"
+                      className={cn(
+                        "flex max-w-[9.5rem] shrink-0 items-center gap-1 sm:max-w-none",
+                        topBarPillClass,
+                        styles.textColor,
+                        styles.hoverColor,
+                      )}
+                      aria-label="Downloads"
+                    >
+                      <Download size={16} className="shrink-0" />
+                      <span className="truncate text-xs sm:text-sm">
+                        Downloads
+                      </span>
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent
+                    align="end"
+                    sideOffset={8}
+                    className={downloadsDropdownContentClass}
+                  >
+                    <DropdownMenuLabel className={downloadsDropdownLabelClass}>
+                      Downloads
+                    </DropdownMenuLabel>
+                    <DropdownMenuSeparator
+                      className={downloadsDropdownSeparatorClass}
+                    />
+                    {headerDownloadsList.map((item, idx) => (
+                      <DropdownMenuItem
+                        key={`${item.title}-${idx}`}
+                        asChild
+                        className={downloadsDropdownItemClass}
+                      >
+                        <a
+                          href={item.href}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex cursor-pointer items-center"
+                        >
+                          <FileText className={downloadsFileIconClass} />
+                          <span className="min-w-0 flex-1">{item.title}</span>
+                        </a>
+                      </DropdownMenuItem>
+                    ))}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              ) : null)}
+
             {useNonInteractiveChrome ? (
               <div
                 className={`p-2 ${styles.textColor} opacity-60 cursor-not-allowed`}
@@ -574,34 +923,35 @@ export default function CommonHeader({
             aria-label="Main navigation"
           >
             <div className="flex flex-col divide-y divide-[var(--color-on-header)]/15">
-              {useNonInteractiveChrome ? (
-                <div
-                  className={cn(
-                    mobileNavRowClass,
-                    "cursor-not-allowed opacity-60",
-                  )}
-                >
-                  <span className={mobileNavIconWrap} aria-hidden>
-                    <Calendar />
-                  </span>
-                  {headerData.browseEvent.linkText}
-                </div>
-              ) : (
-                <Link
-                  href={headerData.browseEvent.link}
-                  className={cn(
-                    mobileNavRowClass,
-                    styles.hoverColor,
-                    "transition-colors",
-                  )}
-                  onClick={toggleMobileMenu}
-                >
-                  <span className={mobileNavIconWrap} aria-hidden>
-                    <Calendar />
-                  </span>
-                  {headerData.browseEvent.linkText}
-                </Link>
-              )}
+              {!hideBrowseEvents &&
+                (useNonInteractiveChrome ? (
+                  <div
+                    className={cn(
+                      mobileNavRowClass,
+                      "cursor-not-allowed opacity-60",
+                    )}
+                  >
+                    <span className={mobileNavIconWrap} aria-hidden>
+                      <Calendar />
+                    </span>
+                    {headerData.browseEvent.linkText}
+                  </div>
+                ) : (
+                  <Link
+                    href={headerData.browseEvent.link}
+                    className={cn(
+                      mobileNavRowClass,
+                      styles.hoverColor,
+                      "transition-colors",
+                    )}
+                    onClick={toggleMobileMenu}
+                  >
+                    <span className={mobileNavIconWrap} aria-hidden>
+                      <Calendar />
+                    </span>
+                    {headerData.browseEvent.linkText}
+                  </Link>
+                ))}
 
               {useNonInteractiveChrome ? (
                 <div
@@ -627,6 +977,51 @@ export default function CommonHeader({
                       "justify-start rounded-none py-0",
                     )}
                   />
+                </div>
+              )}
+
+              {hasHeaderDownloads && (
+                <div className="py-3">
+                  <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-[var(--color-on-header)]/55">
+                    Downloads
+                  </p>
+                  <ul className="flex flex-col gap-2">
+                    {(headerDownloads ?? []).map((item, idx) =>
+                      useNonInteractiveChrome ? (
+                        <li
+                          key={`${item.title}-${idx}`}
+                          className={cn(
+                            mobileNavRowClass,
+                            "cursor-not-allowed opacity-60",
+                          )}
+                        >
+                          <span className={mobileNavIconWrap} aria-hidden>
+                            <FileText />
+                          </span>
+                          {item.title}
+                        </li>
+                      ) : (
+                        <li key={`${item.title}-${idx}`}>
+                          <a
+                            href={item.href}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className={cn(
+                              mobileNavRowClass,
+                              styles.hoverColor,
+                              "transition-colors",
+                            )}
+                            onClick={toggleMobileMenu}
+                          >
+                            <span className={mobileNavIconWrap} aria-hidden>
+                              <FileText />
+                            </span>
+                            {item.title}
+                          </a>
+                        </li>
+                      ),
+                    )}
+                  </ul>
                 </div>
               )}
 

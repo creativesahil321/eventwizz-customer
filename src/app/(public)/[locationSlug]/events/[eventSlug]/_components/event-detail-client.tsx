@@ -2,48 +2,35 @@
 
 import { useEventDetail } from "../_lib/hooks";
 import { EventDetail } from "@/services/common/events/type";
-import { useContext, useRef } from "react";
+import { useContext, useMemo, useRef } from "react";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
+import { EventHeroBand } from "@/components/public/event-hero-band";
 
-// Import event components from onboarding flow
+import CommonHeader from "@/components/shared/common-header";
+import FooterSection from "@/app/(public)/vendor/_components/EventListPage/footer";
 import AboutEventSec from "@/app/(on-boarding)/on-boarding/_components/form-preview/_components/About-event-sec";
 import DatesSection from "@/app/(on-boarding)/on-boarding/_components/form-preview/_components/Dates-section";
-import DrinkSection from "@/app/(on-boarding)/on-boarding/_components/form-preview/_components/drink-section";
-import FaqSection from "@/app/(on-boarding)/on-boarding/_components/form-preview/_components/faq-section";
-// import Footer from "@/app/(on-boarding)/on-boarding/_components/form-preview/_components/footer";
-// import Header from "@/app/(on-boarding)/on-boarding/_components/form-preview/_components/header";
-import MenuSection from "@/app/(on-boarding)/on-boarding/_components/form-preview/_components/menu-section";
+import EventGallery from "@/app/(on-boarding)/on-boarding/_components/form-preview/_components/Event-gallery";
 import PackageSec from "@/app/(on-boarding)/on-boarding/_components/form-preview/_components/package-sec";
 import Timeline from "@/app/(on-boarding)/on-boarding/_components/form-preview/_components/Time-line";
-import BrochureSection from "@/app/(on-boarding)/on-boarding/_components/form-preview/_components/brochure-section";
-import CommonHeader from "@/components/shared/common-header";
-import { SiteHeading } from "@/components/public/site-heading";
-import FooterSection from "@/app/(public)/vendor/_components/EventListPage/footer";
-import EventGallery from "@/app/(on-boarding)/on-boarding/_components/form-preview/_components/Event-gallery";
+import {
+  LazyBrochureSection,
+  LazyDrinkSection,
+  LazyFaqSection,
+  LazyMenuSection,
+} from "@/components/public/event-detail-lazy-sections";
 import { ThemeAnimationManager } from "@/components/theme-animations/theme-animation-manager";
 import { CartConflictProvider } from "@/app/(public)/vendor/checkout/_components/cart-conflict-provider";
-import { addCacheBusting } from "@/lib/image-utils";
 import { useCurrencyFormat } from "@/hooks/use-currency-format";
 import { ServerContext } from "@/lib/server-context";
 import { ThemeSchema } from "@/types/theme.types";
 import { normalizeHeadingEmphasis } from "@/lib/heading-emphasis";
-import {
-  heroBandContentPadClass,
-  heroBandVerticalClass,
-  heroBannerStackClass,
-  heroBannerSubheadingClass,
-  normalizeBannerHeadingAlign,
-  normalizeBannerHeadingValign,
-} from "@/lib/banner-heading-align";
+import { normalizeBannerHeadingAlign } from "@/lib/banner-heading-align";
 import { cn } from "@/lib/utils";
-
-function slugToShortLabel(slug: string) {
-  if (!slug?.trim()) return "Events";
-  const first = slug.split("-")[0]?.trim() || slug;
-  if (!first) return "Events";
-  return first.charAt(0).toUpperCase() + first.slice(1).toLowerCase();
-}
+import { buildEventHeaderDownloadLinks } from "@/lib/event-header-downloads";
+import { EVENT_BOOKING_SECTION_CLASSNAME } from "@/lib/event-booking-section-layout";
+import { slugToShortLabel } from "@/lib/slug-short-label";
 
 interface EventDetailClientProps {
   event: EventDetail;
@@ -74,7 +61,6 @@ export default function EventDetailClient({
   const drinkRef = useRef<HTMLDivElement>(null);
   const faqRef = useRef<HTMLDivElement>(null);
   const bookingRef = useRef<HTMLDivElement>(null);
-  const datesSectionRef = useRef<HTMLDivElement>(null);
 
   const heroTitle =
     eventData.event_banner_heading?.trim() ||
@@ -94,17 +80,24 @@ export default function EventDetailClient({
   const bannerAlign = normalizeBannerHeadingAlign(
     vendorTheme?.banner_heading_align,
   );
-  const bannerValign = normalizeBannerHeadingValign(
-    vendorTheme?.banner_heading_valign,
-  );
   const headingEmphasisFromSite =
     vendorTheme?.typography?.headingEmphasis != null
       ? normalizeHeadingEmphasis(vendorTheme.typography.headingEmphasis)
       : undefined;
 
-  const heroStyles = {
-    videoBackground: "absolute inset-0 h-full w-full object-cover",
-  };
+  const pdfDownloadLinks = useMemo(
+    () =>
+      buildEventHeaderDownloadLinks({
+        brochure_pdf: eventData.brochure_pdf,
+        faq_pdf: eventData.faq_pdf,
+        brochure_pdf_2: eventData.brochure_pdf_2,
+      }),
+    [
+      eventData.brochure_pdf,
+      eventData.faq_pdf,
+      eventData.brochure_pdf_2,
+    ],
+  );
 
   return (
     <CartConflictProvider>
@@ -116,124 +109,42 @@ export default function EventDetailClient({
           intensity="medium"
         />
 
-        <CommonHeader variant="default" />
+        <CommonHeader
+          variant="default"
+          headerDownloads={pdfDownloadLinks}
+          hideHeaderPhone
+          compactGuestAuth
+        />
 
-        {/* Hero band + fade into page background; heading uses surface colors over the fade */}
-        <section
-          ref={heroRef}
-          className={cn(
-            "relative mx-auto flex w-full justify-center overflow-hidden",
-            "h-[min(70dvh,760px)] min-h-[400px] max-h-[820px]",
-            heroBandVerticalClass(bannerValign),
-            bannerAlign === "left" &&
-              bannerValign === "center" &&
-              "!items-stretch",
-          )}
-        >
-          <div className="absolute inset-0 overflow-hidden">
-            {eventData.event_banner_video ? (
-              <>
-                {eventData.event_banner_image && (
-                  <div
-                    className={`${heroStyles.videoBackground} scale-105 bg-cover bg-center`}
-                    style={{
-                      backgroundImage: `url(${eventData.event_banner_image})`,
-                    }}
-                  />
-                )}
-                <video
-                  src={eventData.event_banner_video}
-                  poster={eventData.event_banner_image || undefined}
-                  className={cn(heroStyles.videoBackground, "scale-105")}
-                  autoPlay
-                  muted
-                  loop
-                  playsInline
-                  preload="auto"
-                />
-              </>
-            ) : eventData.event_banner_image ? (
-              // eslint-disable-next-line @next/next/no-img-element -- external vendor URLs + cache busting
-              <img
-                src={addCacheBusting(eventData.event_banner_image)}
-                alt={eventData.event_name || "Event banner"}
-                className={cn(heroStyles.videoBackground, "scale-105")}
-              />
-            ) : (
-              <div
-                className="absolute inset-0 bg-gradient-to-br from-[var(--color-surface)] via-[var(--color-background)] to-[color:color-mix(in_srgb,var(--color-primary)_12%,var(--color-background))]"
-                aria-hidden
-              />
-            )}
-            <div
-              className="pointer-events-none absolute inset-0 z-[1] bg-gradient-to-b from-black/60 via-black/35 to-[color:var(--color-background)]"
-              aria-hidden
-            />
-          </div>
-
-          <div
-            className="pointer-events-none absolute left-1/4 top-16 z-[2] h-72 w-72 rounded-full bg-[color:color-mix(in_srgb,var(--color-primary)_18%,transparent)] blur-[100px] md:h-96 md:w-96 md:blur-[120px]"
-            aria-hidden
-          />
-          <div
-            className="pointer-events-none absolute bottom-24 right-1/4 z-[2] h-64 w-64 rounded-full bg-[color:color-mix(in_srgb,var(--color-primary)_10%,transparent)] blur-[90px]"
-            aria-hidden
-          />
-
-          <div
-            className={cn(
-              "relative z-20 max-w-7xl mx-auto w-full overflow-visible px-4",
-              heroBandContentPadClass(bannerValign),
-            )}
-          >
-            <div
+        <EventHeroBand
+          sectionRef={heroRef}
+          title={heroTitle}
+          subHeading={eventData.event_banner_sub_heading || null}
+          accentHint={heroAccentHint}
+          headingEmphasis={headingEmphasisFromSite}
+          bannerHeadingAlign={vendorTheme?.banner_heading_align ?? null}
+          bannerHeadingValign={vendorTheme?.banner_heading_valign ?? null}
+          bannerImage={eventData.event_banner_image || null}
+          bannerVideo={eventData.event_banner_video || null}
+          cacheBustImage
+          imageAlt={eventData.event_name || "Event banner"}
+          beforeTitle={
+            <Link
+              href={`/${locationSlug}`}
               className={cn(
-                heroBannerStackClass(bannerAlign),
-                "overflow-visible",
+                "mb-6 inline-flex items-center gap-1.5 text-sm font-medium transition-all duration-200",
+                "rounded-full px-3 py-1.5 text-white/80",
+                "hover:bg-[var(--color-primary)] hover:text-[var(--color-primary-foreground)] hover:scale-[1.02] hover:shadow-md",
+                bannerAlign === "left" && "-ml-3",
+                bannerAlign === "center" && "mx-auto",
+                bannerAlign === "right" && "ml-auto",
               )}
             >
-              <Link
-                href={`/${locationSlug}`}
-                className={cn(
-                  "mb-6 inline-flex items-center gap-1.5 text-sm font-medium transition-all duration-200",
-                  "rounded-full px-3 py-1.5 text-white/80", // Transparent by default, slightly smaller padding
-                  "hover:bg-[var(--color-primary)] hover:text-[var(--color-primary-foreground)] hover:scale-[1.02] hover:shadow-md", // Solid hover style
-                  bannerAlign === "left" && "-ml-3", // Offset left padding for left alignment
-                  bannerAlign === "center" && "mx-auto",
-                  bannerAlign === "right" && "ml-auto",
-                )}
-              >
-                <ArrowLeft className="h-4 w-4 shrink-0" aria-hidden />
-                Back to {slugToShortLabel(locationSlug)}
-              </Link>
-              {/* onDark: light copy + text-shadow over imagery (onSurface was invisible on dark photos) */}
-              <SiteHeading
-                level={1}
-                title={heroTitle}
-                accentHint={heroAccentHint}
-                emphasis={headingEmphasisFromSite}
-                variant="onDark"
-                align={bannerAlign}
-                className={cn(
-                  "mb-4 font-black !text-3xl !leading-[0.98] tracking-tight sm:!text-4xl md:!text-5xl lg:!text-6xl",
-                  bannerAlign === "left"
-                    ? "max-w-[min(100%,28rem)] sm:max-w-xl md:max-w-2xl lg:max-w-3xl"
-                    : "max-w-4xl",
-                )}
-              />
-              {eventData.event_banner_sub_heading ? (
-                <p
-                  className={cn(
-                    "max-w-2xl text-base leading-relaxed text-white/85 sm:text-lg md:text-xl",
-                    heroBannerSubheadingClass(bannerAlign),
-                  )}
-                >
-                  {eventData.event_banner_sub_heading}
-                </p>
-              ) : null}
-            </div>
-          </div>
-        </section>
+              <ArrowLeft className="h-4 w-4 shrink-0" aria-hidden />
+              Back to {slugToShortLabel(locationSlug)}
+            </Link>
+          }
+        />
 
         {/* About Section */}
         <div ref={aboutRef}>
@@ -242,7 +153,7 @@ export default function EventDetailClient({
             about_event_sub_heading={eventData.about_event_sub_heading}
             about_event_description={eventData.about_event_description}
             headingEmphasis={headingEmphasisFromSite}
-            aboutHeadingAccentHint={eventData.event_banner_heading_accent}
+            aboutHeadingAccentHint={heroAccentHint}
           />
         </div>
 
@@ -279,7 +190,7 @@ export default function EventDetailClient({
         <div
           ref={bookingRef}
           id="booking"
-          className="mx-auto max-w-7xl px-4 py-8 md:py-12"
+          className={EVENT_BOOKING_SECTION_CLASSNAME}
         >
           <DatesSection
             dates={eventData.dates}
@@ -304,7 +215,7 @@ export default function EventDetailClient({
         {/* Menu Section */}
         {eventData.menus && eventData.menus.length > 0 && (
           <div ref={menuRef}>
-            <MenuSection
+            <LazyMenuSection
               menu_title={eventData.menu_title}
               menu_description={eventData.menu_description}
               menus={eventData.menus}
@@ -321,7 +232,7 @@ export default function EventDetailClient({
         {/* Drink Section */}
         {eventData.packages && eventData.packages.length > 0 && (
           <div ref={drinkRef}>
-            <DrinkSection
+            <LazyDrinkSection
               title={eventData.drink_title}
               description={eventData.drink_description}
               packages={(eventData.packages ?? []).map((pkg) => ({
@@ -332,8 +243,8 @@ export default function EventDetailClient({
             />
           </div>
         )}
-        <div ref={datesSectionRef}>
-          <BrochureSection
+        <div>
+          <LazyBrochureSection
             showMapImmediately
             location={{
               title: "EVENT LOCATION",
@@ -344,32 +255,10 @@ export default function EventDetailClient({
               latitude: eventData.lat,
               longitude: eventData.long,
             }}
-            downloads={[
-              ...(eventData.brochure_pdf
-                ? [
-                    {
-                      title: "Event Details",
-                      download_link: [eventData.brochure_pdf],
-                    },
-                  ]
-                : []),
-              ...(eventData.faq_pdf
-                ? [
-                    {
-                      title: "FAQ Details",
-                      download_link: [eventData.faq_pdf],
-                    },
-                  ]
-                : []),
-              ...(eventData.brochure_pdf_2
-                ? [
-                    {
-                      title: "Event Flayer",
-                      download_link: [eventData.brochure_pdf_2],
-                    },
-                  ]
-                : []),
-            ]}
+            downloads={pdfDownloadLinks.map((d) => ({
+              title: d.title,
+              download_link: [d.href],
+            }))}
             price={{
               title: "PRICES FROM",
               description: `${formatPriceUnit(
@@ -384,7 +273,7 @@ export default function EventDetailClient({
         {/* FAQ Section */}
         {eventData.faqs && eventData.faqs.length > 0 && (
           <div ref={faqRef}>
-            <FaqSection faqs={eventData.faqs} />
+            <LazyFaqSection faqs={eventData.faqs} />
           </div>
         )}
 

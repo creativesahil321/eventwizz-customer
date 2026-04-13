@@ -10,6 +10,7 @@ import {
   getSubdomainFromDomain,
   fetchServerTheme,
 } from "@/lib/server-theme";
+import { ThemeSchema } from "@/types/theme.types";
 
 export default async function OnboardingLayout({
   children,
@@ -79,7 +80,7 @@ export default async function OnboardingLayout({
   const themeToUse = vendorTheme || defaultTheme;
 
   return (
-    <ServerContextProvider value={{ theme: themeToUse, host, subdomain }}>
+    <ServerContextProvider value={{ theme: themeToUse as unknown as ThemeSchema, host, subdomain }}>
       <section
         className={cn(
           "flex min-h-screen w-full flex-col",

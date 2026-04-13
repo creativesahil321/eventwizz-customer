@@ -27,21 +27,22 @@ import { PreviewThemeCustomizer } from "@/components/preview/preview-theme-custo
 import FooterSection from "@/app/(public)/vendor/_components/EventListPage/footer";
 import HeroBanner from "@/app/(public)/vendor/_components/EventListPage/hero-banner";
 import ExperienceSection from "@/app/(public)/vendor/_components/EventListPage/experience";
-import PopularEvents from "@/app/(public)/vendor/_components/EventListPage/popular-event";
-import UpcomingEvents from "@/app/(public)/vendor/_components/EventListPage/upcoming-event";
-import RecentEventsGlimpse from "@/app/(public)/vendor/_components/EventListPage/recent-event";
 import ContactFormSection from "@/app/(public)/vendor/_components/EventListPage/contact-form-section";
 
 import "@/app/(public)/[locationSlug]/events/[eventSlug]/event-detail.css";
 import { ThemeAnimationManager } from "@/components/theme-animations/theme-animation-manager";
 import { themeDetectionFromOnboardingStepThree } from "@/lib/theme-detection-source";
+import { headerLinksFromDownloadItems } from "@/lib/event-header-downloads";
+import { EVENT_BOOKING_SECTION_CLASSNAME } from "@/lib/event-booking-section-layout";
+import { EventHeroBand } from "@/components/public/event-hero-band";
+import { LocationMarketingBody } from "@/components/public/location-marketing-sections";
+import { Image as ImageIcon } from "lucide-react";
 
 // Lazy load components - only import what's actually used
 const BrochureSection = lazy(() => import("./_components/brochure-section"));
 const DrinkSection = lazy(() => import("./_components/drink-section"));
 const FaqSection = lazy(() => import("./_components/faq-section"));
 const AboutEventSec = lazy(() => import("./_components/About-event-sec"));
-const EventHeroSec = lazy(() => import("./_components/Event-hero-sec"));
 const MenuSection = lazy(() => import("./_components/menu-section"));
 const Timeline = lazy(() => import("./_components/Time-line"));
 const PackageSection = lazy(() => import("./_components/package-sec"));
@@ -49,7 +50,6 @@ const DatesSection = lazy(() => import("./_components/Dates-section"));
 const EventGallery = lazy(() => import("./_components/Event-gallery"));
 
 // Component loaders
-const BannerLoader = () => <Skeleton className="w-full h-64 rounded-lg" />;
 const SectionLoader = () => (
   <div className="space-y-4 my-8">
     <Skeleton className="h-8 w-48" />
@@ -171,17 +171,13 @@ export default function FormPreview() {
     };
   }, [tryThemePreviewValues, activeStep]);
 
-  // Build downloads array for preview
-  const buildDownloadsArray = (): Array<{
-    title: string;
-    download_link: string[];
-  }> => {
+  // Brochure downloads — same data drives section + `CommonHeader` (single pill vs dropdown).
+  const downloadsArray = useMemo(() => {
     const downloads: Array<{
       title: string;
       download_link: string[];
     }> = [];
 
-    // Add downloads from the downloads array (main source)
     if (formState.stepEight?.downloads?.length) {
       downloads.push(
         ...formState.stepEight.downloads.map(
@@ -201,23 +197,13 @@ export default function FormPreview() {
       );
     }
 
-    // Add individual PDF fields as fallback (for backward compatibility)
     const individualPdfs: Array<{
       field: File | string | null | undefined;
       title: string;
     }> = [
-      {
-        field: formState.stepEight?.brochure_pdf,
-        title: "Event Details",
-      },
-      {
-        field: formState.stepEight?.brochure_pdf_2,
-        title: "Event Flyer",
-      },
-      {
-        field: formState.stepEight?.faq_pdf,
-        title: "FAQ Details",
-      },
+      { field: formState.stepEight?.brochure_pdf, title: "Event brochure" },
+      { field: formState.stepEight?.brochure_pdf_2, title: "Event Flyer" },
+      { field: formState.stepEight?.faq_pdf, title: "FAQ Details" },
     ];
 
     individualPdfs.forEach(({ field, title }) => {
@@ -232,9 +218,12 @@ export default function FormPreview() {
     });
 
     return downloads;
-  };
+  }, [formState.stepEight]);
 
-  const downloadsArray = buildDownloadsArray();
+  const previewHeaderDownloads = useMemo(
+    () => headerLinksFromDownloadItems(downloadsArray),
+    [downloadsArray],
+  );
 
   // Create refs for scrollable sections
   const headerRef = useRef<HTMLDivElement>(null);
@@ -242,7 +231,7 @@ export default function FormPreview() {
   const aboutRef = useRef<HTMLDivElement>(null);
   const packageRef = useRef<HTMLDivElement>(null);
   const galleryRef = useRef<HTMLDivElement>(null);
-  const eventHeroRef = useRef<HTMLDivElement>(null);
+  const eventHeroRef = useRef<HTMLDivElement | null>(null);
   const aboutEventRef = useRef<HTMLDivElement>(null);
   const datesRef = useRef<HTMLDivElement>(null);
   const timelineRef = useRef<HTMLDivElement>(null);
@@ -509,47 +498,42 @@ export default function FormPreview() {
           />
         </div>
 
-        <div className={mainBandClass} style={mainBandStyle}>
-          <div
-            ref={aboutRef}
-            className={`transition-all duration-300 ${
-              activeField &&
-              (activeField.includes("about_title") ||
-                activeField.includes("about_description") ||
-                activeField.includes("about_link_title"))
-                ? "ring-2 ring-primary ring-opacity-50"
-                : ""
-            }`}
-          >
-            <ExperienceSection
-              aboutTitle={formState.stepTwo?.about_title || ""}
-              aboutDescription={formState.stepTwo?.about_description || ""}
-              aboutLinkTitle={formState.stepTwo?.about_link_title || ""}
-              aboutCtaLink={
-                tv.about_cta_link?.trim() ||
-                themeTyped?.about_cta_link?.trim() ||
-                null
-              }
-            />
-          </div>
-
-          <PopularEvents
-            events={[]}
-            sectionTitle={sectionPopular}
-            locationSlug=""
-            locationLabel={venueLabel}
-          />
-          <UpcomingEvents
-            events={[]}
-            sectionTitle={sectionUpcoming}
-            locationSlug=""
-            locationLabel={venueLabel}
-          />
-          <RecentEventsGlimpse
-            galleryImages={[]}
-            galleryTitle={galleryTitle}
-          />
-        </div>
+        <LocationMarketingBody
+          className={mainBandClass}
+          style={mainBandStyle}
+          experience={
+            <div
+              ref={aboutRef}
+              className={`transition-all duration-300 ${
+                activeField &&
+                (activeField.includes("about_title") ||
+                  activeField.includes("about_description") ||
+                  activeField.includes("about_link_title"))
+                  ? "ring-2 ring-primary ring-opacity-50"
+                  : ""
+              }`}
+            >
+              <ExperienceSection
+                aboutTitle={formState.stepTwo?.about_title || ""}
+                aboutDescription={formState.stepTwo?.about_description || ""}
+                aboutLinkTitle={formState.stepTwo?.about_link_title || ""}
+                aboutCtaLink={
+                  tv.about_cta_link?.trim() ||
+                  themeTyped?.about_cta_link?.trim() ||
+                  null
+                }
+              />
+            </div>
+          }
+          latestEvents={[]}
+          upcomingEvents={[]}
+          popularSectionTitle={sectionPopular}
+          upcomingSectionTitle={sectionUpcoming}
+          galleryTitle={galleryTitle}
+          galleryImages={[]}
+          locationSlug=""
+          locationLabel={venueLabel}
+        />
 
         <ContactFormSection />
 
@@ -596,9 +580,9 @@ export default function FormPreview() {
           contact_number={formState.stepOne?.contact_number || ""}
           logo={formState.stepTwo?.logo || null}
           variant="default"
+          headerDownloads={previewHeaderDownloads}
         />
 
-        {/* Event Hero with Floating Header */}
         <div
           ref={eventHeroRef}
           className={`transition-all duration-300 ${getHighlightClass(
@@ -606,23 +590,36 @@ export default function FormPreview() {
             "banner",
           )}`}
         >
-          <Suspense fallback={<BannerLoader />}>
-            <EventHeroSec
-              heading={
-                formState.stepThree?.event_banner_heading?.trim() ||
-                formState.stepThree?.event_name?.trim() ||
-                ""
-              }
-              image={formState.stepThree?.event_banner_image || null}
-              video={formState.stepThree?.event_banner_video || null}
-              banner_sub_heading={
-                formState.stepThree?.event_banner_sub_heading || ""
-              }
-              contact_number={formState.stepOne?.contact_number || ""}
-              logo={formState.stepTwo?.logo || null}
-              {...(tryHeroPreviewProps ?? {})}
-            />
-          </Suspense>
+          <EventHeroBand
+            title={
+              formState.stepThree?.event_banner_heading?.trim() ||
+              formState.stepThree?.event_name?.trim() ||
+              ""
+            }
+            subHeading={
+              formState.stepThree?.event_banner_sub_heading?.trim() || null
+            }
+            bannerImage={formState.stepThree?.event_banner_image ?? null}
+            bannerVideo={formState.stepThree?.event_banner_video ?? null}
+            bannerHeadingAlign={
+              tryHeroPreviewProps?.bannerHeadingAlign ?? null
+            }
+            bannerHeadingValign={
+              tryHeroPreviewProps?.bannerHeadingValign ?? null
+            }
+            accentHint={tryHeroPreviewProps?.bannerHeadingAccent ?? null}
+            headingEmphasis={
+              tryHeroPreviewProps?.headingEmphasis ?? undefined
+            }
+            emptyMediaSlot={
+              <div className="flex flex-col items-center gap-2">
+                <ImageIcon size={40} className="text-white/40" aria-hidden />
+                <span className="text-sm text-white/60">
+                  Add a cover image or video above
+                </span>
+              </div>
+            }
+          />
         </div>
 
         {/* About Event */}
@@ -710,7 +707,7 @@ export default function FormPreview() {
         <div
           id="booking"
           ref={datesRef}
-          className={`transition-all duration-300 ${getHighlightClass(
+          className={`${EVENT_BOOKING_SECTION_CLASSNAME} transition-all duration-300 ${getHighlightClass(
             5,
             "dates",
           )}`}
@@ -835,13 +832,14 @@ export default function FormPreview() {
 
   return (
     <PreviewProvider isPreviewMode={true}>
-      <section className="relative isolate bg-background flex h-full w-full flex-col overflow-hidden">
+      <section className="relative isolate flex h-full min-h-0 w-full flex-col overflow-hidden bg-background">
         <div
           ref={previewContainerRef}
-          className="max-w-full h-[calc(100vh-120px)] flex-1 overflow-y-auto overflow-x-hidden scroll-smooth"
+          className="max-w-full min-h-0 flex-1 overflow-y-auto overflow-x-hidden scroll-smooth"
         >
-          {/* No transform here — Tailwind `scale-*` sets `transform` and traps `position:fixed` (Try theme tab) inside this box. */}
-          <div className="w-full max-w-full scale-100 origin-top overflow-x-hidden">
+          {/* No transform here — Tailwind `scale-*` sets `transform` and traps `position:fixed` (Try theme tab) inside this box.
+              Avoid overflow-x-hidden on this inner wrapper: with overflow-y visible, CSS forces overflow-y:auto here → extra scrollbar. */}
+          <div className="w-full min-h-0 min-w-0 max-w-full origin-top scale-100">
             {ONBOARDING_THEME_PREVIEW_STEPS.has(activeStep) &&
             tryThemePreviewValues ? (
               <div
