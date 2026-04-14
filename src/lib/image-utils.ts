@@ -3,45 +3,40 @@
  */
 
 /**
- * Adds cache busting query parameter to image URL
- * @param url - The image URL
- * @param updated_at - Optional timestamp (ISO string or number) to use for versioning
- * @returns URL with cache busting parameter
+ * Adds a `v` query param for cache busting when `updated_at` is provided.
+ * Without `updated_at`, returns `url` unchanged so image `src` stays stable across renders.
  */
 export function addCacheBusting(url: string | null | undefined, updated_at?: string | number | null): string {
   if (!url) return "";
-  
+
   try {
     // If URL is a data URL or blob, return as-is (local preview)
     if (url.startsWith("data:") || url.startsWith("blob:")) {
       return url;
     }
-    
-    // Parse URL to check if it already has query params
-    const urlObj = new URL(url, window.location.origin);
-    
-    // Determine cache busting value
-    let cacheValue: string;
-    if (updated_at) {
-      // Use updated_at timestamp if available
-      cacheValue = typeof updated_at === 'number' 
-        ? updated_at.toString() 
-        : new Date(updated_at).getTime().toString();
-    } else {
-      // Fallback to current timestamp
-      cacheValue = Date.now().toString();
+
+    // Without a version, keep the URL stable. Using Date.now() here ran on every React
+    // render and forced constant image reloads (layout shift / flicker in headers, etc.).
+    if (updated_at == null || updated_at === "") {
+      return url;
     }
-    
-    // Add or update the version parameter
-    urlObj.searchParams.set('v', cacheValue);
-    
+
+    const urlObj = new URL(url, window.location.origin);
+    const cacheValue =
+      typeof updated_at === "number"
+        ? updated_at.toString()
+        : new Date(updated_at).getTime().toString();
+    urlObj.searchParams.set("v", cacheValue);
     return urlObj.toString();
-  } catch (error) {
-    // If URL parsing fails, append query param manually
-    const separator = url.includes('?') ? '&' : '?';
-    const cacheValue = updated_at 
-      ? (typeof updated_at === 'number' ? updated_at : new Date(updated_at).getTime())
-      : Date.now();
+  } catch {
+    if (updated_at == null || updated_at === "") {
+      return url;
+    }
+    const separator = url.includes("?") ? "&" : "?";
+    const cacheValue =
+      typeof updated_at === "number"
+        ? updated_at
+        : new Date(updated_at).getTime();
     return `${url}${separator}v=${cacheValue}`;
   }
 }
@@ -52,23 +47,19 @@ export function addCacheBusting(url: string | null | undefined, updated_at?: str
  */
 export function addCacheBustingSSR(url: string | null | undefined, updated_at?: string | number | null): string {
   if (!url) return "";
-  
-  // If URL is a data URL or blob, return as-is
+
   if (url.startsWith("data:") || url.startsWith("blob:")) {
     return url;
   }
-  
-  // Determine cache busting value
-  let cacheValue: string;
-  if (updated_at) {
-    cacheValue = typeof updated_at === 'number' 
-      ? updated_at.toString() 
-      : new Date(updated_at).getTime().toString();
-  } else {
-    cacheValue = Date.now().toString();
+
+  if (updated_at == null || updated_at === "") {
+    return url;
   }
-  
-  // Simple query param append
-  const separator = url.includes('?') ? '&' : '?';
+
+  const cacheValue =
+    typeof updated_at === "number"
+      ? updated_at.toString()
+      : new Date(updated_at).getTime().toString();
+  const separator = url.includes("?") ? "&" : "?";
   return `${url}${separator}v=${cacheValue}`;
 }

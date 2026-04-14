@@ -7,9 +7,12 @@ import {
 import { staffManagementService } from "@/services/common/staff-management/staff-management.service";
 import {
   CreateStaffPayload,
+  StaffMember,
+  StaffResponse,
   StaffSearchParams,
   UpdateStaffPayload,
 } from "@/services/common/staff-management/type";
+import { normalizeStaffApiPayload } from "@/services/common/staff-management/normalize-staff";
 
 // Query keys for staff management
 export const staffKeys = {
@@ -26,13 +29,30 @@ export const staffKeys = {
  */
 export const useStaff = (
   params?: StaffSearchParams,
-  options?: UseQueryOptions<any>
+  options?: Omit<
+    UseQueryOptions<StaffResponse, Error>,
+    "queryKey" | "queryFn"
+  >
 ) => {
   return useQuery({
     queryKey: staffKeys.list(params || {}),
     queryFn: async () => {
       const response = await staffManagementService.getStaff(params);
-      return response;
+      if (!response?.status) {
+        throw new Error(
+          typeof response?.message === "string"
+            ? response.message
+            : "Failed to fetch staff members"
+        );
+      }
+      const raw = response.data;
+      const list = Array.isArray(raw)
+        ? raw.map((row) => normalizeStaffApiPayload(row))
+        : [];
+      return {
+        ...response,
+        data: list,
+      };
     },
     ...options,
   });
@@ -41,13 +61,27 @@ export const useStaff = (
 /**
  * Hook to fetch a specific staff member by ID
  */
-export const useStaffById = (id: number, options?: UseQueryOptions<any>) => {
+export const useStaffById = (
+  id: number,
+  options?: Omit<
+    UseQueryOptions<StaffMember, Error>,
+    "queryKey" | "queryFn"
+  >
+) => {
   return useQuery({
     queryKey: staffKeys.detail(id),
     queryFn: async () => {
       const response = await staffManagementService.getStaffById(id);
-      return response;
+      if (!response?.status || response.data == null) {
+        throw new Error(
+          typeof response?.message === "string"
+            ? response.message
+            : "Failed to fetch staff member"
+        );
+      }
+      return normalizeStaffApiPayload(response.data);
     },
+    enabled: Number.isFinite(id) && id > 0,
     ...options,
   });
 };

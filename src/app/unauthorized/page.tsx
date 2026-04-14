@@ -4,9 +4,31 @@ import { Shell } from "@/components/shell";
 import { Button } from "@/components/ui/button";
 import { AlertTriangle, ArrowLeft } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { useSession } from "next-auth/react";
+import { useMemo } from "react";
+import { getFirstAccessibleVendorPath } from "@/config/menus/first-accessible-vendor-route";
 
 export default function UnauthorizedPage() {
   const router = useRouter();
+  const { data: session, status } = useSession();
+
+  const homeHref = useMemo(() => {
+    const at = session?.user?.account_type;
+    if (at === "vendor") {
+      return getFirstAccessibleVendorPath(
+        Array.isArray(session?.user?.permissions)
+          ? session.user.permissions
+          : undefined,
+      );
+    }
+    if (at === "admin" || at === "customer") {
+      return `/${at}/dashboard`;
+    }
+    return "/auth/login";
+  }, [session]);
+
+  const vendorHasNoMenuAccess =
+    session?.user?.account_type === "vendor" && homeHref === "/unauthorized";
 
   const goBack = () => {
     router.back();
@@ -43,10 +65,15 @@ export default function UnauthorizedPage() {
 
             <Button
               variant="event-primary"
-              onClick={() => router.push("/vendor/dashboard")}
+              disabled={status === "loading" || vendorHasNoMenuAccess}
+              onClick={() => router.push(homeHref)}
               className="w-full sm:w-auto"
             >
-              Go to Dashboard
+              {vendorHasNoMenuAccess
+                ? "No accessible pages"
+                : session?.user?.account_type === "vendor"
+                  ? "Go to first allowed page"
+                  : "Go to Dashboard"}
             </Button>
           </div>
         </div>

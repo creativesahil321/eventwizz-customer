@@ -118,6 +118,7 @@ export default async function RootLayout({
     <html
       lang="en"
       suppressHydrationWarning={true}
+      className="[scrollbar-gutter:stable]"
       data-heading-emphasis={normalizeHeadingEmphasis(
         initialTheme?.typography?.headingEmphasis,
       )}

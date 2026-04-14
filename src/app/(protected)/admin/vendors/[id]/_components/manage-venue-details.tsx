@@ -384,7 +384,7 @@ export function ManageVenueDetails({ venue }: ManageVenueDetailsProps) {
       </Card>
 
       {/* ── 2. Two columns: consolidated left cards, right card ── */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start lg:items-stretch">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
         {/* Left: Contact & Business + Events & Notes (2 merged cards) */}
         <div className="lg:col-span-2 space-y-6 lg:min-h-0">
           <Card className="bg-white border-[var(--color-border)] shadow-sm">
@@ -685,8 +685,8 @@ export function ManageVenueDetails({ venue }: ManageVenueDetailsProps) {
           </Card>
         </div>
 
-        {/* Right: match column height to left; spacer fills gap below cards (no empty card stretch) */}
-        <div className="flex min-h-0 flex-col gap-4 lg:h-full">
+        {/* Right: stack cards with normal spacing (no flex spacer — avoid huge gap vs tall left column) */}
+        <div className="flex min-h-0 flex-col gap-6">
           <Card className="shrink-0 bg-white border-[var(--color-border)] shadow-sm overflow-hidden">
             {/* Event Location Address section */}
             <CardHeader className="space-y-0 pb-5">
@@ -793,14 +793,7 @@ export function ManageVenueDetails({ venue }: ManageVenueDetailsProps) {
             </div>
           </Card>
 
-          {/* Grows on large screens so Venue commission lines up with the bottom of the left column */}
-          <div
-            className="hidden min-h-0 flex-1 basis-0 lg:block"
-            aria-hidden
-          />
-          <div className="shrink-0">
-            <VenueCommissionCard venue={venue} />
-          </div>
+          <VenueCommissionCard venue={venue} />
         </div>
       </div>
 

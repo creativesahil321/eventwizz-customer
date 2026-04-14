@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -32,6 +32,7 @@ import { UpdateStaffPayload } from "@/services/common/staff-management/type";
 import { Role } from "@/services/common/manage-roles/type";
 import { Switch } from "@/components/ui/switch";
 import { editStaffSchema, EditStaffFormValues } from "../_lib/schemas";
+import { staffManagementListPath } from "../_lib/staff-routes";
 import { LocationMultiSelect } from "./location-multi-select";
 import { useVendorLocationsList } from "@/app/(protected)/vendor/venue-locations/_lib/queries";
 
@@ -46,6 +47,8 @@ export default function EditStaffForm({
   hideLocationSelection = false,
 }: EditStaffFormProps) {
   const router = useRouter();
+  const pathname = usePathname() ?? "";
+  const staffListHref = staffManagementListPath(pathname);
 
   // Fetch roles from the API
   const { data: rolesData, isLoading: isLoadingRoles } = useRoles();
@@ -53,9 +56,9 @@ export default function EditStaffForm({
   // Locations: same API/cache as header dropdown and venue-locations page (vendor only)
   const { locations, isLoading: isLoadingLocations } = useVendorLocationsList();
 
-  // Fetch staff data
+  // Fetch staff data (query unwraps + normalizes API payload — same pattern as useRoles)
   const {
-    data: staffData,
+    data: staff,
     isLoading: isLoadingStaff,
     isError,
     error,
@@ -80,53 +83,41 @@ export default function EditStaffForm({
     },
   });
 
-  // Populate form when staff data is loaded
+  const { reset } = form;
+
+  // Populate form when staff data is loaded (avoid `form` in deps — unstable reference can block or fight reset)
   useEffect(() => {
-    if (staffData?.data) {
-      const staff = staffData.data;
+    if (!staff) return;
 
-      // Prefer vendor_location_ids; else derive from locations (single-staff API returns locations as { id, city }[])
-      let locationIds: number[] = [];
-      if (!hideLocationSelection) {
-        if (staff.vendor_location_ids?.length) {
-          locationIds = staff.vendor_location_ids.filter(
-            (id: number) => id !== 0,
-          );
-        } else if (Array.isArray(staff.locations) && staff.locations.length > 0) {
-          const first = staff.locations[0];
-          if (typeof first === "object" && first !== null && "id" in first) {
-            locationIds = (staff.locations as { id: number }[]).map(
-              (l) => l.id,
-            );
-          }
-        }
-        if (
-          locationIds.length === 0 &&
-          staff.vendor_location_id != null &&
-          staff.vendor_location_id !== 0
-        ) {
-          locationIds = [staff.vendor_location_id];
-        }
+    // Prefer vendor_location_ids when present; else use `locations[].id` from GET show/index.
+    let locationIds: number[] = [];
+    if (!hideLocationSelection) {
+      if (staff.vendor_location_ids?.length) {
+        locationIds = staff.vendor_location_ids.filter((id) => id !== 0);
+      } else if (staff.locations.length > 0) {
+        locationIds = staff.locations.map((l) => l.id);
       }
-
-      form.reset({
-        first_name: staff.first_name,
-        last_name: staff.last_name,
-        email: staff.email,
-        phone: staff.phone || "",
-        role_id: staff.role_id,
-        vendor_location_ids: locationIds,
-        status: staff.status,
-        password: "",
-        confirmPassword: "",
-      });
-
-      form.setValue("role_id", staff.role_id);
-      if (!hideLocationSelection) {
-        form.setValue("vendor_location_ids", locationIds);
+      if (
+        locationIds.length === 0 &&
+        staff.vendor_location_id != null &&
+        staff.vendor_location_id !== 0
+      ) {
+        locationIds = [staff.vendor_location_id];
       }
     }
-  }, [staffData, form]);
+
+    reset({
+      first_name: staff.first_name,
+      last_name: staff.last_name,
+      email: staff.email,
+      phone: staff.phone,
+      role_id: staff.role_id,
+      vendor_location_ids: locationIds,
+      status: staff.status,
+      password: "",
+      confirmPassword: "",
+    });
+  }, [staff, hideLocationSelection, reset]);
 
   // Form submission handler
   function onSubmit(values: EditStaffFormValues) {
@@ -156,7 +147,7 @@ export default function EditStaffForm({
       },
       {
         onSuccess: () => {
-          router.push("/vendor/staff-management");
+          router.push(staffListHref);
         },
         onError: (error: unknown) => {
           if (error && typeof error === "object" && "errors" in error) {
@@ -225,7 +216,7 @@ export default function EditStaffForm({
 
         <Button
           variant="ghost"
-          onClick={() => router.push("/vendor/staff-management")}
+          onClick={() => router.push(staffListHref)}
           className="mb-4 pl-0 text-[var(--color-primary)]"
         >
           <ArrowLeft className="mr-2 h-4 w-4" />
@@ -413,7 +404,9 @@ export default function EditStaffForm({
                             }
                           }
                         }}
-                        value={field.value ? field.value.toString() : undefined}
+                        value={
+                          field.value > 0 ? field.value.toString() : undefined
+                        }
                         disabled={isLoadingRoles}
                       >
                         <FormControl>
@@ -571,7 +564,7 @@ export default function EditStaffForm({
               <Button
                 type="button"
                 variant="outline"
-                onClick={() => router.push("/vendor/staff-management")}
+                onClick={() => router.push(staffListHref)}
                 disabled={isSubmitting}
                 className="w-full sm:w-auto"
               >

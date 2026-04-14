@@ -2,17 +2,28 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft } from "lucide-react";
 import { useSitePreviewStore } from "@/store/site-preview.store";
 import { SitePreview } from "@/app/(protected)/_shared/sites-essentials/_components/site-preview";
 import { SiteEssentialsFormValues } from "@/app/(protected)/_shared/sites-essentials/_lib/schema";
+import {
+  siteEssentialsKeys,
+  useSiteEssentialsMutation,
+} from "@/app/(protected)/_shared/sites-essentials/_lib/queries";
 import { Skeleton } from "@/components/ui/skeleton";
 import { PreviewProvider } from "@/contexts/preview-context";
 import { PreviewThemeCustomizer } from "@/components/preview/preview-theme-customizer";
+import { themeKeys } from "@/hooks/use-theme-query";
+import { useToast } from "@/components/ui/use-toast";
 
 export default function SitePreviewPage() {
   const router = useRouter();
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+  const { mutateAsync: saveSiteEssentials, isPending: isSavingTheme } =
+    useSiteEssentialsMutation();
   const { previewData, setPreviewData } = useSitePreviewStore();
   const [isLoading, setIsLoading] = useState(true);
   const [formData, setFormData] = useState<SiteEssentialsFormValues | null>(
@@ -64,6 +75,46 @@ export default function SitePreviewPage() {
   const handleGoBack = () => {
     router.back();
   };
+
+  /** Same API as Site Essentials → Save: persists Try theme tweaks (colors, fonts, hero layout). */
+  const handleSaveTheme = useCallback(async () => {
+    if (!formData) return;
+    try {
+      await saveSiteEssentials({
+        ...formData,
+        _method: "PATCH",
+      } as Partial<SiteEssentialsFormValues> & { _method: "PATCH" });
+      await queryClient.invalidateQueries({ queryKey: themeKeys.all });
+      await queryClient.invalidateQueries({
+        queryKey: siteEssentialsKeys.details(),
+      });
+      try {
+        setPreviewData(structuredClone(formData));
+      } catch {
+        setPreviewData(JSON.parse(JSON.stringify(formData)));
+      }
+      router.refresh();
+      toast({
+        title: "Theme saved",
+        description:
+          "Site Essentials were updated. Live site and previews will use these colors and fonts.",
+      });
+    } catch {
+      toast({
+        title: "Could not save theme",
+        description:
+          "Open Site Essentials and use Save there, or try again in a moment.",
+        variant: "destructive",
+      });
+    }
+  }, [
+    formData,
+    queryClient,
+    router,
+    saveSiteEssentials,
+    setPreviewData,
+    toast,
+  ]);
 
   if (isLoading) {
     return (
@@ -152,6 +203,9 @@ export default function SitePreviewPage() {
           values={formData}
           onValuesChange={handlePreviewValuesChange}
           brandName={formData.name?.trim() || "Site preview"}
+          onSaveTheme={handleSaveTheme}
+          isSavingTheme={isSavingTheme}
+          sheetDescription="Tap a font or color to preview, then Save theme to publish—same as Save on Site Essentials."
         />
 
         {/* Preview chrome: Back button in its own layer so it doesn't overlap header */}

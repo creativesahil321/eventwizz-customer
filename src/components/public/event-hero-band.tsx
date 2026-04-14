@@ -249,7 +249,9 @@ export function EventHeroBand({
             variant="onDark"
             align={bannerAlign}
             className={cn(
-              "mb-4 font-black !text-3xl !leading-[0.98] tracking-tight sm:!text-4xl md:!text-5xl lg:!text-6xl",
+              "mb-4 text-pretty font-black tracking-tight",
+              /* Fluid type between phone and desktop (replaces stepped 3xl→6xl). */
+              "!text-[clamp(1.5rem,4.25vw+0.75rem,3.75rem)] !leading-[0.98]",
               bannerAlign === "left"
                 ? "max-w-[min(100%,28rem)] sm:max-w-xl md:max-w-2xl lg:max-w-3xl"
                 : "max-w-4xl",

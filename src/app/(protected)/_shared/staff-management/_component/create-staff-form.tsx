@@ -1,6 +1,6 @@
 "use client";
 
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -31,6 +31,7 @@ import { useRoles } from "@/app/(protected)/_shared/manage-roles/_lib/queries";
 import { CreateStaffPayload } from "@/services/common/staff-management/type";
 import { Role } from "@/services/common/manage-roles/type";
 import { createStaffSchema, CreateStaffFormValues } from "../_lib/schemas";
+import { staffManagementListPath } from "../_lib/staff-routes";
 import { useVendorLocationsList } from "@/app/(protected)/vendor/venue-locations/_lib/queries";
 
 interface CreateStaffFormProps {
@@ -42,6 +43,8 @@ export default function CreateStaffForm({
   hideLocationSelection = false,
 }: CreateStaffFormProps) {
   const router = useRouter();
+  const pathname = usePathname() ?? "";
+  const staffListHref = staffManagementListPath(pathname);
 
   // Fetch roles from the API
   const { data: rolesData, isLoading: isLoadingRoles } = useRoles();
@@ -83,7 +86,7 @@ export default function CreateStaffForm({
 
     createStaff(apiPayload, {
       onSuccess: () => {
-        router.push("/vendor/staff-management");
+        router.push(staffListHref);
       },
       onError: (error: unknown) => {
         if (error && typeof error === "object" && "errors" in error) {
@@ -411,7 +414,7 @@ export default function CreateStaffForm({
               <Button
                 type="button"
                 variant="outline"
-                onClick={() => router.push("/vendor/staff-management")}
+                onClick={() => router.push(staffListHref)}
                 disabled={isSubmitting}
                 className="w-full sm:w-auto"
               >

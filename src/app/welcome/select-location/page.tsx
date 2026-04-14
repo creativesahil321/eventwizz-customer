@@ -33,6 +33,7 @@ function stableImageUrl(url: string | null | undefined): string {
 import { Skeleton } from "@/components/ui/skeleton";
 import { useTheme } from "@/providers/theme-provider/ThemeContext";
 import { logout } from "@/lib/auth/logout";
+import { getFirstAccessibleVendorPath } from "@/config/menus/first-accessible-vendor-route";
 
 export default function WelcomeLocationSelectionPage() {
   const [selectedLocationId, setSelectedLocationId] = useState<number | null>(null);
@@ -79,7 +80,11 @@ export default function WelcomeLocationSelectionPage() {
     if (!selectedLocationId) return;
     switchLocation(selectedLocationId, {
       onSuccess: () => {
-        router.push("/vendor/dashboard");
+        const perms = session?.user?.permissions;
+        const next = getFirstAccessibleVendorPath(
+          Array.isArray(perms) ? perms : undefined,
+        );
+        router.push(next);
       },
     });
   };

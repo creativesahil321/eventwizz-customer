@@ -1,5 +1,6 @@
 "use client";
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -47,6 +48,7 @@ import {
 } from "@/components/ui/tooltip";
 
 interface StaffManagementProps {
+  /** Optional; URL query (`?page=`) is used when not provided. */
   searchParams?: {
     search?: string;
     status?: string;
@@ -68,8 +70,12 @@ function StaffError({ message }: { message: string }) {
 }
 
 export default function StaffManagement({
-  searchParams = {},
+  searchParams: legacySearch = {},
 }: StaffManagementProps) {
+  const urlSearch = useSearchParams();
+  const pathname = usePathname();
+  const router = useRouter();
+
   // State for delete confirmation
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [staffToDelete, setStaffToDelete] = useState<StaffMemberType | null>(
@@ -78,12 +84,31 @@ export default function StaffManagement({
   // Track staff IDs being updated
   const [updatingStaffIds, setUpdatingStaffIds] = useState<number[]>([]);
 
-  // Format search params for API query
-  const queryParams = {
-    page: searchParams.page ? parseInt(searchParams.page) : 1,
-    search: searchParams.search || "",
-    status:
-      (searchParams.status as "active" | "inactive" | undefined) || undefined,
+  // Align list query with Laravel paginator (?page=) and optional filters
+  const queryParams = useMemo(() => {
+    const pageRaw =
+      legacySearch.page ?? urlSearch.get("page") ?? undefined;
+    const parsed = pageRaw ? Number.parseInt(String(pageRaw), 10) : 1;
+    const page = Number.isFinite(parsed) && parsed > 0 ? parsed : 1;
+    const search =
+      legacySearch.search ?? urlSearch.get("search") ?? "";
+    const statusRaw = legacySearch.status ?? urlSearch.get("status") ?? "";
+    const status =
+      statusRaw === "active" || statusRaw === "inactive"
+        ? statusRaw
+        : undefined;
+    return { page, search, status };
+  }, [legacySearch.page, legacySearch.search, legacySearch.status, urlSearch]);
+
+  const goToPage = (nextPage: number) => {
+    const params = new URLSearchParams(urlSearch.toString());
+    if (nextPage <= 1) {
+      params.delete("page");
+    } else {
+      params.set("page", String(nextPage));
+    }
+    const qs = params.toString();
+    router.push(qs ? `${pathname}?${qs}` : pathname);
   };
 
   // Fetch staff data
@@ -150,8 +175,9 @@ export default function StaffManagement({
     );
   }
 
-  // Handle the nested data structure from the API
-  const staffMembers = staffData?.data?.data || [];
+  // API: { status, message, data: StaffMember[], meta?, links? } — not data.data
+  const staffMembers = Array.isArray(staffData?.data) ? staffData.data : [];
+  const listMeta = staffData?.meta;
 
   if (!staffMembers.length) {
     return (
@@ -269,12 +295,12 @@ export default function StaffManagement({
                       <TooltipTrigger asChild>
                         <span className="inline-block max-w-[140px] min-w-0">
                           <Badge className="bg-blue-50 text-blue-700 border-blue-100 capitalize flex-shrink-0 w-full max-w-full truncate cursor-default">
-                            {member.role}
+                            {member.role ?? "—"}
                           </Badge>
                         </span>
                       </TooltipTrigger>
                       <TooltipContent side="top" className="max-w-[min(320px,90vw)]">
-                        {member.role}
+                        {member.role ?? "No role"}
                       </TooltipContent>
                     </Tooltip>
                   </div>
@@ -283,10 +309,10 @@ export default function StaffManagement({
                       {member.phone}
                     </span>
                   )}
-                  {member.locations && member.locations.length > 0 && (() => {
-                    const cityNames = member.locations.map((loc) =>
-                      typeof loc === "string" ? loc : (loc as { city?: string; name?: string }).city ?? (loc as { city?: string; name?: string }).name ?? ""
-                    ).filter(Boolean);
+                  {member.locations.length > 0 && (() => {
+                    const cityNames = member.locations
+                      .map((loc) => loc.city)
+                      .filter(Boolean);
                     if (cityNames.length === 0) return null;
                     return (
                       <div className="flex items-start gap-1.5 min-w-0 w-full mt-1">
@@ -351,6 +377,41 @@ export default function StaffManagement({
           );
         })}
       </div>
+
+      {listMeta && listMeta.last_page > 1 && (
+        <div className="flex flex-col sm:flex-row items-center justify-center gap-3 mt-8 pb-2">
+          <p className="text-sm text-muted-foreground order-2 sm:order-1">
+            Showing{" "}
+            {listMeta.from != null && listMeta.to != null
+              ? `${listMeta.from}–${listMeta.to}`
+              : staffMembers.length}{" "}
+            of {listMeta.total}
+          </p>
+          <div className="flex items-center gap-2 order-1 sm:order-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={listMeta.current_page <= 1}
+              onClick={() => goToPage(listMeta.current_page - 1)}
+            >
+              Previous
+            </Button>
+            <span className="text-sm tabular-nums px-2">
+              Page {listMeta.current_page} of {listMeta.last_page}
+            </span>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={listMeta.current_page >= listMeta.last_page}
+              onClick={() => goToPage(listMeta.current_page + 1)}
+            >
+              Next
+            </Button>
+          </div>
+        </div>
+      )}
 
       {/* Delete confirmation dialog */}
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
