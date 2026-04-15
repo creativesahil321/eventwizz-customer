@@ -20,6 +20,7 @@ import {
   vendorHomeTrustRowClass,
 } from "@/lib/banner-heading-align";
 import { cn } from "@/lib/utils";
+import { shouldUseNextImageOptimization } from "@/lib/image-utils";
 
 export default function VendorSiteHomePage() {
   const router = useRouter();
@@ -115,7 +116,7 @@ export default function VendorSiteHomePage() {
             className="object-cover"
             priority
             sizes="100vw"
-            unoptimized={/^https?:\/\//i.test(heroImageSrc)}
+            unoptimized={!shouldUseNextImageOptimization(heroImageSrc)}
           />
           <div
             className="absolute inset-0 bg-gradient-to-b from-black/70 via-black/45 to-black/80"

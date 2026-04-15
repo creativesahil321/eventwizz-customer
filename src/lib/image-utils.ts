@@ -2,6 +2,27 @@
  * Utilities for handling user-uploaded images with cache busting
  */
 
+import { isNextImageRemoteHostname } from "@/lib/next-image-remote-patterns";
+
+/**
+ * Use Next.js image optimizer for this `src` (`unoptimized={false}`) only when the host is
+ * listed in `nextImageRemotePatterns` (same list as `next.config` `images.remotePatterns`).
+ * Other remotes stay `unoptimized` so the runtime does not error on disallowed domains.
+ */
+export function shouldUseNextImageOptimization(src: string): boolean {
+  if (!src || src.startsWith("data:") || src.startsWith("blob:")) {
+    return false;
+  }
+  if (!/^https?:\/\//i.test(src)) {
+    return true;
+  }
+  try {
+    return isNextImageRemoteHostname(new URL(src).hostname);
+  } catch {
+    return false;
+  }
+}
+
 /**
  * Adds a `v` query param for cache busting when `updated_at` is provided.
  * Without `updated_at`, returns `url` unchanged so image `src` stays stable across renders.

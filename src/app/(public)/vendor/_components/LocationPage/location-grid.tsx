@@ -8,6 +8,7 @@ import { LocationData } from "@/types/theme.types";
 import { motion, AnimatePresence } from "framer-motion";
 import { useState } from "react";
 import Image from "next/image";
+import { shouldUseNextImageOptimization } from "@/lib/image-utils";
 
 interface LocationGridProps {
   locations: (VenueLocation | LocationData)[];
@@ -21,10 +22,6 @@ const HOVER_GRADIENTS = [
   "from-blue-600 to-purple-600",
   "from-pink-600 to-orange-500",
 ] as const;
-
-function isRemoteImage(src: string) {
-  return /^https?:\/\//i.test(src);
-}
 
 export default function LocationGrid({
   locations,
@@ -147,7 +144,7 @@ export default function LocationGrid({
                     priority={idx < 2}
                     sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
                     className="object-cover transition-transform duration-700 group-hover:scale-110"
-                    unoptimized={isRemoteImage(coverImage)}
+                    unoptimized={!shouldUseNextImageOptimization(coverImage)}
                     onError={(e) => {
                       (e.target as HTMLImageElement).style.display = "none";
                     }}
