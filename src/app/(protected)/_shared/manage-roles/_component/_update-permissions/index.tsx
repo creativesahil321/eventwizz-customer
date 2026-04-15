@@ -177,7 +177,8 @@ export default function PermissionsDialog({
       s.includes("create") ||
       s.includes("delete") ||
       s.includes("edit") ||
-      s.includes("update")
+      s.includes("update") ||
+      s.includes("resend")
     );
   };
 
@@ -577,7 +578,7 @@ export default function PermissionsDialog({
                             className="capitalize cursor-pointer flex-1 min-w-0 text-xs sm:text-sm truncate"
                             title={
                               readRequiredByWrite
-                                ? "Required when Create, Edit, Update or Delete is enabled"
+                                ? "Required when Create, Edit, Update, Delete or Resend is enabled"
                                 : eventSystemLocksReadCategory
                                   ? "Required while Event Management permissions are enabled"
                                 : undefined

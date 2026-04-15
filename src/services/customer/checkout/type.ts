@@ -65,8 +65,6 @@ export interface CheckoutRequest {
   sub_total: number;
   partial_payment: number | null;
   total: number;
-  /** Platform fee charged to customer (flat amount or computed percentage). */
-  platform_fee?: number;
   payment_gateway?: string;
   dates: CheckoutDateData[];
 }

@@ -32,8 +32,7 @@ export const useProcessCheckout = () => {
       }
 
       // Verify totals match (with tolerance for floating point precision)
-      const { calculatedSubTotal, calculatedTotal } =
-        checkoutService.calculateTotals(data);
+      const { calculatedSubTotal } = checkoutService.calculateTotals(data);
 
       if (Math.abs(calculatedSubTotal - data.sub_total) > 0.01) {
         console.warn(
@@ -41,9 +40,10 @@ export const useProcessCheckout = () => {
         );
       }
 
-      if (Math.abs(calculatedTotal - data.total) > 0.01) {
+      // `data.total` includes vendor platform fee for the customer; do not compare to line-item sum.
+      if (data.total + 0.001 < data.sub_total) {
         console.warn(
-          `Total mismatch: calculated ${calculatedTotal}, provided ${data.total}`
+          `Total is below subtotal: sub_total ${data.sub_total}, total ${data.total}`
         );
       }
 

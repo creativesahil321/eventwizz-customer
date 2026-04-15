@@ -157,7 +157,8 @@ export default function CreateRoleForm({
       s.includes("create") ||
       s.includes("delete") ||
       s.includes("edit") ||
-      s.includes("update")
+      s.includes("update") ||
+      s.includes("resend")
     );
   };
 

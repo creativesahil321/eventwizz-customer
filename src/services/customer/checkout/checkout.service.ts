@@ -165,7 +165,9 @@ export const checkoutService = {
 
     return {
       calculatedSubTotal,
-      calculatedTotal: calculatedSubTotal + (data.platform_fee ?? 0),
+      // Request total may exceed line-item sum when vendor platform fee is included;
+      // fee is not sent as a separate field — backend applies it.
+      calculatedTotal: calculatedSubTotal,
     };
   },
 };

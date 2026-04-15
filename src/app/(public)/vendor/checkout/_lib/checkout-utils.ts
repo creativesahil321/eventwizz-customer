@@ -287,13 +287,13 @@ export function transformCartToCheckout(
   // Platform fee is charged on the booking subtotal (flat or percentage)
   const { fee: platformFee } = calculatePlatformFeeFromApi(apiEventData, subTotal);
 
+  // Platform fee is shown in UI only; backend derives fee from cart / rules.
   const checkoutPayload = {
     vendor_event_id: vendorEventId,
     event_slug: eventSlug,
     sub_total: subTotal,
     partial_payment: hasAnyDepositPayments ? partialPayment : null,
-    platform_fee: platformFee,
-    total: totalDueToday + platformFee, // Amount to pay today + platform fee
+    total: totalDueToday + platformFee, // Customer pay today (includes fee for display parity with UI)
     payment_gateway: paymentGateway,
     dates: checkoutDates,
   };
@@ -303,10 +303,10 @@ export function transformCartToCheckout(
     event_slug: checkoutPayload.event_slug,
     sub_total: checkoutPayload.sub_total,
     partial_payment: checkoutPayload.partial_payment,
-    platform_fee: checkoutPayload.platform_fee,
     total: checkoutPayload.total,
     payment_gateway: checkoutPayload.payment_gateway,
     dates_count: checkoutPayload.dates.length,
+    platform_fee_ui_only: platformFee,
   });
 
   return checkoutPayload;
