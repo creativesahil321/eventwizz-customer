@@ -158,7 +158,8 @@ export default function CreateRoleForm({
       s.includes("delete") ||
       s.includes("edit") ||
       s.includes("update") ||
-      s.includes("resend")
+      s.includes("resend") ||
+      s.includes("send")
     );
   };
 

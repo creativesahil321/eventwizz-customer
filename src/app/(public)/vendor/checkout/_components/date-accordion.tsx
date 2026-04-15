@@ -71,6 +71,7 @@ export default function DateAccordion({
   const [isSaving, setIsSaving] = useState(false);
   const [isAutoSaving, setIsAutoSaving] = useState(false);
   const autoSaveTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const isSavingRef = useRef(false);
   const isPreviewMode = useIsPreviewMode();
   const { mutateAsync: storeEventBooking } = useStoreEventBooking();
   const { data: apiCartData } = useGetCartData(!isPreviewMode);
@@ -110,12 +111,20 @@ export default function DateAccordion({
     // Clear any existing timer
     if (autoSaveTimerRef.current) {
       clearTimeout(autoSaveTimerRef.current);
+      autoSaveTimerRef.current = null;
     }
 
     // Only auto-save if there are unsaved changes and not currently saving
-    if (hasChanges && !isSaving && !isAutoSaving && !isPreviewMode) {
+    if (
+      hasChanges &&
+      !isSaving &&
+      !isAutoSaving &&
+      !isSavingRef.current &&
+      !isPreviewMode
+    ) {
       // Set a timer to auto-save after 2 seconds
       autoSaveTimerRef.current = setTimeout(async () => {
+        if (isSavingRef.current) return;
         try {
           setIsAutoSaving(true);
           await handleSaveDate();
@@ -131,6 +140,7 @@ export default function DateAccordion({
     return () => {
       if (autoSaveTimerRef.current) {
         clearTimeout(autoSaveTimerRef.current);
+        autoSaveTimerRef.current = null;
       }
     };
   }, [hasChanges, isSaving, isAutoSaving, isPreviewMode]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -164,7 +174,20 @@ export default function DateAccordion({
   }, 0);
 
   const handleSaveDate = async () => {
+    if (isSavingRef.current || isSaving) return;
+
+    isSavingRef.current = true;
     setIsSaving(true);
+
+    const saveTimeout = setTimeout(() => {
+      if (isSavingRef.current) {
+        console.error("❌ Save operation timed out after 30 seconds");
+        isSavingRef.current = false;
+        setIsSaving(false);
+        setIsAutoSaving(false);
+        toast.error("Save operation timed out. Please try again.");
+      }
+    }, 30000);
 
     try {
       // Get cart data for API
@@ -182,7 +205,6 @@ export default function DateAccordion({
             validation.errorMessage ||
               "Please select at least one table or ticket",
           );
-          setIsSaving(false);
           return;
         }
 
@@ -193,7 +215,6 @@ export default function DateAccordion({
             allocationValidation.errors[0] ||
               "Please complete guest allocation for your tables",
           );
-          setIsSaving(false);
           return;
         }
       }
@@ -247,6 +268,7 @@ export default function DateAccordion({
 
           if (response?.status === true) {
             markDateAsSaved(eventSlug, date);
+            await new Promise((resolve) => setTimeout(resolve, 150));
           } else {
             console.error("API Error Response:", response);
           }
@@ -256,6 +278,7 @@ export default function DateAccordion({
 
           if (response?.status === true) {
             markDateAsSaved(eventSlug, date);
+            await new Promise((resolve) => setTimeout(resolve, 150));
           } else {
             console.error("API Error Response:", response);
           }
@@ -266,6 +289,7 @@ export default function DateAccordion({
 
         if (response?.status === true) {
           markDateAsSaved(eventSlug, date);
+          await new Promise((resolve) => setTimeout(resolve, 150));
         } else {
           console.error("API Error Response:", response);
         }
@@ -311,6 +335,8 @@ export default function DateAccordion({
         );
       }
     } finally {
+      clearTimeout(saveTimeout);
+      isSavingRef.current = false;
       setIsSaving(false);
     }
   };

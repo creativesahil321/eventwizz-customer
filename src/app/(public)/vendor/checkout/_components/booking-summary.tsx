@@ -135,10 +135,7 @@ export default function BookingSummary({}: BookingSummaryProps) {
       availableDates.forEach((date) => {
         const dateData = getDateData(currentEventSlug, date);
         if (dateData) {
-          if (
-            hasUnsavedChanges(currentEventSlug, date) ||
-            dateData.hasChanges
-          ) {
+          if (hasUnsavedChanges(currentEventSlug, date)) {
             hasUnsaved = true;
           }
           const validation = validateDateRequirements(currentEventSlug, date);
