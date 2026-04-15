@@ -5,9 +5,9 @@
  */
 
 import {
-  EventCartData,
   DateData,
   DrinkData,
+  PaymentGatewayData,
   TableData,
   TicketData,
 } from "@/services/customer/cart/type";
@@ -30,19 +30,6 @@ export interface SelectedDrink {
   quantity?: number;
 }
 
-// Professional API Response Types (Date-based structure)
-export interface ApiEventCartData extends EventCartData {
-  drinks: SelectedDrink[];
-  [dateKey: string]:
-    | {
-        payment: PaymentInfo;
-        tables: ApiTableData[];
-        tickets: ApiTicketData[];
-        selected_drinks: SelectedDrink[];
-      }
-    | SelectedDrink[];
-}
-
 export interface ApiDateData extends DateData {
   payment: PaymentInfo;
   selected_drinks: SelectedDrink[];
@@ -57,6 +44,44 @@ export interface ApiTableData extends TableData {
 }
 
 export interface ApiTicketData extends TicketData {}
+
+/** Per-date cart bucket from checkout API (ISO date keys on the event object). */
+export type ApiEventCartDateBucket = {
+  payment: PaymentInfo;
+  tables: ApiTableData[];
+  tickets: ApiTicketData[];
+  selected_drinks: SelectedDrink[];
+};
+
+export type VendorPlatformFee = {
+  mode: "flat" | "percentage";
+  value: number;
+};
+
+/**
+ * Checkout GET cart shape for one event. Not `extends EventCartData` — that type’s
+ * index signature is incompatible with `drinks`, totals, and per-date buckets.
+ */
+export interface ApiEventCartData {
+  event_name: string;
+  event_slug: string;
+  event_image: string;
+  vendor_event_id: number;
+  payment_gateways?: PaymentGatewayData[];
+  drink_title?: string;
+  drinks: SelectedDrink[];
+  cart_sub_total?: number;
+  cart_customer_total?: number;
+  vendor_platform_fee?: VendorPlatformFee;
+  [key: string]:
+    | string
+    | number
+    | undefined
+    | PaymentGatewayData[]
+    | SelectedDrink[]
+    | VendorPlatformFee
+    | ApiEventCartDateBucket;
+}
 
 // Professional UI Types (replacing cart store types)
 export interface DrinkPackage {

@@ -324,6 +324,24 @@ export default function BookingSummary({}: BookingSummaryProps) {
   /** Avoid showing $0.00 as if it were a real quote before any priced selection. */
   const hasPayableTotal = bookingGrandTotal > 0;
 
+  // Platform fee (flat / percentage) from cart API
+  const platformFeeMeta = (currentEventApiData as unknown as {
+    vendor_platform_fee?: { mode: "flat" | "percentage"; value: number };
+  })?.vendor_platform_fee;
+  const platformFeeRaw =
+    hasPayableTotal && platformFeeMeta
+      ? platformFeeMeta.mode === "flat"
+        ? Number(platformFeeMeta.value || 0)
+        : (bookingGrandTotal * Number(platformFeeMeta.value || 0)) / 100
+      : 0;
+  const platformFee =
+    Number.isFinite(platformFeeRaw) && platformFeeRaw > 0
+      ? Number(platformFeeRaw.toFixed(2))
+      : 0;
+
+  const bookingGrandTotalWithFee = bookingGrandTotal + platformFee;
+  const finalTotalWithFee = finalTotal + platformFee;
+
   // Additional safety check for TypeScript
   if (!currentEventApiData) {
     return null;
@@ -605,7 +623,7 @@ export default function BookingSummary({}: BookingSummaryProps) {
               </span>
               {hasPayableTotal ? (
                 <span className="text-lg font-bold text-gray-900">
-                  {formatMoney(bookingGrandTotal)}
+                  {formatMoney(bookingGrandTotalWithFee)}
                 </span>
               ) : (
                 <span className="max-w-[55%] text-right text-sm font-medium text-gray-500">
@@ -614,10 +632,21 @@ export default function BookingSummary({}: BookingSummaryProps) {
               )}
             </div>
 
+            {hasPayableTotal && platformFee > 0 ? (
+              <div className="flex justify-between text-xs text-gray-600">
+                <span>
+                  {platformFeeMeta?.mode === "percentage"
+                    ? `Platform fee (${platformFeeMeta.value}%)`
+                    : "Platform fee"}
+                </span>
+                <span className="font-medium">{formatMoney(platformFee)}</span>
+              </div>
+            ) : null}
+
             {/* Show payment split info only if deposit selected */}
             {hasPayableTotal && totalLater > 0 && (
               <div className="text-xs text-gray-500">
-                Split payment: {formatMoney(totalToday)} today +{" "}
+                Split payment: {formatMoney(finalTotalWithFee)} today +{" "}
                 {formatMoney(totalLater)} later
               </div>
             )}
@@ -657,7 +686,7 @@ export default function BookingSummary({}: BookingSummaryProps) {
                   Amount to Pay Today
                 </span>
                 <span className="text-2xl font-bold text-blue-600">
-                  {formatMoney(finalTotal)}
+                  {formatMoney(finalTotalWithFee)}
                 </span>
               </div>
 

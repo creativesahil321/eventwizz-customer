@@ -77,6 +77,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { normalizePaymentStatusForAddOnsDate } from "@/lib/booking-addons-eligibility";
 import { useCurrencyFormat } from "@/hooks/use-currency-format";
+import { usePermission } from "@/hooks/usePermission";
 
 interface AdjustBookingContentProps {
   bookingId: string;
@@ -86,6 +87,7 @@ export default function AdjustBookingContent({
   bookingId,
 }: AdjustBookingContentProps) {
   const router = useRouter();
+  const canUpdateBooking = usePermission("update-booking");
   const [activeTab, setActiveTab] = useState("booking-info");
   const [expandedAllocations, setExpandedAllocations] = useState<
     Record<string, boolean>
@@ -168,6 +170,10 @@ export default function AdjustBookingContent({
     keyword: string | number,
     type: "table" | "drink" | "ticket",
   ) => {
+    if (!canUpdateBooking) {
+      toast.error("You don't have permission to update bookings.");
+      return;
+    }
     const apiType =
       type === "table" ? "tables" : type === "drink" ? "drinks" : "tickets";
 
@@ -183,6 +189,7 @@ export default function AdjustBookingContent({
   const handleRescheduleClick = (
     dateInfo: NonNullable<typeof bookingData>["event_dates"][0],
   ) => {
+    if (!canUpdateBooking) return;
     const totalPeople =
       (dateInfo.tables?.reduce((sum, table) => sum + (table.people ?? 0), 0) ??
         0) +
@@ -228,6 +235,7 @@ export default function AdjustBookingContent({
 
   // Handler for reschedule confirm
   const handleRescheduleConfirm = (payload: VendorRescheduleBookingPayload) => {
+    if (!canUpdateBooking) return;
     rescheduleMutation.mutate(payload, {
       onSuccess: () => {
         setRescheduleModalOpen(false);
@@ -246,6 +254,7 @@ export default function AdjustBookingContent({
     newStatus: number,
     dateLabel: string,
   ) => {
+    if (!canUpdateBooking) return;
     setStatusUpdateDialog({
       open: true,
       bookingDateId,
@@ -257,6 +266,7 @@ export default function AdjustBookingContent({
 
   // Handler for confirming and updating payment status
   const handleConfirmStatusUpdate = () => {
+    if (!canUpdateBooking) return;
     if (
       !statusUpdateDialog.bookingDateId ||
       statusUpdateDialog.newStatus === null
@@ -388,6 +398,7 @@ export default function AdjustBookingContent({
   };
 
   const handleAddNote = () => {
+    if (!canUpdateBooking) return;
     const trimmed = newNote.trim();
     if (!trimmed || addNoteMutation.isPending) return;
     addNoteMutation.mutate(
@@ -835,74 +846,76 @@ export default function AdjustBookingContent({
                                   dateInfo.payment_status,
                                   "h-7 inline-flex items-center shrink-0",
                                 )}
-                                <Select
-                                  value={String(
-                                    getPaymentStatusNumber(
-                                      dateInfo.payment_status,
-                                    ),
-                                  )}
-                                  onValueChange={(value) => {
-                                    const newStatusNum = parseInt(value);
-                                    const currentStatusNum =
-                                      getPaymentStatusNumber(
-                                        dateInfo.payment_status,
-                                      );
-                                    if (newStatusNum !== currentStatusNum) {
-                                      handleStatusChangeRequest(
-                                        dateInfo.booking_date_id,
-                                        dateInfo.payment_status,
-                                        newStatusNum,
-                                        dateInfo.date,
-                                      );
-                                    }
-                                  }}
-                                  disabled={
-                                    updateStatusMutation.isPending ||
-                                    getAllowedStatusOptions(
+                                {canUpdateBooking ? (
+                                  <Select
+                                    value={String(
                                       getPaymentStatusNumber(
                                         dateInfo.payment_status,
                                       ),
-                                    ).length === 0
-                                  }
-                                >
-                                  <SelectTrigger className="h-7 w-full min-w-0 text-xs border-2 sm:w-[120px] text-muted-foreground shrink-0">
-                                    <div className="flex items-center gap-2">
-                                      {updateStatusMutation.isPending &&
-                                      updatingBookingDateId ===
-                                        dateInfo.booking_date_id ? (
-                                        <>
-                                          <Loader2 className="h-3 w-3 animate-spin shrink-0" />
-                                          <span>Updating...</span>
-                                        </>
-                                      ) : (
-                                        <span>Change status</span>
-                                      )}
-                                    </div>
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    {getAllowedStatusOptions(
-                                      getPaymentStatusNumber(
-                                        dateInfo.payment_status,
-                                      ),
-                                    ).map((statusNum) => (
-                                      <SelectItem
-                                        key={statusNum}
-                                        value={String(statusNum)}
-                                      >
-                                        {getPaymentStatusLabel(statusNum)}
-                                      </SelectItem>
-                                    ))}
-                                    {getAllowedStatusOptions(
-                                      getPaymentStatusNumber(
-                                        dateInfo.payment_status,
-                                      ),
-                                    ).length === 0 && (
-                                      <SelectItem value="4">
-                                        Refunded
-                                      </SelectItem>
                                     )}
-                                  </SelectContent>
-                                </Select>
+                                    onValueChange={(value) => {
+                                      const newStatusNum = parseInt(value);
+                                      const currentStatusNum =
+                                        getPaymentStatusNumber(
+                                          dateInfo.payment_status,
+                                        );
+                                      if (newStatusNum !== currentStatusNum) {
+                                        handleStatusChangeRequest(
+                                          dateInfo.booking_date_id,
+                                          dateInfo.payment_status,
+                                          newStatusNum,
+                                          dateInfo.date,
+                                        );
+                                      }
+                                    }}
+                                    disabled={
+                                      updateStatusMutation.isPending ||
+                                      getAllowedStatusOptions(
+                                        getPaymentStatusNumber(
+                                          dateInfo.payment_status,
+                                        ),
+                                      ).length === 0
+                                    }
+                                  >
+                                    <SelectTrigger className="h-7 w-full min-w-0 text-xs border-2 sm:w-[120px] text-muted-foreground shrink-0">
+                                      <div className="flex items-center gap-2">
+                                        {updateStatusMutation.isPending &&
+                                        updatingBookingDateId ===
+                                          dateInfo.booking_date_id ? (
+                                          <>
+                                            <Loader2 className="h-3 w-3 animate-spin shrink-0" />
+                                            <span>Updating...</span>
+                                          </>
+                                        ) : (
+                                          <span>Change status</span>
+                                        )}
+                                      </div>
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      {getAllowedStatusOptions(
+                                        getPaymentStatusNumber(
+                                          dateInfo.payment_status,
+                                        ),
+                                      ).map((statusNum) => (
+                                        <SelectItem
+                                          key={statusNum}
+                                          value={String(statusNum)}
+                                        >
+                                          {getPaymentStatusLabel(statusNum)}
+                                        </SelectItem>
+                                      ))}
+                                      {getAllowedStatusOptions(
+                                        getPaymentStatusNumber(
+                                          dateInfo.payment_status,
+                                        ),
+                                      ).length === 0 && (
+                                        <SelectItem value="4">
+                                          Refunded
+                                        </SelectItem>
+                                      )}
+                                    </SelectContent>
+                                  </Select>
+                                ) : null}
                               </div>
                             </div>
                           </AccordionTrigger>
@@ -1101,8 +1114,9 @@ export default function AdjustBookingContent({
                                           ))}
                                         </div>
 
-                                        {/* Menu Choices Actions */}
-                                        {bookingData.is_menu_choice && (
+                                        {/* Menu Choices Actions — same bar as reschedule: requires update-booking */}
+                                        {canUpdateBooking &&
+                                          bookingData.is_menu_choice && (
                                           <div className="mt-3 pt-3 border-t border-gray-100">
                                             <Button
                                               onClick={() =>
@@ -1126,7 +1140,8 @@ export default function AdjustBookingContent({
                                         )}
 
                                         {/* Reschedule Button */}
-                                        {dateInfo.has_unbooked_event_dates && (
+                                        {canUpdateBooking &&
+                                          dateInfo.has_unbooked_event_dates && (
                                           <div className="mt-3 pt-3 border-t border-gray-100">
                                             <Button
                                               onClick={() =>
@@ -1498,24 +1513,26 @@ export default function AdjustBookingContent({
                                                             Number(table.total),
                                                           )}
                                                         </p>
-                                                        <Button
-                                                          variant="ghost"
-                                                          size="sm"
-                                                          onClick={() =>
-                                                            handleDeleteAddOn(
-                                                              dateInfo.date_key,
-                                                              table.table_size,
-                                                              "table",
-                                                            )
-                                                          }
-                                                          disabled={
-                                                            deleteAddOnsMutation.isPending
-                                                          }
-                                                          className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
-                                                          title="Delete table"
-                                                        >
-                                                          <Trash2 className="h-4 w-4" />
-                                                        </Button>
+                                                        {canUpdateBooking ? (
+                                                          <Button
+                                                            variant="ghost"
+                                                            size="sm"
+                                                            onClick={() =>
+                                                              handleDeleteAddOn(
+                                                                dateInfo.date_key,
+                                                                table.table_size,
+                                                                "table",
+                                                              )
+                                                            }
+                                                            disabled={
+                                                              deleteAddOnsMutation.isPending
+                                                            }
+                                                            className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
+                                                            title="Delete table"
+                                                          >
+                                                            <Trash2 className="h-4 w-4" />
+                                                          </Button>
+                                                        ) : null}
                                                       </div>
                                                     </div>
                                                   ),
@@ -1556,30 +1573,32 @@ export default function AdjustBookingContent({
                                                                 drink.quantity,
                                                             )}
                                                           </p>
-                                                          <Button
-                                                            variant="ghost"
-                                                            size="sm"
-                                                            onClick={() => {
-                                                              if (!drink.id) {
-                                                                toast.error(
-                                                                  "Unable to delete: Drink ID not available. Please refresh the page.",
+                                                          {canUpdateBooking ? (
+                                                            <Button
+                                                              variant="ghost"
+                                                              size="sm"
+                                                              onClick={() => {
+                                                                if (!drink.id) {
+                                                                  toast.error(
+                                                                    "Unable to delete: Drink ID not available. Please refresh the page.",
+                                                                  );
+                                                                  return;
+                                                                }
+                                                                handleDeleteAddOn(
+                                                                  dateInfo.date_key,
+                                                                  drink.id,
+                                                                  "drink",
                                                                 );
-                                                                return;
+                                                              }}
+                                                              disabled={
+                                                                deleteAddOnsMutation.isPending
                                                               }
-                                                              handleDeleteAddOn(
-                                                                dateInfo.date_key,
-                                                                drink.id,
-                                                                "drink",
-                                                              );
-                                                            }}
-                                                            disabled={
-                                                              deleteAddOnsMutation.isPending
-                                                            }
-                                                            className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
-                                                            title="Delete drink"
-                                                          >
-                                                            <Trash2 className="h-4 w-4" />
-                                                          </Button>
+                                                              className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
+                                                              title="Delete drink"
+                                                            >
+                                                              <Trash2 className="h-4 w-4" />
+                                                            </Button>
+                                                          ) : null}
                                                         </div>
                                                       </div>
                                                     ),
@@ -1630,30 +1649,32 @@ export default function AdjustBookingContent({
                                                                 ticket.quantity,
                                                             )}
                                                           </p>
-                                                          <Button
-                                                            variant="ghost"
-                                                            size="sm"
-                                                            onClick={() => {
-                                                              if (!ticket.id) {
-                                                                toast.error(
-                                                                  "Unable to delete: Ticket ID not available. Please refresh the page.",
+                                                          {canUpdateBooking ? (
+                                                            <Button
+                                                              variant="ghost"
+                                                              size="sm"
+                                                              onClick={() => {
+                                                                if (!ticket.id) {
+                                                                  toast.error(
+                                                                    "Unable to delete: Ticket ID not available. Please refresh the page.",
+                                                                  );
+                                                                  return;
+                                                                }
+                                                                handleDeleteAddOn(
+                                                                  dateInfo.date_key,
+                                                                  ticket.id,
+                                                                  "ticket",
                                                                 );
-                                                                return;
+                                                              }}
+                                                              disabled={
+                                                                deleteAddOnsMutation.isPending
                                                               }
-                                                              handleDeleteAddOn(
-                                                                dateInfo.date_key,
-                                                                ticket.id,
-                                                                "ticket",
-                                                              );
-                                                            }}
-                                                            disabled={
-                                                              deleteAddOnsMutation.isPending
-                                                            }
-                                                            className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
-                                                            title="Delete ticket"
-                                                          >
-                                                            <Trash2 className="h-4 w-4" />
-                                                          </Button>
+                                                              className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
+                                                              title="Delete ticket"
+                                                            >
+                                                              <Trash2 className="h-4 w-4" />
+                                                            </Button>
+                                                          ) : null}
                                                         </div>
                                                       </div>
                                                     ),
@@ -1738,39 +1759,45 @@ export default function AdjustBookingContent({
                         Booking notes
                       </h3>
                       <p className="text-xs text-muted-foreground mt-1">
-                        Staff and vendors can add notes for this booking
+                        {canUpdateBooking
+                          ? "Staff and vendors can add notes for this booking"
+                          : "View-only: existing notes are shown below."}
                       </p>
                     </div>
                   </div>
 
                   <Card className="border-2 border-[var(--color-border)] bg-white shadow-sm overflow-hidden">
                     <CardContent className="p-0">
-                      {/* Add note form */}
-                      <div className="p-4 border-b bg-muted/30">
-                        <Textarea
-                          placeholder="Add a note (e.g. dietary requirements, setup time, special requests…)"
-                          value={newNote}
-                          onChange={(e) => setNewNote(e.target.value)}
-                          className="min-h-[88px] resize-none bg-white border border-input rounded-lg focus-visible:ring-2"
-                          disabled={addNoteMutation.isPending}
-                        />
-                        <div className="flex justify-end mt-3">
-                          <Button
-                            type="button"
-                            size="sm"
-                            onClick={handleAddNote}
-                            disabled={!newNote.trim() || addNoteMutation.isPending}
-                            className="gap-2 bg-[var(--color-primary)] hover:bg-[var(--color-primary-hover)]"
-                          >
-                            {addNoteMutation.isPending ? (
-                              <Loader2 className="h-4 w-4 animate-spin" />
-                            ) : (
-                              <Send className="h-4 w-4" />
-                            )}
-                            Add note
-                          </Button>
+                      {/* Add note form (hidden entirely without update-booking) */}
+                      {canUpdateBooking ? (
+                        <div className="p-4 border-b bg-muted/30">
+                          <Textarea
+                            placeholder="Add a note (e.g. dietary requirements, setup time, special requests…)"
+                            value={newNote}
+                            onChange={(e) => setNewNote(e.target.value)}
+                            className="min-h-[88px] resize-none bg-white border border-input rounded-lg focus-visible:ring-2"
+                            disabled={addNoteMutation.isPending}
+                          />
+                          <div className="flex justify-end mt-3">
+                            <Button
+                              type="button"
+                              size="sm"
+                              onClick={handleAddNote}
+                              disabled={
+                                !newNote.trim() || addNoteMutation.isPending
+                              }
+                              className="gap-2 bg-[var(--color-primary)] hover:bg-[var(--color-primary-hover)]"
+                            >
+                              {addNoteMutation.isPending ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                              ) : (
+                                <Send className="h-4 w-4" />
+                              )}
+                              Add note
+                            </Button>
+                          </div>
                         </div>
-                      </div>
+                      ) : null}
 
                       {/* Notes list */}
                       <ScrollArea className="h-[280px]">
@@ -1782,7 +1809,9 @@ export default function AdjustBookingContent({
                                 No notes yet
                               </p>
                               <p className="text-xs text-muted-foreground mt-1">
-                                Add the first note above
+                                {canUpdateBooking
+                                  ? "Add the first note above"
+                                  : "No notes have been recorded for this booking."}
                               </p>
                             </div>
                           ) : (
@@ -1840,6 +1869,7 @@ export default function AdjustBookingContent({
             <CardContent className="p-6">
               <AddOnsTab
                 bookingId={bookingId}
+                readOnly={!canUpdateBooking}
                 onSaveSuccess={() => setActiveTab("booking-info")}
                 dates={bookingData.event_dates.map((date) => {
                   // Calculate total people from tables and tickets
@@ -1871,7 +1901,7 @@ export default function AdjustBookingContent({
       </Tabs>
 
       {/* Vendor Reschedule Date Modal */}
-      {selectedDateForReschedule && (
+      {selectedDateForReschedule && canUpdateBooking && (
         <VendorRescheduleDateModal
           isOpen={rescheduleModalOpen}
           onClose={() => {

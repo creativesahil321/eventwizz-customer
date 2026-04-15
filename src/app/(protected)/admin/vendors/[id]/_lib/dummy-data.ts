@@ -86,7 +86,6 @@ export function getVenueDetailDummy(id: string): VenueDetail | null {
         id: 1,
         title: "Wedding Reception",
         date: "03 Apr 2024",
-        approvalStatus: "pending",
       },
       { id: 2, title: "Corporate Gala", date: "20 Mar 2024" },
       { id: 3, title: "Birthday Party", date: "12 Mar 2024" },

@@ -36,7 +36,6 @@ export interface EventPagination {
 
 // Interface for our internal use (with additional properties if needed)
 export interface Event extends ApiEvent {
-  is_submitted_for_approval?: boolean;
   vendor_location_id?: number;
   event_category_id?: number;
   event_name?: string;

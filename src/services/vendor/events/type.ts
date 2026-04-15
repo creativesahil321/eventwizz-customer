@@ -33,7 +33,6 @@ export interface EventItem {
   slug: string;
   image: string | null;
   status: string;
-  is_submitted_for_approval: boolean;
   event_date: string;
   // Legacy fields for backward compatibility
   current_step?: number;

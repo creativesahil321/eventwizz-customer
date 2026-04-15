@@ -2,7 +2,7 @@ import { getServerSession } from "next-auth";
 import { redirect } from "next/navigation";
 import { authOptions } from "@/lib/auth/authOptions";
 import "@/assets/scss/app.scss";
-import { tiemposHeadline } from "@/lib/fonts";
+import { tiemposHeadline } from "@/lib/fonts-tiempos";
 import { cn } from "@/lib/utils";
 import { ServerContextProvider } from "@/lib/server-context";
 import {

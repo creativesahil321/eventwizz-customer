@@ -14,6 +14,8 @@ import type {
   AdminVenueCommentsResponse,
   AdminVenueCommentResponse,
   AdminVenueCommentDeleteResponse,
+  AdminVenueCommissionUpdatePayload,
+  AdminVenueCommissionUpdateResponse,
 } from "./type";
 
 function buildUrl(params: AdminVenuesParams): string {
@@ -82,6 +84,23 @@ export const adminVenuesService = {
   ): Promise<AdminVenueUpdateResponse> => {
     const url = API_ENDPOINTS.ADMIN.VENUES.UPDATE.replace("{id}", String(id));
     return api.put<AdminVenueUpdateResponse>(url, payload, { returnFullResponse: true });
+  },
+
+  /**
+   * Set per-venue Stripe Connect application fee (custom commission).
+   * PUT /admin/venues/{id}/venue-commission
+   */
+  updateVenueCommission: async (
+    id: number | string,
+    payload: AdminVenueCommissionUpdatePayload
+  ): Promise<AdminVenueCommissionUpdateResponse> => {
+    const url = API_ENDPOINTS.ADMIN.VENUES.VENUE_COMMISSION.replace(
+      "{id}",
+      String(id)
+    );
+    return api.put<AdminVenueCommissionUpdateResponse>(url, payload, {
+      returnFullResponse: true,
+    });
   },
 
   /**

@@ -6,8 +6,15 @@ import { XIcon } from "lucide-react"
 
 import { cn } from "@/lib/utils"
 
-function Sheet({ ...props }: React.ComponentProps<typeof SheetPrimitive.Root>) {
-  return <SheetPrimitive.Root data-slot="sheet" {...props} />
+/**
+ * Default `modal={false}` avoids Radix scroll-lock layout shift (see `dialog.tsx`).
+ * Pass `modal={true}` for legacy Radix modal behavior if needed.
+ */
+function Sheet({
+  modal = false,
+  ...props
+}: React.ComponentProps<typeof SheetPrimitive.Root>) {
+  return <SheetPrimitive.Root data-slot="sheet" modal={modal} {...props} />
 }
 
 function SheetTrigger({
@@ -28,21 +35,25 @@ function SheetPortal({
   return <SheetPrimitive.Portal data-slot="sheet-portal" {...props} />
 }
 
-function SheetOverlay({
-  className,
-  ...props
-}: React.ComponentProps<typeof SheetPrimitive.Overlay>) {
-  return (
-    <SheetPrimitive.Overlay
+const SheetOverlay = React.forwardRef<
+  HTMLButtonElement,
+  Omit<React.ComponentPropsWithoutRef<"button">, "type">
+>(({ className, ...props }, ref) => (
+  <SheetPrimitive.Close asChild>
+    <button
+      ref={ref}
+      type="button"
       data-slot="sheet-overlay"
+      aria-label="Close sheet"
       className={cn(
-        "data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 fixed inset-0 z-50 bg-black/50",
+        "fixed inset-0 z-50 bg-black/50 animate-in fade-in-0 duration-200",
         className
       )}
       {...props}
     />
-  )
-}
+  </SheetPrimitive.Close>
+))
+SheetOverlay.displayName = "SheetOverlay"
 
 function SheetContent({
   className,
@@ -58,7 +69,7 @@ function SheetContent({
       <SheetPrimitive.Content
         data-slot="sheet-content"
         className={cn(
-          "bg-background data-[state=open]:animate-in data-[state=closed]:animate-out fixed z-50 flex flex-col gap-4 shadow-lg transition ease-in-out data-[state=closed]:duration-300 data-[state=open]:duration-500",
+          "bg-background data-[state=open]:animate-in data-[state=closed]:animate-out fixed z-[51] flex flex-col gap-4 shadow-lg transition ease-in-out data-[state=closed]:duration-300 data-[state=open]:duration-500",
           side === "right" &&
             "data-[state=closed]:slide-out-to-right data-[state=open]:slide-in-from-right inset-y-0 right-0 h-full w-3/4 border-l sm:max-w-sm",
           side === "left" &&

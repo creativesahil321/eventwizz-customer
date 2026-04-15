@@ -7,7 +7,6 @@ import type {
   VenueDetail,
   VenueLocation,
   LocationFinancialSummary,
-  EventApprovalStatus,
   VenueEventCancellationRequest,
 } from "./types";
 
@@ -44,21 +43,6 @@ function mapFinancialSummary(
     totalRevenue: s.total_revenue,
     payoutReleased: s.payout_released,
   };
-}
-
-function normalizeEventApprovalStatus(
-  raw?: string | null
-): EventApprovalStatus | undefined {
-  if (raw == null || raw === "") return undefined;
-  const v = raw.toLowerCase().trim().replace(/-/g, "_");
-  if (v === "draft") return "draft";
-  if (v === "pending") return "pending";
-  if (v === "approved" || v === "live") return "approved";
-  if (v === "rejected") return "rejected";
-  if (v === "changes_requested" || v === "request_changes") {
-    return "changes_requested";
-  }
-  return undefined;
 }
 
 function mapApiToVenueDetail(data: AdminVenueByIdData): VenueDetail {
@@ -130,7 +114,6 @@ function mapApiToVenueDetail(data: AdminVenueByIdData): VenueDetail {
       title: e.event_name,
       date: e.date ?? e.event_date_raw ?? "—",
       locationAddress: e.location_address?.trim() || undefined,
-      approvalStatus: normalizeEventApprovalStatus(e.approval_status),
     })),
     eventCancellationRequests,
     adminNotes,
@@ -147,6 +130,30 @@ function mapApiToVenueDetail(data: AdminVenueByIdData): VenueDetail {
       };
     })(),
     commissionSettings: (() => {
+      const vc = data.venue_commission;
+      if (vc != null && typeof vc === "object" && !Array.isArray(vc)) {
+        const modeRaw = vc.mode;
+        const mode =
+          typeof modeRaw === "string" ? modeRaw.toLowerCase().trim() : "";
+        const rawVal = vc.venue_commission_value;
+        const numVal =
+          typeof rawVal === "number" && Number.isFinite(rawVal) ? rawVal : null;
+        if (mode === "percentage" && numVal != null && numVal > 0) {
+          return {
+            useCustomCommission: true,
+            commissionPercentage: numVal,
+            commissionFlatFee: null,
+          };
+        }
+        if (mode === "flat" && numVal != null && numVal > 0) {
+          return {
+            useCustomCommission: true,
+            commissionPercentage: null,
+            commissionFlatFee: numVal,
+          };
+        }
+      }
+
       const c = data.commission_settings;
       if (c == null) {
         return {

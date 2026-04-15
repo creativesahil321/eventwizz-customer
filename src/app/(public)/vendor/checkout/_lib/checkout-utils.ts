@@ -26,6 +26,38 @@ function checkoutLogCurrencySymbol(): string {
   return resolveCurrencySymbol(undefined);
 }
 
+function calculatePlatformFeeFromApi(
+  apiEventData: unknown,
+  bookingSubTotal: number
+): { fee: number; label: string | null } {
+  const feeMeta = (apiEventData as { vendor_platform_fee?: unknown })
+    ?.vendor_platform_fee as
+    | { mode?: unknown; value?: unknown }
+    | undefined;
+
+  if (!feeMeta || bookingSubTotal <= 0) return { fee: 0, label: null };
+
+  const mode = feeMeta.mode === "percentage" ? "percentage" : feeMeta.mode === "flat" ? "flat" : null;
+  const valueNum =
+    typeof feeMeta.value === "number"
+      ? feeMeta.value
+      : Number.parseFloat(String(feeMeta.value ?? ""));
+
+  if (!mode || !Number.isFinite(valueNum) || valueNum <= 0) {
+    return { fee: 0, label: null };
+  }
+
+  const rawFee = mode === "flat" ? valueNum : (bookingSubTotal * valueNum) / 100;
+  // Currency amounts should never be negative; keep in 2dp range
+  const fee = Math.max(0, Number(rawFee.toFixed(2)));
+
+  if (mode === "flat") {
+    return { fee, label: "Platform fee" };
+  }
+
+  return { fee, label: `Platform fee (${valueNum}%)` };
+}
+
 /**
  * Transform cart edit store data into checkout API format
  */
@@ -252,12 +284,16 @@ export function transformCartToCheckout(
     return null;
   }
 
+  // Platform fee is charged on the booking subtotal (flat or percentage)
+  const { fee: platformFee } = calculatePlatformFeeFromApi(apiEventData, subTotal);
+
   const checkoutPayload = {
     vendor_event_id: vendorEventId,
     event_slug: eventSlug,
     sub_total: subTotal,
     partial_payment: hasAnyDepositPayments ? partialPayment : null,
-    total: totalDueToday, // Total to pay today (sum of all dates: deposits + full payments)
+    platform_fee: platformFee,
+    total: totalDueToday + platformFee, // Amount to pay today + platform fee
     payment_gateway: paymentGateway,
     dates: checkoutDates,
   };
@@ -267,6 +303,7 @@ export function transformCartToCheckout(
     event_slug: checkoutPayload.event_slug,
     sub_total: checkoutPayload.sub_total,
     partial_payment: checkoutPayload.partial_payment,
+    platform_fee: checkoutPayload.platform_fee,
     total: checkoutPayload.total,
     payment_gateway: checkoutPayload.payment_gateway,
     dates_count: checkoutPayload.dates.length,
@@ -442,8 +479,12 @@ export function calculateCheckoutSummary(
   apiCartData?: unknown
 ): {
   subTotal: number;
+  platformFee: number;
+  platformFeeLabel: string | null;
+  grandTotal: number;
   payToday: number;
   payLater: number;
+  payTodayWithFee: number;
   dateCount: number;
   itemCount: number;
 } {
@@ -452,8 +493,12 @@ export function calculateCheckoutSummary(
   if (!eventData) {
     return {
       subTotal: 0,
+      platformFee: 0,
+      platformFeeLabel: null,
+      grandTotal: 0,
       payToday: 0,
       payLater: 0,
+      payTodayWithFee: 0,
       dateCount: 0,
       itemCount: 0,
     };
@@ -607,10 +652,19 @@ export function calculateCheckoutSummary(
     }
   });
 
+  const { fee: platformFee, label: platformFeeLabel } =
+    calculatePlatformFeeFromApi(apiEventData, subTotal);
+  const grandTotal = subTotal + platformFee;
+  const payTodayWithFee = payToday + platformFee;
+
   return {
     subTotal,
+    platformFee,
+    platformFeeLabel,
+    grandTotal,
     payToday,
     payLater,
+    payTodayWithFee,
     dateCount,
     itemCount,
   };

@@ -6,13 +6,11 @@ import ExperienceSection from "../../vendor/_components/EventListPage/experience
 import ContactFormSection from "../../vendor/_components/EventListPage/contact-form-section";
 import FooterSection from "../../vendor/_components/EventListPage/footer";
 import { LocationMarketingBody } from "@/components/public/location-marketing-sections";
-import { ThemeSchema } from "@/types/theme.types";
 import { LocationData } from "@/services/common/events/type";
 import { useLocationData } from "../_lib/hooks";
 
 interface LocationPageClientProps {
   location: LocationData; // Initial data from SSR
-  themeData: ThemeSchema | null;
   locationSlug: string;
   host: string;
   subdomain?: string | null;

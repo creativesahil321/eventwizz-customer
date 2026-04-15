@@ -24,6 +24,8 @@ import {
   THEME_CUSTOM_FONT_STYLESHEET_LINK_ID_PREFIX,
 } from "@/lib/site-custom-font-stylesheets";
 import { normalizeHeadingEmphasis } from "@/lib/heading-emphasis";
+import { fontInter } from "@/lib/fonts";
+import { cn } from "@/lib/utils";
 
 /**
  * Dynamic metadata — single source of truth for brand name, favicon, and title template.
@@ -118,7 +120,7 @@ export default async function RootLayout({
     <html
       lang="en"
       suppressHydrationWarning={true}
-      className="[scrollbar-gutter:stable]"
+      className={cn("[scrollbar-gutter:stable]", fontInter.variable)}
       data-heading-emphasis={normalizeHeadingEmphasis(
         initialTheme?.typography?.headingEmphasis,
       )}

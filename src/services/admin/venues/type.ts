@@ -90,8 +90,6 @@ export interface AdminVenueByIdRecentEvent {
   location_address?: string | null;
   date: string | null;
   event_date_raw: string | null;
-  /** When set: draft | pending | approved | rejected | changes_requested (backend contract). */
-  approval_status?: string | null;
 }
 
 export interface AdminVenueByIdLocation {
@@ -138,6 +136,12 @@ export interface AdminVenueByIdCommissionSettings {
   commission_flat_fee: number | null;
 }
 
+/** Preferred shape from GET /admin/venues/{id} when backend sends venue_commission. */
+export interface AdminVenueByIdVenueCommission {
+  mode?: string | null;
+  venue_commission_value?: number | null;
+}
+
 export interface AdminVenueByIdCancellationRequestActions {
   can_approve: boolean;
   can_disapprove: boolean;
@@ -176,6 +180,8 @@ export interface AdminVenueByIdData {
   login_security: AdminVenueByIdLoginSecurity;
   domain_approval_request?: AdminVenueByIdDomainApproval;
   commission_settings?: AdminVenueByIdCommissionSettings;
+  /** When set, overrides legacy commission_settings for display (PUT /admin/venues/{id}/venue-commission). */
+  venue_commission?: AdminVenueByIdVenueCommission | null;
 }
 
 export interface AdminVenueByIdResponse {
@@ -205,6 +211,19 @@ export interface AdminVenueUpdateResponse {
   status: boolean;
   message: string;
   data: Partial<AdminVenueByIdData>;
+  errors: unknown[];
+}
+
+/** PUT /admin/venues/{id}/venue-commission */
+export interface AdminVenueCommissionUpdatePayload {
+  venue_commission_mode: "percentage" | "flat";
+  venue_commission_value: number;
+}
+
+export interface AdminVenueCommissionUpdateResponse {
+  status: boolean;
+  message: string;
+  data?: unknown;
   errors: unknown[];
 }
 

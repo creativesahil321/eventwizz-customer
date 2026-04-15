@@ -121,9 +121,10 @@ export function LocationMultiSelect({
             value={search}
             onValueChange={setSearch}
           />
-          <CommandList className="max-h-[min(280px,60vh)] p-0">
+          {/* Avoid double-scrollbar: CommandList should not scroll; ScrollArea handles scrolling */}
+          <CommandList className="p-0 overflow-hidden">
             <CommandEmpty>No locations found.</CommandEmpty>
-            <ScrollArea className="h-[min(260px,55vh)]">
+            <ScrollArea className="h-[min(280px,60vh)]">
               <div className="p-2 space-y-0.5">
                 <div className="flex items-center gap-2 rounded-sm px-2 py-2.5 min-h-[44px] touch-manipulation">
                   <Checkbox

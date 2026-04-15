@@ -3,11 +3,7 @@ import { notFound } from "next/navigation";
 import { QueryClient, dehydrate } from "@tanstack/react-query";
 import LocationPageClient from "./_components/location-page-client";
 import { Hydrate } from "./_components/hydration-provider";
-import { themeService } from "@/services/common/theme/theme.service";
-import {
-  getRequestHost,
-  getSubdomainFromDomain,
-} from "@/lib/server-theme";
+import { getRequestHost, getSubdomainFromDomain } from "@/lib/server-theme";
 import {
   eventsService,
   eventKeys,
@@ -52,18 +48,13 @@ async function fetchLocationData(slug: string) {
         locationData: null,
         host,
         subdomain,
-        themeData: null,
       };
     }
-
-    // Get theme data
-    const themeResponse = await themeService.getThemeSettingsByDomain(host);
 
     return {
       locationData: response.data,
       host,
       subdomain,
-      themeData: themeResponse.isSuccess ? themeResponse.data : null,
     };
   } catch (error) {
     console.error("Error fetching location data:", error);
@@ -71,7 +62,6 @@ async function fetchLocationData(slug: string) {
       locationData: null,
       host,
       subdomain,
-      themeData: null,
     };
   }
 }
@@ -86,9 +76,8 @@ export default async function LocationPage(props: {
   // Create a new QueryClient for SSR
   const queryClient = new QueryClient();
 
-  const { locationData, host, subdomain, themeData } = await fetchLocationData(
-    locationSlug
-  );
+  const { locationData, host, subdomain } =
+    await fetchLocationData(locationSlug);
 
   if (!locationData) {
     notFound();
@@ -107,7 +96,6 @@ export default async function LocationPage(props: {
     <Hydrate state={dehydratedState}>
       <LocationPageClient
         location={locationData}
-        themeData={themeData}
         locationSlug={locationSlug}
         host={host}
         subdomain={subdomain}

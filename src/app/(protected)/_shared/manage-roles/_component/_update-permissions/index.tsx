@@ -167,8 +167,11 @@ export default function PermissionsDialog({
   const getPermKey = (perm: PermissionItem) =>
     perm.id?.toString() || perm.slug;
 
+  const normalizePermText = (s: string | undefined | null) =>
+    (s ?? "").toLowerCase().trim();
+
   const isWriteAction = (perm: PermissionItem) => {
-    const s = (perm.slug || perm.label || "").toLowerCase();
+    const s = normalizePermText(perm.slug || perm.label);
     if (s.includes("read")) return false;
     return (
       s.includes("create") ||
@@ -179,10 +182,116 @@ export default function PermissionsDialog({
   };
 
   const isReadPermission = (perm: PermissionItem) =>
-    (perm.slug || perm.label || "").toLowerCase().includes("read");
+    normalizePermText(perm.slug || perm.label).includes("read");
 
   const findReadPermissionInGroup = (group: ProcessedPermissionGroup) =>
     group.permissions.find((p) => isReadPermission(p));
+
+  /**
+   * Cross-group dependencies (practical backend requirements).
+   * Example: Create Event needs Event Categories to be readable so category dropdown can load.
+   */
+  const findReadEventCategoryPermissionKey = (): string | null => {
+    // Most reliable is slug/key match, but we also fall back to label/title heuristics.
+    const candidates: PermissionItem[] = [];
+    for (const group of displayPermissions) {
+      for (const p of group.permissions) {
+        const slug = normalizePermText(p.slug);
+        const label = normalizePermText(p.label || p.title);
+        const groupTitle = normalizePermText(group.title);
+
+        const looksLikeRead =
+          slug.includes("read") || label.startsWith("read ");
+        const looksLikeEventCategory =
+          (slug.includes("event") && slug.includes("categor")) ||
+          (label.includes("event") && label.includes("categor")) ||
+          (groupTitle.includes("event") && groupTitle.includes("categor"));
+
+        if (looksLikeRead && looksLikeEventCategory) {
+          candidates.push(p);
+        }
+      }
+    }
+
+    if (candidates.length === 0) return null;
+
+    // Prefer the most explicit slug match if present.
+    const best =
+      candidates.find((p) => normalizePermText(p.slug).includes("read-event")) ??
+      candidates[0];
+    return getPermKey(best);
+  };
+
+  const isCreateEventPermission = (perm: PermissionItem) => {
+    const slug = normalizePermText(perm.slug);
+    const label = normalizePermText(perm.label || perm.title);
+    return slug.includes("create-event") || label === "create event";
+  };
+
+  const isEventManagementPermission = (perm: PermissionItem) => {
+    const slug = normalizePermText(perm.slug);
+    const label = normalizePermText(perm.label || perm.title);
+    // Avoid matching category/location/menu permissions (they have their own groups)
+    const isEventWord = slug.includes("event") || label.includes("event");
+    const isNotCategoryOrLocationOrMenu =
+      !slug.includes("categor") &&
+      !label.includes("categor") &&
+      !slug.includes("location") &&
+      !label.includes("location") &&
+      !slug.includes("menu") &&
+      !label.includes("menu");
+    // Typical action slugs/labels for event management
+    const isCrud =
+      slug.includes("create") ||
+      slug.includes("read") ||
+      slug.includes("update") ||
+      slug.includes("delete") ||
+      label.startsWith("create ") ||
+      label.startsWith("read ") ||
+      label.startsWith("update ") ||
+      label.startsWith("delete ");
+    return isEventWord && isNotCategoryOrLocationOrMenu && isCrud;
+  };
+
+  const isReadEventCategoryPermissionKey = (permKey: string) => {
+    for (const group of displayPermissions) {
+      for (const p of group.permissions) {
+        if (getPermKey(p) !== permKey) continue;
+        const slug = normalizePermText(p.slug);
+        const label = normalizePermText(p.label || p.title);
+        const groupTitle = normalizePermText(group.title);
+        const looksLikeRead =
+          slug.includes("read") || label.startsWith("read ");
+        const looksLikeEventCategory =
+          (slug.includes("event") && slug.includes("categor")) ||
+          (label.includes("event") && label.includes("categor")) ||
+          (groupTitle.includes("event") && groupTitle.includes("categor"));
+        return looksLikeRead && looksLikeEventCategory;
+      }
+    }
+    return false;
+  };
+
+  const isEventManagementEnabled = (state: { [key: string]: boolean }) => {
+    // Prefer group title detection when available; fallback to slug/label heuristics.
+    for (const group of displayPermissions) {
+      const groupTitle = normalizePermText(group.title);
+      const isEventManagementGroup =
+        groupTitle.includes("event") && groupTitle.includes("management");
+
+      for (const p of group.permissions) {
+        const enabled = state[getPermKey(p)] === true;
+        if (!enabled) continue;
+
+        if (isEventManagementGroup && isEventManagementPermission(p)) return true;
+        if (!isEventManagementGroup && isEventManagementPermission(p)) {
+          // Still count it as event-management if it clearly matches (some APIs don't group well)
+          return true;
+        }
+      }
+    }
+    return false;
+  };
 
   const hasWriteEnabledInGroup = (
     group: ProcessedPermissionGroup,
@@ -207,6 +316,14 @@ export default function PermissionsDialog({
             const readKey = getPermKey(readPerm);
             newState[readKey] = true;
           }
+
+          // Cross-group dependency: enabling "Create Event" requires "Read Event Category".
+          if (isCreateEventPermission(perm)) {
+            const readCategoryKey = findReadEventCategoryPermissionKey();
+            if (readCategoryKey) {
+              newState[readCategoryKey] = true;
+            }
+          }
           break;
         }
       } else {
@@ -217,6 +334,13 @@ export default function PermissionsDialog({
             return prev;
           }
           break;
+        }
+
+        // Prevent disabling read-category while event-management remains enabled.
+        if (isReadEventCategoryPermissionKey(permId)) {
+          if (isEventManagementEnabled(prev)) {
+            return prev;
+          }
         }
       }
 
@@ -429,6 +553,9 @@ export default function PermissionsDialog({
                       const isRead = isReadPermission(perm);
                       const readRequiredByWrite =
                         isRead && hasWriteEnabledInGroup(group, permissionState);
+                      const eventSystemLocksReadCategory =
+                        isReadEventCategoryPermissionKey(permKey) &&
+                        isEventManagementEnabled(permissionState);
                       return (
                         <div
                           key={perm.id || perm.slug}
@@ -438,7 +565,11 @@ export default function PermissionsDialog({
                             id={permKey}
                             checked={permissionState[permKey] || false}
                             onCheckedChange={() => togglePermission(permKey)}
-                            disabled={isDefault || readRequiredByWrite}
+                            disabled={
+                              isDefault ||
+                              readRequiredByWrite ||
+                              eventSystemLocksReadCategory
+                            }
                             className="data-[state=checked]:bg-[var(--color-primary)] shrink-0"
                           />
                           <Label
@@ -447,6 +578,8 @@ export default function PermissionsDialog({
                             title={
                               readRequiredByWrite
                                 ? "Required when Create, Edit, Update or Delete is enabled"
+                                : eventSystemLocksReadCategory
+                                  ? "Required while Event Management permissions are enabled"
                                 : undefined
                             }
                           >

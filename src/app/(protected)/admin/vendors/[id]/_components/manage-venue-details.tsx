@@ -155,12 +155,7 @@ export function ManageVenueDetails({ venue }: ManageVenueDetailsProps) {
   const { formatLocale: formatMoney } = useCurrencyFormat();
   const canImpersonateVendor = usePermission(IMPERSONATE_VENDOR_PERMISSION);
 
-  const pendingApprovalEvents = venue.recentEvents.filter(
-    (e) => e.approvalStatus === "pending",
-  );
-  const recentActivityEvents = venue.recentEvents.filter(
-    (e) => e.approvalStatus !== "pending",
-  );
+  const recentActivityEvents = venue.recentEvents;
 
   const defaultLocation = venue.locations[0];
   const [selectedLocationId, setSelectedLocationId] = useState<number>(
@@ -488,53 +483,6 @@ export function ManageVenueDetails({ venue }: ManageVenueDetailsProps) {
             </CardHeader>
             <CardContent className="space-y-5 pt-0">
               <div className="space-y-5">
-                <div>
-                  <p className="text-sm font-semibold text-foreground mb-3">
-                    Pending event approvals
-                  </p>
-                  {pendingApprovalEvents.length > 0 ? (
-                    <ul className="space-y-3 text-sm">
-                      {pendingApprovalEvents.map((evt) => (
-                        <li
-                          key={evt.id}
-                          className="flex flex-col gap-2 rounded-lg border border-amber-200/80 bg-amber-50/50 px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between"
-                        >
-                          <span className="min-w-0 text-foreground space-y-1">
-                            <span className="block">
-                              <span className="font-medium">{evt.title}</span>
-                              <span className="text-muted-foreground">
-                                {" "}
-                                – {evt.date}
-                              </span>
-                            </span>
-                            {evt.locationAddress ? (
-                              <span className="block text-xs text-muted-foreground break-words">
-                                {evt.locationAddress}
-                              </span>
-                            ) : null}
-                          </span>
-                          <Button
-                            variant="event-primary"
-                            size="sm"
-                            className="w-full shrink-0 gap-1.5 sm:w-auto"
-                            asChild
-                          >
-                            <Link
-                              href={`/admin/events/${evt.id}?fromVendor=${venue.id}`}
-                            >
-                              Review
-                            </Link>
-                          </Button>
-                        </li>
-                      ))}
-                    </ul>
-                  ) : (
-                    <p className="text-sm text-muted-foreground">
-                      No events awaiting approval.
-                    </p>
-                  )}
-                </div>
-
                 <div className="border-t border-slate-100 pt-5">
                   <div className="flex items-center justify-between gap-3 mb-3">
                     <p className="text-sm font-semibold text-foreground">

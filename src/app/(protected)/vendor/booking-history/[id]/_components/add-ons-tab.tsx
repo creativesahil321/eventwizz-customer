@@ -42,12 +42,15 @@ interface AddOnsTabProps {
   totalTables?: number;
   dates?: BookingDate[];
   onSaveSuccess?: () => void;
+  /** When true, disables any mutations / saving (read-only view). */
+  readOnly?: boolean;
 }
 
 export default function AddOnsTab({
   bookingId,
   dates = [],
   onSaveSuccess,
+  readOnly = false,
 }: AddOnsTabProps) {
   const eligibleDates = useMemo(
     () => dates.filter((d) => isBookingDateEligibleForAddOns(d.paymentStatus)),
@@ -769,6 +772,7 @@ export default function AddOnsTab({
     );
 
   const isSaveDisabled =
+    readOnly ||
     saveAddOnsMutation.isPending ||
     !hasChanges ||
     !validation.isValid ||

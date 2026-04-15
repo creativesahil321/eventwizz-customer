@@ -1779,7 +1779,7 @@ export default function DatesTab() {
               Please provide a clear reason before continuing.
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <div className="space-y-2">
+          <div className="space-y-2 text-black">
             <Label htmlFor="cancel-date-reason">Cancellation reason</Label>
             <Textarea
               id="cancel-date-reason"

@@ -2,7 +2,7 @@
 
 import { Button } from "@/components/ui/button";
 import { useEffect } from "react";
-import { tiemposHeadline } from "@/lib/fonts";
+import { tiemposHeadline } from "@/lib/fonts-tiempos";
 import { cn } from "@/lib/utils";
 import { AlertTriangle } from "lucide-react";
 

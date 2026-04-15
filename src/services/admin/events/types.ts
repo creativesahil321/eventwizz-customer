@@ -12,16 +12,7 @@ export interface AdminEventActionResponse {
   message: string;
   data?: {
     id?: number;
-    approval_status?: string;
     [key: string]: unknown;
   };
   errors: unknown[];
-}
-
-export interface AdminRejectEventPayload {
-  reason: string;
-}
-
-export interface AdminRequestChangesPayload {
-  message: string;
 }

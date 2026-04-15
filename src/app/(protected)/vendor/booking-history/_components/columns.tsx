@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/tooltip";
 import { createSelectColumn } from "@/components/data-table/data-table-column-select";
 import { StatusBadge } from "@/components/ui/status-badge";
+import { PermissionGuard } from "@/components/permission/PermissionGuard";
 
 interface GetHistoryColumnsProps {
   setRowAction: React.Dispatch<
@@ -443,14 +444,16 @@ export function getHistoryColumns({
           >
             <Eye size={14} />
           </Button>
-          <Button
-            onClick={() => setRowAction({ row, type: "mail" })}
-            variant={"event-outline"}
-            size="sm"
-            title="Send Mail"
-          >
-            <Mail size={14} />
-          </Button>
+          <PermissionGuard permissionKey="update-booking" fallback={null}>
+            <Button
+              onClick={() => setRowAction({ row, type: "mail" })}
+              variant={"event-outline"}
+              size="sm"
+              title="Send Mail"
+            >
+              <Mail size={14} />
+            </Button>
+          </PermissionGuard>
         </nav>
       ),
       enableSorting: false,

@@ -132,6 +132,8 @@ export default function LocationSelectionHeader({
               {logo ? (
                 <img
                   src={addCacheBusting(logo)}
+                  width={200}
+                  height={116}
                   className="h-14 md:h-16 w-auto object-contain max-w-[200px]"
                   alt={name || "EventWizz"}
                 />

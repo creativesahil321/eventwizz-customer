@@ -165,7 +165,7 @@ export const checkoutService = {
 
     return {
       calculatedSubTotal,
-      calculatedTotal: calculatedSubTotal, // No additional fees as per user requirements
+      calculatedTotal: calculatedSubTotal + (data.platform_fee ?? 0),
     };
   },
 };

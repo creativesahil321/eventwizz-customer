@@ -112,14 +112,12 @@ export default function EventTabs({ search }: EventsProps) {
   const hasDraftEventsToSelect = events.length > 0;
   const showDraftBulkUi = isDraftTab && hasDraftEventsToSelect;
 
-  /** Selected rows: plain drafts vs submitted for admin review */
+  /** Selected rows count (draft tab bulk actions). */
   const selectedDraftBreakdown = useMemo(() => {
     const picked = selectedEvents
       .map((id) => events.find((e) => e.id === id))
       .filter((e): e is EventItem => Boolean(e));
-    const underReview = picked.filter((e) => e.is_submitted_for_approval).length;
-    const draftOnly = picked.length - underReview;
-    return { total: picked.length, underReview, draftOnly };
+    return { total: picked.length };
   }, [selectedEvents, events]);
 
   // Toggle selection mode
@@ -456,34 +454,6 @@ export default function EventTabs({ search }: EventsProps) {
                   from your account. Customers will no longer see these events,
                   and this cannot be undone.
                 </p>
-                {(selectedDraftBreakdown.draftOnly > 0 ||
-                  selectedDraftBreakdown.underReview > 0) && (
-                  <div className="rounded-md border border-border bg-muted/40 px-3 py-2.5">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-foreground mb-2">
-                      Selection summary
-                    </p>
-                    <ul className="list-disc space-y-1 pl-4 text-xs sm:text-sm">
-                      {selectedDraftBreakdown.draftOnly > 0 && (
-                        <li>
-                          {selectedDraftBreakdown.draftOnly}{" "}
-                          {selectedDraftBreakdown.draftOnly === 1
-                            ? "event is"
-                            : "events are"}{" "}
-                          still in draft (not submitted for review)
-                        </li>
-                      )}
-                      {selectedDraftBreakdown.underReview > 0 && (
-                        <li>
-                          {selectedDraftBreakdown.underReview}{" "}
-                          {selectedDraftBreakdown.underReview === 1
-                            ? "event is"
-                            : "events are"}{" "}
-                          submitted and awaiting admin approval
-                        </li>
-                      )}
-                    </ul>
-                  </div>
-                )}
                 <p className="text-xs">
                   If you are unsure, choose Cancel and review your selection
                   before proceeding.

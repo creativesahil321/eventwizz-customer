@@ -1,10 +1,16 @@
 "use client";
 
 import { createContext, useContext, useEffect, ReactNode } from "react";
-import { getDomain, getTenantIdFromDomain } from "@/lib/domain";
+import {
+  getDomain,
+  getTenantIdFromDomain,
+  buildTenantDataFromTheme,
+  primeTenantDataCache,
+} from "@/lib/domain";
 import { useDomainStore } from "@/store/domain.store";
 import { UserType } from "@/types/auth.types";
 import { ThemeSchema } from "@/types/theme.types";
+import { ServerContext } from "@/lib/server-context";
 
 // Use ThemeSchema instead of a limited interface definition
 type TenantSettings = ThemeSchema;
@@ -33,6 +39,7 @@ const DomainContext = createContext<DomainContextType>({
 export const DomainProvider = ({ children }: { children: ReactNode }) => {
   // Use the Zustand store
   const domainStore = useDomainStore();
+  const serverContext = useContext(ServerContext);
 
   // Extract only the values we need to check for changes
   const {
@@ -54,6 +61,37 @@ export const DomainProvider = ({ children }: { children: ReactNode }) => {
           settings: null,
           isLoading: false,
           isDomainRequest: false,
+        });
+        return;
+      }
+
+      const clientHost = detectedDomain.split(":")[0];
+      const serverHost = serverContext.host?.split(":")[0] ?? null;
+      const ssrTheme = serverContext.theme;
+      const canHydrateFromSsr =
+        ssrTheme != null &&
+        serverHost != null &&
+        serverHost === clientHost;
+
+      if (canHydrateFromSsr) {
+        if (
+          detectedDomain === currentDomain &&
+          currentSettings &&
+          !isLoading
+        ) {
+          return;
+        }
+
+        const tenantData = buildTenantDataFromTheme(clientHost, ssrTheme);
+        primeTenantDataCache(clientHost, tenantData);
+        domainStore.setDomain({
+          domain: detectedDomain,
+          tenantId: tenantData.tenantId,
+          website_role: tenantData.website_role,
+          parentDomain: tenantData.parentDomain,
+          settings: tenantData.settings,
+          isLoading: false,
+          isDomainRequest: true,
         });
         return;
       }
@@ -89,7 +127,14 @@ export const DomainProvider = ({ children }: { children: ReactNode }) => {
     };
 
     loadDomainData();
-  }, [currentDomain, currentSettings, isLoading, domainStore]);
+  }, [
+    currentDomain,
+    currentSettings,
+    isLoading,
+    domainStore,
+    serverContext.theme,
+    serverContext.host,
+  ]);
 
   // Provide the Zustand store data through the context
   return (

@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Switch } from "@/components/ui/switch";
 import { adminVenuesService } from "@/services/admin/venues/venues.service";
 import { cn } from "@/lib/utils";
 import type { VenueCommissionSettings } from "../_lib/types";
@@ -95,7 +96,11 @@ export function VenueCommissionCard({ venue }: VenueCommissionCardProps) {
   const queryClient = useQueryClient();
   const c = venue.commissionSettings;
   const groupLabelId = `venue-commission-options-${venue.id}`;
+  const switchId = `venue-commission-custom-toggle-${venue.id}`;
 
+  const [customEnabled, setCustomEnabled] = useState(
+    () => c.useCustomCommission,
+  );
   const [mode, setMode] = useState<CommissionMode>(() => modeFromSettings(c));
   const [pctStr, setPctStr] = useState(() =>
     c.commissionPercentage != null ? String(c.commissionPercentage) : "",
@@ -107,6 +112,7 @@ export function VenueCommissionCard({ venue }: VenueCommissionCardProps) {
   const [flatBlurred, setFlatBlurred] = useState(false);
 
   useEffect(() => {
+    setCustomEnabled(venue.commissionSettings.useCustomCommission);
     setMode(modeFromSettings(venue.commissionSettings));
     setPctStr(
       venue.commissionSettings.commissionPercentage != null
@@ -127,17 +133,24 @@ export function VenueCommissionCard({ venue }: VenueCommissionCardProps) {
   ]);
 
   useEffect(() => {
+    if (customEnabled && mode === "none") {
+      setMode("percentage");
+    }
+  }, [customEnabled, mode]);
+
+  useEffect(() => {
     setPctBlurred(false);
     setFlatBlurred(false);
   }, [mode]);
 
   const saveMutation = useMutation({
     mutationFn: () => {
-      if (mode === "none") {
+      if (!customEnabled) {
         return adminVenuesService.updateVenue(venue.id, {
           use_custom_commission: false,
         });
       }
+
       if (mode === "percentage") {
         const pct = parseOptionalNumber(pctStr);
         if (pct == null) {
@@ -154,28 +167,31 @@ export function VenueCommissionCard({ venue }: VenueCommissionCardProps) {
             ),
           );
         }
-        return adminVenuesService.updateVenue(venue.id, {
-          use_custom_commission: true,
-          commission_percentage: pct,
-          commission_flat_fee: 0,
+        return adminVenuesService.updateVenueCommission(venue.id, {
+          venue_commission_mode: "percentage",
+          venue_commission_value: pct,
         });
       }
-      const flat = parseOptionalNumber(flatStr);
-      if (flat == null) {
-        return Promise.reject(
-          new Error(`Flat fee must be between £${FLAT_MIN} and £${FLAT_MAX}.`),
-        );
+
+      if (mode === "flat") {
+        const flat = parseOptionalNumber(flatStr);
+        if (flat == null) {
+          return Promise.reject(
+            new Error(`Flat fee must be between £${FLAT_MIN} and £${FLAT_MAX}.`),
+          );
+        }
+        if (flat < FLAT_MIN || flat > FLAT_MAX) {
+          return Promise.reject(
+            new Error(`Flat fee must be between £${FLAT_MIN} and £${FLAT_MAX}.`),
+          );
+        }
+        return adminVenuesService.updateVenueCommission(venue.id, {
+          venue_commission_mode: "flat",
+          venue_commission_value: flat,
+        });
       }
-      if (flat < FLAT_MIN || flat > FLAT_MAX) {
-        return Promise.reject(
-          new Error(`Flat fee must be between £${FLAT_MIN} and £${FLAT_MAX}.`),
-        );
-      }
-      return adminVenuesService.updateVenue(venue.id, {
-        use_custom_commission: true,
-        commission_percentage: 0,
-        commission_flat_fee: flat,
-      });
+
+      return Promise.reject(new Error("Choose percentage or flat fee."));
     },
     onSuccess: () => {
       queryClient.invalidateQueries({
@@ -186,16 +202,20 @@ export function VenueCommissionCard({ venue }: VenueCommissionCardProps) {
 
   useEffect(() => {
     saveMutation.reset();
-  }, [mode, pctStr, flatStr]);
+  }, [customEnabled, mode, pctStr, flatStr]);
+
+  const activeMode: "percentage" | "flat" =
+    mode === "flat" ? "flat" : "percentage";
 
   const blockingReason = (() => {
-    if (mode === "percentage") {
+    if (!customEnabled) return false;
+    if (activeMode === "percentage") {
       const pct = parseOptionalNumber(pctStr);
       if (pct == null || pct < PCT_MIN || pct > PCT_MAX) {
         return true;
       }
     }
-    if (mode === "flat") {
+    if (activeMode === "flat") {
       const flat = parseOptionalNumber(flatStr);
       if (flat == null || flat < FLAT_MIN || flat > FLAT_MAX) {
         return true;
@@ -205,7 +225,7 @@ export function VenueCommissionCard({ venue }: VenueCommissionCardProps) {
   })();
 
   const pctErrorShown: string | null =
-    mode === "percentage"
+    customEnabled && activeMode === "percentage"
       ? pctFieldMessage(pctStr) ??
         (pctBlurred && pctStr.trim() === ""
           ? `Enter a percentage between ${PCT_MIN} and ${PCT_MAX}%.`
@@ -213,7 +233,7 @@ export function VenueCommissionCard({ venue }: VenueCommissionCardProps) {
       : null;
 
   const flatErrorShown: string | null =
-    mode === "flat"
+    customEnabled && activeMode === "flat"
       ? flatFieldMessage(flatStr) ??
         (flatBlurred && flatStr.trim() === ""
           ? `Enter a flat fee between £${FLAT_MIN} and £${FLAT_MAX}.`
@@ -221,13 +241,18 @@ export function VenueCommissionCard({ venue }: VenueCommissionCardProps) {
       : null;
 
   const fieldErrorMessage =
-    mode === "percentage"
+    customEnabled && activeMode === "percentage"
       ? pctErrorShown
-      : mode === "flat"
+      : customEnabled && activeMode === "flat"
         ? flatErrorShown
         : null;
 
-  const saveDisabled = saveMutation.isPending || blockingReason;
+  const alreadyUsingPlatformDefault =
+    !customEnabled && !c.useCustomCommission;
+  const saveDisabled =
+    saveMutation.isPending ||
+    (customEnabled && blockingReason) ||
+    alreadyUsingPlatformDefault;
 
   const mutationMessage =
     saveMutation.isError && saveMutation.error instanceof Error
@@ -246,131 +271,147 @@ export function VenueCommissionCard({ venue }: VenueCommissionCardProps) {
         </p>
       </CardHeader>
       <CardContent className="space-y-5 px-6 pt-5 pb-6">
-        <fieldset className="space-y-3 border-0 p-0 m-0 min-w-0">
-          <legend
-            id={groupLabelId}
-            className="text-sm font-medium text-foreground mb-0 block w-full"
-          >
-            Fee for this venue
-          </legend>
-          <RadioGroup
-            className="flex flex-col gap-2.5 pt-0.5"
-            value={mode === "none" ? undefined : mode}
-            onValueChange={(v) =>
-              setMode(v as "percentage" | "flat")
-            }
-            aria-labelledby={groupLabelId}
-          >
-            {CUSTOM_FEE_ROWS.map(({ mode: rowMode, title, description }) => {
-              const inputId = `venue-commission-${venue.id}-${rowMode}`;
-              const selected = mode === rowMode;
-              return (
-                <label
-                  key={rowMode}
-                  htmlFor={inputId}
-                  className={cn(
-                    "flex cursor-pointer gap-3 rounded-lg border p-3.5 transition-colors",
-                    selected
-                      ? "border-[var(--color-primary)]/45 bg-[#f8fafa] shadow-sm"
-                      : "border-slate-200 bg-slate-50/50 hover:border-slate-300/80",
-                  )}
-                >
-                  <RadioGroupItem
-                    value={rowMode}
-                    id={inputId}
-                    className="mt-0.5"
-                  />
-                  <div className="min-w-0 flex-1 space-y-0.5">
-                    <span className="text-sm font-medium text-foreground leading-snug block">
-                      {title}
-                    </span>
-                    <span className="text-xs text-muted-foreground leading-relaxed block">
-                      {description}
-                    </span>
-                  </div>
-                </label>
-              );
-            })}
-          </RadioGroup>
-          {mode !== "none" ? (
-            <div className="pt-1">
-              <button
-                type="button"
-                className="text-xs text-muted-foreground hover:text-foreground underline-offset-2 hover:underline"
-                onClick={() => setMode("none")}
-              >
-                Use platform default (Payment Settings)
-              </button>
-            </div>
-          ) : null}
-        </fieldset>
-
-        {mode !== "none" ? (
-          <div className="rounded-lg border border-slate-200 bg-slate-50/40 px-4 py-4">
-            {mode === "percentage" ? (
-              <div className="space-y-2 max-w-[15rem]">
-                <Label
-                  htmlFor={`venue-commission-pct-${venue.id}`}
-                  className="text-sm font-medium text-foreground"
-                >
-                  Platform fee (%)
-                </Label>
-                <Input
-                  id={`venue-commission-pct-${venue.id}`}
-                  type="number"
-                  inputMode="decimal"
-                  min={PCT_MIN}
-                  max={PCT_MAX}
-                  step="0.01"
-                  placeholder="e.g. 10"
-                  aria-invalid={fieldErrorMessage != null}
-                  className={cn(
-                    "h-10 tabular-nums bg-white",
-                    fieldErrorMessage != null &&
-                      "border-destructive focus-visible:ring-destructive/30",
-                  )}
-                  value={pctStr}
-                  onChange={(e) => setPctStr(e.target.value)}
-                  onBlur={() => setPctBlurred(true)}
-                />
-                <p className="text-xs text-muted-foreground">
-                  Allowed range: {PCT_MIN}%–{PCT_MAX}%.
-                </p>
-              </div>
-            ) : null}
-            {mode === "flat" ? (
-              <div className="space-y-2 max-w-[15rem]">
-                <Label
-                  htmlFor={`venue-commission-flat-${venue.id}`}
-                  className="text-sm font-medium text-foreground"
-                >
-                  Flat amount (£)
-                </Label>
-                <Input
-                  id={`venue-commission-flat-${venue.id}`}
-                  type="number"
-                  inputMode="decimal"
-                  min={FLAT_MIN}
-                  max={FLAT_MAX}
-                  step="0.01"
-                  placeholder={`£${FLAT_MIN}–${FLAT_MAX}`}
-                  aria-invalid={fieldErrorMessage != null}
-                  className={cn(
-                    "h-10 tabular-nums bg-white",
-                    fieldErrorMessage != null &&
-                      "border-destructive focus-visible:ring-destructive/30",
-                  )}
-                  value={flatStr}
-                  onChange={(e) => setFlatStr(e.target.value)}
-                  onBlur={() => setFlatBlurred(true)}
-                />
-                <p className="text-xs text-muted-foreground">
-                  Allowed range: £{FLAT_MIN}–£{FLAT_MAX} (GBP).
-                </p>
-              </div>
-            ) : null}
+        <div className="flex flex-col gap-2 rounded-lg border border-slate-200 bg-slate-50/50 px-4 py-3.5 sm:flex-row sm:items-center sm:justify-between">
+          <div className="space-y-0.5 min-w-0">
+            <Label
+              htmlFor={switchId}
+              className="text-sm font-medium text-foreground cursor-pointer"
+            >
+              Custom commission for this venue
+            </Label>
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              Turn on to set a venue-specific percentage or flat fee. When off,
+              Payment Settings defaults apply.
+            </p>
           </div>
-        ) : null}
+          <Switch
+            id={switchId}
+            checked={customEnabled}
+            onCheckedChange={setCustomEnabled}
+            className="shrink-0 self-start sm:self-center"
+            aria-label="Enable custom commission for this venue"
+          />
+        </div>
+
+        {customEnabled ? (
+          <>
+            <fieldset className="space-y-3 border-0 p-0 m-0 min-w-0">
+              <legend
+                id={groupLabelId}
+                className="text-sm font-medium text-foreground mb-0 block w-full"
+              >
+                Fee for this venue
+              </legend>
+              <RadioGroup
+                className="flex flex-col gap-2.5 pt-0.5"
+                value={activeMode}
+                onValueChange={(v) => setMode(v as "percentage" | "flat")}
+                aria-labelledby={groupLabelId}
+              >
+                {CUSTOM_FEE_ROWS.map(({ mode: rowMode, title, description }) => {
+                  const inputId = `venue-commission-${venue.id}-${rowMode}`;
+                  const selected = activeMode === rowMode;
+                  return (
+                    <label
+                      key={rowMode}
+                      htmlFor={inputId}
+                      className={cn(
+                        "flex cursor-pointer gap-3 rounded-lg border p-3.5 transition-colors",
+                        selected
+                          ? "border-[var(--color-primary)]/45 bg-[#f8fafa] shadow-sm"
+                          : "border-slate-200 bg-slate-50/50 hover:border-slate-300/80",
+                      )}
+                    >
+                      <RadioGroupItem
+                        value={rowMode}
+                        id={inputId}
+                        className="mt-0.5"
+                      />
+                      <div className="min-w-0 flex-1 space-y-0.5">
+                        <span className="text-sm font-medium text-foreground leading-snug block">
+                          {title}
+                        </span>
+                        <span className="text-xs text-muted-foreground leading-relaxed block">
+                          {description}
+                        </span>
+                      </div>
+                    </label>
+                  );
+                })}
+              </RadioGroup>
+            </fieldset>
+
+            <div className="rounded-lg border border-slate-200 bg-slate-50/40 px-4 py-4">
+              {activeMode === "percentage" ? (
+                <div className="space-y-2 max-w-[15rem]">
+                  <Label
+                    htmlFor={`venue-commission-pct-${venue.id}`}
+                    className="text-sm font-medium text-foreground"
+                  >
+                    Platform fee (%)
+                  </Label>
+                  <Input
+                    id={`venue-commission-pct-${venue.id}`}
+                    type="number"
+                    inputMode="decimal"
+                    min={PCT_MIN}
+                    max={PCT_MAX}
+                    step="0.01"
+                    placeholder="e.g. 10"
+                    aria-invalid={fieldErrorMessage != null}
+                    className={cn(
+                      "h-10 tabular-nums bg-white",
+                      fieldErrorMessage != null &&
+                        "border-destructive focus-visible:ring-destructive/30",
+                    )}
+                    value={pctStr}
+                    onChange={(e) => setPctStr(e.target.value)}
+                    onBlur={() => setPctBlurred(true)}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Allowed range: {PCT_MIN}%–{PCT_MAX}%.
+                  </p>
+                </div>
+              ) : null}
+              {activeMode === "flat" ? (
+                <div className="space-y-2 max-w-[15rem]">
+                  <Label
+                    htmlFor={`venue-commission-flat-${venue.id}`}
+                    className="text-sm font-medium text-foreground"
+                  >
+                    Flat amount (£)
+                  </Label>
+                  <Input
+                    id={`venue-commission-flat-${venue.id}`}
+                    type="number"
+                    inputMode="decimal"
+                    min={FLAT_MIN}
+                    max={FLAT_MAX}
+                    step="0.01"
+                    placeholder={`£${FLAT_MIN}–${FLAT_MAX}`}
+                    aria-invalid={fieldErrorMessage != null}
+                    className={cn(
+                      "h-10 tabular-nums bg-white",
+                      fieldErrorMessage != null &&
+                        "border-destructive focus-visible:ring-destructive/30",
+                    )}
+                    value={flatStr}
+                    onChange={(e) => setFlatStr(e.target.value)}
+                    onBlur={() => setFlatBlurred(true)}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Allowed range: £{FLAT_MIN}–£{FLAT_MAX} (GBP).
+                  </p>
+                </div>
+              ) : null}
+            </div>
+          </>
+        ) : (
+          <p className="text-sm text-muted-foreground rounded-md border border-dashed border-slate-200 bg-slate-50/40 px-4 py-3">
+            Platform default commission from Payment Settings is used for
+            this venue.
+          </p>
+        )}
 
         <div className="space-y-2">
           {fieldErrorMessage ? (

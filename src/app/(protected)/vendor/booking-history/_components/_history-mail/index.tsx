@@ -16,6 +16,7 @@ import { TiptapEditor } from "@/components/ui/tiptap-editor";
 import { History } from "../../_lib/types";
 import { useBulkEmailSend } from "../../_lib/queries";
 import { toast } from "sonner";
+import { usePermission } from "@/hooks/usePermission";
 
 interface MailHistoryDialogProps
   extends Omit<
@@ -39,6 +40,7 @@ export default function MailHistoryDialog({
   const [emailData, setEmailData] = useState({ subject: "", body: "" });
   const bulkEmailMutation = useBulkEmailSend();
   const singleEmailInProgressRef = useRef(false);
+  const canUpdateBooking = usePermission("update-booking");
 
   const bookingId = history ? history.booking_id ?? history.id : null;
   const isOpen = controlledOpen ?? false;
@@ -52,6 +54,11 @@ export default function MailHistoryDialog({
   const handleSendEmail = async (e?: React.MouseEvent) => {
     e?.preventDefault();
     e?.stopPropagation();
+
+    if (!canUpdateBooking) {
+      toast.error("You don't have permission to send booking emails.");
+      return;
+    }
 
     if (
       !bookingId ||
@@ -148,7 +155,7 @@ export default function MailHistoryDialog({
             type="button"
             variant="event-primary"
             onClick={(e) => handleSendEmail(e)}
-            disabled={bulkEmailMutation.isPending}
+            disabled={!canUpdateBooking || bulkEmailMutation.isPending}
           >
             {bulkEmailMutation.isPending ? "Sending..." : "Send Email"}
           </Button>

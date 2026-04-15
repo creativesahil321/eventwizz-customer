@@ -81,19 +81,11 @@ export function formatVenueLocationLocalityLine(
   return head || country || null;
 }
 
-export type EventApprovalStatus =
-  | "draft"
-  | "pending"
-  | "approved"
-  | "rejected"
-  | "changes_requested";
-
 export interface VenueRecentEvent {
   id: number;
   title: string;
   date: string;
   locationAddress?: string;
-  approvalStatus?: EventApprovalStatus;
 }
 
 export type EventCancellationRequestStatus =

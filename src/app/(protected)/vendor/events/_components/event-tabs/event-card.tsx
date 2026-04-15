@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Clock, Dot, Eye } from "lucide-react";
+import { Dot, Eye } from "lucide-react";
 import { Event } from "../../_lib/types";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
@@ -166,13 +166,6 @@ export default function EventCard({
 
               {/* Right side: badge + date */}
               <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap sm:flex-nowrap sm:justify-end min-w-0">
-                {event.is_submitted_for_approval && (
-                  <span className="inline-flex items-center gap-1 px-1.5 sm:px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-700 whitespace-nowrap flex-shrink-0">
-                    <Clock className="w-3 h-3 flex-shrink-0" />
-                    <span className="hidden sm:inline">Under review</span>
-                    <span className="sm:hidden">Review</span>
-                  </span>
-                )}
                 {event.event_date && (
                   <p className="text-xs sm:text-sm text-gray-600 whitespace-nowrap hidden sm:block flex-shrink-0">
                     {new Date(event.event_date).toLocaleDateString("en-US", {

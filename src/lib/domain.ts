@@ -59,14 +59,65 @@ export const getParentDomainFromNestedDomain = () => {
 };
 
 // Create a request cache to prevent duplicate API calls
-const domainRequestCache = new Map();
+const domainRequestCache = new Map<string, Promise<TenantData | null>>();
+
+/**
+ * Map theme API schema to tenant store shape (shared by SSR hydration and API responses).
+ */
+export const buildTenantDataFromTheme = (
+  domain: string,
+  themeData: ThemeSchema,
+): TenantData => ({
+  tenantId: domain,
+  website_role: (themeData?.website_role as UserType) || null,
+  parentDomain: null,
+  settings: {
+    ...themeData,
+    colors: themeData?.colors || {
+      primary: "#019ead",
+      secondary: "#2D2D2D",
+    },
+    typography: themeData?.typography || {
+      fontFamily: {
+        heading: "Montserrat",
+        body: "Inter",
+      },
+    },
+    contactDetails: themeData?.contactDetails || {
+      email: "",
+      alternativeEmail: "",
+      phone: "",
+      alternativePhone: "",
+      address: "",
+    },
+    logo: themeData?.logo || "",
+    favicon: themeData?.favicon || "",
+    name: themeData?.name || "EventWizz",
+    website_role: themeData?.website_role || "",
+    locations: themeData?.locations || [],
+    currency_symbol: resolveCurrencySymbol(themeData?.currency_symbol),
+  },
+});
+
+/**
+ * When theme was resolved on the server, prime the cache so other callers skip the network.
+ */
+export const primeTenantDataCache = (
+  domain: string,
+  data: TenantData,
+): void => {
+  const key = domain.split(":")[0];
+  domainRequestCache.set(key, Promise.resolve(data));
+};
 
 export const getTenantIdFromDomain = async (
   domain: string
 ): Promise<TenantData | null> => {
-  // Check cache first
-  if (domainRequestCache.has(domain)) {
-    return domainRequestCache.get(domain);
+  const cacheKey = domain.split(":")[0];
+
+  const cached = domainRequestCache.get(cacheKey);
+  if (cached) {
+    return cached;
   }
 
   // Create a promise for this request
@@ -74,44 +125,12 @@ export const getTenantIdFromDomain = async (
     try {
       const response = await themeService.getThemeSettingsByDomain(domain);
 
-      if (!response.isSuccess) {
+      if (!response.isSuccess || !response.data) {
         resolve(null);
         return;
       }
 
-      const themeData = response.data;
-
-      const result: TenantData = {
-        tenantId: domain,
-        website_role: (themeData?.website_role as UserType) || null,
-        parentDomain: null,
-        settings: {
-          ...themeData,
-          colors: themeData?.colors || {
-            primary: "#019ead",
-            secondary: "#2D2D2D",
-          },
-          typography: themeData?.typography || {
-            fontFamily: {
-              heading: "Montserrat",
-              body: "Inter",
-            },
-          },
-          contactDetails: themeData?.contactDetails || {
-            email: "",
-            alternativeEmail: "",
-            phone: "",
-            alternativePhone: "",
-            address: "",
-          },
-          logo: themeData?.logo || "",
-          favicon: themeData?.favicon || "",
-          name: themeData?.name || "EventWizz",
-          website_role: themeData?.website_role || "",
-          locations: themeData?.locations || [],
-          currency_symbol: resolveCurrencySymbol(themeData?.currency_symbol),
-        },
-      };
+      const result = buildTenantDataFromTheme(cacheKey, response.data);
 
       resolve(result);
     } catch (error) {
@@ -148,12 +167,12 @@ export const getTenantIdFromDomain = async (
       };
 
       // Remove from cache on error to allow retry
-      domainRequestCache.delete(domain);
+      domainRequestCache.delete(cacheKey);
       resolve(fallbackResult);
     }
   });
 
   // Store the promise in the cache
-  domainRequestCache.set(domain, requestPromise);
+  domainRequestCache.set(cacheKey, requestPromise);
   return requestPromise;
 };

@@ -390,6 +390,8 @@ export default function CommonHeader({
                 {logoPath ? (
                   <img
                     src={addCacheBusting(logoPath as string)}
+                    width={200}
+                    height={116}
                     className="max-h-12 w-auto object-contain"
                     alt={vendorTheme?.name || "EventWizz"}
                   />
@@ -408,6 +410,8 @@ export default function CommonHeader({
                   {logoPath ? (
                     <img
                       src={addCacheBusting(logoPath as string)}
+                      width={200}
+                      height={116}
                       className="max-h-12 w-auto object-contain"
                       alt={vendorTheme?.name || "EventWizz"}
                     />
@@ -697,6 +701,8 @@ export default function CommonHeader({
                 {logoPath ? (
                   <img
                     src={addCacheBusting(logoPath as string)}
+                    width={200}
+                    height={116}
                     className="max-h-8 w-auto object-contain"
                     alt={vendorTheme?.name || "EventWizz"}
                   />
@@ -715,6 +721,8 @@ export default function CommonHeader({
                   {logoPath ? (
                     <img
                       src={addCacheBusting(logoPath as string)}
+                      width={200}
+                      height={116}
                       className="max-h-8 w-auto object-contain"
                       alt={vendorTheme?.name || "EventWizz"}
                     />

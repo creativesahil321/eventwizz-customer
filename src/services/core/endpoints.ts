@@ -261,6 +261,8 @@ export const API_ENDPOINTS = {
       GET_BY_ID: "/admin/venues/{id}",
       CREATE: "/admin/venues/store",
       UPDATE: "/admin/venues/{id}",
+      /** Per-venue Stripe Connect fee override (PUT body: venue_commission_mode, venue_commission_value). */
+      VENUE_COMMISSION: "/admin/venues/{id}/venue-commission",
       DELETE: "/admin/venues/delete/{id}",
       RESTORE: "/admin/venues/restore/{id}",
       PERMANENT_DELETE: "/admin/venues/permanent-delete/{id}",
@@ -273,9 +275,6 @@ export const API_ENDPOINTS = {
     },
     EVENTS: {
       SHOW: "/admin/events/{eventId}",
-      APPROVE: "/admin/events/{eventId}/approve",
-      REJECT: "/admin/events/{eventId}/reject",
-      REQUEST_CHANGES: "/admin/events/{eventId}/request-changes",
       APPROVE_DATE_CANCELLATION:
         "/admin/events/{eventId}/dates/{dateId}/approve-cancellation",
     },
