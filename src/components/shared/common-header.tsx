@@ -7,6 +7,7 @@ import {
   X,
   ImageIcon,
   ShoppingCart,
+  MapPin,
   Calendar,
   LayoutDashboard,
   LogIn,
@@ -21,6 +22,10 @@ import { LucideIcon } from "lucide-react";
 import { useSession } from "next-auth/react";
 import { ThemeSchema } from "@/types/theme.types";
 import CartButton from "./cart-button";
+import {
+  VendorPublicLocationBookNow,
+  VendorPublicLocationMobileMenuEntries,
+} from "./vendor-public-location-book-now";
 import { addCacheBusting } from "@/lib/image-utils";
 import { cn } from "@/lib/utils";
 import { useIsPreviewModeFromProvider } from "@/contexts/preview-context";
@@ -260,6 +265,14 @@ export default function CommonHeader({
     variant === "onboarding" ||
     (variant === "default" && isPreviewFromProvider);
 
+  const sessionPending = status === "loading";
+  const commerceSlotLoading =
+    !useNonInteractiveChrome && sessionPending;
+  const showHeaderCart =
+    !useNonInteractiveChrome && !sessionPending && isAuthenticated;
+  const showGuestLocationSwitcher =
+    !useNonInteractiveChrome && !sessionPending && !isAuthenticated;
+
   const mobileContactLink = headerData.navLinks.find(
     (item) => item.icon === "phone",
   );
@@ -329,7 +342,9 @@ export default function CommonHeader({
   const downloadsFileIconClass = cn(
     "size-4 shrink-0",
     "text-[color:var(--color-primary)]",
-    downloadsMenuGlass ? "drop-shadow-[0_0_10px_color-mix(in_srgb,var(--color-primary)_55%,transparent)]" : "opacity-90",
+    downloadsMenuGlass
+      ? "drop-shadow-[0_0_10px_color-mix(in_srgb,var(--color-primary)_55%,transparent)]"
+      : "opacity-90",
   );
 
   // Avoid dark:bg-background here: it overrides vendor --color-header and causes dark-on-dark
@@ -366,9 +381,7 @@ export default function CommonHeader({
           >
             {!hideBrowseEvents &&
               (useNonInteractiveChrome ? (
-                <div
-                  className={cn(topBarPillDisabledClass, styles.textColor)}
-                >
+                <div className={cn(topBarPillDisabledClass, styles.textColor)}>
                   {headerData.browseEvent.linkText}
                 </div>
               ) : (
@@ -430,19 +443,36 @@ export default function CommonHeader({
           <div
             className={`flex items-center gap-2 sm:gap-3 w-1/3 justify-end text-xs sm:text-sm`}
           >
-            {/* Cart Button */}
+            {/* Cart (signed-in) or public location switcher (guest) */}
             {useNonInteractiveChrome ? (
+              isAuthenticated ? (
+                <div
+                  className={cn(
+                    "flex items-center gap-1",
+                    topBarPillDisabledClass,
+                    styles.textColor,
+                  )}
+                >
+                  <ShoppingCart size={16} />
+                  <span>Cart</span>
+                </div>
+              ) : (
+                <VendorPublicLocationBookNow
+                  disabled
+                  pillGlassOnHero={pillGlassOnHero}
+                />
+              )
+            ) : commerceSlotLoading ? (
               <div
                 className={cn(
-                  "flex items-center gap-1",
-                  topBarPillDisabledClass,
-                  styles.textColor,
+                  "h-9 min-w-[7.5rem] rounded-full border border-transparent bg-white/10 animate-pulse backdrop-blur-md",
+                  pillGlassOnHero &&
+                    "shadow-[0_10px_30px_-18px_rgba(0,0,0,0.55)]",
                 )}
-              >
-                <ShoppingCart size={16} />
-                <span>Cart</span>
-              </div>
-            ) : (
+                aria-busy="true"
+                aria-label="Loading"
+              />
+            ) : showHeaderCart ? (
               <CartButton
                 size="sm"
                 className={cn(
@@ -452,6 +482,8 @@ export default function CommonHeader({
                   styles.hoverColor,
                 )}
               />
+            ) : (
+              <VendorPublicLocationBookNow pillGlassOnHero={pillGlassOnHero} />
             )}
 
             {hasHeaderDownloads &&
@@ -466,7 +498,9 @@ export default function CommonHeader({
                     aria-hidden
                   >
                     <FileText size={16} className="shrink-0" />
-                    <span className="truncate">{singleHeaderDownload.title}</span>
+                    <span className="truncate">
+                      {singleHeaderDownload.title}
+                    </span>
                   </div>
                 ) : (
                   <div
@@ -660,7 +694,10 @@ export default function CommonHeader({
                     sideOffset={8}
                     className={downloadsDropdownContentClass}
                   >
-                    <DropdownMenuItem asChild className={downloadsDropdownItemClass}>
+                    <DropdownMenuItem
+                      asChild
+                      className={downloadsDropdownItemClass}
+                    >
                       <Link
                         href="/auth/login"
                         className="flex cursor-pointer items-center gap-2.5"
@@ -669,7 +706,10 @@ export default function CommonHeader({
                         Log in
                       </Link>
                     </DropdownMenuItem>
-                    <DropdownMenuItem asChild className={downloadsDropdownItemClass}>
+                    <DropdownMenuItem
+                      asChild
+                      className={downloadsDropdownItemClass}
+                    >
                       <Link
                         href="/auth/register"
                         className="flex cursor-pointer items-center gap-2.5"
@@ -739,14 +779,31 @@ export default function CommonHeader({
             )}
           </div>
           <div className="flex items-center gap-2">
-            {/* Mobile Cart Button */}
+            {/* Mobile: cart when signed-in, location switcher when guest */}
             {useNonInteractiveChrome ? (
+              isAuthenticated ? (
+                <div
+                  className={`p-2 ${styles.textColor} opacity-60 transition-colors cursor-not-allowed`}
+                >
+                  <ShoppingCart className="h-5 w-5" />
+                </div>
+              ) : (
+                <VendorPublicLocationBookNow
+                  disabled
+                  variant="icon"
+                  pillGlassOnHero={pillGlassOnHero}
+                  iconTriggerClassName={cn("p-2 rounded-md", styles.textColor)}
+                />
+              )
+            ) : commerceSlotLoading ? (
               <div
-                className={`p-2 ${styles.textColor} opacity-60 transition-colors cursor-not-allowed`}
-              >
-                <ShoppingCart className="h-5 w-5" />
-              </div>
-            ) : (
+                className={cn(
+                  "h-9 w-9 shrink-0 rounded-md bg-white/10 animate-pulse",
+                  styles.textColor,
+                )}
+                aria-hidden
+              />
+            ) : showHeaderCart ? (
               <CartButton
                 size="icon"
                 className={cn(
@@ -754,6 +811,17 @@ export default function CommonHeader({
                   styles.textColor,
                   styles.hoverColor,
                 )}
+              />
+            ) : (
+              <VendorPublicLocationBookNow
+                variant="icon"
+                pillGlassOnHero={pillGlassOnHero}
+                iconTriggerClassName={cn(
+                  "p-2 transition-colors rounded-md",
+                  styles.textColor,
+                  styles.hoverColor,
+                )}
+                align="end"
               />
             )}
 
@@ -962,18 +1030,38 @@ export default function CommonHeader({
                 ))}
 
               {useNonInteractiveChrome ? (
+                isAuthenticated ? (
+                  <div
+                    className={cn(
+                      mobileNavRowClass,
+                      "cursor-not-allowed opacity-60",
+                    )}
+                  >
+                    <span className={mobileNavIconWrap} aria-hidden>
+                      <ShoppingCart />
+                    </span>
+                    Cart
+                  </div>
+                ) : (
+                  <VendorPublicLocationMobileMenuEntries
+                    disabled
+                    onNavigate={toggleMobileMenu}
+                    mobileNavRowClass={mobileNavRowClass}
+                    mobileNavIconWrap={mobileNavIconWrap}
+                    hoverColorClass={styles.hoverColor}
+                  />
+                )
+              ) : commerceSlotLoading ? (
                 <div
-                  className={cn(
-                    mobileNavRowClass,
-                    "cursor-not-allowed opacity-60",
-                  )}
+                  className={cn(mobileNavRowClass, "opacity-70")}
+                  aria-busy="true"
                 >
                   <span className={mobileNavIconWrap} aria-hidden>
-                    <ShoppingCart />
+                    <MapPin />
                   </span>
-                  Cart
+                  Loading…
                 </div>
-              ) : (
+              ) : showHeaderCart ? (
                 <div onClick={toggleMobileMenu}>
                   <CartButton
                     size="sm"
@@ -986,6 +1074,13 @@ export default function CommonHeader({
                     )}
                   />
                 </div>
+              ) : (
+                <VendorPublicLocationMobileMenuEntries
+                  onNavigate={toggleMobileMenu}
+                  mobileNavRowClass={mobileNavRowClass}
+                  mobileNavIconWrap={mobileNavIconWrap}
+                  hoverColorClass={styles.hoverColor}
+                />
               )}
 
               {hasHeaderDownloads && (
