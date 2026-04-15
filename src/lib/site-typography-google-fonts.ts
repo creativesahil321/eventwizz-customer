@@ -95,7 +95,7 @@ export function siteEssentialsGoogleFontsStylesheetHref(
   const params = families
     .map(
       (name) =>
-        `family=${encodeURIComponent(name)}:wght@300;400;500;600;700;800`
+        `family=${encodeURIComponent(name)}:wght@400;500;600;700`
     )
     .join("&");
   return `https://fonts.googleapis.com/css2?${params}&display=swap`;

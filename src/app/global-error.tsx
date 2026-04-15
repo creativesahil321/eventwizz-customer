@@ -2,9 +2,10 @@
 
 import { Button } from "@/components/ui/button";
 import { useEffect } from "react";
-import { tiemposHeadline } from "@/lib/fonts-tiempos";
-import { cn } from "@/lib/utils";
 import { AlertTriangle } from "lucide-react";
+
+const globalErrorFontStack =
+  "ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica Neue, Arial, sans-serif";
 
 export default function GlobalError({
   error,
@@ -21,10 +22,8 @@ export default function GlobalError({
   return (
     <html lang="en">
       <body
-        className={cn(
-          "bg-[var(--color-background,#e8f4f6)]",
-          tiemposHeadline.variable
-        )}
+        className="bg-[var(--color-background,#e8f4f6)]"
+        style={{ fontFamily: globalErrorFontStack }}
       >
         <div className="flex min-h-screen w-full flex-col items-center justify-center px-4 py-16">
           <div className="w-full max-w-[500px] text-center">
