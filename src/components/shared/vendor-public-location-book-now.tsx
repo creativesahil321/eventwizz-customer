@@ -28,7 +28,7 @@ export interface VendorPublicLocationMobileMenuEntriesProps {
   hoverColorClass: string;
 }
 
-/** Same locations as the Book Now dropdown, as full-width drawer rows */
+/** Same locations as the Locations dropdown, as full-width drawer rows */
 export function VendorPublicLocationMobileMenuEntries({
   disabled = false,
   onNavigate,
@@ -113,9 +113,9 @@ export interface VendorPublicLocationBookNowProps {
   disabled?: boolean;
   /** Called after navigating to a location (e.g. close mobile drawer) */
   onLocationNavigate?: () => void;
-  /** Primary landing-style control vs compact map icon (e.g. mobile header bar) */
+  /** Primary pill control vs compact map icon (e.g. mobile header bar) */
   variant?: "book-now" | "icon";
-  /** Extra classes on the Book Now trigger (e.g. drawer full width) */
+  /** Extra classes on the Locations trigger (e.g. drawer full width) */
   triggerClassName?: string;
   /** Required for `variant="icon"` — match sibling header controls */
   iconTriggerClassName?: string;
@@ -205,7 +205,7 @@ export function VendorPublicLocationBookNow({
         )}
         aria-hidden
       >
-        <span>Book Now</span>
+        <span>Locations</span>
         <ChevronDown size={14} />
       </div>
     );
@@ -218,7 +218,7 @@ export function VendorPublicLocationBookNow({
           <button
             type="button"
             className={iconTriggerClassName}
-            aria-label="Select a location"
+            aria-label="Locations"
           >
             <MapPin className="h-5 w-5" />
           </button>
@@ -227,8 +227,9 @@ export function VendorPublicLocationBookNow({
             size="sm"
             variant="event-primary"
             className={bookNowPillClass}
+            aria-label="Locations"
           >
-            <span>Book Now</span>
+            <span>Locations</span>
             <ChevronDown size={14} />
           </Button>
         )}
