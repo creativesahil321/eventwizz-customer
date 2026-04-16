@@ -7,8 +7,12 @@ export interface Transaction {
   id: number;
   date: string; // e.g., "5 days ago"
   transaction_id: string;
-  amount: string; // Formatted string from API (may include symbol)
-  /** Numeric amount when API provides it (preferred for display/sort) */
+  /**
+   * Amount returned by the API.
+   * Customer transactions currently return a number; older/vendor payloads may return a formatted string.
+   */
+  amount: number | string;
+  /** Numeric amount when API provides it (preferred for display/sort). */
   amount_raw?: number;
   /** ISO 4217 when API sends `currency` */
   currency?: string;
@@ -66,7 +70,14 @@ export interface TransactionStats {
   failed_count: number;
 }
 
+/** Summary block returned with paginated customer transactions (Laravel API). */
+export interface TransactionsSummary {
+  total: number;
+  amount: string;
+}
+
 export interface TransactionsResponse {
   data: Transaction[];
   meta?: TransactionMeta;
+  summary?: TransactionsSummary;
 }

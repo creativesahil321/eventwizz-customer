@@ -1,14 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import {
   Transaction,
   TransactionFilters,
 } from "./types";
-import {
-  useTransactions,
-  useTransactionStats,
-} from "./queries";
+import { useTransactions } from "./queries";
+import { transactionService } from "@/services/customer/transactions/transaction.service";
 
 export const useTransactionSystem = () => {
   const [filters, setFilters] = useState<TransactionFilters>({
@@ -28,7 +26,10 @@ export const useTransactionSystem = () => {
     refetch: refetchTransactions,
   } = useTransactions(filters);
 
-  const { data: stats, isLoading: isLoadingStats } = useTransactionStats();
+  const stats = useMemo(() => {
+    if (!transactionsResponse?.summary) return undefined;
+    return transactionService.mapSummaryToStats(transactionsResponse.summary);
+  }, [transactionsResponse?.summary]);
 
   // Derived state
   const transactions = Array.isArray(transactionsResponse?.data)
@@ -36,7 +37,7 @@ export const useTransactionSystem = () => {
     : [];
 
   const meta = transactionsResponse?.meta as any;
-  const isLoading = isLoadingTransactions || isLoadingStats;
+  const isLoading = isLoadingTransactions;
 
   // Actions
   const handleFilterChange = (newFilters: Partial<TransactionFilters>) => {

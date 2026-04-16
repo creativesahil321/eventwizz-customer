@@ -96,6 +96,30 @@ export const transactionService = {
         per_page: response.meta.per_page,
         last_page: response.meta.last_page,
       },
+      summary: response.summary,
+    };
+  },
+
+  /**
+   * Maps API summary to UI stats (same shape as legacy getTransactionStats).
+   */
+  mapSummaryToStats: (summary: {
+    total: number;
+    amount: string;
+  }): TransactionStats => {
+    const total_amount_value = parseFormattedMoney(
+      String(summary.amount ?? ""),
+    );
+    const safeTotal = Number.isFinite(total_amount_value)
+      ? total_amount_value
+      : 0;
+
+    return {
+      total_transactions: summary.total,
+      total_amount_value: safeTotal,
+      pending_count: 0,
+      completed_count: 0,
+      failed_count: 0,
     };
   },
 
@@ -103,23 +127,8 @@ export const transactionService = {
    * Get transaction statistics
    */
   getTransactionStats: async (): Promise<TransactionStats> => {
-    // Fetch summary from API
     const response = await fetchCustomerTransactions({ page: 1, limit: 1 });
-
-    const total_amount_value = parseFormattedMoney(
-      String(response.summary.amount ?? ""),
-    );
-    const safeTotal = Number.isFinite(total_amount_value)
-      ? total_amount_value
-      : 0;
-
-    return {
-      total_transactions: response.summary.total,
-      total_amount_value: safeTotal,
-      pending_count: 0, // Not provided by API, can be added later if needed
-      completed_count: 0, // Not provided by API, can be added later if needed
-      failed_count: 0, // Not provided by API, can be added later if needed
-    };
+    return transactionService.mapSummaryToStats(response.summary);
   },
 
   /**

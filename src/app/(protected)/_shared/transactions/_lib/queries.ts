@@ -1,8 +1,42 @@
 "use client";
 
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { transactionService } from "@/services/customer/transactions/transaction.service";
-import { TransactionFilters, TransactionsResponse } from "./types";
+import {
+  TransactionFilters,
+  TransactionStatus,
+  TransactionsResponse,
+} from "./types";
+
+/**
+ * Coalesces filter state so equivalent UI values share one cache entry
+ * (e.g. missing search vs "", status "all" vs undefined).
+ */
+export function normalizeTransactionFilters(
+  filters: TransactionFilters = {},
+): TransactionFilters {
+  const page = filters.page ?? 1;
+  const limit = filters.limit ?? 10;
+  const search = (filters.search ?? "").trim();
+  const payment_date = (filters.payment_date ?? "").trim();
+  const status =
+    !filters.status || filters.status === "all"
+      ? "all"
+      : filters.status;
+  const payment_method =
+    !filters.payment_method || filters.payment_method === "all"
+      ? "all"
+      : filters.payment_method;
+
+  return {
+    page,
+    limit,
+    ...(search ? { search } : {}),
+    ...(payment_date ? { payment_date } : {}),
+    status: status as TransactionStatus | "all",
+    payment_method,
+  };
+}
 
 // Query keys
 export const transactionKeys = {
@@ -10,24 +44,16 @@ export const transactionKeys = {
   lists: () => [...transactionKeys.all, "list"] as const,
   list: (filters: TransactionFilters) =>
     [...transactionKeys.lists(), filters] as const,
-  stats: () => [...transactionKeys.all, "stats"] as const,
 };
 
 // Query hooks
 export const useTransactions = (filters: TransactionFilters = {}) => {
+  const normalized = normalizeTransactionFilters(filters);
   return useQuery<TransactionsResponse>({
-    queryKey: transactionKeys.list(filters),
-    queryFn: () => transactionService.getTransactions(filters),
+    queryKey: transactionKeys.list(normalized),
+    queryFn: () => transactionService.getTransactions(normalized),
     staleTime: 1000 * 60 * 5, // 5 minutes
     gcTime: 1000 * 60 * 10, // 10 minutes
-  });
-};
-
-export const useTransactionStats = () => {
-  return useQuery({
-    queryKey: transactionKeys.stats(),
-    queryFn: () => transactionService.getTransactionStats(),
-    staleTime: 1000 * 60 * 5, // 5 minutes
   });
 };
 

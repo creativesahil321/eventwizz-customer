@@ -58,11 +58,17 @@ export function TransactionsDataTable({
   // Ensure transactions is always an array
   const safeTransactions = Array.isArray(transactions) ? transactions : [];
 
-  // Debounce search input
+  // Debounce search input (treat undefined and "" as the same so we do not refetch)
   React.useEffect(() => {
+    const next = searchInput.trim();
+    const current = (filters.search ?? "").trim();
+    if (next === current) return;
+
     const timer = setTimeout(() => {
-      if (searchInput !== filters.search) {
-        onFilterChange({ search: searchInput });
+      const n = searchInput.trim();
+      const c = (filters.search ?? "").trim();
+      if (n !== c) {
+        onFilterChange({ search: n || undefined });
       }
     }, 500);
 
