@@ -7,10 +7,11 @@ import {
   Smartphone,
   Clock,
   CheckCircle,
+  ChevronDown,
 } from "lucide-react";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 
-// Payment gateway configuration
+// Payment gateway configuration with brand colors
 const PAYMENT_GATEWAYS = {
   stripe: {
     id: "stripe",
@@ -18,7 +19,10 @@ const PAYMENT_GATEWAYS = {
     description: "Credit or debit card",
     icon: CreditCard,
     processingTime: "Instant",
-    color: "blue",
+    brandColor: "from-indigo-500 to-blue-600",
+    bgSelected: "bg-indigo-50 border-indigo-300",
+    textColor: "text-indigo-700",
+    iconBg: "bg-indigo-100",
   },
   paypal: {
     id: "paypal",
@@ -26,15 +30,21 @@ const PAYMENT_GATEWAYS = {
     description: "Pay with your PayPal account",
     icon: Smartphone,
     processingTime: "Instant",
-    color: "yellow",
+    brandColor: "from-blue-500 to-blue-600",
+    bgSelected: "bg-blue-50 border-blue-300",
+    textColor: "text-blue-700",
+    iconBg: "bg-blue-100",
   },
   truelayer: {
     id: "truelayer",
-    name: "TrueLayer",
+    name: "Bank Transfer",
     description: "Pay directly from your bank",
     icon: Building2,
     processingTime: "1-2 business days",
-    color: "green",
+    brandColor: "from-emerald-500 to-green-600",
+    bgSelected: "bg-emerald-50 border-emerald-300",
+    textColor: "text-emerald-700",
+    iconBg: "bg-emerald-100",
   },
   worldpay: {
     id: "worldpay",
@@ -42,7 +52,10 @@ const PAYMENT_GATEWAYS = {
     description: "Secure card payments",
     icon: CreditCard,
     processingTime: "Instant",
-    color: "purple",
+    brandColor: "from-red-500 to-rose-600",
+    bgSelected: "bg-rose-50 border-rose-300",
+    textColor: "text-rose-700",
+    iconBg: "bg-rose-100",
   },
   klarna: {
     id: "klarna",
@@ -50,7 +63,10 @@ const PAYMENT_GATEWAYS = {
     description: "Buy now, pay later",
     icon: Clock,
     processingTime: "Instant approval",
-    color: "pink",
+    brandColor: "from-pink-500 to-fuchsia-600",
+    bgSelected: "bg-pink-50 border-pink-300",
+    textColor: "text-pink-700",
+    iconBg: "bg-pink-100",
   },
 } as const;
 
@@ -105,6 +121,31 @@ export default function PaymentGatewaySelector({
     return null;
   }
 
+  // If only one gateway, show it as auto-selected without the full selector 
+  if (filteredGateways.length === 1 && selectedGateway) {
+    const gateway = filteredGateways[0];
+    const IconComponent = gateway.icon;
+    return (
+      <div className="space-y-2">
+        <h4 className="text-xs font-medium text-gray-500 uppercase tracking-wider">
+          Payment Method
+        </h4>
+        <div className={`flex items-center gap-3 p-3 rounded-xl border ${gateway.bgSelected}`}>
+          <div className={`p-2 rounded-lg ${gateway.iconBg}`}>
+            <IconComponent className={`h-4 w-4 ${gateway.textColor}`} />
+          </div>
+          <div className="flex-1 min-w-0">
+            <span className="font-semibold text-sm text-gray-900">
+              {gateway.name}
+            </span>
+            <div className="text-xs text-gray-500">{gateway.description}</div>
+          </div>
+          <CheckCircle className={`h-4 w-4 ${gateway.textColor}`} />
+        </div>
+      </div>
+    );
+  }
+
   const selectedGatewayConfig = selectedGateway
     ? filteredGateways.find(
         (gateway) => gateway.apiId.toString() === selectedGateway
@@ -114,25 +155,25 @@ export default function PaymentGatewaySelector({
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between">
-        <h4 className="text-xs font-medium text-gray-700 uppercase tracking-wider">
+        <h4 className="text-xs font-medium text-gray-500 uppercase tracking-wider">
           Payment Method
         </h4>
         {showError && (
-          <span className="text-xs text-red-600 font-medium">
-            * Required
+          <span className="text-xs text-red-600 font-medium animate-pulse">
+            Select one ↓
           </span>
         )}
       </div>
       
       {showError && (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-2 text-xs text-red-700">
+        <div className="bg-red-50 border border-red-200 rounded-xl p-2.5 text-xs text-red-700 font-medium">
           Please select a payment method to continue
         </div>
       )}
 
-      {/* All Gateway Options - Show all if no selection or if expanded OR if only one gateway */}
-      {(!selectedGateway || isExpanded || filteredGateways.length === 1) && (
-        <div className="space-y-1.5">
+      {/* Show all gateway options when no selection or expanded */}
+      {(!selectedGateway || isExpanded) && (
+        <div className="space-y-2">
           {filteredGateways.map((gateway) => {
             const isSelected = selectedGateway === gateway.apiId.toString();
             const IconComponent = gateway.icon;
@@ -140,16 +181,15 @@ export default function PaymentGatewaySelector({
             return (
               <button
                 key={gateway.id}
-                className={`w-full text-left transition-all duration-200 border rounded-lg p-2 ${
+                className={`w-full text-left transition-all duration-200 border rounded-xl p-3 group ${
                   isSelected
-                    ? "border-blue-500 bg-blue-50"
+                    ? `${gateway.bgSelected} shadow-sm`
                     : showError
-                    ? "border-red-300 bg-red-50 hover:bg-red-100"
-                    : "border-gray-200 bg-white hover:bg-gray-50"
+                    ? "border-red-200 bg-red-50/50 hover:bg-red-50"
+                    : "border-gray-200 bg-white hover:bg-gray-50 hover:border-gray-300"
                 } ${disabled ? "opacity-50 cursor-not-allowed" : ""}`}
                 onClick={() => {
                   if (!disabled && !isSelected) {
-                    // Only call onGatewaySelect if not already selected
                     onGatewaySelect(gateway.apiId.toString());
                     if (filteredGateways.length > 1) {
                       setIsExpanded(false);
@@ -157,25 +197,25 @@ export default function PaymentGatewaySelector({
                   }
                 }}
               >
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-3">
                   <div
-                    className={`p-1.5 rounded ${
-                      isSelected ? "bg-white" : "bg-gray-100"
+                    className={`p-2 rounded-lg transition-colors ${
+                      isSelected ? gateway.iconBg : "bg-gray-100 group-hover:bg-gray-200"
                     }`}
                   >
-                    <IconComponent className="h-4 w-4 text-gray-700" />
+                    <IconComponent className={`h-4 w-4 ${isSelected ? gateway.textColor : "text-gray-600"}`} />
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-1.5">
-                      <span className="font-medium text-sm text-gray-900">
+                      <span className="font-semibold text-sm text-gray-900">
                         {gateway.name}
                       </span>
                       {isSelected && (
-                        <CheckCircle className="h-3.5 w-3.5 text-blue-600 flex-shrink-0" />
+                        <CheckCircle className={`h-3.5 w-3.5 ${gateway.textColor} flex-shrink-0`} />
                       )}
                     </div>
-                    <div className="text-xs text-gray-500 truncate">
-                      {gateway.processingTime}
+                    <div className="text-xs text-gray-500">
+                      {gateway.description} · {gateway.processingTime}
                     </div>
                   </div>
                 </div>
@@ -185,28 +225,32 @@ export default function PaymentGatewaySelector({
         </div>
       )}
 
-      {/* Selected Gateway Display (Compact) - Only show when collapsed AND multiple gateways */}
+      {/* Compact selected display when collapsed */}
       {selectedGatewayConfig && !isExpanded && filteredGateways.length > 1 && (
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          className="relative"
         >
           <button
             onClick={() => setIsExpanded(true)}
-            className="w-full text-left border border-blue-500 bg-blue-50 rounded-lg p-2 hover:bg-blue-100 transition-colors"
+            className={`w-full text-left ${selectedGatewayConfig.bgSelected} rounded-xl p-3 hover:opacity-90 transition-all`}
           >
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <div className="p-1.5 rounded bg-white">
-                  <selectedGatewayConfig.icon className="h-4 w-4 text-gray-700" />
+              <div className="flex items-center gap-3">
+                <div className={`p-2 rounded-lg ${selectedGatewayConfig.iconBg}`}>
+                  <selectedGatewayConfig.icon className={`h-4 w-4 ${selectedGatewayConfig.textColor}`} />
                 </div>
-                <span className="font-medium text-sm text-gray-900">
-                  {selectedGatewayConfig.name}
-                </span>
-                <CheckCircle className="h-3.5 w-3.5 text-blue-600" />
+                <div>
+                  <span className="font-semibold text-sm text-gray-900">
+                    {selectedGatewayConfig.name}
+                  </span>
+                  <CheckCircle className={`h-3.5 w-3.5 ${selectedGatewayConfig.textColor} inline ml-1.5`} />
+                </div>
               </div>
-              <span className="text-xs text-blue-600 font-medium">Change</span>
+              <span className="text-xs text-gray-500 font-medium flex items-center gap-1">
+                Change
+                <ChevronDown className="h-3 w-3" />
+              </span>
             </div>
           </button>
         </motion.div>

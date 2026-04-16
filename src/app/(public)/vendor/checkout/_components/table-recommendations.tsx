@@ -1,6 +1,8 @@
 /**
  * Compact Table Recommendations Component
- * Similar to tickets section layout
+ * UX Overhaul: Compact group-size input, smart defaults,
+ * show only top recommendations, inline allocation for simple cases.
+ * All calculation/validation logic preserved.
  */
 
 "use client";
@@ -19,6 +21,7 @@ import {
   Info,
   Settings,
   CheckCircle,
+  Sparkles,
 } from "lucide-react";
 import { toast } from "sonner";
 import { motion, AnimatePresence } from "framer-motion";
@@ -122,7 +125,6 @@ export default function TableRecommendations({
 
   // Handle input change - allow clearing and typing
   const handleInputChange = (value: string) => {
-    // Allow empty string, spaces, and numbers while typing
     if (value === "" || /^\d*$/.test(value)) {
       setInputValue(value);
     }
@@ -133,14 +135,12 @@ export default function TableRecommendations({
     const trimmedValue = inputValue.trim();
 
     if (trimmedValue === "") {
-      // If empty, restore to current peopleCount
       setInputValue(String(peopleCount));
       return;
     }
 
     const num = parseInt(trimmedValue);
     if (isNaN(num) || num < 1) {
-      // Invalid input, restore to current value
       toast.error("Please enter a number between 1 and 500");
       setInputValue(String(peopleCount));
       return;
@@ -159,7 +159,6 @@ export default function TableRecommendations({
       setInputValue(String(1));
       updatePeopleCount(eventSlug, date, 1);
     } else {
-      // Valid input, update store
       setInputValue(String(validatedNum));
       updatePeopleCount(eventSlug, date, validatedNum);
     }
@@ -168,7 +167,7 @@ export default function TableRecommendations({
   // Handle Enter key press
   const handleInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter") {
-      e.currentTarget.blur(); // Trigger blur which validates
+      e.currentTarget.blur();
     }
   };
 
@@ -193,8 +192,6 @@ export default function TableRecommendations({
   // Check if a table should be disabled from selection
   const isTableDisabled = (table: { id: number }) => {
     if (!isAllocationComplete) return false;
-
-    // If allocation is complete, only allow changes to already selected tables
     const isAlreadySelected = selectedTables.some(
       (selectedTable) => selectedTable.id === table.id
     );
@@ -203,18 +200,14 @@ export default function TableRecommendations({
 
   // Helper function to check if table is eligible for current people count
   const isTableEligible = (table: { title: string }) => {
-    // Extract min/max persons from table title
     const titleMatch = table.title.match(/\((\d+)-(\d+)\s+persons?\)/);
     if (titleMatch) {
       const min = parseInt(titleMatch[1]);
       const max = parseInt(titleMatch[2]);
       const minPersons = Math.min(min, max);
-
-      // Table is eligible if people count meets the minimum requirement
-      // No flexibility - must meet minimum requirement
       return peopleCount >= minPersons;
     }
-    return true; // Default to eligible if can't parse
+    return true;
   };
 
   // Helper function to get validation message for table
@@ -227,7 +220,7 @@ export default function TableRecommendations({
 
       if (peopleCount < minPersons) {
         const needed = minPersons - peopleCount;
-        return `You need ${needed} more people to book this table`;
+        return `Need ${needed} more guest${needed > 1 ? "s" : ""} for this table`;
       }
     }
     return null;
@@ -244,29 +237,17 @@ export default function TableRecommendations({
       const minPersons = Math.min(min, max);
       const maxPersons = Math.max(min, max);
 
-      // First check: Do we have enough people to meet the minimum requirement?
-      const hasEnoughPeople = peopleCount >= minPersons; // Must meet minimum requirement
+      const hasEnoughPeople = peopleCount >= minPersons;
+      if (!hasEnoughPeople) return false;
 
-      if (!hasEnoughPeople) {
-        return false; // Can't add more tables if we don't have enough people
-      }
-
-      // Calculate total capacity if we add one more table
       const totalCapacityAfterIncrease = (currentQuantity + 1) * minPersons;
-
-      // Don't allow if it would exceed people count by more than 20%
       const wouldExceedReasonableCapacity =
         totalCapacityAfterIncrease > peopleCount * 1.2;
 
-      // Check if remaining people can be accommodated by adding more tables
       const remainingPeople = peopleCount - currentQuantity * maxPersons;
-
-      // Calculate minimum tables needed to accommodate remaining people
       const minTablesNeeded = Math.ceil(remainingPeople / maxPersons);
       const maxTablesNeeded = Math.ceil(remainingPeople / minPersons);
 
-      // Check if we can accommodate remaining people with reasonable number of tables
-      // Allow up to 50 additional tables for very large events
       const canAccommodateRemaining =
         remainingPeople > 0 &&
         minTablesNeeded <= 50 &&
@@ -278,97 +259,33 @@ export default function TableRecommendations({
     return true;
   };
 
-  // Helper function to get table quantity limit message
-  const getTableQuantityLimitMessage = (table: {
-    title: string;
-    id: number;
-  }) => {
-    const currentQuantity = getTotalQuantity(table.id);
-    const titleMatch = table.title.match(/\((\d+)-(\d+)\s+persons?\)/);
-
-    if (titleMatch && currentQuantity > 0) {
-      const min = parseInt(titleMatch[1]);
-      const max = parseInt(titleMatch[2]);
-      const minPersons = Math.min(min, max);
-      const currentCapacity = currentQuantity * minPersons;
-
-      // Only show error if we have excess capacity and can't add more
-      if (currentCapacity > peopleCount && !canIncreaseTableQuantity(table)) {
-        const excessCapacity = currentCapacity - peopleCount;
-        return `You have ${excessCapacity} extra seats. Adding more tables would create excessive capacity.`;
-      }
-    }
-
-    return null;
-  };
-
-  // Helper function to get increment disabled reason
-  const getIncrementDisabledReason = (table: { title: string; id: number }) => {
-    const currentQuantity = getTotalQuantity(table.id);
-    const titleMatch = table.title.match(/\((\d+)-(\d+)\s+persons?\)/);
-
-    if (titleMatch) {
-      const min = parseInt(titleMatch[1]);
-      const max = parseInt(titleMatch[2]);
-      const minPersons = Math.min(min, max);
-      const maxPersons = Math.max(min, max);
-
-      // Check if we can't add more tables
-      if (!canIncreaseTableQuantity(table)) {
-        const remainingPeople = peopleCount - currentQuantity * maxPersons;
-
-        // Check if remaining people can be accommodated
-        const minTablesNeeded = Math.ceil(remainingPeople / maxPersons);
-        const maxTablesNeeded = Math.ceil(remainingPeople / minPersons);
-
-        if (
-          remainingPeople > 0 &&
-          (minTablesNeeded > 50 || minTablesNeeded > maxTablesNeeded)
-        ) {
-          return `Cannot add more tables. ${remainingPeople} people remaining would require ${minTablesNeeded} or more tables.`;
-        }
-
-        // Capacity constraint - check if adding more would create excessive capacity
-        const totalCapacityAfterIncrease = (currentQuantity + 1) * minPersons;
-        if (totalCapacityAfterIncrease > peopleCount * 1.2) {
-          const excessCapacity = totalCapacityAfterIncrease - peopleCount;
-          return `Adding more tables would create excessive capacity (${excessCapacity} extra seats).`;
-        }
-      }
-    }
-
-    return null;
-  };
-
   if (tables.length === 0) {
     return (
-      <div className="text-center py-8">
-        <AlertCircle className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-        <p className="text-gray-500">No tables available for this date</p>
+      <div className="text-center py-6">
+        <AlertCircle className="h-8 w-8 text-gray-300 mx-auto mb-3" />
+        <p className="text-sm text-gray-500">No tables available for this date</p>
       </div>
     );
   }
 
   return (
-    <div className="space-y-4">
-      {/* Compact People Count Input */}
-      <div className="flex items-center justify-between p-3 bg-blue-50 rounded-lg border border-blue-200">
+    <div className="space-y-3">
+      {/* Compact People Count — inline, not a banner */}
+      <div className="flex items-center justify-between p-2.5 bg-amber-50/60 rounded-xl border border-amber-100">
         <div className="flex items-center gap-2">
-          <Users className="h-4 w-4 text-blue-600" />
-          <span className="text-sm font-medium text-blue-900">
-            People in group:
+          <Users className="h-4 w-4 text-amber-600" />
+          <span className="text-sm font-medium text-gray-700">
+            Group size
           </span>
         </div>
-        <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            size="sm"
+        <div className="flex items-center gap-1.5">
+          <button
             onClick={() => handlePeopleCountChange(-1)}
             disabled={peopleCount <= 1}
-            className="h-7 w-7 p-0 rounded-full"
+            className="h-7 w-7 flex items-center justify-center rounded-lg border border-amber-200 bg-white text-amber-600 transition-all hover:bg-amber-50 active:scale-95 disabled:opacity-40"
           >
             <Minus className="h-3 w-3" />
-          </Button>
+          </button>
 
           <input
             type="text"
@@ -377,132 +294,82 @@ export default function TableRecommendations({
             onChange={(e) => handleInputChange(e.target.value)}
             onBlur={handleInputBlur}
             onKeyDown={handleInputKeyDown}
-            className="text-lg font-semibold text-center w-20 bg-white border rounded px-2 py-1 text-blue-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="text-base font-semibold text-center w-14 bg-white border border-amber-200 rounded-lg px-2 py-1 text-gray-900 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-amber-400"
             placeholder="20"
           />
 
-          <Button
-            variant="outline"
-            size="sm"
+          <button
             onClick={() => handlePeopleCountChange(1)}
             disabled={peopleCount >= 500}
-            className="h-7 w-7 p-0 rounded-full"
+            className="h-7 w-7 flex items-center justify-center rounded-lg border border-amber-200 bg-white text-amber-600 transition-all hover:bg-amber-50 active:scale-95 disabled:opacity-40"
           >
             <Plus className="h-3 w-3" />
-          </Button>
+          </button>
         </div>
       </div>
 
-      {/* Guest Allocation Section - responsive: stack on mobile so buttons aren't cut off */}
+      {/* Guest Allocation Banner — compact */}
       {needsAllocation && selectedTables.length > 0 && (
         <div
-          className={`border rounded-lg p-4 ${
+          className={`border rounded-xl p-3 ${
             allocationValidation.isValid
-              ? "bg-green-50 border-green-200"
-              : "bg-blue-50 border-blue-200"
+              ? "bg-emerald-50 border-emerald-200"
+              : "bg-amber-50/60 border-amber-200"
           }`}
         >
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex min-w-0 flex-1 items-start gap-2">
-              <Settings
-                className={`h-4 w-4 flex-shrink-0 ${
-                  allocationValidation.isValid
-                    ? "text-green-600"
-                    : "text-blue-600"
-                }`}
-              />
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex min-w-0 flex-1 items-center gap-2">
+              {allocationValidation.isValid ? (
+                <CheckCircle className="h-4 w-4 text-green-600 flex-shrink-0" />
+              ) : (
+                <Settings className="h-4 w-4 text-amber-600 flex-shrink-0" />
+              )}
               <div className="min-w-0">
-                <h4
-                  className={`text-sm font-medium ${
-                    allocationValidation.isValid
-                      ? "text-green-900"
-                      : "text-blue-900"
-                  }`}
-                >
+                <span className={`text-sm font-medium ${
+                  allocationValidation.isValid ? "text-green-800" : "text-amber-800"
+                }`}>
                   {allocationValidation.isValid
-                    ? "Guest Allocation Complete"
-                    : "Guest Allocation Required"}
-                </h4>
-                <p
-                  className={`text-xs ${
-                    allocationValidation.isValid
-                      ? "text-green-700"
-                      : "text-blue-700"
-                  }`}
-                >
-                  {allocationValidation.isValid
-                    ? `Your ${peopleCount} guests are properly distributed. Only selected tables can be modified.`
-                    : `You have multiple tables selected. Please distribute your ${peopleCount} guests.`}
-                </p>
+                    ? `${peopleCount} guests distributed`
+                    : "Distribute your guests"}
+                </span>
               </div>
             </div>
-            <div className="flex flex-shrink-0 flex-wrap items-center gap-2 sm:justify-end">
-              {allocationValidation.isValid ? (
-                <Badge className="bg-green-100 text-green-800 border-green-200">
-                  <CheckCircle className="h-3 w-3 mr-1" />
-                  Allocated
-                </Badge>
-              ) : (
-                <Badge
-                  variant="outline"
-                  className="border-orange-300 text-orange-700 whitespace-nowrap"
-                >
-                  <AlertCircle className="h-3 w-3 mr-1" />
-                  Needs Setup
-                </Badge>
-              )}
-              <Button
-                onClick={() => setShowAllocationModal(true)}
-                size="sm"
-                variant="outline"
-                className="shrink-0 text-blue-700 border-blue-300 hover:bg-blue-100"
-              >
-                <Settings className="h-3 w-3 mr-1 flex-shrink-0" />
-                <span className="whitespace-nowrap">Manage Seating</span>
-              </Button>
-            </div>
+            <Button
+              onClick={() => setShowAllocationModal(true)}
+              size="sm"
+              variant="outline"
+              className={`shrink-0 text-xs h-8 ${
+                allocationValidation.isValid
+                  ? "text-green-700 border-green-300 hover:bg-green-100"
+                  : "text-amber-700 border-amber-300 hover:bg-amber-100"
+              }`}
+            >
+              <Settings className="h-3 w-3 mr-1 flex-shrink-0" />
+              Manage Seating
+            </Button>
           </div>
 
-          {/* Show allocation errors if any */}
+          {/* Allocation errors — compact */}
           {!allocationValidation.isValid &&
             allocationValidation.errors.length > 0 && (
-              <div className="mt-3 p-2 bg-orange-50 border border-orange-200 rounded text-xs text-orange-700">
-                <ul className="space-y-1">
-                  {allocationValidation.errors
-                    .slice(0, 2)
-                    .map((error, index) => (
-                      <li key={index}>• {error}</li>
-                    ))}
-                  {allocationValidation.errors.length > 2 && (
-                    <li>
-                      • And {allocationValidation.errors.length - 2} more
-                      issues...
-                    </li>
-                  )}
-                </ul>
-              </div>
+              <p className="mt-2 text-xs text-amber-700">
+                {allocationValidation.errors[0]}
+              </p>
             )}
         </div>
       )}
 
-      {/* Information message when allocation is complete */}
+      {/* Table Selection Locked notice */}
       {isAllocationComplete && (
-        <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
-          <div className="flex items-start gap-2">
-            <Info className="h-4 w-4 text-amber-600 mt-0.5 flex-shrink-0" />
-            <div className="text-sm text-amber-800">
-              <p className="font-medium">Table Selection Locked</p>
-              <p className="text-xs mt-1">
-                Guest allocation is complete. You can only modify quantities of
-                already selected tables. To select different tables, please
-                update your allocation first.
-              </p>
-            </div>
-          </div>
+        <div className="flex items-center gap-2 px-3 py-2 bg-amber-50/60 border border-amber-100 rounded-xl">
+          <Info className="h-3.5 w-3.5 text-amber-500 flex-shrink-0" />
+          <p className="text-xs text-amber-700">
+            Seating complete. Update allocation to change tables.
+          </p>
         </div>
       )}
 
-      {/* Separate eligible and ineligible tables */}
+      {/* Table Cards — show recommended first, then "more options" */}
       {(() => {
         const eligibleRecommended = recommended.filter((rec) =>
           isTableEligible(rec.table)
@@ -519,54 +386,47 @@ export default function TableRecommendations({
 
         if (hasEligibleTables) {
           return (
-            <div className="space-y-4">
-              {/* Eligible Tables */}
-              <div className="grid grid-cols-1 gap-3">
+            <div className="space-y-3">
+              {/* Recommended Tables — show top ones */}
+              <div className="space-y-2">
                 {eligibleRecommended.map((rec, index) => {
                   const validationMsg = getTableValidationMessage(rec.table);
                   const isDisabled = isTableDisabled(rec.table);
                   const isSelected = getTotalQuantity(rec.table.id) > 0;
+                  const costPerPerson = getCostPerPerson(rec, peopleCount);
 
                   return (
                     <div
                       key={`${rec.table.id}-${index}`}
-                      className={`border rounded-lg ${
+                      className={`rounded-xl transition-all duration-200 border-l-[3px] ${
                         isDisabled
-                          ? "opacity-60 bg-gray-50"
-                          : "hover:bg-gray-50"
-                      } ${
-                        index === 0 && !isDisabled
-                          ? "border-green-200 bg-green-50"
-                          : ""
-                      } ${
-                        isSelected ? "ring-2 ring-blue-200 bg-blue-50/30" : ""
-                      } ${isDisabled ? "cursor-not-allowed" : ""}`}
+                          ? "opacity-60 bg-gray-50 border-l-transparent border border-gray-100 cursor-not-allowed"
+                          : isSelected
+                            ? "border-l-amber-500 bg-amber-50/40 shadow-sm border-t border-r border-b border-amber-100"
+                            : index === 0
+                              ? "border-l-emerald-500 bg-emerald-50/30 border-t border-r border-b border-emerald-100 hover:bg-emerald-50/50"
+                              : "border-l-transparent bg-gray-50/50 border-t border-r border-b border-gray-100 hover:bg-gray-50"
+                      }`}
                     >
-                      <div className="flex items-center justify-between p-4">
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 mb-1">
-                            <h4 className="font-medium text-gray-900">
+                      <div className="flex items-center justify-between p-3 sm:p-3.5">
+                        <div className="flex-1 min-w-0 mr-3">
+                          <div className="flex items-center gap-2 mb-0.5">
+                            <h4 className="text-sm font-medium text-gray-900 truncate">
                               {rec.table.title}
                             </h4>
-                            {index === 0 && (
-                              <Badge className="text-xs bg-green-100 text-green-800 border-green-200">
-                                <Star className="h-3 w-3 mr-1" />
+                            {index === 0 && !isDisabled && (
+                              <Badge className="text-[10px] bg-emerald-100 text-emerald-700 border-emerald-200 px-1.5 py-0">
+                                <Sparkles className="h-2.5 w-2.5 mr-0.5" />
                                 Best
                               </Badge>
                             )}
                           </div>
-                          <p className="text-sm text-gray-600 mb-2">
-                            {rec.recommendation}
-                          </p>
-                          <div className="flex gap-4 text-xs text-gray-500">
-                            <span>
-                              {formatMoneyUnit(
-                                getCostPerPerson(rec, peopleCount),
-                              )}
-                              /person
+                          <div className="flex items-center gap-3 text-xs text-gray-500">
+                            <span className="font-medium text-amber-700">
+                              {formatMoneyUnit(costPerPerson)}/person
                             </span>
                             {rec.tablesNeeded > 1 && (
-                              <span>{rec.tablesNeeded} tables</span>
+                              <span>{rec.tablesNeeded} tables needed</span>
                             )}
                           </div>
                         </div>
@@ -598,18 +458,12 @@ export default function TableRecommendations({
                           </Badge>
                         )}
                       </div>
-                      {(validationMsg ||
-                        getTableQuantityLimitMessage(rec.table) ||
-                        getIncrementDisabledReason(rec.table)) && (
-                        <div className="px-4 pb-3">
-                          <div className="flex items-center gap-2 text-xs text-orange-600 bg-orange-50 p-2 rounded">
+                      {validationMsg && (
+                        <div className="px-3.5 pb-3">
+                          <p className="text-xs text-amber-600 flex items-center gap-1.5">
                             <Info className="h-3 w-3 flex-shrink-0" />
-                            <span>
-                              {validationMsg ||
-                                getTableQuantityLimitMessage(rec.table) ||
-                                getIncrementDisabledReason(rec.table)}
-                            </span>
-                          </div>
+                            {validationMsg}
+                          </p>
                         </div>
                       )}
                     </div>
@@ -617,22 +471,22 @@ export default function TableRecommendations({
                 })}
               </div>
 
-              {/* Other Options - Show if there are any */}
+              {/* Other Options — collapsed by default */}
               {allOtherOptions.length > 0 && (
                 <div>
                   <Button
                     variant="ghost"
                     onClick={() => setShowAllOptions(!showAllOptions)}
-                    className="w-full justify-between text-gray-600 hover:text-gray-900 h-10"
+                    className="w-full justify-between text-gray-500 hover:text-gray-700 h-9 text-xs"
                   >
-                    <span className="text-sm">
-                      View {allOtherOptions.length} more option
+                    <span>
+                      {showAllOptions ? "Hide" : "View"} {allOtherOptions.length} more option
                       {allOtherOptions.length > 1 ? "s" : ""}
                     </span>
                     {showAllOptions ? (
-                      <ChevronUp className="h-4 w-4" />
+                      <ChevronUp className="h-3.5 w-3.5" />
                     ) : (
-                      <ChevronDown className="h-4 w-4" />
+                      <ChevronDown className="h-3.5 w-3.5" />
                     )}
                   </Button>
 
@@ -643,47 +497,38 @@ export default function TableRecommendations({
                         animate={{ opacity: 1, height: "auto" }}
                         exit={{ opacity: 0, height: 0 }}
                         transition={{ duration: 0.2 }}
-                        className="grid gap-3 mt-3"
+                        className="space-y-2 mt-2"
                       >
                         {allOtherOptions.map((rec, index) => {
                           const isEligible = isTableEligible(rec.table);
                           const isDisabled = isTableDisabled(rec.table);
                           const isSelected = getTotalQuantity(rec.table.id) > 0;
-                          const validationMsg = getTableValidationMessage(
-                            rec.table
-                          );
+                          const validationMsg = getTableValidationMessage(rec.table);
+                          const costPerPerson = getCostPerPerson(rec, peopleCount);
 
                           return (
                             <div
                               key={`${rec.table.id}-other-${index}`}
-                              className={`border rounded-lg ${
+                              className={`rounded-xl border-l-[3px] transition-all duration-200 ${
                                 isDisabled
-                                  ? "opacity-60 bg-gray-50 cursor-not-allowed"
-                                  : "hover:bg-gray-50"
-                              } ${
-                                isSelected
-                                  ? "ring-2 ring-blue-200 bg-blue-50/30"
-                                  : ""
-                              } ${
-                                !isEligible && !isDisabled ? "opacity-75" : ""
+                                  ? "opacity-60 bg-gray-50 border-l-transparent border border-gray-100 cursor-not-allowed"
+                                  : isSelected
+                                    ? "border-l-amber-500 bg-amber-50/40 shadow-sm border-t border-r border-b border-amber-100"
+                                    : !isEligible
+                                      ? "border-l-transparent bg-gray-50/30 border border-gray-100 opacity-75"
+                                      : "border-l-transparent bg-gray-50/50 border border-gray-100 hover:bg-gray-50"
                               }`}
                             >
-                              <div className="flex items-center justify-between p-4">
-                                <div className="flex-1 min-w-0">
-                                  <h4 className="font-medium text-gray-900 mb-1">
+                              <div className="flex items-center justify-between p-3 sm:p-3.5">
+                                <div className="flex-1 min-w-0 mr-3">
+                                  <h4 className="text-sm font-medium text-gray-900 truncate mb-0.5">
                                     {rec.table.title}
                                   </h4>
-                                  <p className="text-sm text-gray-600 mb-2">
-                                    {rec.recommendation}
-                                  </p>
-                                  <div className="flex gap-4 text-xs text-gray-500">
-                                    <span>{formatMoney(rec.totalCost)}</span>
-                                    <span>
-                                      {formatMoneyUnit(
-                                        getCostPerPerson(rec, peopleCount),
-                                      )}
-                                      /person
+                                  <div className="flex items-center gap-3 text-xs text-gray-500">
+                                    <span className="font-medium text-amber-700">
+                                      {formatMoneyUnit(costPerPerson)}/person
                                     </span>
+                                    <span>{formatMoney(rec.totalCost)} total</span>
                                     {rec.tablesNeeded > 1 && (
                                       <span>{rec.tablesNeeded} tables</span>
                                     )}
@@ -719,20 +564,12 @@ export default function TableRecommendations({
                                   </Badge>
                                 )}
                               </div>
-                              {(validationMsg ||
-                                getTableQuantityLimitMessage(rec.table) ||
-                                getIncrementDisabledReason(rec.table)) && (
-                                <div className="px-4 pb-3">
-                                  <div className="flex items-center gap-2 text-xs text-orange-600 bg-orange-50 p-2 rounded">
+                              {validationMsg && (
+                                <div className="px-3.5 pb-3">
+                                  <p className="text-xs text-amber-600 flex items-center gap-1.5">
                                     <Info className="h-3 w-3 flex-shrink-0" />
-                                    <span>
-                                      {validationMsg ||
-                                        getTableQuantityLimitMessage(
-                                          rec.table
-                                        ) ||
-                                        getIncrementDisabledReason(rec.table)}
-                                    </span>
-                                  </div>
+                                    {validationMsg}
+                                  </p>
                                 </div>
                               )}
                             </div>
@@ -748,42 +585,37 @@ export default function TableRecommendations({
         } else {
           // No eligible tables - show sorry message
           return (
-            <div className="space-y-4">
-              <div className="text-center py-6 bg-orange-50 rounded-lg border border-orange-200">
-                <AlertCircle className="h-8 w-8 text-orange-500 mx-auto mb-3" />
-                <h3 className="font-medium text-orange-900 mb-2">
-                  Sorry, we haven&apos;t yet available tables for {peopleCount}{" "}
-                  people
+            <div className="space-y-3">
+              <div className="text-center py-5 bg-amber-50 rounded-xl border border-amber-200">
+                <AlertCircle className="h-7 w-7 text-amber-500 mx-auto mb-2" />
+                <h3 className="font-medium text-amber-900 mb-1 text-sm">
+                  No tables available for {peopleCount} people
                 </h3>
-                <p className="text-sm text-orange-700 mb-3">
-                  Kindly contact with support so they can arrange
+                <p className="text-xs text-amber-700 mb-2">
+                  Please contact support for assistance
                 </p>
-                <div className="flex items-center justify-center gap-4 text-xs text-orange-600">
+                <div className="flex items-center justify-center gap-3 text-xs text-amber-600">
                   <span>📧 support@eventwizz.com</span>
-                  <span>📞 +44 20 1234 5678</span>
                 </div>
               </div>
 
               {/* Show all tables as view-only */}
               <div>
-                <h3 className="text-sm font-medium text-gray-900 mb-3">
-                  Available tables (may require special arrangement):
+                <h3 className="text-xs font-medium text-gray-500 mb-2 uppercase tracking-wider">
+                  Available tables (may require arrangement)
                 </h3>
-                <div className="grid gap-3">
+                <div className="space-y-2">
                   {[...recommended, ...otherOptions].map((rec, index) => (
                     <div
                       key={`${rec.table.id}-alt-${index}`}
-                      className="border rounded-lg opacity-75"
+                      className="border border-gray-100 rounded-xl opacity-75"
                     >
-                      <div className="flex items-center justify-between p-4">
+                      <div className="flex items-center justify-between p-3">
                         <div className="flex-1 min-w-0">
-                          <h4 className="font-medium text-gray-900 mb-1">
+                          <h4 className="text-sm font-medium text-gray-900 mb-0.5">
                             {rec.table.title}
                           </h4>
-                          <p className="text-sm text-gray-600 mb-2">
-                            {rec.recommendation}
-                          </p>
-                          <div className="flex gap-4 text-xs text-gray-500">
+                          <div className="flex gap-3 text-xs text-gray-500">
                             <span>
                               {formatMoneyUnit(
                                 getCostPerPerson(rec, peopleCount),

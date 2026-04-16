@@ -2,9 +2,16 @@
 
 import { useMemo, useState, useEffect, useRef } from "react";
 import { motion } from "framer-motion";
-import { ShoppingCart, CalendarPlus } from "lucide-react";
+import {
+  ShoppingCart,
+  CalendarPlus,
+  MapPin,
+  Calendar,
+  Trash2,
+  MoreHorizontal,
+  Package,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
 import {
   useGetCartData,
@@ -22,7 +29,6 @@ import {
 } from "../_lib/cart-calculations";
 import { CART_METADATA_KEYS_SET } from "@/lib/constants/cart-meta-keys";
 
-// New components
 import DateAccordion from "./date-accordion";
 import CartSkeletonLoader from "./cart-skeleton-loader";
 import { useCartEditStore } from "@/store/cart-edit.store";
@@ -30,19 +36,20 @@ import { useDrinkSelectionStore } from "@/store/drink-selection.store";
 import { useCartSync } from "../_lib/hooks/useCartSync";
 import { useLocationSlug } from "../_lib/hooks/useLocationSlug";
 import { generateEventBookingUrl } from "../_lib/utils/event-url";
+import { addCacheBusting } from "@/lib/image-utils";
+import { format } from "date-fns";
 
-// Component interfaces
 type CartManagerProps = Record<string, never>;
 
 export default function CartManager({}: CartManagerProps) {
   const [isProcessing, setIsProcessing] = useState(false);
   const [expandedDates, setExpandedDates] = useState<Set<string>>(new Set());
+  const [showClearConfirm, setShowClearConfirm] = useState(false);
+  const [showActions, setShowActions] = useState(false);
   const hasInitializedExpanded = useRef(false);
   const isPreviewMode = useIsPreviewMode();
   const { data: session } = useSession();
-  // Removed unused selectedPaymentTypes state - payment types are managed in Zustand store
 
-  // API data (read-only) - only fetch when user is authenticated as customer and not in preview mode
   const {
     data: apiCartData,
     isLoading: isLoadingCartData,
@@ -52,7 +59,6 @@ export default function CartManager({}: CartManagerProps) {
     session?.user?.account_type === "customer" && !isPreviewMode,
   );
 
-  // Edit store for temporary state
   const {
     initializeFromAPI,
     syncNewDatesFromAPI,
@@ -65,63 +71,48 @@ export default function CartManager({}: CartManagerProps) {
     clearAllCarts,
   } = useCartEditStore();
 
-  // Drink selection store for cleanup
   const { setCurrentEvent } = useDrinkSelectionStore();
-
-  // Cart synchronization
   const { syncCart } = useCartSync(apiCartData);
-
-  // Delete mutations
   const deleteCartDateMutation = useDeleteCartDate();
   const clearAllCartMutation = useClearAllCart();
 
-  // Automatically determine current event and date from API data
   const { currentEventSlug, currentEventApiData, firstDate } = useMemo(() => {
     return extractCurrentEventData(apiCartData);
   }, [apiCartData]);
 
-  // Get location slug with fallback strategy
   const locationSlug = useLocationSlug();
 
-  // Generate event booking URL (with #booking hash anchor)
   const eventDetailsUrl = useMemo(
     () => generateEventBookingUrl(locationSlug, currentEventSlug),
     [locationSlug, currentEventSlug],
   );
 
-  // 🍷 DRINK CLEANUP: Set current event and auto-clear drinks if switching events
   useEffect(() => {
     if (currentEventSlug) {
-      console.log(
-        `🍷 Setting current event in drink store: ${currentEventSlug}`,
-      );
       setCurrentEvent(currentEventSlug);
     }
   }, [currentEventSlug, setCurrentEvent]);
 
-  // Initialize expanded dates when first date is available (only once on initial load)
+  // Initialize all dates as expanded (no accordion collapse by default)
   useEffect(() => {
     if (firstDate && !hasInitializedExpanded.current) {
-      setExpandedDates(new Set([firstDate]));
+      // Expand ALL dates by default for the new design
+      const allDates = currentEventApiData
+        ? getAvailableDates(currentEventApiData)
+        : [firstDate];
+      setExpandedDates(new Set(allDates));
       hasInitializedExpanded.current = true;
     }
-    // Reset initialization flag if firstDate changes (new event loaded)
     if (!firstDate) {
       hasInitializedExpanded.current = false;
     }
-  }, [firstDate]);
+  }, [firstDate, currentEventApiData]);
 
   // Cart synchronization check
   useEffect(() => {
     if (!currentEventSlug || !currentEventApiData) return;
-
-    // Perform cart sync check
     syncCart(currentEventSlug).then((wasCleared) => {
       if (wasCleared) {
-        console.log(
-          "🔄 Cart data was cleared due to mismatches, reinitializing...",
-        );
-        // Cart was cleared, reinitialize from API
         setTimeout(() => {
           if (currentEventApiData) {
             initializeFromAPI(currentEventSlug, currentEventApiData);
@@ -131,51 +122,28 @@ export default function CartManager({}: CartManagerProps) {
     });
   }, [currentEventSlug, currentEventApiData, syncCart, initializeFromAPI]);
 
-  // 🔄 SYNC FIX: Enhanced cart synchronization with stale data cleanup
+  // Sync Zustand with API
   useEffect(() => {
     if (!currentEventSlug) return;
-
-    // Get current editing data from store to avoid dependency issues
     const currentEditingData = useCartEditStore.getState().editingData;
 
-    // ⚠️ CRITICAL FIX: If API data is completely empty, clear ALL Zustand data
     if (!currentEventApiData || Object.keys(currentEventApiData).length === 0) {
-      // Check if we have any stale Zustand data
       const hasStaleZustandData = Object.keys(currentEditingData).length > 0;
-
       if (hasStaleZustandData) {
-        console.warn(
-          "🚨 API cart is empty but Zustand has stale data. Clearing all Zustand cart data...",
-        );
-        clearAllCarts(); // Clear ALL events, not just current one
+        clearAllCarts();
         return;
       }
-
-      console.log("✅ Cart is empty (both API and Zustand)");
       return;
     }
 
-    // If no data exists for this event, initialize it
     if (!currentEditingData[currentEventSlug]) {
-      console.log("🔄 Initializing cart data from API for", currentEventSlug);
       initializeFromAPI(currentEventSlug, currentEventApiData);
     } else {
-      // If data exists, sync any new dates that might have been added
-      const newDates = getNewDatesFromAPI(
-        currentEventSlug,
-        currentEventApiData,
-      );
+      const newDates = getNewDatesFromAPI(currentEventSlug, currentEventApiData);
       if (newDates.length > 0) {
-        console.log(
-          `🔄 Found ${newDates.length} new date(s) to sync:`,
-          newDates,
-        );
         syncNewDatesFromAPI(currentEventSlug, currentEventApiData);
-      } else {
-        console.log("✅ No new dates to sync");
       }
 
-      // Check for removed dates that need to be cleaned up from Zustand
       const apiDates = Object.keys(currentEventApiData).filter(
         (key) => !CART_METADATA_KEYS_SET.has(key),
       );
@@ -185,17 +153,12 @@ export default function CartManager({}: CartManagerProps) {
       );
 
       if (removedDates.length > 0) {
-        console.log(
-          `🗑️ Found ${removedDates.length} removed date(s) to clean up:`,
-          removedDates,
-        );
         removedDates.forEach((date) => {
           removeDate(currentEventSlug, date);
         });
       }
     }
 
-    // 🧹 CLEANUP: Check for stale events in Zustand that don't exist in API
     const allApiEventSlugs = extractEventsFromApiResponse(apiCartData).map(
       (e) => e.event_slug,
     );
@@ -205,12 +168,7 @@ export default function CartManager({}: CartManagerProps) {
     );
 
     if (staleEventSlugs.length > 0) {
-      console.warn(
-        `🗑️ Found ${staleEventSlugs.length} stale event(s) in Zustand:`,
-        staleEventSlugs,
-      );
       staleEventSlugs.forEach((slug) => {
-        console.log(`🗑️ Removing stale event: ${slug}`);
         removeAllDates(slug);
       });
     }
@@ -224,70 +182,28 @@ export default function CartManager({}: CartManagerProps) {
     removeAllDates,
     removeDate,
     clearAllCarts,
-    // Removed editingData from dependencies to prevent infinite loop
   ]);
 
-  // Get all available dates using shared utility (DRY principle)
   const availableDates = useMemo(() => {
     return getAvailableDates(currentEventApiData);
   }, [currentEventApiData]);
 
-  // Initialize payment types for each date (simplified - payment types managed in Zustand)
   const initializedPaymentTypes = useMemo(() => {
     if (!currentEventApiData) return {};
-
     const newPaymentTypes: Record<string, "full" | "deposit"> = {};
-
     availableDates.forEach((date) => {
-      // Default to "full" for all dates - actual payment types managed in Zustand store
       newPaymentTypes[date] = "full";
     });
-
     return newPaymentTypes;
   }, [currentEventApiData, availableDates]);
 
-  // Calculate totals with payment breakdown and validation
-  const { totalCartItems, unsavedDatesCount } = useMemo(() => {
+  const { totalCartItems } = useMemo(() => {
     if (!currentEventSlug) {
-      return {
-        totalCartItems: 0,
-        unsavedDatesCount: 0,
-      };
+      return { totalCartItems: 0 };
     }
+    return { totalCartItems: availableDates.length };
+  }, [availableDates, currentEventSlug]);
 
-    let unsavedCount = 0;
-
-    availableDates.forEach((date) => {
-      const dateData = getDateData(currentEventSlug, date);
-      if (dateData) {
-        // Check for unsaved changes using both methods
-        const hasChangesMethod1 = hasUnsavedChanges(currentEventSlug, date);
-        const hasChangesMethod2 = dateData.hasChanges;
-
-        if (hasChangesMethod1 || hasChangesMethod2) {
-          unsavedCount++;
-        }
-      }
-    });
-
-    // Simple logging for debugging
-    if (unsavedCount > 0) {
-      console.log(`${unsavedCount} date(s) have unsaved changes`);
-    }
-
-    return {
-      totalCartItems: availableDates.length, // Count dates as items
-      unsavedDatesCount: unsavedCount,
-    };
-  }, [
-    availableDates,
-    editingData,
-    getDateData,
-    currentEventSlug,
-    hasUnsavedChanges,
-  ]);
-
-  // Calculate payment amounts using per-date logic
   useMemo(() => {
     return calculatePaymentAmounts(
       currentEventApiData,
@@ -302,8 +218,6 @@ export default function CartManager({}: CartManagerProps) {
     getDateData,
   ]);
 
-  // Check if payment should be blocked (after all variables are defined)
-
   const toggleDateExpansion = (date: string) => {
     setExpandedDates((prev) => {
       const newSet = new Set(prev);
@@ -316,20 +230,13 @@ export default function CartManager({}: CartManagerProps) {
     });
   };
 
-  // Handle removing a specific date
   const handleRemoveDate = async (date: string) => {
     try {
       setIsProcessing(true);
-
-      // Call API to delete the date
       await deleteCartDateMutation.mutateAsync(date);
-
-      // Also remove from Zustand store immediately if we have current event
       if (currentEventSlug) {
         removeDate(currentEventSlug, date);
       }
-
-      // Update expanded dates
       setExpandedDates((prev) => {
         const newSet = new Set(prev);
         newSet.delete(date);
@@ -342,19 +249,13 @@ export default function CartManager({}: CartManagerProps) {
     }
   };
 
-  // Handle clearing all cart data
   const handleClearAllCart = async () => {
     try {
       setIsProcessing(true);
-
-      // Call API to clear all cart data
       await clearAllCartMutation.mutateAsync();
-
-      // Also clear Zustand store immediately
       clearAllCarts();
-
-      // Reset expanded dates
       setExpandedDates(new Set());
+      setShowClearConfirm(false);
     } catch (error) {
       console.error("Error clearing cart:", error);
     } finally {
@@ -362,29 +263,27 @@ export default function CartManager({}: CartManagerProps) {
     }
   };
 
-  // Show skeleton only on initial load (no data yet). Keep current UI during background refetch (e.g. after autosave).
+  // Show skeleton only on initial load
   const isInitialLoad = isLoadingCartData && !apiCartData;
   if (isInitialLoad) {
     return <CartSkeletonLoader />;
   }
 
-  // Show error state with better UX
   if (cartError) {
     return (
-      <div className="text-center py-12">
-        <div className="w-16 h-16 mx-auto bg-red-100 rounded-full flex items-center justify-center mb-4">
-          <ShoppingCart className="h-8 w-8 text-red-600" />
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-8 text-center">
+        <div className="w-14 h-14 mx-auto bg-red-50 rounded-2xl flex items-center justify-center mb-4">
+          <ShoppingCart className="h-6 w-6 text-red-500" />
         </div>
-        <div className="text-red-600 font-semibold mb-2">
-          Unable to load cart data
-        </div>
-        <p className="text-gray-500 mb-4">
-          There was an error loading your cart. Please try again.
+        <h3 className="text-base font-semibold text-gray-900 mb-1">
+          Unable to load your cart
+        </h3>
+        <p className="text-sm text-gray-500 mb-5 max-w-xs mx-auto">
+          Something went wrong while loading your cart. Please try refreshing.
         </p>
         <Button
           onClick={() => window.location.reload()}
-          variant="outline"
-          className="border-red-200 text-red-600 hover:bg-red-50"
+          className="bg-gray-900 hover:bg-gray-800 text-white rounded-xl px-5 h-10 text-sm font-medium"
         >
           Refresh Page
         </Button>
@@ -392,98 +291,156 @@ export default function CartManager({}: CartManagerProps) {
     );
   }
 
-  // Check if cart is empty (only when not refetching)
-  if (
-    !isLoadingCartData &&
-    !isFetchingCartData &&
-    availableDates.length === 0
-  ) {
+  // Empty cart
+  if (!isLoadingCartData && !isFetchingCartData && availableDates.length === 0) {
     return (
-      <div className="text-center py-12">
-        <ShoppingCart className="h-16 w-16 text-gray-300 mx-auto mb-4" />
-        <h3 className="text-xl font-semibold text-gray-600 mb-2">
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-10 text-center">
+        <div className="w-16 h-16 mx-auto bg-gray-50 rounded-2xl flex items-center justify-center mb-5">
+          <ShoppingCart className="h-7 w-7 text-gray-300" />
+        </div>
+        <h3 className="text-lg font-semibold text-gray-900 mb-1.5">
           Your cart is empty
         </h3>
-        <p className="text-gray-500 mb-6">Add some items to get started</p>
+        <p className="text-sm text-gray-500 mb-6 max-w-xs mx-auto">
+          Browse events to find tickets, tables, and packages to add to your cart.
+        </p>
         <Button
           onClick={() => window.history.back()}
-          variant="outline"
-          className="mx-auto text-black"
+          className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl px-6 h-10 text-sm font-medium shadow-sm"
         >
-          Continue Shopping
+          Browse Events
         </Button>
       </div>
     );
   }
 
+  // Format date range for header
+  const formatDateRange = () => {
+    if (availableDates.length === 0) return "";
+    try {
+      if (availableDates.length === 1) {
+        return format(new Date(availableDates[0]), "EEE, MMM d, yyyy");
+      }
+      const first = format(new Date(availableDates[0]), "MMM d");
+      const last = format(
+        new Date(availableDates[availableDates.length - 1]),
+        "MMM d, yyyy",
+      );
+      return `${first} — ${last}`;
+    } catch {
+      return "";
+    }
+  };
+
   return (
-    <div className="space-y-6">
-      {/* Enhanced Cart Header */}
+    <div className="space-y-4">
+      {/* Compact Event Context Bar — not a hero card */}
       <motion.div
-        className="flex items-center justify-between flex-wrap gap-4"
+        className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden"
         {...ANIMATION_VARIANTS.FADE_IN_UP}
       >
-        <div className="flex items-center space-x-3">
-          <ShoppingCart className="h-6 w-6 text-blue-600" />
-          <h2 className="text-2xl font-bold text-black">Your Cart</h2>
-        </div>
-        <div className="flex items-center space-x-2 flex-wrap">
-          {/* Add More Dates Button */}
-          {eventDetailsUrl && currentEventSlug && (
-            <Link href={eventDetailsUrl}>
-              <Button
-                variant="outline"
-                size="sm"
-                className="flex items-center gap-2 border-blue-600 text-blue-700 hover:bg-blue-50 hover:text-blue-800"
-              >
-                <CalendarPlus className="h-4 w-4" />
-                <span>Add More Dates</span>
-              </Button>
-            </Link>
+        <div className="flex items-center gap-3 px-4 py-3">
+          {/* Compact Event Image */}
+          {currentEventApiData?.event_image && (
+            <div className="relative w-10 h-10 rounded-lg overflow-hidden bg-gray-100 flex-shrink-0">
+              <img
+                src={addCacheBusting(currentEventApiData.event_image)}
+                alt={currentEventApiData?.event_name || "Event"}
+                className="absolute inset-0 w-full h-full object-cover"
+              />
+            </div>
           )}
-          <Badge
-            variant="outline"
-            className="border-transparent bg-blue-600 px-3 py-1 text-white"
-          >
-            {totalCartItems} {totalCartItems === 1 ? "item" : "items"}
-          </Badge>
-          {unsavedDatesCount > 0 && (
-            <Badge
-              variant="secondary"
-              className="px-3 py-1 bg-blue-50 text-blue-700 border-blue-200"
-            >
-              {unsavedDatesCount} unsaved
-            </Badge>
-          )}
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleClearAllCart}
-            disabled={isProcessing || clearAllCartMutation.isPending}
-            className="text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200"
-          >
-            {clearAllCartMutation.isPending ? "Clearing..." : "Clear All"}
-          </Button>
+
+          {/* Event Info — condensed */}
+          <div className="flex-1 min-w-0">
+            <h1 className="text-sm sm:text-base font-semibold text-gray-900 truncate leading-tight">
+              {currentEventApiData?.event_name || "Your Booking"}
+            </h1>
+            <div className="flex items-center gap-2 mt-0.5">
+              {formatDateRange() && (
+                <span className="text-xs text-gray-500 truncate">
+                  {formatDateRange()}
+                </span>
+              )}
+              {totalCartItems > 1 && (
+                <>
+                  <span className="text-gray-300">·</span>
+                  <span className="text-xs font-medium text-blue-600">
+                    {totalCartItems} dates
+                  </span>
+                </>
+              )}
+            </div>
+          </div>
+
+          {/* Actions — compact */}
+          <div className="flex items-center gap-1.5 flex-shrink-0">
+            {eventDetailsUrl && currentEventSlug && (
+              <Link href={eventDetailsUrl}>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="hidden sm:flex items-center gap-1.5 text-blue-600 border-blue-200 hover:bg-blue-50 hover:text-blue-700 rounded-lg h-8 text-xs font-medium"
+                >
+                  <CalendarPlus className="h-3.5 w-3.5" />
+                  Add Dates
+                </Button>
+              </Link>
+            )}
+
+            {/* Clear all — overflow menu style */}
+            <div className="relative">
+              {showClearConfirm ? (
+                <div className="flex items-center gap-1.5">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleClearAllCart}
+                    disabled={isProcessing || clearAllCartMutation.isPending}
+                    className="text-red-600 border-red-200 hover:bg-red-50 rounded-lg h-8 text-xs"
+                  >
+                    {clearAllCartMutation.isPending ? "Clearing..." : "Confirm"}
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setShowClearConfirm(false)}
+                    className="rounded-lg h-8 text-xs text-gray-500"
+                  >
+                    Cancel
+                  </Button>
+                </div>
+              ) : (
+                <button
+                  onClick={() => setShowClearConfirm(true)}
+                  className="p-1.5 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors"
+                  title="Clear cart"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </button>
+              )}
+            </div>
+          </div>
         </div>
       </motion.div>
 
-      {/* Date Accordions */}
+      {/* Date Sections — always expanded, no accordion collapse */}
       <div className="space-y-4">
         {availableDates.length === 0 ? (
           <motion.div
-            className="text-center py-12"
+            className="bg-white rounded-2xl border border-gray-100 shadow-sm p-10 text-center"
             {...ANIMATION_VARIANTS.FADE_IN_UP}
           >
-            <ShoppingCart className="h-16 w-16 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-xl font-semibold text-gray-600 mb-2">
+            <ShoppingCart className="h-12 w-12 text-gray-200 mx-auto mb-4" />
+            <h3 className="text-base font-semibold text-gray-700 mb-1">
               No event data available
             </h3>
-            <p className="text-gray-500">
-              Please select a date from the event page to add items to your cart
+            <p className="text-sm text-gray-500">
+              Select a date from the event page to add items to your cart
             </p>
           </motion.div>
         ) : (
-          availableDates.map((date) => {
+          availableDates.map((date, index) => {
             const isExpanded = expandedDates.has(date);
             const dateData = currentEventSlug
               ? getDateData(currentEventSlug, date)
@@ -492,15 +449,21 @@ export default function CartManager({}: CartManagerProps) {
             if (!dateData || !currentEventSlug) return null;
 
             return (
-              <DateAccordion
+              <motion.div
                 key={date}
-                eventSlug={currentEventSlug}
-                date={date}
-                dateData={dateData}
-                isExpanded={isExpanded}
-                onToggle={() => toggleDateExpansion(date)}
-                onRemoveDate={handleRemoveDate}
-              />
+                initial={{ opacity: 0, y: 12 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.3, delay: index * 0.05 }}
+              >
+                <DateAccordion
+                  eventSlug={currentEventSlug}
+                  date={date}
+                  dateData={dateData}
+                  isExpanded={isExpanded}
+                  onToggle={() => toggleDateExpansion(date)}
+                  onRemoveDate={handleRemoveDate}
+                />
+              </motion.div>
             );
           })
         )}

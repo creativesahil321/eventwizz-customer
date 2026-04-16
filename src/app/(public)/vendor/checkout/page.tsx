@@ -1,6 +1,5 @@
 "use client";
 
-import { cn } from "@/lib/utils";
 import { useDomain } from "@/providers/domain-provider/domain-provider";
 import CheckoutHeader from "./_components/checkout-header";
 import CartManager from "./_components/cart-manager";
@@ -14,9 +13,7 @@ export default function CheckoutPage({}: CheckoutPageProps) {
   const { settings, isLoading: isDomainLoading } = useDomain();
   const { isClient, status, isAuthenticated, isCustomer } = useCheckoutAuth();
 
-  // No URL parameters needed - CartManager will determine current cart state from API data
-
-  // Centralized loading component for better maintainability
+  // Centralized loading component
   const LoadingScreen = ({
     message,
     color = "blue",
@@ -24,30 +21,37 @@ export default function CheckoutPage({}: CheckoutPageProps) {
     message: string;
     color?: "blue" | "red";
   }) => (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+    <div className="min-h-screen bg-[#FAFBFC] flex items-center justify-center">
       <div className="text-center">
-        <div
-          className={cn(
-            "mx-auto h-32 w-32 animate-spin rounded-full border-b-2",
-            color === "red" ? "border-red-600" : "border-blue-600",
-          )}
-        />
-        <p className="mt-4 text-gray-600">{message}</p>
+        <div className="relative mx-auto h-12 w-12 mb-4">
+          <div
+            className={`absolute inset-0 rounded-full border-2 ${
+              color === "red"
+                ? "border-red-100"
+                : "border-blue-100"
+            }`}
+          />
+          <div
+            className={`absolute inset-0 rounded-full border-2 border-t-transparent animate-spin ${
+              color === "red"
+                ? "border-red-500"
+                : "border-blue-500"
+            }`}
+          />
+        </div>
+        <p className="text-sm text-gray-500 font-medium">{message}</p>
       </div>
     </div>
   );
 
-  // Show loading while checking authentication and domain
   if (!isClient || isDomainLoading || status === "loading") {
     return <LoadingScreen message={LOADING_MESSAGES.LOADING_CHECKOUT} />;
   }
 
-  // Show loading while redirecting to login
   if (status === "unauthenticated") {
     return <LoadingScreen message={LOADING_MESSAGES.REDIRECTING_LOGIN} />;
   }
 
-  // Check if user is authorized (customer with valid token)
   if (isClient && isAuthenticated && !isCustomer) {
     return (
       <LoadingScreen
@@ -59,22 +63,22 @@ export default function CheckoutPage({}: CheckoutPageProps) {
 
   return (
     <motion.div
-      className="min-h-screen bg-gray-50"
+      className="min-h-screen bg-[#FAFBFC]"
       {...ANIMATION_VARIANTS.FADE_IN_UP}
     >
       {/* Header */}
       <CheckoutHeader settings={settings || undefined} />
 
-      {/* Main Content - Restore Original 2-Column Layout */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Cart Manager - Takes 2/3 of the space (LEFT SIDE) */}
-          <div className="lg:col-span-2">
+      {/* Main Content - 2-column layout */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8">
+          {/* Main content area — tickets/tables/drinks */}
+          <div className="lg:col-span-7 xl:col-span-8">
             <CartManager />
           </div>
 
-          {/* Booking Summary - Takes 1/3 of the space (RIGHT SIDE) */}
-          <div className="lg:col-span-1">
+          {/* Order summary sidebar */}
+          <div className="lg:col-span-5 xl:col-span-4">
             <BookingSummary />
           </div>
         </div>

@@ -58,7 +58,7 @@ export const vendorMenus: MenuItemProps[] = [
     href: createVendorUrl("/vendor/menu-choices"),
     url: createVendorUrl("/vendor/menu-choices"),
     type: "title",
-    permissions: "read-event-menu",
+    permissions: "read-menu-choice",
     menu: [],
   },
   {

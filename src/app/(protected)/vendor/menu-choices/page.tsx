@@ -56,7 +56,7 @@ function formatDateLabel(raw: string): string {
 }
 
 function getEventsFromApi(
-  eventsWithDates: EventWithDates[] | undefined
+  eventsWithDates: EventWithDates[] | undefined,
 ): FilterEvent[] {
   if (!eventsWithDates?.length) return [];
   return eventsWithDates.map((e) => ({
@@ -67,7 +67,7 @@ function getEventsFromApi(
 
 function getDatesForEvent(
   eventsWithDates: EventWithDates[] | undefined,
-  selectedEventId: string
+  selectedEventId: string,
 ): FilterDate[] {
   if (!eventsWithDates?.length || !selectedEventId) return [];
   const eventId = Number(selectedEventId);
@@ -84,7 +84,7 @@ export default function Page() {
   const [per_page] = useQueryState("per_page", parseAsInteger.withDefault(30));
   const [eventNameInUrl, setEventNameInUrl] = useQueryState(
     "event_name",
-    parseAsString.withDefault("")
+    parseAsString.withDefault(""),
   );
 
   const [selectedEventId, setSelectedEventId] = useState<string>("");
@@ -187,188 +187,191 @@ export default function Page() {
 
   return (
     <PermissionRoute
-      permissionKey="read-event-menu"
+      permissionKey="read-menu-choice"
       fallbackPath="/vendor/dashboard"
     >
       <section className="page text-black min-w-0">
         <Shell className="gap-2">
           <div className="flex flex-col gap-4 min-w-0">
             {/* Header Card */}
-          <div className="bg-white rounded-lg border border-[var(--color-border)] shadow-md p-6 mb-4 min-w-0">
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center flex-wrap gap-4">
-              {/* Title */}
-              <div className="flex flex-col gap-3">
-                <h1 className="text-2xl title-header font-bold text-black">
-                  Customer Menu Choices
-                </h1>
-                <LocationIndicator variant="card" context="Menu choices" />
-                <p className="text-muted-foreground">
-                  View and manage all customer menu choices.
-                </p>
-              </div>
+            <div className="bg-white rounded-lg border border-[var(--color-border)] shadow-md p-6 mb-4 min-w-0">
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center flex-wrap gap-4">
+                {/* Title */}
+                <div className="flex flex-col gap-3">
+                  <h1 className="text-2xl title-header font-bold text-black">
+                    Customer Menu Choices
+                  </h1>
+                  <LocationIndicator variant="card" />
+                  <p className="text-muted-foreground">
+                    View and manage all customer menu choices.
+                  </p>
+                </div>
 
-              {/* Filters: event search, date, reset, download CSV for date */}
-              <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
-                <Popover
-                  open={eventComboboxOpen}
-                  onOpenChange={handleEventComboboxOpenChange}
-                >
-                  <PopoverTrigger asChild>
-                    <div className="relative w-full sm:w-[280px]">
-                      <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground pointer-events-none" />
-                      <Input
-                        placeholder="Search or select event…"
-                        value={eventSearchQuery}
-                        onChange={(e) => {
-                          const v = e.target.value;
-                          setEventSearchQuery(v);
-                          if (!eventComboboxOpen) setEventComboboxOpen(true);
-                          if (!v.trim() && selectedEventId)
-                            setSelectedEventId("");
-                        }}
-                        onFocus={() => setEventComboboxOpen(true)}
-                        className="pl-8 pr-8 w-full"
-                        aria-label="Search or select event"
-                        aria-busy={isSearching}
-                      />
-                      {isSearching ? (
-                        <Loader2
-                          className="absolute right-2.5 top-2.5 h-4 w-4 animate-spin text-muted-foreground"
-                          aria-hidden
-                        />
-                      ) : (
-                        <ChevronDown className="absolute right-2.5 top-2.5 h-4 w-4 text-muted-foreground pointer-events-none" />
-                      )}
-                    </div>
-                  </PopoverTrigger>
-                  <PopoverContent
-                    className="w-[var(--radix-popover-trigger-width)] p-0"
-                    align="start"
-                    onOpenAutoFocus={(e) => e.preventDefault()}
+                {/* Filters: event search, date, reset, download CSV for date */}
+                <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
+                  <Popover
+                    open={eventComboboxOpen}
+                    onOpenChange={handleEventComboboxOpenChange}
                   >
-                    <Command
-                      shouldFilter={false}
-                      className="rounded-md border-0 shadow-none"
+                    <PopoverTrigger asChild>
+                      <div className="relative w-full sm:w-[280px]">
+                        <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground pointer-events-none" />
+                        <Input
+                          placeholder="Search or select event…"
+                          value={eventSearchQuery}
+                          onChange={(e) => {
+                            const v = e.target.value;
+                            setEventSearchQuery(v);
+                            if (!eventComboboxOpen) setEventComboboxOpen(true);
+                            if (!v.trim() && selectedEventId)
+                              setSelectedEventId("");
+                          }}
+                          onFocus={() => setEventComboboxOpen(true)}
+                          className="pl-8 pr-8 w-full"
+                          aria-label="Search or select event"
+                          aria-busy={isSearching}
+                        />
+                        {isSearching ? (
+                          <Loader2
+                            className="absolute right-2.5 top-2.5 h-4 w-4 animate-spin text-muted-foreground"
+                            aria-hidden
+                          />
+                        ) : (
+                          <ChevronDown className="absolute right-2.5 top-2.5 h-4 w-4 text-muted-foreground pointer-events-none" />
+                        )}
+                      </div>
+                    </PopoverTrigger>
+                    <PopoverContent
+                      className="w-[var(--radix-popover-trigger-width)] p-0"
+                      align="start"
+                      onOpenAutoFocus={(e) => e.preventDefault()}
                     >
-                      <CommandList className="max-h-[280px]">
-                        {eventsLoading && (
-                          <div className="flex items-center justify-center gap-2 py-6 text-sm text-muted-foreground">
-                            <Loader2
-                              className="h-4 w-4 shrink-0 animate-spin"
-                              aria-hidden
-                            />
-                            <span>Searching events…</span>
-                          </div>
-                        )}
-                        {!eventsLoading && eventsError && (
-                          <div className="py-6 text-center text-sm text-muted-foreground">
-                            Could not load events. Try again.
-                          </div>
-                        )}
-                        {!eventsLoading &&
-                          !eventsError &&
-                          events.length === 0 &&
-                          (!eventNameInUrl?.trim() || !menuChoicesLoading) && (
-                            <div className="py-6 text-center text-sm text-muted-foreground">
-                              {eventNameInUrl?.trim()
-                                ? "No event found for this search."
-                                : "No events to show."}
+                      <Command
+                        shouldFilter={false}
+                        className="rounded-md border-0 shadow-none"
+                      >
+                        <CommandList className="max-h-[280px]">
+                          {eventsLoading && (
+                            <div className="flex items-center justify-center gap-2 py-6 text-sm text-muted-foreground">
+                              <Loader2
+                                className="h-4 w-4 shrink-0 animate-spin"
+                                aria-hidden
+                              />
+                              <span>Searching events…</span>
                             </div>
                           )}
-                        {!eventsLoading &&
-                          !eventsError &&
-                          events.length > 0 &&
-                          events.map((ev) => (
-                            <CommandItem
-                              key={ev.id}
-                              value={ev.name}
-                              onSelect={() => handleSelectEvent(ev)}
-                              className="cursor-pointer"
-                            >
-                              {ev.name}
-                            </CommandItem>
-                          ))}
-                      </CommandList>
-                    </Command>
-                  </PopoverContent>
-                </Popover>
-                <Select
-                  value={selectedEventDate}
-                  onValueChange={setSelectedEventDate}
-                  disabled={!selectedEventId}
-                >
-                  <SelectTrigger className="w-full sm:w-[200px]">
-                    <SelectValue
-                      placeholder={
-                        !selectedEventId ? "Select event first" : "Select date"
-                      }
-                    />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {eventDates.map((d) => (
-                      <SelectItem key={d.value} value={d.value}>
-                        {d.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {hasEventDateFilter && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={handleResetAllFilters}
-                    className="gap-2 shrink-0"
-                    aria-label="Reset filters"
+                          {!eventsLoading && eventsError && (
+                            <div className="py-6 text-center text-sm text-muted-foreground">
+                              Could not load events. Try again.
+                            </div>
+                          )}
+                          {!eventsLoading &&
+                            !eventsError &&
+                            events.length === 0 &&
+                            (!eventNameInUrl?.trim() ||
+                              !menuChoicesLoading) && (
+                              <div className="py-6 text-center text-sm text-muted-foreground">
+                                {eventNameInUrl?.trim()
+                                  ? "No event found for this search."
+                                  : "No events to show."}
+                              </div>
+                            )}
+                          {!eventsLoading &&
+                            !eventsError &&
+                            events.length > 0 &&
+                            events.map((ev) => (
+                              <CommandItem
+                                key={ev.id}
+                                value={ev.name}
+                                onSelect={() => handleSelectEvent(ev)}
+                                className="cursor-pointer"
+                              >
+                                {ev.name}
+                              </CommandItem>
+                            ))}
+                        </CommandList>
+                      </Command>
+                    </PopoverContent>
+                  </Popover>
+                  <Select
+                    value={selectedEventDate}
+                    onValueChange={setSelectedEventDate}
+                    disabled={!selectedEventId}
                   >
-                    <RotateCcw className="h-4 w-4" />
-                    Reset all
-                  </Button>
-                )}
-                {selectedEventId && selectedEventDate && (
-                  <Button
-                    variant="event-primary"
-                    size="sm"
-                    onClick={handleDownloadAllCsvForDate}
-                    disabled={dateCsvExporting}
-                    className="flex items-center gap-2 shrink-0"
-                    aria-label="Export CSV for selected date"
-                  >
-                    {dateCsvExporting ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <Download className="h-4 w-4" />
-                    )}
-                    Export CSV for selected date
-                  </Button>
-                )}
+                    <SelectTrigger className="w-full sm:w-[200px]">
+                      <SelectValue
+                        placeholder={
+                          !selectedEventId
+                            ? "Select event first"
+                            : "Select date"
+                        }
+                      />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {eventDates.map((d) => (
+                        <SelectItem key={d.value} value={d.value}>
+                          {d.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {hasEventDateFilter && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleResetAllFilters}
+                      className="gap-2 shrink-0"
+                      aria-label="Reset filters"
+                    >
+                      <RotateCcw className="h-4 w-4" />
+                      Reset all
+                    </Button>
+                  )}
+                  {selectedEventId && selectedEventDate && (
+                    <Button
+                      variant="event-primary"
+                      size="sm"
+                      onClick={handleDownloadAllCsvForDate}
+                      disabled={dateCsvExporting}
+                      className="flex items-center gap-2 shrink-0"
+                      aria-label="Export CSV for selected date"
+                    >
+                      {dateCsvExporting ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Download className="h-4 w-4" />
+                      )}
+                      Export CSV for selected date
+                    </Button>
+                  )}
+                </div>
               </div>
             </div>
-          </div>
 
-          {/* Data Table */}
-          <Suspense
-            fallback={
-              <DataTableSkeleton
-                columnCount={8}
-                cellWidths={[
-                  "4rem",
-                  "12rem",
-                  "12rem",
-                  "12rem",
-                  "16rem",
-                  "12rem",
-                  "10rem",
-                  "6rem",
-                ]}
-                shrinkZero
-              />
-            }
-          >
-            <CustomerMenuDataTable search={menuSearch} />
-          </Suspense>
-        </div>
-      </Shell>
-    </section>
+            {/* Data Table */}
+            <Suspense
+              fallback={
+                <DataTableSkeleton
+                  columnCount={8}
+                  cellWidths={[
+                    "4rem",
+                    "12rem",
+                    "12rem",
+                    "12rem",
+                    "16rem",
+                    "12rem",
+                    "10rem",
+                    "6rem",
+                  ]}
+                  shrinkZero
+                />
+              }
+            >
+              <CustomerMenuDataTable search={menuSearch} />
+            </Suspense>
+          </div>
+        </Shell>
+      </section>
     </PermissionRoute>
   );
 }

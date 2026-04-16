@@ -1,96 +1,76 @@
 "use client";
 
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 
-// Professional Order Summary Skeleton Loader Component
 export default function BookingSummarySkeleton() {
   return (
-    <Card className="h-fit sticky top-4">
-      <CardHeader className="pb-4">
-        <div className="flex items-center gap-2">
-          <Skeleton className="h-5 w-5 rounded" />
-          <Skeleton className="h-6 w-24" />
-        </div>
-      </CardHeader>
+    <>
+      {/* Desktop Skeleton */}
+      <div className="hidden lg:block">
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm sticky top-20 p-5 space-y-4">
+          <Skeleton className="h-5 w-32" />
 
-      <CardContent className="space-y-4">
-        {/* Event Details Skeleton */}
-        <div className="flex gap-3">
-          <Skeleton className="w-16 h-16 rounded-lg" />
-          <div className="flex-1 min-w-0 space-y-2">
-            <Skeleton className="h-4 w-32" />
-            <div className="flex items-center gap-1">
-              <Skeleton className="h-3 w-3 rounded" />
-              <Skeleton className="h-3 w-24" />
-            </div>
-            <div className="flex items-center gap-1">
-              <Skeleton className="h-3 w-3 rounded" />
-              <Skeleton className="h-3 w-20" />
+          {/* Date breakdown skeleton */}
+          <div className="space-y-2">
+            <div className="rounded-xl bg-gray-50 border border-gray-100 p-3 space-y-2">
+              <div className="flex justify-between">
+                <Skeleton className="h-3.5 w-24" />
+                <Skeleton className="h-3.5 w-16" />
+              </div>
+              <div className="flex gap-1.5">
+                <Skeleton className="h-5 w-10 rounded-md" />
+                <Skeleton className="h-5 w-10 rounded-md" />
+              </div>
             </div>
           </div>
-        </div>
 
-        <Separator />
+          <Skeleton className="h-[1px] w-full" />
 
-        {/* Cart Items Summary Skeleton */}
-        <div className="space-y-2">
-          <Skeleton className="h-4 w-32" />
+          {/* Pricing skeleton */}
           <div className="space-y-2">
             <div className="flex justify-between">
-              <Skeleton className="h-3 w-24" />
-              <Skeleton className="h-3 w-16" />
+              <Skeleton className="h-4 w-16" />
+              <Skeleton className="h-4 w-14" />
             </div>
+            <Skeleton className="h-[1px] w-full" />
             <div className="flex justify-between">
-              <Skeleton className="h-3 w-20" />
-              <Skeleton className="h-3 w-12" />
+              <Skeleton className="h-5 w-20" />
+              <Skeleton className="h-6 w-20" />
             </div>
-            <div className="flex justify-between">
-              <Skeleton className="h-3 w-28" />
+          </div>
+
+          <Skeleton className="h-[1px] w-full" />
+
+          {/* Payment method skeleton */}
+          <div className="space-y-2">
+            <Skeleton className="h-3 w-28" />
+            <Skeleton className="h-10 w-full rounded-lg" />
+          </div>
+
+          <Skeleton className="h-[1px] w-full" />
+
+          {/* CTA skeleton */}
+          <Skeleton className="h-12 w-full rounded-xl" />
+          <div className="flex justify-center gap-4">
+            <Skeleton className="h-3 w-20" />
+            <Skeleton className="h-3 w-24" />
+          </div>
+        </div>
+      </div>
+
+      {/* Mobile skeleton (bottom bar) */}
+      <div className="lg:hidden">
+        <div className="h-20" />
+        <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 shadow-lg px-4 py-3">
+          <div className="flex items-center justify-between">
+            <div className="space-y-1">
               <Skeleton className="h-3 w-14" />
+              <Skeleton className="h-6 w-20" />
             </div>
+            <Skeleton className="h-11 w-28 rounded-xl" />
           </div>
         </div>
-
-        <Separator />
-
-        {/* Pricing Breakdown Skeleton */}
-        <div className="space-y-2">
-          <div className="flex justify-between">
-            <Skeleton className="h-4 w-20" />
-            <Skeleton className="h-4 w-16" />
-          </div>
-          <div className="flex justify-between">
-            <Skeleton className="h-4 w-24" />
-            <Skeleton className="h-4 w-12" />
-          </div>
-          <div className="flex justify-between">
-            <Skeleton className="h-4 w-28" />
-            <Skeleton className="h-4 w-14" />
-          </div>
-        </div>
-
-        <Separator />
-
-        {/* Total Skeleton */}
-        <div className="flex justify-between items-center">
-          <Skeleton className="h-6 w-16" />
-          <Skeleton className="h-6 w-20" />
-        </div>
-
-        {/* Action Buttons Skeleton */}
-        <div className="space-y-2 pt-4">
-          <Skeleton className="h-10 w-full rounded-md" />
-          <Skeleton className="h-8 w-full rounded-md" />
-        </div>
-
-        {/* Security Badge Skeleton */}
-        <div className="flex items-center justify-center gap-2 pt-2">
-          <Skeleton className="h-4 w-4 rounded" />
-          <Skeleton className="h-3 w-32" />
-        </div>
-      </CardContent>
-    </Card>
+      </div>
+    </>
   );
 }

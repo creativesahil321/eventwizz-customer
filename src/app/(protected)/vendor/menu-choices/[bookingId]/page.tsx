@@ -39,7 +39,7 @@ import {
   useSaveVendorMenuChoice,
 } from "@/services/vendor/bookings/query";
 import { useVendorBookingById } from "@/services/vendor/bookings/hooks/useVendorBookingById";
-import { MenuTable } from "@/services/customer/bookings/type";
+import { MenuTable, SaveMenuChoicePayload } from "@/services/customer/bookings/type";
 import { vendorBookingsService } from "@/services/vendor/bookings/bookings.service";
 import { PermissionRoute } from "@/components/permission";
 
@@ -357,7 +357,7 @@ function MenuChoicesContent({ params }: MenuChoicesPageProps) {
       pendingSavesCountRef.current += 1;
 
       try {
-        await saveMenuChoiceMutation.mutateAsync(payload);
+        await saveMenuChoiceMutation.mutateAsync(payload as SaveMenuChoicePayload);
         setEditingAttendee(null);
       } catch (error) {
         console.error("Error saving menu choice:", error);
@@ -749,7 +749,7 @@ export default function MenuChoicesPage({
 }: Readonly<MenuChoicesPageProps>) {
   return (
     <PermissionRoute
-      permissionKey="read-event-menu"
+      permissionKey="read-menu-choice"
       fallbackPath="/vendor/menu-choices"
     >
       <Suspense fallback={<MenuChoicesPageSkeleton />}>

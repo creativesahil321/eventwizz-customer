@@ -1,9 +1,9 @@
 /**
- * Professional Quantity Controls Component
- * Handles +/- buttons with smooth animations and validation
+ * Refined Quantity Controls Component
+ * Cleaner visual design with smooth animations
+ * Enhanced: Add button shows price preview for zero-quantity items
  */
 
-import { Button } from "@/components/ui/button";
 import { Minus, Plus, Trash2 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -16,6 +16,8 @@ interface QuantityControlsProps {
   disabled?: boolean;
   showRemove?: boolean;
   size?: "sm" | "default";
+  /** Optional price to show on the Add button */
+  priceLabel?: string;
 }
 
 export default function QuantityControls({
@@ -27,15 +29,16 @@ export default function QuantityControls({
   disabled = false,
   showRemove = true,
   size = "default",
+  priceLabel,
 }: QuantityControlsProps) {
-  const buttonSize = size === "sm" ? "w-8 h-8" : "w-10 h-10";
-  const iconSize = size === "sm" ? "w-3 h-3" : "w-4 h-4";
+  const buttonSize = size === "sm" ? "w-8 h-8" : "w-9 h-9";
+  const iconSize = size === "sm" ? "w-3.5 h-3.5" : "w-3.5 h-3.5";
 
   const canIncrease = !disabled && (!maxQuantity || quantity < maxQuantity);
   const canDecrease = !disabled && quantity > 0;
 
   return (
-    <div className="flex items-center gap-2">
+    <div className="flex items-center gap-1.5">
       <AnimatePresence>
         {quantity > 0 && (
           <motion.div
@@ -43,61 +46,55 @@ export default function QuantityControls({
             animate={{ opacity: 1, scale: 1, width: "auto" }}
             exit={{ opacity: 0, scale: 0.8, width: 0 }}
             transition={{ duration: 0.2, ease: "easeInOut" }}
-            className="flex items-center gap-2"
+            className="flex items-center gap-1.5"
           >
             {/* Decrease Button */}
-            <Button
-              variant="outline"
-              size="icon"
-              className={`${buttonSize} border-gray-300 hover:border-red-400 hover:bg-red-50 transition-colors`}
+            <button
+              className={`${buttonSize} flex items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-600 transition-all duration-150 hover:border-red-300 hover:bg-red-50 hover:text-red-600 active:scale-95 disabled:opacity-40 disabled:pointer-events-none`}
               onClick={onDecrease}
               disabled={!canDecrease}
               aria-label="Decrease quantity"
             >
               <Minus className={iconSize} />
-            </Button>
+            </button>
 
             {/* Quantity Display */}
             <motion.div
               key={quantity}
-              initial={{ scale: 1.2 }}
+              initial={{ scale: 1.15 }}
               animate={{ scale: 1 }}
-              transition={{ duration: 0.15 }}
-              className="min-w-[2rem] text-center text-lg font-semibold text-blue-600"
+              transition={{ duration: 0.12 }}
+              className={`${size === "sm" ? "min-w-[1.75rem] text-sm" : "min-w-[2rem] text-base"} text-center font-semibold text-gray-900 tabular-nums`}
             >
               {quantity}
             </motion.div>
 
             {/* Increase Button */}
-            <Button
-              variant="outline"
-              size="icon"
-              className={`${buttonSize} border-gray-300 hover:border-green-400 hover:bg-green-50 transition-colors`}
+            <button
+              className={`${buttonSize} flex items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-600 transition-all duration-150 hover:border-blue-300 hover:bg-blue-50 hover:text-blue-600 active:scale-95 disabled:opacity-40 disabled:pointer-events-none`}
               onClick={onIncrease}
               disabled={!canIncrease}
               aria-label="Increase quantity"
             >
               <Plus className={iconSize} />
-            </Button>
+            </button>
 
             {/* Remove Button */}
             {showRemove && (
-              <Button
-                variant="ghost"
-                size="icon"
-                className={`${buttonSize} text-red-500 hover:text-red-700 hover:bg-red-50 transition-colors ml-2`}
+              <button
+                className={`${buttonSize} flex items-center justify-center rounded-lg text-gray-300 transition-all duration-150 hover:text-red-500 hover:bg-red-50 active:scale-95 disabled:opacity-40 disabled:pointer-events-none ml-0.5`}
                 onClick={onRemove}
                 disabled={disabled}
                 aria-label="Remove item"
               >
                 <Trash2 className={iconSize} />
-              </Button>
+              </button>
             )}
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* Add Button (shown when quantity is 0) */}
+      {/* Add Button (shown when quantity is 0) — now shows price preview */}
       <AnimatePresence>
         {quantity === 0 && (
           <motion.div
@@ -106,16 +103,20 @@ export default function QuantityControls({
             exit={{ opacity: 0, scale: 0.8 }}
             transition={{ duration: 0.2 }}
           >
-            <Button
-              variant="outline"
-              size={size}
+            <button
               onClick={onIncrease}
               disabled={!canIncrease}
-              className="border-slate-300 text-slate-900 transition-all duration-200 hover:scale-105 hover:bg-slate-50"
+              className="flex items-center gap-1.5 px-3.5 h-9 rounded-xl bg-blue-600 text-white text-sm font-medium transition-all duration-200 hover:bg-blue-700 hover:shadow-md active:scale-95 disabled:opacity-40 disabled:pointer-events-none shadow-sm"
             >
-              <Plus className={`${iconSize} mr-1`} />
-              Add
-            </Button>
+              <Plus className="w-3.5 h-3.5" />
+              <span>Add</span>
+              {priceLabel && (
+                <>
+                  <span className="w-px h-3.5 bg-blue-400/50" />
+                  <span className="text-blue-100 font-normal text-xs">{priceLabel}</span>
+                </>
+              )}
+            </button>
           </motion.div>
         )}
       </AnimatePresence>
@@ -123,11 +124,11 @@ export default function QuantityControls({
       {/* Capacity Warning */}
       {maxQuantity && quantity >= maxQuantity && (
         <motion.div
-          initial={{ opacity: 0, x: -10 }}
+          initial={{ opacity: 0, x: -6 }}
           animate={{ opacity: 1, x: 0 }}
-          className="text-xs text-amber-600 bg-amber-50 px-2 py-1 rounded-full border border-amber-200"
+          className="text-xs text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-100 font-medium"
         >
-          Max: {maxQuantity}
+          Max
         </motion.div>
       )}
     </div>

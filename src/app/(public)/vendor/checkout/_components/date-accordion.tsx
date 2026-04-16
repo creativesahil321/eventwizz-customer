@@ -1,27 +1,25 @@
 /**
- * Professional Date Accordion Component
- * Handles date-specific cart editing with AUTO-SAVE functionality
+ * Redesigned Date Section Component
+ * Visual hierarchy overhaul: distinct section accents for tables/tickets/drinks
+ * No more tabs — all item types shown as flat sections with clear differentiation.
+ * Auto-save remains invisible to the user.
  */
 
 "use client";
 
 import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import {
   ChevronDown,
   ChevronUp,
   Calendar,
-  Save,
-  Clock,
   Wine,
   UtensilsCrossed,
   Ticket,
   MessageSquare,
   Trash2,
+  Sparkles,
 } from "lucide-react";
 import { format } from "date-fns";
 import { toast } from "sonner";
@@ -70,6 +68,7 @@ export default function DateAccordion({
     useCurrencyFormat();
   const [isSaving, setIsSaving] = useState(false);
   const [isAutoSaving, setIsAutoSaving] = useState(false);
+  const [showSpecialRequest, setShowSpecialRequest] = useState(false);
   const autoSaveTimerRef = useRef<NodeJS.Timeout | null>(null);
   const isSavingRef = useRef(false);
   const isPreviewMode = useIsPreviewMode();
@@ -88,7 +87,6 @@ export default function DateAccordion({
     updateSpecialRequest,
   } = useCartEditStore();
 
-  // Get specialRequest from Zustand store
   const currentDateData = getDateData(eventSlug, date);
   const specialRequest = currentDateData?.specialRequest || "";
 
@@ -106,15 +104,13 @@ export default function DateAccordion({
   const validation = validateDateRequirements(eventSlug, date);
   const hasValidationError = !validation.isValid && validation.errorMessage;
 
-  // AUTO-SAVE: Automatically save changes after 2 seconds of inactivity
+  // AUTO-SAVE: Invisible to user — no badges, no status shown
   useEffect(() => {
-    // Clear any existing timer
     if (autoSaveTimerRef.current) {
       clearTimeout(autoSaveTimerRef.current);
       autoSaveTimerRef.current = null;
     }
 
-    // Only auto-save if there are unsaved changes and not currently saving
     if (
       hasChanges &&
       !isSaving &&
@@ -122,7 +118,6 @@ export default function DateAccordion({
       !isSavingRef.current &&
       !isPreviewMode
     ) {
-      // Set a timer to auto-save after 2 seconds
       autoSaveTimerRef.current = setTimeout(async () => {
         if (isSavingRef.current) return;
         try {
@@ -133,10 +128,9 @@ export default function DateAccordion({
         } finally {
           setIsAutoSaving(false);
         }
-      }, 2000); // 2 second delay
+      }, 2000);
     }
 
-    // Cleanup timer on unmount or dependency change
     return () => {
       if (autoSaveTimerRef.current) {
         clearTimeout(autoSaveTimerRef.current);
@@ -145,30 +139,25 @@ export default function DateAccordion({
     };
   }, [hasChanges, isSaving, isAutoSaving, isPreviewMode]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Calculate total amount for this date using per-person pricing
+  // Calculate total amount for this date
   const totalAmount = [
     ...dateData.tables,
     ...dateData.tickets,
     ...dateData.drinks,
   ].reduce((sum, item) => {
     if (item.type === "table") {
-      // For tables: calculate based on actual guest allocation
       const pricePerPerson = item.pricePerPerson || item.price;
-
       if (item.allocation && item.allocation.length > 0) {
-        // Use actual guest allocation
         const totalGuests = item.allocation.reduce(
           (sum, guests) => sum + guests,
           0,
         );
         return sum + pricePerPerson * totalGuests;
       } else {
-        // Fallback: use minimum capacity if no allocation
         const minGuests = (item.minPersons || 1) * item.quantity;
         return sum + pricePerPerson * minGuests;
       }
     } else {
-      // For tickets/drinks: use regular pricing
       return sum + item.price * item.quantity;
     }
   }, 0);
@@ -190,14 +179,12 @@ export default function DateAccordion({
     }, 30000);
 
     try {
-      // Get cart data for API
       const cartData = getItemsForAPI(eventSlug, date);
       const hasItems =
         cartData.tables.length > 0 ||
         cartData.tickets.length > 0 ||
         cartData.drink_package.length > 0;
 
-      // If there are items, validate requirements (table/ticket requirement)
       if (hasItems) {
         const validation = validateDateRequirements(eventSlug, date);
         if (!validation.isValid) {
@@ -208,7 +195,6 @@ export default function DateAccordion({
           return;
         }
 
-        // Also validate guest allocation if multiple tables are selected
         const allocationValidation = validateGuestAllocation(eventSlug, date);
         if (!allocationValidation.isValid) {
           toast.error(
@@ -220,14 +206,11 @@ export default function DateAccordion({
       }
 
       if (!hasItems) {
-        // Even if no items, we should still call the API to remove items from server
-        // This handles the case where user removes all items
         toast.info(
           `Removing all items for ${format(new Date(date), "MMM dd, yyyy")}`,
         );
       }
 
-      // Debug: Log the payload structure for development
       if (process.env.NODE_ENV === "development") {
         console.log(
           `🔍 Saving ${format(new Date(date), "MMM dd, yyyy")}:`,
@@ -235,7 +218,7 @@ export default function DateAccordion({
         );
       }
 
-      // 🔒 SECURITY: Validate prices against server data to prevent manipulation
+      // Security: Validate prices against server data
       if (apiCartData) {
         const eventsArray = extractEventsFromApiResponse(apiCartData);
         const serverEventData = findEventBySlug(eventsArray, eventSlug);
@@ -247,10 +230,7 @@ export default function DateAccordion({
           );
 
           if (!priceValidation.isValid) {
-            // Log security incident
             logSecurityIncident(priceValidation);
-
-            // Show user-friendly error message
             toast.error(
               "Price data appears to be outdated. Please refresh the page and try again.",
             );
@@ -258,14 +238,12 @@ export default function DateAccordion({
             return;
           }
 
-          // Sanitize prices to ensure server values are used
           const sanitizedCartData = sanitizeCartPrices(
             cartData,
             serverEventData,
           );
 
           const response = await storeEventBooking(sanitizedCartData);
-
           if (response?.status === true) {
             markDateAsSaved(eventSlug, date);
             await new Promise((resolve) => setTimeout(resolve, 150));
@@ -273,9 +251,7 @@ export default function DateAccordion({
             console.error("API Error Response:", response);
           }
         } else {
-          // Fallback if server data not available
           const response = await storeEventBooking(cartData);
-
           if (response?.status === true) {
             markDateAsSaved(eventSlug, date);
             await new Promise((resolve) => setTimeout(resolve, 150));
@@ -284,9 +260,7 @@ export default function DateAccordion({
           }
         }
       } else {
-        // Fallback if API data not loaded
         const response = await storeEventBooking(cartData);
-
         if (response?.status === true) {
           markDateAsSaved(eventSlug, date);
           await new Promise((resolve) => setTimeout(resolve, 150));
@@ -295,7 +269,6 @@ export default function DateAccordion({
         }
       }
     } catch (error) {
-      // Enhanced error handling with detailed logging
       console.error("Error saving date cart data:", {
         error,
         eventSlug,
@@ -304,7 +277,6 @@ export default function DateAccordion({
       });
 
       if (error instanceof Error) {
-        // Handle specific error types
         if (
           error.message.includes("Network Error") ||
           error.message.includes("Failed to fetch")
@@ -359,342 +331,335 @@ export default function DateAccordion({
     }
   };
 
+  // Count active items
+  const activeTablesCount = dateData.tables.filter(
+    (t) => t.quantity > 0,
+  ).length;
+  const activeTicketsCount = dateData.tickets.filter(
+    (t) => t.quantity > 0,
+  ).length;
+  const activeDrinksCount = dateData.drinks.filter(
+    (d) => d.quantity > 0,
+  ).length;
+  const totalActiveItems = activeTablesCount + activeTicketsCount + activeDrinksCount;
+
   return (
-    <Card key={date} className="overflow-hidden">
-      <CardHeader
-        className="cursor-pointer hover:bg-gray-50 transition-colors py-3"
+    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+      {/* Date Header — cleaner, more scannable */}
+      <div
+        className="flex items-center justify-between px-4 sm:px-5 py-3 cursor-pointer hover:bg-gray-50/50 transition-colors"
         onClick={onToggle}
       >
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex min-w-0 flex-1 items-center gap-2 sm:space-x-3">
-            <Calendar className="h-5 w-5 flex-shrink-0 text-blue-600" />
-            <CardTitle className="truncate text-base font-medium text-black">
-              {formatDate(date)}
-            </CardTitle>
+        <div className="flex items-center gap-3 min-w-0 flex-1">
+          {/* Date icon with accent */}
+          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center flex-shrink-0 shadow-sm">
+            <Calendar className="h-4 w-4 text-white" />
           </div>
-          <div
-            className="flex flex-shrink-0 flex-wrap items-center gap-2 sm:gap-3"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* Validation Error Badge */}
-            {hasValidationError && (
-              <Badge
-                variant="destructive"
-                className="text-xs bg-red-50 text-red-700 border-red-200"
-              >
-                <span>⚠️ Validation Required</span>
-              </Badge>
-            )}
+          <div className="min-w-0">
+            <h3 className="text-sm sm:text-base font-semibold text-gray-900 truncate">
+              {formatDate(date)}
+            </h3>
+            <div className="flex items-center gap-2 mt-0.5">
+              {totalActiveItems > 0 ? (
+                <span className="text-xs text-gray-500">
+                  {totalActiveItems} item{totalActiveItems !== 1 ? "s" : ""} selected
+                </span>
+              ) : (
+                <span className="text-xs text-gray-400">
+                  No items selected yet
+                </span>
+              )}
+            </div>
+          </div>
+        </div>
 
-            {/* Auto-Saving Status Badge */}
-            {isAutoSaving && (
-              <Badge
-                variant="secondary"
-                className="text-xs bg-green-50 text-green-700 border-green-200 animate-pulse"
-              >
-                <div className="w-3 h-3 border border-green-700/30 border-t-green-700 rounded-full animate-spin mr-1" />
-                <span>Auto-saving...</span>
-              </Badge>
-            )}
+        <div className="flex items-center gap-2.5 flex-shrink-0">
+          {/* Validation error indicator */}
+          {hasValidationError && (
+            <span className="text-xs font-medium text-amber-600 bg-amber-50 px-2.5 py-1 rounded-full border border-amber-100">
+              Action needed
+            </span>
+          )}
 
-            {/* Unsaved Badge */}
-            {hasChanges && !isAutoSaving && !hasValidationError && (
-              <Badge
-                variant="secondary"
-                className="text-xs bg-blue-50 text-blue-700 border-blue-200 whitespace-nowrap"
-              >
-                <Clock className="h-3 w-3 mr-1 flex-shrink-0" />
-                <span>Auto-save in 2s...</span>
-              </Badge>
-            )}
+          {/* Date total */}
+          {totalAmount > 0 && (
+            <span className="text-sm sm:text-base font-bold text-gray-900 tabular-nums">
+              {formatMoney(totalAmount)}
+            </span>
+          )}
 
-            {/* Manual Save Button */}
-            {hasChanges && !isAutoSaving && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleSaveDate();
-                }}
-                disabled={isSaving}
-                className="shrink-0 text-xs text-gray-600 hover:text-gray-900"
-                title="Click to save immediately"
-              >
-                {isSaving ? (
-                  <>
-                    <div className="w-3 h-3 border border-gray-400/30 border-t-gray-600 rounded-full animate-spin mr-1" />
-                    Saving...
-                  </>
-                ) : (
-                  <>
-                    <Save className="w-3 h-3 mr-1 flex-shrink-0" />
-                    <span className="whitespace-nowrap">Save Now</span>
-                  </>
-                )}
-              </Button>
-            )}
+          {/* Remove date */}
+          {onRemoveDate && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onRemoveDate(date);
+              }}
+              className="p-1.5 rounded-lg text-gray-300 hover:text-red-500 hover:bg-red-50 transition-colors"
+              title="Remove this date"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+            </button>
+          )}
 
-            {/* Remove Date Button */}
-            {onRemoveDate && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onRemoveDate(date);
-                }}
-                className="shrink-0 text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200"
-              >
-                <Trash2 className="h-3 w-3" />
-              </Button>
-            )}
-
-            {totalAmount > 0 && (
-              <div className="text-right shrink-0">
-                <p className="text-sm text-gray-600">Date Total</p>
-                <p className="font-semibold text-blue-600">
-                  {formatMoney(totalAmount)}
-                </p>
-              </div>
-            )}
+          {/* Expand/collapse chevron */}
+          <div className="text-gray-400">
             {isExpanded ? (
-              <ChevronUp className="h-4 w-4 shrink-0 text-gray-400" />
+              <ChevronUp className="h-4 w-4" />
             ) : (
-              <ChevronDown className="h-4 w-4 shrink-0 text-gray-400" />
+              <ChevronDown className="h-4 w-4" />
             )}
           </div>
         </div>
-      </CardHeader>
+      </div>
 
+      {/* Expanded Content — sections with distinct visual identity */}
       {isExpanded && (
-        <CardContent className="pt-0">
-          <Tabs
-            defaultValue={
-              dateData.tables.length > 0
-                ? "tables"
-                : dateData.tickets.length > 0
-                  ? "tickets"
-                  : "drinks"
-            }
-            className="w-full overflow-hidden"
-          >
-            <TabsList
-              className={`grid w-full gap-1 ${
-                [
-                  dateData.tables.length > 0,
-                  dateData.tickets.length > 0,
-                  dateData.drinks.length > 0,
-                ].filter(Boolean).length === 3
-                  ? "grid-cols-3"
-                  : [
-                        dateData.tables.length > 0,
-                        dateData.tickets.length > 0,
-                        dateData.drinks.length > 0,
-                      ].filter(Boolean).length === 2
-                    ? "grid-cols-2"
-                    : "grid-cols-1"
-              }`}
+        <div className="border-t border-gray-100">
+
+          {/* ═══ TICKETS SECTION ═══ — Primary action, shown first */}
+          {dateData.tickets.length > 0 && (
+            <div className="px-4 sm:px-5 py-4">
+              {/* Section header with accent */}
+              <div className="flex items-center gap-2.5 mb-3">
+                <div className="w-7 h-7 rounded-lg bg-blue-50 flex items-center justify-center">
+                  <Ticket className="h-3.5 w-3.5 text-blue-600" />
+                </div>
+                <div className="flex items-center gap-2">
+                  <h4 className="text-sm font-semibold text-gray-900">
+                    Tickets
+                  </h4>
+                  <span className="text-xs text-gray-400 font-medium">
+                    {dateData.tickets.length} type{dateData.tickets.length > 1 ? "s" : ""}
+                  </span>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                {dateData.tickets.map((ticket) => (
+                  <div
+                    key={ticket.id}
+                    className={`flex items-center justify-between p-3 sm:p-3.5 rounded-xl border-l-[3px] transition-all duration-200 ${
+                      ticket.quantity > 0
+                        ? "border-l-blue-500 bg-blue-50/50 shadow-sm border-t border-r border-b border-blue-100"
+                        : "border-l-transparent bg-gray-50/50 hover:bg-gray-50 border-t border-r border-b border-gray-100"
+                    }`}
+                  >
+                    <div className="flex-1 min-w-0 mr-3">
+                      <h5 className="text-sm font-medium text-gray-900 truncate">
+                        {ticket.title}
+                      </h5>
+                      <div className="flex items-center gap-2 mt-0.5">
+                        <span className="text-sm font-semibold text-blue-600">
+                          {formatMoneyUnit(Number(ticket.price))}
+                        </span>
+                        {ticket.description && (
+                          <>
+                            <span className="text-gray-300">·</span>
+                            <span className="text-xs text-gray-500 truncate">
+                              {ticket.description}
+                            </span>
+                          </>
+                        )}
+                      </div>
+                      {ticket.maxQuantity && ticket.maxQuantity <= 10 && (
+                        <p className="text-xs text-amber-600 mt-0.5 font-medium">
+                          Only {ticket.maxQuantity} left
+                        </p>
+                      )}
+                    </div>
+                    <div className="flex-shrink-0">
+                      <QuantityControls
+                        quantity={ticket.quantity}
+                        maxQuantity={ticket.maxQuantity}
+                        onIncrease={() =>
+                          handleQuantityChange("ticket", ticket.id, 1)
+                        }
+                        onDecrease={() =>
+                          handleQuantityChange("ticket", ticket.id, -1)
+                        }
+                        onRemove={() =>
+                          updateQuantity(
+                            eventSlug,
+                            date,
+                            "ticket",
+                            ticket.id,
+                            0,
+                          )
+                        }
+                        size="sm"
+                        priceLabel={formatMoneyUnit(Number(ticket.price))}
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Divider between sections */}
+          {dateData.tickets.length > 0 && dateData.tables.length > 0 && (
+            <div className="mx-4 sm:mx-5 border-t border-gray-100" />
+          )}
+
+          {/* ═══ TABLES SECTION ═══ — with amber accent */}
+          {dateData.tables.length > 0 && (
+            <div className="px-4 sm:px-5 py-4">
+              <div className="flex items-center gap-2.5 mb-3">
+                <div className="w-7 h-7 rounded-lg bg-amber-50 flex items-center justify-center">
+                  <UtensilsCrossed className="h-3.5 w-3.5 text-amber-600" />
+                </div>
+                <div className="flex items-center gap-2">
+                  <h4 className="text-sm font-semibold text-gray-900">
+                    Tables
+                  </h4>
+                  <span className="text-xs text-gray-400 font-medium">
+                    {dateData.tables.length} available
+                  </span>
+                </div>
+              </div>
+              <TableRecommendations
+                eventSlug={eventSlug}
+                date={date}
+                tables={dateData.tables}
+                onQuantityChange={(tableId, change) =>
+                  handleQuantityChange("table", tableId, change)
+                }
+                onUpdateQuantity={(tableId, quantity) =>
+                  updateQuantity(eventSlug, date, "table", tableId, quantity)
+                }
+                getTotalQuantity={(tableId) =>
+                  getTotalQuantity(eventSlug, date, "table", tableId)
+                }
+              />
+            </div>
+          )}
+
+          {/* Divider between sections */}
+          {(dateData.tickets.length > 0 || dateData.tables.length > 0) && dateData.drinks.length > 0 && (
+            <div className="mx-4 sm:mx-5 border-t border-gray-100" />
+          )}
+
+          {/* ═══ DRINKS SECTION ═══ — optional add-on with purple accent */}
+          {dateData.drinks.length > 0 && (
+            <div className="px-4 sm:px-5 py-4">
+              <div className="flex items-center gap-2.5 mb-3">
+                <div className="w-7 h-7 rounded-lg bg-purple-50 flex items-center justify-center">
+                  <Wine className="h-3.5 w-3.5 text-purple-600" />
+                </div>
+                <div className="flex items-center gap-2 flex-1">
+                  <h4 className="text-sm font-semibold text-gray-900">
+                    {drinkTitle}
+                  </h4>
+                  <span className="text-xs text-purple-600 bg-purple-50 px-2 py-0.5 rounded-full font-medium border border-purple-100">
+                    Optional
+                  </span>
+                </div>
+              </div>
+              <div className="space-y-2">
+                {dateData.drinks.map((drink, index) => (
+                  <div
+                    key={index}
+                    className={`flex items-center justify-between p-3 sm:p-3.5 rounded-xl border-l-[3px] transition-all duration-200 ${
+                      drink.quantity > 0
+                        ? "border-l-purple-500 bg-purple-50/40 shadow-sm border-t border-r border-b border-purple-100"
+                        : "border-l-transparent bg-gray-50/50 hover:bg-gray-50 border-t border-r border-b border-gray-100"
+                    }`}
+                  >
+                    <div className="flex-1 min-w-0 mr-3">
+                      <h5 className="text-sm font-medium text-gray-900 truncate">
+                        {drink.title}
+                      </h5>
+                      <div className="flex items-center gap-2 mt-0.5">
+                        <span className="text-sm font-semibold text-purple-600">
+                          {formatMoneyUnit(Number(drink.price))}
+                        </span>
+                        {drink.quantity > 0 && (
+                          <>
+                            <span className="text-gray-300">·</span>
+                            <span className="text-xs text-purple-600 font-medium">
+                              {drink.quantity} selected
+                            </span>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex-shrink-0">
+                      <QuantityControls
+                        quantity={drink.quantity}
+                        onIncrease={() =>
+                          handleQuantityChange("drink", drink.id, 1)
+                        }
+                        onDecrease={() =>
+                          handleQuantityChange("drink", drink.id, -1)
+                        }
+                        onRemove={() =>
+                          updateQuantity(
+                            eventSlug,
+                            date,
+                            "drink",
+                            drink.id,
+                            0,
+                          )
+                        }
+                        size="sm"
+                        priceLabel={formatMoneyUnit(Number(drink.price))}
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* ═══ SPECIAL REQUESTS ═══ */}
+          <div className="px-4 sm:px-5 pb-4">
+            <button
+              onClick={() => setShowSpecialRequest(!showSpecialRequest)}
+              className="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-700 transition-colors py-1.5 w-full"
             >
-              {dateData.tables.length > 0 && (
-                <TabsTrigger
-                  value="tables"
-                  className="flex min-w-0 items-center justify-center gap-1 px-1 text-xs data-[state=active]:!bg-blue-600 data-[state=active]:!text-white sm:gap-2 sm:px-2 sm:text-sm"
-                >
-                  <UtensilsCrossed className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
-                  <span className="truncate">
-                    <span>Tables </span>
-                    <span className="font-semibold">
-                      ({dateData.tables.length})
-                    </span>
-                  </span>
-                </TabsTrigger>
-              )}
-              {dateData.tickets.length > 0 && (
-                <TabsTrigger
-                  value="tickets"
-                  className="flex min-w-0 items-center justify-center gap-1 px-1 text-xs data-[state=active]:!bg-blue-600 data-[state=active]:!text-white sm:gap-2 sm:px-2 sm:text-sm"
-                >
-                  <Ticket className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
-                  <span className="truncate">
-                    <span>Tickets </span>
-                    <span className="font-semibold">
-                      ({dateData.tickets.length})
-                    </span>
-                  </span>
-                </TabsTrigger>
-              )}
-              {dateData.drinks.length > 0 && (
-                <TabsTrigger
-                  value="drinks"
-                  className="flex min-w-0 items-center justify-center gap-1 px-1 text-xs data-[state=active]:!bg-blue-600 data-[state=active]:!text-white sm:gap-2 sm:px-2 sm:text-sm"
-                >
-                  <Wine className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
-                  <span className="truncate">
-                    <span className="hidden sm:inline">{drinkTitle} </span>
-                    <span className="sm:hidden">
-                      {drinkTitle.length > 8
-                        ? drinkTitle.substring(0, 6) + ".."
-                        : drinkTitle}
-                    </span>
-                    <span className="font-semibold">
-                      ({dateData.drinks.length})
-                    </span>
-                  </span>
-                </TabsTrigger>
-              )}
-            </TabsList>
-
-            {/* Tables Tab - Now with Professional Recommendations */}
-            {dateData.tables.length > 0 && (
-              <TabsContent value="tables" className="mt-4">
-                <TableRecommendations
-                  eventSlug={eventSlug}
-                  date={date}
-                  tables={dateData.tables}
-                  onQuantityChange={(tableId, change) =>
-                    handleQuantityChange("table", tableId, change)
-                  }
-                  onUpdateQuantity={(tableId, quantity) =>
-                    updateQuantity(eventSlug, date, "table", tableId, quantity)
-                  }
-                  getTotalQuantity={(tableId) =>
-                    getTotalQuantity(eventSlug, date, "table", tableId)
-                  }
-                />
-              </TabsContent>
-            )}
-
-            {/* Tickets Tab */}
-            {dateData.tickets.length > 0 && (
-              <TabsContent
-                value="tickets"
-                className="mt-4 space-y-3 sm:space-y-4"
-              >
-                <div className="grid grid-cols-1 gap-3 sm:gap-4">
-                  {dateData.tickets.map((ticket) => (
-                    <div
-                      key={ticket.id}
-                      className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 p-3 sm:p-4 border rounded-lg hover:bg-gray-50"
-                    >
-                      <div className="flex-1 min-w-0">
-                        <h4 className="font-medium text-sm sm:text-base mb-1">
-                          {ticket.title}
-                        </h4>
-                        <p className="text-xs sm:text-sm text-gray-600 mb-1 break-words">
-                          {formatMoneyUnit(Number(ticket.price))} •{" "}
-                          {ticket.description}
-                        </p>
-                        <p className="text-xs text-gray-500">
-                          Capacity: {ticket.maxQuantity}
-                        </p>
-                      </div>
-                      <div className="flex-shrink-0">
-                        <QuantityControls
-                          quantity={ticket.quantity}
-                          maxQuantity={ticket.maxQuantity}
-                          onIncrease={() =>
-                            handleQuantityChange("ticket", ticket.id, 1)
-                          }
-                          onDecrease={() =>
-                            handleQuantityChange("ticket", ticket.id, -1)
-                          }
-                          onRemove={() =>
-                            updateQuantity(
-                              eventSlug,
-                              date,
-                              "ticket",
-                              ticket.id,
-                              0,
-                            )
-                          }
-                          size="sm"
-                        />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </TabsContent>
-            )}
-
-            {/* Drinks Tab */}
-            {dateData.drinks.length > 0 && (
-              <TabsContent
-                value="drinks"
-                className="mt-4 space-y-3 sm:space-y-4"
-              >
-                <div className="grid grid-cols-1 gap-3 sm:gap-4">
-                  {dateData.drinks.map((drink, index) => (
-                    <div
-                      key={index}
-                      className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 p-3 sm:p-4 border rounded-lg hover:bg-gray-50"
-                    >
-                      <div className="flex-1 min-w-0">
-                        <h4 className="font-medium text-sm sm:text-base mb-1">
-                          {drink.title}
-                        </h4>
-                        <p className="text-xs sm:text-sm text-gray-600 break-words">
-                          {formatMoneyUnit(Number(drink.price))} • Quantity in
-                          cart: {drink.quantity}
-                        </p>
-                      </div>
-                      <div className="flex-shrink-0">
-                        <QuantityControls
-                          quantity={drink.quantity}
-                          onIncrease={() =>
-                            handleQuantityChange("drink", drink.id, 1)
-                          }
-                          onDecrease={() =>
-                            handleQuantityChange("drink", drink.id, -1)
-                          }
-                          onRemove={() =>
-                            updateQuantity(
-                              eventSlug,
-                              date,
-                              "drink",
-                              drink.id,
-                              0,
-                            )
-                          }
-                          size="sm"
-                        />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </TabsContent>
-            )}
-          </Tabs>
-
-          {/* Special Request Section - Common for all tabs */}
-          <div className="mt-4 sm:mt-6 p-3 sm:p-4 bg-gray-50 rounded-lg border border-gray-200">
-            <div className="flex items-center gap-2 mb-2 sm:mb-3">
-              <MessageSquare className="h-4 w-4 text-gray-600 flex-shrink-0" />
-              <h3 className="text-xs sm:text-sm font-medium text-gray-900">
-                Special Requests for Support Team
-              </h3>
-            </div>
-            <Textarea
-              value={specialRequest}
-              onChange={(e) =>
-                updateSpecialRequest(eventSlug, date, e.target.value)
-              }
-              placeholder="Tell us about any special requirements... (e.g., child tickets, specific table arrangements, drinks like vodka, wheelchair accessibility, etc.)"
-              className="min-h-[80px] text-xs sm:text-sm"
-              maxLength={500}
-            />
-            <div className="flex justify-between items-center mt-2">
-              <p className="text-xs text-gray-500">
-                This information will be sent to our support team to help
-                arrange your booking
-              </p>
-              <span className="text-xs text-gray-400">
-                {specialRequest.length}/500
+              <MessageSquare className="h-3.5 w-3.5" />
+              <span className="font-medium">
+                {specialRequest
+                  ? "Edit special requests"
+                  : "Add special requests"}
               </span>
-            </div>
+              {specialRequest && (
+                <span className="text-xs bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded-full font-medium">
+                  Added
+                </span>
+              )}
+              {showSpecialRequest ? (
+                <ChevronUp className="h-3 w-3 ml-auto" />
+              ) : (
+                <ChevronDown className="h-3 w-3 ml-auto" />
+              )}
+            </button>
+
+            {showSpecialRequest && (
+              <div className="mt-2 p-3.5 bg-gray-50 rounded-xl border border-gray-100">
+                <Textarea
+                  value={specialRequest}
+                  onChange={(e) =>
+                    updateSpecialRequest(eventSlug, date, e.target.value)
+                  }
+                  placeholder="Tell us about any special requirements... (e.g., dietary needs, accessibility, seating preferences)"
+                  className="min-h-[80px] text-sm bg-white border-gray-200 rounded-lg resize-none focus:ring-blue-500 focus:border-blue-500"
+                  maxLength={500}
+                />
+                <div className="flex justify-between items-center mt-2">
+                  <p className="text-xs text-gray-400">
+                    This will be sent to the support team
+                  </p>
+                  <span className="text-xs text-gray-400">
+                    {specialRequest.length}/500
+                  </span>
+                </div>
+              </div>
+            )}
           </div>
-        </CardContent>
+        </div>
       )}
-    </Card>
+    </div>
   );
 }
