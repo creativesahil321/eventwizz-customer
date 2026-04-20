@@ -1,15 +1,9 @@
-export type SearchParams = {
-  page?: string;
-  per_page?: string;
-};
+export type SystemLogLevel = "info" | "warning" | "error";
 
-/** System log entry (same shape as vendor; replace with API type when backend is ready) */
+/** Row shape for the admin system logs table (API-backed). */
 export interface SystemLogEntry {
   id: string;
-  timestamp: string;
-  level: "info" | "warning" | "error";
-  action: string;
-  user: string;
-  message: string;
-  ip_address?: string;
+  level: SystemLogLevel;
+  time: string;
+  description: string;
 }

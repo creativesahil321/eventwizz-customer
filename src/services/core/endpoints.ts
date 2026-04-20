@@ -406,6 +406,9 @@ export const API_ENDPOINTS = {
       LIST: "/admin/commissions",
       EXPORT: "/admin/commissions/export",
     },
+    SYSTEM_LOGS: {
+      LIST: "/admin/systemlogs",
+    },
     PROFILE: {
       GET: "/admin/profile",
       UPDATE_AVATAR: "/admin/profile/update/avatar",

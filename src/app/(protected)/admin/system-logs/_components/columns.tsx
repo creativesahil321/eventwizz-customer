@@ -5,7 +5,8 @@ import { DataTableColumnHeader } from "@/components/data-table/data-table-column
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { SystemLogEntry } from "../_lib/types";
-import { format } from "date-fns";
+import { format, parse } from "date-fns";
+import { enUS } from "date-fns/locale";
 
 const levelVariant: Record<
   SystemLogEntry["level"],
@@ -22,34 +23,53 @@ const levelClassName: Record<SystemLogEntry["level"], string | undefined> = {
   error: undefined,
 };
 
+function formatLogTime(raw: string): string {
+  try {
+    const parsed = parse(raw, "dd MMM yyyy HH:mm:ss", new Date(), {
+      locale: enUS,
+    });
+    if (Number.isNaN(parsed.getTime())) {
+      const fallback = new Date(raw);
+      if (!Number.isNaN(fallback.getTime())) {
+        return format(fallback, "dd MMM yyyy, HH:mm");
+      }
+      return raw;
+    }
+    return format(parsed, "dd MMM yyyy, HH:mm");
+  } catch {
+    return raw;
+  }
+}
+
 export function getSystemLogColumns(): ColumnDef<SystemLogEntry>[] {
   return [
     {
-      accessorKey: "timestamp",
+      accessorKey: "time",
       header: ({ column }) => (
         <DataTableColumnHeader column={column} title="Date & time" />
       ),
-      cell: ({ row }) => {
-        const ts = row.getValue("timestamp") as string;
-        try {
-          const date = new Date(ts);
-          return (
-            <span className="text-muted-foreground whitespace-nowrap">
-              {format(date, "dd MMM yyyy, HH:mm")}
-            </span>
-          );
-        } catch {
-          return <span className="text-muted-foreground">{ts}</span>;
-        }
+      meta: {
+        className:
+          "w-[11rem] min-w-[11rem] max-w-[12rem] align-top whitespace-nowrap",
       },
-      enableSorting: true,
-      sortingFn: "datetime",
+      cell: ({ row }) => {
+        const raw = row.getValue("time") as string;
+        return (
+          <span className="text-muted-foreground whitespace-nowrap tabular-nums">
+            {formatLogTime(raw)}
+          </span>
+        );
+      },
+      enableSorting: false,
     },
     {
       accessorKey: "level",
       header: ({ column }) => (
         <DataTableColumnHeader column={column} title="Level" />
       ),
+      meta: {
+        className: "w-[7rem] min-w-[7rem] max-w-[8rem] align-top",
+      },
       cell: ({ row }) => {
         const level = row.getValue("level") as SystemLogEntry["level"];
         return (
@@ -61,47 +81,26 @@ export function getSystemLogColumns(): ColumnDef<SystemLogEntry>[] {
           </Badge>
         );
       },
-      enableSorting: true,
+      enableSorting: false,
     },
     {
-      accessorKey: "action",
-      header: ({ column }) => (
-        <DataTableColumnHeader column={column} title="Action" />
-      ),
-      cell: ({ row }) => (
-        <span className="font-mono text-sm">{row.getValue("action")}</span>
-      ),
-      enableSorting: true,
-    },
-    {
-      accessorKey: "user",
-      header: ({ column }) => (
-        <DataTableColumnHeader column={column} title="User" />
-      ),
-      cell: ({ row }) => (
-        <span className="text-muted-foreground truncate max-w-[180px] block">
-          {row.getValue("user")}
-        </span>
-      ),
-      enableSorting: true,
-    },
-    {
-      accessorKey: "message",
+      accessorKey: "description",
       header: ({ column }) => (
         <DataTableColumnHeader column={column} title="Message" />
       ),
+      meta: {
+        className:
+          "min-w-0 align-top whitespace-normal [overflow-wrap:anywhere]",
+      },
       cell: ({ row }) => {
-        const msg = (row.getValue("message") as string) ?? "";
+        const msg = (row.getValue("description") as string) ?? "";
         return (
-          <span
-            className="text-sm truncate max-w-[320px] block"
-            title={msg}
-          >
+          <span className="text-sm text-foreground block max-w-full leading-relaxed break-words whitespace-normal [overflow-wrap:anywhere]">
             {msg}
           </span>
         );
       },
-      enableSorting: true,
+      enableSorting: false,
     },
   ];
 }

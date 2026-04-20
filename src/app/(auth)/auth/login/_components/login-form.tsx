@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { PasswordInput } from "@/components/ui/password-input";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import React from "react";
 import { useForm } from "react-hook-form";
 import { LoginFormInputs, loginSchema } from "./schema";
@@ -30,6 +31,7 @@ import { handleUrlErrorParams } from "@/lib/auth/url-utils";
 export default function LoginForm() {
   const [loading, setLoading] = React.useState(false);
   const [redirecting, setRedirecting] = React.useState(false);
+  const router = useRouter();
   const { website_role, parentDomain } = useDomain();
 
   // Handle error from URL parameters (for OAuth errors)
@@ -179,24 +181,24 @@ export default function LoginForm() {
           throw new Error(result.error);
         }
 
-        // Redirect after successful authentication
-        setTimeout(() => {
-          try {
-            if (account_type === "vendor") {
-              // Only redirect to welcome/select-location if onboarding is complete
-              if (isVendorOnboarded) {
-                window.location.replace("/welcome/select-location");
-              }
+        // Redirect after successful authentication using SPA navigation
+        // (router.push avoids a full page reload that causes flash of login page)
+        try {
+          if (account_type === "vendor") {
+            if (isVendorOnboarded) {
+              router.push("/welcome/select-location");
             } else {
-              // For non-vendor users, redirect to their dashboard
-              window.location.href = `/${account_type}/dashboard`;
+              router.push("/on-boarding");
             }
-          } catch (error) {
-            console.error("Error redirecting:", error);
-            setRedirecting(false);
-            setLoading(false);
+          } else {
+            // For non-vendor users, redirect to their dashboard
+            router.push(`/${account_type}/dashboard`);
           }
-        }, 300);
+        } catch (error) {
+          console.error("Error redirecting:", error);
+          setRedirecting(false);
+          setLoading(false);
+        }
       } catch (error) {
         console.error("Error in NextAuth session:", error);
         setLoading(false);

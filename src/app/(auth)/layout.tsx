@@ -83,8 +83,10 @@ export default function AuthLayout({
     }
   }, [session, status, router, isSecurityViolation, isSigningOutSecurity]);
 
-  // Show fullscreen loader when redirecting after auth or when signing out due to security_violation
-  if (status === "authenticated" || isRedirecting || isSigningOutSecurity) {
+  // Show fullscreen loader when session is loading/authenticated or redirecting.
+  // Including "loading" prevents a brief flash of the login form on page load
+  // before the session resolves (e.g. browser back button, hard navigation).
+  if (status === "loading" || status === "authenticated" || isRedirecting || isSigningOutSecurity) {
     return (
       <AuthSkeleton
         accountType={session?.user?.account_type}
