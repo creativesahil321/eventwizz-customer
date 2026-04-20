@@ -258,6 +258,20 @@ export default function BookingSummary({}: BookingSummaryProps) {
     getDateData,
   ]);
 
+  // Count total items for mobile bar — MUST be before early returns (Rules of Hooks)
+  const totalItemCount = useMemo(() => {
+    let count = 0;
+    availableDates.forEach((date) => {
+      const dateData = currentEventSlug ? getDateData(currentEventSlug, date) : null;
+      if (dateData) {
+        count += dateData.tables.filter(t => t.quantity > 0).reduce((s, t) => s + t.quantity, 0);
+        count += dateData.tickets.filter(t => t.quantity > 0).reduce((s, t) => s + t.quantity, 0);
+        count += dateData.drinks.filter(d => d.quantity > 0).reduce((s, d) => s + d.quantity, 0);
+      }
+    });
+    return count;
+  }, [availableDates, currentEventSlug, editingData, getDateData]);
+
   // Show skeleton only on initial load
   const isInitialLoad = isLoadingCartData && !apiCartData;
   if (isInitialLoad) {
@@ -338,19 +352,7 @@ export default function BookingSummary({}: BookingSummaryProps) {
           ? `Pay ${formatMoney(finalTotalWithFee)} Now`
           : "Continue to Payment";
 
-  // Count total items for mobile bar
-  const totalItemCount = useMemo(() => {
-    let count = 0;
-    availableDates.forEach((date) => {
-      const dateData = currentEventSlug ? getDateData(currentEventSlug, date) : null;
-      if (dateData) {
-        count += dateData.tables.filter(t => t.quantity > 0).reduce((s, t) => s + t.quantity, 0);
-        count += dateData.tickets.filter(t => t.quantity > 0).reduce((s, t) => s + t.quantity, 0);
-        count += dateData.drinks.filter(d => d.quantity > 0).reduce((s, d) => s + d.quantity, 0);
-      }
-    });
-    return count;
-  }, [availableDates, currentEventSlug, editingData, getDateData]);
+  // totalItemCount is computed above (before early returns) to comply with Rules of Hooks
 
   // ──────────────────────────────────────────────
   // RENDER: ORDER SUMMARY CARD

@@ -274,6 +274,14 @@ export async function resetAllStores(): Promise<void> {
     const permissionStore = await import("@/store/permission.store");
     const locationStore = await import("@/store/location.store");
     const domainStore = await import("@/store/domain.store");
+    // Cart store persists to localStorage and must be explicitly reset on logout
+    // (resetAllStores is called by auth logout flow)
+    try {
+      const cartEditStore = await import("@/store/cart-edit.store");
+      cartEditStore.useCartEditStore.getState().clearAllCarts();
+    } catch {
+      // Silent — cart store may not be loaded in some contexts
+    }
 
     // Reset each store that has a reset method
     permissionStore.usePermissionStore.getState().reset();
@@ -295,6 +303,9 @@ export async function resetAllStores(): Promise<void> {
         "permission-storage",
         "location-storage",
         "domain-storage",
+        // Cart persisted keys (customer checkout)
+        "cart-edit-storage",
+        "cart-storage",
       ];
 
       storageKeys.forEach((key) => {

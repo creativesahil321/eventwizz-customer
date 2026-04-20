@@ -1,25 +1,28 @@
 /**
- * Professional Guest Allocation Modal
- * User-friendly interface for distributing guests across selected tables
- * Matches checkout system exactly
+ * Guest Allocation Modal — Premium Professional Redesign
+ * Clean, focused interface for distributing guests across tables.
+ * Matches the checkout modal design system exactly.
+ * Design: Stripe-inspired — minimal chrome, clear hierarchy, confident actions.
  */
 
 "use client";
 
 import { useState, useEffect, useMemo, useRef } from "react";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import {
   Users,
   Wand2,
-  CheckCircle,
-  AlertTriangle,
+  CheckCircle2,
+  AlertCircle,
   RotateCcw,
+  X,
+  Armchair,
+  Minus,
+  Plus,
 } from "lucide-react";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 
 import {
@@ -38,7 +41,7 @@ interface NewTableSelection {
   max_persons: number;
   quantity: number;
   price: number;
-  currentAllocation?: number[]; // For existing tables - current allocation before adding
+  currentAllocation?: number[];
 }
 
 interface GuestAllocationModalProps {
@@ -61,18 +64,14 @@ export default function GuestAllocationModal({
   dateString,
 }: GuestAllocationModalProps) {
   const { formatCompact: formatMoneyUnit } = useCurrencyFormat();
-  // Local state for allocations
   const [allocations, setAllocations] = useState<Record<number, number[]>>({});
-  // Track raw input values to allow clearing/editing
   const [inputValues, setInputValues] = useState<Record<string, string>>({});
   const [isAutoArranging, setIsAutoArranging] = useState(false);
-  const [hasBeenAutoArranged, setHasBeenAutoArranged] = useState(false);
 
-  // Track if we've initialized allocations for this modal session
   const initializedRef = useRef(false);
   const previousTablesRef = useRef<NewTableSelection[]>([]);
 
-  // Convert newTables to EditableItem format for compatibility
+  // Convert newTables to internal format
   const selectedTables = useMemo(() => {
     return newTables.map((table) => ({
       id: table.id,
@@ -86,146 +85,118 @@ export default function GuestAllocationModal({
     }));
   }, [newTables, allocations]);
 
-  // Initialize allocations when modal opens and auto-fill if needed
+  // Initialize allocations when modal opens
   useEffect(() => {
     if (!isOpen) {
-      // Reset when modal closes
       initializedRef.current = false;
       previousTablesRef.current = [];
       setAllocations({});
       setInputValues({});
-      setHasBeenAutoArranged(false);
       return;
     }
 
-    if (newTables.length === 0) {
-      return;
-    }
+    if (newTables.length === 0) return;
 
-    // Check if tables have changed (by comparing IDs and quantities)
     const tablesChanged =
       previousTablesRef.current.length !== newTables.length ||
       previousTablesRef.current.some(
         (prevTable, index) =>
           prevTable.id !== newTables[index]?.id ||
-          prevTable.quantity !== newTables[index]?.quantity
+          prevTable.quantity !== newTables[index]?.quantity,
       );
 
-    // Only initialize if modal just opened or tables changed
     if (!initializedRef.current || tablesChanged) {
       const tables = newTables;
       const initialAllocations: Record<number, number[]> = {};
 
       tables.forEach((table) => {
-        // For existing tables, start with current allocation if provided
-        // Otherwise initialize with minimum capacity
         if (
           table.currentAllocation &&
           table.currentAllocation.length === table.quantity
         ) {
-          // This is an existing table - start with current allocation
           initialAllocations[table.id] = [...table.currentAllocation];
         } else {
-          // New table - initialize with minimum capacity
           initialAllocations[table.id] = Array(table.quantity).fill(
-            table.min_persons || 1
+            table.min_persons || 1,
           );
         }
       });
 
-      // Calculate total allocated
       let totalAllocated = 0;
       Object.values(initialAllocations).forEach((allocation) => {
         totalAllocated += allocation.reduce((sum, count) => sum + count, 0);
       });
 
-      // For existing tables, calculate target total (current + people to add)
-      // For new tables, target is just totalPeople
       const hasExistingAllocation = tables.some(
-        (t) => t.currentAllocation && t.currentAllocation.length > 0
+        (t) => t.currentAllocation && t.currentAllocation.length > 0,
       );
       const targetTotal = hasExistingAllocation
-        ? totalAllocated + totalPeople // Current allocation + people to add
-        : totalPeople; // Just the new people
+        ? totalAllocated + totalPeople
+        : totalPeople;
 
-      // Check if all tables are at minimum capacity
       const allAtMinimum = Object.entries(initialAllocations).every(
         ([tableId, allocation]) => {
           const table = tables.find((t) => t.id === parseInt(tableId));
           return allocation.every(
-            (count) => count === (table?.min_persons || 1)
+            (count) => count === (table?.min_persons || 1),
           );
-        }
+        },
       );
 
-      // Auto-fill if allocation is incomplete (same as checkout)
-      // For existing tables: always auto-fill when there are people to add
-      // For new tables: auto-fill only when all at minimum and incomplete
       const needsAutoFill = hasExistingAllocation
-        ? totalAllocated !== targetTotal // Existing tables: always auto-fill if incomplete
-        : totalAllocated !== targetTotal && allAtMinimum; // New tables: only if at minimum
+        ? totalAllocated !== targetTotal
+        : totalAllocated !== targetTotal && allAtMinimum;
 
       if (needsAutoFill) {
-        // Auto-arrange guests automatically on first open (like checkout)
         const tableData = tables.map((table) => ({
           id: table.id,
           title: table.title,
           minPersons: table.min_persons || 1,
-          maxPersons: table.max_persons || 999, // Use actual max capacity
+          maxPersons: table.max_persons || 999,
           quantity: table.quantity,
         }));
 
         const autoArranged = autoArrangeGuests(tableData, targetTotal);
 
-        // Verify the auto-arranged total doesn't exceed targetTotal
         let autoArrangedTotal = 0;
         Object.values(autoArranged).forEach((allocation) => {
           autoArrangedTotal += allocation.reduce(
             (sum, count) => sum + count,
-            0
+            0,
           );
         });
 
-        // If it exceeds, clamp it
         let finalAllocations: Record<number, number[]>;
         if (autoArrangedTotal > targetTotal) {
-          // Recalculate to ensure exact total
           finalAllocations = autoArrangeGuests(tableData, targetTotal);
-          setAllocations(finalAllocations);
         } else {
           finalAllocations = autoArranged;
-          setAllocations(autoArranged);
         }
 
-        // Initialize input values from final allocations
-        const initialInputValues: Record<string, string> = {};
-        Object.entries(finalAllocations).forEach(([tableId, allocation]) => {
-          allocation.forEach((value, index) => {
-            initialInputValues[`${tableId}-${index}`] = value.toString();
-          });
-        });
-        setInputValues(initialInputValues);
-        setHasBeenAutoArranged(true);
+        setAllocations(finalAllocations);
+        syncInputValues(finalAllocations);
       } else {
         setAllocations(initialAllocations);
-        // Initialize input values from initial allocations
-        const initialInputValues: Record<string, string> = {};
-        Object.entries(initialAllocations).forEach(([tableId, allocation]) => {
-          allocation.forEach((value, index) => {
-            initialInputValues[`${tableId}-${index}`] = value.toString();
-          });
-        });
-        setInputValues(initialInputValues);
-        setHasBeenAutoArranged(false);
+        syncInputValues(initialAllocations);
       }
 
-      // Mark as initialized and store current tables
       initializedRef.current = true;
       previousTablesRef.current = [...newTables];
     }
   }, [isOpen, newTables, totalPeople]);
 
-  // Convert selected tables to allocation data format
+  // Sync input display values
+  const syncInputValues = (allocs: Record<number, number[]>) => {
+    const values: Record<string, string> = {};
+    Object.entries(allocs).forEach(([tableId, allocation]) => {
+      allocation.forEach((value, index) => {
+        values[`${tableId}-${index}`] = value.toString();
+      });
+    });
+    setInputValues(values);
+  };
+
+  // Allocation data for validation
   const tableAllocationData: TableAllocationData[] = useMemo(() => {
     return selectedTables.map((table) => ({
       tableId: table.id,
@@ -240,44 +211,45 @@ export default function GuestAllocationModal({
   }, [selectedTables, allocations]);
 
   // Calculate target total for validation
-  // For existing tables: current allocation + people to add
-  // For new tables: just totalPeople
   const targetTotalForValidation = useMemo(() => {
     const hasExistingAllocation = newTables.some(
-      (t) => t.currentAllocation && t.currentAllocation.length > 0
+      (t) => t.currentAllocation && t.currentAllocation.length > 0,
     );
     if (hasExistingAllocation) {
-      // Calculate original current total from currentAllocation
       let originalTotal = 0;
       newTables.forEach((table) => {
         if (table.currentAllocation) {
           originalTotal += table.currentAllocation.reduce(
             (sum, count) => sum + count,
-            0
+            0,
           );
         }
       });
-      // Target is original + people to add
       return originalTotal + totalPeople;
     }
     return totalPeople;
   }, [newTables, totalPeople]);
 
-  // Validation results
+  // Validation
   const validation = useMemo(() => {
     return validateAllocation(tableAllocationData, targetTotalForValidation);
   }, [tableAllocationData, targetTotalForValidation]);
 
-  // Auto-arrange functionality
+  // Derived state
+  const guestsRemaining = targetTotalForValidation - validation.totalAllocated;
+  const progressPercent = Math.min(
+    100,
+    Math.round(
+      (validation.totalAllocated / targetTotalForValidation) * 100,
+    ),
+  );
+
+  // Auto-arrange
   const handleAutoArrange = async () => {
     setIsAutoArranging(true);
-
     try {
-      // Simulate brief loading for better UX
-      await new Promise((resolve) => setTimeout(resolve, 800));
-
+      await new Promise((resolve) => setTimeout(resolve, 400));
       const tableData = selectedTables.map((table) => {
-        // Find the original table config to get correct maxPersons
         const originalTable = newTables.find((t) => t.id === table.id);
         return {
           id: table.id,
@@ -288,9 +260,8 @@ export default function GuestAllocationModal({
         };
       });
 
-      // Calculate target total (current + people to add for existing tables)
       const hasExistingAllocation = newTables.some(
-        (t) => t.currentAllocation && t.currentAllocation.length > 0
+        (t) => t.currentAllocation && t.currentAllocation.length > 0,
       );
       let currentTotal = 0;
       Object.values(allocations).forEach((allocation) => {
@@ -302,17 +273,8 @@ export default function GuestAllocationModal({
 
       const autoArranged = autoArrangeGuests(tableData, targetTotal);
       setAllocations(autoArranged);
-      // Update input values from auto-arranged allocations
-      const newInputValues: Record<string, string> = { ...inputValues };
-      Object.entries(autoArranged).forEach(([tableId, allocation]) => {
-        allocation.forEach((value, index) => {
-          newInputValues[`${tableId}-${index}`] = value.toString();
-        });
-      });
-      setInputValues(newInputValues);
-      setHasBeenAutoArranged(true);
-
-      toast.success("Guests arranged automatically!");
+      syncInputValues(autoArranged);
+      toast.success("Guests distributed evenly!");
     } catch (error) {
       console.error("Auto-arrange error:", error);
       toast.error("Failed to auto-arrange guests");
@@ -321,108 +283,102 @@ export default function GuestAllocationModal({
     }
   };
 
-  // Reset to minimum allocations (or current allocation for existing tables)
+  // Reset
   const handleReset = () => {
     const resetAllocations: Record<number, number[]> = {};
-    const resetInputValues: Record<string, string> = {};
     selectedTables.forEach((table) => {
-      // Find original table to check if it's existing
       const originalTable = newTables.find((t) => t.id === table.id);
       const currentAllocation = originalTable?.currentAllocation || [];
 
       if (currentAllocation.length === table.quantity) {
-        // Existing table - reset to current allocation
         resetAllocations[table.id] = [...currentAllocation];
-        currentAllocation.forEach((value, index) => {
-          resetInputValues[`${table.id}-${index}`] = value.toString();
-        });
       } else {
-        // New table - reset to minimum
         const minValue = table.minPersons || 1;
         resetAllocations[table.id] = Array(table.quantity).fill(minValue);
-        Array.from({ length: table.quantity }, (_, index) => {
-          resetInputValues[`${table.id}-${index}`] = minValue.toString();
-        });
       }
     });
     setAllocations(resetAllocations);
-    setInputValues(resetInputValues);
-    setHasBeenAutoArranged(false);
+    syncInputValues(resetAllocations);
     toast.info("Reset to original allocations");
   };
 
-  // Calculate remaining guests
-  const remainingGuests = useMemo(() => {
-    let totalAllocated = 0;
-    Object.values(allocations).forEach((allocation) => {
-      totalAllocated += allocation.reduce((sum, count) => sum + count, 0);
-    });
-    return totalPeople - totalAllocated;
-  }, [allocations, totalPeople]);
-
-  // Update individual table allocation
+  // Update individual input
   const updateTableAllocation = (
     tableId: number,
     tableIndex: number,
-    value: string
+    value: string,
   ) => {
     const inputKey = `${tableId}-${tableIndex}`;
     const table = selectedTables.find((t) => t.id === tableId);
     if (!table) return;
 
-    // Store raw input value (allows empty string for clearing)
-    setInputValues((prev) => ({
-      ...prev,
-      [inputKey]: value,
-    }));
+    setInputValues((prev) => ({ ...prev, [inputKey]: value }));
 
-    // Only update numeric allocation if value is a valid number
-    if (value === "" || value === "-") {
-      // Allow empty during editing, don't update numeric state yet
-      return;
-    }
+    if (value === "" || value === "-") return;
 
     const numValue = parseInt(value);
-    if (isNaN(numValue) || numValue < 0) {
-      return;
-    }
+    if (isNaN(numValue) || numValue < 0) return;
 
-    // Find original table config to check if it's an existing table
     const originalTable = newTables.find((t) => t.id === tableId);
     const currentAllocation = originalTable?.currentAllocation || [];
     const isExistingTable = currentAllocation.length > 0;
 
-    // For existing tables, minimum is the current allocation value
-    // For new tables, minimum is minPersons
     const minValue =
       isExistingTable && currentAllocation[tableIndex] !== undefined
-        ? currentAllocation[tableIndex] // Can't go below current allocation
+        ? currentAllocation[tableIndex]
         : table.minPersons || 1;
 
-    // Clamp to table capacity limits and minimum value
     const clampedValue = Math.max(
       minValue,
-      Math.min(table.maxPersons || 999, numValue)
+      Math.min(table.maxPersons || 999, numValue),
     );
 
     setAllocations((prev) => {
-      const newAllocations = { ...prev };
-      if (!newAllocations[tableId]) {
-        newAllocations[tableId] = [];
-      }
-
-      newAllocations[tableId] = [...newAllocations[tableId]];
-      newAllocations[tableId][tableIndex] = clampedValue;
-
-      return newAllocations;
+      const updated = { ...prev };
+      if (!updated[tableId]) updated[tableId] = [];
+      updated[tableId] = [...updated[tableId]];
+      updated[tableId][tableIndex] = clampedValue;
+      return updated;
     });
   };
 
-  // Handle blur to normalize empty/invalid values
+  // Stepper: increment/decrement a specific table input
+  const stepAllocation = (
+    tableId: number,
+    tableIndex: number,
+    delta: number,
+  ) => {
+    const table = selectedTables.find((t) => t.id === tableId);
+    if (!table) return;
+
+    const originalTable = newTables.find((t) => t.id === tableId);
+    const currentAllocation = originalTable?.currentAllocation || [];
+    const isExistingTable = currentAllocation.length > 0;
+
+    const minValue =
+      isExistingTable && currentAllocation[tableIndex] !== undefined
+        ? currentAllocation[tableIndex]
+        : table.minPersons || 1;
+
+    const current = allocations[tableId]?.[tableIndex] ?? minValue;
+    const next = Math.max(minValue, Math.min(table.maxPersons || 999, current + delta));
+
+    const inputKey = `${tableId}-${tableIndex}`;
+    setInputValues((prev) => ({ ...prev, [inputKey]: next.toString() }));
+    setAllocations((prev) => {
+      const updated = { ...prev };
+      if (!updated[tableId]) updated[tableId] = [];
+      updated[tableId] = [...updated[tableId]];
+      updated[tableId][tableIndex] = next;
+      return updated;
+    });
+  };
+
+  // Handle blur — clamp values
   const handleInputBlur = (
     tableId: number,
     tableIndex: number,
-    table: (typeof selectedTables)[0]
+    table: (typeof selectedTables)[0],
   ) => {
     const inputKey = `${tableId}-${tableIndex}`;
     const rawValue = inputValues[inputKey];
@@ -430,558 +386,493 @@ export default function GuestAllocationModal({
     const currentAllocation = originalTable?.currentAllocation || [];
     const isExistingTable = currentAllocation.length > 0;
 
-    // For existing tables, minimum is the current allocation value
-    // For new tables, minimum is minPersons
     const minValue =
       isExistingTable && currentAllocation[tableIndex] !== undefined
         ? currentAllocation[tableIndex]
         : table.minPersons || 1;
 
-    // If empty or invalid, set to minimum
-    if (!rawValue || rawValue === "" || rawValue === "-") {
-      setInputValues((prev) => ({
-        ...prev,
-        [inputKey]: minValue.toString(),
-      }));
-      setAllocations((prev) => {
-        const newAllocations = { ...prev };
-        if (!newAllocations[tableId]) {
-          newAllocations[tableId] = [];
-        }
-        newAllocations[tableId] = [...newAllocations[tableId]];
-        newAllocations[tableId][tableIndex] = minValue;
-        return newAllocations;
-      });
-    } else {
-      // Validate and clamp to min/max
+    let finalValue = minValue;
+    if (rawValue && rawValue !== "" && rawValue !== "-") {
       const numValue = parseInt(rawValue);
-      if (isNaN(numValue) || numValue < minValue) {
-        const finalValue = minValue;
-        setInputValues((prev) => ({
-          ...prev,
-          [inputKey]: finalValue.toString(),
-        }));
-        setAllocations((prev) => {
-          const newAllocations = { ...prev };
-          if (!newAllocations[tableId]) {
-            newAllocations[tableId] = [];
-          }
-          newAllocations[tableId] = [...newAllocations[tableId]];
-          newAllocations[tableId][tableIndex] = finalValue;
-          return newAllocations;
-        });
-      } else if (numValue > (table.maxPersons || 999)) {
-        const finalValue = table.maxPersons || 999;
-        setInputValues((prev) => ({
-          ...prev,
-          [inputKey]: finalValue.toString(),
-        }));
-        setAllocations((prev) => {
-          const newAllocations = { ...prev };
-          if (!newAllocations[tableId]) {
-            newAllocations[tableId] = [];
-          }
-          newAllocations[tableId] = [...newAllocations[tableId]];
-          newAllocations[tableId][tableIndex] = finalValue;
-          return newAllocations;
-        });
+      if (!isNaN(numValue)) {
+        finalValue = Math.max(minValue, Math.min(table.maxPersons || 999, numValue));
       }
     }
+
+    setInputValues((prev) => ({ ...prev, [inputKey]: finalValue.toString() }));
+    setAllocations((prev) => {
+      const updated = { ...prev };
+      if (!updated[tableId]) updated[tableId] = [];
+      updated[tableId] = [...updated[tableId]];
+      updated[tableId][tableIndex] = finalValue;
+      return updated;
+    });
   };
 
-  // Handle confirmation
+  // Confirm
   const handleConfirm = () => {
     if (validation.isValid) {
       onConfirm(allocations);
-      toast.success("Guest allocation confirmed!");
+      toast.success("Seating confirmed!");
       onClose();
     } else {
-      toast.error("Please fix allocation errors before confirming");
+      toast.error("Please assign all guests before confirming");
     }
   };
 
   if (!isOpen) return null;
 
+  const totalTableCount = selectedTables.reduce(
+    (sum, t) => sum + t.quantity,
+    0,
+  );
+
+  const hasExistingTables = newTables.some(
+    (t) => t.currentAllocation && t.currentAllocation.length > 0,
+  );
+
+  // Calculate grand total cost
+  const grandTotalCost = selectedTables.reduce((sum, table) => {
+    const pricePerPerson = table.pricePerPerson || table.price;
+    const currentAlloc = allocations[table.id] || [];
+    const tableGuestTotal = currentAlloc.reduce((s, guests) => s + guests, 0);
+    return sum + pricePerPerson * tableGuestTotal;
+  }, 0);
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col p-0 [&>button]:hidden">
-        {/* Visually Hidden Title for Screen Readers */}
+      <DialogContent className="max-w-lg max-h-[90vh] overflow-hidden flex flex-col p-0 [&>button]:hidden rounded-2xl border-0 shadow-2xl">
         <DialogTitle className="sr-only">
-          Manage Seating - Distribute {totalPeople} guests across tables
+          Assign Seating - Distribute guests across tables
         </DialogTitle>
 
-        {/* Header */}
-        <div className="bg-[var(--color-primary)] text-white p-4 relative">
-          <div className="flex items-center justify-between pr-12">
+        {/* ── Header ── Premium feel */}
+        <div className="px-6 pt-5 pb-4 bg-gradient-to-b from-gray-50 to-white">
+          <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="p-1.5 bg-white/20 rounded-lg">
-                <Users className="h-5 w-5" />
+              <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-amber-400 to-amber-500 flex items-center justify-center shadow-sm">
+                <Users className="h-4 w-4 text-white" />
               </div>
               <div>
-                <h2 className="text-xl font-bold">Manage Seating</h2>
-                {(() => {
-                  // Check if managing existing tables
-                  const hasExistingTables = newTables.some(
-                    (t) => t.currentAllocation && t.currentAllocation.length > 0
-                  );
-                  return (
-                    <p className="text-blue-100 text-xs">
-                      {hasExistingTables ? (
-                        <>
-                          Adjust your existing table allocation • Add up to{" "}
-                          {totalPeople} more guests
-                        </>
-                      ) : (
-                        <>
-                          {eventName && dateString
-                            ? `${eventName} • ${dateString}`
-                            : `Distribute ${totalPeople} guests`}
-                        </>
-                      )}
-                    </p>
-                  );
-                })()}
+                <h2 className="text-base font-semibold text-gray-900 leading-tight">
+                  {hasExistingTables ? "Adjust Seating" : "Assign Seating"}
+                </h2>
+                <p className="text-xs text-gray-400 mt-0.5 leading-tight">
+                  {hasExistingTables
+                    ? `Add up to ${totalPeople} more guests`
+                    : [eventName, dateString].filter(Boolean).join(" · ") ||
+                      `Distribute ${totalPeople} guests`}
+                </p>
               </div>
             </div>
-            <div className="text-right">
-              <div className="text-2xl font-bold">{totalPeople}</div>
-              <div className="text-blue-100 text-xs">
-                {newTables.some(
-                  (t) => t.currentAllocation && t.currentAllocation.length > 0
-                )
-                  ? "Additional Guests"
-                  : "Total Guests"}
-              </div>
-            </div>
+            <button
+              onClick={onClose}
+              className="w-8 h-8 rounded-lg flex items-center justify-center text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
+              aria-label="Close"
+            >
+              <X className="h-4 w-4" />
+            </button>
           </div>
 
-          {/* Custom Close Button */}
-          <button
-            onClick={onClose}
-            className="absolute top-4 right-4 p-2 rounded-lg bg-white/20 hover:bg-white/30 transition-all duration-200 text-white hover:text-white focus:outline-none focus:ring-2 focus:ring-white/50"
-            aria-label="Close modal"
-          >
-            <svg
-              className="h-5 w-5"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-              xmlns="http://www.w3.org/2000/svg"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M6 18L18 6M6 6l12 12"
-              />
-            </svg>
-          </button>
+          {/* Progress */}
+          <div className="mt-4">
+            <div className="flex items-center gap-3">
+              <div className="flex-1 bg-gray-200/60 rounded-full h-1.5 overflow-hidden">
+                <motion.div
+                  className={`h-full rounded-full transition-colors duration-300 ${
+                    validation.isValid
+                      ? "bg-emerald-500"
+                      : validation.totalAllocated > targetTotalForValidation
+                        ? "bg-red-500"
+                        : "bg-blue-500"
+                  }`}
+                  initial={{ width: 0 }}
+                  animate={{ width: `${progressPercent}%` }}
+                  transition={{ duration: 0.4, ease: "easeOut" }}
+                />
+              </div>
+              <span className="text-xs tabular-nums text-gray-500 flex-shrink-0">
+                <span
+                  className={`font-semibold ${
+                    validation.isValid
+                      ? "text-emerald-600"
+                      : validation.totalAllocated > targetTotalForValidation
+                        ? "text-red-600"
+                        : "text-gray-900"
+                  }`}
+                >
+                  {validation.totalAllocated}
+                </span>
+                <span className="text-gray-300 mx-0.5">/</span>
+                <span>{targetTotalForValidation}</span>
+              </span>
+            </div>
+
+            {/* Status text */}
+            <div className="mt-1.5 min-h-[1.25rem]">
+              <AnimatePresence mode="wait">
+                {validation.isValid ? (
+                  <motion.div
+                    key="valid"
+                    initial={{ opacity: 0, y: 4 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -4 }}
+                    className="flex items-center gap-1.5"
+                  >
+                    <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />
+                    <span className="text-xs font-medium text-emerald-600">
+                      All guests assigned perfectly
+                    </span>
+                  </motion.div>
+                ) : guestsRemaining > 0 ? (
+                  <motion.p
+                    key="remaining"
+                    initial={{ opacity: 0, y: 4 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -4 }}
+                    className="text-xs text-gray-500"
+                  >
+                    <span className="font-semibold text-amber-600">
+                      {guestsRemaining}
+                    </span>{" "}
+                    guest{guestsRemaining !== 1 ? "s" : ""} still need a seat
+                  </motion.p>
+                ) : guestsRemaining < 0 ? (
+                  <motion.p
+                    key="overflow"
+                    initial={{ opacity: 0, y: 4 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -4 }}
+                    className="text-xs font-medium text-red-600"
+                  >
+                    {Math.abs(guestsRemaining)} too many — remove some guests
+                  </motion.p>
+                ) : null}
+              </AnimatePresence>
+            </div>
+          </div>
         </div>
 
-        {/* Content */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-4">
-          {/* Existing Tables Info Banner */}
-          {newTables.some(
-            (t) => t.currentAllocation && t.currentAllocation.length > 0
-          ) && (
-            <div className="bg-purple-50 border border-purple-200 rounded-lg p-2.5">
-              <p className="text-xs text-purple-700">
-                💡{" "}
-                <span className="font-semibold">Adjusting existing tables</span>{" "}
-                - You can only increase the numbers. Use &quot;Auto
-                Arrange&quot; for quick distribution.
+        {/* ── Quick Actions ── */}
+        <div className="px-6 pb-3 flex items-center gap-2">
+          {hasExistingTables && (
+            <div className="flex-1 mr-2">
+              <p className="text-[11px] text-purple-600 font-medium">
+                ↑ Only values can be increased for existing tables
               </p>
             </div>
           )}
-
-          {/* Progress Section */}
-          <div className="bg-gradient-to-r from-gray-50 to-gray-100 rounded-lg p-4 border border-gray-200">
-            <div className="flex items-center justify-between mb-3">
-              <div className="flex items-center gap-2">
-                <div className="p-1.5 bg-blue-100 rounded-lg">
-                  <Users className="h-4 w-4 text-blue-600" />
-                </div>
-                <div>
-                  <h3 className="font-semibold text-gray-900 text-sm">
-                    Guest Assignment
-                  </h3>
-                  <p className="text-xs text-gray-600">
-                    {validation.isValid
-                      ? "All guests assigned"
-                      : `${validation.totalAllocated} of ${validation.totalRequired} assigned`}
-                  </p>
-                </div>
-              </div>
-              <div className="text-right">
-                <div className="text-xl font-bold text-gray-900">
-                  {validation.totalAllocated}
-                </div>
-                <div className="text-xs text-gray-500">assigned</div>
-              </div>
-            </div>
-
-            {/* Progress Bar */}
-            <div className="relative">
-              <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
-                <motion.div
-                  className={`h-full rounded-full transition-all duration-500 ${
-                    validation.isValid
-                      ? "bg-gradient-to-r from-green-500 to-green-600"
-                      : validation.totalAllocated > validation.totalRequired
-                      ? "bg-gradient-to-r from-red-500 to-red-600"
-                      : "bg-gradient-to-r from-blue-500 to-blue-600"
-                  }`}
-                  initial={{ width: 0 }}
-                  animate={{
-                    width: `${Math.min(
-                      100,
-                      (validation.totalAllocated / validation.totalRequired) *
-                        100
-                    )}%`,
-                  }}
-                  transition={{ duration: 0.8, ease: "easeOut" }}
-                />
-              </div>
-              <div className="absolute inset-0 flex items-center justify-center">
-                <span className="text-xs font-medium text-white drop-shadow-sm">
-                  {Math.round(
-                    (validation.totalAllocated / validation.totalRequired) * 100
-                  )}
-                  %
-                </span>
-              </div>
-            </div>
-
-            {/* Remaining/Over-allocation Status */}
-            <div className="mt-3">
-              {validation.isValid ? (
-                <motion.div
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="flex items-center gap-2 text-green-700"
-                >
-                  <CheckCircle className="h-4 w-4" />
-                  <span className="font-medium text-sm">
-                    Perfect! All guests assigned correctly.
-                  </span>
-                </motion.div>
-              ) : remainingGuests > 0 ? (
-                <div className="flex items-center gap-2 text-blue-700">
-                  <AlertTriangle className="h-4 w-4" />
-                  <span className="text-sm font-medium">
-                    {remainingGuests} guest{remainingGuests > 1 ? "s" : ""}{" "}
-                    remaining
-                  </span>
-                </div>
-              ) : remainingGuests < 0 ? (
-                <div className="flex items-center gap-2 text-red-700">
-                  <AlertTriangle className="h-4 w-4" />
-                  <span className="text-sm font-medium">
-                    {Math.abs(remainingGuests)} guest
-                    {Math.abs(remainingGuests) > 1 ? "s" : ""} over-allocated
-                  </span>
-                </div>
-              ) : null}
-            </div>
-          </div>
-
-          {/* Action Buttons */}
-          <div className="flex items-center gap-2">
-            <Button
-              onClick={handleAutoArrange}
-              disabled={isAutoArranging}
-              className="bg-[var(--color-primary)] text-white px-4 py-2 rounded-lg font-medium transition-all duration-200 shadow-lg hover:shadow-xl text-sm"
-            >
-              {isAutoArranging ? (
-                <>
-                  <div className="animate-spin rounded-full h-3 w-3 border-2 border-white border-t-transparent mr-2" />
-                  Arranging...
-                </>
-              ) : (
-                <>
-                  <Wand2 className="h-3 w-3 mr-2" />
-                  Auto Arrange
-                </>
-              )}
-            </Button>
-
-            <Button
-              onClick={handleReset}
-              variant="outline"
-              className="border-gray-300 hover:bg-gray-50 px-4 py-2 rounded-lg font-medium transition-all text-black duration-200 text-sm"
-            >
-              <RotateCcw className="h-3 w-3 mr-2" />
-              Reset
-            </Button>
-
-            {hasBeenAutoArranged && (
-              <Badge className="bg-green-100 text-green-800 border-green-200 px-2 py-1 text-xs">
-                Auto-arranged
-              </Badge>
+          <button
+            onClick={handleAutoArrange}
+            disabled={isAutoArranging}
+            className="flex items-center gap-1.5 px-3.5 h-8 rounded-lg bg-blue-600 text-white text-xs font-medium transition-all hover:bg-blue-700 active:scale-[0.97] disabled:opacity-60 shadow-sm"
+          >
+            {isAutoArranging ? (
+              <>
+                <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                <span>Distributing...</span>
+              </>
+            ) : (
+              <>
+                <Wand2 className="h-3 w-3" />
+                <span>Auto Distribute</span>
+              </>
             )}
-          </div>
+          </button>
+          <button
+            onClick={handleReset}
+            className="flex items-center gap-1.5 px-3 h-8 rounded-lg border border-gray-200 text-gray-500 text-xs font-medium transition-all hover:bg-gray-50 hover:text-gray-700 active:scale-[0.97]"
+          >
+            <RotateCcw className="h-3 w-3" />
+            <span>Reset</span>
+          </button>
+        </div>
 
-          {/* Table Allocation Cards */}
-          <div className="grid gap-4">
-            {selectedTables.map((table, tableIndex) => (
+        <div className="h-px bg-gray-100 mx-6" />
+
+        {/* ── Table Cards ── */}
+        <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
+          {selectedTables.map((table, tableGroupIndex) => {
+            const pricePerPerson = table.pricePerPerson || table.price;
+            const currentAlloc = allocations[table.id] || [];
+            const tableGuestTotal = currentAlloc.reduce(
+              (sum, guests) => sum + guests,
+              0,
+            );
+
+            const originalTable = newTables.find((t) => t.id === table.id);
+            const isExisting =
+              originalTable?.currentAllocation &&
+              originalTable.currentAllocation.length > 0;
+
+            return (
               <motion.div
                 key={table.id}
-                initial={{ opacity: 0, y: 20 }}
+                initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: tableIndex * 0.1 }}
-                className="bg-white border border-gray-200 rounded-lg p-4 shadow-sm hover:shadow-md transition-all duration-200"
+                transition={{ delay: tableGroupIndex * 0.05 }}
+                className={`rounded-xl border overflow-hidden bg-white ${
+                  isExisting ? "border-purple-200" : "border-gray-200"
+                }`}
               >
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center gap-3 flex-1">
-                    <div className="p-2 bg-blue-50 rounded-lg">
-                      <Users className="h-5 w-5 text-blue-600" />
+                {/* Table header */}
+                <div
+                  className={`flex items-center justify-between px-4 py-2.5 border-b ${
+                    isExisting
+                      ? "bg-purple-50/50 border-purple-100"
+                      : "bg-gray-50/70 border-gray-100"
+                  }`}
+                >
+                  <div className="flex items-center gap-2.5">
+                    <div
+                      className={`w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 ${
+                        isExisting ? "bg-purple-100" : "bg-amber-100"
+                      }`}
+                    >
+                      <Armchair
+                        className={`h-3.5 w-3.5 ${
+                          isExisting ? "text-purple-700" : "text-amber-700"
+                        }`}
+                      />
                     </div>
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-1">
-                        <h4 className="text-base font-semibold text-gray-900">
+                    <div>
+                      <div className="flex items-center gap-1.5">
+                        <h4 className="text-sm font-semibold text-gray-900 leading-tight">
                           {table.title}
                         </h4>
-                        {/* Check if this is an existing table */}
-                        {(() => {
-                          const originalTable = newTables.find(
-                            (t) => t.id === table.id
-                          );
-                          const hasCurrentAllocation =
-                            originalTable?.currentAllocation &&
-                            originalTable.currentAllocation.length > 0;
-                          return (
-                            hasCurrentAllocation && (
-                              <Badge className="bg-purple-100 text-purple-800 border-purple-200 px-2 py-0.5 text-xs">
-                                Existing
-                              </Badge>
-                            )
-                          );
-                        })()}
+                        {isExisting && (
+                          <span className="text-[10px] font-medium text-purple-600 bg-purple-100 px-1.5 py-0.5 rounded">
+                            Existing
+                          </span>
+                        )}
                       </div>
-                      <p className="text-xs text-gray-600">
-                        {table.quantity} table{table.quantity > 1 ? "s" : ""} •
-                        Max {table.maxPersons} per table
+                      <p className="text-[11px] text-gray-400 leading-tight">
+                        {table.quantity} table{table.quantity > 1 ? "s" : ""} ·{" "}
+                        {table.minPersons}–{table.maxPersons} per table
                       </p>
                     </div>
                   </div>
-                  {table.pricePerPerson > 0 && (
-                    <div className="text-right">
-                      <div className="text-lg font-bold text-gray-900">
-                        {formatMoneyUnit(
-                          Number(table.pricePerPerson || table.price),
-                        )}
-                      </div>
-                      <div className="text-xs text-gray-500">per person</div>
+                  {pricePerPerson > 0 && (
+                    <div className="text-right flex-shrink-0">
+                      <p className="text-sm font-bold text-gray-900 tabular-nums leading-tight">
+                        {formatMoneyUnit(pricePerPerson * tableGuestTotal)}
+                      </p>
+                      <p className="text-[10px] text-gray-400 leading-tight">
+                        {formatMoneyUnit(pricePerPerson)}/person
+                      </p>
                     </div>
                   )}
                 </div>
 
-                <div
-                  className="grid gap-3"
-                  style={{
-                    gridTemplateColumns: `repeat(${Math.min(
-                      table.quantity,
-                      4
-                    )}, 1fr)`,
-                  }}
-                >
-                  {Array.from({ length: table.quantity }, (_, index) => {
-                    // Find original table to get current allocation
-                    const originalTable = newTables.find(
-                      (t) => t.id === table.id
-                    );
-                    const currentAllocation =
-                      originalTable?.currentAllocation || [];
-                    const isExistingTable = currentAllocation.length > 0;
+                {/* Seat inputs with steppers */}
+                <div className="p-4">
+                  <div className="grid gap-2.5 sm:gap-3 grid-cols-2 sm:grid-cols-3">
+                    {Array.from({ length: table.quantity }, (_, index) => {
+                      const inputKey = `${table.id}-${index}`;
+                      const rawInputValue = inputValues[inputKey];
 
-                    // For existing tables, minimum is current allocation; for new tables, use minPersons
-                    const minValue =
-                      isExistingTable && currentAllocation[index] !== undefined
-                        ? currentAllocation[index]
-                        : table.minPersons || 1;
+                      const existingAllocation =
+                        originalTable?.currentAllocation || [];
+                      const isExistingTable = existingAllocation.length > 0;
+                      const minValue =
+                        isExistingTable &&
+                        existingAllocation[index] !== undefined
+                          ? existingAllocation[index]
+                          : table.minPersons || 1;
 
-                    const inputKey = `${table.id}-${index}`;
-                    const rawInputValue = inputValues[inputKey];
-                    const currentValue =
-                      allocations[table.id]?.[index] || minValue;
-                    // Use raw input value if available, otherwise use numeric value
-                    const displayValue =
-                      rawInputValue !== undefined
-                        ? rawInputValue
-                        : currentValue.toString();
-                    const isValid =
-                      currentValue >= minValue &&
-                      currentValue <= (table.maxPersons || 999);
+                      const currentValue =
+                        allocations[table.id]?.[index] || minValue;
+                      const displayValue =
+                        rawInputValue !== undefined
+                          ? rawInputValue
+                          : currentValue.toString();
+                      const isValid =
+                        currentValue >= minValue &&
+                        currentValue <= (table.maxPersons || 999);
+                      const isOverflow =
+                        currentValue > (table.maxPersons || 999);
+                      const isUnder = currentValue < minValue;
 
-                    return (
-                      <div key={index} className="space-y-2">
-                        <Label
-                          htmlFor={`table-${table.id}-${index}`}
-                          className="text-xs font-medium text-gray-700 block"
+                      return (
+                        <div
+                          key={index}
+                          className={`text-center rounded-xl p-3 border transition-colors duration-200 ${
+                            isOverflow
+                              ? "border-red-200 bg-red-50/50"
+                              : isUnder
+                                ? "border-amber-200 bg-amber-50/50"
+                                : isValid && validation.isValid
+                                  ? "border-emerald-200 bg-emerald-50/30"
+                                  : "border-gray-150 bg-gray-50/30"
+                          }`}
                         >
-                          Table {index + 1}
-                          {/* Show minimum for existing tables */}
-                          {isExistingTable &&
-                            currentAllocation[index] !== undefined && (
-                              <span className="ml-1 text-purple-600 font-normal">
-                                (min: {currentAllocation[index]})
-                              </span>
-                            )}
-                        </Label>
-                        <div className="relative">
-                          <Input
-                            id={`table-${table.id}-${index}`}
-                            type="text"
-                            inputMode="numeric"
-                            min={minValue}
-                            max={table.maxPersons || 999}
-                            value={displayValue}
-                            onChange={(e) => {
-                              // Only allow numbers and empty string
-                              const value = e.target.value;
-                              if (value === "" || /^-?\d*$/.test(value)) {
-                                updateTableAllocation(table.id, index, value);
-                              }
-                            }}
-                            onBlur={() =>
-                              handleInputBlur(table.id, index, table)
-                            }
-                            onFocus={(e) => e.target.select()}
-                            className={`h-10 text-center font-semibold ${
-                              isValid
-                                ? validation.totalAllocated >
-                                  validation.totalRequired
-                                  ? "border-orange-300 focus:border-orange-500 bg-orange-50"
-                                  : isExistingTable
-                                  ? "border-purple-300 focus:border-purple-500 bg-purple-50"
-                                  : "border-gray-300 focus:border-blue-500"
-                                : "border-red-300 focus:border-red-500 bg-red-50"
-                            }`}
-                            placeholder={
-                              isExistingTable
-                                ? `Min: ${minValue}`
-                                : `${table.minPersons}-${table.maxPersons}`
-                            }
-                          />
-                          {!isValid && (
-                            <div className="absolute -bottom-5 left-0 right-0 text-xs text-red-600 text-center">
-                              Invalid
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
+                          <label
+                            htmlFor={`seat-${table.id}-${index}`}
+                            className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider block mb-2"
+                          >
+                            Table {index + 1}
+                          </label>
 
-                {/* Table Summary */}
-                <div className="mt-4 pt-4 border-t border-gray-200">
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-gray-600">Total for this table:</span>
-                    <span className="font-semibold text-gray-900">
-                      {(
-                        allocations[table.id] || Array(table.quantity).fill(0)
-                      ).reduce((sum, count) => sum + count, 0)}{" "}
-                      guests
-                    </span>
+                          {/* Stepper input group */}
+                          <div className="flex items-center justify-center gap-1">
+                            <button
+                              onClick={() =>
+                                stepAllocation(table.id, index, -1)
+                              }
+                              disabled={currentValue <= minValue}
+                              className="w-7 h-7 rounded-md border border-gray-200 bg-white flex items-center justify-center text-gray-500 hover:bg-gray-50 hover:border-gray-300 transition-all active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed"
+                            >
+                              <Minus className="h-3 w-3" />
+                            </button>
+
+                            <Input
+                              id={`seat-${table.id}-${index}`}
+                              type="text"
+                              inputMode="numeric"
+                              value={displayValue}
+                              onChange={(e) => {
+                                const value = e.target.value;
+                                if (value === "" || /^\d*$/.test(value)) {
+                                  updateTableAllocation(
+                                    table.id,
+                                    index,
+                                    value,
+                                  );
+                                }
+                              }}
+                              onBlur={() =>
+                                handleInputBlur(table.id, index, table)
+                              }
+                              onFocus={(e) => e.target.select()}
+                              className={`text-center text-lg font-bold w-14 h-9 rounded-lg border-0 bg-transparent shadow-none focus:ring-0 tabular-nums ${
+                                isOverflow
+                                  ? "text-red-600"
+                                  : isUnder
+                                    ? "text-amber-600"
+                                    : "text-gray-900"
+                              }`}
+                            />
+
+                            <button
+                              onClick={() =>
+                                stepAllocation(table.id, index, 1)
+                              }
+                              disabled={
+                                currentValue >= (table.maxPersons || 999)
+                              }
+                              className="w-7 h-7 rounded-md border border-gray-200 bg-white flex items-center justify-center text-gray-500 hover:bg-gray-50 hover:border-gray-300 transition-all active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed"
+                            >
+                              <Plus className="h-3 w-3" />
+                            </button>
+                          </div>
+
+                          {/* Capacity hint */}
+                          <p
+                            className={`text-[10px] mt-1.5 tabular-nums ${
+                              isOverflow
+                                ? "text-red-500 font-medium"
+                                : isUnder
+                                  ? "text-amber-500 font-medium"
+                                  : "text-gray-400"
+                            }`}
+                          >
+                            {isOverflow
+                              ? `Max ${table.maxPersons}`
+                              : isUnder
+                                ? `Min ${minValue}`
+                                : isExistingTable
+                                  ? `Min ${minValue} · Max ${table.maxPersons}`
+                                  : `${table.minPersons}–${table.maxPersons} guests`}
+                          </p>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               </motion.div>
-            ))}
-          </div>
+            );
+          })}
 
-          {/* Validation Errors */}
-          {!validation.isValid && validation.errors.length > 0 && (
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              className={`rounded-lg p-4 ${
-                validation.totalAllocated > validation.totalRequired
-                  ? "bg-orange-50 border border-orange-200"
-                  : "bg-red-50 border border-red-200"
-              }`}
-            >
-              <div className="flex items-start gap-2">
-                <AlertTriangle
-                  className={`h-5 w-5 mt-0.5 flex-shrink-0 ${
-                    validation.totalAllocated > validation.totalRequired
-                      ? "text-orange-600"
-                      : "text-red-600"
-                  }`}
-                />
-                <div className="flex-1">
-                  <h4
-                    className={`font-semibold mb-2 ${
-                      validation.totalAllocated > validation.totalRequired
-                        ? "text-orange-900"
-                        : "text-red-900"
-                    }`}
-                  >
-                    {validation.totalAllocated > validation.totalRequired
-                      ? "Too Many Guests Assigned"
-                      : "Allocation Issues"}
-                  </h4>
-                  <ul className="space-y-1">
-                    {validation.errors.map((error, index) => (
-                      <li
-                        key={index}
-                        className={`text-sm ${
-                          validation.totalAllocated > validation.totalRequired
-                            ? "text-orange-700"
-                            : "text-red-700"
-                        }`}
-                      >
-                        • {error}
-                      </li>
+          {/* Validation errors */}
+          <AnimatePresence>
+            {!validation.isValid && validation.errors.length > 0 && (
+              <motion.div
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -8 }}
+                className="rounded-xl bg-red-50 border border-red-100 p-3"
+              >
+                <div className="flex items-start gap-2">
+                  <AlertCircle className="h-4 w-4 text-red-500 mt-0.5 flex-shrink-0" />
+                  <div className="space-y-0.5">
+                    {validation.errors.slice(0, 2).map((error, index) => (
+                      <p key={index} className="text-xs text-red-700">
+                        {error}
+                      </p>
                     ))}
-                  </ul>
-                  {validation.totalAllocated > validation.totalRequired && (
-                    <p className="text-xs mt-2 text-orange-600">
-                      Tip: Reduce guest counts in the tables above to match the
-                      required {validation.totalRequired} guests.
-                    </p>
-                  )}
+                    {validation.errors.length > 2 && (
+                      <p className="text-xs text-red-500">
+                        +{validation.errors.length - 2} more issue
+                        {validation.errors.length - 2 > 1 ? "s" : ""}
+                      </p>
+                    )}
+                  </div>
                 </div>
-              </div>
-            </motion.div>
-          )}
-
-          {/* Allocation Summary */}
-          {validation.isValid && (
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="bg-green-50 border border-green-200 rounded-lg p-4"
-            >
-              <div className="flex items-center gap-2">
-                <CheckCircle className="h-5 w-5 text-green-600" />
-                <div>
-                  <h4 className="font-semibold text-green-900">
-                    Allocation Complete
-                  </h4>
-                  <p className="text-sm text-green-700 whitespace-pre-line">
-                    {generateAllocationSummary(tableAllocationData)}
-                  </p>
-                </div>
-              </div>
-            </motion.div>
-          )}
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
 
-        {/* Footer */}
-        <div className="border-t border-gray-200 p-4 bg-gray-50">
-          <div className="flex items-center justify-end gap-3">
-            <Button onClick={onClose} variant="event-outline" className="px-6">
-              Cancel
-            </Button>
-            <Button
-              onClick={handleConfirm}
-              disabled={!validation.isValid || isAutoArranging}
-              variant="event-primary"
-              className="px-6"
-            >
-              Confirm Allocation
-            </Button>
+        <div className="border-t border-gray-100 px-4 sm:px-6 py-3 sm:py-3.5 bg-white flex-shrink-0">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-center gap-2 sm:gap-3 text-xs">
+              <span className="text-gray-400">
+                {totalTableCount} table{totalTableCount !== 1 ? "s" : ""}
+              </span>
+              <div className="w-px h-3 bg-gray-200" />
+              <span>
+                <span className="font-semibold text-gray-700">
+                  {validation.totalAllocated}
+                </span>
+                <span className="text-gray-400"> guests</span>
+              </span>
+              {grandTotalCost > 0 && (
+                <>
+                  <div className="w-px h-3 bg-gray-200" />
+                  <span className="font-semibold text-gray-700 tabular-nums">
+                    {formatMoneyUnit(grandTotalCost)}
+                  </span>
+                </>
+              )}
+            </div>
+
+            <div className="flex items-center gap-2 w-full sm:w-auto">
+              <Button
+                variant="ghost"
+                onClick={onClose}
+                className="rounded-xl h-9 px-4 text-sm font-medium text-gray-500 hover:text-gray-700 hover:bg-gray-100"
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleConfirm}
+                disabled={!validation.isValid || isAutoArranging}
+                className={`rounded-xl h-9 px-4 sm:px-5 text-sm font-semibold transition-all duration-200 flex-1 sm:flex-initial ${
+                  validation.isValid
+                    ? "bg-emerald-600 text-white hover:bg-emerald-700 shadow-sm shadow-emerald-200 active:scale-[0.97]"
+                    : "bg-gray-100 text-gray-400 cursor-not-allowed"
+                }`}
+              >
+                {validation.isValid ? (
+                  <span className="flex items-center justify-center gap-1.5">
+                    <CheckCircle2 className="h-3.5 w-3.5" />
+                    Confirm Seating
+                  </span>
+                ) : (
+                  <span>Assign All Guests</span>
+                )}
+              </Button>
+            </div>
           </div>
         </div>
       </DialogContent>

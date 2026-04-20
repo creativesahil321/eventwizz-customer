@@ -776,15 +776,7 @@ export default function GuestAllocationModal({
                   )}
                 </div>
 
-                <div
-                  className="grid gap-3"
-                  style={{
-                    gridTemplateColumns: `repeat(${Math.min(
-                      table.quantity,
-                      4
-                    )}, 1fr)`,
-                  }}
-                >
+                <div className="grid gap-2.5 sm:gap-3 grid-cols-2 sm:grid-cols-3">
                   {Array.from({ length: table.quantity }, (_, index) => {
                     // Find original table to get current allocation
                     const originalTable = newTables.find(
@@ -969,16 +961,16 @@ export default function GuestAllocationModal({
         </div>
 
         {/* Footer */}
-        <div className="border-t border-gray-200 p-4 bg-gray-50">
-          <div className="flex items-center justify-end gap-3">
-            <Button onClick={onClose} variant="event-outline" className="px-6">
+        <div className="border-t border-gray-200 p-3 sm:p-4 bg-gray-50">
+          <div className="flex items-center justify-end gap-2 sm:gap-3">
+            <Button onClick={onClose} variant="event-outline" className="px-4 sm:px-6">
               Cancel
             </Button>
             <Button
               onClick={handleConfirm}
               disabled={!validation.isValid || isAutoArranging}
               variant="event-primary"
-              className="px-6"
+              className="px-4 sm:px-6"
             >
               Confirm Allocation
             </Button>

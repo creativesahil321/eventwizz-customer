@@ -408,10 +408,10 @@ export default function TableRecommendations({
                               : "border-l-transparent bg-gray-50/50 border-t border-r border-b border-gray-100 hover:bg-gray-50"
                       }`}
                     >
-                      <div className="flex items-center justify-between p-3 sm:p-3.5">
-                        <div className="flex-1 min-w-0 mr-3">
-                          <div className="flex items-center gap-2 mb-0.5">
-                            <h4 className="text-sm font-medium text-gray-900 truncate">
+                      <div className="flex items-start justify-between gap-3 p-3 sm:p-3.5">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex flex-wrap items-center gap-1.5 mb-0.5">
+                            <h4 className="text-sm font-medium text-gray-900 leading-snug">
                               {rec.table.title}
                             </h4>
                             {index === 0 && !isDisabled && (
@@ -421,14 +421,14 @@ export default function TableRecommendations({
                               </Badge>
                             )}
                           </div>
-                          <div className="flex items-center gap-3 text-xs text-gray-500">
-                            <span className="font-medium text-amber-700">
-                              {formatMoneyUnit(costPerPerson)}/person
-                            </span>
-                            {rec.tablesNeeded > 1 && (
-                              <span>{rec.tablesNeeded} tables needed</span>
-                            )}
-                          </div>
+                          <span className="text-sm font-semibold text-amber-700 block">
+                            {formatMoneyUnit(costPerPerson)}/person
+                          </span>
+                          {rec.tablesNeeded > 1 && (
+                            <p className="text-xs text-gray-500 mt-0.5">
+                              {rec.tablesNeeded} tables needed
+                            </p>
+                          )}
                         </div>
                         {isTableEligible(rec.table) && !isDisabled ? (
                           <QuantityControls
@@ -519,18 +519,18 @@ export default function TableRecommendations({
                                       : "border-l-transparent bg-gray-50/50 border border-gray-100 hover:bg-gray-50"
                               }`}
                             >
-                              <div className="flex items-center justify-between p-3 sm:p-3.5">
-                                <div className="flex-1 min-w-0 mr-3">
-                                  <h4 className="text-sm font-medium text-gray-900 truncate mb-0.5">
+                              <div className="flex items-start justify-between gap-3 p-3 sm:p-3.5">
+                                <div className="flex-1 min-w-0">
+                                  <h4 className="text-sm font-medium text-gray-900 leading-snug mb-0.5">
                                     {rec.table.title}
                                   </h4>
-                                  <div className="flex items-center gap-3 text-xs text-gray-500">
-                                    <span className="font-medium text-amber-700">
-                                      {formatMoneyUnit(costPerPerson)}/person
-                                    </span>
+                                  <span className="text-sm font-semibold text-amber-700 block">
+                                    {formatMoneyUnit(costPerPerson)}/person
+                                  </span>
+                                  <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-gray-500 mt-0.5">
                                     <span>{formatMoney(rec.totalCost)} total</span>
                                     {rec.tablesNeeded > 1 && (
-                                      <span>{rec.tablesNeeded} tables</span>
+                                      <span>· {rec.tablesNeeded} tables</span>
                                     )}
                                   </div>
                                 </div>

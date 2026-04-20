@@ -331,6 +331,15 @@ export default function DateAccordion({
     }
   };
 
+  // Short mobile format — just "Jan 20, 2026"
+  const formatDateMobile = (dateString: string) => {
+    try {
+      return format(new Date(dateString), "MMM dd, yyyy");
+    } catch {
+      return dateString;
+    }
+  };
+
   // Count active items
   const activeTablesCount = dateData.tables.filter(
     (t) => t.quantity > 0,
@@ -350,16 +359,27 @@ export default function DateAccordion({
         className="flex items-center justify-between px-4 sm:px-5 py-3 cursor-pointer hover:bg-gray-50/50 transition-colors"
         onClick={onToggle}
       >
-        <div className="flex items-center gap-3 min-w-0 flex-1">
+        <div className="flex items-center gap-2.5 sm:gap-3 min-w-0 flex-1">
           {/* Date icon with accent */}
-          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center flex-shrink-0 shadow-sm">
-            <Calendar className="h-4 w-4 text-white" />
+          <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center flex-shrink-0 shadow-sm">
+            <Calendar className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-white" />
           </div>
-          <div className="min-w-0">
-            <h3 className="text-sm sm:text-base font-semibold text-gray-900 truncate">
-              {formatDate(date)}
-            </h3>
-            <div className="flex items-center gap-2 mt-0.5">
+          <div className="min-w-0 flex-1">
+            {/* Date + price on same row */}
+            <div className="flex items-center justify-between gap-2">
+              <h3 className="text-sm sm:text-base font-semibold text-gray-900 leading-snug whitespace-nowrap">
+                <span className="hidden sm:inline">{formatDate(date)}</span>
+                <span className="sm:hidden">{formatDateMobile(date)}</span>
+              </h3>
+              {/* Price — visible on mobile next to date */}
+              {totalAmount > 0 && (
+                <span className="text-sm sm:text-base font-bold text-gray-900 tabular-nums flex-shrink-0 sm:hidden">
+                  {formatMoney(totalAmount)}
+                </span>
+              )}
+            </div>
+            {/* Subtitle row */}
+            <div className="flex items-center gap-1.5 mt-0.5">
               {totalActiveItems > 0 ? (
                 <span className="text-xs text-gray-500">
                   {totalActiveItems} item{totalActiveItems !== 1 ? "s" : ""} selected
@@ -369,21 +389,27 @@ export default function DateAccordion({
                   No items selected yet
                 </span>
               )}
+              {/* Action needed — small inline badge on mobile */}
+              {hasValidationError && (
+                <span className="text-[10px] sm:text-xs font-medium text-amber-600 bg-amber-50 px-1.5 sm:px-2.5 py-0.5 sm:py-1 rounded-full border border-amber-100 sm:hidden">
+                  Action needed
+                </span>
+              )}
             </div>
           </div>
         </div>
 
-        <div className="flex items-center gap-2.5 flex-shrink-0">
-          {/* Validation error indicator */}
+        <div className="flex items-center gap-1.5 sm:gap-2.5 flex-shrink-0">
+          {/* Validation error indicator — desktop only (shown inline on mobile) */}
           {hasValidationError && (
-            <span className="text-xs font-medium text-amber-600 bg-amber-50 px-2.5 py-1 rounded-full border border-amber-100">
+            <span className="hidden sm:inline-flex text-xs font-medium text-amber-600 bg-amber-50 px-2.5 py-1 rounded-full border border-amber-100">
               Action needed
             </span>
           )}
 
-          {/* Date total */}
+          {/* Date total — desktop only (shown next to date on mobile) */}
           {totalAmount > 0 && (
-            <span className="text-sm sm:text-base font-bold text-gray-900 tabular-nums">
+            <span className="hidden sm:inline text-base font-bold text-gray-900 tabular-nums">
               {formatMoney(totalAmount)}
             </span>
           )}
@@ -439,36 +465,31 @@ export default function DateAccordion({
                 {dateData.tickets.map((ticket) => (
                   <div
                     key={ticket.id}
-                    className={`flex items-center justify-between p-3 sm:p-3.5 rounded-xl border-l-[3px] transition-all duration-200 ${
+                    className={`flex items-start justify-between gap-3 p-3 sm:p-3.5 rounded-xl border-l-[3px] transition-all duration-200 ${
                       ticket.quantity > 0
                         ? "border-l-blue-500 bg-blue-50/50 shadow-sm border-t border-r border-b border-blue-100"
                         : "border-l-transparent bg-gray-50/50 hover:bg-gray-50 border-t border-r border-b border-gray-100"
                     }`}
                   >
-                    <div className="flex-1 min-w-0 mr-3">
-                      <h5 className="text-sm font-medium text-gray-900 truncate">
+                    <div className="flex-1 min-w-0">
+                      <h5 className="text-sm font-medium text-gray-900 leading-snug">
                         {ticket.title}
                       </h5>
-                      <div className="flex items-center gap-2 mt-0.5">
-                        <span className="text-sm font-semibold text-blue-600">
-                          {formatMoneyUnit(Number(ticket.price))}
-                        </span>
-                        {ticket.description && (
-                          <>
-                            <span className="text-gray-300">·</span>
-                            <span className="text-xs text-gray-500 truncate">
-                              {ticket.description}
-                            </span>
-                          </>
-                        )}
-                      </div>
+                      <span className="text-sm font-semibold text-blue-600 mt-0.5 block">
+                        {formatMoneyUnit(Number(ticket.price))}
+                      </span>
+                      {ticket.description && (
+                        <p className="text-xs text-gray-500 mt-1 leading-relaxed">
+                          {ticket.description}
+                        </p>
+                      )}
                       {ticket.maxQuantity && ticket.maxQuantity <= 10 && (
-                        <p className="text-xs text-amber-600 mt-0.5 font-medium">
+                        <p className="text-xs text-amber-600 mt-1 font-medium">
                           Only {ticket.maxQuantity} left
                         </p>
                       )}
                     </div>
-                    <div className="flex-shrink-0">
+                    <div className="flex-shrink-0 mt-0.5">
                       <QuantityControls
                         quantity={ticket.quantity}
                         maxQuantity={ticket.maxQuantity}
@@ -560,31 +581,26 @@ export default function DateAccordion({
                 {dateData.drinks.map((drink, index) => (
                   <div
                     key={index}
-                    className={`flex items-center justify-between p-3 sm:p-3.5 rounded-xl border-l-[3px] transition-all duration-200 ${
+                    className={`flex items-start justify-between gap-3 p-3 sm:p-3.5 rounded-xl border-l-[3px] transition-all duration-200 ${
                       drink.quantity > 0
                         ? "border-l-purple-500 bg-purple-50/40 shadow-sm border-t border-r border-b border-purple-100"
                         : "border-l-transparent bg-gray-50/50 hover:bg-gray-50 border-t border-r border-b border-gray-100"
                     }`}
                   >
-                    <div className="flex-1 min-w-0 mr-3">
-                      <h5 className="text-sm font-medium text-gray-900 truncate">
+                    <div className="flex-1 min-w-0">
+                      <h5 className="text-sm font-medium text-gray-900 leading-snug">
                         {drink.title}
                       </h5>
-                      <div className="flex items-center gap-2 mt-0.5">
-                        <span className="text-sm font-semibold text-purple-600">
-                          {formatMoneyUnit(Number(drink.price))}
-                        </span>
-                        {drink.quantity > 0 && (
-                          <>
-                            <span className="text-gray-300">·</span>
-                            <span className="text-xs text-purple-600 font-medium">
-                              {drink.quantity} selected
-                            </span>
-                          </>
-                        )}
-                      </div>
+                      <span className="text-sm font-semibold text-purple-600 mt-0.5 block">
+                        {formatMoneyUnit(Number(drink.price))}
+                      </span>
+                      {drink.description && (
+                        <p className="text-xs text-gray-500 mt-1 leading-relaxed">
+                          {drink.description}
+                        </p>
+                      )}
                     </div>
-                    <div className="flex-shrink-0">
+                    <div className="flex-shrink-0 mt-0.5">
                       <QuantityControls
                         quantity={drink.quantity}
                         onIncrease={() =>
