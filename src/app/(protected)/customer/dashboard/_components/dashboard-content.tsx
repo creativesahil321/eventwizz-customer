@@ -3,10 +3,10 @@
 import { useCustomerDashboard } from "@/services/customer/dashboard";
 import type { CustomerDashboardUpcomingEvent } from "@/services/customer/dashboard";
 import { useDomain } from "@/providers/domain-provider/domain-provider";
-import { PageLoader } from "@/components/ui/page-loader";
 import DashboardEvents from "./dashboard-events";
 import DashboardRecentBookings from "./dashboard-recent-bookings";
 import DashboardNearbyEvents from "./dashboard-nearby-events";
+import { CustomerDashboardSkeleton } from "./customer-dashboard-skeleton";
 
 /** Event shape expected by DashboardEvents */
 interface DashboardEventItem {
@@ -41,7 +41,7 @@ export default function CustomerDashboardContent() {
   const { settings } = useDomain();
 
   if (isLoading && !data) {
-    return <PageLoader />;
+    return <CustomerDashboardSkeleton />;
   }
 
   if (isError) {

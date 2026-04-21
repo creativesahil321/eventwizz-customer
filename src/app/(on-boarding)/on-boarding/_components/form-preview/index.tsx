@@ -832,7 +832,7 @@ export default function FormPreview() {
 
   return (
     <PreviewProvider isPreviewMode={true}>
-      <section className="relative isolate flex h-full min-h-0 w-full flex-col overflow-hidden bg-background">
+      <section className="relative isolate flex h-full min-h-0 w-full flex-col overflow-hidden bg-slate-950">
         <div
           ref={previewContainerRef}
           className="max-w-full min-h-0 flex-1 overflow-y-auto overflow-x-hidden scroll-smooth"

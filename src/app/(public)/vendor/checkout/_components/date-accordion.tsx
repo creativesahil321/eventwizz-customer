@@ -660,7 +660,7 @@ export default function DateAccordion({
                     updateSpecialRequest(eventSlug, date, e.target.value)
                   }
                   placeholder="Tell us about any special requirements... (e.g., dietary needs, accessibility, seating preferences)"
-                  className="min-h-[80px] text-sm bg-white border-gray-200 rounded-lg resize-none focus:ring-blue-500 focus:border-blue-500"
+                  className="min-h-[80px] text-sm bg-white text-gray-900 caret-gray-900 placeholder:text-gray-500 border-gray-200 rounded-lg resize-none focus:ring-blue-500 focus:border-blue-500"
                   maxLength={500}
                 />
                 <div className="flex justify-between items-center mt-2">
