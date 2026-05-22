@@ -40,6 +40,10 @@ export function UpdateCustomerForm({
 }: UpdateCustomerProps) {
   const [apiErrors, setApiErrors] = useState<Record<string, string[]>>({});
   const updateCustomerMutation = useUpdateCustomer();
+  const normalizedStatus =
+    String(customer?.status || "active").toLowerCase() === "inactive"
+      ? "inactive"
+      : "active";
 
   const form = useForm<z.infer<typeof UserSchema>>({
     resolver: zodResolver(UserSchema),
@@ -50,7 +54,7 @@ export function UpdateCustomerForm({
       phone: customer?.phone || "",
       password: "",
       password_confirmation: "",
-      status: customer?.status || "active",
+      status: normalizedStatus,
     },
   });
 
@@ -248,7 +252,7 @@ export function UpdateCustomerForm({
               <FormLabel className="text-foreground opacity-70">
                 Status
               </FormLabel>
-              <Select onValueChange={field.onChange} defaultValue={field.value}>
+              <Select value={field.value} onValueChange={field.onChange}>
                 <FormControl>
                   <SelectTrigger
                     className={apiErrors.status ? "border-red-500" : ""}

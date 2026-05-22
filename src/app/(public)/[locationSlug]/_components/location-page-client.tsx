@@ -47,8 +47,6 @@ export default function LocationPageClient({
           <ExperienceSection
             aboutTitle={locationData.about_title}
             aboutDescription={locationData.about_description}
-            aboutLinkTitle={locationData.about_link_title}
-            aboutCtaLink={locationData.about_cta_link}
           />
         }
         latestEvents={latestEvents}

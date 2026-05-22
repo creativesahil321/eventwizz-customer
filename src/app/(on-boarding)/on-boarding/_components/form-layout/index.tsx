@@ -231,6 +231,7 @@ const FormLayoutProvider = ({
     if (isMediumScreen && splitLayoutSteps.has(activeStep)) {
       return (
         <SplitLayout
+          key={`split-${activeStep}`}
           step={StepComponent as React.ComponentType}
           defaultCollapsed={defaultSidebarCollapsed}
         />
@@ -239,11 +240,13 @@ const FormLayoutProvider = ({
 
     return splitLayoutSteps.has(activeStep) ? (
       <SplitLayout
+        key={`split-${activeStep}`}
         step={StepComponent as React.ComponentType}
         defaultCollapsed={defaultSidebarCollapsed}
       />
     ) : (
       <FullLayout
+        key={`full-${activeStep}`}
         activeStep={activeStep}
         step={StepComponent as React.ComponentType}
         centered={centeredSteps.has(activeStep)}

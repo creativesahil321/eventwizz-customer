@@ -15,7 +15,10 @@ export interface ApiEvent {
   slug: string;
   image: string | null;
   status: string;
+  /** Legacy: single date (older APIs) */
   event_date?: string;
+  /** Current: multiple event dates (newer APIs) */
+  event_dates?: string[];
 }
 
 // Map the API pagination metadata

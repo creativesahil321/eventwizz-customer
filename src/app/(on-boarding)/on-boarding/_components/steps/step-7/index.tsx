@@ -1,7 +1,7 @@
 "use client";
 
-import React, { useState } from "react";
-import { useForm, useFieldArray, useWatch } from "react-hook-form";
+import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { useForm, Controller, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { CardContent, CardHeader, OnboardingCard } from "@/components/ui/card";
 import {
@@ -12,16 +12,17 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
-import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useFormContext } from "../../form-provider";
 import { stepSevenSchema, StepSevenType } from "../../form-provider/schema";
+import { FileUploader } from "@/components/ui/file-uploader";
+import { toast } from "sonner";
 import {
   OnboardingTitle,
   OnboardingFieldGroupTitle,
 } from "@/components/ui/typography";
-import { toast } from "sonner";
 import { onboardingService } from "@/services/vendor/onboarding/onboarding.service";
+import { Resolver } from "react-hook-form";
 import { useSession } from "next-auth/react";
 import { useFieldFocusHandler } from "../../form-preview/field-focus-handler";
 import { useEventId } from "../../../_lib/hooks/useEventId";
@@ -29,154 +30,497 @@ import { WholeStepGuidedShell } from "../../whole-step-guided-shell";
 import { guidedInsetSectionSurfaceClass } from "../../guided-section-surface";
 import { guidedOnboardingSkipButtonClass } from "../../guided-sticky-approval-bar";
 import { GuidedWholeStepBottomActions } from "../../guided-section-chips";
+import EventLocationMap from "./event-location-map";
+import AddressAutocomplete from "./address-autocomplete";
 import { useCurrencySymbol } from "@/hooks/use-currency-format";
+import { MultiSpaceHeader } from "../../rooms/multi-space-header";
+import { useRoomScopeSync } from "../../rooms/use-room-scope-sync";
 import {
-  DRINK_PACKAGE_ITEM_TITLE_MAX_CHARS,
-  DRINK_SECTION_DESCRIPTION_MAX_CHARS,
-  DRINK_SECTION_TITLE_MAX_CHARS,
-  RICH_DESCRIPTION_MAX_CHARS,
-  clampDrinkPackagePrice,
-  clampDrinkPackageQuantity,
-  DRINK_PACKAGE_PRICE_MAX,
-  DRINK_PACKAGE_QTY_MAX,
-} from "@/lib/event-form-limits";
+  isRoomSectionComplete,
+  useRoomManager,
+} from "../../rooms/use-room-manager";
 
 export default function StepSeven() {
   const currencySymbol = useCurrencySymbol();
+  const { handleFieldFocus } = useFieldFocusHandler();
   const {
     form: globalForm,
     save,
     setActiveStep,
+    activeField,
     persistedProgressHydrated,
   } = useFormContext();
 
-  const stepSevenPersistedApproved = useWatch({
+  const stepSevenPersistedApprovedSingle = useWatch({
     control: globalForm.control,
     name: "stepSeven.isApproved",
   });
-  const { handleFieldFocus } = useFieldFocusHandler();
+  // Multi-room hookup for the Brochure / Location / Price section.
+  const roomScope = useRoomScopeSync("brochure");
+  const { rooms, currentRoomIndex, setCurrentRoomIndex } = useRoomManager();
+  const stepSevenPersistedApproved = roomScope.isMultiRoom
+    ? roomScope.persistedApproved
+    : stepSevenPersistedApprovedSingle === true;
   const [loading, setLoading] = useState(false);
   const { update: updateSession } = useSession();
-
-  // Predefined package as per the specified format
-  const predefinedPackage = [
-    {
-      title: "Premium Package",
-      description: "This is a premium service package",
-      price: 20,
-      available_quantity: 100,
-    },
-  ];
+  // Get the address from Step 1 to prefill the event address
+  const getStepOneAddress = useCallback(() => {
+    const stepOneData = globalForm.getValues("stepOne");
+    return stepOneData?.address || "";
+  }, [globalForm]);
 
   const eventId = useEventId(globalForm, "stepSeven");
+  const activeScopedBrochure = roomScope.isMultiRoom
+    ? rooms[currentRoomIndex]?.brochure
+    : globalForm.getValues("stepSeven");
 
-  const form = useForm({
-    resolver: zodResolver(stepSevenSchema),
+  const form = useForm<StepSevenType>({
+    resolver: zodResolver(stepSevenSchema) as Resolver<StepSevenType>,
     defaultValues: {
-      step: 7 as const,
+      step: 7,
       event_id: eventId,
-      drink_title: globalForm.getValues("stepSeven.drink_title") || "",
-      drink_description:
-        globalForm.getValues("stepSeven.drink_description") || "",
-      packages:
-        globalForm.getValues("stepSeven.packages")?.length > 0
-          ? globalForm.getValues("stepSeven.packages")
-          : predefinedPackage,
+      brochure_pdf: globalForm.getValues("stepSeven.brochure_pdf") || undefined,
+      faq_pdf: globalForm.getValues("stepSeven.faq_pdf") || undefined,
+      event_address:
+        globalForm.getValues("stepSeven.event_address") || getStepOneAddress(),
+      latitude: globalForm.getValues("stepSeven.latitude") || undefined,
+      longitude: globalForm.getValues("stepSeven.longitude") || undefined,
+      price_start_from:
+        globalForm.getValues("stepSeven.price_start_from") || "",
+      location: {
+        title: "LOCATION",
+        description:
+          globalForm.getValues("stepSeven.event_address") ||
+          getStepOneAddress(),
+        icon: "MapPin",
+      },
+      downloads: globalForm.getValues("stepSeven.downloads") || [],
+      remove_brochure_pdf: false,
+      remove_brochure_pdf_2: false,
+      remove_faq_pdf: false,
     },
     mode: "onChange",
   });
 
-  const { fields, append, remove } = useFieldArray({
-    control: form.control,
-    name: "packages",
-  });
+  // Track if we have string URLs from backend
+  const [brochurePdfUrl, setBrochurePdfUrl] = useState<string | null>(null);
+  const [brochurePdfUrl2, setBrochurePdfUrl2] = useState<string | null>(null);
+  const addressSearchFunctionRef = useRef<((address: string) => void) | null>(
+    null,
+  );
 
-  const onSubmit = async (data: StepSevenType) => {
+  const setScopedBrochureField = useCallback(
+    (field: keyof StepSevenType, value: unknown) => {
+      globalForm.setValue(`stepSeven.${field}` as never, value as never);
+      if (roomScope.isMultiRoom) {
+        globalForm.setValue(
+          `multiSpace.rooms.${currentRoomIndex}.brochure.${field}` as never,
+          value as never,
+        );
+      }
+    },
+    [globalForm, roomScope.isMultiRoom, currentRoomIndex],
+  );
+
+  const normalizeOptionalPdfValue = useCallback(
+    (value: unknown): File | string | null => {
+      if (value instanceof File) return value;
+      if (typeof value === "string") {
+        const trimmed = value.trim();
+        return trimmed.length > 0 ? trimmed : null;
+      }
+      return null;
+    },
+    [],
+  );
+
+  const mergeScopedBrochureState = useCallback(
+    (patch: Partial<StepSevenType>) => {
+      const currentStepSeven = (globalForm.getValues("stepSeven") ??
+        {}) as Record<string, unknown>;
+      globalForm.setValue("stepSeven", {
+        ...currentStepSeven,
+        ...patch,
+      } as never);
+
+      if (!roomScope.isMultiRoom) return;
+      const roomPath = `multiSpace.rooms.${currentRoomIndex}.brochure` as never;
+      const currentRoomBrochure =
+        (globalForm.getValues(roomPath) as
+          | Record<string, unknown>
+          | undefined) ?? {};
+      globalForm.setValue(roomPath, {
+        ...currentRoomBrochure,
+        ...patch,
+      } as never);
+    },
+    [globalForm, roomScope.isMultiRoom, currentRoomIndex],
+  );
+
+  const previousRoomIndexRef = useRef(currentRoomIndex);
+
+  // Stable key so the rehydration effect fires on actual data change too
+  // (not just room index), without relying on unstable object references.
+  const scopedBrochureKey = useMemo(() => {
+    const s = (activeScopedBrochure ?? {}) as Record<string, unknown>;
+    return JSON.stringify({
+      bp: typeof s.brochure_pdf === "string" ? s.brochure_pdf : "",
+      bp2: typeof s.brochure_pdf_2 === "string" ? s.brochure_pdf_2 : "",
+      ps: s.price_start_from ?? "",
+    });
+  }, [activeScopedBrochure]);
+
+  // Helper: build the full reset state from a scoped brochure object.
+  const buildResetState = useCallback(
+    (scoped: Record<string, unknown>) => {
+      const stepOneAddress = getStepOneAddress();
+      const scopedAddress =
+        typeof scoped.event_address === "string" && scoped.event_address.trim()
+          ? scoped.event_address
+          : stepOneAddress;
+
+      return {
+        step: 7 as const,
+        event_id: eventId,
+        brochure_pdf: normalizeOptionalPdfValue(scoped.brochure_pdf),
+        brochure_pdf_2: normalizeOptionalPdfValue(scoped.brochure_pdf_2),
+        faq_pdf: normalizeOptionalPdfValue(scoped.faq_pdf),
+        remove_brochure_pdf:
+          typeof scoped.remove_brochure_pdf === "boolean"
+            ? scoped.remove_brochure_pdf
+            : false,
+        remove_brochure_pdf_2:
+          typeof scoped.remove_brochure_pdf_2 === "boolean"
+            ? scoped.remove_brochure_pdf_2
+            : false,
+        remove_faq_pdf:
+          typeof scoped.remove_faq_pdf === "boolean"
+            ? scoped.remove_faq_pdf
+            : false,
+        event_address: scopedAddress,
+        latitude:
+          typeof scoped.latitude === "number" ? scoped.latitude : undefined,
+        longitude:
+          typeof scoped.longitude === "number" ? scoped.longitude : undefined,
+        price_start_from:
+          typeof scoped.price_start_from === "string"
+            ? scoped.price_start_from
+            : "",
+        location: {
+          title: "LOCATION" as const,
+          description: scopedAddress,
+          icon: "MapPin" as const,
+        },
+        price: {
+          title: "PRICES FROM" as const,
+          description:
+            typeof scoped.price_start_from === "string" &&
+            scoped.price_start_from
+              ? `${currencySymbol}${scoped.price_start_from} PP exc VAT`
+              : "",
+          link: "#",
+          icon: "Tag" as const,
+          price_title: "",
+        },
+        downloads: Array.isArray(scoped.downloads) ? scoped.downloads : [],
+        more_info: Array.isArray(scoped.more_info) ? scoped.more_info : [],
+      };
+    },
+    [currencySymbol, eventId, getStepOneAddress, normalizeOptionalPdfValue],
+  );
+
+  // Helper: sync the PDF URL state-setters from a scoped object.
+  const syncPdfUrlState = useCallback(
+    (scoped: Record<string, unknown>) => {
+      setBrochurePdfUrl(
+        typeof scoped.brochure_pdf === "string" &&
+          scoped.brochure_pdf.trim().length > 0
+          ? scoped.brochure_pdf
+          : null,
+      );
+      setBrochurePdfUrl2(
+        typeof scoped.brochure_pdf_2 === "string" &&
+          scoped.brochure_pdf_2.trim().length > 0
+          ? scoped.brochure_pdf_2
+          : null,
+      );
+    },
+    [],
+  );
+
+  // Persist outgoing room draft, then force-reset from the incoming room.
+  // Driven by `currentRoomIndex` (primitive) so it always fires on tab switch.
+  useEffect(() => {
+    if (!roomScope.isMultiRoom) {
+      previousRoomIndexRef.current = currentRoomIndex;
+      // Single-room: still rehydrate from scoped data (initial load / API update).
+      const scoped = (activeScopedBrochure ?? {}) as Record<string, unknown>;
+      form.reset(buildResetState(scoped) as StepSevenType);
+      syncPdfUrlState(scoped);
+      return;
+    }
+
+    // 1. Save outgoing room's local form state so work isn't lost.
+    const previousRoomIndex = previousRoomIndexRef.current;
+    if (
+      previousRoomIndex !== currentRoomIndex &&
+      previousRoomIndex >= 0 &&
+      previousRoomIndex < rooms.length
+    ) {
+      const outgoing = form.getValues();
+      globalForm.setValue(
+        `multiSpace.rooms.${previousRoomIndex}.brochure`,
+        {
+          brochure_pdf: outgoing.brochure_pdf,
+          brochure_pdf_2: outgoing.brochure_pdf_2,
+          faq_pdf: outgoing.faq_pdf,
+          remove_brochure_pdf: outgoing.remove_brochure_pdf,
+          remove_brochure_pdf_2: outgoing.remove_brochure_pdf_2,
+          remove_faq_pdf: outgoing.remove_faq_pdf,
+          event_address: outgoing.event_address,
+          latitude: outgoing.latitude,
+          longitude: outgoing.longitude,
+          price_start_from: outgoing.price_start_from,
+          downloads: outgoing.downloads ?? [],
+          more_info: outgoing.more_info ?? [],
+        },
+        { shouldValidate: false, shouldDirty: true },
+      );
+    }
+    previousRoomIndexRef.current = currentRoomIndex;
+
+    // 2. Force-reset local form from the incoming room's brochure data.
+    const scoped = (rooms[currentRoomIndex]?.brochure ?? {}) as Record<
+      string,
+      unknown
+    >;
+    // Inherit shared address/lat/lng from stepSeven when the room doesn't have its own.
+    const globalStepSeven = (globalForm.getValues("stepSeven") ?? {}) as Record<
+      string,
+      unknown
+    >;
+    if (!scoped.event_address && globalStepSeven.event_address) {
+      scoped.event_address = globalStepSeven.event_address;
+    }
+    if (scoped.latitude === undefined && globalStepSeven.latitude !== undefined) {
+      scoped.latitude = globalStepSeven.latitude;
+    }
+    if (
+      scoped.longitude === undefined &&
+      globalStepSeven.longitude !== undefined
+    ) {
+      scoped.longitude = globalStepSeven.longitude;
+    }
+
+    form.reset(buildResetState(scoped) as StepSevenType);
+    syncPdfUrlState(scoped);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentRoomIndex, roomScope.isMultiRoom, scopedBrochureKey]);
+
+  // Generic function to handle PDF uploads to downloads array
+  const handlePdfUploadToDownloads = (
+    file: File | null,
+    title: string,
+    id: number,
+    localFieldName: "brochure_pdf" | "brochure_pdf_2" | "faq_pdf",
+    urlSetter: (url: string | null) => void,
+    removalFlagName:
+      | "remove_brochure_pdf"
+      | "remove_brochure_pdf_2"
+      | "remove_faq_pdf",
+  ) => {
+    // Check if file is PDF
+    if (file && file.type !== "application/pdf") {
+      toast.error("Only PDF files are allowed");
+      return;
+    }
+
+    form.setValue(localFieldName, file || null);
+    setScopedBrochureField(localFieldName, file || null);
+
+    // Update global form downloads array
+    const downloads = globalForm.getValues("stepSeven.downloads") || [];
+
+    if (file) {
+      // When new file is uploaded, clear the URL
+      urlSetter(null);
+      // Clear removal flag when new file is uploaded
+      form.setValue(removalFlagName, false);
+      setScopedBrochureField(removalFlagName, false);
+
+      // Add or update PDF in downloads array
+      const existingIndex = downloads.findIndex(
+        (d: { title?: string | undefined }) => d.title === title,
+      );
+
+      if (existingIndex >= 0) {
+        downloads[existingIndex] = {
+          ...downloads[existingIndex],
+          title,
+          pdf: file,
+          id,
+          download_link: ["#"],
+        };
+      } else {
+        downloads.push({
+          id,
+          title,
+          pdf: file,
+          download_link: ["#"],
+        });
+      }
+    } else {
+      // Remove PDF if file is null
+      urlSetter(null);
+      // Set removal flag when file is removed
+      form.setValue(removalFlagName, true);
+      setScopedBrochureField(removalFlagName, true);
+
+      const filteredDownloads = downloads.filter(
+        (d: { title?: string | undefined }) => d.title !== title,
+      );
+      mergeScopedBrochureState({
+        downloads: filteredDownloads,
+      });
+      return;
+    }
+
+    mergeScopedBrochureState({
+      downloads,
+    });
+
+    // Manually trigger validation
+    form.trigger(localFieldName);
+  };
+
+  // Handle file upload for main brochure PDF
+  const handleBrochureUpload = (file: File | null) => {
+    handlePdfUploadToDownloads(
+      file,
+      "Brochure",
+      1,
+      "brochure_pdf",
+      setBrochurePdfUrl,
+      "remove_brochure_pdf",
+    );
+  };
+
+  // Handle file upload for Event Flyer PDF
+  const handleBrochureUpload2 = (file: File | null) => {
+    handlePdfUploadToDownloads(
+      file,
+      "Event Flyer",
+      3,
+      "brochure_pdf_2",
+      setBrochurePdfUrl2,
+      "remove_brochure_pdf_2",
+    );
+  };
+
+  const handleSubmit = async (
+    data: StepSevenType,
+    applyToAllRooms = false,
+  ) => {
     setLoading(true);
     try {
-      // Validate the form BEFORE updating global form state
-      const isValid = await form.trigger();
-      if (!isValid) {
-        const errors = form.formState.errors;
-        console.log("Form errors:", errors);
+      // Check for required fields manually before submission
+      const missingFields = [];
 
-        // Collect error messages
-        const errorMessages: string[] = [];
+      if (!data.event_address || data.event_address.trim() === "") {
+        missingFields.push("Event Address");
+      }
 
-        // Check for drink_title and drink_description errors
-        if (errors.drink_title) {
-          errorMessages.push(errors.drink_title.message as string);
-        }
-        if (errors.drink_description) {
-          errorMessages.push(errors.drink_description.message as string);
-        }
-
-        // Check for package errors
-        if (errors.packages) {
-          if (Array.isArray(errors.packages)) {
-            errors.packages.forEach((pkgError, idx) => {
-              if (pkgError && typeof pkgError === "object") {
-                if (pkgError.title) {
-                  errorMessages.push(
-                    `Package ${idx + 1} title: ${pkgError.title.message}`
-                  );
-                }
-                if (pkgError.description) {
-                  errorMessages.push(
-                    `Package ${idx + 1} description: ${
-                      pkgError.description.message
-                    }`
-                  );
-                }
-                if (pkgError.available_quantity) {
-                  errorMessages.push(
-                    `Package ${idx + 1} available quantity: ${
-                      pkgError.available_quantity.message
-                    }`
-                  );
-                }
-                if (pkgError.price) {
-                  errorMessages.push(
-                    `Package ${idx + 1} price: ${pkgError.price.message}`
-                  );
-                }
-              }
-            });
-          } else if (errors.packages.message) {
-            errorMessages.push(errors.packages.message);
-          }
-        }
-
-        // Show consolidated error message
-        if (errorMessages.length > 0) {
-          toast.error(errorMessages.join("; "));
-        } else {
-          toast.error("Please correct the highlighted fields");
-        }
-
+      if (missingFields.length > 0) {
+        toast.error(
+          `Please fill in the required fields: ${missingFields.join(", ")}`,
+        );
         setLoading(false);
         return;
       }
 
-      // Call the API using the service
-      const response = await onboardingService.storeStepSevenData({
+      // First ensure the preview data is properly formatted
+      const formattedData = {
         ...data,
-        isApproved: true,
-      });
+        location: {
+          title: "LOCATION",
+          description: data.event_address || "",
+          icon: "MapPin",
+        },
+        price: {
+          title: "PRICES FROM",
+          description: data.price_start_from
+            ? `${currencySymbol}${data.price_start_from} PP exc VAT`
+            : "",
+          link: "#",
+          icon: "Tag",
+          price_title: "",
+        },
+      };
 
-      if (response?.status) {
-        globalForm.setValue("stepSeven", { ...data, isApproved: true });
-        // INSTANT TRANSITION: Set active step FIRST for smooth UX
-        setActiveStep(8);
+      // Update global form with formatted data
+      globalForm.setValue("stepSeven", formattedData);
 
-        // Then handle async operations in background
-        Promise.all([updateSession({ on_boarding_step: 8 }), save()]).catch(
-          (error) => {
-            console.error("Background save error:", error);
-          }
+      // Validate the form using schema validation only
+      const isSchemaValid = await form.trigger();
+
+      if (!isSchemaValid) {
+        const errors = form.formState.errors;
+        // Display schema validation errors
+        const errorFields = Object.keys(errors);
+        toast.error(
+          `Please correct the highlighted fields: ${errorFields.join(", ")}`,
         );
-      } else {
-        console.error("API Error:", response);
+        setLoading(false);
+        return;
+      }
+
+      try {
+        // Branch on multi-room mode. Single-room mode hits the existing endpoint; multi-room
+        // dispatches via the room-scoped endpoint and mirrors data into the active room slot.
+        const succeeded = await roomScope.saveSection({
+          stepData: { ...data, isApproved: true } as StepSevenType,
+          applyToAllRooms,
+          singleRoomSave: async () => {
+            const response = await onboardingService.storeStepSevenData({
+              ...data,
+              isApproved: true,
+            });
+            if (response?.status) {
+              globalForm.setValue("stepSeven", {
+                ...formattedData,
+                isApproved: true,
+              });
+              return true;
+            }
+            console.error("API Error:", response);
+            return false;
+          },
+        });
+
+        if (succeeded) {
+          if (roomScope.isMultiRoom && !applyToAllRooms) {
+            const updatedRooms = (globalForm.getValues("multiSpace")?.rooms ??
+              []) as typeof rooms;
+            const nextIncompleteRoomIndex = updatedRooms.findIndex(
+              (room) => !isRoomSectionComplete(room, "brochure"),
+            );
+            if (nextIncompleteRoomIndex !== -1) {
+              if (nextIncompleteRoomIndex !== currentRoomIndex) {
+                setCurrentRoomIndex(nextIncompleteRoomIndex);
+              }
+              await save();
+              return;
+            }
+          }
+          setActiveStep(8);
+          Promise.all([updateSession({ on_boarding_step: 8 }), save()]).catch(
+            (error) => {
+              console.error("Background save error:", error);
+            },
+          );
+        }
+      } catch (apiError) {
+        console.error("API call failed:", apiError);
       }
     } catch (error) {
       console.error("Error during Step Seven submission:", error);
@@ -191,443 +535,416 @@ export default function StepSeven() {
       <div className="w-full min-w-0 max-w-none mx-auto relative">
         <OnboardingCard className="w-full mx-auto shadow-sm mb-16">
           <CardHeader className="pb-2 pt-4">
-            <OnboardingTitle>Do You Want To Add Any Packages?</OnboardingTitle>
+            <OnboardingTitle>
+              Check Out The Latest Dates To Be Released
+            </OnboardingTitle>
           </CardHeader>
 
           <CardContent className="px-6 py-2 pb-8">
+            {/* Per-room tab bar shown only when multi-space mode is enabled. */}
+            <MultiSpaceHeader section="brochure" />
+
             <Form {...form}>
-              <form
-                onSubmit={(e) => e.preventDefault()}
-                className="space-y-6"
-              >
+              <form onSubmit={(e) => e.preventDefault()} className="space-y-6">
                 <input type="hidden" {...form.register("step")} />
-                <input type="hidden" {...form.register("event_id")} />
+                <input
+                  type="hidden"
+                  {...form.register("event_id", {
+                    setValueAs: (value) => Number(value),
+                  })}
+                />
 
                 <WholeStepGuidedShell
                   form={form}
-                  sectionId="step-seven-packages"
-                  chipLabel="Other packages"
-                  chipDescription="Optional add-on packages and pricing."
+                  sectionId="step-seven-brochure-location"
+                  chipLabel="Brochure & location"
+                  chipDescription="Brochure files, address, map, and pricing."
                   persistenceHydrated={persistedProgressHydrated}
-                  persistedStepApproved={stepSevenPersistedApproved === true}
+                  persistedStepApproved={stepSevenPersistedApproved}
                   renderFooter={({ guided }) => (
                     <GuidedWholeStepBottomActions
                       guided={guided}
                       loading={loading}
-                      labelWhenReady="Save & continue"
-                      onContinue={() => void form.handleSubmit(onSubmit)()}
+                      alwaysShowReadyLabel={roomScope.isMultiRoom}
+                      labelWhenReady={
+                        roomScope.isMultiRoom
+                          ? "Apply to this room only"
+                          : "Save & continue"
+                      }
+                      onContinue={() => void form.handleSubmit(handleSubmit)()}
                       extraActions={
-                        <Button
-                          variant="event-outline"
-                          type="button"
-                          onClick={() => setActiveStep(8)}
-                          className={guidedOnboardingSkipButtonClass}
-                        >
-                          Skip
-                        </Button>
+                        roomScope.isMultiRoom &&
+                        isRoomSectionComplete(
+                          rooms[currentRoomIndex],
+                          "brochure",
+                        ) &&
+                        rooms.some(
+                          (room, index) =>
+                            index !== currentRoomIndex &&
+                            !isRoomSectionComplete(room, "brochure"),
+                        ) ? (
+                          <Button
+                            variant="event-outline"
+                            type="button"
+                            onClick={() =>
+                              void form.handleSubmit((data) =>
+                                handleSubmit(data, true),
+                              )()
+                            }
+                            className={guidedOnboardingSkipButtonClass}
+                          >
+                            Apply to all rooms
+                          </Button>
+                        ) : !roomScope.isMultiRoom ? (
+                          <Button
+                            variant="event-outline"
+                            type="button"
+                            onClick={() => setActiveStep(8)}
+                            className={guidedOnboardingSkipButtonClass}
+                          >
+                            Skip
+                          </Button>
+                        ) : null
                       }
                     />
                   )}
                 >
                   {() => (
-                <div className="space-y-6">
-                  <section className={guidedInsetSectionSurfaceClass("w-full mb-4")}>
-                    <OnboardingFieldGroupTitle>Title</OnboardingFieldGroupTitle>
-                    <FormField
-                      control={form.control}
-                      name="drink_title"
-                      render={({ field }) => {
-                        const currentLength = field.value?.length || 0;
-                        const maxLength = DRINK_SECTION_TITLE_MAX_CHARS;
-                        return (
-                          <FormItem className="mt-2">
-                            <FormControl>
-                              <Input
-                                {...field}
-                                placeholder="e.g. VIP Packages, Premium Access, etc."
-                                className="h-10 bg-white/5 border-white/10"
-                                maxLength={maxLength}
-                                onChange={(e) => {
-                                  field.onChange(e);
-                                  globalForm.setValue(
-                                    "stepSeven.drink_title",
-                                    e.target.value
-                                  );
-                                }}
-                                onFocus={() => handleFieldFocus("drink_title")}
-                              />
-                            </FormControl>
-                            <div className="text-xs text-muted-foreground mt-1">
-                              <span
-                                className={
-                                  currentLength > maxLength
-                                    ? "text-destructive"
-                                    : ""
-                                }
-                              >
-                                {currentLength}/{maxLength} characters
-                              </span>
-                            </div>
-                            <FormMessage />
-                          </FormItem>
-                        );
-                      }}
-                    />
-                  </section>
+                    <>
+                      {/* Brochure Section */}
+                      <section
+                        className={guidedInsetSectionSurfaceClass(
+                          "w-full mb-4",
+                        )}
+                      >
+                        <OnboardingFieldGroupTitle>
+                          Add More Information
+                        </OnboardingFieldGroupTitle>
 
-                  <section className={guidedInsetSectionSurfaceClass("w-full mb-4")}>
-                    <OnboardingFieldGroupTitle>
-                      Description
-                    </OnboardingFieldGroupTitle>
-                    <FormField
-                      control={form.control}
-                      name="drink_description"
-                      render={({ field }) => {
-                        const currentLength = field.value?.length || 0;
-                        const maxLength = DRINK_SECTION_DESCRIPTION_MAX_CHARS;
-                        return (
-                          <FormItem className="mt-2">
-                            <FormControl>
-                              <Input
-                                {...field}
-                                placeholder="e.g. Please note: Special terms and conditions apply..."
-                                className="h-10 bg-white/5 border-white/10"
-                                maxLength={maxLength}
-                                onChange={(e) => {
-                                  field.onChange(e);
-                                  globalForm.setValue(
-                                    "stepSeven.drink_description",
-                                    e.target.value
-                                  );
-                                }}
-                                onFocus={() =>
-                                  handleFieldFocus("drink_description")
-                                }
-                              />
-                            </FormControl>
-                            <div className="text-xs text-muted-foreground mt-1">
-                              <span
-                                className={
-                                  currentLength > maxLength
-                                    ? "text-destructive"
-                                    : ""
-                                }
-                              >
-                                {currentLength}/{maxLength} characters
-                              </span>
-                            </div>
-                            <FormMessage />
-                          </FormItem>
-                        );
-                      }}
-                    />
-                  </section>
-
-                  <section className={guidedInsetSectionSurfaceClass("w-full mb-4")}>
-                    <OnboardingFieldGroupTitle>
-                      Packages Deals
-                    </OnboardingFieldGroupTitle>
-
-                    <div className="space-y-6 mt-4">
-                      {fields.map((field, index) => (
-                        <div
-                          key={field.id}
-                          className="space-y-4 rounded-lg border border-white/10 bg-white/[0.03] p-6"
-                        >
+                        <div className="mt-4 w-full min-w-0 space-y-6 rounded-lg border border-white/10 bg-white/[0.03] p-4 sm:p-6">
                           <FormField
                             control={form.control}
-                            name={`packages.${index}.title`}
-                            render={({ field }) => {
-                              const currentLength = field.value?.length || 0;
-                              const maxLength = DRINK_PACKAGE_ITEM_TITLE_MAX_CHARS;
-                              return (
-                                <FormItem>
-                                  <FormLabel className="text-sm font-medium">
-                                    Package Heading
-                                  </FormLabel>
-                                  <FormControl>
-                                    <Input
-                                      {...field}
-                                      placeholder="e.g. Premium Package A"
-                                      className="h-10 bg-white/5 border-white/10"
-                                      maxLength={maxLength}
-                                      onChange={(e) => {
-                                        field.onChange(e);
-                                        // Update global form immediately
-                                        const currentPackages =
-                                          form.getValues("packages");
-                                        const updatedPackages = [
-                                          ...currentPackages,
-                                        ];
-                                        updatedPackages[index].title =
-                                          e.target.value;
-                                        globalForm.setValue(
-                                          "stepSeven.packages",
-                                          updatedPackages as StepSevenType["packages"]
-                                        );
-                                      }}
-                                      onBlur={() => {
-                                        field.onBlur();
-                                        form.trigger(`packages.${index}.title`);
-                                      }}
-                                      onFocus={() =>
-                                        handleFieldFocus(
-                                          `packages.${index}.title`
-                                        )
-                                      }
-                                    />
-                                  </FormControl>
-                                  <div className="text-xs text-muted-foreground mt-1">
-                                    <span
-                                      className={
-                                        currentLength > maxLength
-                                          ? "text-destructive"
-                                          : ""
-                                      }
-                                    >
-                                      {currentLength}/{maxLength} characters
-                                    </span>
-                                  </div>
-                                  <FormMessage />
-                                </FormItem>
-                              );
-                            }}
-                          />
-
-                          <FormField
-                            control={form.control}
-                            name={`packages.${index}.description`}
-                            render={({ field }) => {
-                              const currentLength = field.value?.length || 0;
-                              const maxLength = RICH_DESCRIPTION_MAX_CHARS;
-                              return (
-                                <FormItem>
-                                  <FormLabel className="text-sm font-medium">
-                                    Package Description
-                                  </FormLabel>
-                                  <FormControl>
-                                    <Input
-                                      {...field}
-                                      placeholder="e.g. Includes premium access, special amenities..."
-                                      className="h-10 bg-white/5 border-white/10"
-                                      maxLength={maxLength}
-                                      onChange={(e) => {
-                                        field.onChange(e);
-                                        // Update global form immediately
-                                        const currentPackages =
-                                          form.getValues("packages");
-                                        const updatedPackages = [
-                                          ...currentPackages,
-                                        ];
-                                        updatedPackages[index].description =
-                                          e.target.value;
-                                        globalForm.setValue(
-                                          "stepSeven.packages",
-                                          updatedPackages as StepSevenType["packages"]
-                                        );
-                                      }}
-                                    />
-                                  </FormControl>
-                                  <div className="text-xs text-muted-foreground mt-1">
-                                    <span
-                                      className={
-                                        currentLength > maxLength
-                                          ? "text-destructive"
-                                          : ""
-                                      }
-                                    >
-                                      {currentLength}/{maxLength} characters
-                                    </span>
-                                  </div>
-                                  <FormMessage />
-                                </FormItem>
-                              );
-                            }}
-                          />
-
-                          <FormField
-                            control={form.control}
-                            name={`packages.${index}.price`}
-                            render={({ field }) => (
+                            name="brochure_pdf"
+                            render={() => (
                               <FormItem>
                                 <FormLabel className="text-sm font-medium">
-                                  Package Price{" "}
-                                  <span className="text-red-500">*</span>
+                                  Event Brochure PDF (Optional)
                                 </FormLabel>
                                 <FormControl>
-                                  <Input
-                                    type="number"
-                                    className="h-10 bg-white/5 border-white/10"
-                                    min="0"
-                                    max={DRINK_PACKAGE_PRICE_MAX}
-                                    maxLength={10}
-                                    step="0.01"
-                                    value={
-                                      field.value === 0 ? "" : field.value ?? ""
-                                    }
-                                    onChange={(e) => {
-                                      const value = e.target.value;
-                                      // Allow empty string while typing
-                                      if (value === "" || value === null) {
-                                        field.onChange("");
-                                        // Update global form with empty string temporarily
-                                        const currentPackages =
-                                          form.getValues("packages");
-                                        const updatedPackages = [
-                                          ...currentPackages,
-                                        ];
-                                        updatedPackages[index].price = "";
-                                        globalForm.setValue(
-                                          "stepSeven.packages",
-                                          updatedPackages as StepSevenType["packages"]
-                                        );
-                                        return;
-                                      }
-
-                                      const numValue = Number.parseFloat(value);
-                                      if (
-                                        !Number.isFinite(numValue) ||
-                                        numValue <= 0
-                                      ) {
-                                        return;
-                                      }
-                                      const capped =
-                                        clampDrinkPackagePrice(numValue);
-                                      field.onChange(capped);
-                                      const currentPackages =
-                                        form.getValues("packages");
-                                      const updatedPackages = [
-                                        ...currentPackages,
-                                      ];
-                                      updatedPackages[index].price = capped;
-                                      globalForm.setValue(
-                                        "stepSeven.packages",
-                                        updatedPackages as StepSevenType["packages"]
-                                      );
-                                    }}
-                                    onBlur={() => {
-                                      // Keep empty string on blur - validation will catch it
-                                      field.onBlur();
-                                      form.trigger(`packages.${index}.price`);
-                                    }}
-                                    onFocus={() =>
-                                      handleFieldFocus(
-                                        `packages.${index}.price`
-                                      )
-                                    }
-                                    placeholder={`${currencySymbol}0.00`}
-                                  />
+                                  {brochurePdfUrl ? (
+                                    <div className="w-full min-w-0">
+                                      <div className="mb-2 flex min-w-0 items-center justify-between gap-3 rounded-lg border border-white/10 bg-white/[0.06] p-4">
+                                        <div className="flex items-center min-w-0 flex-1 overflow-hidden">
+                                          <svg
+                                            className="shrink-0"
+                                            width="24"
+                                            height="24"
+                                            viewBox="0 0 32 32"
+                                            fill="none"
+                                            xmlns="http://www.w3.org/2000/svg"
+                                          >
+                                            <path
+                                              d="M20 2H8C6.9 2 6 2.9 6 4V28C6 29.1 6.9 30 8 30H24C25.1 30 26 29.1 26 28V8L20 2Z"
+                                              fill="#FF5252"
+                                            />
+                                            <path
+                                              d="M20 2V8H26L20 2Z"
+                                              fill="#FF8A80"
+                                            />
+                                            <path
+                                              d="M14 16H18V18H14V16Z"
+                                              fill="white"
+                                            />
+                                            <path
+                                              d="M14 20H18V22H14V20Z"
+                                              fill="white"
+                                            />
+                                          </svg>
+                                          <span
+                                            className="ml-2 text-sm truncate"
+                                            title={
+                                              brochurePdfUrl.split("/").pop() ??
+                                              undefined
+                                            }
+                                          >
+                                            {brochurePdfUrl.split("/").pop()}
+                                          </span>
+                                        </div>
+                                        <Button
+                                          className="shrink-0"
+                                          type="button"
+                                          variant="ghost"
+                                          size="sm"
+                                          onClick={() => {
+                                            setBrochurePdfUrl(null);
+                                            form.setValue("brochure_pdf", null);
+                                            form.setValue(
+                                              "remove_brochure_pdf",
+                                              true,
+                                            );
+                                            globalForm.setValue(
+                                              "stepSeven.remove_brochure_pdf",
+                                              true,
+                                            );
+                                            handleBrochureUpload(null);
+                                          }}
+                                        >
+                                          Remove
+                                        </Button>
+                                      </div>
+                                    </div>
+                                  ) : (
+                                    <Controller
+                                      name="brochure_pdf"
+                                      control={form.control}
+                                      render={({ field: { value } }) => (
+                                        <FileUploader
+                                          value={
+                                            value instanceof File ? [value] : []
+                                          }
+                                          onValueChange={(files) =>
+                                            handleBrochureUpload(
+                                              files[0] || null,
+                                            )
+                                          }
+                                          maxFileCount={1}
+                                          maxSize={20 * 1024 * 1024}
+                                          onRemove={() =>
+                                            handleBrochureUpload(null)
+                                          }
+                                          accept={{
+                                            "application/pdf": [".pdf"],
+                                          }}
+                                          onFocus={() =>
+                                            handleFieldFocus("brochure_pdf")
+                                          }
+                                        />
+                                      )}
+                                    />
+                                  )}
                                 </FormControl>
                                 <FormMessage />
+                                <p className="text-xs text-muted-foreground mt-1">
+                                  Upload your event brochure (PDF only, up to 20MB)
+                                </p>
+                              </FormItem>
+                            )}
+                          />
+                          <FormField
+                            control={form.control}
+                            name="brochure_pdf_2"
+                            render={() => (
+                              <FormItem>
+                                <FormLabel className="text-sm font-medium">
+                                  Event Flyer PDF (Optional)
+                                </FormLabel>
+                                <FormControl>
+                                  {brochurePdfUrl2 ? (
+                                    <div className="w-full min-w-0">
+                                      <div className="mb-2 flex min-w-0 items-center justify-between gap-3 rounded-lg border border-white/10 bg-white/[0.06] p-4">
+                                        <div className="flex items-center min-w-0 flex-1 overflow-hidden">
+                                          <svg
+                                            className="shrink-0"
+                                            width="24"
+                                            height="24"
+                                            viewBox="0 0 32 32"
+                                            fill="none"
+                                            xmlns="http://www.w3.org/2000/svg"
+                                          >
+                                            <path
+                                              d="M20 2H8C6.9 2 6 2.9 6 4V28C6 29.1 6.9 30 8 30H24C25.1 30 26 29.1 26 28V8L20 2Z"
+                                              fill="#FF5252"
+                                            />
+                                            <path
+                                              d="M20 2V8H26L20 2Z"
+                                              fill="#FF8A80"
+                                            />
+                                            <path
+                                              d="M14 16H18V18H14V16Z"
+                                              fill="white"
+                                            />
+                                            <path
+                                              d="M14 20H18V22H14V20Z"
+                                              fill="white"
+                                            />
+                                          </svg>
+                                          <span
+                                            className="ml-2 text-sm truncate"
+                                            title={
+                                              brochurePdfUrl2
+                                                .split("/")
+                                                .pop() ?? undefined
+                                            }
+                                          >
+                                            {brochurePdfUrl2.split("/").pop()}
+                                          </span>
+                                        </div>
+                                        <Button
+                                          className="shrink-0"
+                                          type="button"
+                                          variant="ghost"
+                                          size="sm"
+                                          onClick={() => {
+                                            setBrochurePdfUrl2(null);
+                                            form.setValue(
+                                              "brochure_pdf_2",
+                                              null,
+                                            );
+                                            form.setValue(
+                                              "remove_brochure_pdf_2",
+                                              true,
+                                            );
+                                            globalForm.setValue(
+                                              "stepSeven.remove_brochure_pdf_2",
+                                              true,
+                                            );
+                                            handleBrochureUpload2(null);
+                                          }}
+                                        >
+                                          Remove
+                                        </Button>
+                                      </div>
+                                    </div>
+                                  ) : (
+                                    <Controller
+                                      name="brochure_pdf_2"
+                                      control={form.control}
+                                      render={({ field: { value } }) => (
+                                        <FileUploader
+                                          value={
+                                            value instanceof File ? [value] : []
+                                          }
+                                          onValueChange={(files) =>
+                                            handleBrochureUpload2(
+                                              files[0] || null,
+                                            )
+                                          }
+                                          maxFileCount={1}
+                                          maxSize={20 * 1024 * 1024}
+                                          onRemove={() =>
+                                            handleBrochureUpload2(null)
+                                          }
+                                          accept={{
+                                            "application/pdf": [".pdf"],
+                                          }}
+                                          onFocus={() =>
+                                            handleFieldFocus("brochure_pdf_2")
+                                          }
+                                        />
+                                      )}
+                                    />
+                                  )}
+                                </FormControl>
+                                <FormMessage />
+                                <p className="text-xs text-muted-foreground mt-1">
+                                  Upload your event flyer (PDF only, up to 20MB)
+                                </p>
                               </FormItem>
                             )}
                           />
 
-                          <FormField
-                            control={form.control}
-                            name={`packages.${index}.available_quantity`}
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormLabel className="text-sm font-medium">
-                                  Available Quantity{" "}
-                                  <span className="text-red-500">*</span>
-                                </FormLabel>
-                                <FormControl>
-                                  <Input
-                                    type="number"
-                                    {...field}
-                                    value={field.value as number}
-                                    className="h-10 bg-white/5 border-white/10"
-                                    min={1}
-                                    max={DRINK_PACKAGE_QTY_MAX}
-                                    placeholder="e.g. 100"
-                                    onChange={(e) => {
-                                      const value = e.target.value;
-                                      if (value === "" || value === null) {
-                                        field.onChange(Number.NaN);
-                                        const currentPackages =
-                                          form.getValues("packages");
-                                        const updatedPackages = [
-                                          ...currentPackages,
-                                        ];
-                                        updatedPackages[
-                                          index
-                                        ].available_quantity =
-                                          undefined as unknown as number;
-                                        globalForm.setValue(
-                                          "stepSeven.packages",
-                                          updatedPackages as StepSevenType["packages"]
-                                        );
-                                        return;
-                                      }
-                                      const numValue = Number(value);
-                                      if (!Number.isFinite(numValue)) return;
-                                      const capped =
-                                        clampDrinkPackageQuantity(numValue);
-                                      field.onChange(capped);
-                                      const currentPackages =
-                                        form.getValues("packages");
-                                      const updatedPackages = [
-                                        ...currentPackages,
-                                      ];
-                                      updatedPackages[
-                                        index
-                                      ].available_quantity = capped;
-                                      globalForm.setValue(
-                                        "stepSeven.packages",
-                                        updatedPackages as StepSevenType["packages"]
-                                      );
-                                    }}
-                                    onFocus={() =>
-                                      handleFieldFocus(
-                                        `packages.${index}.available_quantity`
-                                      )
-                                    }
-                                  />
-                                </FormControl>
-                                <FormMessage />
-                              </FormItem>
-                            )}
-                          />
-
-                          <Button
-                            type="button"
-                            variant="outline"
-                            className="border-red-400/50 text-red-400 hover:bg-red-500/10"
-                            onClick={() => {
-                              if (fields.length <= 1) {
-                                toast.error("At least one package is required");
-                                return;
-                              }
-                              remove(index);
-                            }}
-                            disabled={fields.length <= 1}
-                          >
-                            Remove Package
-                          </Button>
                         </div>
-                      ))}
+                      </section>
 
-                      {fields.length < 10 && (
-                        <Button
-                          type="button"
-                          variant="outline"
-                          onClick={() =>
-                            append({
-                              title: "",
-                              description: "",
-                              price: 0,
-                              available_quantity: 100,
-                            })
-                          }
-                          className="mt-4 border-white/20 bg-white/[0.04] text-sm hover:bg-white/[0.08]"
-                        >
-                          Add More Package
-                        </Button>
-                      )}
-                    </div>
-                  </section>
-                </div>
+                      <section
+                        className={guidedInsetSectionSurfaceClass(
+                          "w-full mb-4",
+                        )}
+                      >
+                        <OnboardingFieldGroupTitle>
+                          Event Location
+                        </OnboardingFieldGroupTitle>
+
+                        <div className="space-y-4 rounded-lg border border-white/10 bg-white/[0.03] p-6">
+                          <FormField
+                            control={form.control}
+                            name="event_address"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel className="text-sm font-medium">
+                                  Event Address (exact location)
+                                </FormLabel>
+                                <FormControl>
+                                  <AddressAutocomplete
+                                    value={field.value}
+                                    onChange={(address) => {
+                                      field.onChange(address);
+                                      mergeScopedBrochureState({
+                                        event_address: address,
+                                        location: {
+                                          title: "LOCATION",
+                                          description: address,
+                                          icon: "MapPin",
+                                        },
+                                      });
+                                    }}
+                                    onSelect={(placeId, address) => {
+                                      field.onChange(address);
+                                      mergeScopedBrochureState({
+                                        event_address: address,
+                                        location: {
+                                          title: "LOCATION",
+                                          description: address,
+                                          icon: "MapPin",
+                                        },
+                                      });
+
+                                      // Trigger map search for the selected address
+                                      if (addressSearchFunctionRef.current) {
+                                        addressSearchFunctionRef.current(
+                                          address,
+                                        );
+                                      }
+                                    }}
+                                    onFocus={() =>
+                                      handleFieldFocus("event_address")
+                                    }
+                                    autoFocus={activeField === "event_address"}
+                                    placeholder="Type to search for a UK address or location..."
+                                    className="w-full"
+                                    variant="dark"
+                                  />
+                                </FormControl>
+                                <p className="mt-1 text-xs font-medium text-[var(--color-primary,#38bdf8)]">
+                                  ⓘ Search for UK addresses or use the map below
+                                  to set exact location
+                                </p>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+
+                          {/* Interactive Google Map */}
+
+                          <EventLocationMap
+                            initialAddress={form.watch("event_address")}
+                            onLocationChange={(location) => {
+                              // Update form values with new location data
+                              form.setValue("event_address", location.address);
+                              form.setValue("latitude", location.latitude);
+                              form.setValue("longitude", location.longitude);
+
+                              mergeScopedBrochureState({
+                                event_address: location.address,
+                                latitude: location.latitude,
+                                longitude: location.longitude,
+                                location: {
+                                  title: "LOCATION",
+                                  description: location.address,
+                                  icon: "MapPin",
+                                },
+                              });
+                            }}
+                            onAddressSearch={(searchFunction) => {
+                              addressSearchFunctionRef.current = searchFunction;
+                            }}
+                            className="mt-4"
+                          />
+
+                          {/* Location Status Indicator */}
+                        </div>
+                      </section>
+                    </>
                   )}
                 </WholeStepGuidedShell>
               </form>

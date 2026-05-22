@@ -28,20 +28,12 @@ export default function EventGallery({ gallery, galleryTitle }: PackageSectionPr
     return "/assets/images/gallery-image.png";
   };
 
-  // Default sample party images if no gallery is provided
-  const defaultImages = [
-    "/assets/images/events/DummyEvents/event1.jpg",
-    "/assets/images/events/DummyEvents/event2.jpg",
-    "/assets/images/events/DummyEvents/event3.jpg",
-    "/assets/images/events/DummyEvents/event4.jpg",
-    "/assets/images/events/DummyEvents/event1.jpg",
-    "/assets/images/events/DummyEvents/event2.jpg",
-    "/assets/images/events/DummyEvents/event3.jpg",
-    "/assets/images/events/DummyEvents/event4.jpg",
-  ];
+  if (!gallery || gallery.length === 0) {
+    return null;
+  }
 
   const title = galleryTitle || "Captured Moments";
-  const images = gallery && gallery.length > 0 ? gallery : defaultImages;
+  const images = gallery;
 
   return (
     <section className="w-full bg-[color:var(--color-background)] py-16 px-4">

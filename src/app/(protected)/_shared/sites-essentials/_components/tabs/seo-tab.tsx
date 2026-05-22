@@ -14,8 +14,10 @@ import { SectionTitle } from "../ui/section-title";
 import { Separator } from "@/components/ui/separator";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { useSiteEssentialsUpdateGate } from "../../_lib/site-essentials-update-context";
 
 export function SeoTab() {
+  const { readOnly } = useSiteEssentialsUpdateGate();
   const form = useFormContext<SiteEssentialsFormValues>();
 
   return (
@@ -39,6 +41,7 @@ export function SeoTab() {
               <FormControl>
                 <Input
                   className="h-10"
+                  disabled={readOnly}
                   placeholder="EventWizz - Event Management Platform"
                   {...field}
                 />
@@ -63,6 +66,7 @@ export function SeoTab() {
                 <Textarea
                   placeholder="EventWizz is a comprehensive event management platform for creating, managing and selling tickets for your events."
                   className="min-h-24 resize-none p-3"
+                  disabled={readOnly}
                   {...field}
                 />
               </FormControl>
@@ -85,6 +89,7 @@ export function SeoTab() {
               <FormControl>
                 <Input
                   className="h-10"
+                  disabled={readOnly}
                   placeholder="event management, tickets, booking, events, conferences"
                   {...field}
                 />

@@ -17,7 +17,7 @@ import { FaSitemap } from "react-icons/fa";
 import { useFormContext } from "../form-provider";
 import Link from "next/link";
 import { ServerContext } from "@/lib/server-context";
-import { useContext } from "react";
+import { useContext, useMemo } from "react";
 import { addCacheBusting } from "@/lib/image-utils";
 import {
   Tooltip,
@@ -30,11 +30,11 @@ const steps = [
   { id: 1, label: "Venue", icon: <MapPin size={16} /> },
   { id: 2, label: "Site", icon: <FaSitemap size={16} /> },
   { id: 3, label: "Event", icon: <PartyPopper size={16} /> },
-  { id: 4, label: "Package", icon: <Package size={16} /> },
+  { id: 4, label: "Timeline & Package", icon: <Package size={16} /> },
   { id: 5, label: "Dates", icon: <CalendarDays size={16} /> },
   { id: 6, label: "Catering", icon: <Utensils size={16} /> },
-  { id: 7, label: "Other Packages", icon: <Wine size={16} /> },
-  { id: 8, label: "Brochure info", icon: <Info size={16} /> },
+  { id: 7, label: "Brochure info", icon: <Info size={16} /> },
+  { id: 8, label: "Other Packages", icon: <Wine size={16} /> },
   { id: 9, label: "FAQs", icon: <HelpCircle size={16} /> },
   { id: 10, label: "Payment", icon: <CreditCard size={16} /> },
   { id: 11, label: "Publish", icon: <UploadCloud size={16} /> },
@@ -43,12 +43,12 @@ const steps = [
 const stepTooltips: Record<number, string> = {
   1: "Core venue details and contact information.",
   2: "Site branding, hero banner, and about section.",
-  3: "Event identity, banner media, story, and schedule.",
-  4: "Package copy, image, details, and gallery.",
+  3: "Event identity, banner media, and story.",
+  4: "Timeline setup, package content, image, details, and gallery.",
   5: "Dates, tickets, tables, and payment rules.",
   6: "Catering and menu information.",
-  7: "Drinks and add-on packages.",
-  8: "Brochure and location for collateral.",
+  7: "Brochure and location for collateral.",
+  8: "Drinks and add-on packages.",
   9: "Frequently asked questions.",
   10: "Payment provider connections.",
   11: "Final review and publish.",
@@ -57,6 +57,20 @@ const stepTooltips: Record<number, string> = {
 export default function Stepper({ activeStep }: { activeStep: number }) {
   const { setActiveStep, lastCompletedStep } = useFormContext();
   const { theme } = useContext(ServerContext);
+
+  /** Same basis as the connector fill: step 1 → 0%, step 2 → 10%, …, step 11 → 100%. */
+  const progressPercent = useMemo(() => {
+    const n = steps.length;
+    const step = Math.max(1, Math.min(n, Number(activeStep) || 1));
+    if (n <= 1) return 100;
+    return Math.round(((step - 1) / (n - 1)) * 100);
+  }, [activeStep]);
+
+  const safeActiveStep = useMemo(
+    () => Math.max(1, Math.min(steps.length, Number(activeStep) || 1)),
+    [activeStep],
+  );
+
   const logoPath =
     theme?.logo?.startsWith("/") ||
     theme?.logo?.startsWith("data:") ||
@@ -88,7 +102,7 @@ export default function Stepper({ activeStep }: { activeStep: number }) {
           </Link>
         </div>
 
-        <div className="flex items-center justify-between max-w-7xl mx-auto pl-28 md:pl-32 lg:pl-36 xl:pl-40 pr-4">
+        <div className="flex items-center justify-between gap-4 max-w-7xl mx-auto pl-28 md:pl-32 lg:pl-36 xl:pl-40 pr-4">
           <div className="relative flex-1 overflow-x-auto overflow-y-visible no-scrollbar">
             <div className="relative flex justify-center items-start space-x-2 md:space-x-3 lg:space-x-4 min-w-max px-4 md:px-6 mt-2">
               <div className="absolute top-[22px] left-4 md:left-6 right-4 md:right-6 h-[2px] bg-white/[0.08] z-0 rounded-full" />
@@ -210,6 +224,39 @@ export default function Stepper({ activeStep }: { activeStep: number }) {
                   </div>
                 );
               })}
+            </div>
+
+            {/* Overall progress: line + right-end text on the same row (matches reference). */}
+            <div className="mt-4 w-full max-w-2xl mx-auto px-4 md:px-6">
+              <div className="flex items-center gap-3">
+                <div
+                  className="h-[3px] flex-1 rounded-full bg-white/[0.08] overflow-hidden ring-1 ring-white/[0.06]"
+                  role="progressbar"
+                  aria-valuenow={progressPercent}
+                  aria-valuemin={0}
+                  aria-valuemax={100}
+                  aria-label={`Onboarding progress, ${progressPercent} percent complete`}
+                >
+                  <div
+                    className="h-full rounded-full transition-[width] duration-700 ease-out"
+                    style={{
+                      width: `${progressPercent}%`,
+                      background: `linear-gradient(90deg, var(--color-primary, #3b82f6), var(--color-secondary, #8b5cf6))`,
+                      boxShadow: `0 0 10px color-mix(in srgb, var(--color-primary, #3b82f6) 35%, transparent)`,
+                    }}
+                  />
+                </div>
+                <div
+                  className="shrink-0 whitespace-nowrap text-[11px] sm:text-xs text-slate-400"
+                  aria-live="polite"
+                >
+                  <span className="tabular-nums">
+                    Step {safeActiveStep} of {steps.length}
+                  </span>
+                  <span className="mx-1.5 text-slate-500">·</span>
+                  <span className="tabular-nums">{progressPercent}%</span>
+                </div>
+              </div>
             </div>
           </div>
         </div>

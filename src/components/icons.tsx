@@ -33,6 +33,7 @@ import {
   UserCog,
   Users,
   Wrench,
+  Table2,
 } from "lucide-react";
 
 type IconProps = React.HTMLAttributes<SVGElement>;
@@ -97,6 +98,7 @@ export const Icons = {
   notifications: (props: IconProps) => <Bell {...props} />,
   support: (props: IconProps) => <Wrench {...props} />,
   disputeResolution: (props: IconProps) => <ReplaceAll {...props} />,
+  tableAssignment: (props: IconProps) => <Table2 {...props} />,
   telegram: (props: IconProps) => {
     return (
       <svg viewBox="0 0 24 24" fill="currentColor" {...props}>

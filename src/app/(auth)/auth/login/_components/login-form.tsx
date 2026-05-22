@@ -27,6 +27,7 @@ import { OAuthErrorBoundary } from "@/components/auth/OAuthErrorBoundary";
 import { OAuthSkeleton } from "@/components/auth/OAuthSkeleton";
 import { OAuthButtons } from "@/components/auth/OAuthButtons";
 import { handleUrlErrorParams } from "@/lib/auth/url-utils";
+import { AuthAlternateLink } from "@/app/(auth)/_components/auth-alternate-link";
 
 export default function LoginForm() {
   const [loading, setLoading] = React.useState(false);
@@ -328,6 +329,8 @@ export default function LoginForm() {
                 ? "Redirecting..."
                 : "Sign in"}
             </Button>
+
+            <AuthAlternateLink variant="login" />
           </div>
         </form>
       </div>

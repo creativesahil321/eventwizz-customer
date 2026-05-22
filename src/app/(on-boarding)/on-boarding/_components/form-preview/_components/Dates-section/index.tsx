@@ -76,8 +76,7 @@ export default function DatesSection({
       checkAndHandleConflict = cartConflictHook.checkAndHandleConflict;
     }
   } catch {
-    // Cart conflict context not available - this is expected in some contexts
-    console.log("Cart conflict context not available");
+    // Context may be absent during onboarding preview render paths.
   }
 
   const sessionUser = session?.user as SessionUser | undefined;

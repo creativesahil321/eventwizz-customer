@@ -180,6 +180,78 @@ export default function CreateRoleForm({
         selectedIds.includes(getPermKey(p) as number)
     );
 
+  const normalizeSlug = (s: string | undefined) =>
+    (s ?? "").toLowerCase().trim();
+
+  const STAFF_ACTION_SLUGS = new Set([
+    "read-staff",
+    "create-staff",
+    "update-staff",
+    "delete-staff",
+    "change-staff-status",
+  ]);
+
+  const isStaffManagementPermission = (perm: ProcessedPermission) => {
+    const slug = normalizeSlug(perm.slug);
+    if (!slug) return false;
+    if (STAFF_ACTION_SLUGS.has(slug)) return true;
+    return (
+      slug.includes("staff") &&
+      (slug.includes("read") ||
+        slug.includes("create") ||
+        slug.includes("update") ||
+        slug.includes("delete") ||
+        slug.includes("change"))
+    );
+  };
+
+  const findPermissionById = (
+    permissionId: number,
+  ): ProcessedPermission | undefined => {
+    for (const group of displayPermissions) {
+      const p = group.permissions.find((x) => x.id === permissionId);
+      if (p) return p;
+    }
+    return undefined;
+  };
+
+  const findReadRolePermission = (): ProcessedPermission | undefined => {
+    for (const group of displayPermissions) {
+      for (const p of group.permissions) {
+        const slug = normalizeSlug(p.slug);
+        if (
+          slug === "read-role-permission" ||
+          (slug.includes("read") &&
+            slug.includes("role") &&
+            slug.includes("permission"))
+        ) {
+          return p;
+        }
+      }
+    }
+    return undefined;
+  };
+
+  const isReadRolePermission = (perm: ProcessedPermission) => {
+    const slug = normalizeSlug(perm.slug);
+    return (
+      slug === "read-role-permission" ||
+      (slug.includes("read") &&
+        slug.includes("role") &&
+        slug.includes("permission"))
+    );
+  };
+
+  const isStaffManagementEnabled = (selectedIds: number[]) => {
+    for (const group of displayPermissions) {
+      for (const p of group.permissions) {
+        if (p.id === undefined || !isStaffManagementPermission(p)) continue;
+        if (selectedIds.includes(p.id)) return true;
+      }
+    }
+    return false;
+  };
+
   // Update the "all checked" state
   useEffect(() => {
     const allEnabled =
@@ -200,12 +272,23 @@ export default function CreateRoleForm({
         ? currentPermissions
         : [...currentPermissions, permissionId];
 
+      const toggledPerm = findPermissionById(permissionId);
+      if (toggledPerm && isStaffManagementPermission(toggledPerm)) {
+        const readRole = findReadRolePermission();
+        if (
+          readRole?.id !== undefined &&
+          !updatedPermissions.includes(readRole.id)
+        ) {
+          updatedPermissions = [...updatedPermissions, readRole.id];
+        }
+      }
+
       // If a write permission is enabled, ensure read in same group is enabled.
       for (const group of displayPermissions) {
-        const toggledPerm = group.permissions.find(
+        const perm = group.permissions.find(
           (p) => p.id !== undefined && p.id === permissionId
         );
-        if (!toggledPerm || !isWriteAction(toggledPerm)) continue;
+        if (!perm || !isWriteAction(perm)) continue;
 
         const readPerm = findReadPermissionInGroup(group);
         if (
@@ -217,12 +300,19 @@ export default function CreateRoleForm({
         break;
       }
     } else {
+      const toggledPerm = findPermissionById(permissionId);
+      if (toggledPerm && isReadRolePermission(toggledPerm)) {
+        if (isStaffManagementEnabled(currentPermissions)) {
+          return;
+        }
+      }
+
       // If trying to disable READ while write exists in same group, block it.
       for (const group of displayPermissions) {
-        const toggledPerm = group.permissions.find(
+        const perm = group.permissions.find(
           (p) => p.id !== undefined && p.id === permissionId
         );
-        if (!toggledPerm || !isReadPermission(toggledPerm)) continue;
+        if (!perm || !isReadPermission(perm)) continue;
 
         if (hasWriteEnabledInGroup(group, currentPermissions)) {
           return;
@@ -410,34 +500,50 @@ export default function CreateRoleForm({
                       </div>
                       <Separator className="mb-3" />
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 py-2">
-                        {group.permissions.map(
-                          (perm) =>
-                            perm.id !== undefined && (
-                              <div
-                                key={perm.id}
-                                className="flex items-center space-x-2 p-1 rounded hover:bg-[var(--color-background-hover)]"
+                        {group.permissions.map((perm) => {
+                          if (perm.id === undefined) return null;
+                          const isRead = isReadPermission(perm);
+                          const readRequiredByWrite =
+                            isRead &&
+                            hasWriteEnabledInGroup(
+                              group,
+                              selectedPermissions,
+                            );
+                          const staffManagementLocksReadRole =
+                            isReadRolePermission(perm) &&
+                            isStaffManagementEnabled(selectedPermissions);
+                          return (
+                            <div
+                              key={perm.id}
+                              className="flex items-center space-x-2 p-1 rounded hover:bg-[var(--color-background-hover)]"
+                            >
+                              <Switch
+                                id={`perm-${perm.id}`}
+                                checked={selectedPermissions.includes(perm.id)}
+                                onCheckedChange={(checked) =>
+                                  updatePermissionSelections(perm.id!, checked)
+                                }
+                                disabled={
+                                  readRequiredByWrite ||
+                                  staffManagementLocksReadRole
+                                }
+                              />
+                              <FormLabel
+                                htmlFor={`perm-${perm.id}`}
+                                className="capitalize cursor-pointer flex-1"
+                                title={
+                                  readRequiredByWrite
+                                    ? "Required when Create, Edit, Update, Delete, Resend or Send is enabled in this group"
+                                    : staffManagementLocksReadRole
+                                      ? "Required while any Staff Management permission is enabled"
+                                      : undefined
+                                }
                               >
-                                <Switch
-                                  id={`perm-${perm.id}`}
-                                  checked={selectedPermissions.includes(
-                                    perm.id
-                                  )}
-                                  onCheckedChange={(checked) =>
-                                    updatePermissionSelections(
-                                      perm.id!,
-                                      checked
-                                    )
-                                  }
-                                />
-                                <FormLabel
-                                  htmlFor={`perm-${perm.id}`}
-                                  className="capitalize cursor-pointer flex-1"
-                                >
-                                  {perm.label}
-                                </FormLabel>
-                              </div>
-                            )
-                        )}
+                                {perm.label}
+                              </FormLabel>
+                            </div>
+                          );
+                        })}
                       </div>
                     </div>
                   ))}

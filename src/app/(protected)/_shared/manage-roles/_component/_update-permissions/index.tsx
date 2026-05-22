@@ -133,29 +133,6 @@ export default function PermissionsDialog({
     setDisplayPermissions(transformedGroups);
   }, [permissionsData, open]);
 
-  // Update permission state when role data is loaded
-  useEffect(() => {
-    if (!roleData || !displayPermissions.length) return;
-
-    // Create a set of existing permission slugs for quick lookup
-    const existingPermSlugs = new Set(
-      roleData.permissions ? roleData.permissions.map((p) => p.slug) : []
-    );
-
-    // Initialize permission state - only set true for existing permissions
-    const initialState: { [key: string]: boolean } = {};
-    displayPermissions.forEach((group) => {
-      group.permissions.forEach((perm) => {
-        initialState[perm.id?.toString() || perm.slug] = existingPermSlugs.has(
-          perm.slug
-        );
-      });
-    });
-
-    setPermissionState(initialState);
-    updateAllCheckedState(initialState);
-  }, [roleData, displayPermissions]);
-
   // Update the "all checked" state
   const updateAllCheckedState = (state: { [key: string]: boolean }) => {
     const permValues = Object.values(state);
@@ -223,6 +200,101 @@ export default function PermissionsDialog({
       candidates[0];
     return getPermKey(best);
   };
+
+  const findPermissionByKey = (
+    permKey: string,
+  ): PermissionItem | undefined => {
+    for (const group of displayPermissions) {
+      for (const p of group.permissions) {
+        if (getPermKey(p) === permKey) return p;
+      }
+    }
+    return undefined;
+  };
+
+  /** Staff UI/API needs roles readable; backend aligns with read-role-permission. */
+  const STAFF_ACTION_SLUGS = new Set([
+    "read-staff",
+    "create-staff",
+    "update-staff",
+    "delete-staff",
+    "change-staff-status",
+  ]);
+
+  const isStaffManagementPermission = (perm: PermissionItem) => {
+    const slug = normalizePermText(perm.slug);
+    if (!slug) return false;
+    if (STAFF_ACTION_SLUGS.has(slug)) return true;
+    return (
+      slug.includes("staff") &&
+      (slug.includes("read") ||
+        slug.includes("create") ||
+        slug.includes("update") ||
+        slug.includes("delete") ||
+        slug.includes("change"))
+    );
+  };
+
+  const findReadRolePermissionKey = (): string | null => {
+    for (const group of displayPermissions) {
+      for (const p of group.permissions) {
+        const slug = normalizePermText(p.slug);
+        if (
+          slug === "read-role-permission" ||
+          (slug.includes("read") && slug.includes("role") && slug.includes("permission"))
+        ) {
+          return getPermKey(p);
+        }
+      }
+    }
+    return null;
+  };
+
+  const isReadRolePermissionKey = (permKey: string) => {
+    const p = findPermissionByKey(permKey);
+    if (!p) return false;
+    const slug = normalizePermText(p.slug);
+    return (
+      slug === "read-role-permission" ||
+      (slug.includes("read") && slug.includes("role") && slug.includes("permission"))
+    );
+  };
+
+  const isStaffManagementEnabled = (state: { [key: string]: boolean }) => {
+    for (const group of displayPermissions) {
+      for (const p of group.permissions) {
+        if (!isStaffManagementPermission(p)) continue;
+        if (state[getPermKey(p)] === true) return true;
+      }
+    }
+    return false;
+  };
+
+  // Update permission state when role data is loaded (after helpers: staff → read role)
+  useEffect(() => {
+    if (!roleData || !displayPermissions.length) return;
+
+    const existingPermSlugs = new Set(
+      roleData.permissions ? roleData.permissions.map((p) => p.slug) : [],
+    );
+
+    const initialState: { [key: string]: boolean } = {};
+    displayPermissions.forEach((group) => {
+      group.permissions.forEach((perm) => {
+        initialState[perm.id?.toString() || perm.slug] = existingPermSlugs.has(
+          perm.slug,
+        );
+      });
+    });
+
+    if (isStaffManagementEnabled(initialState)) {
+      const readRoleKey = findReadRolePermissionKey();
+      if (readRoleKey) initialState[readRoleKey] = true;
+    }
+
+    setPermissionState(initialState);
+    updateAllCheckedState(initialState);
+  }, [roleData, displayPermissions]);
 
   const isCreateEventPermission = (perm: PermissionItem) => {
     const slug = normalizePermText(perm.slug);
@@ -310,6 +382,12 @@ export default function PermissionsDialog({
       const newState = { ...prev, [permId]: !prev[permId] };
 
       if (isEnabling) {
+        const toggledPerm = findPermissionByKey(permId);
+        if (toggledPerm && isStaffManagementPermission(toggledPerm)) {
+          const readRoleKey = findReadRolePermissionKey();
+          if (readRoleKey) newState[readRoleKey] = true;
+        }
+
         for (const group of displayPermissions) {
           const perm = group.permissions.find((p) => getPermKey(p) === permId);
           if (!perm || !isWriteAction(perm)) continue;
@@ -341,6 +419,13 @@ export default function PermissionsDialog({
         // Prevent disabling read-category while event-management remains enabled.
         if (isReadEventCategoryPermissionKey(permId)) {
           if (isEventManagementEnabled(prev)) {
+            return prev;
+          }
+        }
+
+        // Prevent disabling read-role-permission while any staff permission is enabled.
+        if (isReadRolePermissionKey(permId)) {
+          if (isStaffManagementEnabled(prev)) {
             return prev;
           }
         }
@@ -558,6 +643,9 @@ export default function PermissionsDialog({
                       const eventSystemLocksReadCategory =
                         isReadEventCategoryPermissionKey(permKey) &&
                         isEventManagementEnabled(permissionState);
+                      const staffManagementLocksReadRole =
+                        isReadRolePermissionKey(permKey) &&
+                        isStaffManagementEnabled(permissionState);
                       return (
                         <div
                           key={perm.id || perm.slug}
@@ -570,7 +658,8 @@ export default function PermissionsDialog({
                             disabled={
                               isDefault ||
                               readRequiredByWrite ||
-                              eventSystemLocksReadCategory
+                              eventSystemLocksReadCategory ||
+                              staffManagementLocksReadRole
                             }
                             className="data-[state=checked]:bg-[var(--color-primary)] shrink-0"
                           />
@@ -582,7 +671,9 @@ export default function PermissionsDialog({
                                 ? "Required when Create, Edit, Update, Delete, Resend or Send is enabled"
                                 : eventSystemLocksReadCategory
                                   ? "Required while Event Management permissions are enabled"
-                                : undefined
+                                  : staffManagementLocksReadRole
+                                    ? "Required while any Staff Management permission is enabled"
+                                    : undefined
                             }
                           >
                             {perm.label}

@@ -14,6 +14,7 @@ import {
   AI_ONBOARDING_APPLY_STEPS,
   applyAIGeneratedOnboardingContent,
 } from "../../_lib/apply-ai-onboarding-content";
+import { clearAIBulkApplyStarted } from "../../_lib/ai-bulk-apply-session-flag";
 
 const themeAccent = {
   text: { color: `var(--color-primary, #3b82f6)` } as React.CSSProperties,
@@ -82,14 +83,10 @@ export default function AIAutoApply({
         latestRef.current.onComplete();
       } catch (error) {
         console.error("Error applying AI content:", error);
-        toast.error(
-          error instanceof Error
-            ? error.message
-            : "Failed to apply content. Please try again.",
-        );
         latestRef.current.onApplyFailed();
       } finally {
         setApplyStep(-1);
+        clearAIBulkApplyStarted();
       }
     };
 

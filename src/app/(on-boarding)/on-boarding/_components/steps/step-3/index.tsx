@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useCallback, useEffect, useMemo } from "react";
-import { useForm, useFieldArray, Controller, useWatch } from "react-hook-form";
+import { useForm, Controller, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
   Form,
@@ -16,7 +16,6 @@ import { Button } from "@/components/ui/button";
 import { FileUploader } from "@/components/ui/file-uploader";
 import { useFormContext } from "../../form-provider";
 import CategoryDropdown from "./event-category";
-import EventScheduler from "./event-schedular";
 import { stepThreeSchema, StepThreeType } from "../../form-provider/schema";
 import { CardHeader, CardContent, OnboardingCard } from "@/components/ui/card";
 import {
@@ -36,7 +35,7 @@ import { cn } from "@/lib/utils";
 import {
   BANNER_HEADING_MAX_WORDS,
   countWords,
-  truncateToMaxWords,
+  truncateToMaxWordsForInput,
 } from "@/lib/word-count";
 import { useGuidedOnboardingSections } from "../../../_lib/hooks/use-guided-onboarding-sections";
 import type { GuidedSectionConfig } from "../../../_lib/hooks/use-guided-onboarding-sections";
@@ -49,9 +48,9 @@ import { guidedSectionSurfaceClass } from "../../guided-section-surface";
 import { GuidedSectionTitleBar } from "../../guided-section-title-bar";
 
 function resolveStepThreeErrorIndex(keys: string[]) {
-  if (keys.some((k) => k === "__extra_validation__")) return 1;
+  if (keys.some((k) => k === "__extra_validation__")) return 0;
   if (keys.some((k) => k === "event_name" || k === "event_category_id"))
-    return 0;
+    return 2;
   if (
     keys.some(
       (k) =>
@@ -61,9 +60,9 @@ function resolveStepThreeErrorIndex(keys: string[]) {
         k === "event_banner_video",
     )
   )
-    return 1;
-  if (keys.some((k) => k.startsWith("about_event"))) return 2;
-  return 3;
+    return 0;
+  if (keys.some((k) => k.startsWith("about_event"))) return 1;
+  return 0;
 }
 
 export default function StepThree() {
@@ -135,24 +134,10 @@ export default function StepThree() {
         globalForm.getValues("stepThree.about_event_sub_heading") || "",
       about_event_description:
         globalForm.getValues("stepThree.about_event_description") || "",
-      event_schedular_title:
-        globalForm.getValues("stepThree.event_schedular_title") || "",
-      event_schedular: globalForm.getValues("stepThree.event_schedular") || [
-        { title: "", time: "" },
-      ],
       remove_event_banner_image: false,
       remove_event_banner_video: false,
     },
     mode: "onChange",
-  });
-
-  const {
-    fields: schedulerFields,
-    append: appendScheduler,
-    remove: removeScheduler,
-  } = useFieldArray({
-    control: form.control,
-    name: "event_schedular",
   });
 
   // Get the current event category name based on the selected category ID
@@ -221,12 +206,6 @@ export default function StepThree() {
   const sectionConfigs = useMemo((): GuidedSectionConfig<StepThreeType>[] => {
     return [
       {
-        id: "event-details",
-        label: "Event details",
-        description: "Event name and category.",
-        fields: ["event_name", "event_category_id"],
-      },
-      {
         id: "event-hero",
         label: "Banner",
         description: "Cover image or video and banner headings.",
@@ -264,10 +243,10 @@ export default function StepThree() {
         ],
       },
       {
-        id: "schedule",
-        label: "Schedule",
-        description: "Scheduler title and time slots.",
-        fields: ["event_schedular_title", "event_schedular"],
+        id: "event-details",
+        label: "Event details",
+        description: "Backend event identifier and category.",
+        fields: ["event_name", "event_category_id"],
       },
     ];
   }, [
@@ -435,12 +414,6 @@ export default function StepThree() {
     [globalForm, form, setBannerVideoFile, setBannerVideoUrl, setBannerType],
   );
 
-  useEffect(() => {
-    if (schedulerFields.length === 0) {
-      appendScheduler({ title: "", time: "" });
-    }
-  }, [schedulerFields, appendScheduler]);
-
   // Cleanup object URLs when component unmounts
   useEffect(() => {
     const objectUrls: string[] = [];
@@ -491,7 +464,6 @@ export default function StepThree() {
         "about_event_heading",
         "about_event_sub_heading",
         "about_event_description",
-        "event_schedular_title",
       ];
 
       const missingFields = requiredFields.filter(
@@ -511,37 +483,6 @@ export default function StepThree() {
         return;
       }
 
-      // Validate event scheduler times
-      if (data.event_schedular && data.event_schedular.length > 0) {
-        // Check for sequence
-        const validSchedules = data.event_schedular.filter(
-          (schedule) => schedule.time && schedule.title,
-        );
-        for (let i = 0; i < validSchedules.length - 1; i++) {
-          const currentTime = validSchedules[i].time;
-          const nextTime = validSchedules[i + 1].time;
-
-          if (!currentTime || !nextTime) continue;
-
-          const [currentHours, currentMinutes] = currentTime
-            .split(":")
-            .map(Number);
-          const [nextHours, nextMinutes] = nextTime.split(":").map(Number);
-
-          const currentTotalMinutes = currentHours * 60 + currentMinutes;
-          const nextTotalMinutes = nextHours * 60 + nextMinutes;
-
-          if (nextTotalMinutes <= currentTotalMinutes) {
-            toast.error("Event times must be in ascending order.", {
-              description: "Please arrange the times from earliest to latest.",
-              duration: 5000,
-            });
-            setLoading(false);
-            return;
-          }
-        }
-      }
-
       // Create a mapping of field names to user-friendly labels
       const fieldLabels: Record<string, string> = {
         event_name: "Event Name",
@@ -552,8 +493,6 @@ export default function StepThree() {
         about_event_heading: "About Event Heading",
         about_event_sub_heading: "About Event Sub Heading",
         about_event_description: "About Event Description",
-        event_schedular_title: "Event Scheduler Title",
-        event_schedular: "Event Schedule",
         gallery: "Gallery Images",
       };
 
@@ -711,141 +650,22 @@ export default function StepThree() {
                 e.preventDefault();
                 void handleContinue();
               }}
-              className="space-y-6"
+              className="flex flex-col gap-6"
             >
               <input type="hidden" {...form.register("step")} />
               <input type="hidden" {...form.register("vendor_location_id")} />
-
-              <section
-                data-guided-section="event-details"
-                tabIndex={-1}
-                className={guidedSectionSurfaceClass(
-                  guided.allSectionsApproved ||
-                    guided.currentSectionIndex === 0,
-                  "mb-6",
-                )}
-              >
-                <GuidedSectionTitleBar
-                  sectionIndex={0}
-                  sectionId="event-details"
-                  guided={guided}
-                  title="Event details"
-                />
-                <fieldset
-                  disabled={
-                    !guided.allSectionsApproved &&
-                    guided.currentSectionIndex !== 0
-                  }
-                  className={cn(
-                    "min-w-0 border-0 p-0 m-0",
-                    !guided.allSectionsApproved &&
-                      guided.currentSectionIndex !== 0 &&
-                      "pointer-events-none",
-                  )}
-                >
-                  <div className="mt-4 space-y-4">
-                    {/* Event Name field */}
-                    <FormField
-                      control={form.control}
-                      name="event_name"
-                      render={({ field }) => {
-                        const currentLength = field.value?.length || 0;
-                        const maxLength = 40;
-                        return (
-                          <FormItem>
-                            <FormLabel className="text-md font-medium">
-                              Event Name <span className="text-red-400">*</span>
-                            </FormLabel>
-                            <FormControl>
-                              <Input
-                                placeholder="Enter your event name"
-                                {...field}
-                                value={
-                                  typeof field.value === "string"
-                                    ? field.value
-                                    : ""
-                                }
-                                maxLength={maxLength}
-                                onFocus={() => handleFieldFocus("event_name")}
-                                onChange={(e) => {
-                                  field.onChange(e);
-                                  globalForm.setValue(
-                                    "stepThree.event_name",
-                                    e.target.value,
-                                  );
-                                }}
-                              />
-                            </FormControl>
-                            <div className="text-xs text-muted-foreground mt-1">
-                              <span
-                                className={
-                                  currentLength > maxLength
-                                    ? "text-destructive"
-                                    : ""
-                                }
-                              >
-                                {currentLength}/{maxLength} characters
-                              </span>
-                            </div>
-                            <FormMessage />
-                          </FormItem>
-                        );
-                      }}
-                    />
-
-                    {/* Event Category field */}
-                    <Controller
-                      control={form.control}
-                      name="event_category_id"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel className="text-md font-medium">
-                            Event Category
-                          </FormLabel>
-                          <FormControl>
-                            <CategoryDropdown
-                              categories={eventCategories}
-                              onSelect={(value) => {
-                                field.onChange(Number(value));
-                                globalForm.setValue(
-                                  "stepThree.event_category_id",
-                                  Number(value),
-                                );
-                              }}
-                              isLoading={isCategoriesLoading}
-                              initialValue={initialCategoryId}
-                              onCategoryCreated={handleCategoryCreated}
-                            />
-                          </FormControl>
-                          {form.formState.errors.event_category_id && (
-                            <FormMessage>
-                              {form.formState.errors.event_category_id.message}
-                            </FormMessage>
-                          )}
-                        </FormItem>
-                      )}
-                    />
-                  </div>
-                  <GuidedSectionActionFooter
-                    isActive={guided.currentSectionIndex === 0}
-                    hideSectionMeta
-                  >
-                    <GuidedSectionCoreActions guided={guided} />
-                  </GuidedSectionActionFooter>
-                </fieldset>
-              </section>
 
               <section
                 data-guided-section="event-hero"
                 tabIndex={-1}
                 className={guidedSectionSurfaceClass(
                   guided.allSectionsApproved ||
-                    guided.currentSectionIndex === 1,
-                  "space-y-6",
+                    guided.currentSectionIndex === 0,
+                  "space-y-6 order-1",
                 )}
               >
                 <GuidedSectionTitleBar
-                  sectionIndex={1}
+                  sectionIndex={0}
                   sectionId="event-hero"
                   guided={guided}
                   title="Banner"
@@ -853,12 +673,12 @@ export default function StepThree() {
                 <fieldset
                   disabled={
                     !guided.allSectionsApproved &&
-                    guided.currentSectionIndex !== 1
+                    guided.currentSectionIndex !== 0
                   }
                   className={cn(
                     "min-w-0 border-0 p-0 m-0 space-y-6",
                     !guided.allSectionsApproved &&
-                      guided.currentSectionIndex !== 1 &&
+                      guided.currentSectionIndex !== 0 &&
                       "pointer-events-none",
                   )}
                 >
@@ -922,7 +742,7 @@ export default function StepThree() {
                                         )
                                       }
                                       maxFileCount={1}
-                                      maxSize={2 * 1024 * 1024}
+                                      maxSize={10 * 1024 * 1024}
                                       onRemove={() =>
                                         handleRemoveHeaderBanner(field.onChange)
                                       }
@@ -1004,7 +824,7 @@ export default function StepThree() {
                                         )
                                       }
                                       maxFileCount={1}
-                                      maxSize={10 * 1024 * 1024} // 10MB for banner video
+                                      maxSize={50 * 1024 * 1024}
                                       onRemove={() =>
                                         handleRemoveBannerVideo(field.onChange)
                                       }
@@ -1026,7 +846,7 @@ export default function StepThree() {
                                       <p className="mt-2 text-sm text-muted-foreground">
                                         Upload a banner video for your event
                                         header (MP4, WebM, or OGG format, max
-                                        10MB)
+                                        50MB)
                                       </p>
                                       <div className="w-full mt-3">
                                         <VideoFormatInfo variant="compact" />
@@ -1069,7 +889,7 @@ export default function StepThree() {
                                 handleFieldFocus("event_banner_heading")
                               }
                               onChange={(e) => {
-                                const next = truncateToMaxWords(
+                                const next = truncateToMaxWordsForInput(
                                   e.target.value,
                                   BANNER_HEADING_MAX_WORDS,
                                 );
@@ -1144,7 +964,7 @@ export default function StepThree() {
                     }}
                   />
                   <GuidedSectionActionFooter
-                    isActive={guided.currentSectionIndex === 1}
+                    isActive={guided.currentSectionIndex === 0}
                     hideSectionMeta
                   >
                     <GuidedSectionCoreActions guided={guided} />
@@ -1157,12 +977,12 @@ export default function StepThree() {
                 tabIndex={-1}
                 className={guidedSectionSurfaceClass(
                   guided.allSectionsApproved ||
-                    guided.currentSectionIndex === 2,
-                  "space-y-4",
+                    guided.currentSectionIndex === 1,
+                  "space-y-4 order-2",
                 )}
               >
                 <GuidedSectionTitleBar
-                  sectionIndex={2}
+                  sectionIndex={1}
                   sectionId="about-event"
                   guided={guided}
                   title="About the event"
@@ -1170,12 +990,12 @@ export default function StepThree() {
                 <fieldset
                   disabled={
                     !guided.allSectionsApproved &&
-                    guided.currentSectionIndex !== 2
+                    guided.currentSectionIndex !== 1
                   }
                   className={cn(
                     "min-w-0 border-0 p-0 m-0 space-y-4",
                     !guided.allSectionsApproved &&
-                      guided.currentSectionIndex !== 2 &&
+                      guided.currentSectionIndex !== 1 &&
                       "pointer-events-none",
                   )}
                 >
@@ -1329,7 +1149,7 @@ export default function StepThree() {
                     )}
                   />
                   <GuidedSectionActionFooter
-                    isActive={guided.currentSectionIndex === 2}
+                    isActive={guided.currentSectionIndex === 1}
                     hideSectionMeta
                   >
                     <GuidedSectionCoreActions guided={guided} />
@@ -1338,91 +1158,118 @@ export default function StepThree() {
               </section>
 
               <section
-                data-guided-section="schedule"
+                data-guided-section="event-details"
                 tabIndex={-1}
                 className={guidedSectionSurfaceClass(
                   guided.allSectionsApproved ||
-                    guided.currentSectionIndex === 3,
-                  "space-y-6",
+                    guided.currentSectionIndex === 2,
+                  "mb-6 order-3 border border-white/10 bg-white/[0.03] rounded-lg p-4",
                 )}
               >
                 <GuidedSectionTitleBar
-                  sectionIndex={3}
-                  sectionId="schedule"
+                  sectionIndex={2}
+                  sectionId="event-details"
                   guided={guided}
-                  title="Schedule"
+                  title="How shall we categorise this event for you?"
                 />
                 <fieldset
                   disabled={
                     !guided.allSectionsApproved &&
-                    guided.currentSectionIndex !== 3
+                    guided.currentSectionIndex !== 2
                   }
                   className={cn(
-                    "min-w-0 border-0 p-0 m-0 space-y-6",
+                    "min-w-0 border-0 p-0 m-0",
                     !guided.allSectionsApproved &&
-                      guided.currentSectionIndex !== 3 &&
+                      guided.currentSectionIndex !== 2 &&
                       "pointer-events-none",
                   )}
                 >
-                  <FormField
-                    control={form.control}
-                    name="event_schedular_title"
-                    render={({ field }) => {
-                      const currentLength = field.value?.length || 0;
-                      const maxLength = 40;
-                      return (
-                        <FormItem>
-                          <OnboardingFieldGroupTitle>
-                            Event Scheduler Title
-                          </OnboardingFieldGroupTitle>
-                          <FormControl>
-                            <Input
-                              id="event-schedular-title"
-                              placeholder="e.g. Event Night"
-                              {...field}
-                              maxLength={maxLength}
-                              onFocus={() =>
-                                handleFieldFocus("event_schedular_title")
-                              }
-                              onKeyDown={(e) => {
-                                if (e.key === "Enter") {
-                                  e.preventDefault();
-                                  e.stopPropagation();
+                  <div className="mt-4 space-y-4">
+                    <FormField
+                      control={form.control}
+                      name="event_name"
+                      render={({ field }) => {
+                        const currentLength = field.value?.length || 0;
+                        const maxLength = 40;
+                        return (
+                          <FormItem>
+                            <FormLabel className="text-md font-medium">
+                              What is the unique event identifier?{" "}
+                              <span className="text-red-400">*</span>
+                            </FormLabel>
+                            <FormControl>
+                              <Input
+                                placeholder="Ie Christmas Events 2026"
+                                {...field}
+                                value={
+                                  typeof field.value === "string"
+                                    ? field.value
+                                    : ""
                                 }
-                              }}
-                              onChange={(e) => {
-                                field.onChange(e);
+                                maxLength={maxLength}
+                                onFocus={() => handleFieldFocus("event_name")}
+                                onChange={(e) => {
+                                  field.onChange(e);
+                                  globalForm.setValue(
+                                    "stepThree.event_name",
+                                    e.target.value,
+                                  );
+                                }}
+                              />
+                            </FormControl>
+                            <div className="text-xs text-muted-foreground mt-1">
+                              <p className="mb-1">
+                                Example helper text: Ie Christmas Events 2026
+                              </p>
+                              <span
+                                className={
+                                  currentLength > maxLength
+                                    ? "text-destructive"
+                                    : ""
+                                }
+                              >
+                                {currentLength}/{maxLength} characters
+                              </span>
+                            </div>
+                            <FormMessage />
+                          </FormItem>
+                        );
+                      }}
+                    />
+                    <Controller
+                      control={form.control}
+                      name="event_category_id"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-md font-medium">
+                            Event Category
+                          </FormLabel>
+                          <FormControl>
+                            <CategoryDropdown
+                              categories={eventCategories}
+                              onSelect={(value) => {
+                                field.onChange(Number(value));
                                 globalForm.setValue(
-                                  "stepThree.event_schedular_title",
-                                  e.target.value,
+                                  "stepThree.event_category_id",
+                                  Number(value),
                                 );
                               }}
+                              isLoading={isCategoriesLoading}
+                              initialValue={initialCategoryId}
+                              onCategoryCreated={handleCategoryCreated}
                             />
                           </FormControl>
-                          <div className="text-xs text-muted-foreground mt-1">
-                            <span
-                              className={
-                                currentLength > maxLength
-                                  ? "text-destructive"
-                                  : ""
-                              }
-                            >
-                              {currentLength}/{maxLength} characters
-                            </span>
-                          </div>
-                          <FormMessage />
+                          {form.formState.errors.event_category_id && (
+                            <FormMessage>
+                              {form.formState.errors.event_category_id.message}
+                            </FormMessage>
+                          )}
                         </FormItem>
-                      );
-                    }}
-                  />
-                  <EventScheduler
-                    control={form.control}
-                    fields={schedulerFields}
-                    append={appendScheduler}
-                    remove={removeScheduler}
-                  />
+                      )}
+                    />
+                  </div>
                   <GuidedSectionActionFooter
-                    isActive={guided.currentSectionIndex === 3}
+                    isActive={guided.currentSectionIndex === 2}
                     hideSectionMeta
                   >
                     <GuidedSectionCoreActions guided={guided} />
@@ -1434,6 +1281,7 @@ export default function StepThree() {
                 allSectionsApproved={guided.allSectionsApproved}
                 loading={loading}
                 onContinue={() => void handleContinue()}
+                className="order-4"
               />
             </form>
           </Form>

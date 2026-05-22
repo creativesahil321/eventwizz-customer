@@ -52,6 +52,8 @@ interface TiptapEditorProps {
   };
   showAIButton?: boolean;
   wrapText?: boolean;
+  /** When true, the editor is view-only (no toolbar, no edits). */
+  readOnly?: boolean;
 }
 
 export function TiptapEditor({
@@ -64,6 +66,7 @@ export function TiptapEditor({
   aiContext,
   showAIButton = true,
   wrapText = false,
+  readOnly = false,
 }: TiptapEditorProps) {
   const [isLinkDialogOpen, setIsLinkDialogOpen] = useState(false);
   const [linkUrl, setLinkUrl] = useState("");
@@ -105,6 +108,7 @@ export function TiptapEditor({
       const html = editor.getHTML();
       onChange(html); // Ensure onChange is called on updates
     },
+    editable: !readOnly,
     immediatelyRender: false,
     editorProps: {
       attributes: {
@@ -123,6 +127,10 @@ export function TiptapEditor({
       editor.commands.setContent(value);
     }
   }, [editor, value]);
+
+  React.useEffect(() => {
+    editor?.setEditable(!readOnly);
+  }, [editor, readOnly]);
 
   const setLink = () => {
     if (!linkUrl) return;
@@ -189,6 +197,7 @@ export function TiptapEditor({
   return (
     <div className="relative w-full">
       <div className="min-h-[120px] w-full rounded-md border border-input bg-background overflow-hidden">
+        {!readOnly && (
         <div className="flex flex-wrap gap-1 p-1 border-b border-input bg-background">
           <Toggle
             size="sm"
@@ -301,6 +310,7 @@ export function TiptapEditor({
             </Button>
           )}
         </div>
+        )}
         <EditorContent
           editor={editor}
           className="px-3 py-2 overflow-x-hidden max-w-full"

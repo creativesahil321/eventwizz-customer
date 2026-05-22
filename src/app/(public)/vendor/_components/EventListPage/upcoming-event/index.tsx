@@ -1,6 +1,9 @@
 "use client";
 
-import { getEventCardDateLabel } from "../event-card-utils";
+import {
+  getEventCardCategoryLabel,
+  getEventCardDateLabel,
+} from "../event-card-utils";
 import { LocationEventCard } from "../location-event-card";
 import { useMemo, useContext, useState } from "react";
 import { cn } from "@/lib/utils";
@@ -57,6 +60,7 @@ export default function UpcomingEvents({
           ? formatMoneyCompact(Number(event.lowest_price), currencySym)
           : null,
       dateLabel: getEventCardDateLabel(event),
+      category: getEventCardCategoryLabel(event),
       image: event.banner_image || eventImages[0],
       slug: event.slug || "",
     }));

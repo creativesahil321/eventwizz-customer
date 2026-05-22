@@ -14,6 +14,8 @@ export interface EmailLogItem {
   email_to: string;
   subject: string;
   content: string;
+  attachments?: string[];
+  attachments_count?: number;
   type: "automatic" | "manual";
   role: string;
   status: "Success" | "Pending" | "Processing" | "Failed";

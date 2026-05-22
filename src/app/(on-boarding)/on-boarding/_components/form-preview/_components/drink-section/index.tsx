@@ -1,11 +1,10 @@
 "use client";
 
-import { Button } from "@/components/ui/button";
 import { useState, useEffect } from "react";
 import { useDrinkSelectionStore } from "@/store/drink-selection.store";
 import { useHydration } from "@/hooks/useHydration";
-import { ChevronDown, ChevronUp } from "lucide-react";
 import { useCurrencyFormat } from "@/hooks/use-currency-format";
+import { Button } from "@/components/ui/button";
 
 type DrinkPackage = {
   id?: number; // Optional for backward compatibility, but should always be present from API
@@ -32,7 +31,7 @@ export default function DrinkSection({
   defaultExpanded = true,
 }: DrinkSectionProps) {
   const { format: formatMoney } = useCurrencyFormat();
-  const [showMore, setShowMore] = useState(defaultExpanded);
+  const [showMore] = useState(defaultExpanded);
   const isHydrated = useHydration(); // Professional hydration handling
   const {
     addDrink,
@@ -117,22 +116,6 @@ export default function DrinkSection({
             </span>
           </div>
         )}
-        <section className="w-full flex items-center justify-center mt-4 sm:mt-6">
-          <Button
-            variant="event-primary"
-            onClick={() => {
-              setShowMore(!showMore);
-            }}
-            className="flex items-center gap-2 text-sm sm:text-base px-4 sm:px-6 py-2 sm:py-2.5 w-full sm:w-auto"
-          >
-            View Package List
-            {showMore ? (
-              <ChevronUp className="h-4 w-4" />
-            ) : (
-              <ChevronDown className="h-4 w-4" />
-            )}
-          </Button>
-        </section>
         <section className="flex w-full flex-col space-y-4 sm:space-y-6 mt-4 sm:mt-6 overflow-hidden text-left">
           {showMore &&
             filteredPackages?.length > 0 &&

@@ -27,6 +27,10 @@ export interface AIOnboardingInput {
   email: string;
   /** When true, venueName is the brand / primary Google place for a multi-location business. */
   has_multiple_locations?: boolean;
+  /** Whether venue operates multiple event spaces / room system. */
+  has_room_system?: boolean;
+  /** Optional room names used when has_room_system is true. */
+  room_names?: string[];
   eventType?: string;
   guestCount?: string;
   priceRange?: string;
@@ -59,15 +63,17 @@ export interface AIDate {
   deposit_due_date?: string;
 }
 
+export interface AIRoomDates {
+  room_name: string;
+  dates: AIDate[];
+}
+
 export interface AIGeneratedContent {
   stepTwo: {
     banner_heading: string;
     banner_sub_heading: string;
     about_title: string;
     about_description: string;
-    about_link_title: string;
-    /** URL or path for the landing CTA; optional for older cached responses */
-    about_cta_link?: string;
   };
   stepThree: {
     event_name: string;
@@ -76,17 +82,20 @@ export interface AIGeneratedContent {
     about_event_heading: string;
     about_event_sub_heading: string;
     about_event_description: string;
-    event_schedular_title: string;
-    event_schedular: Array<{ title: string; time: string }>;
   };
   stepFour: {
     package_title: string;
     package_description: string;
     package_button_name: string;
     package_details: Array<{ title: string }>;
+    event_schedular_title: string;
+    event_schedule_subtitle?: string;
+    event_schedular_custom_copy?: string;
+    event_schedular: Array<{ title: string; time: string }>;
   };
   stepFive: {
     dates: AIDate[];
+    rooms?: AIRoomDates[];
   };
   stepSix: {
     menu_title: string;
@@ -150,9 +159,10 @@ CRITICAL RULES:
 9. IMPORTANT: If the vendor provides specific details about tickets, tables, pricing, seating, food, or capacity in the "Additional Info", use those EXACT numbers and specifications in stepFive (dates/tickets/tables), stepSix (menu), and stepSeven (drinks). Always honor the vendor's stated preferences over defaults.
 10. For dates with booking_type "tables" or "both": include payment_type ("full" or "deposit"). If deposit is used, set is_deposit_enabled true and include deposit_type ("amount" or "percentage"), deposit_value (e.g. "50" for £50 or "25" for 25%), and deposit_due_date (YYYY-MM-DD, before event_date).
 11. stepFive.dates: event_date must be YYYY-MM-DD. List dates in chronological ascending order (earliest first). No duplicate event_dates. Each event_date should be today or in the future.
-11. stepSix (menu) is OPTIONAL: some venues have no catering. If the venue type or vendor info suggests no food/catering, set menus to an empty array [] and keep menu_title/menu_description short; the vendor can also remove the menu section in review.
-12. stepSeven (drinks) is OPTIONAL: some venues have no drink packages. If the venue type or vendor info suggests no drinks/beverage packages, set packages to an empty array [] and keep drink_title/drink_description short; the vendor can also remove the drinks section in review.
-13. stepNine.faqs: include at most ${STEP_NINE_MAX_FAQS} FAQ objects (hard limit). Prefer 5–8 high-quality FAQs over many short ones. Never return more than ${STEP_NINE_MAX_FAQS} items.`;
+12. If room system is "Yes", include stepFive.rooms with one object per provided room_name. Each room must have its own dates array (can differ by room).
+13. stepSix (menu) is OPTIONAL: some venues have no catering. If the venue type or vendor info suggests no food/catering, set menus to an empty array [] and keep menu_title/menu_description short; the vendor can also remove the menu section in review.
+14. stepSeven (drinks) is OPTIONAL: some venues have no drink packages. If the venue type or vendor info suggests no drinks/beverage packages, set packages to an empty array [] and keep drink_title/drink_description short; the vendor can also remove the drinks section in review.
+15. stepNine.faqs: include at most ${STEP_NINE_MAX_FAQS} FAQ objects (hard limit). Prefer 5–8 high-quality FAQs over many short ones. Never return more than ${STEP_NINE_MAX_FAQS} items.`;
 
     const businessContext =
       input.has_multiple_locations === true
@@ -171,6 +181,9 @@ ${input.eventType ? `- Event Type: "${input.eventType}"` : ""}
 ${input.guestCount ? `- Typical Guest Count: "${input.guestCount}"` : ""}
 ${input.priceRange ? `- Price Range: "${input.priceRange}"` : ""}
 ${input.description ? `\nVENDOR'S DETAILED REQUIREMENTS (USE THESE EXACT SPECS FOR TICKETS/TABLES/PRICING):\n"${input.description}"` : ""}
+- Room system (multiple event spaces): "${input.has_room_system === true ? "Yes" : "No"}"
+${input.has_room_system === true ? `- Room names: "${(input.room_names ?? []).join(", ")}"` : ""}
+- StepFive room output rule: ${input.has_room_system === true ? "Include stepFive.rooms with one entry per room_name and room-specific dates" : "Return stepFive.rooms as []"}
 
 Generate this EXACT JSON structure:
 
@@ -179,9 +192,7 @@ Generate this EXACT JSON structure:
     "banner_heading": "string (max 30 words, compelling headline for landing page)",
     "banner_sub_heading": "string (max 80 chars, engaging tagline)",
     "about_title": "string (max 40 chars, title for about section)",
-    "about_description": "string (max 340 chars / 50 words, professional about text, no HTML)",
-    "about_link_title": "string (max 18 chars, CTA button text like 'Explore Events')",
-    "about_cta_link": "string (max 2048 chars, full URL or site path for that CTA, e.g. https://example.com/events or /events)"
+    "about_description": "string (max 340 chars / 50 words, professional about text, no HTML)"
   },
   "stepThree": {
     "event_name": "string (max 40 chars, name for the main event)",
@@ -189,14 +200,7 @@ Generate this EXACT JSON structure:
     "event_banner_sub_heading": "string (max 80 chars, event page banner subheading)",
     "about_event_heading": "string (max 50 chars, about event section heading)",
     "about_event_sub_heading": "string (max 80 chars, about event section subheading)",
-    "about_event_description": "string (max 340 chars, event description, no HTML)",
-    "event_schedular_title": "string (max 40 chars, schedule section title)",
-    "event_schedular": [
-      {"title": "string (max 40 chars)", "time": "HH:mm"},
-      {"title": "string (max 40 chars)", "time": "HH:mm"},
-      {"title": "string (max 40 chars)", "time": "HH:mm"},
-      {"title": "string (max 40 chars)", "time": "HH:mm"}
-    ]
+    "about_event_description": "string (max 340 chars, event description, no HTML)"
   },
   "stepFour": {
     "package_title": "string (max 40 chars, packages section title)",
@@ -208,6 +212,14 @@ Generate this EXACT JSON structure:
       {"title": "string (max 40 chars, package feature)"},
       {"title": "string (max 40 chars, package feature)"},
       {"title": "string (max 40 chars, package feature)"}
+    ],
+    "event_schedular_title": "string (max 40 chars, timeline section title)",
+    "event_schedule_subtitle": "string (optional, max 160 chars)",
+    "event_schedular": [
+      {"title": "string (max 40 chars)", "time": "HH:mm"},
+      {"title": "string (max 40 chars)", "time": "HH:mm"},
+      {"title": "string (max 40 chars)", "time": "HH:mm"},
+      {"title": "string (max 40 chars)", "time": "HH:mm"}
     ]
   },
   "stepFive": {
@@ -238,6 +250,24 @@ Generate this EXACT JSON structure:
         ],
         "tables": [],
         "payment_type": "full"
+      }
+    ],
+    "rooms": [
+      {
+        "room_name": "string (must match one of provided room names exactly)",
+        "dates": [
+          {
+            "event_date": "YYYY-MM-DD",
+            "booking_type": "tickets | tables | both",
+            "tickets": [
+              {"title": "string", "description": "string", "total_capacity": "string", "price": "string"}
+            ],
+            "tables": [
+              {"min_persons": "string", "max_persons": "string", "price": "string", "total_tables": "string"}
+            ],
+            "payment_type": "full or deposit"
+          }
+        ]
       }
     ]
   },
@@ -299,7 +329,9 @@ Make times chronologically ascending. Make prices realistic for the venue type a
         { role: "user", content: userPrompt },
       ],
       temperature: 0.7,
-      max_tokens: 4000,
+      // Keep this lower to reduce Groq TPM/TPD failures across models.
+      // The output JSON is large, but 2500 is typically enough while materially reducing quota pressure.
+      max_tokens: 2500,
     });
 
     if (!result.success || !result.data) {
@@ -308,6 +340,9 @@ Make times chronologically ascending. Make prices realistic for the venue type a
           error: "Failed to generate onboarding content",
           details: result.error,
           modelsTried: result.modelsTried,
+          retryAfter: result.retryAfterHuman,
+          retryAfterMs: result.retryAfterMs,
+          lastError: result.lastError,
         },
         { status: result.status || 500 }
       );
@@ -341,13 +376,6 @@ Make times chronologically ascending. Make prices realistic for the venue type a
         content.stepTwo.banner_sub_heading = truncate(content.stepTwo.banner_sub_heading, 80);
         content.stepTwo.about_title = truncate(content.stepTwo.about_title, 40);
         content.stepTwo.about_description = truncate(content.stepTwo.about_description, 340);
-        content.stepTwo.about_link_title = truncate(content.stepTwo.about_link_title, 18);
-        if (content.stepTwo.about_cta_link) {
-          content.stepTwo.about_cta_link = truncate(
-            content.stepTwo.about_cta_link,
-            2048,
-          );
-        }
       }
 
       if (content.stepThree) {
@@ -360,22 +388,11 @@ Make times chronologically ascending. Make prices realistic for the venue type a
         content.stepThree.about_event_heading = truncate(content.stepThree.about_event_heading, 50);
         content.stepThree.about_event_sub_heading = truncate(content.stepThree.about_event_sub_heading, 80);
         content.stepThree.about_event_description = truncate(content.stepThree.about_event_description, 340);
-        content.stepThree.event_schedular_title = truncate(content.stepThree.event_schedular_title, 40);
-
-        if (content.stepThree.event_schedular) {
-          content.stepThree.event_schedular = content.stepThree.event_schedular.map((s) => ({
-            title: truncate(s.title, 40),
-            time: /^([01]\d|2[0-3]):([0-5]\d)$/.test(s.time) ? s.time : "12:00",
-          }));
-          content.stepThree.event_schedular.sort((a, b) => {
-            const [ha, ma] = a.time.split(":").map(Number);
-            const [hb, mb] = b.time.split(":").map(Number);
-            return ha * 60 + ma - (hb * 60 + mb);
-          });
-        }
       }
 
       if (content.stepFour) {
+        content.stepFour.event_schedular_title =
+          content.stepFour.event_schedular_title || "Event Timeline";
         content.stepFour.package_title = truncate(
           content.stepFour.package_title,
           EVENT_PACKAGE_MAIN_HEADING_MAX_CHARS
@@ -395,20 +412,56 @@ Make times chronologically ascending. Make prices realistic for the venue type a
             })
           );
         }
+        content.stepFour.event_schedular_title = truncate(
+          content.stepFour.event_schedular_title,
+          40,
+        );
+        content.stepFour.event_schedule_subtitle = truncate(
+          content.stepFour.event_schedule_subtitle ||
+            content.stepFour.event_schedular_custom_copy ||
+            "",
+          160,
+        );
+        if (Array.isArray(content.stepFour.event_schedular)) {
+          content.stepFour.event_schedular = content.stepFour.event_schedular
+            .map((s) => ({
+              title: truncate(s.title, 40),
+              time: /^([01]\d|2[0-3]):([0-5]\d)$/.test(s.time)
+                ? s.time
+                : "12:00",
+            }))
+            .sort((a, b) => {
+              const [ha, ma] = a.time.split(":").map(Number);
+              const [hb, mb] = b.time.split(":").map(Number);
+              return ha * 60 + ma - (hb * 60 + mb);
+            });
+          if (content.stepFour.event_schedular.length === 0) {
+            content.stepFour.event_schedular = [
+              { title: "Doors Open", time: "19:00" },
+            ];
+          }
+        } else {
+          content.stepFour.event_schedular = [
+            { title: "Doors Open", time: "19:00" },
+          ];
+        }
       }
 
-      // Enforce stepFive validation
-      if (content.stepFive?.dates) {
+      const sanitizeAIDates = (dates: AIDate[] | undefined, fallbackMonthOffset = 2): AIDate[] => {
         const now = new Date();
-        content.stepFive.dates = content.stepFive.dates.map((date, idx) => {
+        const inputDates = Array.isArray(dates) ? dates : [];
+        const normalized = inputDates.map((date, idx) => {
           const futureDate = new Date(now);
-          futureDate.setMonth(futureDate.getMonth() + 2 + idx);
+          futureDate.setMonth(futureDate.getMonth() + fallbackMonthOffset + idx);
           const fallbackDate = futureDate.toISOString().split("T")[0];
 
           const isValidDate = /^\d{4}-\d{2}-\d{2}$/.test(date.event_date || "");
           const todayStart = new Date(now.toISOString().split("T")[0] + "T00:00:00").getTime();
-          const eventTime = isValidDate ? new Date(date.event_date + "T00:00:00").getTime() : todayStart;
-          const eventDate = isValidDate && eventTime >= todayStart ? date.event_date : fallbackDate;
+          const eventTime = isValidDate
+            ? new Date(date.event_date + "T00:00:00").getTime()
+            : todayStart;
+          const eventDate =
+            isValidDate && eventTime >= todayStart ? date.event_date : fallbackDate;
 
           const validBookingTypes = ["tickets", "tables", "both"];
           const bookingType = validBookingTypes.includes(date.booking_type)
@@ -418,7 +471,9 @@ Make times chronologically ascending. Make prices realistic for the venue type a
           const tickets = (date.tickets || []).map((t) => ({
             title: truncate(t.title || "General Admission", 25),
             description: truncate(t.description || "Standard entry ticket", 160),
-            total_capacity: String(Math.max(1, Math.min(100000, parseInt(t.total_capacity) || 100))),
+            total_capacity: String(
+              Math.max(1, Math.min(100000, parseInt(t.total_capacity) || 100)),
+            ),
             price: String(Math.max(1, Math.min(9999, parseInt(t.price) || 50))),
           }));
 
@@ -426,46 +481,87 @@ Make times chronologically ascending. Make prices realistic for the venue type a
             min_persons: String(Math.max(1, parseInt(t.min_persons) || 2)),
             max_persons: String(Math.max(1, parseInt(t.max_persons) || 6)),
             price: String(Math.max(0, Math.min(9999, parseInt(t.price) || 100))),
-            total_tables: String(Math.max(1, Math.min(5000, parseInt(t.total_tables) || 10))),
+            total_tables: String(
+              Math.max(1, Math.min(5000, parseInt(t.total_tables) || 10)),
+            ),
           }));
 
           const isTablesOrBoth = bookingType === "tables" || bookingType === "both";
-          const paymentType = (date.payment_type === "deposit" ? "deposit" : "full") as "full" | "deposit";
-          const isDepositEnabled = isTablesOrBoth && paymentType === "deposit" && (date.is_deposit_enabled === true);
+          const paymentType = (date.payment_type === "deposit" ? "deposit" : "full") as
+            | "full"
+            | "deposit";
+          const isDepositEnabled =
+            isTablesOrBoth &&
+            paymentType === "deposit" &&
+            date.is_deposit_enabled === true;
 
           return {
             event_date: eventDate,
             booking_type: bookingType as "tickets" | "tables" | "both",
-            tickets: bookingType !== "tables" && tickets.length > 0
-              ? tickets
-              : bookingType !== "tables"
-                ? [{ title: "General Admission", description: "Standard entry ticket", total_capacity: "100", price: "50" }]
-                : [],
-            tables: bookingType !== "tickets" && tables.length > 0
-              ? tables
-              : bookingType !== "tickets"
-                ? [{ min_persons: "2", max_persons: "6", price: "100", total_tables: "10" }]
-                : [],
+            tickets:
+              bookingType !== "tables" && tickets.length > 0
+                ? tickets
+                : bookingType !== "tables"
+                  ? [
+                      {
+                        title: "General Admission",
+                        description: "Standard entry ticket",
+                        total_capacity: "100",
+                        price: "50",
+                      },
+                    ]
+                  : [],
+            tables:
+              bookingType !== "tickets" && tables.length > 0
+                ? tables
+                : bookingType !== "tickets"
+                  ? [
+                      {
+                        min_persons: "2",
+                        max_persons: "6",
+                        price: "100",
+                        total_tables: "10",
+                      },
+                    ]
+                  : [],
             payment_type: isTablesOrBoth ? paymentType : "full",
-            is_deposit_enabled: isTablesOrBoth ? (isDepositEnabled && paymentType === "deposit") : false,
-            deposit_type: isTablesOrBoth && isDepositEnabled ? (date.deposit_type === "percentage" ? "percentage" : "amount") : undefined,
-            deposit_value: isTablesOrBoth && isDepositEnabled && date.deposit_value ? String(date.deposit_value) : "",
-            deposit_due_date: isTablesOrBoth && isDepositEnabled && date.deposit_due_date ? String(date.deposit_due_date) : "",
-          };
+            is_deposit_enabled: isTablesOrBoth
+              ? isDepositEnabled && paymentType === "deposit"
+              : false,
+            deposit_type:
+              isTablesOrBoth && isDepositEnabled
+                ? date.deposit_type === "percentage"
+                  ? "percentage"
+                  : "amount"
+                : undefined,
+            deposit_value:
+              isTablesOrBoth && isDepositEnabled && date.deposit_value
+                ? String(date.deposit_value)
+                : "",
+            deposit_due_date:
+              isTablesOrBoth && isDepositEnabled && date.deposit_due_date
+                ? String(date.deposit_due_date)
+                : "",
+          } as AIDate;
         });
-        // Sort by event_date ascending and remove duplicates
+
         const seen = new Set<string>();
-        content.stepFive.dates = content.stepFive.dates
+        return normalized
           .sort(
             (a, b) =>
               new Date(a.event_date + "T00:00:00").getTime() -
-              new Date(b.event_date + "T00:00:00").getTime()
+              new Date(b.event_date + "T00:00:00").getTime(),
           )
           .filter((d) => {
             if (!d.event_date || seen.has(d.event_date)) return false;
             seen.add(d.event_date);
             return true;
           });
+      };
+
+      // Enforce stepFive validation
+      if (content.stepFive?.dates) {
+        content.stepFive.dates = sanitizeAIDates(content.stepFive.dates, 2);
       } else {
         // Fallback: generate default dates if AI missed stepFive
         const d1 = new Date();
@@ -503,6 +599,15 @@ Make times chronologically ascending. Make prices realistic for the venue type a
             },
           ],
         };
+      }
+
+      if (Array.isArray(content.stepFive?.rooms)) {
+        content.stepFive.rooms = content.stepFive.rooms
+          .map((room, roomIdx) => ({
+            room_name: truncate(String(room.room_name || "").trim(), 80),
+            dates: sanitizeAIDates(room.dates, 2 + roomIdx),
+          }))
+          .filter((room) => room.room_name.length > 0);
       }
 
       if (content.stepSeven) {

@@ -1,10 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useSession, signOut } from "next-auth/react";
 import { useContext, useEffect, useState } from "react";
-import { useDomain } from "@/providers/domain-provider/domain-provider";
 import { AuthContent } from "./_components/auth-content";
 import { ServerContext } from "@/lib/server-context";
 import { AuthSkeleton } from "./_components/auth-skeleton";
@@ -15,11 +14,9 @@ export default function AuthLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const pathname = usePathname();
   const router = useRouter();
   const searchParams = useSearchParams();
   const { data: session, status } = useSession();
-  const { website_role } = useDomain();
   const [isRedirecting, setIsRedirecting] = useState(false);
   const [isSigningOutSecurity, setIsSigningOutSecurity] = useState(false);
   const { theme } = useContext(ServerContext);
@@ -33,24 +30,6 @@ export default function AuthLayout({
     theme?.logo?.startsWith("https")
       ? theme.logo
       : "/assets/images/logos/eventwizz-logo.png";
-  // Check if the current path is registration-related
-  const isRegistrationPage = pathname.includes("/register");
-
-  // Get registration path based on website_role
-  const getRegistrationPath = () => {
-    if (!website_role) return "/auth/register/customer";
-
-    const paths = {
-      admin: "/auth/register/vendor",
-      vendor: "/auth/register/customer",
-      customer: "/auth/register/customer",
-    };
-
-    return (
-      paths[website_role as keyof typeof paths] || "/auth/register/customer"
-    );
-  };
-
   // When login page has security_violation, clear any stale session so user must re-login (no redirect to welcome)
   useEffect(() => {
     if (!isSecurityViolation || status !== "authenticated") return;
@@ -106,29 +85,6 @@ export default function AuthLayout({
               src={addCacheBusting(logoPath)}
             />
           </Link>
-          <nav className="text-sm text-[var(--color-on-header)]/85">
-            {isRegistrationPage ? (
-              <div>
-                Have an account?{" "}
-                <Link
-                  href="/auth/login"
-                  className="font-medium text-[var(--color-on-header)] hover:opacity-90 hover:underline hover:decoration-2 underline-offset-2 hover:decoration-[color:var(--color-primary)]"
-                >
-                  Sign in
-                </Link>
-              </div>
-            ) : (
-              <div>
-                Don&apos;t have an account?{" "}
-                <Link
-                  href={getRegistrationPath()}
-                  className="font-medium text-[var(--color-on-header)] hover:opacity-90 hover:underline hover:decoration-2 underline-offset-2 hover:decoration-[color:var(--color-primary)]"
-                >
-                  Sign Up
-                </Link>
-              </div>
-            )}
-          </nav>
         </div>
       </header>
 

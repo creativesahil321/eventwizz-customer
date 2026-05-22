@@ -38,11 +38,19 @@ export const API_ENDPOINTS = {
     DASHBOARD: {
       STATISTICS: "/vendor/dashboard",
     },
+    ROOMS: "/vendor/rooms",
+    ROOMS_STORE: "/vendor/rooms/store",
+    ROOM_BY_ID: "/vendor/rooms/{room_id}",
     ONBOARDING: {
       STEPS: "/vendor/onboarding/store",
-      GET_ALL_STEPS: "/vendor/onboarding/steps/{location_id}",
+      GET_ALL_STEPS: "/vendor/onboarding/steps/{location_id}/{is_rooms}",
       PAYMENT_GATEWAYS: "/vendor/onboarding/payment-gateway-connect",
       PAYMENT_RETURN: "/vendor/onboarding/return",
+      // Multi-room ("event spaces") endpoints. Same vendor onboarding surface, room-scoped.
+      ROOMS: "/vendor/onboarding/rooms",
+      ROOM_BY_ID: "/vendor/onboarding/rooms/{room_id}",
+      ROOMS_TOGGLE: "/vendor/onboarding/rooms/multi-space",
+      ROOM_STEP_STORE: "/vendor/onboarding/rooms/{room_id}/store",
     },
     PAYMENT_GATEWAYS: {
       GET_ALL: "/vendor/payment-gateway",
@@ -65,6 +73,16 @@ export const API_ENDPOINTS = {
       BULK_DELETE: "/vendor/events/bulk-delete",
       GET_EVENT_OVERVIEW:
         "/vendor/events/{eventId}/overview?date_status={date_status}&date_filter={date_filter}",
+    },
+    TABLE_ASSIGNMENTS: {
+      LIST: "/vendor/table-assignments",
+      EXPORT: "/vendor/table-assignments/export",
+      CONFIRM_BOOKING_DATE:
+        "/vendor/table-assignments/booking-dates/{bookingDateId}/confirm",
+      SEATING_PLAN_IMAGE:
+        "/vendor/table-assignments/booking-dates/{bookingDateId}/seating-plan-image",
+      DELETE_FINAL_ASSIGNMENT:
+        "/vendor/table-assignments/booking-dates/{bookingDateId}/final-assignments",
     },
 
     EMAIL_TEMPLATES: {

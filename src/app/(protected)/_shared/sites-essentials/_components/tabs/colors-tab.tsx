@@ -25,8 +25,10 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { FacebookIcon } from "lucide-react";
+import { useSiteEssentialsUpdateGate } from "../../_lib/site-essentials-update-context";
 
 export function ColorsTab() {
+  const { readOnly } = useSiteEssentialsUpdateGate();
   const form = useFormContext<SiteEssentialsFormValues>();
   const [showAIModal, setShowAIModal] = useState(false);
 
@@ -150,6 +152,7 @@ export function ColorsTab() {
           type="button"
           variant="default"
           size="default"
+          disabled={readOnly}
           onClick={() => setShowAIModal(true)}
           className="flex items-center gap-2 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white shadow-lg"
         >
@@ -191,6 +194,7 @@ export function ColorsTab() {
                     <ColorPicker
                       value={ensureColor(field.value)}
                       onChange={field.onChange}
+                      disabled={readOnly}
                     />
                   </FormControl>
                   <p className="text-xs text-gray-500">
@@ -213,6 +217,7 @@ export function ColorsTab() {
                     <ColorPicker
                       value={ensureColor(field.value)}
                       onChange={field.onChange}
+                      disabled={readOnly}
                     />
                   </FormControl>
                   <p className="text-xs text-gray-500">
@@ -258,6 +263,7 @@ export function ColorsTab() {
                     <ColorPicker
                       value={ensureColor(field.value)}
                       onChange={field.onChange}
+                      disabled={readOnly}
                     />
                   </FormControl>
                   <p className="text-xs text-gray-500">Header bar background</p>
@@ -278,6 +284,7 @@ export function ColorsTab() {
                     <ColorPicker
                       value={ensureColor(field.value)}
                       onChange={field.onChange}
+                      disabled={readOnly}
                     />
                   </FormControl>
                   <p className="text-xs text-gray-500">Footer bar background</p>
@@ -300,6 +307,7 @@ export function ColorsTab() {
                   onGradientEndColorChange={setGradientEndColor}
                   gradientDirection={gradientDirection}
                   onGradientDirectionChange={setGradientDirection}
+                  disabled={readOnly}
                 />
               </FormControl>
               <p className="text-xs text-gray-500">
@@ -319,6 +327,7 @@ export function ColorsTab() {
                     <ColorPicker
                       value={ensureColor(field.value)}
                       onChange={field.onChange}
+                      disabled={readOnly}
                     />
                   </FormControl>
                   <p className="text-xs text-gray-500">Cards and panels</p>
@@ -339,6 +348,7 @@ export function ColorsTab() {
                     <ColorPicker
                       value={ensureColor(field.value)}
                       onChange={field.onChange}
+                      disabled={readOnly}
                     />
                   </FormControl>
                   <p className="text-xs text-gray-500">Primary text color</p>
@@ -359,6 +369,7 @@ export function ColorsTab() {
                     <ColorPicker
                       value={ensureColor(field.value)}
                       onChange={field.onChange}
+                      disabled={readOnly}
                     />
                   </FormControl>
                   <p className="text-xs text-gray-500">
@@ -423,6 +434,7 @@ export function ColorsTab() {
                     <ColorPicker
                       value={ensureColor(field.value)}
                       onChange={field.onChange}
+                      disabled={readOnly}
                     />
                   </FormControl>
                   <p className="text-xs text-gray-500">
@@ -446,6 +458,7 @@ export function ColorsTab() {
                     <ColorPicker
                       value={ensureColor(field.value)}
                       onChange={field.onChange}
+                      disabled={readOnly}
                     />
                   </FormControl>
                   <p className="text-xs text-gray-500">

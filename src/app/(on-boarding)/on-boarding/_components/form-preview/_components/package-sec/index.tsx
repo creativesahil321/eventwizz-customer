@@ -2,7 +2,6 @@
 
 import type { ReactNode } from "react";
 import { Check, ImageIcon } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { addCacheBusting } from "@/lib/image-utils";
 import { useCurrencySymbol } from "@/hooks/use-currency-format";
 import { cn } from "@/lib/utils";
@@ -31,15 +30,13 @@ function resolvePackageAccentHint(
   const h = (heading || "").trim();
   if (!h) return null;
   if (h.toLowerCase() === "packages") return null;
-  return h.includes("Packages") ? "Packages" : null;
+  return /\bpackages$/i.test(h) ? "Packages" : null;
 }
 
 type PackageSectionProps = {
   heading: string;
   subHeading: string;
   image?: PackageImage | File | null | string;
-  buttonName: string;
-  buttonLink: string;
   packageDetails: PackageDetail[];
   /** Same as vendor theme `typography.headingEmphasis` (e.g. accent_tail) */
   headingEmphasis?: HeadingEmphasis | null;
@@ -84,8 +81,6 @@ export default function PackageSection({
   heading,
   subHeading,
   image,
-  buttonName,
-  buttonLink,
   packageDetails,
   headingEmphasis,
   headingAccentHint,
@@ -106,38 +101,6 @@ export default function PackageSection({
   /** Keep tall lists compact next to the hero image (2 cols from md, 3 from lg). */
   const useMultiColumnList = details.length >= 6;
   const useThreeColumns = details.length >= 12;
-
-  const cta = (
-    <>
-      {buttonLink?.startsWith("#") ? (
-        <Button
-          type="button"
-          variant="event-primary"
-          size="lg"
-          className="h-12 w-full rounded-full px-8 text-base font-bold sm:w-auto"
-          onClick={() => {
-            const id = buttonLink.slice(1);
-            document
-              .getElementById(id)
-              ?.scrollIntoView({ behavior: "smooth", block: "start" });
-          }}
-        >
-          {buttonName || "Book Now"}
-        </Button>
-      ) : (
-        <Button
-          asChild
-          variant="event-primary"
-          size="lg"
-          className="h-12 w-full rounded-full px-8 text-base font-bold sm:w-auto"
-        >
-          <a href={buttonLink || "#"} target="_blank" rel="noopener noreferrer">
-            {buttonName || "Book Now"}
-          </a>
-        </Button>
-      )}
-    </>
-  );
 
   return (
     <section className="w-full bg-[var(--color-background)] px-4 py-20 md:py-28">
@@ -225,17 +188,6 @@ export default function PackageSection({
               </p>
             )}
 
-            <div className="relative mt-10 inline-flex w-full sm:w-auto">
-              <span
-                className="pointer-events-none absolute left-1/2 top-[58%] h-14 w-[min(100%,20rem)] -translate-x-1/2 -translate-y-1/2 rounded-[999px] bg-[color:var(--color-primary)] opacity-[0.2] blur-[28px]"
-                aria-hidden
-              />
-              <span
-                className="pointer-events-none absolute left-[55%] top-[70%] h-10 w-32 -translate-x-1/2 -translate-y-1/2 rounded-[999px] bg-[color:var(--color-primary)] opacity-[0.16] blur-[22px]"
-                aria-hidden
-              />
-              <div className="relative z-[1] w-full sm:w-auto">{cta}</div>
-            </div>
           </div>
         </div>
       </div>

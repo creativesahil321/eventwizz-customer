@@ -10,6 +10,7 @@ type EventScheduler = {
 
 type EventSchedulerProps = {
   eventSchedularTitle?: string;
+  eventSchedularCopy?: string;
   eventSchedular: EventScheduler[] | null | undefined;
   eventSchedularBackgroundImage?: string | null;
 };
@@ -17,6 +18,7 @@ type EventSchedulerProps = {
 export default function Timeline({
   eventSchedular,
   eventSchedularTitle,
+  eventSchedularCopy,
   eventSchedularBackgroundImage,
 }: EventSchedulerProps) {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -89,8 +91,9 @@ export default function Timeline({
     );
   };
 
-  // Check overflow on mount and when content changes (after layout so widths are correct)
+  // Check overflow on mount, when content changes, and when preview column resizes.
   useEffect(() => {
+    const container = scrollContainerRef.current;
     const run = () => checkScrollability();
     const id = requestAnimationFrame(() => {
       run();
@@ -100,9 +103,16 @@ export default function Timeline({
     const handleResize = () => run();
     window.addEventListener("resize", handleResize);
 
+    let resizeObserver: ResizeObserver | undefined;
+    if (container && typeof ResizeObserver !== "undefined") {
+      resizeObserver = new ResizeObserver(() => run());
+      resizeObserver.observe(container);
+    }
+
     return () => {
       cancelAnimationFrame(id);
       window.removeEventListener("resize", handleResize);
+      resizeObserver?.disconnect();
     };
   }, [displaySchedules]);
 
@@ -184,7 +194,7 @@ export default function Timeline({
   };
 
   return (
-    <section className="relative w-full overflow-x-visible overflow-y-hidden bg-[var(--color-background)] px-2 py-16 sm:px-4">
+    <section className="relative w-full overflow-x-hidden overflow-y-hidden bg-[var(--color-background)] px-2 py-16 sm:px-4">
       {eventSchedularBackgroundImage?.trim() && (
         <div className="absolute left-0 top-0 h-full w-full">
           {/* Decorative background — intentionally empty alt */}
@@ -205,15 +215,24 @@ export default function Timeline({
           <h2 className="text-2xl font-black tracking-tight text-[var(--color-text)] md:text-3xl">
             {eventSchedularTitle || "What to Expect"}
           </h2>
+          {eventSchedularCopy?.trim() ? (
+            <p className="mx-auto mt-3 max-w-2xl text-sm text-[var(--color-text-dimmed)] md:text-base">
+              {eventSchedularCopy}
+            </p>
+          ) : null}
         </div>
-        <div className="relative flex items-center justify-center">
+        <div
+          className={`relative flex w-full min-w-0 items-center justify-center ${
+            showArrows ? "px-10 sm:px-12 md:px-14" : ""
+          }`}
+        >
           {/* Left Arrow - Only show if content overflows */}
           {showArrows && (
             <button
               type="button"
               onClick={() => scroll("left")}
               disabled={!canScrollLeft}
-              className={`absolute left-0 top-1/2 z-40 flex size-9 -translate-y-1/2 items-center justify-center rounded-full shadow-md transition-all duration-200 sm:-left-8 md:-left-16 bg-[var(--color-primary)] text-[var(--color-primary-foreground)] ${
+              className={`absolute left-0 top-1/2 z-40 flex size-9 -translate-y-1/2 items-center justify-center rounded-full shadow-md transition-all duration-200 bg-[var(--color-primary)] text-[var(--color-primary-foreground)] ${
                 canScrollLeft
                   ? "cursor-pointer opacity-100 hover:opacity-90 active:scale-95"
                   : "cursor-not-allowed opacity-30 pointer-events-none"
@@ -227,7 +246,11 @@ export default function Timeline({
           {/* Timeline Container - Native Scroll (below arrow controls) */}
           <div className="relative z-10 w-full min-w-0">
             {/* Timeline line with tick marks - visible on all screens */}
-            <div className="pointer-events-none absolute left-14 right-14 top-[30px] z-10 sm:top-10">
+            <div
+              className={`pointer-events-none absolute top-[30px] z-10 sm:top-10 ${
+                showArrows ? "left-4 right-4 sm:left-8 sm:right-8" : "inset-x-2"
+              }`}
+            >
               {/* Main horizontal line — ink for secondary band */}
               <div className="h-[2px] w-full bg-[var(--color-primary)]/30" />
 
@@ -249,19 +272,24 @@ export default function Timeline({
             {/* Scrollable Timeline Items - center when content doesn't overflow */}
             <div
               ref={scrollContainerRef}
-              className={`relative z-10 flex min-w-0 cursor-grab select-none items-start gap-4 overflow-x-auto overflow-y-visible scroll-smooth py-2 pl-4 pr-8 no-scrollbar sm:gap-6 sm:pl-8 sm:pr-10 md:gap-8 md:pl-14 md:pr-14 ${!showArrows ? "justify-center" : ""}`}
-              onMouseDown={handleMouseDown}
-              onMouseLeave={handleMouseLeave}
-              onMouseUp={handleMouseUp}
-              onMouseMove={handleMouseMove}
+              className={`relative z-10 flex min-w-0 select-none items-start gap-3 overflow-y-visible scroll-smooth py-2 sm:gap-5 md:gap-6 ${
+                showArrows
+                  ? "cursor-grab overflow-x-auto overscroll-x-contain no-scrollbar pl-2 pr-2 sm:pl-4 sm:pr-4"
+                  : "cursor-default justify-center overflow-x-hidden px-2"
+              }`}
+              onMouseDown={showArrows ? handleMouseDown : undefined}
+              onMouseLeave={showArrows ? handleMouseLeave : undefined}
+              onMouseUp={showArrows ? handleMouseUp : undefined}
+              onMouseMove={showArrows ? handleMouseMove : undefined}
             >
               {displaySchedules.map((item, index) => (
                 <div
                   key={index}
                   className="flex flex-col items-center justify-center text-center flex-shrink-0"
                   style={{
-                    minWidth: "140px",
-                    maxWidth: "180px",
+                    minWidth: showArrows ? "120px" : "0",
+                    maxWidth: showArrows ? "160px" : "180px",
+                    flex: showArrows ? "0 0 auto" : "1 1 0",
                   }}
                 >
                   {/* Time Circle — surface token so times stay readable on any secondary hue */}
@@ -291,7 +319,7 @@ export default function Timeline({
               type="button"
               onClick={() => scroll("right")}
               disabled={!canScrollRight}
-              className={`absolute right-0 top-1/2 z-40 flex size-9 -translate-y-1/2 items-center justify-center rounded-full shadow-md transition-all duration-200 sm:-right-8 md:-right-16 bg-[var(--color-primary)] text-[var(--color-primary-foreground)] ${
+              className={`absolute right-0 top-1/2 z-40 flex size-9 -translate-y-1/2 items-center justify-center rounded-full shadow-md transition-all duration-200 bg-[var(--color-primary)] text-[var(--color-primary-foreground)] ${
                 canScrollRight
                   ? "cursor-pointer opacity-100 hover:opacity-90 active:scale-95"
                   : "cursor-not-allowed opacity-30 pointer-events-none"

@@ -370,13 +370,6 @@ function PaymentSuccessContent() {
                 <li className="flex items-start gap-3">
                   <CheckCircle className="h-5 w-5 text-blue-600 mt-0.5 flex-shrink-0" />
                   <span className="text-blue-900">
-                    Event details and instructions will be sent 24 hours before
-                    the event
-                  </span>
-                </li>
-                <li className="flex items-start gap-3">
-                  <CheckCircle className="h-5 w-5 text-blue-600 mt-0.5 flex-shrink-0" />
-                  <span className="text-blue-900">
                     You can view and manage your booking anytime in your
                     dashboard
                   </span>

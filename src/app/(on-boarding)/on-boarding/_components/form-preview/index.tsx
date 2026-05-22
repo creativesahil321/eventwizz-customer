@@ -3,7 +3,6 @@ import React, {
   useEffect,
   useState,
   useMemo,
-  useCallback,
   lazy,
   Suspense,
   useRef,
@@ -23,7 +22,7 @@ import {
   siteEssentialsToPreviewRootStyle,
 } from "../../_lib/onboarding-site-essentials-bridge";
 import { SiteEssentialsGoogleFontsLoader } from "@/components/shared/site-essentials-google-fonts-loader";
-import { PreviewThemeCustomizer } from "@/components/preview/preview-theme-customizer";
+import { PreviewRoomFloatingSelector } from "../rooms/preview-room-floating-selector";
 import FooterSection from "@/app/(public)/vendor/_components/EventListPage/footer";
 import HeroBanner from "@/app/(public)/vendor/_components/EventListPage/hero-banner";
 import ExperienceSection from "@/app/(public)/vendor/_components/EventListPage/experience";
@@ -37,6 +36,7 @@ import { EVENT_BOOKING_SECTION_CLASSNAME } from "@/lib/event-booking-section-lay
 import { EventHeroBand } from "@/components/public/event-hero-band";
 import { LocationMarketingBody } from "@/components/public/location-marketing-sections";
 import { Image as ImageIcon } from "lucide-react";
+import { useCurrencySymbol } from "@/hooks/use-currency-format";
 
 // Lazy load components - only import what's actually used
 const BrochureSection = lazy(() => import("./_components/brochure-section"));
@@ -100,58 +100,28 @@ function resolveOnboardingLogoUrl(
   return null;
 }
 
-/** Same steps as `form-layout` `splitLayoutSteps` — sidebar + live preview (Try theme applies here). */
+/** Same steps as `form-layout` `splitLayoutSteps` — live preview with tenant theme styles. */
 const ONBOARDING_THEME_PREVIEW_STEPS = new Set([2, 3, 4, 5, 6, 7, 8, 9]);
+/** Steps where the per-room floating selector should appear in the live preview. Mirrors the
+ *  steps that bind to `multiSpace.rooms[i]` data (Package, Dates, Catering, Brochure info). */
+const ROOM_FLOATING_SELECTOR_STEPS = new Set([4, 5, 6, 7]);
 
 // Only load components needed for the current step
 export default function FormPreview() {
   const { form, activeStep, activeField } = useFormContext();
+  const currencySymbol = useCurrencySymbol();
   const { theme } = useContext(ServerContext);
-  const userAdjustedTryThemeRef = useRef(false);
-  const [trySiteValues, setTrySiteValues] =
-    useState<SiteEssentialsFormValues | null>(null);
-
   const [formState, setFormState] = useState<OnboardingFormData>(
     form.getValues(),
   );
 
-  const handleTryThemeValuesChange = useCallback(
-    (next: SiteEssentialsFormValues) => {
-      userAdjustedTryThemeRef.current = true;
-      setTrySiteValues(next);
-    },
-    [],
-  );
-
-  useEffect(() => {
-    if (!ONBOARDING_THEME_PREVIEW_STEPS.has(activeStep)) return;
-    const fresh = buildOnboardingStepTwoSiteEssentialsValues(
+  const tryThemePreviewValues = useMemo((): SiteEssentialsFormValues | null => {
+    if (!ONBOARDING_THEME_PREVIEW_STEPS.has(activeStep)) return null;
+    return buildOnboardingStepTwoSiteEssentialsValues(
       formState,
       theme as ThemeSchema | null | undefined,
     );
-    setTrySiteValues((prev) => {
-      if (!userAdjustedTryThemeRef.current || !prev) return fresh;
-      return {
-        ...fresh,
-        colors: prev.colors,
-        typography: prev.typography,
-        banner_heading_align: prev.banner_heading_align,
-        banner_heading_valign: prev.banner_heading_valign,
-        banner_heading_accent: prev.banner_heading_accent,
-      };
-    });
   }, [activeStep, formState.stepOne, formState.stepTwo, theme]);
-
-  const tryThemePreviewValues = useMemo((): SiteEssentialsFormValues | null => {
-    if (!ONBOARDING_THEME_PREVIEW_STEPS.has(activeStep)) return null;
-    return (
-      trySiteValues ??
-      buildOnboardingStepTwoSiteEssentialsValues(
-        formState,
-        theme as ThemeSchema | null | undefined,
-      )
-    );
-  }, [activeStep, trySiteValues, formState.stepOne, formState.stepTwo, theme]);
 
   const tryHeroPreviewProps = useMemo(() => {
     if (
@@ -171,16 +141,85 @@ export default function FormPreview() {
     };
   }, [tryThemePreviewValues, activeStep]);
 
+  const activePreviewBrochure = useMemo(() => {
+    const ms = formState.multiSpace;
+    const rooms = ms?.rooms ?? [];
+    if (!ms?.enabled || rooms.length === 0) {
+      return formState.stepSeven;
+    }
+    const idx = Math.min(
+      ms.currentRoomIndex ?? 0,
+      Math.max(rooms.length - 1, 0),
+    );
+    return rooms[idx]?.brochure ?? formState.stepSeven;
+  }, [formState.multiSpace, formState.stepSeven]);
+
+  const activePreviewBrochureLocation = useMemo(() => {
+    const location = activePreviewBrochure?.location;
+    return {
+      title: location?.title || "",
+      description:
+        location?.description ||
+        String(activePreviewBrochure?.event_address ?? "").trim(),
+      icon: location?.icon || "",
+      latitude: activePreviewBrochure?.latitude,
+      longitude: activePreviewBrochure?.longitude,
+    };
+  }, [activePreviewBrochure]);
+
+  const activePreviewBrochurePrice = useMemo(() => {
+    const price = activePreviewBrochure?.price;
+    const startFrom = String(activePreviewBrochure?.price_start_from ?? "").trim();
+    return {
+      title: price?.title || "",
+      description:
+        price?.description ||
+        (startFrom ? `${currencySymbol}${startFrom} PP exc VAT` : ""),
+      link: price?.link || "",
+      icon: price?.icon || "",
+      price_title: price?.price_title || "",
+    };
+  }, [activePreviewBrochure, currencySymbol]);
+
   // Brochure downloads — same data drives section + `CommonHeader` (single pill vs dropdown).
   const downloadsArray = useMemo(() => {
     const downloads: Array<{
       title: string;
       download_link: string[];
     }> = [];
+    const normalizeTitle = (value: string) =>
+      value.toLowerCase().replace(/[\s_-]+/g, "");
+    const hasDownloadSlot = (
+      slot: "brochure" | "flyer" | "faq",
+      item?: { id?: number; title?: string },
+    ) => {
+      if (!item) return false;
+      const normalizedTitle = normalizeTitle(String(item.title ?? ""));
+      if (slot === "brochure") {
+        return (
+          item.id === 1 ||
+          normalizedTitle === "brochure" ||
+          normalizedTitle === "eventbrochure"
+        );
+      }
+      if (slot === "flyer") {
+        return (
+          item.id === 3 ||
+          normalizedTitle === "eventflyer" ||
+          normalizedTitle === "flyer"
+        );
+      }
+      return (
+        item.id === 2 ||
+        normalizedTitle === "frequentlyaskedquestions" ||
+        normalizedTitle === "faq" ||
+        normalizedTitle === "faqdetails"
+      );
+    };
 
-    if (formState.stepEight?.downloads?.length) {
+    if (activePreviewBrochure?.downloads?.length) {
       downloads.push(
-        ...formState.stepEight.downloads.map(
+        ...activePreviewBrochure.downloads.map(
           (download: {
             title?: string;
             pdf?: File | null;
@@ -200,14 +239,29 @@ export default function FormPreview() {
     const individualPdfs: Array<{
       field: File | string | null | undefined;
       title: string;
+      slot: "brochure" | "flyer";
     }> = [
-      { field: formState.stepEight?.brochure_pdf, title: "Event brochure" },
-      { field: formState.stepEight?.brochure_pdf_2, title: "Event Flyer" },
-      { field: formState.stepEight?.faq_pdf, title: "FAQ Details" },
+      {
+        field: activePreviewBrochure?.brochure_pdf,
+        title: "Event brochure",
+        slot: "brochure",
+      },
+      {
+        field: activePreviewBrochure?.brochure_pdf_2,
+        title: "Event Flyer",
+        slot: "flyer",
+      },
     ];
 
-    individualPdfs.forEach(({ field, title }) => {
-      if (field && !downloads.some((d) => d.title === title)) {
+    individualPdfs.forEach(({ field, title, slot }) => {
+      const alreadyRepresentedInDownloads = (
+        activePreviewBrochure?.downloads ?? []
+      ).some((download) => hasDownloadSlot(slot, download));
+      if (
+        field &&
+        !alreadyRepresentedInDownloads &&
+        !downloads.some((d) => normalizeTitle(d.title) === normalizeTitle(title))
+      ) {
         downloads.push({
           title,
           download_link: [
@@ -218,7 +272,7 @@ export default function FormPreview() {
     });
 
     return downloads;
-  }, [formState.stepEight]);
+  }, [activePreviewBrochure]);
 
   const previewHeaderDownloads = useMemo(
     () => headerLinksFromDownloadItems(downloadsArray),
@@ -241,17 +295,94 @@ export default function FormPreview() {
   const faqRef = useRef<HTMLDivElement>(null);
   const previewContainerRef = useRef<HTMLDivElement>(null);
 
+  const [isPastTimeline, setIsPastTimeline] = useState(false);
+  useEffect(() => {
+    const root = previewContainerRef.current;
+    const target = timelineRef.current;
+    if (!root || !target || !ROOM_FLOATING_SELECTOR_STEPS.has(activeStep)) {
+      setIsPastTimeline(false);
+      return;
+    }
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (!entry || !entry.rootBounds) return;
+        const pastTop =
+          !entry.isIntersecting &&
+          entry.boundingClientRect.bottom <= entry.rootBounds.top;
+        // Show the room selector from the timeline section onward:
+        // - while timeline is visible
+        // - and after timeline has scrolled past the top
+        setIsPastTimeline(entry.isIntersecting || pastTop);
+      },
+      { root, threshold: 0 },
+    );
+    observer.observe(target);
+    return () => observer.disconnect();
+  }, [activeStep]);
+
+  const activePreviewPackage = useMemo(() => {
+    const ms = formState.multiSpace;
+    const rooms = ms?.rooms ?? [];
+    if (!ms?.enabled || rooms.length === 0) {
+      return formState.stepFour;
+    }
+    const idx = Math.min(
+      ms.currentRoomIndex ?? 0,
+      Math.max(rooms.length - 1, 0),
+    );
+    return rooms[idx]?.package ?? formState.stepFour;
+  }, [formState.multiSpace, formState.stepFour]);
+
+  const activePreviewDates = useMemo(() => {
+    const ms = formState.multiSpace;
+    const rooms = ms?.rooms ?? [];
+    if (!ms?.enabled || rooms.length === 0) {
+      return formState.stepFive?.dates;
+    }
+    const idx = Math.min(
+      ms.currentRoomIndex ?? 0,
+      Math.max(rooms.length - 1, 0),
+    );
+    const roomDates = rooms[idx]?.dates?.dates;
+    if (Array.isArray(roomDates)) {
+      return roomDates as StepFiveType["dates"];
+    }
+    return formState.stepFive?.dates;
+  }, [formState.multiSpace, formState.stepFive?.dates]);
+
+  const activePreviewCatering = useMemo(() => {
+    const ms = formState.multiSpace;
+    const rooms = ms?.rooms ?? [];
+    if (!ms?.enabled || rooms.length === 0) {
+      return formState.stepSix;
+    }
+    const idx = Math.min(
+      ms.currentRoomIndex ?? 0,
+      Math.max(rooms.length - 1, 0),
+    );
+    return rooms[idx]?.catering ?? formState.stepSix;
+  }, [formState.multiSpace, formState.stepSix]);
+
   // Stable gallery for preview: reuse File.preview when set (avoids new blob URLs on reorder so preview updates instantly)
   const galleryPreviewItems = useMemo(() => {
-    const gallery = formState.stepFour?.gallery;
+    const gallery = activePreviewPackage?.gallery;
+    const fallbackImage = {
+      path: "/assets/images/gallery-image.png",
+      relativePath: "/assets/images/gallery-image.png",
+      preview: "/assets/images/gallery-image.png",
+    };
     if (!gallery || gallery.length === 0) {
-      return Array(8).fill({
-        path: "/assets/images/gallery-image.png",
-        relativePath: "/assets/images/gallery-image.png",
-        preview: "/assets/images/gallery-image.png",
-      });
+      return [];
     }
     return gallery.map((image) => {
+      if (typeof image === "string") {
+        return {
+          path: image,
+          relativePath: image,
+          preview: image,
+        };
+      }
+
       if (image instanceof File) {
         const fileWithPreview = image as File & { preview?: string };
         return {
@@ -260,6 +391,7 @@ export default function FormPreview() {
           preview: fileWithPreview.preview || URL.createObjectURL(image),
         };
       }
+
       if (typeof image === "object" && image !== null && "url" in image) {
         const galleryItem = image as { id: number; url: string };
         return {
@@ -268,9 +400,27 @@ export default function FormPreview() {
           preview: galleryItem.url,
         };
       }
-      return image as { path: string; relativePath: string; preview: string };
+
+      if (typeof image === "object" && image !== null) {
+        const anyImage = image as {
+          preview?: string;
+          path?: string;
+          relativePath?: string;
+        };
+        const src =
+          anyImage.preview || anyImage.path || anyImage.relativePath || "";
+        if (src) {
+          return {
+            path: anyImage.path || src,
+            relativePath: anyImage.relativePath || src,
+            preview: anyImage.preview || src,
+          };
+        }
+      }
+
+      return fallbackImage;
     });
-  }, [formState.stepFour?.gallery]);
+  }, [activePreviewPackage?.gallery]);
 
   // Force re-render when form data changes
   useEffect(() => {
@@ -330,19 +480,18 @@ export default function FormPreview() {
           activeField.includes("event_category")
         ) {
           scrollToElement(aboutEventRef);
-        } else if (activeField.includes("event_schedular")) {
-          scrollToElement(timelineRef);
         }
         break;
 
       case 4: // Package details
-        if (activeField.includes("gallery")) {
+        if (activeField.includes("event_schedular")) {
+          scrollToElement(timelineRef);
+        } else if (activeField.includes("gallery")) {
           scrollToElement(galleryRef);
         } else if (
           activeField.includes("package_image") ||
           activeField.includes("package_title") ||
           activeField.includes("package_description") ||
-          activeField.includes("package_button_name") ||
           activeField.includes("package_details")
         ) {
           scrollToElement(packageRef);
@@ -366,27 +515,25 @@ export default function FormPreview() {
         }
         break;
 
-      case 7: // Other Packages
-        if (
-          activeField.includes("drink_") ||
-          activeField.includes("packages")
-        ) {
-          scrollToElement(drinkRef);
-        }
-        break;
-
-      case 8: // More Info
+      case 7: // Brochure & location
         if (
           activeField.includes("brochure_pdf") ||
-          activeField.includes("faq_pdf") ||
           activeField.includes("event_address") ||
           activeField.includes("price_start_from") ||
-          activeField.includes("price_start_from_button_text") ||
           activeField.includes("location") ||
           activeField.includes("downloads") ||
           activeField.includes("more_info")
         ) {
           scrollToElement(moreInfoRef);
+        }
+        break;
+
+      case 8: // Other Packages
+        if (
+          activeField.includes("drink_") ||
+          activeField.includes("packages")
+        ) {
+          scrollToElement(drinkRef);
         }
         break;
 
@@ -421,8 +568,8 @@ export default function FormPreview() {
   }, [activeStep]);
 
   const datesPreviewItems = useMemo(
-    () => buildDatesPreviewFromStepFive(formState.stepFive?.dates),
-    [formState.stepFive?.dates],
+    () => buildDatesPreviewFromStepFive(activePreviewDates),
+    [activePreviewDates],
   );
 
   // Render homepage preview (step 2) — same structure as `/[locationSlug]` + Site Essentials preview
@@ -490,11 +637,17 @@ export default function FormPreview() {
             coverImage={getMediaPreviewUrl(formState.stepTwo?.cover_image)}
             coverVideo={null}
             bannerHeading={formState.stepTwo?.banner_heading ?? undefined}
-            bannerSubHeading={formState.stepTwo?.banner_sub_heading ?? undefined}
+            bannerSubHeading={
+              formState.stepTwo?.banner_sub_heading ?? undefined
+            }
             bannerHeadingAccent={tryHeroPreviewProps?.bannerHeadingAccent}
             headingEmphasis={tryHeroPreviewProps?.headingEmphasis ?? undefined}
-            bannerHeadingAlign={tryHeroPreviewProps?.bannerHeadingAlign ?? undefined}
-            bannerHeadingValign={tryHeroPreviewProps?.bannerHeadingValign ?? undefined}
+            bannerHeadingAlign={
+              tryHeroPreviewProps?.bannerHeadingAlign ?? undefined
+            }
+            bannerHeadingValign={
+              tryHeroPreviewProps?.bannerHeadingValign ?? undefined
+            }
           />
         </div>
 
@@ -507,8 +660,7 @@ export default function FormPreview() {
               className={`transition-all duration-300 ${
                 activeField &&
                 (activeField.includes("about_title") ||
-                  activeField.includes("about_description") ||
-                  activeField.includes("about_link_title"))
+                  activeField.includes("about_description"))
                   ? "ring-2 ring-primary ring-opacity-50"
                   : ""
               }`}
@@ -516,12 +668,6 @@ export default function FormPreview() {
               <ExperienceSection
                 aboutTitle={formState.stepTwo?.about_title || ""}
                 aboutDescription={formState.stepTwo?.about_description || ""}
-                aboutLinkTitle={formState.stepTwo?.about_link_title || ""}
-                aboutCtaLink={
-                  tv.about_cta_link?.trim() ||
-                  themeTyped?.about_cta_link?.trim() ||
-                  null
-                }
               />
             </div>
           }
@@ -564,6 +710,16 @@ export default function FormPreview() {
       typeof formState.stepThree?.event_banner_video === "string"
         ? formState.stepThree.event_banner_video
         : undefined;
+    const legacyStepThreeTimeline = formState.stepThree as unknown as {
+      event_schedular_title?: string;
+      event_schedule_subtitle?: string;
+      event_schedular_custom_copy?: string;
+      event_schedular?: Array<{ title: string; time: string }>;
+    };
+    const activePreviewPackageLegacy =
+      activePreviewPackage as typeof activePreviewPackage & {
+        event_schedular_custom_copy?: string;
+      };
     const datesEventImage = eventBannerImageStr ?? eventBannerVideoStr;
 
     return (
@@ -601,16 +757,12 @@ export default function FormPreview() {
             }
             bannerImage={formState.stepThree?.event_banner_image ?? null}
             bannerVideo={formState.stepThree?.event_banner_video ?? null}
-            bannerHeadingAlign={
-              tryHeroPreviewProps?.bannerHeadingAlign ?? null
-            }
+            bannerHeadingAlign={tryHeroPreviewProps?.bannerHeadingAlign ?? null}
             bannerHeadingValign={
               tryHeroPreviewProps?.bannerHeadingValign ?? null
             }
             accentHint={tryHeroPreviewProps?.bannerHeadingAccent ?? null}
-            headingEmphasis={
-              tryHeroPreviewProps?.headingEmphasis ?? undefined
-            }
+            headingEmphasis={tryHeroPreviewProps?.headingEmphasis ?? undefined}
             emptyMediaSlot={
               <div className="flex flex-col items-center gap-2">
                 <ImageIcon size={40} className="text-white/40" aria-hidden />
@@ -641,7 +793,9 @@ export default function FormPreview() {
               about_event_description={
                 formState.stepThree?.about_event_description || ""
               }
-              headingEmphasis={tryHeroPreviewProps?.headingEmphasis ?? undefined}
+              headingEmphasis={
+                tryHeroPreviewProps?.headingEmphasis ?? undefined
+              }
               aboutHeadingAccentHint={
                 tryHeroPreviewProps?.bannerHeadingAccent ?? null
               }
@@ -653,16 +807,29 @@ export default function FormPreview() {
         <div
           ref={timelineRef}
           className={`transition-all duration-300 ${getHighlightClass(
-            3,
+            4,
             "event_schedular",
           )}`}
         >
           <Suspense fallback={<SectionLoader />}>
             <Timeline
               eventSchedularTitle={
-                formState.stepThree?.event_schedular_title || ""
+                activePreviewPackage?.event_schedular_title ||
+                legacyStepThreeTimeline.event_schedular_title ||
+                ""
               }
-              eventSchedular={formState.stepThree?.event_schedular || []}
+              eventSchedularCopy={
+                activePreviewPackage?.event_schedule_subtitle ||
+                activePreviewPackageLegacy?.event_schedular_custom_copy ||
+                legacyStepThreeTimeline.event_schedule_subtitle ||
+                legacyStepThreeTimeline.event_schedular_custom_copy ||
+                ""
+              }
+              eventSchedular={
+                activePreviewPackage?.event_schedular ||
+                legacyStepThreeTimeline.event_schedular ||
+                []
+              }
             />
           </Suspense>
         </div>
@@ -677,28 +844,26 @@ export default function FormPreview() {
         >
           <Suspense fallback={<SectionLoader />}>
             <PackageSection
-              heading={formState.stepFour?.package_title || ""}
+              heading={activePreviewPackage?.package_title || ""}
               image={
-                typeof formState.stepFour?.package_image === "string"
+                typeof activePreviewPackage?.package_image === "string"
                   ? {
-                      path: formState.stepFour.package_image,
-                      relativePath: formState.stepFour.package_image,
-                      preview: formState.stepFour.package_image,
+                      path: activePreviewPackage.package_image,
+                      relativePath: activePreviewPackage.package_image,
+                      preview: activePreviewPackage.package_image,
                     }
-                  : formState.stepFour?.package_image || null
+                  : activePreviewPackage?.package_image || null
               }
-              subHeading={formState.stepFour?.package_description || ""}
+              subHeading={activePreviewPackage?.package_description || ""}
               packageDetails={
-                formState?.stepFour?.package_details?.map((detail) => ({
+                activePreviewPackage?.package_details?.map((detail) => ({
                   title: detail.title || "",
                   description: detail.title || "", // Use title as description since it's not in the schema
                 })) || []
               }
-              buttonLink={
-                formState.stepFour?.package_button_name ? "#booking" : ""
+              headingEmphasis={
+                tryHeroPreviewProps?.headingEmphasis ?? undefined
               }
-              buttonName={formState.stepFour?.package_button_name || ""}
-              headingEmphasis={tryHeroPreviewProps?.headingEmphasis ?? undefined}
             />
           </Suspense>
         </div>
@@ -721,7 +886,7 @@ export default function FormPreview() {
           </Suspense>
         </div>
 
-        {/* Event Gallery */}
+        {/* Event Gallery — optional; hidden until at least one image is uploaded */}
         <div
           ref={galleryRef}
           className={`transition-all duration-300 ${getHighlightClass(
@@ -729,9 +894,23 @@ export default function FormPreview() {
             "gallery",
           )}`}
         >
-          <Suspense fallback={<SectionLoader />}>
-            <EventGallery gallery={galleryPreviewItems} />
-          </Suspense>
+          {galleryPreviewItems.length > 0 ? (
+            <Suspense fallback={<SectionLoader />}>
+              <EventGallery gallery={galleryPreviewItems} />
+            </Suspense>
+          ) : activeField?.includes("gallery") ? (
+            <section className="w-full bg-[color:var(--color-background)] py-16 px-4">
+              <div className="max-w-7xl mx-auto text-center">
+                <ImageIcon
+                  className="mx-auto mb-3 h-10 w-10 text-[var(--color-textDimmed,#64748b)] opacity-50"
+                  aria-hidden
+                />
+                <p className="text-sm text-[var(--color-textDimmed,#64748b)]">
+                  Gallery is optional. Uploaded images will appear here.
+                </p>
+              </div>
+            </section>
+          ) : null}
         </div>
 
         {/* Catering Options — same visibility rule as live event page */}
@@ -739,39 +918,13 @@ export default function FormPreview() {
           ref={menuRef}
           className={`transition-all duration-300 ${getHighlightClass(6, "")}`}
         >
-          {(formState.stepSix?.menus?.length ?? 0) > 0 && (
+          {(activePreviewCatering?.menus?.length ?? 0) > 0 && (
             <Suspense fallback={<SectionLoader />}>
               <MenuSection
-                menu_title={formState.stepSix?.menu_title || ""}
-                menu_description={formState.stepSix?.menu_description || ""}
-                catering_option={formState.stepSix?.catering_option ?? 1}
-                menus={formState.stepSix?.menus || []}
-              />
-            </Suspense>
-          )}
-        </div>
-
-        {/* Other Packages */}
-        <div
-          ref={drinkRef}
-          className={`transition-all duration-300 ${getHighlightClass(
-            7,
-            "other-packages",
-          )}`}
-        >
-          {(formState.stepSeven?.packages?.length ?? 0) > 0 && (
-            <Suspense fallback={<SectionLoader />}>
-              <DrinkSection
-                title={formState.stepSeven?.drink_title || ""}
-                description={formState.stepSeven?.drink_description || ""}
-                packages={
-                  formState.stepSeven?.packages.map((pkg) => ({
-                    title: pkg.title,
-                    description: pkg.description,
-                    price: Number(pkg.price),
-                  })) || []
-                }
-                defaultExpanded
+                menu_title={activePreviewCatering?.menu_title || ""}
+                menu_description={activePreviewCatering?.menu_description || ""}
+                catering_option={activePreviewCatering?.catering_option ?? 1}
+                menus={activePreviewCatering?.menus || []}
               />
             </Suspense>
           )}
@@ -781,27 +934,40 @@ export default function FormPreview() {
         <div
           ref={moreInfoRef}
           className={`transition-all duration-300 ${getHighlightClass(
-            8,
+            7,
             "more_info",
           )}`}
         >
           <BrochureSection
-            location={{
-              title: formState.stepEight?.location?.title || "",
-              description: formState.stepEight?.location?.description || "",
-              icon: formState.stepEight?.location?.icon || "",
-              latitude: formState.stepEight?.latitude,
-              longitude: formState.stepEight?.longitude,
-            }}
+            location={activePreviewBrochureLocation}
             downloads={downloadsArray}
-            price={{
-              title: formState.stepEight?.price?.title || "",
-              description: formState.stepEight?.price?.description || "",
-              link: formState.stepEight?.price?.link || "",
-              icon: formState.stepEight?.price?.icon || "",
-              price_title: formState.stepEight?.price?.price_title || "",
-            }}
+            price={activePreviewBrochurePrice}
           />
+        </div>
+        {/* Other Packages */}
+        <div
+          ref={drinkRef}
+          className={`transition-all duration-300 ${getHighlightClass(
+            8,
+            "other-packages",
+          )}`}
+        >
+          {(formState.stepEight?.packages?.length ?? 0) > 0 && (
+            <Suspense fallback={<SectionLoader />}>
+              <DrinkSection
+                title={formState.stepEight?.drink_title || ""}
+                description={formState.stepEight?.drink_description || ""}
+                packages={
+                  formState.stepEight?.packages.map((pkg) => ({
+                    title: pkg.title,
+                    description: pkg.description,
+                    price: Number(pkg.price),
+                  })) || []
+                }
+                defaultExpanded
+              />
+            </Suspense>
+          )}
         </div>
 
         {/* FAQs — same visibility rule as live event page */}
@@ -837,9 +1003,10 @@ export default function FormPreview() {
           ref={previewContainerRef}
           className="max-w-full min-h-0 flex-1 overflow-y-auto overflow-x-hidden scroll-smooth"
         >
-          {/* No transform here — Tailwind `scale-*` sets `transform` and traps `position:fixed` (Try theme tab) inside this box.
+          {/* No transform here — Tailwind `scale-*` sets `transform` and can trap `position:fixed` inside this box.
               Avoid overflow-x-hidden on this inner wrapper: with overflow-y visible, CSS forces overflow-y:auto here → extra scrollbar. */}
           <div className="w-full min-h-0 min-w-0 max-w-full origin-top scale-100">
+            {/* Room floating selector is rendered outside the scroll container (see below) */}
             {ONBOARDING_THEME_PREVIEW_STEPS.has(activeStep) &&
             tryThemePreviewValues ? (
               <div
@@ -865,20 +1032,12 @@ export default function FormPreview() {
             )}
           </div>
         </div>
-        {/* Outside scroll + no transformed ancestors so `fixed` in Try theme pins to the viewport (whole preview column), not the content width. */}
-        {ONBOARDING_THEME_PREVIEW_STEPS.has(activeStep) &&
-          tryThemePreviewValues && (
-            <PreviewThemeCustomizer
-              values={tryThemePreviewValues}
-              onValuesChange={handleTryThemeValuesChange}
-              brandName={
-                formState.stepOne?.name?.trim() ||
-                (theme as ThemeSchema | null | undefined)?.name?.trim() ||
-                "Your site"
-              }
-              sheetDescription="Tap colors or fonts — your preview updates live. Same Try theme flow as Site Essentials; save permanently there after onboarding."
-            />
-          )}
+
+        {/* Room floating selector — outside the scroll container so it never affects CommonHeader layout.
+            Absolutely positioned within the <section> (which is `relative`), sitting just below the header. */}
+        {ROOM_FLOATING_SELECTOR_STEPS.has(activeStep) && (
+          <PreviewRoomFloatingSelector visible={isPastTimeline} />
+        )}
       </section>
     </PreviewProvider>
   );

@@ -23,8 +23,8 @@ export const AI_EVENT_APPLY_STEPS = [
   { label: "Packages", icon: "📦" },
   { label: "Dates, tickets & tables", icon: "🎟️" },
   { label: "Catering & menu", icon: "🍽️" },
+  { label: "Brochure info", icon: "📍" },
   { label: "Other packages", icon: "🥂" },
-  { label: "Location & pricing", icon: "📍" },
   { label: "FAQs", icon: "❓" },
 ] as const;
 
@@ -203,20 +203,70 @@ export async function applyAIGeneratedEventToBackend(params: {
   });
   await sleep(300);
 
+  const stepFiveAny = s.stepFive as Record<string, unknown>;
+  const stepSixAny = s.stepSix as Record<string, unknown>;
+  const legacyAiShape =
+    typeof stepFiveAny.drink_title === "string" || Array.isArray(stepFiveAny.packages);
+
+  const brochureSource = (legacyAiShape ? stepSixAny : stepFiveAny) as {
+    event_address?: string;
+    price_start_from?: string;
+    price_start_from_button_text?: string;
+  };
+  const drinksSource = (legacyAiShape ? stepFiveAny : stepSixAny) as {
+    drink_title?: string;
+    drink_description?: string;
+    packages?: Array<{
+      title?: string;
+      description?: string;
+      price?: number;
+      available_quantity?: number;
+    }>;
+  };
+
+  const brochureSectionRemoved = legacyAiShape
+    ? removedSections.has("stepSix")
+    : removedSections.has("stepFive");
+  const drinksSectionRemoved = legacyAiShape
+    ? removedSections.has("stepFive")
+    : removedSections.has("stepSix");
+
   onProgress?.(4);
-  const drinksSectionRemoved = removedSections.has("stepFive");
-  const mappedDrinkPackages = (s.stepFive.packages ?? [])
+  if (!brochureSectionRemoved) {
+    const stepFiveFD = new FormData();
+    stepFiveFD.append("step", "5");
+    stepFiveFD.append("event_id", String(eventId));
+    stepFiveFD.append(
+      "event_address",
+      String(brochureSource.event_address || eventInput.venueAddress || "")
+    );
+    stepFiveFD.append(
+      "price_start_from",
+      String(brochureSource.price_start_from || "0")
+    );
+    stepFiveFD.append(
+      "price_start_from_button_text",
+      String(brochureSource.price_start_from_button_text || "Book Now")
+    );
+    stepFiveFD.append("lat", "51.5074");
+    stepFiveFD.append("long", "-0.1278");
+    await eventsService.storeStepFiveData(stepFiveFD as unknown as never);
+  }
+  await sleep(300);
+
+  onProgress?.(5);
+  const mappedDrinkPackages = (drinksSource.packages ?? [])
     .filter((p) => String(p.title ?? "").trim() !== "")
     .map((p) => ({
-      title: p.title,
-      description: p.description,
-      price: p.price,
-      available_quantity: p.available_quantity,
+      title: p.title || "",
+      description: p.description || "",
+      price: p.price ?? 0,
+      available_quantity: p.available_quantity ?? 0,
     }));
   const hasUsableDrinksContent =
     !drinksSectionRemoved &&
-    String(s.stepFive.drink_title ?? "").trim() !== "" &&
-    String(s.stepFive.drink_description ?? "").trim() !== "" &&
+    String(drinksSource.drink_title ?? "").trim() !== "" &&
+    String(drinksSource.drink_description ?? "").trim() !== "" &&
     mappedDrinkPackages.length > 0;
 
   const placeholderDrinkPackages = [
@@ -228,32 +278,15 @@ export async function applyAIGeneratedEventToBackend(params: {
     },
   ];
 
-  await eventsService.storeStepFiveData({
-    step: 5 as const,
+  await eventsService.storeStepSixData({
+    step: 6 as const,
     event_id: eventId,
-    drink_title: hasUsableDrinksContent ? s.stepFive.drink_title.trim() : "Drinks",
+    drink_title: hasUsableDrinksContent ? String(drinksSource.drink_title).trim() : "Drinks",
     drink_description: hasUsableDrinksContent
-      ? s.stepFive.drink_description.trim()
+      ? String(drinksSource.drink_description).trim()
       : "Drink packages",
     packages: hasUsableDrinksContent ? mappedDrinkPackages : placeholderDrinkPackages,
-  });
-  await sleep(300);
-
-  onProgress?.(5);
-  if (!removedSections.has("stepSix")) {
-    const stepSixFD = new FormData();
-    stepSixFD.append("step", "6");
-    stepSixFD.append("event_id", String(eventId));
-    stepSixFD.append("event_address", s.stepSix.event_address || eventInput.venueAddress || "");
-    stepSixFD.append("price_start_from", s.stepSix.price_start_from || "0");
-    stepSixFD.append(
-      "price_start_from_button_text",
-      s.stepSix.price_start_from_button_text || "Book Now"
-    );
-    stepSixFD.append("lat", "51.5074");
-    stepSixFD.append("long", "-0.1278");
-    await eventsService.storeStepSixData(stepSixFD);
-  }
+  } as never);
   await sleep(300);
 
   onProgress?.(6);

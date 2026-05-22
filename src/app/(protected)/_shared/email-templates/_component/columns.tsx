@@ -1,15 +1,13 @@
 import { ColumnDef } from "@tanstack/react-table";
 import { DataTableColumnHeader } from "@/components/data-table/data-table-column-header";
-import { Button } from "@/components/ui/button";
 import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { SquarePen } from "lucide-react";
 import React from "react";
 import { DataTableRowAction, EmailTemplate } from "../_lib/types";
-import { PermissionGuard } from "@/components/permission";
+import { EmailTemplateRowActions } from "./email-template-row-actions";
 
 interface GetColumnsProps {
   setRowAction: React.Dispatch<
@@ -125,15 +123,7 @@ export function getColumns({
       cell: ({ row }) => {
         return (
           <nav className="flex space-x-3">
-            <PermissionGuard permissionKey="update-email-template">
-              <Button
-                onClick={() => setRowAction({ row, type: "update" })}
-                variant="outline"
-                size="sm"
-              >
-                <SquarePen className="text-base" strokeWidth={2} />
-              </Button>
-            </PermissionGuard>
+            <EmailTemplateRowActions row={row} setRowAction={setRowAction} />
           </nav>
         );
       },

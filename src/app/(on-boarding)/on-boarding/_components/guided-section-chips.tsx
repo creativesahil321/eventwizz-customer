@@ -159,6 +159,7 @@ export function GuidedMultiSectionBottomActions({
   allSectionsApproved,
   onContinue,
   loading = false,
+  labelWhenReady,
   extraActions,
   className,
 }: {
@@ -166,6 +167,7 @@ export function GuidedMultiSectionBottomActions({
   allSectionsApproved: boolean;
   onContinue: () => void | Promise<void>;
   loading?: boolean;
+  labelWhenReady?: string;
   extraActions?: ReactNode;
   className?: string;
 }) {
@@ -191,7 +193,7 @@ export function GuidedMultiSectionBottomActions({
       ? "Saving..."
       : "Validating..."
     : allSectionsApproved
-      ? "Save & continue"
+      ? (labelWhenReady ?? "Save & continue")
       : "Validate, approve & continue";
 
   return (
@@ -233,6 +235,7 @@ export function GuidedWholeStepBottomActions({
   onContinue,
   loading = false,
   labelWhenReady,
+  alwaysShowReadyLabel = false,
   continueDisabled = false,
   continueTitle,
   extraActions,
@@ -246,6 +249,7 @@ export function GuidedWholeStepBottomActions({
   onContinue: () => void | Promise<void>;
   loading?: boolean;
   labelWhenReady: string;
+  alwaysShowReadyLabel?: boolean;
   continueDisabled?: boolean;
   continueTitle?: string;
   extraActions?: ReactNode;
@@ -281,7 +285,7 @@ export function GuidedWholeStepBottomActions({
     ? approving
       ? "Validating..."
       : "Saving..."
-    : guided.allSectionsApproved
+    : alwaysShowReadyLabel || guided.allSectionsApproved
       ? labelWhenReady
       : "Validate, approve & continue";
 

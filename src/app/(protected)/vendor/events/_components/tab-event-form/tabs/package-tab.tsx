@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useCallback, useState, useEffect } from "react";
-import { useForm, useFieldArray } from "react-hook-form";
+import { useForm, useFieldArray, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -18,6 +18,8 @@ import { FileUploader } from "@/components/ui/file-uploader";
 import { Trash, PlusCircle, GripVertical } from "lucide-react";
 import { toast } from "sonner";
 import { Accept } from "react-dropzone";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Label } from "@/components/ui/label";
 import { useEventFormContext } from "../../events-form-provider";
 import { StepTwoType, stepTwoSchema } from "../schema";
 import { eventsService } from "@/services/vendor/events/events.service";
@@ -40,6 +42,38 @@ interface GalleryItem {
   url: string;
   preview?: string;
 }
+
+const normalizePackageDetails = (
+  details: Array<{ title?: string } | undefined> | undefined
+) => {
+  const normalized = (details || [])
+    .map((detail) => ({ title: String(detail?.title || "") }))
+    .filter((detail) => detail.title.trim().length > 0);
+  return normalized.length > 0 ? normalized : [{ title: "" }];
+};
+
+const isRoomPackageFilled = (
+  room:
+    | {
+        package_title?: string;
+        package_description?: string;
+        package_button_name?: string;
+        package_details?: Array<{ title?: string }>;
+      }
+    | undefined
+) => {
+  if (!room) return false;
+  const hasTitle = String(room.package_title || "").trim().length > 0;
+  const hasDescription =
+    String(room.package_description || "").trim().length > 0;
+  const hasButtonName = String(room.package_button_name || "").trim().length > 0;
+  const hasDetails = Array.isArray(room.package_details)
+    ? room.package_details.some(
+        (detail) => String(detail?.title || "").trim().length > 0
+      )
+    : false;
+  return hasTitle && hasDescription && hasButtonName && hasDetails;
+};
 
 export default function PackageTab() {
   const currencySymbol = useCurrencySymbol();
@@ -67,12 +101,16 @@ export default function PackageTab() {
     defaultValues: {
       step: 2,
       event_id: getEventId(),
+      is_rooms: globalForm.getValues().stepTwo?.is_rooms === 1 ? 1 : 0,
+      active_room_index: globalForm.getValues().stepTwo?.active_room_index || 0,
+      rooms: globalForm.getValues().stepTwo?.rooms || [],
       package_image: globalForm.getValues().stepTwo?.package_image,
       package_title: globalForm.getValues().stepTwo?.package_title || "",
       package_description:
         globalForm.getValues().stepTwo?.package_description || "",
       package_button_name:
         globalForm.getValues().stepTwo?.package_button_name || "",
+      package_button_link: globalForm.getValues().stepTwo?.package_button_link || "",
       package_details: globalForm.getValues().stepTwo?.package_details || [
         { title: "" },
       ],
@@ -96,6 +134,14 @@ export default function PackageTab() {
   const [draggedItem, setDraggedItem] = useState<number | null>(null);
   const [draggedOverItem, setDraggedOverItem] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const isRoomsEnabled = useWatch({
+    control: globalForm.control,
+    name: "stepTwo.is_rooms",
+  });
+  const activeRoomIndex = useWatch({
+    control: globalForm.control,
+    name: "stepTwo.active_room_index",
+  });
 
   // Sync local form changes to global form
   useEffect(() => {
@@ -106,11 +152,87 @@ export default function PackageTab() {
           ...globalForm.getValues().stepTwo,
           [fieldName]: value[fieldName],
         });
+
+        if (
+          isRoomsEnabled === 1 &&
+          ["package_title", "package_description", "package_button_name", "package_details"].includes(name)
+        ) {
+          const rooms = (globalForm.getValues().stepTwo?.rooms || []) as NonNullable<
+            StepTwoType["rooms"]
+          >;
+          if (rooms.length > 0) {
+            const idx =
+              typeof activeRoomIndex === "number" && activeRoomIndex >= 0
+                ? Math.min(activeRoomIndex, rooms.length - 1)
+                : 0;
+            const updatedRooms = rooms.map((room, roomIndex) =>
+              roomIndex === idx
+                ? {
+                    ...room,
+                    package_title:
+                      value.package_title ?? room.package_title ?? "",
+                    package_description:
+                      value.package_description ?? room.package_description ?? "",
+                    package_button_name:
+                      value.package_button_name ?? room.package_button_name ?? "",
+                    package_button_link:
+                      value.package_button_link ?? room.package_button_link ?? "",
+                    package_details: normalizePackageDetails(
+                      (value.package_details as Array<{ title?: string } | undefined> | undefined) ??
+                        room.package_details
+                    ),
+                  }
+                : room
+            );
+            globalForm.setValue("stepTwo.rooms", updatedRooms, {
+              shouldDirty: true,
+              shouldTouch: false,
+            });
+          }
+        }
       }
     });
 
     return () => subscription.unsubscribe();
-  }, [form, globalForm]);
+  }, [form, globalForm, isRoomsEnabled, activeRoomIndex]);
+
+  useEffect(() => {
+    if (isRoomsEnabled !== 1) return;
+    const rooms = (globalForm.getValues().stepTwo?.rooms || []) as NonNullable<
+      StepTwoType["rooms"]
+    >;
+    if (!rooms.length) return;
+    const idx =
+      typeof activeRoomIndex === "number" && activeRoomIndex >= 0
+        ? Math.min(activeRoomIndex, rooms.length - 1)
+        : 0;
+    const room = rooms[idx];
+    if (!room) return;
+
+    form.setValue("package_title", room.package_title || "", {
+      shouldDirty: false,
+      shouldTouch: false,
+    });
+    form.setValue("package_description", room.package_description || "", {
+      shouldDirty: false,
+      shouldTouch: false,
+    });
+    form.setValue("package_button_name", room.package_button_name || "", {
+      shouldDirty: false,
+      shouldTouch: false,
+    });
+    form.setValue("package_button_link", room.package_button_link || "", {
+      shouldDirty: false,
+      shouldTouch: false,
+    });
+    form.setValue(
+      "package_details",
+      normalizePackageDetails(
+        room.package_details as Array<{ title?: string } | undefined> | undefined
+      ),
+      { shouldDirty: false, shouldTouch: false }
+    );
+  }, [isRoomsEnabled, activeRoomIndex, globalForm, form]);
 
   // Initialize URL value from form on mount
   useEffect(() => {
@@ -285,14 +407,82 @@ export default function PackageTab() {
           data.package_image = packageImage[0];
         }
 
+        let payload: StepTwoType = { ...data };
+        if (isRoomsEnabled === 1) {
+          const existingRooms = (globalForm.getValues().stepTwo?.rooms || []) as NonNullable<
+            StepTwoType["rooms"]
+          >;
+          if (existingRooms.length === 0) {
+            toast.error("Please create at least one room first.");
+            setIsLoading(false);
+            return;
+          }
+
+          const idx =
+            typeof activeRoomIndex === "number" && activeRoomIndex >= 0
+              ? Math.min(activeRoomIndex, existingRooms.length - 1)
+              : 0;
+
+          const syncedRooms = existingRooms.map((room, roomIndex) =>
+            roomIndex === idx
+              ? {
+                  ...room,
+                  package_title: data.package_title,
+                  package_description: data.package_description,
+                  package_button_name: data.package_button_name,
+                  package_button_link:
+                    data.package_button_link || room.package_button_link || "",
+                  package_details: data.package_details,
+                }
+              : room
+          );
+
+          if (syncedRooms.length < 2) {
+            toast.error("Please create at least 2 rooms.");
+            setIsLoading(false);
+            return;
+          }
+
+          const nextUnfilledIndex = syncedRooms.findIndex(
+            (room) => !isRoomPackageFilled(room)
+          );
+
+          payload = {
+            ...data,
+            is_rooms: 1,
+            rooms: syncedRooms,
+            active_room_index: idx,
+          };
+
+          globalForm.setValue("stepTwo", {
+            ...globalForm.getValues().stepTwo,
+            ...payload,
+          });
+
+          if (nextUnfilledIndex !== -1) {
+            globalForm.setValue("stepTwo.active_room_index", nextUnfilledIndex, {
+              shouldDirty: false,
+              shouldTouch: false,
+            });
+            toast.info("Room saved. Continue filling remaining room data.");
+            setIsLoading(false);
+            return;
+          }
+        } else {
+          payload = {
+            ...data,
+            is_rooms: 0,
+          };
+        }
+
         // Update global form with all fields
         globalForm.setValue("stepTwo", {
           ...globalForm.getValues().stepTwo,
-          ...data,
+          ...payload,
         });
 
         // Call the API directly using eventsService
-        const response = await eventsService.storeStepTwoData(data);
+        const response = await eventsService.storeStepTwoData(payload);
 
         if (response && response.status) {
           // Sync form with saved gallery from response (cap at 8; backend may return more until delete logic is fixed)
@@ -322,7 +512,7 @@ export default function PackageTab() {
         setIsLoading(false);
       }
     },
-    [form, globalForm, save, setActiveField, packageImage]
+    [form, globalForm, save, setActiveField, packageImage, isRoomsEnabled, activeRoomIndex]
   );
 
   return (
@@ -346,6 +536,48 @@ export default function PackageTab() {
             <div className="flex items-center gap-3">
               <h2 className="text-xl font-bold title-header">Event Package</h2>
             </div>
+
+            <FormField
+              control={form.control}
+              name="is_rooms"
+              render={({ field }) => (
+                <FormItem className="rounded-lg border border-[#E5E7EB] p-4 bg-[#FAFCFC]">
+                  <FormLabel className="text-sm font-semibold">
+                    Do you have a room system?
+                  </FormLabel>
+                  <FormControl>
+                    <RadioGroup
+                      value={String(field.value ?? 0)}
+                      onValueChange={(value) => {
+                        const nextValue = value === "1" ? 1 : 0;
+                        field.onChange(nextValue);
+                        globalForm.setValue("stepTwo.is_rooms", nextValue, {
+                          shouldDirty: true,
+                          shouldTouch: true,
+                        });
+                      }}
+                      className="flex items-center gap-6 pt-2"
+                    >
+                      <FormItem className="flex items-center space-x-2 space-y-0">
+                        <FormControl>
+                          <RadioGroupItem value="1" />
+                        </FormControl>
+                        <Label className="font-medium cursor-pointer">Yes</Label>
+                      </FormItem>
+                      <FormItem className="flex items-center space-x-2 space-y-0">
+                        <FormControl>
+                          <RadioGroupItem value="0" />
+                        </FormControl>
+                        <Label className="font-medium cursor-pointer">No</Label>
+                      </FormItem>
+                    </RadioGroup>
+                  </FormControl>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Enable this if your event has room-wise package, dates, menu, and brochure flows.
+                  </p>
+                </FormItem>
+              )}
+            />
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {/* Package Title */}
@@ -832,7 +1064,13 @@ export default function PackageTab() {
               disabled={isLoading || globalLoading || readOnly}
               variant="event-primary"
             >
-              {readOnly ? "View only" : isLoading || globalLoading ? "Saving..." : "Save & Next"}
+              {readOnly
+                ? "View only"
+                : isLoading || globalLoading
+                ? "Saving..."
+                : isRoomsEnabled === 1
+                ? "Save Room Data"
+                : "Save & Next"}
             </Button>
           </div>
         </form>

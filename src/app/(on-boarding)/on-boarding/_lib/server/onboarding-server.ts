@@ -23,22 +23,23 @@ export async function getServerOnboardingData(): Promise<ApiResponse | null> {
   };
 
   try {
-    // Log the full URL that will be used
-    const endpoint = API_ENDPOINTS.VENDOR.ONBOARDING.GET_ALL_STEPS.replace(
-      "{location_id}",
-      String(locationId)
-    );
-    console.log(`Fetching onboarding data with endpoint: ${endpoint}`);
+    const fetchByRoomMode = async (isRooms: boolean) =>
+      request<ApiResponse>({
+        url: API_ENDPOINTS.VENDOR.ONBOARDING.GET_ALL_STEPS.replace(
+          "{location_id}",
+          String(locationId),
+        ).replace("{is_rooms}", isRooms ? "true" : "false"),
+        method: "GET",
+        headers,
+        returnFullResponse: true,
+      });
 
-    // Call the API directly with the correct endpoint
-    const response = await request<ApiResponse>({
-      url: endpoint,
-      method: "GET",
-      headers,
-      returnFullResponse: true,
-    });
-
-    console.log("Onboarding API response status:", response.status);
+    // Probe room mode first, then fallback to non-room mode.
+    // This avoids hardcoding `/false` for venues that already use rooms.
+    const roomResponse = await fetchByRoomMode(true);
+    const response = roomResponse.status
+      ? roomResponse
+      : await fetchByRoomMode(false);
 
     // If successful, process and return the data
     if (response.status) {

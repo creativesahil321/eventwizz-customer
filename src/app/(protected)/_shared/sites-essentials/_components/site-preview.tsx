@@ -117,8 +117,6 @@ export function SitePreview({ formValues }: Readonly<SitePreviewProps>) {
           <ExperienceSection
             aboutTitle={formValues.about_title || null}
             aboutDescription={formValues.about_description || null}
-            aboutLinkTitle={formValues.about_link_title || null}
-            aboutCtaLink={formValues.about_cta_link || null}
           />
         }
         latestEvents={[]}

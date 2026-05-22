@@ -6,7 +6,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { eventsService } from "@/services/vendor/events/events.service";
 import { Button } from "@/components/ui/button";
 import { Form } from "@/components/ui/form";
-import { StepSixType, stepSixSchema } from "../schema";
+import { StepFiveType, stepFiveSchema } from "../schema";
 import { useEventFormContext } from "../../events-form-provider";
 import { toast } from "sonner";
 import {
@@ -23,7 +23,12 @@ import EventLocationMap from "./_components/event-location-map";
 
 export default function MoreInfoTab() {
   const [isLoading, setIsLoading] = useState(false);
-  const { form: globalForm, save, setActiveField, readOnly } = useEventFormContext();
+  const {
+    form: globalForm,
+    save,
+    setActiveField,
+    readOnly,
+  } = useEventFormContext();
 
   // Track if we have string URLs from backend
   const [brochurePdfUrl, setBrochurePdfUrl] = useState<string | null>(null);
@@ -43,37 +48,31 @@ export default function MoreInfoTab() {
   };
 
   // Initialize form with combined step data
-  const stepSixDefaults = globalForm.getValues().stepSix;
+  const stepFiveDefaults = globalForm.getValues().stepFive;
   const eventId = getEventId();
 
   // Setup form with the new schema structure
-  const form = useForm<StepSixType>({
-    resolver: zodResolver(stepSixSchema),
+  const form = useForm<StepFiveType>({
+    resolver: zodResolver(stepFiveSchema),
     mode: "onChange",
     defaultValues: {
-      step: 6,
+      step: 5,
       event_id: eventId,
-      brochure_pdf: stepSixDefaults?.brochure_pdf || null,
-      brochure_pdf_2: stepSixDefaults?.brochure_pdf_2 || null,
-      faq_pdf: stepSixDefaults?.faq_pdf || null,
-      event_address: stepSixDefaults?.event_address || "",
-      latitude: stepSixDefaults?.latitude || undefined,
-      longitude: stepSixDefaults?.longitude || undefined,
-      price_start_from: stepSixDefaults?.price_start_from || "",
+      brochure_pdf: stepFiveDefaults?.brochure_pdf || null,
+      brochure_pdf_2: stepFiveDefaults?.brochure_pdf_2 || null,
+      faq_pdf: stepFiveDefaults?.faq_pdf || null,
+      event_address: stepFiveDefaults?.event_address || "",
+      latitude: stepFiveDefaults?.latitude || undefined,
+      longitude: stepFiveDefaults?.longitude || undefined,
+      price_start_from: stepFiveDefaults?.price_start_from || "",
       price_start_from_button_text:
-        stepSixDefaults?.price_start_from_button_text || "Book Now",
-      location: stepSixDefaults?.location || {
+        stepFiveDefaults?.price_start_from_button_text || "Book Now",
+      location: stepFiveDefaults?.location || {
         title: "LOCATION",
         description: "",
         icon: "MapPin",
       },
-      price: stepSixDefaults?.price || undefined,
-      downloads: stepSixDefaults?.downloads || [],
-      more_info: stepSixDefaults?.more_info || [],
-      remove_brochure_pdf: false,
-      remove_brochure_pdf_2: false,
-      remove_faq_pdf: false,
-    } as StepSixType,
+    } as StepFiveType,
   });
 
   // Update form when eventId changes
@@ -93,8 +92,9 @@ export default function MoreInfoTab() {
 
   // Initialize URL values from global form on mount
   useEffect(() => {
-    const brochurePdf = globalForm.getValues("stepSix.brochure_pdf");
-    const faqPdf = globalForm.getValues("stepSix.faq_pdf");
+    const brochurePdf = globalForm.getValues("stepFive.brochure_pdf");
+    const faqPdf = globalForm.getValues("stepFive.faq_pdf");
+    const brochurePdf2 = globalForm.getValues("stepFive.brochure_pdf_2");
 
     // Check if values are string URLs
     if (typeof brochurePdf === "string" && brochurePdf) {
@@ -103,6 +103,10 @@ export default function MoreInfoTab() {
 
     if (typeof faqPdf === "string" && faqPdf) {
       setFaqPdfUrl(faqPdf);
+    }
+
+    if (typeof brochurePdf2 === "string" && brochurePdf2) {
+      setBrochurePdfUrl2(brochurePdf2);
     }
   }, [globalForm]);
 
@@ -120,12 +124,12 @@ export default function MoreInfoTab() {
       setBrochurePdfUrl(null);
       // Clear removal flag when new file is uploaded
       form.setValue("remove_brochure_pdf", false);
-      globalForm.setValue("stepSix.remove_brochure_pdf", false);
+      globalForm.setValue("stepFive.remove_brochure_pdf", false);
     } else {
       setBrochurePdfUrl(null);
       // Set removal flag when file is removed
       form.setValue("remove_brochure_pdf", true);
-      globalForm.setValue("stepSix.remove_brochure_pdf", true);
+      globalForm.setValue("stepFive.remove_brochure_pdf", true);
     }
   };
 
@@ -143,12 +147,12 @@ export default function MoreInfoTab() {
       setFaqPdfUrl(null);
       // Clear removal flag when new file is uploaded
       form.setValue("remove_faq_pdf", false);
-      globalForm.setValue("stepSix.remove_faq_pdf", false);
+      globalForm.setValue("stepFive.remove_faq_pdf", false);
     } else {
       setFaqPdfUrl(null);
       // Set removal flag when file is removed
       form.setValue("remove_faq_pdf", true);
-      globalForm.setValue("stepSix.remove_faq_pdf", true);
+      globalForm.setValue("stepFive.remove_faq_pdf", true);
     }
   };
 
@@ -159,12 +163,12 @@ export default function MoreInfoTab() {
       setBrochurePdfUrl2(null);
       // Clear removal flag when new file is uploaded
       form.setValue("remove_brochure_pdf_2", false);
-      globalForm.setValue("stepSix.remove_brochure_pdf_2", false);
+      globalForm.setValue("stepFive.remove_brochure_pdf_2", false);
     } else {
       setBrochurePdfUrl2(null);
       // Set removal flag when file is removed
       form.setValue("remove_brochure_pdf_2", true);
-      globalForm.setValue("stepSix.remove_brochure_pdf_2", true);
+      globalForm.setValue("stepFive.remove_brochure_pdf_2", true);
     }
   };
 
@@ -172,11 +176,11 @@ export default function MoreInfoTab() {
   useEffect(() => {
     const subscription = form.watch((value) => {
       if (value) {
-        globalForm.setValue("stepSix", {
+        globalForm.setValue("stepFive", {
           ...value,
           price_start_from_button_text:
             value.price_start_from_button_text || "Book Now",
-        } as StepSixType);
+        } as StepFiveType);
       }
     });
 
@@ -185,7 +189,7 @@ export default function MoreInfoTab() {
 
   // Handle form submission
   const handleSubmit = useCallback(
-    async (data: StepSixType) => {
+    async (data: StepFiveType) => {
       setIsLoading(true);
 
       try {
@@ -293,15 +297,15 @@ export default function MoreInfoTab() {
         }
 
         // Update global form with all fields
-        globalForm.setValue("stepSix", {
-          ...globalForm.getValues().stepSix,
+        globalForm.setValue("stepFive", {
+          ...globalForm.getValues().stepFive,
           ...data,
           price_start_from_button_text:
             data.price_start_from_button_text || "Book Now",
-        } as StepSixType);
+        } as StepFiveType);
 
         // Call the API directly using eventsService
-        const response = await eventsService.storeStepSixData(data);
+        const response = await eventsService.storeStepFiveData(data);
 
         if (response && response.status) {
           // Success message is handled by axios interceptor
@@ -381,7 +385,7 @@ export default function MoreInfoTab() {
                                 form.setValue("brochure_pdf", null);
                                 form.setValue("remove_brochure_pdf", true);
                                 globalForm.setValue(
-                                  "stepSix.remove_brochure_pdf",
+                                  "stepFive.remove_brochure_pdf",
                                   true,
                                 );
                                 handleBrochureUpload(null);
@@ -458,7 +462,7 @@ export default function MoreInfoTab() {
                                 form.setValue("brochure_pdf_2", null);
                                 form.setValue("remove_brochure_pdf_2", true);
                                 globalForm.setValue(
-                                  "stepSix.remove_brochure_pdf_2",
+                                  "stepFive.remove_brochure_pdf_2",
                                   true,
                                 );
                                 handleBrochureUpload2(null);
@@ -537,7 +541,7 @@ export default function MoreInfoTab() {
                                 form.setValue("faq_pdf", null);
                                 form.setValue("remove_faq_pdf", true);
                                 globalForm.setValue(
-                                  "stepSix.remove_faq_pdf",
+                                  "stepFive.remove_faq_pdf",
                                   true,
                                 );
                                 handleFaqUpload(null);
@@ -600,8 +604,8 @@ export default function MoreInfoTab() {
                           field.onChange(address);
                           // Update location for preview
                           const currentStepSix =
-                            globalForm.getValues("stepSix") || {};
-                          globalForm.setValue("stepSix", {
+                            globalForm.getValues("stepFive") || {};
+                          globalForm.setValue("stepFive", {
                             ...currentStepSix,
                             event_address: address,
                             location: {
@@ -615,8 +619,8 @@ export default function MoreInfoTab() {
                           field.onChange(address);
                           // Update global form
                           const currentStepSix =
-                            globalForm.getValues("stepSix") || {};
-                          globalForm.setValue("stepSix", {
+                            globalForm.getValues("stepFive") || {};
+                          globalForm.setValue("stepFive", {
                             ...currentStepSix,
                             event_address: address,
                             location: {
@@ -655,9 +659,10 @@ export default function MoreInfoTab() {
                   form.setValue("longitude", location.longitude);
 
                   // Update global form
-                  const currentStepSix = globalForm.getValues("stepSix") || {};
-                  globalForm.setValue("stepSix", {
-                    ...currentStepSix,
+                  const currentStepFive =
+                    globalForm.getValues("stepFive") || {};
+                  globalForm.setValue("stepFive", {
+                    ...currentStepFive,
                     event_address: location.address,
                     latitude: location.latitude,
                     longitude: location.longitude,
@@ -715,49 +720,51 @@ export default function MoreInfoTab() {
                 )}
               />
 
-                <FormField
-                  control={control}
-                  name="price_start_from_button_text"
-                  render={({ field }) => {
-                    const currentLength = field.value?.length || 0;
-                    const maxLength = 18;
-                    return (
-                      <FormItem>
-                        <FormLabel className="text-sm font-medium">
-                          Button Text
-                        </FormLabel>
-                        <FormControl>
-                          <Input
-                            {...field}
-                            placeholder="e.g. Book Now"
-                            className="h-10 bg-[#F9FAFB] border-[#E5E7EB]"
-                            maxLength={maxLength}
-                            onFocus={() =>
-                              handleFieldFocus("price_start_from_button_text")
-                            }
-                          />
-                        </FormControl>
-                        <div className="text-xs text-gray-500 mt-1">
-                          <span
-                            className={
-                              currentLength > maxLength
-                                ? "text-red-500"
-                                : ""
-                            }
-                          >
-                            {currentLength}/{maxLength} characters
-                          </span>
-                        </div>
-                        <FormMessage />
-                      </FormItem>
-                    );
-                  }}
-                />
+              <FormField
+                control={control}
+                name="price_start_from_button_text"
+                render={({ field }) => {
+                  const currentLength = field.value?.length || 0;
+                  const maxLength = 18;
+                  return (
+                    <FormItem>
+                      <FormLabel className="text-sm font-medium">
+                        Button Text
+                      </FormLabel>
+                      <FormControl>
+                        <Input
+                          {...field}
+                          placeholder="e.g. Book Now"
+                          className="h-10 bg-[#F9FAFB] border-[#E5E7EB]"
+                          maxLength={maxLength}
+                          onFocus={() =>
+                            handleFieldFocus("price_start_from_button_text")
+                          }
+                        />
+                      </FormControl>
+                      <div className="text-xs text-gray-500 mt-1">
+                        <span
+                          className={
+                            currentLength > maxLength ? "text-red-500" : ""
+                          }
+                        >
+                          {currentLength}/{maxLength} characters
+                        </span>
+                      </div>
+                      <FormMessage />
+                    </FormItem>
+                  );
+                }}
+              />
             </div>
           </div>
 
           <div className="flex justify-end gap-4 pt-4">
-            <Button type="submit" disabled={isLoading || readOnly} variant="event-primary">
+            <Button
+              type="submit"
+              disabled={isLoading || readOnly}
+              variant="event-primary"
+            >
               {readOnly ? "View only" : isLoading ? "Saving..." : "Save & Next"}
             </Button>
           </div>

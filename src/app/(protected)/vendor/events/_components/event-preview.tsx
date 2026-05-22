@@ -354,16 +354,7 @@ export function EventPreview({
           />
         </div>
 
-        <EventGallery
-          gallery={
-            galleryImages ??
-            Array.from({ length: 8 }, () => ({
-              path: "/assets/images/gallery-image.png",
-              relativePath: "/assets/images/gallery-image.png",
-              preview: "/assets/images/gallery-image.png",
-            }))
-          }
-        />
+        <EventGallery gallery={galleryImages} />
 
         {showMenu && (
           <LazyMenuSection

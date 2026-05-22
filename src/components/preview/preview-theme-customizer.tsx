@@ -59,6 +59,7 @@ import {
   isLightUiBackground,
   paletteAccessibilityFlags,
 } from "@/lib/wcag-color-contrast";
+import { usePermission } from "@/hooks/usePermission";
 
 const PREVIEW_TRY_THEME_LAST_FONT_KEY = "eventwizz:preview-try-theme:last-font";
 const PREVIEW_TRY_THEME_LAST_COLOR_KEY =
@@ -138,6 +139,7 @@ export function PreviewThemeCustomizer({
   onSaveTheme,
   isSavingTheme = false,
 }: PreviewThemeCustomizerProps) {
+  const canPersistSiteEssentials = usePermission("update-site-essential");
   useSiteEssentialsPresetFontsPreload();
   const [open, setOpen] = useState(false);
   const [colorFilter, setColorFilter] = useState<"all" | "dark" | "light">(
@@ -400,17 +402,31 @@ export function PreviewThemeCustomizer({
               <Button
                 type="button"
                 className="w-full border border-slate-200 bg-white font-medium text-slate-900 shadow-sm hover:bg-slate-50"
-                disabled={isSavingTheme}
+                disabled={isSavingTheme || !canPersistSiteEssentials}
                 onClick={() => void onSaveTheme()}
               >
                 {isSavingTheme ? (
                   <Loader2 className="mr-2 h-4 w-4 shrink-0 animate-spin" />
                 ) : null}
-                Save theme
+                {canPersistSiteEssentials ? "Save theme" : "View only"}
               </Button>
               <p className="mt-2 text-[10px] leading-snug text-slate-500">
-                Writes colors, fonts, and hero layout to Site Essentials (same
-                as Save on the Site Essentials page).
+                {canPersistSiteEssentials ? (
+                  <>
+                    Writes colors, fonts, and hero layout to Site Essentials
+                    (same as Save on the Site Essentials page).
+                  </>
+                ) : (
+                  <>
+                    Saving requires the{" "}
+                    <span className="font-medium text-slate-600">
+                      update-site-essential
+                    </span>{" "}
+                    permission. You can still try fonts and colors in this
+                    preview; they are not saved until someone with access saves
+                    from here or Site Essentials.
+                  </>
+                )}
               </p>
             </div>
           ) : null}

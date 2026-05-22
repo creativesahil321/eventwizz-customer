@@ -62,6 +62,8 @@ function HistoryDataTable({ search, tableRef }: HistoryDataTableProps) {
     per_page: per_page || 30,
     status: typeof search.status === "string" ? search.status : "",
     event_date: typeof search.event_date === "string" ? search.event_date : "",
+    from_date: typeof search.from_date === "string" ? search.from_date : "",
+    to_date: typeof search.to_date === "string" ? search.to_date : "",
   };
 
   const { data: history, isError, isLoading } = useHistory(queryParams);

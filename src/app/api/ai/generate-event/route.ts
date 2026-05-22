@@ -271,7 +271,8 @@ Return ONLY the JSON.`;
         { role: "user", content: userPrompt },
       ],
       temperature: 0.7,
-      max_tokens: 4000,
+      // Keep this lower to reduce Groq TPM/TPD failures across models.
+      max_tokens: 2500,
     });
 
     if (!result.success || !result.data) {
@@ -280,6 +281,9 @@ Return ONLY the JSON.`;
           error: "Failed to generate event content",
           details: result.error,
           modelsTried: result.modelsTried,
+          retryAfter: result.retryAfterHuman,
+          retryAfterMs: result.retryAfterMs,
+          lastError: result.lastError,
         },
         { status: result.status || 500 }
       );

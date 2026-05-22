@@ -90,11 +90,11 @@ export default function TableRecommendations({
   // Check if multiple tables are selected (allocation needed)
   const needsAllocation = useMemo(() => {
     const totalTablesSelected = selectedTables.reduce(
-      (sum, table) => sum + table.quantity,
-      0
+      (sum, table) => sum + getTotalQuantity(table.id),
+      0,
     );
     return totalTablesSelected > 1;
-  }, [selectedTables]);
+  }, [selectedTables, getTotalQuantity]);
 
   // Check if allocation is complete and should disable other table selection
   const isAllocationComplete = useMemo(() => {
@@ -153,14 +153,20 @@ export default function TableRecommendations({
         description: "Please contact support for larger events.",
       });
       setInputValue(String(500));
-      updatePeopleCount(eventSlug, date, 500);
+      if (peopleCount !== 500) {
+        updatePeopleCount(eventSlug, date, 500);
+      }
     } else if (num < 1) {
       toast.error("Minimum group size is 1 person");
       setInputValue(String(1));
-      updatePeopleCount(eventSlug, date, 1);
+      if (peopleCount !== 1) {
+        updatePeopleCount(eventSlug, date, 1);
+      }
     } else {
       setInputValue(String(validatedNum));
-      updatePeopleCount(eventSlug, date, validatedNum);
+      if (validatedNum !== peopleCount) {
+        updatePeopleCount(eventSlug, date, validatedNum);
+      }
     }
   };
 
@@ -193,7 +199,7 @@ export default function TableRecommendations({
   const isTableDisabled = (table: { id: number }) => {
     if (!isAllocationComplete) return false;
     const isAlreadySelected = selectedTables.some(
-      (selectedTable) => selectedTable.id === table.id
+      (selectedTable) => selectedTable.id === table.id,
     );
     return !isAlreadySelected;
   };
@@ -227,7 +233,11 @@ export default function TableRecommendations({
   };
 
   // Helper function to check if user can increase table quantity
-  const canIncreaseTableQuantity = (table: { title: string; id: number }) => {
+  const canIncreaseTableQuantity = (table: {
+    title: string;
+    id: number;
+    maxQuantity?: number;
+  }) => {
     const currentQuantity = getTotalQuantity(table.id);
     const titleMatch = table.title.match(/\((\d+)-(\d+)\s+persons?\)/);
 
@@ -235,35 +245,27 @@ export default function TableRecommendations({
       const min = parseInt(titleMatch[1]);
       const max = parseInt(titleMatch[2]);
       const minPersons = Math.min(min, max);
-      const maxPersons = Math.max(min, max);
 
       const hasEnoughPeople = peopleCount >= minPersons;
       if (!hasEnoughPeople) return false;
 
-      const totalCapacityAfterIncrease = (currentQuantity + 1) * minPersons;
-      const wouldExceedReasonableCapacity =
-        totalCapacityAfterIncrease > peopleCount * 1.2;
+      const maxAllowedQuantity = table.maxQuantity ?? 50;
+      if (currentQuantity >= maxAllowedQuantity) return false;
 
-      const remainingPeople = peopleCount - currentQuantity * maxPersons;
-      const minTablesNeeded = Math.ceil(remainingPeople / maxPersons);
-      const maxTablesNeeded = Math.ceil(remainingPeople / minPersons);
-
-      const canAccommodateRemaining =
-        remainingPeople > 0 &&
-        minTablesNeeded <= 50 &&
-        minTablesNeeded <= maxTablesNeeded;
-
-      return !wouldExceedReasonableCapacity && canAccommodateRemaining;
+      return true;
     }
 
-    return true;
+    const maxAllowedQuantity = table.maxQuantity ?? 50;
+    return currentQuantity < maxAllowedQuantity;
   };
 
   if (tables.length === 0) {
     return (
       <div className="text-center py-6">
         <AlertCircle className="h-8 w-8 text-gray-300 mx-auto mb-3" />
-        <p className="text-sm text-gray-500">No tables available for this date</p>
+        <p className="text-sm text-gray-500">
+          No tables available for this date
+        </p>
       </div>
     );
   }
@@ -274,9 +276,7 @@ export default function TableRecommendations({
       <div className="flex items-center justify-between p-2.5 bg-amber-50/60 rounded-xl border border-amber-100">
         <div className="flex items-center gap-2">
           <Users className="h-4 w-4 text-amber-600" />
-          <span className="text-sm font-medium text-gray-700">
-            Group size
-          </span>
+          <span className="text-sm font-medium text-gray-700">Group size</span>
         </div>
         <div className="flex items-center gap-1.5">
           <button
@@ -325,9 +325,13 @@ export default function TableRecommendations({
                 <Settings className="h-4 w-4 text-amber-600 flex-shrink-0" />
               )}
               <div className="min-w-0">
-                <span className={`text-sm font-medium ${
-                  allocationValidation.isValid ? "text-green-800" : "text-amber-800"
-                }`}>
+                <span
+                  className={`text-sm font-medium ${
+                    allocationValidation.isValid
+                      ? "text-green-800"
+                      : "text-amber-800"
+                  }`}
+                >
                   {allocationValidation.isValid
                     ? `${peopleCount} guests distributed`
                     : "Distribute your guests"}
@@ -372,13 +376,13 @@ export default function TableRecommendations({
       {/* Table Cards — show recommended first, then "more options" */}
       {(() => {
         const eligibleRecommended = recommended.filter((rec) =>
-          isTableEligible(rec.table)
+          isTableEligible(rec.table),
         );
         const eligibleOther = otherOptions.filter((rec) =>
-          isTableEligible(rec.table)
+          isTableEligible(rec.table),
         );
         const ineligibleOther = otherOptions.filter(
-          (rec) => !isTableEligible(rec.table)
+          (rec) => !isTableEligible(rec.table),
         );
 
         const hasEligibleTables = eligibleRecommended.length > 0;
@@ -480,7 +484,8 @@ export default function TableRecommendations({
                     className="w-full justify-between text-gray-500 hover:text-gray-700 h-9 text-xs"
                   >
                     <span>
-                      {showAllOptions ? "Hide" : "View"} {allOtherOptions.length} more option
+                      {showAllOptions ? "Hide" : "View"}{" "}
+                      {allOtherOptions.length} more option
                       {allOtherOptions.length > 1 ? "s" : ""}
                     </span>
                     {showAllOptions ? (
@@ -503,8 +508,13 @@ export default function TableRecommendations({
                           const isEligible = isTableEligible(rec.table);
                           const isDisabled = isTableDisabled(rec.table);
                           const isSelected = getTotalQuantity(rec.table.id) > 0;
-                          const validationMsg = getTableValidationMessage(rec.table);
-                          const costPerPerson = getCostPerPerson(rec, peopleCount);
+                          const validationMsg = getTableValidationMessage(
+                            rec.table,
+                          );
+                          const costPerPerson = getCostPerPerson(
+                            rec,
+                            peopleCount,
+                          );
 
                           return (
                             <div
@@ -528,7 +538,9 @@ export default function TableRecommendations({
                                     {formatMoneyUnit(costPerPerson)}/person
                                   </span>
                                   <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-gray-500 mt-0.5">
-                                    <span>{formatMoney(rec.totalCost)} total</span>
+                                    <span>
+                                      {formatMoney(rec.totalCost)} total
+                                    </span>
                                     {rec.tablesNeeded > 1 && (
                                       <span>· {rec.tablesNeeded} tables</span>
                                     )}

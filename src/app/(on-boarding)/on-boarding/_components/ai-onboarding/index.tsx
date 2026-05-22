@@ -11,11 +11,20 @@ import type { AIOnboardingInput } from "@/app/api/ai/generate-onboarding/route";
 interface AIOnboardingFlowProps {
   onComplete: () => void;
   onSwitchToManual: () => void;
+  /** From GET persistence: `null` = never set → show location gate; `true`/`false` = skip gate. */
+  persistedHasMultipleLocations: boolean | null;
+  /** From GET persistence: `null` = unknown; otherwise pre-lock room-system choice. */
+  persistedHasRoomSystem: boolean | null;
+  /** Existing room names from persistence (e.g. stepFour.rooms keys). */
+  persistedRoomNames: string[];
 }
 
 export default function AIOnboardingFlow({
   onComplete,
   onSwitchToManual,
+  persistedHasMultipleLocations,
+  persistedHasRoomSystem,
+  persistedRoomNames,
 }: AIOnboardingFlowProps) {
   const { step, content, error, isGenerating, generateContent, setStep, reset } =
     useAIOnboarding();
@@ -68,6 +77,9 @@ export default function AIOnboardingFlow({
               onSwitchToManual={onSwitchToManual}
               isLoading={isGenerating}
               initialData={venueInput}
+              persistedHasMultipleLocations={persistedHasMultipleLocations}
+              persistedHasRoomSystem={persistedHasRoomSystem}
+              persistedRoomNames={persistedRoomNames}
             />
           </motion.div>
         )}

@@ -84,6 +84,8 @@ Examples:
           details: result.error,
           status: result.status || 500,
           modelsTried: result.modelsTried,
+          retryAfter: result.retryAfterHuman,
+          retryAfterMs: result.retryAfterMs,
         },
         { status: result.status || 500 }
       );

@@ -1,7 +1,7 @@
 import { FileUploader } from "@/components/ui/file-uploader";
 import { FormControl, FormItem, FormMessage } from "@/components/ui/form";
 import { ControllerRenderProps } from "react-hook-form";
-import React, { useEffect, useState, DragEvent } from "react";
+import React, { useEffect, useRef, useState, DragEvent } from "react";
 import { StepFourType } from "../../form-provider/schema";
 import { useFormContext } from "../../form-provider";
 import { OnboardingFieldGroupTitle } from "@/components/ui/typography";
@@ -10,6 +10,8 @@ import { Trash, GripVertical } from "lucide-react";
 
 interface GalleryUploaderProps {
   field: ControllerRenderProps<StepFourType, "gallery">;
+  scopedGalleryPath?: string;
+  onExistingItemRemove?: (item: { id: number; url: string }) => void;
 }
 
 // Define an interface for files with preview
@@ -41,7 +43,11 @@ const isGalleryItem = (item: unknown): item is GalleryItem => {
   );
 };
 
-const GalleryUploader: React.FC<GalleryUploaderProps> = ({ field }) => {
+const GalleryUploader: React.FC<GalleryUploaderProps> = ({
+  field,
+  scopedGalleryPath = "stepFour.gallery",
+  onExistingItemRemove,
+}) => {
   const { form: globalForm } = useFormContext();
 
   // State to track all gallery items (both Files and backend items)
@@ -49,6 +55,9 @@ const GalleryUploader: React.FC<GalleryUploaderProps> = ({ field }) => {
   const [galleryUploading, setGalleryUploading] = useState(false);
   const [draggedItem, setDraggedItem] = useState<number | null>(null);
   const [draggedOverItem, setDraggedOverItem] = useState<number | null>(null);
+  const uploadResetTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null,
+  );
 
   // Initialize galleryItems from field.value on mount and when field.value changes (cap at 8)
   useEffect(() => {
@@ -58,12 +67,12 @@ const GalleryUploader: React.FC<GalleryUploaderProps> = ({ field }) => {
       setGalleryItems(capped);
       if (field.value.length > 8) {
         field.onChange(capped);
-        globalForm.setValue("stepFour.gallery", capped);
+        globalForm.setValue(scopedGalleryPath as never, capped as never);
       }
     } else {
       setGalleryItems([]);
     }
-  }, [field, field.value, globalForm]);
+  }, [field, field.value, globalForm, scopedGalleryPath]);
 
   const handleGalleryChange = (files: FileWithPreview[]) => {
     if (!files.length) return;
@@ -78,18 +87,30 @@ const GalleryUploader: React.FC<GalleryUploaderProps> = ({ field }) => {
       return file;
     });
 
+    const currentScopedGallery = globalForm.getValues(
+      scopedGalleryPath as never,
+    ) as GalleryItemType[] | undefined;
+    const baseItems = Array.isArray(currentScopedGallery)
+      ? currentScopedGallery
+      : galleryItems;
+
     // Append new files to existing gallery (keep all: backend items + existing Files)
-    const updatedGalleryItems = [...galleryItems, ...filesWithPreviews];
+    const updatedGalleryItems = [...baseItems, ...filesWithPreviews];
 
     // Limit to maximum 8 items
     const limitedGalleryItems = updatedGalleryItems.slice(0, 8);
 
     setGalleryItems(limitedGalleryItems);
     field.onChange(limitedGalleryItems);
-    globalForm.setValue("stepFour.gallery", limitedGalleryItems);
+    globalForm.setValue(
+      scopedGalleryPath as never,
+      limitedGalleryItems as never,
+    );
 
-    // Simulate upload completion
-    setTimeout(() => {
+    if (uploadResetTimeoutRef.current) {
+      clearTimeout(uploadResetTimeoutRef.current);
+    }
+    uploadResetTimeoutRef.current = setTimeout(() => {
       setGalleryUploading(false);
     }, 500);
   };
@@ -101,11 +122,14 @@ const GalleryUploader: React.FC<GalleryUploaderProps> = ({ field }) => {
     if (isFile(itemToRemove) && (itemToRemove as FileWithPreview).preview) {
       URL.revokeObjectURL((itemToRemove as FileWithPreview).preview!);
     }
+    if (isGalleryItem(itemToRemove)) {
+      onExistingItemRemove?.(itemToRemove);
+    }
 
     const updatedItems = galleryItems.filter((_, i) => i !== index);
     setGalleryItems(updatedItems);
     field.onChange(updatedItems);
-    globalForm.setValue("stepFour.gallery", updatedItems);
+    globalForm.setValue(scopedGalleryPath as never, updatedItems as never);
   };
 
   // Drag and drop handlers
@@ -151,7 +175,7 @@ const GalleryUploader: React.FC<GalleryUploaderProps> = ({ field }) => {
     // Update state and form
     setGalleryItems(items);
     field.onChange(items);
-    globalForm.setValue("stepFour.gallery", items);
+    globalForm.setValue(scopedGalleryPath as never, items as never);
 
     // Reset drag state
     setDraggedItem(null);
@@ -162,6 +186,14 @@ const GalleryUploader: React.FC<GalleryUploaderProps> = ({ field }) => {
     setDraggedItem(null);
     setDraggedOverItem(null);
   };
+
+  useEffect(() => {
+    return () => {
+      if (uploadResetTimeoutRef.current) {
+        clearTimeout(uploadResetTimeoutRef.current);
+      }
+    };
+  }, []);
 
   return (
     <FormItem className="w-full">

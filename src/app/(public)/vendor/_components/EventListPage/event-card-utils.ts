@@ -21,3 +21,18 @@ export function getEventCardDateLabel(event: Event): string | null {
   }
   return s;
 }
+
+/** Category label for event list cards (e.g. Christmas, Lipstick). */
+export function getEventCardCategoryLabel(event: Event): string | null {
+  const fromName = event.event_category_name?.trim();
+  if (fromName) return fromName;
+
+  const raw = event.event_category;
+  if (typeof raw === "string" && raw.trim()) return raw.trim();
+  if (raw && typeof raw === "object" && "name" in raw) {
+    const nested = raw.name?.trim();
+    if (nested) return nested;
+  }
+
+  return null;
+}

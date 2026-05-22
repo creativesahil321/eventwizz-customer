@@ -18,6 +18,8 @@ export interface EmailLog extends Omit<EmailLogItem, "email_to" | "content"> {
   email_to: string;
   content: string;
   date: string;
+  attachments?: string[];
+  attachments_count?: number;
 }
 
 /**

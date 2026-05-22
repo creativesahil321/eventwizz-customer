@@ -16,6 +16,7 @@ import {
   StepTenType,
   StepElevenType,
 } from "./type";
+import type { RoomType } from "@/app/(on-boarding)/on-boarding/_components/form-provider/schema";
 // import { OnBoardingPreviewType } from "@/app/(on-boarding)/on-boarding/_components/form-provider/schema";
 
 /** Reads the persisted onboarding mode from sessionStorage (client-only, safe). */
@@ -50,6 +51,148 @@ function mergeManualIsApproved<T extends Record<string, unknown>>(
   if (getOnboardingMode() !== "manual") return payload;
   if (typeof isApproved !== "boolean") return payload;
   return { ...payload, isApproved };
+}
+
+type StepFourExistingGalleryItem = { id: number; url: string };
+type StepFourGalleryItem = File | Blob | StepFourExistingGalleryItem;
+
+function appendStepFourGalleryPayload(
+  formData: FormData,
+  gallery: StepFourGalleryItem[],
+  options?: {
+    deleteGallery?: Array<number | string>;
+    replaceGallery?: Array<number | string>;
+    roomKey?: string;
+  },
+): void {
+  const roomPrefix = options?.roomKey
+    ? `rooms[${options.roomKey}]`
+    : "";
+  const key = (base: string) => {
+    if (!roomPrefix) return base;
+    const match = /^([^\[]+)(.*)$/.exec(base);
+    if (!match) return `${roomPrefix}[${base}]`;
+    const [, root, suffix] = match;
+    return `${roomPrefix}[${root}]${suffix}`;
+  };
+
+  let fileIndex = 0;
+  let existingImageIndex = 0;
+  const galleryOrder: Array<
+    { type: "existing"; id: number } | { type: "new"; index: number }
+  > = [];
+
+  gallery.forEach((item) => {
+    if (item instanceof File || item instanceof Blob) {
+      formData.append(key(`event_gallery_images[${fileIndex}]`), item);
+      galleryOrder.push({ type: "new", index: fileIndex });
+      fileIndex++;
+      return;
+    }
+
+    if (
+      item &&
+      typeof item === "object" &&
+      typeof (item as StepFourExistingGalleryItem).id === "number" &&
+      typeof (item as StepFourExistingGalleryItem).url === "string"
+    ) {
+      const existing = item as StepFourExistingGalleryItem;
+      formData.append(
+        key(`existing_gallery_images[${existingImageIndex}][id]`),
+        String(existing.id),
+      );
+      formData.append(
+        key(`existing_gallery_images[${existingImageIndex}][url]`),
+        existing.url,
+      );
+      galleryOrder.push({ type: "existing", id: existing.id });
+      existingImageIndex++;
+    }
+  });
+
+  galleryOrder.forEach((item, index) => {
+    formData.append(key(`gallery_order[${index}][type]`), item.type);
+    if (item.type === "existing") {
+      formData.append(key(`gallery_order[${index}][id]`), String(item.id));
+    } else {
+      formData.append(key(`gallery_order[${index}][index]`), String(item.index));
+    }
+  });
+
+  if (Array.isArray(options?.deleteGallery)) {
+    options.deleteGallery.forEach((id, index) => {
+      formData.append(key(`delete_gallery[${index}]`), String(id));
+    });
+  }
+  if (Array.isArray(options?.replaceGallery)) {
+    options.replaceGallery.forEach((id, index) => {
+      formData.append(key(`replace_gallery[${index}]`), String(id));
+    });
+  }
+}
+
+function toSafeNumber(value: unknown): number {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "string" && value.trim() !== "") {
+    const parsed = Number(value);
+    if (Number.isFinite(parsed)) return parsed;
+  }
+  return 0;
+}
+
+function normalizeStepFiveDatePayload(
+  date: StepFiveType["dates"][number],
+): Record<string, unknown> {
+  const anyDate = date as unknown as {
+    generate_qr_code?: boolean;
+    show_on_frontend?: boolean;
+  };
+  const bookingType = date.booking_type ?? "tickets";
+  const tickets =
+    bookingType !== "tables"
+      ? (date.tickets ?? []).map((ticket) => ({
+        title: ticket.title ?? "",
+        description: ticket.description ?? "",
+        total_capacity: toSafeNumber(ticket.total_capacity),
+        price: toSafeNumber(ticket.price),
+      }))
+      : [];
+  const tables =
+    bookingType !== "tickets"
+      ? (date.tables ?? []).map((table) => ({
+        min_persons: toSafeNumber(table.min_persons),
+        max_persons: toSafeNumber(table.max_persons),
+        price: toSafeNumber(table.price),
+        total_tables: toSafeNumber(table.total_tables),
+      }))
+      : [];
+
+  const payload: Record<string, unknown> = {
+    date: date.event_date,
+    booking_type: bookingType,
+    total_table_types: tables.length,
+    tables,
+    total_ticket_types: tickets.length,
+    generate_qr_code: anyDate.generate_qr_code ?? true,
+    tickets,
+    show_on_frontend: anyDate.show_on_frontend ?? true,
+  };
+
+  if (bookingType !== "tickets") {
+    const paymentType = date.payment_type ?? "full";
+    payload.payment_type = paymentType;
+    if (paymentType === "deposit" && date.is_deposit_enabled !== false) {
+      const depositValue = toSafeNumber(date.deposit_value);
+      payload.deposit_type =
+        date.deposit_type === "percentage" ? "percentage" : "amount";
+      payload.deposit_value = depositValue;
+      // Keep legacy key for backward compatibility with any backend variants.
+      payload.deposit_amount = depositValue;
+      payload.deposit_due_date = date.deposit_due_date ?? "";
+    }
+  }
+
+  return payload;
 }
 
 export const onboardingService = {
@@ -217,8 +360,6 @@ export const onboardingService = {
     formData.append("banner_sub_heading", data.banner_sub_heading);
     formData.append("about_title", data.about_title);
     formData.append("about_description", data.about_description);
-    formData.append("about_link_title", data.about_link_title);
-    formData.append("about_cta_link", data.about_cta_link);
 
     // Add logo and cover_image if they exist
     // Check for both File and Blob (cropped images might be Blob)
@@ -315,7 +456,6 @@ export const onboardingService = {
     formData.append("about_event_heading", data.about_event_heading);
     formData.append("about_event_sub_heading", data.about_event_sub_heading);
     formData.append("about_event_description", data.about_event_description);
-    formData.append("event_schedular_title", data.event_schedular_title);
 
     // Add header banner if it exists - handle both File and Blob (cropped images)
     if (data.event_banner_image) {
@@ -351,15 +491,6 @@ export const onboardingService = {
       }
     }
 
-    // Add event scheduler data
-    if (data.event_schedular && data.event_schedular.length > 0) {
-      // The API expects event_schedular[time] and event_schedular[title] format
-      data.event_schedular.forEach((schedule, index) => {
-        formData.append(`event_schedular[${index}][time]`, schedule.time);
-        formData.append(`event_schedular[${index}][title]`, schedule.title);
-      });
-    }
-
     appendManualIsApprovedToFormData(formData, data.isApproved);
 
     const response = await request<ApiResponse>({
@@ -387,54 +518,49 @@ export const onboardingService = {
     const formData = new FormData();
     formData.append("step", data.step.toString());
     formData.append("event_id", data.event_id.toString());
+    formData.append("is_rooms", "0");
     formData.append("package_title", data.package_title);
     formData.append("package_description", data.package_description);
-    formData.append("package_button_name", data.package_button_name);
+    formData.append("event_schedular_title", data.event_schedular_title ?? "");
+    formData.append("event_schedule_subtitle", data.event_schedule_subtitle ?? "");
+    const anyStepFour = data as unknown as {
+      delete_gallery?: Array<number | string>;
+      replace_gallery?: Array<number | string>;
+    };
 
     // Add package image if it exists - handle both File and Blob
-    if (data.package_image) {
-      if (
-        data.package_image instanceof File ||
-        data.package_image instanceof Blob
-      ) {
-        formData.append("package_image", data.package_image);
-      }
+    // (Data may be a URL string as well, so guard `instanceof` checks.)
+    const stepFourImg: any = data.package_image as any;
+    if (
+      stepFourImg &&
+      typeof stepFourImg === "object" &&
+      (stepFourImg instanceof File || stepFourImg instanceof Blob)
+    ) {
+      formData.append("package_image", stepFourImg);
+    } else if (typeof stepFourImg === "string") {
+      formData.append("package_image", stepFourImg);
+    } else {
+      formData.append("package_image", "");
     }
 
     // Add package details in the format package_details[0][title], package_details[1][title], etc.
     data.package_details.forEach((detail, index) => {
       formData.append(`package_details[${index}][title]`, detail.title);
     });
+    (data.event_schedular ?? []).forEach((schedule, index) => {
+      formData.append(`event_schedular[${index}][time]`, schedule.time ?? "");
+      formData.append(`event_schedular[${index}][title]`, schedule.title ?? "");
+    });
 
     // Handle gallery images - both new files and existing backend images (see docs/backend-api/GALLERY_API_FRONTEND_GUIDE.md)
-    if (data.gallery && data.gallery.length > 0) {
-      let fileIndex = 0;
-      let existingImageIndex = 0;
-      const galleryOrder: Array<{ type: "existing"; id: number } | { type: "new"; index: number }> = [];
-
-      data.gallery.forEach((item) => {
-        if (item instanceof File || item instanceof Blob) {
-          formData.append(`event_gallery_images[${fileIndex}]`, item);
-          galleryOrder.push({ type: "new", index: fileIndex });
-          fileIndex++;
-        } else if (
-          typeof item === "object" &&
-          item !== null &&
-          "id" in item &&
-          "url" in item
-        ) {
-          const existing = item as { id: number; url: string };
-          formData.append(`existing_gallery_images[${existingImageIndex}][id]`, existing.id.toString());
-          formData.append(`existing_gallery_images[${existingImageIndex}][url]`, existing.url);
-          galleryOrder.push({ type: "existing", id: existing.id });
-          existingImageIndex++;
-        }
-      });
-
-      if (galleryOrder.length > 0) {
-        formData.append("gallery_order", JSON.stringify(galleryOrder));
-      }
-    }
+    appendStepFourGalleryPayload(
+      formData,
+      ((data.gallery ?? []) as unknown as StepFourGalleryItem[]).slice(0, 8),
+      {
+        deleteGallery: anyStepFour.delete_gallery,
+        replaceGallery: anyStepFour.replace_gallery,
+      },
+    );
 
     appendManualIsApprovedToFormData(formData, data.isApproved);
 
@@ -465,68 +591,160 @@ export const onboardingService = {
   },
 
   /**
+   * Store step 4 onboarding data in multi-room mode (packages per room).
+   * Backend expects `is_rooms: true` and a `rooms` array-like object keyed by index.
+   */
+  storeStepFourRoomsData: async (payload: {
+    event_id: number;
+    isApproved?: boolean;
+    currentRoomIndex?: number;
+    rooms: RoomType[];
+    delete_gallery?: Array<number | string>;
+    replace_gallery?: Array<number | string>;
+  }): Promise<ApiResponse> => {
+    const formData = new FormData();
+    formData.append("step", "4");
+    formData.append("event_id", payload.event_id.toString());
+    formData.append("is_rooms", "1");
+
+    const activeIndex = Math.min(
+      payload.currentRoomIndex ?? 0,
+      Math.max(payload.rooms.length - 1, 0),
+    );
+    payload.rooms.forEach((room, roomIndex) => {
+      const roomId = Number(room.id);
+      if (!Number.isFinite(roomId) || roomId <= 0) return;
+
+      const key = String(roomIndex);
+      formData.append(`rooms[${key}][room_id]`, roomId.toString());
+
+      const p = room.package ?? ({} as RoomType["package"]);
+
+      if (p.package_title) {
+        formData.append(`rooms[${key}][package_title]`, p.package_title);
+      } else {
+        formData.append(`rooms[${key}][package_title]`, "");
+      }
+      if (p.package_description) {
+        formData.append(
+          `rooms[${key}][package_description]`,
+          p.package_description,
+        );
+      } else {
+        formData.append(`rooms[${key}][package_description]`, "");
+      }
+      formData.append(
+        `rooms[${key}][event_schedular_title]`,
+        p.event_schedular_title ?? "",
+      );
+      formData.append(
+        `rooms[${key}][event_schedule_subtitle]`,
+        p.event_schedule_subtitle ?? "",
+      );
+
+      const img: any = p.package_image as any;
+      if (
+        img &&
+        typeof img === "object" &&
+        (img instanceof File || img instanceof Blob)
+      ) {
+        formData.append(`rooms[${key}][package_image]`, img);
+      } else if (typeof img === "string") {
+        formData.append(`rooms[${key}][package_image]`, img);
+      } else {
+        formData.append(`rooms[${key}][package_image]`, "");
+      }
+
+      const details = p.package_details ?? [];
+      details.forEach((detail, detailIndex) => {
+        formData.append(
+          `rooms[${key}][package_details][${detailIndex}][title]`,
+          detail?.title ?? "",
+        );
+      });
+      (p.event_schedular ?? []).forEach((schedule, scheduleIndex) => {
+        formData.append(
+          `rooms[${key}][event_schedular][${scheduleIndex}][title]`,
+          schedule?.title ?? "",
+        );
+        formData.append(
+          `rooms[${key}][event_schedular][${scheduleIndex}][time]`,
+          schedule?.time ?? "",
+        );
+      });
+
+      appendStepFourGalleryPayload(
+        formData,
+        ((p.gallery ?? []) as unknown as StepFourGalleryItem[]).slice(0, 8),
+        {
+          roomKey: key,
+          deleteGallery:
+            roomIndex === activeIndex ? payload.delete_gallery : undefined,
+          replaceGallery:
+            roomIndex === activeIndex ? payload.replace_gallery : undefined,
+        },
+      );
+    });
+
+    appendManualIsApprovedToFormData(formData, payload.isApproved);
+
+    const response = await request<ApiResponse>({
+      method: "POST",
+      url: API_ENDPOINTS.VENDOR.ONBOARDING.STEPS,
+      data: formData,
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
+      returnFullResponse: true,
+    });
+
+    if (response.status) {
+      await onboardingService.notifyDataChanged();
+    }
+
+    return response;
+  },
+
+  /**
    * Store step 5 onboarding data (booking type and dates/pricing)
    * @param data Step 5 data to be stored
    * @returns API response with status and message
    */
 
   storeStepFiveData: async (data: StepFiveType): Promise<ApiResponse> => {
-    // Format dates to match API expectations
-    const formattedDates = data.dates?.map(
-      (date: StepFiveType["dates"][number]) => {
-        // Format deposit_due_date if present
-        let formattedDepositDueDate = "";
-        if (date.payment_type === "deposit" && date.deposit_due_date) {
-          try {
-            if (typeof date.deposit_due_date === "string") {
-              formattedDepositDueDate = date.deposit_due_date;
-            } else {
-              // Handle date objects if they come from a date picker
-              formattedDepositDueDate = new Date(date.deposit_due_date)
-                .toISOString()
-                .split("T")[0];
-            }
-          } catch (error) {
-            console.error("Error formatting deposit due date:", error);
-            formattedDepositDueDate = "";
-          }
-        }
+    // Keep single-room payload backward-compatible with the previous contract.
+    const formattedDates = (data.dates ?? []).map((date) => {
+      const bookingType = date.booking_type ?? "tickets";
+      const base = {
+        event_date: date.event_date,
+        booking_type: bookingType,
+        total_table_types:
+          bookingType !== "tickets" ? (date.tables ?? []).length : 0,
+        tables: bookingType !== "tickets" ? (date.tables ?? []) : [],
+        total_ticket_types:
+          bookingType !== "tables" ? (date.tickets ?? []).length : 0,
+        tickets: bookingType !== "tables" ? (date.tickets ?? []) : [],
+      };
 
-        // Return formatted date object for API
-        // Now using date.booking_type instead of data.booking_type
-        const baseDate = {
-          event_date: date.event_date,
-          booking_type: date.booking_type, // Include booking_type for each date
-          total_table_types:
-            date.booking_type !== "tickets" ? date.total_table_types : 0,
-          tables: date.booking_type !== "tickets" ? date.tables : [],
-          total_ticket_types:
-            date.booking_type !== "tables" ? date.total_ticket_types : 0,
-          tickets: date.booking_type !== "tables" ? date.tickets : [],
+      if (bookingType !== "tickets") {
+        return {
+          ...base,
+          payment_type: date.payment_type,
+          is_deposit_enabled: date.is_deposit_enabled ?? true,
+          deposit_type: date.deposit_type || "amount",
+          deposit_value: date.deposit_value || 0,
+          deposit_due_date: date.deposit_due_date || "",
         };
-
-        // Only include payment fields for tables/both booking types
-        if (date.booking_type === "tables" || date.booking_type === "both") {
-          return {
-            ...baseDate,
-            payment_type: date.payment_type,
-            is_deposit_enabled: date.is_deposit_enabled ?? true,
-            deposit_type: date.deposit_type || "amount",
-            deposit_value: date.deposit_value || 0,
-            deposit_due_date: formattedDepositDueDate,
-          };
-        }
-
-        return baseDate;
       }
-    );
 
-    // Create payload with all required data
+      return base;
+    });
+
     const payload = mergeManualIsApproved(
       {
         step: data.step,
         event_id: data.event_id,
-        dates: formattedDates || [],
+        dates: formattedDates,
       },
       data.isApproved,
     );
@@ -558,6 +776,54 @@ export const onboardingService = {
   },
 
   /**
+   * Store step 5 data in multi-room mode.
+   * Backend expects `is_rooms: 1` and an aggregate `rooms[]` payload.
+   */
+  storeStepFiveRoomsData: async (payload: {
+    event_id: number;
+    rooms: RoomType[];
+    isApproved?: boolean;
+  }): Promise<ApiResponse> => {
+    const roomBlocks = payload.rooms
+      .filter((room) => Number.isFinite(Number(room.id)) && Number(room.id) > 0)
+      .map((room) => ({
+        room_id: Number(room.id),
+        dates: ((room.dates?.dates ?? []) as StepFiveType["dates"]).map(
+          normalizeStepFiveDatePayload,
+        ),
+      }));
+
+    const firstDate = roomBlocks[0]?.dates?.[0] as
+      | { booking_type?: "tickets" | "tables" | "both" }
+      | undefined;
+
+    const body = mergeManualIsApproved(
+      {
+        step: 5,
+        event_id: payload.event_id,
+        booking_type: firstDate?.booking_type ?? "tickets",
+        is_rooms: 1,
+        rooms: roomBlocks,
+      },
+      payload.isApproved,
+    );
+
+    const response = await api.post<ApiResponse>(
+      API_ENDPOINTS.VENDOR.ONBOARDING.STEPS,
+      body,
+      {
+        returnFullResponse: true,
+      },
+    );
+
+    if (response.status) {
+      await onboardingService.notifyDataChanged();
+    }
+
+    return response;
+  },
+
+  /**
    * Store step 6 onboarding data
    * @param data Step 6 data to be stored
    * @returns API response with status and message
@@ -568,6 +834,7 @@ export const onboardingService = {
     formData.append("step", data.step.toString());
     formData.append("event_id", data.event_id.toString());
     formData.append("catering_option", data.catering_option.toString());
+    formData.append("is_rooms", "0");
 
     if (data.menu_title) {
       formData.append("menu_title", data.menu_title);
@@ -624,39 +891,75 @@ export const onboardingService = {
   },
 
   /**
-   * Store step 7 onboarding data
-   * @param data Step 7 data to be stored
-   * @returns API response with status and message
+   * Store step 6 data in multi-room mode.
+   * Backend expects multipart payload with `rooms[index][...]`.
    */
-  storeStepSevenData: async (data: StepSevenType): Promise<ApiResponse> => {
-    const payload = mergeManualIsApproved(
-      {
-        step: data.step || 7,
-        event_id: data.event_id,
-        drink_title: data.drink_title,
-        drink_description: data.drink_description,
-        packages: data.packages,
-      },
-      data.isApproved,
-    );
+  storeStepSixRoomsData: async (payload: {
+    event_id: number;
+    rooms: RoomType[];
+    isApproved?: boolean;
+  }): Promise<ApiResponse> => {
+    const formData = new FormData();
+    formData.append("step", "6");
+    formData.append("event_id", payload.event_id.toString());
+    formData.append("is_rooms", "1");
 
-    const response = await api.post<ApiResponse>(
-      API_ENDPOINTS.VENDOR.ONBOARDING.STEPS,
-      payload,
-      {
-        returnFullResponse: true,
+    payload.rooms.forEach((room, roomIndex) => {
+      const roomId = Number(room.id);
+      if (!Number.isFinite(roomId) || roomId <= 0) return;
+
+      const catering = room.catering ?? {};
+      formData.append(`rooms[${roomIndex}][room_id]`, roomId.toString());
+      formData.append(
+        `rooms[${roomIndex}][catering_option]`,
+        String(catering.catering_option ?? 0),
+      );
+
+      if ((catering.catering_option ?? 0) === 1) {
+        formData.append(
+          `rooms[${roomIndex}][menu_title]`,
+          catering.menu_title ?? "",
+        );
+        formData.append(
+          `rooms[${roomIndex}][menu_description]`,
+          catering.menu_description ?? "",
+        );
+
+        (catering.menus ?? []).forEach((menu, menuIndex) => {
+          const m = menu as {
+            name?: string;
+            items?: Array<{ title?: string; description?: string }>;
+          };
+          formData.append(
+            `rooms[${roomIndex}][menus][${menuIndex}][name]`,
+            m.name ?? "",
+          );
+          (m.items ?? []).forEach((item, itemIndex) => {
+            formData.append(
+              `rooms[${roomIndex}][menus][${menuIndex}][items][${itemIndex}][title]`,
+              item.title ?? "",
+            );
+            formData.append(
+              `rooms[${roomIndex}][menus][${menuIndex}][items][${itemIndex}][description]`,
+              item.description ?? "",
+            );
+          });
+        });
       }
-    );
+    });
 
-    // Check if onboarding is already completed
-    const isCompleted = await onboardingService.checkOnboardingCompleted(
-      response
-    );
-    if (isCompleted) {
-      return response;
-    }
+    appendManualIsApprovedToFormData(formData, payload.isApproved);
 
-    // Notify that data has changed if successful
+    const response = await request<ApiResponse>({
+      method: "POST",
+      url: API_ENDPOINTS.VENDOR.ONBOARDING.STEPS,
+      data: formData,
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
+      returnFullResponse: true,
+    });
+
     if (response.status) {
       await onboardingService.notifyDataChanged();
     }
@@ -665,13 +968,11 @@ export const onboardingService = {
   },
 
   /**
-   * Store step 8 onboarding data
-   * @param data Step 8 data to be stored or FormData instance
+   * Store step 7 onboarding data
+   * @param data Step 7 data to be stored
    * @returns API response with status and message
    */
-  storeStepEightData: async (
-    data: StepEightType | FormData
-  ): Promise<ApiResponse> => {
+  storeStepSevenData: async (data: StepSevenType): Promise<ApiResponse> => {
     let formData: FormData;
 
     if (!(data instanceof FormData)) {
@@ -681,6 +982,7 @@ export const onboardingService = {
       // Add required fields
       formData.append("step", data.step.toString());
       formData.append("event_id", data.event_id.toString());
+      formData.append("is_rooms", "0");
 
       // Add files if available - only if they're actually File objects
       // If they're URLs, don't send them - backend will keep existing files
@@ -692,19 +994,12 @@ export const onboardingService = {
         formData.append("brochure_pdf_2", data.brochure_pdf_2);
       }
 
-      if (data.faq_pdf instanceof File) {
-        formData.append("faq_pdf", data.faq_pdf);
-      }
-
       // Add removal flags for PDFs
       if (data.remove_brochure_pdf) {
         formData.append("remove_brochure_pdf", "true");
       }
       if (data.remove_brochure_pdf_2) {
         formData.append("remove_brochure_pdf_2", "true");
-      }
-      if (data.remove_faq_pdf) {
-        formData.append("remove_faq_pdf", "true");
       }
 
       // Add text fields
@@ -723,13 +1018,6 @@ export const onboardingService = {
 
       if (data.price_start_from) {
         formData.append("price_start_from", data.price_start_from);
-      }
-
-      if (data.price_start_from_button_text) {
-        formData.append(
-          "price_start_from_button_text",
-          data.price_start_from_button_text
-        );
       }
 
       appendManualIsApprovedToFormData(formData, data.isApproved);
@@ -763,6 +1051,121 @@ export const onboardingService = {
 
     return response;
   },
+
+  /**
+   * Store step 7 data in multi-room mode.
+   * Backend expects shared `event_address` and per-room brochure files/removal flags.
+   */
+  storeStepSevenRoomsData: async (payload: {
+    event_id: number;
+    event_address: string;
+    latitude?: number;
+    longitude?: number;
+    rooms: RoomType[];
+    isApproved?: boolean;
+  }): Promise<ApiResponse> => {
+    const formData = new FormData();
+    formData.append("step", "7");
+    formData.append("event_id", payload.event_id.toString());
+    formData.append("is_rooms", "1");
+    formData.append("event_address", payload.event_address ?? "");
+    if (typeof payload.latitude === "number") {
+      formData.append("lat", payload.latitude.toString());
+    }
+    if (typeof payload.longitude === "number") {
+      formData.append("long", payload.longitude.toString());
+    }
+
+    payload.rooms.forEach((room, roomIndex) => {
+      const roomId = Number(room.id);
+      if (!Number.isFinite(roomId) || roomId <= 0) return;
+
+      const brochure = room.brochure ?? {};
+      formData.append(`rooms[${roomIndex}][room_id]`, roomId.toString());
+
+      if (brochure.brochure_pdf instanceof File) {
+        formData.append(`rooms[${roomIndex}][brochure_pdf]`, brochure.brochure_pdf);
+      }
+      if (brochure.brochure_pdf_2 instanceof File) {
+        formData.append(
+          `rooms[${roomIndex}][brochure_pdf_2]`,
+          brochure.brochure_pdf_2,
+        );
+      }
+      if (brochure.remove_brochure_pdf) {
+        formData.append(`rooms[${roomIndex}][remove_brochure_pdf]`, "true");
+      }
+      if (brochure.remove_brochure_pdf_2) {
+        formData.append(`rooms[${roomIndex}][remove_brochure_pdf_2]`, "true");
+      }
+    });
+
+    appendManualIsApprovedToFormData(formData, payload.isApproved);
+
+    const response = await request<ApiResponse>({
+      method: "POST",
+      url: API_ENDPOINTS.VENDOR.ONBOARDING.STEPS,
+      data: formData,
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
+      returnFullResponse: true,
+    });
+
+    if (response.status) {
+      await onboardingService.notifyDataChanged();
+    }
+
+    return response;
+  },
+
+  /**
+   * Store step 8 onboarding data
+   * @param data Step 8 data to be stored or FormData instance
+   * @returns API response with status and message
+   */
+  storeStepEightData: async (
+    data: StepEightType | FormData
+  ): Promise<ApiResponse> => {
+    const payload =
+      data instanceof FormData
+        ? data
+        : mergeManualIsApproved(
+          {
+            step: data.step,
+            event_id: data.event_id,
+            drink_title: data.drink_title,
+            drink_description: data.drink_description,
+            packages: data.packages,
+          },
+          data.isApproved,
+        );
+
+    const response = await api.post<ApiResponse>(
+      API_ENDPOINTS.VENDOR.ONBOARDING.STEPS,
+      payload,
+      {
+        returnFullResponse: true,
+      }
+    );
+
+    // Check if onboarding is already completed
+    const isCompleted = await onboardingService.checkOnboardingCompleted(
+      response
+    );
+    if (isCompleted) {
+      return response;
+    }
+
+    // Notify that data has changed if successful
+    if (response.status) {
+      await onboardingService.notifyDataChanged();
+    }
+
+    return response;
+  },
+
+
 
   /**
    * Store step 9 onboarding data (FAQs)
@@ -837,9 +1240,11 @@ export const onboardingService = {
     // Create FormData for consistent handling
     const formData = new FormData();
 
-    // Add basic fields only
+    // Add required fields
     formData.append("step", data.step.toString());
     formData.append("event_id", data.event_id.toString());
+    formData.append("accept_payment_method", data.accept_payment_method);
+    formData.append("is_skipped", data.is_skipped ? "1" : "0");
 
     appendManualIsApprovedToFormData(formData, data.isApproved);
 
@@ -955,13 +1360,14 @@ export const onboardingService = {
   },
 
   getAllSteps: async (
-    headers: Record<string, string>
+    headers: Record<string, string>,
+    isRooms = false,
   ): Promise<ApiResponse> => {
     const locationId = headers["X-Venue-Location-Id"];
     const endpoint = API_ENDPOINTS.VENDOR.ONBOARDING.GET_ALL_STEPS.replace(
       "{location_id}",
-      locationId
-    );
+      locationId,
+    ).replace("{is_rooms}", isRooms ? "true" : "false");
 
     return request<ApiResponse>({
       url: endpoint,
@@ -1086,8 +1492,7 @@ export const onboardingService = {
         };
         errors: string[];
       }>(
-        `${
-          API_ENDPOINTS.VENDOR.ONBOARDING.PAYMENT_RETURN
+        `${API_ENDPOINTS.VENDOR.ONBOARDING.PAYMENT_RETURN
         }?${queryParams.toString()}`,
         {
           returnFullResponse: true,

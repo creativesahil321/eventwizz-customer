@@ -71,3 +71,36 @@ export function exportTableToCSV<TData>(
   link.click();
   document.body.removeChild(link);
 }
+
+export function exportRowsToCSV(
+  rows: Array<Record<string, unknown>>,
+  opts: {
+    filename?: string;
+    headers: Array<{ key: string; label: string }>;
+  },
+): void {
+  const { filename = "export", headers } = opts;
+
+  const escapeCell = (value: unknown) => {
+    if (value == null) return "";
+    const s = String(value);
+    return `"${s.replace(/"/g, '""')}"`;
+  };
+
+  const csvContent = [
+    headers.map((h) => escapeCell(h.label)).join(","),
+    ...rows.map((row) =>
+      headers.map((h) => escapeCell(row[h.key])).join(","),
+    ),
+  ].join("\n");
+
+  const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.setAttribute("href", url);
+  link.setAttribute("download", `${filename}.csv`);
+  link.style.visibility = "hidden";
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+}

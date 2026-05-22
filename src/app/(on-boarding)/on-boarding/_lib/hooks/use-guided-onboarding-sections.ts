@@ -298,6 +298,10 @@ export function useGuidedOnboardingSections<T extends FieldValues>({
     [sectionFlow, approvedSections, currentSectionIndex, canNavigateToIndex],
   );
 
+  const resetToFirstSection = useCallback(() => {
+    setCurrentSectionIndex(0);
+  }, []);
+
   return {
     sectionFlow,
     currentSectionIndex,
@@ -310,5 +314,6 @@ export function useGuidedOnboardingSections<T extends FieldValues>({
     handleApproveAllSections,
     handleChipClick,
     handleUnlockSection,
+    resetToFirstSection,
   };
 }

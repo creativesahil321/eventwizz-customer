@@ -12,6 +12,7 @@ import { ApiResponse } from "@/services/core/api-client";
 import { useSession } from "next-auth/react";
 import { useEffect } from "react";
 import { useIsPreviewModeFromProvider } from "@/contexts/preview-context";
+import { eventKeys as vendorEventsListKeys } from "../queries";
 
 // Define query key for event data
 export const eventKeys = {
@@ -31,6 +32,7 @@ function attachEventDataChangedListener(qc: QueryClient) {
 
   eventDataChangedHandler = () => {
     void qc.invalidateQueries({ queryKey: eventKeys.all });
+    void qc.invalidateQueries({ queryKey: vendorEventsListKeys.lists() });
   };
   window.addEventListener(EVENT_DATA_CHANGED, eventDataChangedHandler);
 }
@@ -149,9 +151,14 @@ export function useEventData(eventId?: string) {
   // Mutation for invalidating the cache after form submissions
   const invalidateCache = useMutation({
     mutationFn: async () => {
-      await queryClient.invalidateQueries({
-        queryKey: eventKeys.data(eventId),
-      });
+      await Promise.all([
+        queryClient.invalidateQueries({
+          queryKey: eventKeys.data(eventId),
+        }),
+        queryClient.invalidateQueries({
+          queryKey: vendorEventsListKeys.lists(),
+        }),
+      ]);
     },
   });
 
@@ -166,6 +173,6 @@ export function useEventData(eventId?: string) {
     isError,
     error,
     refetch,
-    invalidateCache: invalidateCache.mutate,
+    invalidateCache: invalidateCache.mutateAsync,
   };
 }

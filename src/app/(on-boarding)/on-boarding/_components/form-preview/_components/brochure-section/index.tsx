@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import * as Icons from "lucide-react";
 import { Button } from "@/components/ui/button";
 import LocationMap from "./location-map";
@@ -51,6 +50,30 @@ export default function BrochureSection({
 }: BrochureSectionProps) {
   const { format: formatMoney } = useCurrencyFormat();
 
+  const sanitizeHref = (raw: unknown): string | null => {
+    if (typeof raw !== "string") return null;
+    const value = raw.trim();
+    if (!value || value === "#") return null;
+    if (
+      value.startsWith("blob:") ||
+      value.startsWith("/") ||
+      value.startsWith("#")
+    ) {
+      return value;
+    }
+    try {
+      const parsed = new URL(value);
+      if (parsed.protocol === "http:" || parsed.protocol === "https:") {
+        return value;
+      }
+      return null;
+    } catch {
+      // Keep relative paths valid for local/public assets.
+      if (value.startsWith("./") || value.startsWith("../")) return value;
+      return null;
+    }
+  };
+
   const renderIcon = (iconName?: string, size = 24) => {
     if (!iconName) return null;
     const LucideIcon = Icons[iconName as LucideIconName] as React.ElementType;
@@ -73,14 +96,19 @@ export default function BrochureSection({
     title: price?.title || "PRICES FROM",
     description: price?.description || `${formatMoney(45)} PP exc VAT`,
     link: price?.link || "#",
-    price_title: price?.price_title || "Book Now",
+    price_title: price?.price_title || "",
     icon: price?.icon || "Tag",
   };
 
   // Filter out downloads with invalid links
-  const validDownloads = downloads.filter(
-    (item) => item.download_link && item.download_link.length > 0,
-  );
+  const validDownloads = downloads.filter((item) => {
+    if (!item.download_link || item.download_link.length === 0) return false;
+    const title = (item.title || "").toLowerCase();
+    if (title.includes("faq") || title.includes("frequently asked")) {
+      return false;
+    }
+    return true;
+  });
   const showDownloads = validDownloads.length > 0;
 
   const gridClass = cn(
@@ -127,8 +155,8 @@ export default function BrochureSection({
             {validDownloads.map((item, idx) => (
               <div key={idx} className="mb-1 flex items-center gap-1">
                 {renderIcon("FileText", 16)}
-                <Link
-                  href={item.download_link[0]}
+                <a
+                  href={sanitizeHref(item.download_link[0]) ?? "#"}
                   className="break-all text-xs text-[var(--color-text)] underline sm:text-sm"
                   target="_blank"
                   rel="noopener noreferrer"
@@ -142,11 +170,13 @@ export default function BrochureSection({
                       document.body.appendChild(link);
                       link.click();
                       document.body.removeChild(link);
+                    } else if (!sanitizeHref(item.download_link[0])) {
+                      e.preventDefault();
                     }
                   }}
                 >
                   {item.title}
-                </Link>
+                </a>
               </div>
             ))}
           </section>
@@ -164,27 +194,40 @@ export default function BrochureSection({
             >
               {defaultPrice.description}
             </p>
-            <Button
-              variant="event-outline"
-              type="button"
-              className="mt-3"
-              asChild
-            >
-              {defaultPrice.link?.startsWith("#") ? (
-                <button
-                  type="button"
-                  onClick={() => {
-                    const id = defaultPrice.link!.slice(1);
-                    const el = id ? document.getElementById(id) : null;
-                    el?.scrollIntoView({ behavior: "smooth", block: "start" });
-                  }}
-                >
-                  {defaultPrice.price_title}
-                </button>
-              ) : (
-                <Link href={defaultPrice.link}>{defaultPrice.price_title}</Link>
-              )}
-            </Button>
+            {defaultPrice.price_title ? (
+              <Button
+                variant="event-outline"
+                type="button"
+                className="mt-3"
+                asChild
+              >
+                {defaultPrice.link?.startsWith("#") ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const id = defaultPrice.link!.slice(1);
+                      const el = id ? document.getElementById(id) : null;
+                      el?.scrollIntoView({ behavior: "smooth", block: "start" });
+                    }}
+                  >
+                    {defaultPrice.price_title}
+                  </button>
+                ) : (
+                  <a
+                    href={sanitizeHref(defaultPrice.link) ?? "#"}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={(e) => {
+                      if (!sanitizeHref(defaultPrice.link)) {
+                        e.preventDefault();
+                      }
+                    }}
+                  >
+                    {defaultPrice.price_title}
+                  </a>
+                )}
+              </Button>
+            ) : null}
           </section>
         ) : null}
       </section>

@@ -15,6 +15,9 @@ export interface Event {
   slug: string;
   banner_image: string;
   lowest_price: number;
+  /** Event category label for marketing cards (e.g. Christmas, Lipstick) */
+  event_category_name?: string | null;
+  event_category?: string | { name?: string | null } | null;
   /** Human-readable date for marketing cards when API provides it */
   event_date?: string | null;
   formatted_date?: string | null;

@@ -27,10 +27,14 @@ export const initialData: EventSchemaType = {
   stepTwo: {
     step: 2,
     event_id: 0,
+    is_rooms: 0,
+    active_room_index: 0,
+    rooms: [],
     package_image: null,
     package_title: "",
     package_description: "",
     package_button_name: "",
+    package_button_link: "",
     package_details: [
       {
         title: "",
@@ -85,21 +89,6 @@ export const initialData: EventSchemaType = {
   stepFive: {
     step: 5,
     event_id: 0,
-    drink_title: "",
-    drink_description: "",
-    packages: [
-      {
-        title: "",
-        description: "",
-        price: 0,
-        available_quantity: 0,
-      },
-    ],
-  },
-
-  stepSix: {
-    step: 6,
-    event_id: 0,
     brochure_pdf: null,
     brochure_pdf_2: null,
     faq_pdf: null,
@@ -115,6 +104,20 @@ export const initialData: EventSchemaType = {
     more_info: [],
   },
 
+  stepSix: {
+    step: 6,
+    event_id: 0,
+    drink_title: "",
+    drink_description: "",
+    packages: [
+      {
+        title: "",
+        description: "",
+        price: 0,
+        available_quantity: 0,
+      },
+    ],
+  },
   stepSeven: {
     step: 7,
     event_id: 0,

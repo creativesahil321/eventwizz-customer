@@ -43,7 +43,7 @@ export default function MenuItems({
             defaultValue={itemField.title || ""}
             render={({ field, fieldState: { error } }) => (
               <FormItem className="w-full">
-                <FormLabel>Item Title</FormLabel>
+                <FormLabel>Item Title {itemIdx + 1}</FormLabel>
                 <FormControl>
                   <Input placeholder="e.g. Chicken" {...field} />
                 </FormControl>

@@ -12,10 +12,21 @@ const PREVIEW_IMAGES = [
 ] as const;
 
 const DUMMY_EVENT_META = [
-  { title: "Sample: Evening Gala", fromAmount: 45, image: PREVIEW_IMAGES[0] },
-  { title: "Sample: Live Music Night", fromAmount: 28, image: PREVIEW_IMAGES[1] },
+  {
+    title: "Sample: Evening Gala",
+    category: "Christmas",
+    fromAmount: 45,
+    image: PREVIEW_IMAGES[0],
+  },
+  {
+    title: "Sample: Live Music Night",
+    category: "Lipstick",
+    fromAmount: 28,
+    image: PREVIEW_IMAGES[1],
+  },
   {
     title: "Sample: Weekend Brunch Club",
+    category: "Bottomless Brunch",
     fromAmount: 35,
     image: PREVIEW_IMAGES[2],
   },
@@ -41,6 +52,7 @@ export function SitePreviewDummyEventSection({
     () =>
       DUMMY_EVENT_META.map((e) => ({
         title: e.title,
+        category: e.category,
         image: e.image,
         price: `From ${formatCompact(e.fromAmount)} (demo pricing)`,
       })),
@@ -112,6 +124,9 @@ export function SitePreviewDummyEventSection({
                   </div>
                 </div>
                 <div className="border-t border-white/[0.06] bg-zinc-950 px-3 py-2.5">
+                  <p className="mb-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--color-primary)]">
+                    {event.category}
+                  </p>
                   <h3 className="line-clamp-2 text-left text-sm font-bold text-white">
                     {event.title}
                   </h3>

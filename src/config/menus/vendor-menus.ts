@@ -43,6 +43,16 @@ export const vendorMenus: MenuItemProps[] = [
   },
   {
     id: 5,
+    title: "Table Assignment",
+    icon: "tableAssignment",
+    href: createVendorUrl("/vendor/table-assignment"),
+    url: createVendorUrl("/vendor/table-assignment"),
+    type: "title",
+    permissions: "read-table-assignment",
+    menu: [],
+  },
+  {
+    id: 6,
     title: "Email Templates",
     icon: "emailTemplates",
     href: createVendorUrl("/vendor/email-templates"),
@@ -52,7 +62,7 @@ export const vendorMenus: MenuItemProps[] = [
     menu: [],
   },
   {
-    id: 6,
+    id: 7,
     title: "Menu Choice",
     icon: "menuChoice",
     href: createVendorUrl("/vendor/menu-choices"),
@@ -62,7 +72,7 @@ export const vendorMenus: MenuItemProps[] = [
     menu: [],
   },
   {
-    id: 7,
+    id: 8,
     title: "Transactions",
     icon: "payments",
     href: createVendorUrl("/vendor/transactions"),
@@ -72,7 +82,7 @@ export const vendorMenus: MenuItemProps[] = [
     menu: [],
   },
   {
-    id: 8,
+    id: 9,
     title: "Sites Essentials",
     icon: "sitesEssentials",
     href: createVendorUrl("/vendor/sites-essentials"),
@@ -82,7 +92,7 @@ export const vendorMenus: MenuItemProps[] = [
     menu: [],
   },
   {
-    id: 9,
+    id: 10,
     title: "Event Locations",
     icon: "eventLocations",
     href: createVendorUrl("/vendor/venue-locations"),
@@ -92,7 +102,7 @@ export const vendorMenus: MenuItemProps[] = [
     menu: [],
   },
   {
-    id: 10,
+    id: 11,
     title: "Marketing",
     icon: "marketing",
     href: createVendorUrl("/vendor/marketing"),
@@ -102,7 +112,7 @@ export const vendorMenus: MenuItemProps[] = [
     menu: [],
   },
   {
-    id: 11,
+    id: 12,
     title: "Newsletter",
     icon: "newsletter",
     href: createVendorUrl("/vendor/newsletter"),
@@ -112,7 +122,7 @@ export const vendorMenus: MenuItemProps[] = [
     menu: [],
   },
   {
-    id: 12,
+    id: 13,
     title: "Email Logs",
     icon: "emailLogs",
     href: createVendorUrl("/vendor/email-logs"),
@@ -121,18 +131,9 @@ export const vendorMenus: MenuItemProps[] = [
     permissions: "read-email-log",
     menu: [],
   },
-  // {
-  //   id: 20,
-  //   title: "System Logs",
-  //   icon: "fileText",
-  //   href: createVendorUrl("/vendor/system-logs"),
-  //   url: createVendorUrl("/vendor/system-logs"),
-  //   type: "title",
-  //   permissions: "read-system-logs",
-  //   menu: [],
-  // },
+
   {
-    id: 13,
+    id: 14,
     title: "Manage Roles",
     icon: "manageRoles",
     href: createVendorUrl("/vendor/manage-roles"),
@@ -142,7 +143,7 @@ export const vendorMenus: MenuItemProps[] = [
     menu: [],
   },
   {
-    id: 14,
+    id: 15,
     title: "Staff Management",
     icon: "staffManagement",
     href: createVendorUrl("/vendor/staff-management"),
@@ -152,7 +153,7 @@ export const vendorMenus: MenuItemProps[] = [
     menu: [],
   },
   {
-    id: 15,
+    id: 16,
     title: "Seo Tools",
     icon: "seoTools",
     href: createVendorUrl("/vendor/seo-tools"),
@@ -162,7 +163,7 @@ export const vendorMenus: MenuItemProps[] = [
     menu: [],
   },
   {
-    id: 16,
+    id: 17,
     title: "Notifications",
     icon: "notifications",
     href: createVendorUrl("/vendor/notifications"),
@@ -172,7 +173,7 @@ export const vendorMenus: MenuItemProps[] = [
     menu: [],
   },
   {
-    id: 17,
+    id: 18,
     title: "Support",
     icon: "support",
     href: createVendorUrl("/vendor/support"),
@@ -182,7 +183,7 @@ export const vendorMenus: MenuItemProps[] = [
     menu: [],
   },
   {
-    id: 18,
+    id: 19,
     title: "Dispute Resolution",
     icon: "disputeResolution",
     href: createVendorUrl("/vendor/dispute-resolution"),
@@ -192,7 +193,7 @@ export const vendorMenus: MenuItemProps[] = [
     menu: [],
   },
   {
-    id: 19,
+    id: 20,
     title: "Payment Settings",
     icon: "settings",
     href: createVendorUrl("/vendor/payment-settings"),
@@ -201,4 +202,5 @@ export const vendorMenus: MenuItemProps[] = [
     permissions: "read-account",
     menu: [],
   },
+
 ];

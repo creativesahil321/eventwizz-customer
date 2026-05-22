@@ -19,8 +19,21 @@ import { Card } from "@/components/ui/card";
 import { useSitePreviewStore } from "@/store/site-preview.store";
 import { SocialMediaTab } from "./tabs/social-media-tab";
 import { ThemePresetsTab } from "./tabs/theme-presets-tab";
+import {
+  SiteEssentialsUpdateProvider,
+  useSiteEssentialsUpdateGate,
+} from "../_lib/site-essentials-update-context";
 
 export function SiteEssentialsForm() {
+  return (
+    <SiteEssentialsUpdateProvider>
+      <SiteEssentialsFormInner />
+    </SiteEssentialsUpdateProvider>
+  );
+}
+
+function SiteEssentialsFormInner() {
+  const { readOnly } = useSiteEssentialsUpdateGate();
   const { form, onSubmit, isLoading, siteEssentials, fetchSiteEssentials } =
     useSiteEssentials();
   const [submitting, setSubmitting] = useState(false);
@@ -165,6 +178,8 @@ export function SiteEssentialsForm() {
 
   // Handle form submission
   const handleSubmit = async (values: SiteEssentialsFormValues) => {
+    if (readOnly) return;
+
     setSubmitting(true);
     setShowErrorSummary(false);
 
@@ -225,6 +240,8 @@ export function SiteEssentialsForm() {
 
   // Handle form reset
   const handleReset = async () => {
+    if (readOnly) return;
+
     try {
       // First, refetch the latest data from the server
       await fetchSiteEssentials();
@@ -453,14 +470,16 @@ export function SiteEssentialsForm() {
                   variant="outline"
                   type="button"
                   onClick={handleReset}
-                  disabled={previewLoading || submitting}
+                  disabled={readOnly || previewLoading || submitting}
                   className="flex items-center justify-center gap-2 border-slate-300 bg-white text-slate-900 hover:bg-slate-50"
                 >
                   <RotateCcw className="h-4 w-4" /> Reset
                 </Button>
                 <Button
                   type="submit"
-                  disabled={submitting || isLoading || previewLoading}
+                  disabled={
+                    readOnly || submitting || isLoading || previewLoading
+                  }
                   className="flex w-full items-center justify-center gap-2 rounded-lg bg-[var(--color-primary)] px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-[var(--color-primary-hover)] disabled:opacity-50 sm:min-w-[120px] sm:w-auto"
                 >
                   {submitting ? (
@@ -468,7 +487,7 @@ export function SiteEssentialsForm() {
                   ) : (
                     <Save className="h-4 w-4" />
                   )}
-                  Save
+                  {readOnly ? "View only" : "Save"}
                 </Button>
               </div>
             </div>

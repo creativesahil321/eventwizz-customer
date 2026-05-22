@@ -156,6 +156,27 @@ export const stepTwoSchema = z
   .object({
     step: z.literal(2),
     event_id: z.number().min(1, "Event ID is required"),
+    is_rooms: z.union([z.literal(0), z.literal(1)]).optional(),
+    active_room_index: z.number().int().min(0).optional(),
+    rooms: z
+      .array(
+        z.object({
+          room_id: z.number().optional(),
+          name: z.string().optional(),
+          package_title: z.string().optional(),
+          package_description: z.string().optional(),
+          package_button_name: z.string().optional(),
+          package_button_link: z.string().optional(),
+          package_details: z
+            .array(
+              z.object({
+                title: z.string().optional(),
+              })
+            )
+            .optional(),
+        })
+      )
+      .optional(),
     package_image: z
       .union([z.instanceof(File), z.string().url(), z.null()])
       .nullable()
@@ -181,6 +202,7 @@ export const stepTwoSchema = z
         PACKAGE_BUTTON_NAME_MAX_CHARS,
         `Button name must not exceed ${PACKAGE_BUTTON_NAME_MAX_CHARS} characters`
       ),
+    package_button_link: z.string().optional(),
     package_details: z
       .array(
         z.object({
@@ -202,6 +224,25 @@ export const stepTwoSchema = z
         ])
       )
       .optional(),
+  })
+  .superRefine((data, ctx) => {
+    if (data.is_rooms === 1) {
+      const roomsCount = Array.isArray(data.rooms) ? data.rooms.length : 0;
+      if (roomsCount < 2) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "At least 2 rooms are required in room system mode.",
+          path: ["rooms"],
+        });
+      }
+      if (roomsCount > 3) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Maximum 3 rooms are allowed.",
+          path: ["rooms"],
+        });
+      }
+    }
   })
   .refine(
     (data) => {
@@ -743,89 +784,9 @@ export const stepFourSchema = z
 export type StepFourType = z.infer<typeof stepFourSchema>;
 
 //=== Step 5 ===//
-export const stepFiveSchema = z.object({
-  step: z.literal(5),
-  event_id: z.number(),
-  drink_title: z
-    .string()
-    .min(1, "The drink title field is required")
-    .max(
-      DRINK_SECTION_TITLE_MAX_CHARS,
-      `Drink title must not exceed ${DRINK_SECTION_TITLE_MAX_CHARS} characters`
-    ),
-  drink_description: z
-    .string()
-    .min(1, "The drink description field is required")
-    .max(
-      DRINK_SECTION_DESCRIPTION_MAX_CHARS,
-      `Drink description must not exceed ${DRINK_SECTION_DESCRIPTION_MAX_CHARS} characters`
-    ),
-  packages: z
-    .array(
-      z.object({
-        id: z.number().optional(), // Optional for backward compatibility (required when from API)
-        title: z
-          .string()
-          .min(1, "Package title is required")
-          .max(
-            DRINK_PACKAGE_ITEM_TITLE_MAX_CHARS,
-            `Package title must not exceed ${DRINK_PACKAGE_ITEM_TITLE_MAX_CHARS} characters`
-          ),
-        description: z
-          .string()
-          .min(1, "Package description is required")
-          .refine(
-            (val) =>
-              plainTextCharCount(val) <= RICH_DESCRIPTION_MAX_CHARS,
-            {
-              message: `Package description must not exceed ${RICH_DESCRIPTION_MAX_CHARS} characters`,
-            }
-          ),
-        price: z.union([z.number(), z.string()]).refine(
-          (val) => {
-            // Check if value is empty, null, or undefined
-            if (val === "" || val === null || val === undefined) {
-              return false;
-            }
-            const num = typeof val === "string" ? Number.parseFloat(val) : val;
-            return (
-              !Number.isNaN(num) && num > 0 && num <= DRINK_PACKAGE_PRICE_MAX
-            );
-          },
-          {
-            message: `Package price is required and must be between 1 and ${DRINK_PACKAGE_PRICE_MAX}`,
-          }
-        ),
-        available_quantity: z
-          .union([z.number(), z.string()])
-          .transform((val) => {
-            if (typeof val === "string") {
-              // Handle empty string from API - default to 100
-              if (val.trim() === "") {
-                return 100;
-              }
-              const num = Number.parseFloat(val);
-              return Number.isNaN(num) ? 100 : num;
-            }
-            return val || 100;
-          })
-          .refine((val) => val >= 1, {
-            message: "Available quantity must be at least 1",
-          })
-          .refine((val) => val <= DRINK_PACKAGE_QTY_MAX, {
-            message: `Available quantity cannot exceed ${DRINK_PACKAGE_QTY_MAX}`,
-          }),
-        sold_quantity: z.number().optional(), // Read-only from API
-      })
-    )
-    .min(1, "At least one package is required"),
-});
-export type StepFiveType = z.infer<typeof stepFiveSchema>;
-
-//=== Step 6 ===//
-export const stepSixSchema = z
+export const stepFiveSchema = z
   .object({
-    step: z.literal(6),
+    step: z.literal(5),
     event_id: z.number(),
     remove_brochure_pdf: z.boolean().optional(),
     remove_brochure_pdf_2: z.boolean().optional(),
@@ -935,6 +896,89 @@ export const stepSixSchema = z
       });
     }
   });
+
+
+
+export type StepFiveType = z.infer<typeof stepFiveSchema>;
+
+//=== Step 6 ===//
+export const stepSixSchema = z.object({
+  step: z.literal(6),
+  event_id: z.number(),
+  drink_title: z
+    .string()
+    .min(1, "The drink title field is required")
+    .max(
+      DRINK_SECTION_TITLE_MAX_CHARS,
+      `Drink title must not exceed ${DRINK_SECTION_TITLE_MAX_CHARS} characters`
+    ),
+  drink_description: z
+    .string()
+    .min(1, "The drink description field is required")
+    .max(
+      DRINK_SECTION_DESCRIPTION_MAX_CHARS,
+      `Drink description must not exceed ${DRINK_SECTION_DESCRIPTION_MAX_CHARS} characters`
+    ),
+  packages: z
+    .array(
+      z.object({
+        id: z.number().optional(), // Optional for backward compatibility (required when from API)
+        title: z
+          .string()
+          .min(1, "Package title is required")
+          .max(
+            DRINK_PACKAGE_ITEM_TITLE_MAX_CHARS,
+            `Package title must not exceed ${DRINK_PACKAGE_ITEM_TITLE_MAX_CHARS} characters`
+          ),
+        description: z
+          .string()
+          .min(1, "Package description is required")
+          .refine(
+            (val) =>
+              plainTextCharCount(val) <= RICH_DESCRIPTION_MAX_CHARS,
+            {
+              message: `Package description must not exceed ${RICH_DESCRIPTION_MAX_CHARS} characters`,
+            }
+          ),
+        price: z.union([z.number(), z.string()]).refine(
+          (val) => {
+            // Check if value is empty, null, or undefined
+            if (val === "" || val === null || val === undefined) {
+              return false;
+            }
+            const num = typeof val === "string" ? Number.parseFloat(val) : val;
+            return (
+              !Number.isNaN(num) && num > 0 && num <= DRINK_PACKAGE_PRICE_MAX
+            );
+          },
+          {
+            message: `Package price is required and must be between 1 and ${DRINK_PACKAGE_PRICE_MAX}`,
+          }
+        ),
+        available_quantity: z
+          .union([z.number(), z.string()])
+          .transform((val) => {
+            if (typeof val === "string") {
+              // Handle empty string from API - default to 100
+              if (val.trim() === "") {
+                return 100;
+              }
+              const num = Number.parseFloat(val);
+              return Number.isNaN(num) ? 100 : num;
+            }
+            return val || 100;
+          })
+          .refine((val) => val >= 1, {
+            message: "Available quantity must be at least 1",
+          })
+          .refine((val) => val <= DRINK_PACKAGE_QTY_MAX, {
+            message: `Available quantity cannot exceed ${DRINK_PACKAGE_QTY_MAX}`,
+          }),
+        sold_quantity: z.number().optional(), // Read-only from API
+      })
+    )
+    .min(1, "At least one package is required"),
+});
 export type StepSixType = z.infer<typeof stepSixSchema>;
 
 //=== Step 7 ===//

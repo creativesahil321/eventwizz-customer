@@ -9,7 +9,7 @@ import {
   DialogTrigger,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Trash } from "lucide-react";
+import { ExternalLink, Trash } from "lucide-react";
 import { EmailLog } from "../../_lib/types";
 import { useCurrencyFormat } from "@/hooks/use-currency-format";
 import { reformatMonetaryAmountsInHtml } from "@/lib/currency-format";
@@ -36,6 +36,9 @@ export function EmailShowDialog({
   const formattedDate = new Date(
     (template as EmailLog)?.created_at as string,
   ).toLocaleString();
+  const attachments = Array.isArray((template as EmailLog)?.attachments)
+    ? ((template as EmailLog).attachments as string[]).filter(Boolean)
+    : [];
   return (
     <Dialog onOpenChange={onOpenChange} {...props}>
       {showTrigger ? (
@@ -70,6 +73,28 @@ export function EmailShowDialog({
                 </span>
                 <span className="opacity-70">{formattedDate}</span>
               </div>
+
+              {attachments.length > 0 && (
+                <div className="mb-3 mt-1 flex flex-wrap gap-2">
+                  {attachments.map((url, index) => (
+                    <Button
+                      key={`${url}-${index}`}
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() =>
+                        window.open(url, "_blank", "noopener,noreferrer")
+                      }
+                      className="gap-1.5"
+                    >
+                      <ExternalLink className="h-3.5 w-3.5" />
+                      {attachments.length > 1
+                        ? `View attachment ${index + 1}`
+                        : "View attachment"}
+                    </Button>
+                  ))}
+                </div>
+              )}
             </>
           )}
         </DialogHeader>

@@ -28,7 +28,7 @@ import { cn } from "@/lib/utils";
 import {
   BANNER_HEADING_MAX_WORDS,
   countWords,
-  truncateToMaxWords,
+  truncateToMaxWordsForInput,
 } from "@/lib/word-count";
 import { useGuidedOnboardingSections } from "../../../_lib/hooks/use-guided-onboarding-sections";
 import type { GuidedSectionConfig } from "../../../_lib/hooks/use-guided-onboarding-sections";
@@ -51,7 +51,6 @@ const resolveStepTwoErrorIndex = (keys: string[]) => {
 export default function StepTwo() {
   const {
     form: globalForm,
-    save,
     setActiveStep,
     setActiveField,
     persistedProgressHydrated,
@@ -76,8 +75,6 @@ export default function StepTwo() {
         globalForm.getValues("stepTwo.about_description") || "",
       logo: globalForm.getValues("stepTwo.logo") || undefined,
       cover_image: globalForm.getValues("stepTwo.cover_image") || undefined,
-      about_link_title: globalForm.getValues("stepTwo.about_link_title") || "",
-      about_cta_link: globalForm.getValues("stepTwo.about_cta_link") || "",
     },
     mode: "onChange",
   });
@@ -150,8 +147,8 @@ export default function StepTwo() {
       {
         id: "about",
         label: "About section",
-        description: "Title, description, and CTA button label/link.",
-        fields: ["about_title", "about_description", "about_link_title", "about_cta_link"],
+        description: "Title and description for your about section.",
+        fields: ["about_title", "about_description"],
       },
     ];
   }, [form, logoUrl, logoFiles.length, coverUrl, coverFiles.length]);
@@ -265,8 +262,6 @@ export default function StepTwo() {
         "banner_sub_heading",
         "about_title",
         "about_description",
-        "about_link_title",
-        "about_cta_link",
         "logo",
         "cover_image",
       ] as const;
@@ -275,8 +270,6 @@ export default function StepTwo() {
         banner_sub_heading: "Banner Sub-Heading",
         about_title: "Title for Your Page",
         about_description: "Short Description",
-        about_link_title: "Button Text",
-        about_cta_link: "Button Link",
         logo: "Logo",
         cover_image: "Landing Page Image",
       };
@@ -345,14 +338,20 @@ export default function StepTwo() {
         }
 
         setActiveField(null);
+        globalForm.setValue("activeStep", 3);
 
-        setActiveStep(3);
+        // Keep step transition deterministic: persist session first, then navigate.
+        try {
+          await updateSession({
+            on_boarding_step: 3,
+            last_completed_step: 3,
+          });
+        } catch (error) {
+          console.error("Failed to update session for step 3:", error);
+        }
 
-        Promise.all([updateSession({ on_boarding_step: 3 }), save()]).catch(
-          (error) => {
-            console.error("Background save error:", error);
-          },
-        );
+        // Session is already synced above; skip duplicate sync inside provider.
+        await setActiveStep(3, { skipSessionSync: true });
       }
     } catch {
       console.error("An error occurred. Please try again.");
@@ -365,7 +364,6 @@ export default function StepTwo() {
     logoFiles,
     coverFiles,
     updateSession,
-    save,
     setActiveField,
     setActiveStep,
   ]);
@@ -584,7 +582,7 @@ export default function StepTwo() {
                               {...field}
                               onFocus={() => handleFieldFocus("banner_heading")}
                               onChange={(e) => {
-                                const next = truncateToMaxWords(
+                                const next = truncateToMaxWordsForInput(
                                   e.target.value,
                                   BANNER_HEADING_MAX_WORDS,
                                 );
@@ -761,88 +759,12 @@ export default function StepTwo() {
                               banner_sub_heading:
                                 form.watch("banner_sub_heading") || undefined,
                               title: form.watch("about_title") || undefined,
-                              ctaText:
-                                form.watch("about_link_title") || undefined,
                             }}
                           />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
                     )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="about_link_title"
-                    render={({ field }) => {
-                      const currentLength = field.value?.length || 0;
-                      const maxLength = 18;
-                      return (
-                        <FormItem>
-                          <OnboardingFieldGroupTitle>
-                            Button Text
-                          </OnboardingFieldGroupTitle>
-                          <FormControl>
-                            <Input
-                              placeholder="Explore Link Text"
-                              {...field}
-                              maxLength={maxLength}
-                              onFocus={() =>
-                                handleFieldFocus("about_link_title")
-                              }
-                              onChange={(e) => {
-                                field.onChange(e);
-                                globalForm.setValue(
-                                  "stepTwo.about_link_title",
-                                  e.target.value,
-                                );
-                              }}
-                            />
-                          </FormControl>
-                          <div className="text-xs text-muted-foreground mt-1">
-                            <span
-                              className={
-                                currentLength > maxLength
-                                  ? "text-destructive"
-                                  : ""
-                              }
-                            >
-                              {currentLength}/{maxLength} characters
-                            </span>
-                          </div>
-                          <FormMessage />
-                        </FormItem>
-                      );
-                    }}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="about_cta_link"
-                    render={({ field }) => {
-                      const maxLength = 2048;
-                      return (
-                        <FormItem className="mt-4">
-                          <OnboardingFieldGroupTitle>
-                            Button Link
-                          </OnboardingFieldGroupTitle>
-                          <FormControl>
-                            <Input
-                              placeholder="e.g. /events or https://example.com"
-                              {...field}
-                              maxLength={maxLength}
-                              onFocus={() => handleFieldFocus("about_cta_link")}
-                              onChange={(e) => {
-                                field.onChange(e);
-                                globalForm.setValue(
-                                  "stepTwo.about_cta_link",
-                                  e.target.value,
-                                );
-                              }}
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      );
-                    }}
                   />
                   <GuidedSectionActionFooter
                     isActive={guided.currentSectionIndex === 2}

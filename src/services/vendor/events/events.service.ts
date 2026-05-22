@@ -18,6 +18,7 @@ import {
   EventCategory,
   EventCategoryPayload,
   EventMenuCategoryPayload,
+  EventMenuCategoryQueryParams,
   EventMenuCategory,
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   EventOverviewResponse,
@@ -26,6 +27,11 @@ import {
 /** Step 3 API body requires a resolved venue id */
 export type StepThreeSavePayload = StepThreeType & {
   vendor_location_id: number;
+};
+
+const isFileOrBlob = (value: unknown): value is File | Blob => {
+  if (typeof value !== "object" || value === null) return false;
+  return value instanceof File || value instanceof Blob;
 };
 
 export const eventsService = {
@@ -169,31 +175,35 @@ export const eventsService = {
   },
 
   /**
-   * Get all event menu categories
+   * Get all event menu categories (pass room_id when multi-room is enabled)
    */
-  getEventMenuCategories: async (): Promise<
-    ApiResponse<EventMenuCategory[]> | EventMenuCategory[]
-  > => {
+  getEventMenuCategories: async (
+    params?: EventMenuCategoryQueryParams,
+  ): Promise<ApiResponse<EventMenuCategory[]> | EventMenuCategory[]> => {
+    const roomId = params?.room_id;
     return api.get<ApiResponse<EventMenuCategory[]>>(
       API_ENDPOINTS.VENDOR.EVENT.GET_MENU_CATEGORIES,
       {
         returnFullResponse: true,
-      }
+        ...(roomId != null && roomId > 0
+          ? { params: { room_id: roomId } }
+          : {}),
+      },
     );
   },
 
   /**
-   * Create a new event menu category
+   * Create a new event menu category (include room_id when multi-room is enabled)
    */
   createEventMenuCategory: async (
-    data: EventMenuCategoryPayload
+    data: EventMenuCategoryPayload,
   ): Promise<ApiResponse<EventMenuCategory>> => {
     return api.post<ApiResponse<EventMenuCategory>>(
       API_ENDPOINTS.VENDOR.EVENT.CREATE_MENU_CATEGORY,
       data,
       {
         returnFullResponse: true,
-      }
+      },
     );
   },
   /**
@@ -269,10 +279,7 @@ export const eventsService = {
     }
 
     if (data.event_schedular_background_image) {
-      if (
-        data.event_schedular_background_image instanceof File ||
-        data.event_schedular_background_image instanceof Blob
-      ) {
+      if (isFileOrBlob(data.event_schedular_background_image)) {
         formData.append(
           "event_schedular_background_image",
           data.event_schedular_background_image
@@ -380,10 +387,7 @@ export const eventsService = {
     }
 
     if (data.event_schedular_background_image) {
-      if (
-        data.event_schedular_background_image instanceof File ||
-        data.event_schedular_background_image instanceof Blob
-      ) {
+      if (isFileOrBlob(data.event_schedular_background_image)) {
         formData.append(
           "event_schedular_background_image",
           data.event_schedular_background_image
@@ -436,24 +440,58 @@ export const eventsService = {
     const formData = new FormData();
     formData.append("step", data.step.toString());
     formData.append("event_id", data.event_id.toString());
-    formData.append("package_title", data.package_title);
-    formData.append("package_description", data.package_description);
-    formData.append("package_button_name", data.package_button_name);
+    formData.append("is_rooms", String(data.is_rooms === 1 ? 1 : 0));
+    if (data.is_rooms === 1 && Array.isArray(data.rooms) && data.rooms.length > 0) {
+      data.rooms.forEach((room, roomIndex) => {
+        if (room.room_id) {
+          formData.append(`rooms[${roomIndex}][room_id]`, String(room.room_id));
+        }
+        formData.append(
+          `rooms[${roomIndex}][package_title]`,
+          room.package_title || "",
+        );
+        formData.append(
+          `rooms[${roomIndex}][package_description]`,
+          room.package_description || "",
+        );
+        formData.append(
+          `rooms[${roomIndex}][package_button_name]`,
+          room.package_button_name || "",
+        );
+        formData.append(
+          `rooms[${roomIndex}][package_button_link]`,
+          room.package_button_link || "",
+        );
 
-    // Add package image if it exists - handle both File and Blob (cropped images)
-    if (data.package_image) {
-      if (
-        data.package_image instanceof File ||
-        data.package_image instanceof Blob
-      ) {
-        formData.append("package_image", data.package_image);
+        (room.package_details || []).forEach((detail, detailIndex) => {
+          formData.append(
+            `rooms[${roomIndex}][package_details][${detailIndex}][title]`,
+            detail.title || "",
+          );
+        });
+      });
+    } else {
+      formData.append("package_title", data.package_title);
+      formData.append("package_description", data.package_description);
+      formData.append("package_button_name", data.package_button_name);
+      if (data.package_button_link) {
+        formData.append("package_button_link", data.package_button_link);
       }
     }
 
-    // Add package details in the format package_details[0][title], package_details[1][title], etc.
-    data.package_details.forEach((detail, index) => {
-      formData.append(`package_details[${index}][title]`, detail.title);
-    });
+    if (data.is_rooms !== 1) {
+      // Add package image if it exists - handle both File and Blob (cropped images)
+      if (data.package_image) {
+        if (isFileOrBlob(data.package_image)) {
+          formData.append("package_image", data.package_image);
+        }
+      }
+
+      // Add package details in the format package_details[0][title], package_details[1][title], etc.
+      data.package_details.forEach((detail, index) => {
+        formData.append(`package_details[${index}][title]`, detail.title);
+      });
+    }
 
     // Handle gallery images - both new files and existing backend images (see docs/backend-api/GALLERY_API_FRONTEND_GUIDE.md)
     if (data.gallery && data.gallery.length > 0) {
@@ -546,9 +584,9 @@ export const eventsService = {
           ...(date.cancelled === true && { cancelled: true }),
           ...(date.cancelled === true &&
             date.cancel_reason?.trim() && {
-              cancel_reason: date.cancel_reason.trim(),
-              cancellation_reason: date.cancel_reason.trim(),
-            }),
+            cancel_reason: date.cancel_reason.trim(),
+            cancellation_reason: date.cancel_reason.trim(),
+          }),
           total_table_types:
             date.booking_type !== "tickets" ? date.total_table_types : 0,
           tables: date.booking_type !== "tickets" ? date.tables : [],
@@ -690,54 +728,21 @@ export const eventsService = {
   },
 
   /**
-   * Store step 7 onboarding data
-   * @param data Step 7 data to be stored
+   * Store step 5 data (Brochure Info / Location & Pricing)
+   * @param data Step 5 data to be stored or FormData instance
    * @returns API response with status and message
    */
-  storeStepFiveData: async (data: StepFiveType): Promise<ApiResponse> => {
-    const payload = {
-      step: data.step || 7,
-      event_id: data.event_id,
-      drink_title: data.drink_title,
-      drink_description: data.drink_description,
-      packages: data.packages,
-    };
-
-    const response = await api.post<ApiResponse>(
-      API_ENDPOINTS.VENDOR.EVENT.UPDATE_EVENT.replace(
-        "{eventId}",
-        data.event_id.toString()
-      ),
-      payload,
-      {
-        returnFullResponse: true,
-      }
-    );
-
-    // Notify that data has changed if successful
-    if (response.status) {
-      await eventsService.notifyDataChanged();
-    }
-
-    return response;
-  },
-
-  /**
-   * Store step 8 onboarding data
-   * @param data Step 8 data to be stored or FormData instance
-   * @returns API response with status and message
-   */
-  storeStepSixData: async (
-    data: StepSixType | FormData
+  storeStepFiveData: async (
+    data: StepFiveType | FormData
   ): Promise<ApiResponse> => {
     let formData: FormData;
 
     if (!(data instanceof FormData)) {
-      // Convert StepEightType to FormData
+      // Convert StepFiveType to FormData
       formData = new FormData();
 
       // Add required fields
-      formData.append("step", data.step.toString());
+      formData.append("step", String(data.step || 5));
       formData.append("event_id", data.event_id.toString());
 
       // Add files if available - only if they're actually File objects
@@ -816,6 +821,41 @@ export const eventsService = {
 
     return response;
   },
+
+  /**
+   * Store step 6 data (Other Packages / drinks)
+   * @param data Step 6 data to be stored
+   * @returns API response with status and message
+   */
+  storeStepSixData: async (data: StepSixType): Promise<ApiResponse> => {
+    const payload = {
+      step: data.step || 6,
+      event_id: data.event_id,
+      drink_title: data.drink_title,
+      drink_description: data.drink_description,
+      packages: data.packages,
+    };
+
+    const response = await api.post<ApiResponse>(
+      API_ENDPOINTS.VENDOR.EVENT.UPDATE_EVENT.replace(
+        "{eventId}",
+        data.event_id.toString()
+      ),
+      payload,
+      {
+        returnFullResponse: true,
+      }
+    );
+
+    // Notify that data has changed if successful
+    if (response.status) {
+      await eventsService.notifyDataChanged();
+    }
+
+    return response;
+  },
+
+
 
   /**
    * Store step 9 onboarding data (FAQs)

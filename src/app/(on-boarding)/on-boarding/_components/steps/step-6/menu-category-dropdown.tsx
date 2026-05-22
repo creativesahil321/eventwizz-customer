@@ -43,7 +43,9 @@ interface MenuCategoryDropdownProps {
   initialValue?: number;
   onCategoryCreated?: (newCategory?: { id: number; name: string }) => void;
   disabled?: boolean;
-  eventId?: number; // Add eventId prop
+  eventId?: number;
+  /** When multi-room is enabled, scope categories to this room */
+  roomId?: number;
 }
 
 // Schema for menu category creation
@@ -64,6 +66,7 @@ export default function MenuCategoryDropdown({
   onCategoryCreated,
   disabled = false,
   eventId,
+  roomId,
 }: MenuCategoryDropdownProps) {
   const [selectedValue, setSelectedValue] = useState<string | undefined>(
     initialValue ? String(initialValue) : undefined,
@@ -82,9 +85,11 @@ export default function MenuCategoryDropdown({
 
   // Update selected value when initialValue changes
   useEffect(() => {
-    if (initialValue) {
-      setSelectedValue(String(initialValue));
-    }
+    setSelectedValue(
+      initialValue !== undefined && initialValue !== null
+        ? String(initialValue)
+        : undefined,
+    );
   }, [initialValue]);
 
   const handleSelectChange = (value: string) => {
@@ -115,6 +120,7 @@ export default function MenuCategoryDropdown({
       const payload = {
         vendor_event_id: Number(currentEventId),
         name: values.name.trim(),
+        ...(roomId != null && roomId > 0 ? { room_id: roomId } : {}),
       };
 
       const response = await eventsService.createEventMenuCategory(payload);
@@ -160,7 +166,6 @@ export default function MenuCategoryDropdown({
             // Select the newly created category
             const newCategoryId = String(categoryData.id);
             setSelectedValue(newCategoryId);
-            onSelect(newCategoryId);
           }, 100);
         }
       } else {

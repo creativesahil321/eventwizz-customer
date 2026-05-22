@@ -1,6 +1,10 @@
 "use client";
 
 import { useState, useCallback } from "react";
+import {
+  clearAIBulkApplyStarted,
+  markAIBulkApplyStarted,
+} from "../ai-bulk-apply-session-flag";
 import type {
   AIOnboardingInput,
   AIGeneratedContent,
@@ -56,9 +60,11 @@ export function useAIOnboarding(): UseAIOnboardingReturn {
         }
 
         setContent(data.content);
+        markAIBulkApplyStarted();
         setStep("applying");
         return data.content;
       } catch (err) {
+        clearAIBulkApplyStarted();
         const message =
           err instanceof Error ? err.message : "Failed to generate content";
         setError(message);
@@ -72,6 +78,7 @@ export function useAIOnboarding(): UseAIOnboardingReturn {
   );
 
   const reset = useCallback(() => {
+    clearAIBulkApplyStarted();
     setStep("idle");
     setContent(null);
     setError(null);

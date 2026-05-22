@@ -1,6 +1,5 @@
 "use client";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { PasswordInput } from "@/components/ui/password-input";
 import { Label, Small } from "@/components/ui/typography";
 import { ChevronRight } from "lucide-react";
@@ -25,6 +24,7 @@ export default function ResetPasswordForm() {
     register,
     handleSubmit,
     setValue,
+    watch,
     formState: { errors },
   } = useForm<RegisterForm>({
     mode: "onChange",
@@ -78,21 +78,19 @@ export default function ResetPasswordForm() {
       setLoading(false);
     }
   };
+  const emailValue = watch("email") ?? "";
 
   return (
     <section className="w-full">
       <div className="w-full mx-auto">
         <div className="w-full my-5">
           <form onSubmit={handleSubmit(onSubmit)}>
+            <input type="hidden" {...register("email")} />
             <div className="flex flex-col justify-start space-y-2 mb-4">
               <Label className="text-left">Email</Label>
-              <Input
-                id="email"
-                type="email"
-                placeholder="abc@gmail.com"
-                {...register("email")}
-                className="border border-gray-400 rounded-sm"
-              />
+              <div className="border border-gray-400 rounded-sm h-12 px-3 flex items-center bg-muted/30 text-gray-700">
+                {emailValue || "Email not found in reset link"}
+              </div>
               {errors.email && (
                 <Small className="text-red-500 text-left">
                   {errors.email.message}

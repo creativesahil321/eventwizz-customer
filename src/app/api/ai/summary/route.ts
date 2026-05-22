@@ -102,6 +102,8 @@ export async function POST(req: Request) {
           error: "Failed to generate description. API error.",
           details: result.error,
           modelsTried: result.modelsTried,
+          retryAfter: result.retryAfterHuman,
+          retryAfterMs: result.retryAfterMs,
         },
         { status: result.status || 500 }
       );

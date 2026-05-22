@@ -263,8 +263,10 @@ export default function EventOverviewClient({
             </Button>
           </Link>
           <div>
-            <h1 className="text-2xl font-bold text-[var(--text-primary)]">{eventData.name}</h1>
-            <p className="text-sm text-[var(--text-primary)]">
+            <h1 className="text-2xl font-bold text-[var(--color-text)]">
+              {eventData.name}
+            </h1>
+            <p className="text-sm text-[var(--color-text)]">
               Event Overview & Booking Details
             </p>
           </div>
@@ -342,10 +344,10 @@ export default function EventOverviewClient({
                 />
                 {!dateFilter && (
                   <span
-className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-500 sm:hidden"
-                  aria-hidden
-                >
-                  dd-mm-yyyy
+                    className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-500 sm:hidden"
+                    aria-hidden
+                  >
+                    dd-mm-yyyy
                   </span>
                 )}
               </div>
@@ -473,7 +475,11 @@ className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm 
                                             </span>{" "}
                                             × Table of {tableConfig.size}{" "}
                                             <span className="text-muted-foreground">
-                                              ({formatOverviewPrice(tableConfig.price)})
+                                              (
+                                              {formatOverviewPrice(
+                                                tableConfig.price,
+                                              )}
+                                              )
                                             </span>
                                           </p>
                                         ),

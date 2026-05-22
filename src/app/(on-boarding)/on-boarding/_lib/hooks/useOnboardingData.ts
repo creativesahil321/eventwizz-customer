@@ -9,20 +9,39 @@ import {
 } from "@/services/vendor/onboarding/type";
 import { OnboardingFormData } from "../../_components/form-provider/schema";
 import { useSession } from "next-auth/react";
-import { useEffect } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useLocationStore } from "@/store/location.store";
 import { VenueLocation } from "@/types/api.types";
 
 // Define query key for onboarding data
 export const onboardingKeys = {
   all: ["onboarding"] as const,
-  data: () => [...onboardingKeys.all, "data"] as const,
+  data: (isRooms: boolean | "unknown") =>
+    [...onboardingKeys.all, "data", isRooms] as const,
 };
+
+const ONBOARDING_IS_ROOMS_STORAGE_KEY = "onboarding_is_rooms";
+
+function readIsRoomsFlag(): boolean | undefined {
+  if (typeof window === "undefined") return undefined;
+  const raw = sessionStorage.getItem(ONBOARDING_IS_ROOMS_STORAGE_KEY);
+  if (raw === "true") return true;
+  if (raw === "false") return false;
+  return undefined;
+}
+
+function coerceIsRoomsFlag(value: unknown): boolean | undefined {
+  if (value === true || value === false) return value;
+  if (value === 1 || value === "1" || value === "true") return true;
+  if (value === 0 || value === "0" || value === "false") return false;
+  return undefined;
+}
 
 // Function to fetch onboarding data
 async function fetchOnboardingData(
   token: string,
-  locationId: string
+  locationId: string,
+  isRooms?: boolean,
 ): Promise<ApiResponse | null> {
   if (!token || !locationId) {
     console.warn("Missing token or locationId for onboarding data fetch:", {
@@ -48,17 +67,26 @@ async function fetchOnboardingData(
   };
 
   try {
-    const endpoint = API_ENDPOINTS.VENDOR.ONBOARDING.GET_ALL_STEPS.replace(
-      "{location_id}",
-      locationId
-    );
+    const fetchByMode = async (roomsMode: boolean) =>
+      request<ApiResponse>({
+        url: API_ENDPOINTS.VENDOR.ONBOARDING.GET_ALL_STEPS.replace(
+          "{location_id}",
+          locationId,
+        ).replace("{is_rooms}", roomsMode ? "true" : "false"),
+        method: "GET",
+        headers,
+        returnFullResponse: true,
+      });
 
-    const response = await request<ApiResponse>({
-      url: endpoint,
-      method: "GET",
-      headers,
-      returnFullResponse: true,
-    });
+    const response =
+      typeof isRooms === "boolean"
+        ? await fetchByMode(isRooms)
+        : await (() => {
+            // Unknown mode: probe rooms first, then fallback.
+            return fetchByMode(true).then((roomsRes) =>
+              roomsRes?.status ? roomsRes : fetchByMode(false),
+            );
+          })();
 
     if (response.status) {
       if (!response.data) {
@@ -95,6 +123,9 @@ export function useOnboardingData() {
   const queryClient = useQueryClient();
   const token = session?.user?.token;
   const { setLocations, setSelectedLocation } = useLocationStore();
+  const [isRoomsFlag, setIsRoomsFlag] = useState<boolean | undefined>(() =>
+    readIsRoomsFlag(),
+  );
 
   // Get locationId from session
   const locationId = session?.user?.vendor_location_id?.toString();
@@ -106,6 +137,10 @@ export function useOnboardingData() {
     locationId !== "undefined" &&
     locationId !== "";
 
+  const syncIsRoomsFlagFromStorage = useCallback(() => {
+    setIsRoomsFlag(readIsRoomsFlag());
+  }, []);
+
   const {
     data: onboardingData,
     isLoading,
@@ -113,8 +148,9 @@ export function useOnboardingData() {
     error,
     refetch,
   } = useQuery({
-    queryKey: onboardingKeys.data(),
-    queryFn: () => fetchOnboardingData(token as string, locationId as string),
+    queryKey: onboardingKeys.data(isRoomsFlag ?? "unknown"),
+    queryFn: () =>
+      fetchOnboardingData(token as string, locationId as string, isRoomsFlag),
     enabled: !!token && !!isValidLocationId,
     staleTime: 1000 * 60 * 5, // 5 minutes
     refetchOnWindowFocus: false,
@@ -123,6 +159,21 @@ export function useOnboardingData() {
   // Sync location data from persistence API to Zustand store and session
   useEffect(() => {
     if (!onboardingData?.data) return;
+
+    const payload = onboardingData.data as unknown as Record<string, unknown>;
+    const persistedIsRooms = coerceIsRoomsFlag(payload.is_rooms);
+    if (typeof persistedIsRooms === "boolean" && persistedIsRooms !== isRoomsFlag) {
+      setIsRoomsFlag(persistedIsRooms);
+      if (typeof window !== "undefined") {
+        sessionStorage.setItem(
+          ONBOARDING_IS_ROOMS_STORAGE_KEY,
+          persistedIsRooms ? "true" : "false",
+        );
+      }
+      // If API says room mode differs from current query mode,
+      // force a refetch with the corrected mode immediately.
+      void refetch();
+    }
 
     const syncData = async () => {
       const persistenceData = onboardingData.data as unknown as {
@@ -221,12 +272,14 @@ export function useOnboardingData() {
     // Call the async function
     syncData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [onboardingData]);
+  }, [onboardingData, isRoomsFlag]);
 
   // Mutation for invalidating the cache after form submissions
   const invalidateCache = useMutation({
     mutationFn: async () => {
-      await queryClient.invalidateQueries({ queryKey: onboardingKeys.data() });
+      await queryClient.invalidateQueries({
+        queryKey: onboardingKeys.data(isRoomsFlag ?? "unknown"),
+      });
       return await refetch();
     },
   });
@@ -234,16 +287,19 @@ export function useOnboardingData() {
   // Listen for the custom event from onboardingService.notifyDataChanged
   useEffect(() => {
     const handleDataChanged = () => {
-      console.log("Data changed event received, refetching...");
-      refetch();
+      syncIsRoomsFlagFromStorage();
+      void queryClient.invalidateQueries({ queryKey: onboardingKeys.all });
+      void refetch();
     };
 
     window.addEventListener("onboarding-data-changed", handleDataChanged);
+    window.addEventListener("storage", syncIsRoomsFlagFromStorage);
 
     return () => {
       window.removeEventListener("onboarding-data-changed", handleDataChanged);
+      window.removeEventListener("storage", syncIsRoomsFlagFromStorage);
     };
-  }, [refetch]);
+  }, [queryClient, refetch, syncIsRoomsFlagFromStorage]);
 
   return {
     onboardingData,

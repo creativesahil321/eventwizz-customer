@@ -11,6 +11,7 @@ import { Label } from "@/components/ui/label";
 import { useDomain } from "@/providers/domain-provider/domain-provider";
 import { setCookie } from "cookies-next";
 import { OAuthButtons } from "@/components/auth/OAuthButtons";
+import { AuthAlternateLink } from "@/app/(auth)/_components/auth-alternate-link";
 
 const registerSchema = z.object({
   email: z.string().email("Please enter a valid email address"),
@@ -183,6 +184,8 @@ export function UnifiedRegisterForm({ accountType }: UnifiedRegisterFormProps) {
             {loading ? "Verifying..." : "Verify email"}
             {!loading && <span className="ml-1">⟩</span>}
           </Button>
+
+          <AuthAlternateLink variant="register" />
         </div>
       </form>
     </div>

@@ -36,7 +36,7 @@ import { addCacheBusting } from "@/lib/image-utils";
 import {
   BANNER_HEADING_MAX_WORDS,
   countWords,
-  truncateToMaxWords,
+  truncateToMaxWordsForInput,
 } from "@/lib/word-count";
 
 export default function EventNameTab() {
@@ -1046,7 +1046,7 @@ export default function EventNameTab() {
                               handleFieldFocus("event_banner_heading")
                             }
                             onChange={(e) => {
-                              const next = truncateToMaxWords(
+                              const next = truncateToMaxWordsForInput(
                                 e.target.value,
                                 BANNER_HEADING_MAX_WORDS
                               );

@@ -1053,6 +1053,8 @@ Remember: Return solid hex colors for most fields, but background can be either 
           error: "Failed to generate color theme. API error.",
           details: result.error,
           modelsTried: result.modelsTried,
+          retryAfter: result.retryAfterHuman,
+          retryAfterMs: result.retryAfterMs,
         },
         { status: result.status || 500 }
       );

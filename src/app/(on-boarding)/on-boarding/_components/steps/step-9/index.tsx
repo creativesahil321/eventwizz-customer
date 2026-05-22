@@ -241,7 +241,7 @@ export default function StepNine() {
                 >
                   {() => (
                     <section className={guidedInsetSectionSurfaceClass("w-full mb-4")}>
-                      <OnboardingFieldGroupTitle>FAQ List</OnboardingFieldGroupTitle>
+                      <OnboardingFieldGroupTitle>Text Entries</OnboardingFieldGroupTitle>
 
                       <div className="space-y-8 mt-4">
                         {fields.map((field, index) => (
@@ -263,7 +263,7 @@ export default function StepNine() {
                             </div>
 
                             <div className="mb-2 text-sm font-medium text-muted-foreground">
-                              FAQ #{index + 1}
+                              FAQ {index + 1}
                             </div>
 
                             <div className="space-y-4">
@@ -277,7 +277,7 @@ export default function StepNine() {
                                   return (
                                     <FormItem>
                                       <FormLabel className="text-sm font-medium">
-                                        Question
+                                        Question {index + 1}
                                       </FormLabel>
                                       <FormControl>
                                         <Input
@@ -330,7 +330,7 @@ export default function StepNine() {
                                   return (
                                     <FormItem>
                                       <FormLabel className="text-sm font-medium">
-                                        Answer
+                                        Answer {index + 1}
                                       </FormLabel>
                                       <FormControl>
                                         <Textarea
@@ -383,7 +383,7 @@ export default function StepNine() {
                             disabled={fields.length >= STEP_NINE_MAX_FAQS}
                             className="border border-white/15 bg-white/[0.04] text-foreground hover:bg-white/[0.08] disabled:opacity-50"
                           >
-                            <span className="mr-1">+</span> Add Another FAQ
+                            <span className="mr-1">+</span> Add Text
                           </Button>
                           <p className="text-xs text-muted-foreground text-center">
                             Maximum {STEP_NINE_MAX_FAQS} FAQs per event.

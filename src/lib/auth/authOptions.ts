@@ -123,6 +123,7 @@ declare module "next-auth" {
 
   interface Session {
     user: {
+      last_completed_step: any;
       venue_locations: VenueLocation[];
       default_venue_location: VenueLocation;
       name: string | null;

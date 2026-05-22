@@ -74,6 +74,26 @@ export const stepOneSchema = z
   });
 export type StepOneType = z.infer<typeof stepOneSchema>;
 
+/** Snake or camel `has_multiple_locations` on any API object (root, step, venue). */
+export function readHasMultipleLocationsField(source: unknown): unknown {
+  if (!source || typeof source !== "object") return undefined;
+  const o = source as Record<string, unknown>;
+  return o.has_multiple_locations ?? o.hasMultipleLocations;
+}
+
+/** Root or nested persistence values (API may send 0/1 or strings). */
+export function coerceHasMultipleLocationsFromApi(
+  value: unknown,
+): boolean | undefined {
+  if (value === true || value === 1 || value === "1" || value === "true") {
+    return true;
+  }
+  if (value === false || value === 0 || value === "0" || value === "false") {
+    return false;
+  }
+  return undefined;
+}
+
 /** Merge API step-1 fields (e.g. brand_name, string booleans) into client stepOne shape. */
 export function normalizeStepOneFromApi(
   stepOne: unknown,
@@ -96,42 +116,15 @@ export function normalizeStepOneFromApi(
     typeof rest.name === "string" ? rest.name.trim() : "";
   const name = nameFromApi || nameFromLegacy;
 
-  const rawHasMulti = rest.has_multiple_locations;
-  let has_multiple_locations = rawHasMulti;
-  if (
-    rawHasMulti === true ||
-    rawHasMulti === 1 ||
-    rawHasMulti === "1" ||
-    rawHasMulti === "true"
-  ) {
-    has_multiple_locations = true;
-  } else if (
-    rawHasMulti === false ||
-    rawHasMulti === 0 ||
-    rawHasMulti === "0" ||
-    rawHasMulti === "false"
-  ) {
-    has_multiple_locations = false;
-  }
+  const has_multiple_locations = coerceHasMultipleLocationsFromApi(
+    readHasMultipleLocationsField(rest),
+  );
 
   return {
     ...rest,
     name,
     has_multiple_locations,
   } as Partial<StepOneType> & Record<string, unknown>;
-}
-
-/** Root or nested persistence values (API may send 0/1 or strings). */
-export function coerceHasMultipleLocationsFromApi(
-  value: unknown,
-): boolean | undefined {
-  if (value === true || value === 1 || value === "1" || value === "true") {
-    return true;
-  }
-  if (value === false || value === 0 || value === "0" || value === "false") {
-    return false;
-  }
-  return undefined;
 }
 
 //#===step-2===#
@@ -157,14 +150,6 @@ export const stepTwoSchema = z.object({
     .min(1, "Title is required")
     .max(40, "Title must not exceed 40 characters"),
   about_description: z.string().min(1, "Description is required"),
-  about_link_title: z
-    .string()
-    .min(1, "Button text is required")
-    .max(18, "Button text must not exceed 18 characters"),
-  about_cta_link: z
-    .string()
-    .min(1, "Button link is required")
-    .max(2048, "Button link is too long"),
 });
 export type StepTwoType = z.infer<typeof stepTwoSchema>;
 
@@ -238,25 +223,6 @@ export const stepThreeSchema = z.object({
   about_event_description: z
     .string()
     .min(1, "About event description is required"),
-  event_schedular_title: z
-    .string()
-    .min(1, "Event schedular title is required")
-    .max(40, "Event schedular title must not exceed 40 characters"),
-  event_schedular: z
-    .array(
-      z.object({
-        title: z
-          .string()
-          .min(1, "Title is required")
-          .max(40, "Schedule title must not exceed 40 characters"),
-        time: z
-          .string()
-          .min(1, "Time is required")
-          .regex(/^([01]\d|2[0-3]):([0-5]\d)$/, "Time must be in HH:mm format"),
-      })
-    )
-    .min(1, "At least one schedule is required")
-    .refine(validateTimeSequence, "Times must be in ascending order"),
 });
 export type StepThreeType = z.infer<typeof stepThreeSchema>;
 
@@ -272,17 +238,17 @@ export const stepFourSchema = z
       .optional(),
     package_title: z
       .string()
-      .min(1, "Event main heading is required")
+      .min(1, "Event package main heading is required")
       .max(
         EVENT_PACKAGE_MAIN_HEADING_MAX_CHARS,
-        `Event main heading must not exceed ${EVENT_PACKAGE_MAIN_HEADING_MAX_CHARS} characters`
+        `Event package main heading must not exceed ${EVENT_PACKAGE_MAIN_HEADING_MAX_CHARS} characters`
       ),
     package_description: z
       .string()
-      .min(1, "Event sub-heading is required")
+      .min(1, "Event package sub-heading is required")
       .max(
         EVENT_PACKAGE_SUB_HEADING_MAX_CHARS,
-        `Event sub-heading must not exceed ${EVENT_PACKAGE_SUB_HEADING_MAX_CHARS} characters`
+        `Event package sub-heading must not exceed ${EVENT_PACKAGE_SUB_HEADING_MAX_CHARS} characters`
       ),
     package_button_name: z
       .string()
@@ -304,6 +270,70 @@ export const stepFourSchema = z
         })
       )
       .min(1, "At least one package detail is required"),
+    event_schedular_title: z
+      .string()
+      .max(40, "Event schedular title must not exceed 40 characters"),
+    event_schedule_subtitle: z
+      .string()
+      .max(160, "Custom copy must not exceed 160 characters"),
+    event_schedular: z
+      .array(
+        z.object({
+          title: z
+            .string()
+            .max(40, "Schedule title must not exceed 40 characters"),
+          time: z.string(),
+        }),
+      )
+      .superRefine((schedules, ctx) => {
+        schedules.forEach((schedule, index) => {
+          const hasTitle = Boolean(schedule.title?.trim());
+          const hasTime = Boolean(schedule.time?.trim());
+
+          if (hasTitle !== hasTime) {
+            if (!hasTitle) {
+              ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                message: "Title is required when time is set",
+                path: [index, "title"],
+              });
+            }
+            if (!hasTime) {
+              ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                message: "Time is required when title is set",
+                path: [index, "time"],
+              });
+            }
+          }
+
+          if (
+            hasTime &&
+            !/^([01]\d|2[0-3]):([0-5]\d)$/.test(schedule.time!.trim())
+          ) {
+            ctx.addIssue({
+              code: z.ZodIssueCode.custom,
+              message: "Time must be in HH:mm format",
+              path: [index, "time"],
+            });
+          }
+        });
+
+        const filled = schedules
+          .filter((schedule) => schedule.title?.trim() && schedule.time?.trim())
+          .map((schedule) => ({
+            title: schedule.title!.trim(),
+            time: schedule.time!.trim(),
+          }));
+
+        if (filled.length > 1 && !validateTimeSequence(filled)) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: "Times must be in ascending order",
+            path: [],
+          });
+        }
+      }),
     gallery: z
       .array(
         z.union([
@@ -332,6 +362,22 @@ export const stepFourSchema = z
     }
   );
 export type StepFourType = z.infer<typeof stepFourSchema>;
+
+/** Drops blank timeline rows before persisting optional schedules. */
+export function normalizeEventSchedularForSave(
+  schedules: Array<{ title?: string; time?: string }> | undefined,
+): Array<{ title: string; time: string }> {
+  return (schedules ?? [])
+    .filter(
+      (schedule) =>
+        String(schedule.title ?? "").trim().length > 0 &&
+        String(schedule.time ?? "").trim().length > 0,
+    )
+    .map((schedule) => ({
+      title: String(schedule.title).trim(),
+      time: String(schedule.time).trim(),
+    }));
+}
 
 //#===step-5===#
 
@@ -821,8 +867,112 @@ export type StepSixType = z.infer<typeof stepSixSchema>;
 export const StepSixSchema = stepSixSchema;
 
 //#===step-7===#
-export const stepSevenSchema = z.object({
-  step: z.literal(7),
+export const stepSevenSchema = z
+  .object({
+    step: z.number(),
+    isApproved: z.boolean().optional(),
+    event_id: z.number(),
+    remove_brochure_pdf: z.boolean().optional(),
+    remove_brochure_pdf_2: z.boolean().optional(),
+    remove_faq_pdf: z.boolean().optional(),
+    brochure_pdf: z
+      .union([z.instanceof(File), z.string().url(), z.null()])
+      .optional(),
+    brochure_pdf_2: z
+      .union([z.instanceof(File), z.string().url(), z.null()])
+      .optional(),
+    faq_pdf: z
+      .union([z.instanceof(File), z.string().url(), z.null()])
+      .optional(),
+    event_address: z.string().min(1, "Event address is required"),
+    latitude: z.number().optional(),
+    longitude: z.number().optional(),
+    price_start_from: z
+      .string()
+      .optional()
+      .default("")
+      .refine(
+        (val) => {
+          if (!val) return true;
+          const num = Number(val);
+          return !Number.isNaN(num) && num >= 0 && num <= 999999;
+        },
+        { message: "Price must be between 0 and 999999" }
+      ),
+    location: z.object({
+      title: z
+        .string()
+        .max(40, "Location title must not exceed 40 characters")
+        .optional(),
+      description: z
+        .string()
+        .max(160, "Location description must not exceed 160 characters")
+        .optional(),
+      icon: z.string().optional(),
+    }),
+    price: z
+      .object({
+        title: z
+          .string()
+          .max(40, "Price title must not exceed 40 characters")
+          .optional(),
+        description: z
+          .string()
+          .max(160, "Price description must not exceed 160 characters")
+          .optional(),
+        link: z.string().optional(),
+        icon: z.string().optional(),
+        price_title: z
+          .string()
+          .max(40, "Price title must not exceed 40 characters")
+          .optional(),
+      })
+      .optional(),
+    downloads: z
+      .array(
+        z.object({
+          id: z.number().optional(),
+          title: z
+            .string()
+            .max(40, "Download title must not exceed 40 characters")
+            .optional(),
+          pdf: z.instanceof(File).nullable().optional(),
+          download_link: z.array(z.string()).optional(),
+        })
+      )
+      .optional(),
+    more_info: z
+      .array(
+        z.object({
+          id: z.number().optional(),
+          title: z
+            .string()
+            .max(40, "More info title must not exceed 40 characters")
+            .optional(),
+          description: z
+            .string()
+            .max(160, "More info description must not exceed 160 characters")
+            .optional(),
+          button_text: z
+            .string()
+            .max(18, "Button text must not exceed 18 characters")
+            .optional(),
+          button_link: z.string().optional(),
+        })
+      )
+      .optional(),
+  });
+
+
+
+
+
+export type StepSevenType = z.infer<typeof stepSevenSchema>;
+
+//#===step-8===#
+
+export const stepEightSchema = z.object({
+  step: z.number(),
   isApproved: z.boolean().optional(),
   event_id: z.number(),
   drink_title: z
@@ -929,119 +1079,6 @@ export const stepSevenSchema = z.object({
     )
     .min(1, "At least one package is required"),
 });
-
-export type StepSevenType = z.infer<typeof stepSevenSchema>;
-
-//#===step-8===#
-
-export const stepEightSchema = z
-  .object({
-    step: z.number(),
-    isApproved: z.boolean().optional(),
-    event_id: z.number(),
-    remove_brochure_pdf: z.boolean().optional(),
-    remove_brochure_pdf_2: z.boolean().optional(),
-    remove_faq_pdf: z.boolean().optional(),
-    brochure_pdf: z
-      .union([z.instanceof(File), z.string().url(), z.null()])
-      .optional(),
-    brochure_pdf_2: z
-      .union([z.instanceof(File), z.string().url(), z.null()])
-      .optional(),
-    faq_pdf: z
-      .union([z.instanceof(File), z.string().url(), z.null()])
-      .optional(),
-    event_address: z.string().min(1, "Event address is required"),
-    latitude: z.number().optional(),
-    longitude: z.number().optional(),
-    price_start_from: z
-      .string()
-      .min(1, "Starting price is required")
-      .refine(
-        (val) => {
-          const num = Number(val);
-          return !Number.isNaN(num) && num >= 0 && num <= 999999;
-        },
-        { message: "Price must be between 0 and 999999" }
-      ),
-    price_start_from_button_text: z
-      .string()
-      .max(18, "Button text must not exceed 18 characters")
-      .optional()
-      .default("Book Now"),
-    location: z.object({
-      title: z
-        .string()
-        .max(40, "Location title must not exceed 40 characters")
-        .optional(),
-      description: z
-        .string()
-        .max(160, "Location description must not exceed 160 characters")
-        .optional(),
-      icon: z.string().optional(),
-    }),
-    price: z
-      .object({
-        title: z
-          .string()
-          .max(40, "Price title must not exceed 40 characters")
-          .optional(),
-        description: z
-          .string()
-          .max(160, "Price description must not exceed 160 characters")
-          .optional(),
-        link: z.string().optional(),
-        icon: z.string().optional(),
-        price_title: z
-          .string()
-          .max(40, "Price title must not exceed 40 characters")
-          .optional(),
-      })
-      .optional(),
-    downloads: z
-      .array(
-        z.object({
-          id: z.number().optional(),
-          title: z
-            .string()
-            .max(40, "Download title must not exceed 40 characters")
-            .optional(),
-          pdf: z.instanceof(File).nullable().optional(),
-          download_link: z.array(z.string()).optional(),
-        })
-      )
-      .optional(),
-    more_info: z
-      .array(
-        z.object({
-          id: z.number().optional(),
-          title: z
-            .string()
-            .max(40, "More info title must not exceed 40 characters")
-            .optional(),
-          description: z
-            .string()
-            .max(160, "More info description must not exceed 160 characters")
-            .optional(),
-          button_text: z
-            .string()
-            .max(18, "Button text must not exceed 18 characters")
-            .optional(),
-          button_link: z.string().optional(),
-        })
-      )
-      .optional(),
-  })
-  .superRefine((data, ctx) => {
-    // Main brochure PDF is required
-    if (!data.brochure_pdf && !data.remove_brochure_pdf) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: "Event Brochure PDF is required",
-        path: ["brochure_pdf"],
-      });
-    }
-  });
 export type StepEightType = z.infer<typeof stepEightSchema>;
 
 //#===step-9===#
@@ -1076,15 +1113,47 @@ export type StepNineType = z.infer<typeof stepNineSchema>;
 
 //#===step-10===#
 // Payment gateway schema (backend structure)
+/** Laravel often sends `null` for absent strings; `z.string().optional()` rejects null and breaks the whole step. */
+const nullableGatewayString = z
+  .union([z.string(), z.null(), z.undefined()])
+  .transform((v) => (v === null || v === undefined ? undefined : v));
+
+/** Treat common API shapes as connected for onboarding gating (string, boolean, int). */
+export function isGatewayStatusActive(status: unknown): boolean {
+  if (status === true || status === 1 || status === "1" || status === "true") {
+    return true;
+  }
+  if (typeof status === "string") {
+    return status.trim().toLowerCase() === "active";
+  }
+  return false;
+}
+
+const gatewayStatusSchema = z.preprocess((val: unknown) => {
+  if (val === true || val === 1 || val === "1" || val === "true") {
+    return "active";
+  }
+  if (typeof val === "string") {
+    const s = val.trim().toLowerCase();
+    if (
+      s === "pending" ||
+      s === "active" ||
+      s === "under_review" ||
+      s === "restricted"
+    ) {
+      return s;
+    }
+  }
+  return val;
+}, z.enum(["pending", "active", "under_review", "restricted"]).optional());
+
 const paymentGatewaySchema = z.object({
-  status: z
-    .enum(["pending", "active", "under_review", "restricted"])
-    .optional(),
-  account_id: z.string().optional(),
+  status: gatewayStatusSchema,
+  account_id: nullableGatewayString.optional(),
   bank: z
     .object({
-      bank_name: z.string().optional(),
-      account_masked: z.string().optional(),
+      bank_name: nullableGatewayString.optional(),
+      account_masked: nullableGatewayString.optional(),
     })
     .optional(),
 });
@@ -1102,24 +1171,27 @@ export const stepTenSchema = z
     step: z.literal(10),
     isApproved: z.boolean().optional(),
     event_id: z.number(),
+    accept_payment_method: z.enum(["bank_transfer", "payment_gateway", "both"], {
+      required_error: "The accept payment method field is required.",
+    }),
     payment_gateways: paymentGatewaysSchema.optional(),
     is_skipped: z.boolean().default(false),
   })
   .superRefine((data, ctx) => {
-    // Validate that at least one payment gateway is connected if not skipped
+    // Validate that at least one payment gateway is ACTIVE if not skipped
     if (!data.is_skipped) {
-      const hasAnyGateway =
-        data.payment_gateways?.stripe?.status ||
-        data.payment_gateways?.paypal?.status ||
-        data.payment_gateways?.truelayer?.status ||
-        data.payment_gateways?.worldpay?.status ||
-        data.payment_gateways?.klarna?.status;
+      const hasAnyGatewayActive =
+        isGatewayStatusActive(data.payment_gateways?.stripe?.status) ||
+        isGatewayStatusActive(data.payment_gateways?.paypal?.status) ||
+        isGatewayStatusActive(data.payment_gateways?.truelayer?.status) ||
+        isGatewayStatusActive(data.payment_gateways?.worldpay?.status) ||
+        isGatewayStatusActive(data.payment_gateways?.klarna?.status);
 
-      if (!hasAnyGateway) {
+      if (!hasAnyGatewayActive) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           message:
-            "Please connect at least one payment gateway or skip this step",
+            "Connect at least one payment method (bank, Stripe, or PayPal) to save, or tap Skip for now.",
           path: ["payment_gateways"],
         });
       }
@@ -1191,11 +1263,149 @@ export type StepElevenType = z.infer<typeof stepElevenSchema>;
 
 // export type OnBoardingPreviewType = z.infer<typeof OnBoardingPreviewSchema>;
 
+//#===multi-space (rooms) ===#
+/**
+ * Multi-room ("event spaces") system: opt-in on Step 4. When enabled, vendors define up to
+ * {@link MAX_ROOMS} rooms and Steps 4–7 are filled per room via a tab UI. Single-room users
+ * continue to use the existing `stepFour…stepSeven` blocks unchanged.
+ */
+export const MAX_ROOMS = 3;
+
+/**
+ * Per-room data shape. Mirrors the relevant fields of `stepFour…stepSeven` minus the wizard-level
+ * `step` / `event_id` / `isApproved` keys (those live on the wizard step, not the room). Each
+ * room carries its own `isApproved*` flag per sub-section so room-level progress is preserved.
+ *
+ * Validation is intentionally permissive here so an in-progress room (e.g. user just added it
+ * and only filled the package) doesn't fail validation of the whole `multiSpace` block. Strict
+ * per-section validation is enforced by each step at submit time, identical to single-room mode.
+ */
+const roomPackageSchema = z.object({
+  package_image: z
+    .union([z.instanceof(File), z.string().url(), z.null()])
+    .nullable()
+    .optional(),
+  package_title: z.string().optional().default(""),
+  package_description: z.string().optional().default(""),
+  package_button_name: z.string().optional().default(""),
+  package_details: z
+    .array(z.object({ title: z.string().optional().default("") }))
+    .optional()
+    .default([]),
+  event_schedular_title: z.string().optional().default(""),
+  event_schedule_subtitle: z.string().optional().default(""),
+  event_schedular: z
+    .array(
+      z.object({
+        title: z.string().optional().default(""),
+        time: z.string().optional().default(""),
+      }),
+    )
+    .optional()
+    .default([]),
+  gallery: z
+    .array(
+      z.union([
+        z.instanceof(File),
+        z.object({ id: z.number(), url: z.string().url() }),
+      ]),
+    )
+    .optional(),
+});
+
+const roomDatesSchema = z.object({
+  // Reuse the same per-date shape as stepFive but make the array optional
+  // (a freshly-added room may not have any dates yet).
+  dates: z.array(z.any()).optional().default([]),
+});
+
+const roomCateringSchema = z.object({
+  catering_option: z.number().min(0).max(1).optional().default(0),
+  menu_title: z.string().optional().default(""),
+  menu_description: z.string().optional().default(""),
+  event_menu_category_id: z.number().optional(),
+  menus: z.array(z.any()).optional().default([]),
+});
+
+const roomBrochureSchema = z.object({
+  brochure_pdf: z
+    .union([z.instanceof(File), z.string().url(), z.null()])
+    .optional(),
+  brochure_pdf_2: z
+    .union([z.instanceof(File), z.string().url(), z.null()])
+    .optional(),
+  faq_pdf: z
+    .union([z.instanceof(File), z.string().url(), z.null()])
+    .optional(),
+  remove_brochure_pdf: z.boolean().optional(),
+  remove_brochure_pdf_2: z.boolean().optional(),
+  remove_faq_pdf: z.boolean().optional(),
+  event_address: z.string().optional().default(""),
+  latitude: z.number().optional(),
+  longitude: z.number().optional(),
+  price_start_from: z.string().optional().default(""),
+  location: z
+    .object({
+      title: z.string().optional(),
+      description: z.string().optional(),
+      icon: z.string().optional(),
+    })
+    .optional(),
+  price: z
+    .object({
+      title: z.string().optional(),
+      description: z.string().optional(),
+      link: z.string().optional(),
+      icon: z.string().optional(),
+      price_title: z.string().optional(),
+    })
+    .optional(),
+  downloads: z.array(z.any()).optional().default([]),
+  more_info: z.array(z.any()).optional().default([]),
+});
+
+export const roomSchema = z.object({
+  /** Backend room id (assigned after first save). */
+  id: z.number().optional(),
+  /** Display name of the room (e.g. "Grand Ballroom"). */
+  name: z
+    .string()
+    .min(1, "Room name is required")
+    .max(40, "Room name must not exceed 40 characters"),
+  /** Per-section approval flags so Stepper / preview can show completion per room. */
+  isApprovedPackage: z.boolean().optional(),
+  isApprovedDates: z.boolean().optional(),
+  isApprovedCatering: z.boolean().optional(),
+  isApprovedBrochure: z.boolean().optional(),
+  package: roomPackageSchema.default({}),
+  dates: roomDatesSchema.default({ dates: [] }),
+  catering: roomCateringSchema.default({}),
+  brochure: roomBrochureSchema.default({}),
+});
+export type RoomType = z.infer<typeof roomSchema>;
+
+export const multiSpaceSchema = z.object({
+  /** True when the vendor selected "Yes" to multiple event spaces on Step 4. */
+  enabled: z.boolean().default(false),
+  /** Active room tab in the UI (0-based index into `rooms`). */
+  currentRoomIndex: z.number().min(0).default(0),
+  rooms: z
+    .array(roomSchema)
+    .max(MAX_ROOMS, `You can add at most ${MAX_ROOMS} rooms`)
+    .default([]),
+});
+export type MultiSpaceType = z.infer<typeof multiSpaceSchema>;
+
 //#===on-boarding-schema===#
 export const onboardingSchema = z.object({
   isApproved: z.boolean().default(false),
   activeStep: z.number().min(1).max(11),
   last_completed_step: z.number().min(1).max(11),
+  /**
+   * Multi-space (rooms) container. Optional so existing single-room data continues to validate
+   * without it. The Step 4 toggle owns the `enabled` flag.
+   */
+  multiSpace: multiSpaceSchema.optional(),
   stepOne: stepOneSchema,
   stepTwo: stepTwoSchema,
   stepThree: stepThreeSchema,

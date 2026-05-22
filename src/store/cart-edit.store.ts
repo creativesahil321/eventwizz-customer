@@ -619,9 +619,9 @@ export const useCartEditStore = create<CartEditState>()(
             const dateData = { ...newEditingData[eventSlug][date] };
             const items = [
               ...dateData[
-                itemType === "drink"
-                  ? "drinks"
-                  : (`${itemType}s` as "tables" | "tickets")
+              itemType === "drink"
+                ? "drinks"
+                : (`${itemType}s` as "tables" | "tickets")
               ],
             ];
 
@@ -679,11 +679,21 @@ export const useCartEditStore = create<CartEditState>()(
                     // If no people count set, use minimum table capacity
                     updatedItem.allocation = [updatedItem.minPersons || 1];
                     console.log(
-                      `🔄 Auto-allocated ${
-                        updatedItem.minPersons || 1
+                      `🔄 Auto-allocated ${updatedItem.minPersons || 1
                       } people (min capacity) to single table ${itemId}`
                     );
                   } else if (totalTablesAfterUpdate > 1) {
+                    // Keep allocation array in sync with quantity when multiple tables are selected.
+                    // Preserve existing values and fill new slots with minimum allowed guests.
+                    const existingAllocation = Array.isArray(updatedItem.allocation)
+                      ? updatedItem.allocation
+                      : [];
+                    const minGuestsPerTable = updatedItem.minPersons || 1;
+                    const normalizedAllocation = Array.from(
+                      { length: quantity },
+                      (_, index) => existingAllocation[index] ?? minGuestsPerTable
+                    );
+                    updatedItem.allocation = normalizedAllocation;
                     console.log(
                       `🔄 Multiple tables (${totalTablesAfterUpdate}) - manual allocation required`
                     );
@@ -816,6 +826,11 @@ export const useCartEditStore = create<CartEditState>()(
               console.warn(
                 `🚨 People count ${peopleCount} is invalid. Clamped to ${validatedPeopleCount} (min: 1, max: 500)`
               );
+            }
+
+            // Skip when nothing changed — avoids hasChanges + autosave on blur-without-edit
+            if (validatedPeopleCount === currentPeopleCount) {
+              return state;
             }
 
             // Update people count and handle allocation
@@ -1099,8 +1114,8 @@ export const useCartEditStore = create<CartEditState>()(
           itemType === "drink"
             ? dateData.drinks
             : itemType === "table"
-            ? dateData.tables
-            : dateData.tickets;
+              ? dateData.tables
+              : dateData.tickets;
 
         const item = items.find((item) => item.id === itemId);
         return item?.quantity || 0;
@@ -1334,8 +1349,7 @@ export const useCartEditStore = create<CartEditState>()(
         selectedTables.forEach((table) => {
           if (!table.allocation || table.allocation.length !== table.quantity) {
             errors.push(
-              `${table.title} needs guest allocation for ${
-                table.quantity
+              `${table.title} needs guest allocation for ${table.quantity
               } table${table.quantity > 1 ? "s" : ""}`
             );
             return;
@@ -1345,15 +1359,13 @@ export const useCartEditStore = create<CartEditState>()(
           table.allocation.forEach((guestCount, index) => {
             if (guestCount < (table.minPersons || 1)) {
               errors.push(
-                `${table.title} Table ${index + 1}: minimum ${
-                  table.minPersons
+                `${table.title} Table ${index + 1}: minimum ${table.minPersons
                 } guests required`
               );
             }
             if (guestCount > (table.maxPersons || 999)) {
               errors.push(
-                `${table.title} Table ${index + 1}: maximum ${
-                  table.maxPersons
+                `${table.title} Table ${index + 1}: maximum ${table.maxPersons
                 } guests allowed`
               );
             }

@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useRef, useState, useCallback } from "react";
-import { useForm } from "react-hook-form";
+import { useForm, useFieldArray, type Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Loader } from "@googlemaps/js-api-loader";
@@ -44,6 +44,9 @@ const INPUT_CLASS =
 const collectInfoSchema = z
   .object({
     has_multiple_locations: z.boolean(),
+    has_room_system: z.boolean().optional(),
+    /** Object rows: RHF `useFieldArray` excludes `string[]`; default `[]` in `useForm` only. */
+    room_names: z.array(z.object({ name: z.string() })),
     venueName: z.string(),
     selectedPlaceId: z.string().optional(),
     venueType: z.string().min(1, "Please select an event category"),
@@ -61,6 +64,33 @@ const collectInfoSchema = z
     description: z.string().max(800, "Max 800 characters").optional(),
   })
   .superRefine((data, ctx) => {
+    if (typeof data.has_room_system !== "boolean") {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Please choose whether you have a room system",
+        path: ["has_room_system"],
+      });
+    }
+    if (data.has_room_system === true) {
+      const names = data.room_names
+        .map((r) => r.name.trim())
+        .filter((n) => n.length > 0);
+      if (names.length < 2) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Please add at least 2 room names",
+          path: ["room_names"],
+        });
+      }
+      if (names.length > 3) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "You can add up to 3 room names only",
+          path: ["room_names"],
+        });
+      }
+    }
+
     const multi = data.has_multiple_locations === true;
     const name = data.venueName?.trim() ?? "";
     if (multi) {
@@ -137,6 +167,34 @@ interface AICollectInfoProps {
   onSwitchToManual: () => void;
   isLoading: boolean;
   initialData: AIOnboardingInput | null;
+  /** GET persistence: only `null` means “never answered” → show location gate. */
+  persistedHasMultipleLocations: boolean | null;
+  /** GET persistence: when known, room-system question is pre-answered and locked. */
+  persistedHasRoomSystem: boolean | null;
+  /** Existing room names from persistence (stepFour rooms keys). */
+  persistedRoomNames: string[];
+}
+
+function resolveKnownHasMultipleLocations(
+  initial: AIOnboardingInput | null,
+  persisted: boolean | null,
+): boolean | null {
+  if (typeof initial?.has_multiple_locations === "boolean") {
+    return initial.has_multiple_locations;
+  }
+  if (persisted === true || persisted === false) return persisted;
+  return null;
+}
+
+function resolveKnownHasRoomSystem(
+  initial: AIOnboardingInput | null,
+  persisted: boolean | null,
+): boolean | null {
+  if (typeof initial?.has_room_system === "boolean") {
+    return initial.has_room_system;
+  }
+  if (persisted === true || persisted === false) return persisted;
+  return null;
 }
 
 type Suggestion = { description: string; place_id: string };
@@ -146,17 +204,40 @@ export default function AICollectInfo({
   onSwitchToManual,
   isLoading,
   initialData,
+  persistedHasMultipleLocations,
+  persistedHasRoomSystem,
+  persistedRoomNames,
 }: AICollectInfoProps) {
   const currencySymbol = useCurrencySymbol();
-  const [locationGateDone, setLocationGateDone] = useState(
-    typeof initialData?.has_multiple_locations === "boolean",
+  const knownMultiOnMount = resolveKnownHasMultipleLocations(
+    initialData,
+    persistedHasMultipleLocations,
   );
+  const [locationGateDone, setLocationGateDone] = useState(
+    knownMultiOnMount === true || knownMultiOnMount === false,
+  );
+  const knownRoomSystemOnMount = resolveKnownHasRoomSystem(
+    initialData,
+    persistedHasRoomSystem,
+  );
+  const roomSystemLocked =
+    knownRoomSystemOnMount === true || knownRoomSystemOnMount === false;
 
   const form = useForm<CollectInfoForm>({
-    resolver: zodResolver(collectInfoSchema),
+    resolver: zodResolver(collectInfoSchema) as Resolver<CollectInfoForm>,
     defaultValues: {
       has_multiple_locations:
-        initialData?.has_multiple_locations ?? false,
+        knownMultiOnMount ?? false,
+      has_room_system:
+        typeof initialData?.has_room_system === "boolean"
+          ? initialData.has_room_system
+          : knownRoomSystemOnMount ?? undefined,
+      room_names:
+        initialData?.room_names && initialData.room_names.length > 0
+          ? initialData.room_names.map((n) => ({ name: n }))
+          : persistedRoomNames.length > 0
+            ? persistedRoomNames.slice(0, 3).map((n) => ({ name: n }))
+          : [],
       venueName: initialData?.venueName || "",
       selectedPlaceId: "",
       venueType:
@@ -174,6 +255,41 @@ export default function AICollectInfo({
     },
     mode: "onChange",
   });
+  const roomNames = useFieldArray({
+    control: form.control,
+    name: "room_names",
+  });
+
+  useEffect(() => {
+    const known = resolveKnownHasMultipleLocations(
+      initialData,
+      persistedHasMultipleLocations,
+    );
+    if (known !== true && known !== false) return;
+    setLocationGateDone(true);
+    form.setValue("has_multiple_locations", known, { shouldValidate: true });
+  }, [initialData, persistedHasMultipleLocations, form]);
+
+  useEffect(() => {
+    const knownRoom = resolveKnownHasRoomSystem(initialData, persistedHasRoomSystem);
+    if (knownRoom !== true && knownRoom !== false) return;
+
+    form.setValue("has_room_system", knownRoom, { shouldValidate: true });
+    if (knownRoom) {
+      const incoming =
+        initialData?.room_names && initialData.room_names.length > 0
+          ? initialData.room_names
+          : persistedRoomNames;
+      const seeded = incoming
+        .map((name) => name.trim())
+        .filter((name) => name.length > 0)
+        .slice(0, 3)
+        .map((name) => ({ name }));
+      if (seeded.length > 0) {
+        form.setValue("room_names", seeded, { shouldValidate: true });
+      }
+    }
+  }, [initialData, persistedHasRoomSystem, persistedRoomNames, form]);
 
   const selectedVenueType = form.watch("venueType");
   const [showAllCategories, setShowAllCategories] = useState(false);
@@ -374,11 +490,30 @@ export default function AICollectInfo({
       venueType: category?.name ?? data.venueType,
       event_category_id: categoryId,
       has_multiple_locations: data.has_multiple_locations,
+      has_room_system: data.has_room_system,
+      room_names: data.room_names
+        .map((r) => r.name.trim())
+        .filter((n) => n.length > 0)
+        .slice(0, 3),
     };
     onSubmit(payload);
   };
 
   const isBrandMode = form.watch("has_multiple_locations") === true;
+  const hasRoomSystem = form.watch("has_room_system");
+  const setRoomSystem = (value: boolean) => {
+    form.setValue("has_room_system", value, { shouldValidate: true });
+    const current = form.getValues("room_names");
+    if (value) {
+      if (current.length < 2) {
+        const seeded = [...current];
+        while (seeded.length < 2) seeded.push({ name: "" });
+        form.setValue("room_names", seeded, { shouldValidate: true });
+      }
+    } else {
+      form.setValue("room_names", [], { shouldValidate: true });
+    }
+  };
 
   const pickMultipleLocations = (value: boolean) => {
     form.setValue("has_multiple_locations", value, { shouldValidate: true });
@@ -564,6 +699,125 @@ export default function AICollectInfo({
                 </p>
               )}
             </div>
+
+            {/* Event Category: 2×4 initially, "More" to expand (same list as manual step 3) */}
+            <div>
+              <label className="flex items-center gap-2 text-sm font-medium text-slate-300 mb-3">
+                <Building2 className="w-4 h-4" style={themeAccent.text} />
+                Do you have multiple event spaces (room system)?{" "}
+                <span className="text-red-400">*</span>
+              </label>
+              {roomSystemLocked ? (
+                <div className="rounded-lg border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-slate-300">
+                  Using your saved room system preference:{" "}
+                  <span className="font-semibold text-white">
+                    {hasRoomSystem ? "Yes" : "No"}
+                  </span>
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setRoomSystem(true)}
+                    className={`px-4 py-2.5 rounded-lg border text-sm font-medium transition-colors ${
+                      hasRoomSystem === true
+                        ? "text-white"
+                        : "bg-white/5 border-white/10 text-slate-400 hover:bg-white/10"
+                    }`}
+                    style={
+                      hasRoomSystem === true ? themeAccent.selectedCard : undefined
+                    }
+                  >
+                    Yes
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setRoomSystem(false)}
+                    className={`px-4 py-2.5 rounded-lg border text-sm font-medium transition-colors ${
+                      hasRoomSystem === false
+                        ? "text-white"
+                        : "bg-white/5 border-white/10 text-slate-400 hover:bg-white/10"
+                    }`}
+                    style={
+                      hasRoomSystem === false
+                        ? themeAccent.selectedCard
+                        : undefined
+                    }
+                  >
+                    No
+                  </button>
+                </div>
+              )}
+              {form.formState.errors.has_room_system && (
+                <p className="text-red-400 text-xs mt-1.5">
+                  {form.formState.errors.has_room_system.message}
+                </p>
+              )}
+            </div>
+
+            {hasRoomSystem === true && (
+              <div>
+                <label className="flex items-center gap-2 text-sm font-medium text-slate-300 mb-2">
+                  <Building2 className="w-4 h-4" style={themeAccent.text} />
+                  Room names (min 2, max 3) <span className="text-red-400">*</span>
+                </label>
+                <div className="space-y-2">
+                  {roomNames.fields.map((field, index) => (
+                    <div key={field.id} className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <input
+                          {...form.register(`room_names.${index}.name`)}
+                          maxLength={40}
+                          placeholder={`Room ${index + 1} name`}
+                          className={INPUT_CLASS}
+                        />
+                        {roomNames.fields.length > 2 && (
+                          <button
+                            type="button"
+                            onClick={() => roomNames.remove(index)}
+                            className="px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-slate-300 hover:bg-white/10"
+                          >
+                            Remove
+                          </button>
+                        )}
+                      </div>
+                      {form.formState.errors.room_names?.[index]?.name
+                        ?.message && (
+                        <p className="text-red-400 text-xs">
+                          {
+                            form.formState.errors.room_names[index]?.name
+                              ?.message
+                          }
+                        </p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+                <div className="mt-2 flex items-center gap-2">
+                  {roomNames.fields.length < 3 && (
+                    <button
+                      type="button"
+                      onClick={() => roomNames.append({ name: "" })}
+                      className="px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-slate-300 hover:bg-white/10 text-xs"
+                    >
+                      + Add room
+                    </button>
+                  )}
+                  <p className="text-xs text-slate-500">
+                    These names will guide AI content tone per room.
+                  </p>
+                </div>
+                {form.formState.errors.room_names && (
+                  <p className="text-red-400 text-xs mt-1.5">
+                    {
+                      (form.formState.errors.room_names as unknown as {
+                        message?: string;
+                      })?.message
+                    }
+                  </p>
+                )}
+              </div>
+            )}
 
             {/* Event Category: 2×4 initially, "More" to expand (same list as manual step 3) */}
             <div>

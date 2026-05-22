@@ -39,7 +39,6 @@ export function useEventId(
   if (stepName) {
     const stepEventId = getFormEventId(`${stepName}.event_id`);
     if (stepEventId) {
-      console.log(`✅ Using event_id from ${stepName}:`, stepEventId);
       return stepEventId;
     }
   }
@@ -47,25 +46,21 @@ export function useEventId(
   // Priority 2: Check stepFour (set by Step 3 after successful save)
   const stepFourEventId = getFormEventId("stepFour.event_id");
   if (stepFourEventId) {
-    console.log("✅ Using event_id from stepFour:", stepFourEventId);
     return stepFourEventId;
   }
 
   // Priority 3: Check stepThree (set by Step 3 after successful save)
   const stepThreeEventId = getFormEventId("stepThree.event_id");
   if (stepThreeEventId) {
-    console.log("✅ Using event_id from stepThree:", stepThreeEventId);
     return stepThreeEventId;
   }
 
   // Priority 4: Fall back to session
   const sessionEventId = session?.user?.event_id;
   if (sessionEventId && Number(sessionEventId) > 0) {
-    console.log("✅ Using event_id from session:", sessionEventId);
     return Number(sessionEventId);
   }
 
-  console.warn("⚠️ No valid event_id found in any source");
   return 0;
 }
 
@@ -89,6 +84,4 @@ export function setEventIdInForm(
   steps.forEach((step) => {
     setFormEventId(`${step}.event_id`, eventId);
   });
-
-  console.log(`✅ Stored event_id (${eventId}) in steps:`, steps.join(", "));
 }

@@ -15,3 +15,31 @@ export function truncateToMaxWords(input: string, maxWords: number): string {
   if (words.length <= maxWords) return trimmed;
   return words.slice(0, maxWords).join(" ");
 }
+
+/**
+ * Keeps user-typed spacing while enforcing a max word count in live inputs.
+ * Use this in onChange handlers so pressing space is not stripped immediately.
+ */
+export function truncateToMaxWordsForInput(
+  input: string,
+  maxWords: number
+): string {
+  if (!input) return "";
+  const words = input.match(/\S+/g);
+  if (!words || words.length <= maxWords) return input;
+
+  const wordPattern = /\S+/g;
+  let wordCount = 0;
+  let endIndex = input.length;
+  let match: RegExpExecArray | null;
+
+  while ((match = wordPattern.exec(input)) !== null) {
+    wordCount += 1;
+    if (wordCount === maxWords) {
+      endIndex = wordPattern.lastIndex;
+      break;
+    }
+  }
+
+  return input.slice(0, endIndex).replace(/\s+$/, "");
+}

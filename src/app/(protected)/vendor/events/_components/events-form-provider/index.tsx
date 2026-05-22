@@ -100,6 +100,8 @@ export function FormProvider({
 
         // Transform Step 6 location data (lat/long → latitude/longitude)
         type StepSixWithLegacy = typeof eventDataAny.stepSix & {
+          latitude?: number;
+          longitude?: number;
           lat?: string | number;
           long?: string | number;
         };
@@ -165,6 +167,17 @@ export function FormProvider({
           stepOne: eventDataAny.stepOne || initialData.stepOne,
           stepTwo: {
             ...stepTwoData,
+            is_rooms:
+              typeof stepTwoData?.is_rooms === "number"
+                ? stepTwoData.is_rooms
+                : (eventDataAny as { is_rooms?: number | boolean | string })
+                    .is_rooms === true ||
+                  (eventDataAny as { is_rooms?: number | boolean | string })
+                    .is_rooms === 1 ||
+                  (eventDataAny as { is_rooms?: number | boolean | string })
+                    .is_rooms === "1"
+                ? 1
+                : 0,
             gallery: cappedGallery ?? initialData.stepTwo?.gallery ?? [],
           } as EventSchemaType["stepTwo"],
           stepThree: normalizedStepThree || initialData.stepThree,

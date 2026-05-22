@@ -12,7 +12,8 @@ export const eventKeys = {
   list: (filters: Record<string, unknown>) =>
     [...eventKeys.lists(), filters] as const,
   categories: () => [...eventKeys.all, "categories"] as const,
-  menuCategories: () => [...eventKeys.all, "menuCategories"] as const,
+  menuCategories: (roomId?: number | null) =>
+    [...eventKeys.all, "menuCategories", roomId ?? "event"] as const,
   details: () => [...eventKeys.all, "detail"] as const,
   detail: (id: number) => [...eventKeys.details(), id] as const,
 };
@@ -76,24 +77,38 @@ export const useEventCategories = () => {
   });
 };
 
+export type UseEventMenuCategoriesOptions = {
+  /** Pass when multi-room / event spaces are enabled */
+  roomId?: number | null;
+  enabled?: boolean;
+};
+
 /**
  * Hook to fetch event menu categories with TanStack Query
  */
-export const useEventMenuCategories = () => {
+export const useEventMenuCategories = (
+  options: UseEventMenuCategoriesOptions = {},
+) => {
+  const roomId =
+    options.roomId != null && options.roomId > 0 ? options.roomId : undefined;
+
   return useQuery<
     EventMenuCategory[] | ApiResponse<EventMenuCategory[]>,
     Error,
     NormalizedMenuCategoryResponse
   >({
-    queryKey: eventKeys.menuCategories(),
+    queryKey: eventKeys.menuCategories(roomId),
     queryFn: async () => {
       try {
-        const response = await eventsService.getEventMenuCategories();
+        const response = await eventsService.getEventMenuCategories(
+          roomId != null ? { room_id: roomId } : undefined,
+        );
         return response;
       } catch (error) {
         throw error;
       }
     },
+    enabled: options.enabled !== false,
     select: (data) => {
       // Check if data is an array (direct response format)
       if (Array.isArray(data)) {
@@ -118,9 +133,10 @@ export const useEventMenuCategories = () => {
       // Return the menu categories
       return data;
     },
-    // Add retry and staleTime options
     retry: 1,
-    staleTime: 10 * 60 * 1000, // 10 minutes
+    // Per-room lists must refetch when switching tabs (avoid stale cache after "Add New")
+    staleTime: roomId != null ? 0 : 10 * 60 * 1000,
+    refetchOnMount: roomId != null ? "always" : true,
   });
 };
 

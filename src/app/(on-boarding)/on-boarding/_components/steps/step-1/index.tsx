@@ -14,6 +14,7 @@ import { Input } from "@/components/ui/input";
 import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useFormContext } from "../../form-provider";
+import { shouldShowStepOneLocationGate } from "../../form-provider/hydrate-onboarding-from-api";
 import { stepOneSchema, StepOneType } from "../../form-provider/schema";
 import GoogleBusinessSearch from "./google-business";
 import { env } from "@/env";
@@ -188,7 +189,10 @@ export default function StepOne() {
     await form.handleSubmit(persistStepOne)();
   };
 
-  const showLocationGate = hasMultipleLocations === undefined;
+  const showLocationGate = shouldShowStepOneLocationGate(
+    hasMultipleLocations,
+    stepOnePersistedApproved,
+  );
 
   return (
     <div className="flex flex-col items-center justify-center w-full min-h-screen py-8 px-4">

@@ -36,7 +36,7 @@ export default function PaymentModal({
   const tenantSymbol = useCurrencySymbol();
   const displaySymbol = currency ?? tenantSymbol;
   const [selectedGateway, setSelectedGateway] = useState<PaymentGateway | null>(
-    null
+    null,
   );
   const [isProcessing, setIsProcessing] = useState(false);
 

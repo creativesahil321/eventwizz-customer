@@ -11,6 +11,7 @@ export type LocationEventCardModel = {
   image: string;
   price: string | null;
   dateLabel: string | null;
+  category?: string | null;
 };
 
 type LocationEventCardProps = {
@@ -84,6 +85,11 @@ export function LocationEventCard({
         </div>
 
         <div className="border-t border-white/[0.06] bg-zinc-950 px-3 py-2.5">
+          {event.category ? (
+            <p className="mb-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--color-primary)]">
+              {event.category}
+            </p>
+          ) : null}
           <h3
             className={cn(
               "line-clamp-2 text-left text-sm font-bold leading-snug text-white transition-colors duration-300",

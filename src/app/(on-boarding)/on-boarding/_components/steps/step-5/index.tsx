@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useForm, useFieldArray, Resolver, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Button } from "@/components/ui/button";
@@ -31,7 +31,6 @@ import { Input } from "@/components/ui/input";
 import { PlusCircle, Trash2, ChevronDown, ChevronRight } from "lucide-react";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
 import {
   getDefaultDate,
   stepFiveSchema,
@@ -43,6 +42,12 @@ import { useEventId } from "../../../_lib/hooks/useEventId";
 import { WholeStepGuidedShell } from "../../whole-step-guided-shell";
 import { guidedOnboardingSkipButtonClass } from "../../guided-sticky-approval-bar";
 import { GuidedWholeStepBottomActions } from "../../guided-section-chips";
+import { MultiSpaceHeader } from "../../rooms/multi-space-header";
+import { useRoomScopeSync } from "../../rooms/use-room-scope-sync";
+import {
+  isRoomSectionComplete,
+  useRoomManager,
+} from "../../rooms/use-room-manager";
 
 // Helper function to get today's date in YYYY-MM-DD format
 const getTodayDateString = () => {
@@ -75,6 +80,46 @@ const formatDateDisplay = (dateString: string | undefined | null): string => {
   }
 };
 
+const hasMeaningfulDateData = (
+  dates: StepFiveType["dates"] | undefined,
+): boolean => {
+  if (!dates || dates.length === 0) return false;
+  const hasNonEmpty = (value: unknown) =>
+    String(value ?? "")
+      .trim()
+      .length > 0;
+  return dates.some((date) => {
+    const hasDate = hasNonEmpty(date?.event_date);
+    const hasTickets =
+      Array.isArray(date?.tickets) &&
+      date.tickets.some(
+        (ticket) =>
+          hasNonEmpty(ticket?.title) ||
+          hasNonEmpty(ticket?.description) ||
+          hasNonEmpty(ticket?.total_capacity) ||
+          hasNonEmpty(ticket?.price),
+      );
+    const hasTables =
+      Array.isArray(date?.tables) &&
+      date.tables.some(
+        (table) =>
+          hasNonEmpty(table?.min_persons) ||
+          hasNonEmpty(table?.max_persons) ||
+          hasNonEmpty(table?.price) ||
+          hasNonEmpty(table?.total_tables),
+      );
+    const hasDepositData =
+      hasNonEmpty(date?.deposit_value) || hasNonEmpty(date?.deposit_due_date);
+    return hasDate || hasTickets || hasTables || hasDepositData;
+  });
+};
+
+const normalizeDepositType = (
+  value: unknown,
+): "amount" | "percentage" => {
+  return value === "percentage" ? "percentage" : "amount";
+};
+
 export default function StepFive() {
   const {
     form: globalForm,
@@ -83,14 +128,31 @@ export default function StepFive() {
     persistedProgressHydrated,
   } = useFormContext();
 
-  const stepFivePersistedApproved = useWatch({
+  const stepFivePersistedApprovedSingle = useWatch({
     control: globalForm.control,
     name: "stepFive.isApproved",
+  });
+  const stepFiveScopedData = useWatch({
+    control: globalForm.control,
+    name: "stepFive",
   });
   const { handleFieldFocus, clearActiveField } = useFieldFocusHandler();
   const [loading, setLoading] = useState(false);
   const [openAccordions, setOpenAccordions] = useState<string[]>([]);
   const { update: updateSession } = useSession();
+
+  // Multi-room sync: when enabled, the active room's `dates` slot drives the form below and
+  // saves go through the room-scoped endpoint. Single-room mode is unchanged.
+  const roomScope = useRoomScopeSync("dates");
+  const { currentRoomIndex, rooms, setCurrentRoomIndex } = useRoomManager();
+  const stepFivePersistedApproved = roomScope.isMultiRoom
+    ? roomScope.persistedApproved
+    : stepFivePersistedApprovedSingle === true;
+  const isRoomSwitchHydratingRef = useRef(false);
+  const previousRoomIndexRef = useRef(currentRoomIndex);
+  const activeScopedDates = roomScope.isMultiRoom
+    ? (rooms[currentRoomIndex]?.dates?.dates as StepFiveType["dates"] | undefined)
+    : (stepFiveScopedData?.dates as StepFiveType["dates"] | undefined);
 
   // Initialize form with combined step data
   const stepFiveDefaults = globalForm.getValues("stepFive");
@@ -130,7 +192,7 @@ export default function StepFive() {
         return date;
       });
     },
-    []
+    [],
   );
 
   // Setup form with the new schema structure
@@ -165,6 +227,62 @@ export default function StepFive() {
     }
   }, [stepFiveDefaults?.dates, cleanDatesData, form]);
 
+  // Rehydrate local form from the active room-scoped step payload on room switch / API hydration.
+  // Without this reset, Step 5 can keep stale local values even though `multiSpace.rooms[*].dates`
+  // and `stepFive` were updated by `useRoomScopeSync`.
+  useEffect(() => {
+    if (!roomScope.isMultiRoom) return;
+    const previousRoomIndex = previousRoomIndexRef.current;
+    if (
+      previousRoomIndex !== currentRoomIndex &&
+      previousRoomIndex >= 0 &&
+      previousRoomIndex < rooms.length
+    ) {
+      const localDates = cleanDatesData(form.getValues("dates"));
+      const existingPreviousDates =
+        (globalForm.getValues(
+          `multiSpace.rooms.${previousRoomIndex}.dates.dates`,
+        ) as StepFiveType["dates"] | undefined) ?? [];
+
+      // Persist the outgoing room snapshot before hydrating the incoming room.
+      // Guard: never overwrite already-meaningful previous room data with blank defaults.
+      if (
+        hasMeaningfulDateData(localDates) ||
+        !hasMeaningfulDateData(existingPreviousDates)
+      ) {
+        globalForm.setValue(
+          `multiSpace.rooms.${previousRoomIndex}.dates`,
+          { dates: localDates },
+          { shouldValidate: false, shouldDirty: true },
+        );
+      }
+    }
+    isRoomSwitchHydratingRef.current = true;
+    previousRoomIndexRef.current = currentRoomIndex;
+  }, [roomScope.isMultiRoom, currentRoomIndex]);
+
+  useEffect(() => {
+    const incomingDates = cleanDatesData(activeScopedDates);
+    const currentDates = form.getValues("dates");
+    if (JSON.stringify(currentDates) === JSON.stringify(incomingDates)) {
+      isRoomSwitchHydratingRef.current = false;
+      return;
+    }
+    form.reset({
+      step: 5,
+      event_id: eventId,
+      dates: incomingDates,
+    });
+    isRoomSwitchHydratingRef.current = false;
+  }, [
+    activeScopedDates,
+    roomScope.currentRoomId,
+    roomScope.isMultiRoom,
+    eventId,
+    cleanDatesData,
+    form,
+  ]);
+
   // Setup field array for dates
   const {
     fields: dateFields,
@@ -174,20 +292,132 @@ export default function StepFive() {
     control: form.control,
     name: "dates",
   });
+  const watchedDates = useWatch({
+    control: form.control,
+    name: "dates",
+  });
+
+  // Keep deposit defaults in sync with schema expectations.
+  // Without this, UI can show "Fixed Amount" while underlying `deposit_type`
+  // stays undefined (triggering the red "Deposit type is required" error).
+  useEffect(() => {
+    if (!Array.isArray(watchedDates)) return;
+    watchedDates.forEach((date, index) => {
+      if (!date) return;
+      const bookingType = date.booking_type;
+      if (bookingType !== "tables" && bookingType !== "both") return;
+
+      if (!date.payment_type) {
+        form.setValue(`dates.${index}.payment_type`, "full", {
+          shouldValidate: false,
+        });
+      }
+
+      if (date.payment_type !== "deposit") return;
+
+      if (date.is_deposit_enabled === undefined) {
+        form.setValue(`dates.${index}.is_deposit_enabled`, true, {
+          shouldValidate: false,
+        });
+      }
+
+      // When vendor explicitly disables deposit for this date, keep all deposit fields cleared.
+      // This prevents a normalization loop where `deposit_type` is repeatedly set back to "amount"
+      // while cleanup logic keeps removing it.
+      if (date.is_deposit_enabled === false) {
+        if (date.deposit_type !== undefined) {
+          form.setValue(`dates.${index}.deposit_type`, undefined, {
+            shouldValidate: false,
+          });
+        }
+        if (date.deposit_value !== undefined && date.deposit_value !== "") {
+          form.setValue(`dates.${index}.deposit_value`, undefined, {
+            shouldValidate: false,
+          });
+        }
+        if (date.deposit_due_date !== undefined && date.deposit_due_date !== "") {
+          form.setValue(`dates.${index}.deposit_due_date`, undefined, {
+            shouldValidate: false,
+          });
+        }
+        return;
+      }
+
+      const normalizedType = normalizeDepositType(date.deposit_type);
+      if (date.deposit_type !== normalizedType) {
+        form.setValue(`dates.${index}.deposit_type`, normalizedType, {
+          shouldValidate: false,
+        });
+      }
+    });
+  }, [watchedDates, form]);
 
   // Keep global onboarding form in sync so the split preview (FormPreview) updates live.
   // Previously stepFive was only written on Save & Next, so duplicate/add date never appeared in preview.
   useEffect(() => {
     const pushToGlobal = () => {
+      if (roomScope.isMultiRoom && isRoomSwitchHydratingRef.current) {
+        return;
+      }
+
       const data = form.getValues();
-      globalForm.setValue(
-        "stepFive",
-        {
-          ...data,
-          event_id: eventId,
-        },
-        { shouldValidate: false, shouldDirty: true },
-      );
+      const incomingDates = cleanDatesData(activeScopedDates);
+      const localDates = cleanDatesData(data.dates);
+
+      // Do not clobber hydrated room data with the temporary blank default on first mount.
+      if (
+        roomScope.isMultiRoom &&
+        hasMeaningfulDateData(incomingDates) &&
+        !hasMeaningfulDateData(localDates)
+      ) {
+        return;
+      }
+
+      const currentGlobalStepFive = globalForm.getValues("stepFive");
+      const nextGlobalStepFive = {
+        ...data,
+        event_id: eventId,
+      };
+      const shouldWriteStepFive =
+        JSON.stringify(currentGlobalStepFive?.dates ?? []) !==
+          JSON.stringify(nextGlobalStepFive.dates ?? []) ||
+        Number(currentGlobalStepFive?.event_id ?? 0) !== Number(eventId);
+
+      if (shouldWriteStepFive) {
+        globalForm.setValue("stepFive", nextGlobalStepFive, {
+          shouldValidate: false,
+          shouldDirty: true,
+        });
+      }
+
+      if (roomScope.isMultiRoom) {
+        const currentRoomDates = globalForm.getValues(
+          `multiSpace.rooms.${currentRoomIndex}.dates`,
+        ) as { dates?: StepFiveType["dates"] } | undefined;
+        const roomDatesFromStore = cleanDatesData(currentRoomDates?.dates);
+        const localHasData = hasMeaningfulDateData(localDates);
+        const roomHasData = hasMeaningfulDateData(roomDatesFromStore);
+
+        // Critical hydration guard:
+        // on first mount after API hydrate, local form may still hold default blank rows.
+        // Never overwrite real room data with those temporary blanks.
+        if (roomHasData && !localHasData) {
+          return;
+        }
+
+        const shouldWriteRoomDates =
+          JSON.stringify(roomDatesFromStore ?? []) !==
+          JSON.stringify(localDates);
+        if (shouldWriteRoomDates) {
+          globalForm.setValue(
+            `multiSpace.rooms.${currentRoomIndex}.dates`,
+            { dates: localDates },
+            { shouldValidate: false, shouldDirty: true },
+          );
+        }
+      } else {
+        return;
+      }
     };
 
     pushToGlobal();
@@ -195,7 +425,15 @@ export default function StepFive() {
       pushToGlobal();
     });
     return () => subscription.unsubscribe();
-  }, [form, globalForm, eventId]);
+  }, [
+    form,
+    globalForm,
+    eventId,
+    roomScope.isMultiRoom,
+    currentRoomIndex,
+    cleanDatesData,
+    activeScopedDates,
+  ]);
 
   // Update dates when booking type changes for a specific date
   const updateDate = useCallback(
@@ -206,14 +444,21 @@ export default function StepFive() {
       if (bookingType === "tickets") {
         form.setValue(
           `dates.${dateIndex}.total_ticket_types`,
-          currentDate.tickets?.length || 1
+          currentDate.tickets?.length || 1,
         );
         form.setValue(`dates.${dateIndex}.total_table_types`, 0);
 
         // Make sure we have at least one ticket
         if (!currentDate.tickets || currentDate.tickets.length === 0) {
           form.setValue(`dates.${dateIndex}.tickets`, [
-            { title: "", description: "", total_capacity: "", price: "", discount_type: "none", discount_value: "" },
+            {
+              title: "",
+              description: "",
+              total_capacity: "",
+              price: "",
+              discount_type: "none",
+              discount_value: "",
+            },
           ]);
         }
 
@@ -228,13 +473,20 @@ export default function StepFive() {
         form.setValue(`dates.${dateIndex}.total_ticket_types`, 0);
         form.setValue(
           `dates.${dateIndex}.total_table_types`,
-          currentDate.tables?.length || 1
+          currentDate.tables?.length || 1,
         );
 
         // Make sure we have at least one table
         if (!currentDate.tables || currentDate.tables.length === 0) {
           form.setValue(`dates.${dateIndex}.tables`, [
-            { min_persons: "", max_persons: "", price: "", total_tables: "", discount_type: "none", discount_value: "" },
+            {
+              min_persons: "",
+              max_persons: "",
+              price: "",
+              total_tables: "",
+              discount_type: "none",
+              discount_value: "",
+            },
           ]);
         }
 
@@ -249,24 +501,38 @@ export default function StepFive() {
         // both
         form.setValue(
           `dates.${dateIndex}.total_ticket_types`,
-          currentDate.tickets?.length || 1
+          currentDate.tickets?.length || 1,
         );
         form.setValue(
           `dates.${dateIndex}.total_table_types`,
-          currentDate.tables?.length || 1
+          currentDate.tables?.length || 1,
         );
 
         // Make sure we have at least one ticket
         if (!currentDate.tickets || currentDate.tickets.length === 0) {
           form.setValue(`dates.${dateIndex}.tickets`, [
-            { title: "", description: "", total_capacity: "", price: "", discount_type: "none", discount_value: "" },
+            {
+              title: "",
+              description: "",
+              total_capacity: "",
+              price: "",
+              discount_type: "none",
+              discount_value: "",
+            },
           ]);
         }
 
         // Make sure we have at least one table
         if (!currentDate.tables || currentDate.tables.length === 0) {
           form.setValue(`dates.${dateIndex}.tables`, [
-            { min_persons: "", max_persons: "", price: "", total_tables: "", discount_type: "none", discount_value: "" },
+            {
+              min_persons: "",
+              max_persons: "",
+              price: "",
+              total_tables: "",
+              discount_type: "none",
+              discount_value: "",
+            },
           ]);
         }
 
@@ -278,7 +544,7 @@ export default function StepFive() {
         form.setValue(`dates.${dateIndex}.deposit_due_date`, "");
       }
     },
-    [form]
+    [form],
   );
 
   // Add date with default booking type of tickets
@@ -300,7 +566,7 @@ export default function StepFive() {
       // Check for duplicate dates
       if (otherDates.includes(newDate)) {
         toast.error(
-          "This date is already selected. Please choose a different date."
+          "This date is already selected. Please choose a different date.",
         );
         return false;
       }
@@ -311,14 +577,14 @@ export default function StepFive() {
 
       if (JSON.stringify(sortedDates) !== JSON.stringify(currentOrder)) {
         toast.warning(
-          "Dates should be in ascending order. Please arrange them chronologically."
+          "Dates should be in ascending order. Please arrange them chronologically.",
         );
         return false;
       }
 
       return true;
     },
-    [form]
+    [form],
   );
 
   // Create custom field arrays for tickets - now checks individual date's booking type
@@ -331,7 +597,9 @@ export default function StepFive() {
 
       return (
         <>
-          <OnboardingFieldGroupTitle>Ticket Information</OnboardingFieldGroupTitle>
+          <OnboardingFieldGroupTitle>
+            Ticket Information
+          </OnboardingFieldGroupTitle>
           <div className="mt-5 space-y-4 pt-4 border-t border-white/10">
             <div className="flex justify-between items-center gap-3">
               <Button
@@ -385,7 +653,7 @@ export default function StepFive() {
                                 maxLength={maxLength}
                                 onFocus={() =>
                                   handleFieldFocus(
-                                    `dates.${dateIndex}.tickets.${ticketIndex}.title`
+                                    `dates.${dateIndex}.tickets.${ticketIndex}.title`,
                                   )
                                 }
                               />
@@ -425,7 +693,7 @@ export default function StepFive() {
                                 maxLength={maxLength}
                                 onFocus={() =>
                                   handleFieldFocus(
-                                    `dates.${dateIndex}.tickets.${ticketIndex}.description`
+                                    `dates.${dateIndex}.tickets.${ticketIndex}.description`,
                                   )
                                 }
                               />
@@ -482,7 +750,7 @@ export default function StepFive() {
                               }}
                               onFocus={() =>
                                 handleFieldFocus(
-                                  `dates.${dateIndex}.tickets.${ticketIndex}.total_capacity`
+                                  `dates.${dateIndex}.tickets.${ticketIndex}.total_capacity`,
                                 )
                               }
                             />
@@ -527,7 +795,7 @@ export default function StepFive() {
                               }}
                               onFocus={() =>
                                 handleFieldFocus(
-                                  `dates.${dateIndex}.tickets.${ticketIndex}.price`
+                                  `dates.${dateIndex}.tickets.${ticketIndex}.price`,
                                 )
                               }
                             />
@@ -548,15 +816,15 @@ export default function StepFive() {
                             form.getValues(`dates.${dateIndex}.tickets`) || [];
                           if (tickets.length > 1) {
                             const updatedTickets = tickets.filter(
-                              (_, i) => i !== ticketIndex
+                              (_, i) => i !== ticketIndex,
                             );
                             form.setValue(
                               `dates.${dateIndex}.tickets`,
-                              updatedTickets
+                              updatedTickets,
                             );
                             form.setValue(
                               `dates.${dateIndex}.total_ticket_types`,
-                              updatedTickets.length
+                              updatedTickets.length,
                             );
                           } else {
                             toast.error("You must have at least one ticket");
@@ -574,7 +842,7 @@ export default function StepFive() {
         </>
       );
     },
-    [form, handleFieldFocus]
+    [form, handleFieldFocus],
   );
 
   // Create custom field arrays for tables - now checks individual date's booking type
@@ -668,10 +936,10 @@ export default function StepFive() {
                           onBlur={async () => {
                             // Validate cross-field comparison on blur
                             const currentMin = form.getValues(
-                              `dates.${dateIndex}.tables.${tableIndex}.min_persons`
+                              `dates.${dateIndex}.tables.${tableIndex}.min_persons`,
                             );
                             const maxPersons = form.getValues(
-                              `dates.${dateIndex}.tables.${tableIndex}.max_persons`
+                              `dates.${dateIndex}.tables.${tableIndex}.max_persons`,
                             );
 
                             if (
@@ -685,18 +953,18 @@ export default function StepFive() {
                                   type: "manual",
                                   message:
                                     "Minimum people cannot be greater than maximum people",
-                                }
+                                },
                               );
                             } else {
                               // Clear error if valid
                               await form.trigger(
-                                `dates.${dateIndex}.tables.${tableIndex}.min_persons`
+                                `dates.${dateIndex}.tables.${tableIndex}.min_persons`,
                               );
                             }
                           }}
                           onFocus={() =>
                             handleFieldFocus(
-                              `dates.${dateIndex}.tables.${tableIndex}.min_persons`
+                              `dates.${dateIndex}.tables.${tableIndex}.min_persons`,
                             )
                           }
                         />
@@ -752,10 +1020,10 @@ export default function StepFive() {
                           onBlur={async () => {
                             // Validate cross-field comparison on blur
                             const minPersons = form.getValues(
-                              `dates.${dateIndex}.tables.${tableIndex}.min_persons`
+                              `dates.${dateIndex}.tables.${tableIndex}.min_persons`,
                             );
                             const currentMax = form.getValues(
-                              `dates.${dateIndex}.tables.${tableIndex}.max_persons`
+                              `dates.${dateIndex}.tables.${tableIndex}.max_persons`,
                             );
 
                             if (
@@ -769,18 +1037,18 @@ export default function StepFive() {
                                   type: "manual",
                                   message:
                                     "Maximum people cannot be less than minimum people",
-                                }
+                                },
                               );
                             } else {
                               // Clear error if valid
                               await form.trigger(
-                                `dates.${dateIndex}.tables.${tableIndex}.max_persons`
+                                `dates.${dateIndex}.tables.${tableIndex}.max_persons`,
                               );
                             }
                           }}
                           onFocus={() =>
                             handleFieldFocus(
-                              `dates.${dateIndex}.tables.${tableIndex}.max_persons`
+                              `dates.${dateIndex}.tables.${tableIndex}.max_persons`,
                             )
                           }
                         />
@@ -825,7 +1093,7 @@ export default function StepFive() {
                           }}
                           onFocus={() =>
                             handleFieldFocus(
-                              `dates.${dateIndex}.tables.${tableIndex}.price`
+                              `dates.${dateIndex}.tables.${tableIndex}.price`,
                             )
                           }
                         />
@@ -870,7 +1138,7 @@ export default function StepFive() {
                           }}
                           onFocus={() =>
                             handleFieldFocus(
-                              `dates.${dateIndex}.tables.${tableIndex}.total_tables`
+                              `dates.${dateIndex}.tables.${tableIndex}.total_tables`,
                             )
                           }
                         />
@@ -892,15 +1160,15 @@ export default function StepFive() {
                         form.getValues(`dates.${dateIndex}.tables`) || [];
                       if (tables.length > 1) {
                         const updatedTables = tables.filter(
-                          (_, i) => i !== tableIndex
+                          (_, i) => i !== tableIndex,
                         );
                         form.setValue(
                           `dates.${dateIndex}.tables`,
-                          updatedTables
+                          updatedTables,
                         );
                         form.setValue(
                           `dates.${dateIndex}.total_table_types`,
-                          updatedTables.length
+                          updatedTables.length,
                         );
                       } else {
                         toast.error("You must have at least one table");
@@ -917,7 +1185,7 @@ export default function StepFive() {
         </div>
       );
     },
-    [form, handleFieldFocus]
+    [form, handleFieldFocus],
   );
 
   const renderDateFields = useCallback(
@@ -925,6 +1193,9 @@ export default function StepFive() {
       const dateValue = form.watch(`dates.${dateIndex}.event_date`);
       const accordionValue = `date-${dateIndex}`;
       const isOpen = openAccordions.includes(accordionValue);
+      const safeDepositType = normalizeDepositType(
+        form.watch(`dates.${dateIndex}.deposit_type`),
+      );
 
       return (
         <div
@@ -939,7 +1210,7 @@ export default function StepFive() {
                   setOpenAccordions((prev) =>
                     isOpen
                       ? prev.filter((item) => item !== accordionValue)
-                      : [...prev, accordionValue]
+                      : [...prev, accordionValue],
                   );
                 }}
                 className="flex min-w-0 items-center gap-2 text-left transition-colors hover:text-[var(--color-primary,#3b82f6)]"
@@ -1029,7 +1300,7 @@ export default function StepFive() {
                         <Select
                           value={field.value}
                           onValueChange={(
-                            value: "tickets" | "tables" | "both"
+                            value: "tickets" | "tables" | "both",
                           ) => {
                             field.onChange(value);
                             // Update the date structure based on the new booking type
@@ -1072,287 +1343,306 @@ export default function StepFive() {
                     full payment)
                   </p>
                   <div className="space-y-5 rounded-lg border border-white/10 bg-white/[0.03] p-4 sm:p-5">
-                      {/* Payment Type */}
-                      <div>
+                    {/* Payment Type */}
+                    <div>
+                      <FormField
+                        control={form.control}
+                        name={`dates.${dateIndex}.payment_type`}
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="text-md font-medium">
+                              Payment Type
+                            </FormLabel>
+                            <FormControl>
+                              <RadioGroup
+                                value={field.value}
+                                onValueChange={(value: "full" | "deposit") => {
+                                  field.onChange(value);
+                                  // Update is_deposit_enabled based on payment type
+                                  if (value === "full") {
+                                    form.setValue(
+                                      `dates.${dateIndex}.is_deposit_enabled`,
+                                      false,
+                                    );
+                                  } else if (value === "deposit") {
+                                    form.setValue(
+                                      `dates.${dateIndex}.is_deposit_enabled`,
+                                      true,
+                                    );
+                                  }
+                                  handleFieldFocus(
+                                    `dates.${dateIndex}.payment_type`,
+                                  );
+                                }}
+                                className="flex space-x-4 pt-2"
+                              >
+                                <FormItem className="flex items-center space-x-2 space-y-0">
+                                  <FormControl>
+                                    <RadioGroupItem value="full" />
+                                  </FormControl>
+                                  <FormLabel className="font-normal cursor-pointer">
+                                    Full Payment
+                                  </FormLabel>
+                                </FormItem>
+                                <FormItem className="flex items-center space-x-2 space-y-0">
+                                  <FormControl>
+                                    <RadioGroupItem value="deposit" />
+                                  </FormControl>
+                                  <FormLabel className="font-normal cursor-pointer">
+                                    Deposit
+                                  </FormLabel>
+                                </FormItem>
+                              </RadioGroup>
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+
+                    {/* Conditional deposit fields */}
+                    {form.watch(`dates.${dateIndex}.payment_type`) ===
+                      "deposit" && (
+                      <div className="space-y-4 border-t border-white/10 pt-4">
+                        {/* Enable/Disable Deposit Toggle */}
                         <FormField
                           control={form.control}
-                          name={`dates.${dateIndex}.payment_type`}
+                          name={`dates.${dateIndex}.is_deposit_enabled`}
                           render={({ field }) => (
-                            <FormItem>
-                              <FormLabel className="text-md font-medium">
-                                Payment Type
-                              </FormLabel>
+                            <FormItem className="flex flex-row items-center justify-between rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2.5">
+                              <div className="space-y-0.5">
+                                <FormLabel>Enable Deposit</FormLabel>
+                                <div className="text-sm text-muted-foreground">
+                                  Allow customers to pay deposit for this date
+                                </div>
+                              </div>
                               <FormControl>
-                                <RadioGroup
-                                  value={field.value}
-                                  onValueChange={(
-                                    value: "full" | "deposit"
-                                  ) => {
-                                    field.onChange(value);
-                                    // Update is_deposit_enabled based on payment type
-                                    if (value === "full") {
-                                      form.setValue(
-                                        `dates.${dateIndex}.is_deposit_enabled`,
-                                        false
-                                      );
-                                    } else if (value === "deposit") {
-                                      form.setValue(
-                                        `dates.${dateIndex}.is_deposit_enabled`,
-                                        true
-                                      );
+                                <div className="inline-flex items-center rounded-lg border border-white/10 bg-white/[0.04] p-1">
+                                  <Button
+                                    type="button"
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={() => field.onChange(true)}
+                                    className={
+                                      field.value !== false
+                                        ? "h-7 px-3 text-xs font-semibold bg-[var(--color-secondary,var(--color-primary))] text-white hover:bg-[var(--color-secondary,var(--color-primary))]"
+                                        : "h-7 px-3 text-xs font-medium text-slate-300 hover:bg-white/10"
                                     }
-                                    handleFieldFocus(
-                                      `dates.${dateIndex}.payment_type`
-                                    );
-                                  }}
-                                  className="flex space-x-4 pt-2"
-                                >
-                                  <FormItem className="flex items-center space-x-2 space-y-0">
-                                    <FormControl>
-                                      <RadioGroupItem value="full" />
-                                    </FormControl>
-                                    <FormLabel className="font-normal cursor-pointer">
-                                      Full Payment
-                                    </FormLabel>
-                                  </FormItem>
-                                  <FormItem className="flex items-center space-x-2 space-y-0">
-                                    <FormControl>
-                                      <RadioGroupItem value="deposit" />
-                                    </FormControl>
-                                    <FormLabel className="font-normal cursor-pointer">
-                                      Deposit
-                                    </FormLabel>
-                                  </FormItem>
-                                </RadioGroup>
+                                  >
+                                    Yes
+                                  </Button>
+                                  <Button
+                                    type="button"
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={() => {
+                                      field.onChange(false);
+                                      form.setValue(
+                                        `dates.${dateIndex}.deposit_type`,
+                                        undefined,
+                                        { shouldValidate: false },
+                                      );
+                                      form.setValue(
+                                        `dates.${dateIndex}.deposit_value`,
+                                        undefined,
+                                        { shouldValidate: false },
+                                      );
+                                      form.setValue(
+                                        `dates.${dateIndex}.deposit_due_date`,
+                                        undefined,
+                                        { shouldValidate: false },
+                                      );
+                                    }}
+                                    className={
+                                      field.value === false
+                                        ? "h-7 px-3 text-xs font-semibold bg-[var(--color-secondary,var(--color-primary))] text-white hover:bg-[var(--color-secondary,var(--color-primary))]"
+                                        : "h-7 px-3 text-xs font-medium text-slate-300 hover:bg-white/10"
+                                    }
+                                  >
+                                    No
+                                  </Button>
+                                </div>
                               </FormControl>
-                              <FormMessage />
                             </FormItem>
                           )}
                         />
-                      </div>
 
-                      {/* Conditional deposit fields */}
-                      {form.watch(`dates.${dateIndex}.payment_type`) ===
-                        "deposit" && (
-                        <div className="space-y-4 border-t border-white/10 pt-4">
-                          {/* Enable/Disable Deposit Toggle */}
-                          <FormField
-                            control={form.control}
-                            name={`dates.${dateIndex}.is_deposit_enabled`}
-                            render={({ field }) => (
-                              <FormItem className="flex flex-row items-center justify-between rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2.5">
-                                <div className="space-y-0.5">
-                                  <FormLabel>Enable Deposit</FormLabel>
-                                  <div className="text-sm text-muted-foreground">
-                                    Allow customers to pay deposit for this date
-                                  </div>
-                                </div>
-                                <FormControl>
-                                  <Switch
-                                    checked={field.value ?? true}
-                                    onCheckedChange={field.onChange}
-                                  />
-                                </FormControl>
-                              </FormItem>
-                            )}
-                          />
+                        {/* Only show deposit fields if enabled */}
+                        {form.watch(
+                          `dates.${dateIndex}.is_deposit_enabled`,
+                        ) && (
+                          <>
+                            {/* Deposit Type Selection */}
+                            <FormField
+                              control={form.control}
+                              name={`dates.${dateIndex}.deposit_type`}
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel className="text-md font-medium">
+                                    Deposit Type
+                                  </FormLabel>
+                                  <FormControl>
+                                    <RadioGroup
+                                      value={safeDepositType}
+                                      onValueChange={(
+                                        value: "amount" | "percentage",
+                                      ) => {
+                                        field.onChange(value);
+                                        handleFieldFocus(
+                                          `dates.${dateIndex}.deposit_type`,
+                                        );
+                                        // Clear the deposit_value when switching type
+                                        form.setValue(
+                                          `dates.${dateIndex}.deposit_value`,
+                                          "",
+                                        );
+                                      }}
+                                      className="flex space-x-4 pt-2"
+                                    >
+                                      <FormItem className="flex items-center space-x-2 space-y-0">
+                                        <FormControl>
+                                          <RadioGroupItem value="amount" />
+                                        </FormControl>
+                                        <Label className="font-normal cursor-pointer">
+                                          Fixed Amount
+                                        </Label>
+                                      </FormItem>
+                                      <FormItem className="flex items-center space-x-2 space-y-0">
+                                        <FormControl>
+                                          <RadioGroupItem value="percentage" />
+                                        </FormControl>
+                                        <Label className="font-normal cursor-pointer">
+                                          Percentage
+                                        </Label>
+                                      </FormItem>
+                                    </RadioGroup>
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
 
-                          {/* Only show deposit fields if enabled */}
-                          {form.watch(
-                            `dates.${dateIndex}.is_deposit_enabled`
-                          ) && (
-                            <>
-                              {/* Deposit Type Selection */}
-                                <FormField
-                                  control={form.control}
-                                  name={`dates.${dateIndex}.deposit_type`}
-                                  render={({ field }) => (
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                              {/* Unified Deposit Value Field */}
+                              <FormField
+                                control={form.control}
+                                name={`dates.${dateIndex}.deposit_value`}
+                                render={({ field }) => (
                                   <FormItem>
-                                    <FormLabel className="text-md font-medium">
-                                      Deposit Type
+                                    <FormLabel>
+                                      {safeDepositType === "amount"
+                                        ? "Deposit Amount/Person"
+                                        : "Deposit Percentage (%)"}
                                     </FormLabel>
                                     <FormControl>
-                                      <RadioGroup
-                                        value={field.value ?? "amount"}
-                                        onValueChange={(
-                                          value: "amount" | "percentage"
-                                        ) => {
-                                          field.onChange(value);
-                                          handleFieldFocus(
-                                            `dates.${dateIndex}.deposit_type`
+                                      <Input
+                                        type="number"
+                                        min={safeDepositType === "percentage" ? "20" : "1"}
+                                        max={safeDepositType === "percentage" ? "80" : undefined}
+                                        step="1"
+                                        placeholder={
+                                          safeDepositType === "amount"
+                                            ? "Enter deposit amount"
+                                            : "Enter percentage (20-80)"
+                                        }
+                                        {...field}
+                                        value={field.value ?? ""}
+                                        className="w-full h-11 bg-white/5 border-white/10 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                        onChange={(e) => {
+                                          const value = e.target.value;
+                                          const depositType = safeDepositType;
+
+                                          // Allow empty value
+                                          if (value === "") {
+                                            field.onChange("");
+                                            return;
+                                          }
+
+                                          // Remove any decimal points and non-numeric characters except digits
+                                          const cleanedValue = value.replace(
+                                            /[^\d]/g,
+                                            "",
                                           );
-                                          // Clear the deposit_value when switching type
-                                          form.setValue(
-                                            `dates.${dateIndex}.deposit_value`,
-                                            ""
+
+                                          if (cleanedValue === "") {
+                                            field.onChange("");
+                                            return;
+                                          }
+
+                                          const numValue = parseInt(
+                                            cleanedValue,
+                                            10,
                                           );
+
+                                          if (
+                                            !isNaN(numValue) &&
+                                            numValue >= 0
+                                          ) {
+                                            // For percentage: limit to 100
+                                            if (depositType === "percentage") {
+                                              if (numValue <= 100) {
+                                                field.onChange(numValue);
+                                              } else {
+                                                field.onChange(100);
+                                              }
+                                            } else {
+                                              // For amount: allow any positive integer
+                                              field.onChange(numValue);
+                                            }
+                                          }
                                         }}
-                                        className="flex space-x-4 pt-2"
-                                      >
-                                        <FormItem className="flex items-center space-x-2 space-y-0">
-                                          <FormControl>
-                                            <RadioGroupItem value="amount" />
-                                          </FormControl>
-                                          <Label className="font-normal cursor-pointer">
-                                            Fixed Amount
-                                          </Label>
-                                        </FormItem>
-                                        <FormItem className="flex items-center space-x-2 space-y-0">
-                                          <FormControl>
-                                            <RadioGroupItem value="percentage" />
-                                          </FormControl>
-                                          <Label className="font-normal cursor-pointer">
-                                            Percentage
-                                          </Label>
-                                        </FormItem>
-                                      </RadioGroup>
+                                        onFocus={() =>
+                                          handleFieldFocus(
+                                            `dates.${dateIndex}.deposit_value`,
+                                          )
+                                        }
+                                      />
                                     </FormControl>
                                     <FormMessage />
                                   </FormItem>
                                 )}
                               />
 
-                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                {/* Unified Deposit Value Field */}
-                                <FormField
-                                  control={form.control}
-                                  name={`dates.${dateIndex}.deposit_value`}
-                                  render={({ field }) => (
-                                    <FormItem>
-                                      <FormLabel>
-                                        {form.watch(
-                                          `dates.${dateIndex}.deposit_type`
-                                        ) === "amount"
-                                          ? "Deposit Amount/Person"
-                                          : "Deposit Percentage (%)"}
-                                      </FormLabel>
-                                      <FormControl>
+                              {/* Balance due date */}
+                              <FormField
+                                control={form.control}
+                                name={`dates.${dateIndex}.deposit_due_date`}
+                                render={({ field }) => (
+                                  <FormItem>
+                                    <FormLabel>Balance due date</FormLabel>
+                                    <FormControl>
+                                      <div className="relative w-full">
                                         <Input
-                                          type="number"
-                                          min={
-                                            form.watch(
-                                              `dates.${dateIndex}.deposit_type`
-                                            ) === "percentage"
-                                              ? "20"
-                                              : "1"
-                                          }
-                                          max={
-                                            form.watch(
-                                              `dates.${dateIndex}.deposit_type`
-                                            ) === "percentage"
-                                              ? "80"
-                                              : undefined
-                                          }
-                                          step="1"
-                                          placeholder={
-                                            form.watch(
-                                              `dates.${dateIndex}.deposit_type`
-                                            ) === "amount"
-                                              ? "Enter deposit amount"
-                                              : "Enter percentage (20-80)"
-                                          }
+                                          type="date"
+                                          placeholder="Select due date"
                                           {...field}
-                                          value={field.value ?? ""}
-                                          className="w-full h-11 bg-white/5 border-white/10 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                                          onChange={(e) => {
-                                            const value = e.target.value;
-                                            const depositType = form.watch(
-                                              `dates.${dateIndex}.deposit_type`
-                                            );
-
-                                            // Allow empty value
-                                            if (value === "") {
-                                              field.onChange("");
-                                              return;
-                                            }
-
-                                            // Remove any decimal points and non-numeric characters except digits
-                                            const cleanedValue = value.replace(
-                                              /[^\d]/g,
-                                              ""
-                                            );
-
-                                            if (cleanedValue === "") {
-                                              field.onChange("");
-                                              return;
-                                            }
-
-                                            const numValue = parseInt(
-                                              cleanedValue,
-                                              10
-                                            );
-
-                                            if (
-                                              !isNaN(numValue) &&
-                                              numValue >= 0
-                                            ) {
-                                              // For percentage: limit to 100
-                                              if (
-                                                depositType === "percentage"
-                                              ) {
-                                                if (numValue <= 100) {
-                                                  field.onChange(numValue);
-                                                } else {
-                                                  field.onChange(100);
-                                                }
-                                              } else {
-                                                // For amount: allow any positive integer
-                                                field.onChange(numValue);
-                                              }
-                                            }
-                                          }}
+                                          min={getTodayDateString()}
+                                          className="w-full h-11 bg-white/5 border-white/10"
                                           onFocus={() =>
                                             handleFieldFocus(
-                                              `dates.${dateIndex}.deposit_value`
+                                              `dates.${dateIndex}.deposit_due_date`,
                                             )
                                           }
                                         />
-                                      </FormControl>
-                                      <FormMessage />
-                                    </FormItem>
-                                  )}
-                                />
-
-                                {/* Balance due date */}
-                                <FormField
-                                  control={form.control}
-                                  name={`dates.${dateIndex}.deposit_due_date`}
-                                  render={({ field }) => (
-                                    <FormItem>
-                                      <FormLabel>Balance due date</FormLabel>
-                                      <FormControl>
-                                        <div className="relative w-full">
-                                          <Input
-                                            type="date"
-                                            placeholder="Select due date"
-                                            {...field}
-                                            min={getTodayDateString()}
-                                            className="w-full h-11 bg-white/5 border-white/10"
-                                            onFocus={() =>
-                                              handleFieldFocus(
-                                                `dates.${dateIndex}.deposit_due_date`
-                                              )
-                                            }
-                                          />
-                                          {!field.value && (
-                                            <span
-                                              className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground sm:hidden"
-                                              aria-hidden
-                                            >
-                                              dd-mm-yyyy
-                                            </span>
-                                          )}
-                                        </div>
-                                      </FormControl>
-                                      <FormMessage />
-                                    </FormItem>
-                                  )}
-                                />
-                              </div>
-                            </>
-                          )}
-                        </div>
-                      )}
+                                        {!field.value && (
+                                          <span
+                                            className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground sm:hidden"
+                                            aria-hidden
+                                          >
+                                            dd-mm-yyyy
+                                          </span>
+                                        )}
+                                      </div>
+                                    </FormControl>
+                                    <FormMessage />
+                                  </FormItem>
+                                )}
+                              />
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
               )}
@@ -1394,10 +1684,10 @@ export default function StepFive() {
       remove,
       updateDate,
       validateDateUniqueness,
-    ]
+    ],
   );
 
-  const handleSubmit = async () => {
+  const handleSubmit = async (applyToAllRooms = false) => {
     setLoading(true);
     try {
       // Get form data
@@ -1454,7 +1744,8 @@ export default function StepFive() {
 
               if (badFields.length > 0) {
                 const shown = badFields.slice(0, 3).join(", ");
-                const extra = badFields.length > 3 ? ` +${badFields.length - 3} more` : "";
+                const extra =
+                  badFields.length > 3 ? ` +${badFields.length - 3} more` : "";
                 dateErrors.push(`Date ${index + 1}: ${shown}${extra}`);
               } else {
                 dateErrors.push(`Date ${index + 1}: incomplete`);
@@ -1465,15 +1756,15 @@ export default function StepFive() {
           errorMessages.push(
             dateErrors.length > 0
               ? `Please fix — ${dateErrors.join(" | ")}`
-              : "Please complete all date entries before saving"
+              : "Please complete all date entries before saving",
           );
         }
 
-        const otherErrorFields = Object.keys(errors).filter((k) => k !== "dates");
+        const otherErrorFields = Object.keys(errors).filter(
+          (k) => k !== "dates",
+        );
         if (otherErrorFields.length > 0) {
-          errorMessages.push(
-            `Please correct: ${otherErrorFields.join(", ")}`
-          );
+          errorMessages.push(`Please correct: ${otherErrorFields.join(", ")}`);
         }
 
         if (errorMessages.length > 0) {
@@ -1484,33 +1775,47 @@ export default function StepFive() {
         return;
       }
 
-      // Make API call to store the data
-      const response = await onboardingService.storeStepFiveData({
-        ...data,
-        isApproved: true,
+      // Branch on multi-room mode. In single-room mode this calls the existing endpoint
+      // unchanged; in multi-room mode it dispatches to the room-scoped endpoint and mirrors
+      // the saved data into `multiSpace.rooms[currentRoomIndex].dates`.
+      const succeeded = await roomScope.saveSection({
+        stepData: { ...data, isApproved: true } as StepFiveType,
+        applyToAllRooms,
+        singleRoomSave: async () => {
+          const response = await onboardingService.storeStepFiveData({
+            ...data,
+            isApproved: true,
+          });
+          if (response && response.status) {
+            globalForm.setValue("stepFive", { ...data, isApproved: true });
+            return true;
+          }
+          console.error("API Error:", response);
+          return false;
+        },
       });
 
-      if (response && response.status) {
-        globalForm.setValue("stepFive", { ...data, isApproved: true });
-        // Update global form with the returned data if needed
-        if (response.data) {
-          // Session update will handle event_id persistence
+      if (succeeded) {
+        if (roomScope.isMultiRoom && !applyToAllRooms) {
+          const updatedRooms = (globalForm.getValues("multiSpace")?.rooms ??
+            []) as typeof rooms;
+          const nextIncompleteRoomIndex = updatedRooms.findIndex(
+            (room) => !isRoomSectionComplete(room, "dates"),
+          );
+          if (nextIncompleteRoomIndex !== -1) {
+            if (nextIncompleteRoomIndex !== currentRoomIndex) {
+              setCurrentRoomIndex(nextIncompleteRoomIndex);
+            }
+            await save();
+            return;
+          }
         }
-
-        // Save to local storage
         await save();
-
         clearActiveField();
-
-        // INSTANT TRANSITION: Set active step FIRST for smooth UX
         setActiveStep(6);
-
-        // Then handle async operations in background
         updateSession({ on_boarding_step: 6 }).catch((error) => {
           console.error("Background save error:", error);
         });
-      } else {
-        console.error("API Error:", response);
       }
     } catch (error) {
       console.error("Error during step submission:", error);
@@ -1528,6 +1833,9 @@ export default function StepFive() {
         </CardHeader>
 
         <CardContent className="px-6 py-4">
+          {/* Per-room tab bar shown only when multi-space mode is enabled. */}
+          <MultiSpaceHeader section="dates" />
+
           <Form {...form}>
             <form onSubmit={(e) => e.preventDefault()} className="space-y-4">
               <input type="hidden" {...form.register("event_id")} />
@@ -1538,22 +1846,47 @@ export default function StepFive() {
                 chipLabel="Event Dates & Pricing"
                 chipDescription="Set dates, booking type, and pricing for each slot."
                 persistenceHydrated={persistedProgressHydrated}
-                persistedStepApproved={stepFivePersistedApproved === true}
+                persistedStepApproved={stepFivePersistedApproved}
                 renderFooter={({ guided }) => (
                   <GuidedWholeStepBottomActions
                     guided={guided}
                     loading={loading}
-                    labelWhenReady="Save & continue"
+                    alwaysShowReadyLabel={roomScope.isMultiRoom}
+                    labelWhenReady={
+                      roomScope.isMultiRoom
+                        ? "Apply to this room only"
+                        : "Save & continue"
+                    }
                     onContinue={() => void handleSubmit()}
                     extraActions={
-                      <Button
-                        variant="event-outline"
-                        type="button"
-                        onClick={() => setActiveStep(6)}
-                        className={guidedOnboardingSkipButtonClass}
-                      >
-                        Skip
-                      </Button>
+                      roomScope.isMultiRoom &&
+                      isRoomSectionComplete(
+                        rooms[currentRoomIndex],
+                        "dates",
+                      ) &&
+                      rooms.some(
+                        (room, index) =>
+                          index !== currentRoomIndex &&
+                          !isRoomSectionComplete(room, "dates"),
+                      ) ? (
+                        <Button
+                          variant="event-outline"
+                          type="button"
+                          onClick={() => void handleSubmit(true)}
+                          className={guidedOnboardingSkipButtonClass}
+                        >
+                          Apply to all rooms
+                        </Button>
+                      ) : !roomScope.isMultiRoom ? (
+                        <Button
+                          variant="event-outline"
+                          type="button"
+                          onClick={() => setActiveStep(6)}
+                          className={guidedOnboardingSkipButtonClass}
+                        >
+                          Skip
+                        </Button>
+                      ) : null
                     }
                   />
                 )}

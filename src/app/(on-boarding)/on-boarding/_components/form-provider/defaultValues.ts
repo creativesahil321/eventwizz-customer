@@ -3,6 +3,11 @@ import { OnboardingFormData } from "./schema";
 export const defaultValues: OnboardingFormData = {
   activeStep: 1,
   last_completed_step: 1,
+  multiSpace: {
+    enabled: false,
+    currentRoomIndex: 0,
+    rooms: [],
+  },
   stepOne: {
     isApproved: false,
     step: 1,
@@ -24,8 +29,6 @@ export const defaultValues: OnboardingFormData = {
     banner_sub_heading: "",
     about_title: "",
     about_description: "",
-    about_link_title: "",
-    about_cta_link: "",
   },
   stepThree: {
     isApproved: false,
@@ -40,13 +43,7 @@ export const defaultValues: OnboardingFormData = {
     about_event_heading: "",
     about_event_sub_heading: "",
     about_event_description: "",
-    event_schedular_title: "",
-    event_schedular: [
-      {
-        title: "",
-        time: "",
-      },
-    ],
+    
     // gallery: [],
   },
   stepFour: {
@@ -62,6 +59,9 @@ export const defaultValues: OnboardingFormData = {
         title: "",
       },
     ],
+    event_schedular_title: "",
+    event_schedule_subtitle: "",
+    event_schedular: [],
   },
   stepFive: {
     isApproved: false,
@@ -110,6 +110,24 @@ export const defaultValues: OnboardingFormData = {
     isApproved: false,
     step: 7,
     event_id: 0,
+    brochure_pdf: null,
+    brochure_pdf_2: null,
+    faq_pdf: null,
+    event_address: "",
+    price_start_from: "",
+    location: {
+      title: "",
+      description: "",
+      icon: "",
+    },
+    downloads: [],
+    more_info: [],
+  },
+
+  stepEight: {
+    isApproved: false,
+    step: 8,
+    event_id: 0,
     drink_title: "",
     drink_description: "",
     packages: [
@@ -122,24 +140,8 @@ export const defaultValues: OnboardingFormData = {
     ],
   },
 
-  stepEight: {
-    isApproved: false,
-    step: 8,
-    event_id: 0,
-    brochure_pdf: null,
-    brochure_pdf_2: null,
-    faq_pdf: null,
-    event_address: "",
-    price_start_from: "",
-    price_start_from_button_text: "",
-    location: {
-      title: "",
-      description: "",
-      icon: "",
-    },
-    downloads: [],
-    more_info: [],
-  },
+
+
   stepNine: {
     isApproved: false,
     step: 9,
@@ -155,6 +157,7 @@ export const defaultValues: OnboardingFormData = {
     isApproved: false,
     step: 10,
     event_id: 0,
+    accept_payment_method: "both",
     payment_gateways: {
       stripe: {
         status: undefined,

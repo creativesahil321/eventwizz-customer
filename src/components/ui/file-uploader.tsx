@@ -292,9 +292,8 @@ export function FileUploader(props: FileUploaderProps) {
 
       const updatedFiles = files ? [...files, ...newFiles] : newFiles;
 
-      // Update files state AND explicitly call onValueChange
+      // Update files state
       setFiles(updatedFiles);
-      onValueChange?.(updatedFiles);
 
       // Process any remaining pending files
       if (pendingFiles.length > 0) {
@@ -489,9 +488,6 @@ export function FileUploader(props: FileUploaderProps) {
 
       setFiles(updatedFiles);
 
-      // Explicitly call onValueChange to ensure parent receives the files
-      onValueChange?.(updatedFiles);
-
       if (
         onUpload &&
         updatedFiles.length > 0 &&
@@ -531,7 +527,6 @@ export function FileUploader(props: FileUploaderProps) {
     }
     const newFiles = files.filter((_, i) => i !== index);
     setFiles(newFiles);
-    onValueChange?.(newFiles);
   }
 
   // Revoke preview url when component unmounts

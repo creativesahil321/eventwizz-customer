@@ -46,6 +46,7 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion";
 import { isLightUiBackground } from "@/lib/wcag-color-contrast";
+import { useSiteEssentialsUpdateGate } from "../../_lib/site-essentials-update-context";
 
 type ThemePresetsTabProps = {
   onGoToColors: () => void;
@@ -58,6 +59,7 @@ export function ThemePresetsTab({
   onGoToTypography,
   onGoToBranding,
 }: ThemePresetsTabProps) {
+  const { readOnly } = useSiteEssentialsUpdateGate();
   useSiteEssentialsPresetFontsPreload();
   const { data: session, status: sessionStatus } = useSession();
   /** Stable per-account cache key (id may be absent on some session shapes). */
@@ -227,6 +229,7 @@ export function ThemePresetsTab({
                     <RadioGroup
                       onValueChange={field.onChange}
                       value={field.value ?? "uniform"}
+                      disabled={readOnly}
                       className="grid gap-2 sm:grid-cols-3"
                     >
                       {(
@@ -394,6 +397,7 @@ export function ThemePresetsTab({
                           size="sm"
                           variant={selected ? "event-secondary" : "event-primary"}
                           className="mt-auto h-7 w-full px-2 text-[11px]"
+                          disabled={readOnly}
                           onClick={() => {
                             applySiteThemePreset(preset, setValue, getValues);
                             writeLastAppliedSiteThemePresetId(

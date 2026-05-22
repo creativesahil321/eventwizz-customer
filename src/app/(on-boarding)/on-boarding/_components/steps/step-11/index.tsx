@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { CardContent, CardHeader, OnboardingCard } from "@/components/ui/card";
@@ -16,10 +16,7 @@ import { useFormContext } from "../../form-provider";
 import { stepElevenSchema, StepElevenType } from "../../form-provider/schema";
 import { onboardingService } from "@/services/vendor/onboarding/onboarding.service";
 import { useSession } from "next-auth/react";
-import {
-  OnboardingTitle,
-  RadioButtonLabel,
-} from "@/components/ui/typography";
+import { OnboardingTitle, RadioButtonLabel } from "@/components/ui/typography";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import {
   Select,
@@ -33,13 +30,51 @@ import GoogleLocationSearch from "./google-location-search";
 import { fetchLocationDetails } from "./_lib/actions";
 import { env } from "@/env";
 import { useDomainSuggestions } from "./_lib/hooks/useDomainSuggestions";
-import { Loader2, Check, CheckCircle2, Globe, Mail, MapPin } from "lucide-react";
+import {
+  Loader2,
+  Check,
+  CheckCircle2,
+  Globe,
+  Mail,
+  MapPin,
+} from "lucide-react";
 import { useEventId } from "../../../_lib/hooks/useEventId";
 import { WholeStepGuidedShell } from "../../whole-step-guided-shell";
 import { guidedInsetSectionSurfaceClass } from "../../guided-section-surface";
 import { GuidedWholeStepBottomActions } from "../../guided-section-chips";
 import { motion, AnimatePresence } from "framer-motion";
 import { useRouter } from "next/navigation";
+import { slugify } from "@/lib/utils";
+
+/** Public-link preview: never show raw venue names (spaces). Match subdomain rules: a-z, 0-9, hyphens, max 63. */
+function subdomainPublicPreviewLabel(
+  selected: string | undefined | null,
+  venueName: string,
+): string {
+  const stripHostSuffix = (s: string) =>
+    s
+      .replace(/\.eventwizz\.vercel\.app$/i, "")
+      .replace(/\.eventwizz\.com$/i, "")
+      .replace(/\.com$/i, "");
+
+  const normalizeLabel = (s: string) => {
+    const cleaned = stripHostSuffix(s.trim())
+      .toLowerCase()
+      .replace(/[^a-z0-9-]/g, "")
+      .replace(/-+/g, "-")
+      .replace(/^-+|-+$/g, "")
+      .slice(0, 63);
+    return cleaned || "yoursubdomain";
+  };
+
+  const trimmedSelected = (selected ?? "").trim();
+  if (trimmedSelected) {
+    return normalizeLabel(trimmedSelected);
+  }
+
+  const fromVenue = slugify(venueName.trim()).slice(0, 63);
+  return fromVenue || "yoursubdomain";
+}
 
 const PUBLISH_STEPS = [
   { label: "Saving your settings", icon: "💾" },
@@ -104,8 +139,16 @@ export default function StepEleven() {
     return error;
   };
 
-  // Get venue info from global form
-  const venueName = globalForm.getValues("stepOne.name") || "";
+  const persistedStepElevenDomain = useWatch({
+    control: globalForm.control,
+    name: "stepEleven.domain",
+  });
+
+  // Reactive so subdomain can seed after persistence GET fills step one.
+  const venueName = useWatch({
+    control: globalForm.control,
+    name: "stepOne.name",
+  }) || "";
   const venueType = "event venue"; // Could be enhanced to get from form data
   const venueLocation = globalForm.getValues("stepOne.city") || "";
   /** Set from step 1 save and from persistence GET (root `has_multiple_locations` merged into stepOne in FormProvider). */
@@ -138,6 +181,39 @@ export default function StepEleven() {
       form.setValue("submit_type", "submit");
     }
   }, [stepOneHasMulti, form]);
+
+  /**
+   * Visible subdomain input is driven by `selectedDomain`, while “Public link” preview can show
+   * slugified venue — keep them aligned from persistence and default preview.
+   */
+  const subdomainInputSeededRef = useRef(false);
+  useEffect(() => {
+    if (!persistedProgressHydrated) return;
+
+    const fromGlobal = (persistedStepElevenDomain ?? "").trim();
+    if (fromGlobal) {
+      const slug = subdomainPublicPreviewLabel(fromGlobal, "");
+      setSelectedDomain(slug);
+      form.setValue("domain", slug);
+      subdomainInputSeededRef.current = true;
+      return;
+    }
+
+    if (subdomainInputSeededRef.current) return;
+
+    const fallback = subdomainPublicPreviewLabel("", venueName);
+    if (fallback && fallback !== "yoursubdomain") {
+      setSelectedDomain(fallback);
+      form.setValue("domain", fallback);
+      subdomainInputSeededRef.current = true;
+    }
+  }, [
+    persistedProgressHydrated,
+    persistedStepElevenDomain,
+    venueName,
+    form,
+    setSelectedDomain,
+  ]);
 
   // Watch reminder email configuration state
   const showReminderDays =
@@ -235,7 +311,7 @@ export default function StepEleven() {
       ? 0
       : Math.min(
           Math.round(((publishStep + 1) / PUBLISH_STEPS.length) * 100),
-          100
+          100,
         );
 
   return (
@@ -326,9 +402,7 @@ export default function StepEleven() {
                     {/* Progress bar */}
                     <div className="mb-6">
                       <div className="flex justify-between items-center mb-1.5">
-                        <span className="text-xs text-slate-500">
-                          Progress
-                        </span>
+                        <span className="text-xs text-slate-500">Progress</span>
                         <span className="text-xs font-semibold text-blue-400">
                           {progressPct}%
                         </span>
@@ -417,9 +491,7 @@ export default function StepEleven() {
       <div className="w-full max-w-4xl mx-auto relative">
         <OnboardingCard className="w-full mx-auto shadow-sm">
           <CardHeader className="space-y-2 pb-4 pt-4 text-center sm:text-left">
-            <OnboardingTitle>
-              Almost done — publish your event
-            </OnboardingTitle>
+            <OnboardingTitle>Almost done — publish your event</OnboardingTitle>
             <p className="mx-auto max-w-xl text-sm leading-relaxed text-slate-400 sm:mx-0">
               Choose the web address for bookings, optionally turn on balance
               reminders, then submit. Everything stays editable in your
@@ -429,572 +501,579 @@ export default function StepEleven() {
 
           <CardContent className="px-6 py-2 pb-8">
             <Form {...form}>
-                <form
-                  onSubmit={(e) => e.preventDefault()}
-                  className="space-y-6"
+              <form onSubmit={(e) => e.preventDefault()} className="space-y-6">
+                {/* Hidden fields */}
+                <input type="hidden" {...form.register("step")} />
+                <input
+                  type="hidden"
+                  {...form.register("event_id", {
+                    valueAsNumber: true,
+                  })}
+                />
+
+                <WholeStepGuidedShell
+                  form={form}
+                  sectionId="step-eleven-publish"
+                  chipLabel="Publish"
+                  chipDescription="Domain, reminders, and submit."
+                  persistenceHydrated={persistedProgressHydrated}
+                  persistedStepApproved={stepElevenPersistedApproved === true}
+                  renderFooter={({ guided }) => (
+                    <div className="w-full space-y-4">
+                      <GuidedWholeStepBottomActions
+                        guided={guided}
+                        loading={publishing}
+                        labelWhenReady={
+                          form.watch("submit_type") === "duplicate"
+                            ? "Duplicate & submit"
+                            : "Submit"
+                        }
+                        continueDisabled={
+                          publishing ||
+                          !selectedDomain ||
+                          !form.watch("confirm_domain")
+                        }
+                        onContinue={() => void form.handleSubmit(onSubmit)()}
+                        primaryButtonClassName="h-12 px-10"
+                      />
+                      {!selectedDomain && (
+                        <p className="text-center text-sm text-muted-foreground">
+                          Please select a subdomain to continue
+                        </p>
+                      )}
+                      {selectedDomain && !form.watch("confirm_domain") && (
+                        <p className="text-center text-sm text-muted-foreground">
+                          Please confirm your selection
+                        </p>
+                      )}
+                    </div>
+                  )}
                 >
-                  {/* Hidden fields */}
-                  <input type="hidden" {...form.register("step")} />
-                  <input
-                    type="hidden"
-                    {...form.register("event_id", {
-                      valueAsNumber: true,
-                    })}
-                  />
-
-                  <WholeStepGuidedShell
-                    form={form}
-                    sectionId="step-eleven-publish"
-                    chipLabel="Publish"
-                    chipDescription="Domain, reminders, and submit."
-                    persistenceHydrated={persistedProgressHydrated}
-                    persistedStepApproved={stepElevenPersistedApproved === true}
-                    renderFooter={({ guided }) => (
-                      <div className="w-full space-y-4">
-                        <GuidedWholeStepBottomActions
-                          guided={guided}
-                          loading={publishing}
-                          labelWhenReady={
-                            form.watch("submit_type") === "duplicate"
-                              ? "Duplicate & submit"
-                              : "Submit"
-                          }
-                          continueDisabled={
-                            publishing ||
-                            !selectedDomain ||
-                            !form.watch("confirm_domain")
-                          }
-                          onContinue={() => void form.handleSubmit(onSubmit)()}
-                          primaryButtonClassName="h-12 px-10"
-                        />
-                        {!selectedDomain && (
-                          <p className="text-center text-sm text-muted-foreground">
-                            Please select a subdomain to continue
-                          </p>
-                        )}
-                        {selectedDomain && !form.watch("confirm_domain") && (
-                          <p className="text-center text-sm text-muted-foreground">
-                            Please confirm your selection
-                          </p>
-                        )}
-                      </div>
-                    )}
-                  >
-                    {() => (
-                  <section
-                    className={guidedInsetSectionSurfaceClass(
-                      "w-full space-y-6 sm:space-y-8",
-                    )}
-                  >
-                    {/* 1 — Website address (required) */}
-                    <div className={publishCardClass}>
-                      <div className="flex gap-4">
-                        <span className={publishStepBadgeClass}>1</span>
-                        <div className="min-w-0 flex-1 space-y-4">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <Globe
-                              className="h-5 w-5 shrink-0 text-sky-400/90"
-                              aria-hidden
-                            />
-                            <h3 className="text-base font-semibold tracking-tight text-white">
-                              Your booking website address
-                            </h3>
-                          </div>
-                          <p className="text-sm leading-relaxed text-slate-400">
-                            Public link:{" "}
-                            <strong className="font-medium text-slate-200">
-                              {(
-                                selectedDomain ||
-                                venueName ||
-                                "yoursubdomain"
-                              ).replace(/\.com$|\.eventwizz\.com$/g, "")}
-                              .eventwizz.com
-                            </strong>
-                          </p>
-
-                          <div className="space-y-3">
-                            <div className="space-y-2">
-                              <label className="text-sm font-medium text-slate-300">
-                                Subdomain
-                              </label>
-                              <div className="relative">
-                                <Input
-                                  placeholder="Enter subdomain name"
-                                  value={selectedDomain || ""}
-                                  onChange={(e) => {
-                                    const value = e.target.value
-                                      .toLowerCase()
-                                      .replace(/[^a-z0-9-]/g, "");
-                                    setSelectedDomain(value);
-                                    form.setValue("domain", value);
-
-                                    // Generate suggestions based on typing
-                                    if (value && value.length >= 3) {
-                                      generateSuggestions(
-                                        value, // Use the typed value
-                                        venueType,
-                                        venueLocation
-                                      );
-                                    }
-                                  }}
-                                  className="h-9 border-white/20 bg-white/5 pr-20 text-sm"
-                                  maxLength={63}
-                                />
-                                <div className="absolute right-3 top-1/2 flex -translate-y-1/2 transform items-center text-sm text-muted-foreground">
-                                  .eventwizz.com
-                                </div>
-                                {selectedDomain && (
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      setSelectedDomain("");
-                                      form.setValue("domain", "");
-                                    }}
-                                    className="absolute right-16 top-1/2 transform -translate-y-1/2 text-slate-500 hover:text-slate-300"
-                                    title="Clear domain"
-                                  >
-                                    ✕
-                                  </button>
-                                )}
-                                {isGeneratingSuggestions && (
-                                  <div className="absolute right-20 top-1/2 transform -translate-y-1/2">
-                                    <Loader2 className="h-4 w-4 animate-spin text-blue-600" />
-                                  </div>
-                                )}
-                              </div>
+                  {() => (
+                    <section
+                      className={guidedInsetSectionSurfaceClass(
+                        "w-full space-y-6 sm:space-y-8",
+                      )}
+                    >
+                      {/* 1 — Website address (required) */}
+                      <div className={publishCardClass}>
+                        <div className="flex gap-4">
+                          <span className={publishStepBadgeClass}>1</span>
+                          <div className="min-w-0 flex-1 space-y-4">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <Globe
+                                className="h-5 w-5 shrink-0 text-sky-400/90"
+                                aria-hidden
+                              />
+                              <h3 className="text-base font-semibold tracking-tight text-white">
+                                Your booking website address
+                              </h3>
                             </div>
+                            <p className="text-sm leading-relaxed text-slate-400">
+                              Public link:{" "}
+                              <strong className="font-medium text-slate-200 break-all">
+                                {subdomainPublicPreviewLabel(
+                                  selectedDomain,
+                                  venueName,
+                                )}
+                                .{env.NEXT_PUBLIC_WHITE_LABEL_URL}
+                              </strong>
+                            </p>
 
-                            {suggestionsError && (
-                              <div className="flex items-start gap-2 mt-2 w-full">
-                                <div className="w-4 h-4 rounded-full bg-red-500 flex items-center justify-center flex-shrink-0 mt-0.5">
-                                  <span className="text-white text-xs font-bold">
-                                    !
-                                  </span>
-                                </div>
-                                <div className="flex-1 min-w-0 w-full">
-                                  <p className="text-sm text-red-600 leading-relaxed break-words overflow-wrap-anywhere">
-                                    {getErrorMessage(suggestionsError)}
-                                  </p>
-                                  {(suggestionsError.includes("explicit") ||
-                                    suggestionsError.includes(
-                                      "cannotprovide"
-                                    ) ||
-                                    suggestionsError.includes("content")) && (
-                                    <div className="mt-2">
-                                      <p className="mb-2 text-xs text-muted-foreground">
-                                        Try these alternatives:
-                                      </p>
-                                      <div className="flex flex-wrap gap-2">
-                                        {[
-                                          "venue",
-                                          "events",
-                                          "booking",
-                                          "venue123",
-                                          "myvenue",
-                                        ].map((alt, index) => (
-                                          <button
-                                            key={index}
-                                            type="button"
-                                            onClick={() => {
-                                              setSelectedDomain(alt);
-                                              form.setValue("domain", alt);
-                                            }}
-                                            className="rounded-full border border-white/15 bg-white/[0.06] px-3 py-1.5 text-sm text-foreground transition-all duration-200 hover:border-white/25 hover:bg-white/[0.1]"
-                                          >
-                                            {alt}
-                                          </button>
-                                        ))}
-                                      </div>
+                            <div className="space-y-3">
+                              <div className="space-y-2">
+                                <label className="text-sm font-medium text-slate-300">
+                                  Subdomain
+                                </label>
+                                <div className="relative">
+                                  <Input
+                                    placeholder="Enter subdomain name"
+                                    value={selectedDomain || ""}
+                                    onChange={(e) => {
+                                      const value = e.target.value
+                                        .toLowerCase()
+                                        .replace(/[^a-z0-9-]/g, "");
+                                      setSelectedDomain(value);
+                                      form.setValue("domain", value);
+
+                                      // Generate suggestions based on typing
+                                      if (value && value.length >= 3) {
+                                        generateSuggestions(
+                                          value, // Use the typed value
+                                          venueType,
+                                          venueLocation,
+                                        );
+                                      }
+                                    }}
+                                    className="h-9 border-white/20 bg-white/5 pr-20 text-sm"
+                                    maxLength={63}
+                                  />
+                                  <div className="absolute right-3 top-1/2 flex -translate-y-1/2 transform items-center text-sm text-muted-foreground">
+                                    .eventwizz.com
+                                  </div>
+                                  {selectedDomain && (
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setSelectedDomain("");
+                                        form.setValue("domain", "");
+                                      }}
+                                      className="absolute right-16 top-1/2 transform -translate-y-1/2 text-slate-500 hover:text-slate-300"
+                                      title="Clear domain"
+                                    >
+                                      ✕
+                                    </button>
+                                  )}
+                                  {isGeneratingSuggestions && (
+                                    <div className="absolute right-20 top-1/2 transform -translate-y-1/2">
+                                      <Loader2 className="h-4 w-4 animate-spin text-blue-600" />
                                     </div>
                                   )}
                                 </div>
                               </div>
-                            )}
 
-                            {suggestions.length > 0 && (
-                              <div className="space-y-2">
-                                <div className="flex flex-wrap gap-2">
-                                  {suggestions.map((suggestion, index) => (
-                                    <button
-                                      key={index}
-                                      type="button"
-                                      onClick={() => {
-                                        setSelectedDomain(suggestion.domain);
-                                        form.setValue(
-                                          "domain",
-                                          suggestion.domain
-                                        );
-                                      }}
-                                      className={`rounded-full border px-3 py-1.5 text-sm transition-all duration-200 hover:shadow-sm ${
-                                        selectedDomain === suggestion.domain
-                                          ? "border-[var(--color-primary,#3b82f6)] bg-[var(--color-primary,#3b82f6)]/15 text-foreground shadow-sm"
-                                          : "border-white/15 bg-white/[0.06] text-foreground hover:border-white/25 hover:bg-white/[0.1]"
-                                      }`}
-                                    >
-                                      {suggestion.domain.replace(
-                                        /\.com$|\.eventwizz\.com$/g,
-                                        ""
-                                      )}
-                                    </button>
-                                  ))}
-                                </div>
-                              </div>
-                            )}
-
-                            {/* Show message when no suggestions available but user is typing */}
-                            {isGeneratingSuggestions &&
-                              (selectedDomain || "").length >= 3 && (
-                                <div className="mt-2 flex items-center gap-2 text-xs text-[var(--color-primary,#38bdf8)]">
-                                  <Loader2 className="h-3 w-3 animate-spin" />
-                                  Finding suggestions...
+                              {suggestionsError && (
+                                <div className="flex items-start gap-2 mt-2 w-full">
+                                  <div className="w-4 h-4 rounded-full bg-red-500 flex items-center justify-center flex-shrink-0 mt-0.5">
+                                    <span className="text-white text-xs font-bold">
+                                      !
+                                    </span>
+                                  </div>
+                                  <div className="flex-1 min-w-0 w-full">
+                                    <p className="text-sm text-red-600 leading-relaxed break-words overflow-wrap-anywhere">
+                                      {getErrorMessage(suggestionsError)}
+                                    </p>
+                                    {(suggestionsError.includes("explicit") ||
+                                      suggestionsError.includes(
+                                        "cannotprovide",
+                                      ) ||
+                                      suggestionsError.includes("content")) && (
+                                      <div className="mt-2">
+                                        <p className="mb-2 text-xs text-muted-foreground">
+                                          Try these alternatives:
+                                        </p>
+                                        <div className="flex flex-wrap gap-2">
+                                          {[
+                                            "venue",
+                                            "events",
+                                            "booking",
+                                            "venue123",
+                                            "myvenue",
+                                          ].map((alt, index) => (
+                                            <button
+                                              key={index}
+                                              type="button"
+                                              onClick={() => {
+                                                setSelectedDomain(alt);
+                                                form.setValue("domain", alt);
+                                              }}
+                                              className="rounded-full border border-white/15 bg-white/[0.06] px-3 py-1.5 text-sm text-foreground transition-all duration-200 hover:border-white/25 hover:bg-white/[0.1]"
+                                            >
+                                              {alt}
+                                            </button>
+                                          ))}
+                                        </div>
+                                      </div>
+                                    )}
+                                  </div>
                                 </div>
                               )}
 
+                              {suggestions.length > 0 && (
+                                <div className="space-y-2">
+                                  <div className="flex flex-wrap gap-2">
+                                    {suggestions.map((suggestion, index) => (
+                                      <button
+                                        key={index}
+                                        type="button"
+                                        onClick={() => {
+                                          setSelectedDomain(suggestion.domain);
+                                          form.setValue(
+                                            "domain",
+                                            suggestion.domain,
+                                          );
+                                        }}
+                                        className={`rounded-full border px-3 py-1.5 text-sm transition-all duration-200 hover:shadow-sm ${
+                                          selectedDomain === suggestion.domain
+                                            ? "border-[var(--color-primary,#3b82f6)] bg-[var(--color-primary,#3b82f6)]/15 text-foreground shadow-sm"
+                                            : "border-white/15 bg-white/[0.06] text-foreground hover:border-white/25 hover:bg-white/[0.1]"
+                                        }`}
+                                      >
+                                        {suggestion.domain.replace(
+                                          /\.com$|\.eventwizz\.com$/g,
+                                          "",
+                                        )}
+                                      </button>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+
+                              {/* Show message when no suggestions available but user is typing */}
+                              {isGeneratingSuggestions &&
+                                (selectedDomain || "").length >= 3 && (
+                                  <div className="mt-2 flex items-center gap-2 text-xs text-[var(--color-primary,#38bdf8)]">
+                                    <Loader2 className="h-3 w-3 animate-spin" />
+                                    Finding suggestions...
+                                  </div>
+                                )}
+
+                              <FormField
+                                control={form.control}
+                                name="domain"
+                                render={({ field }) => (
+                                  <FormItem className="hidden">
+                                    <FormControl>
+                                      <Input {...field} />
+                                    </FormControl>
+                                    <FormMessage />
+                                  </FormItem>
+                                )}
+                              />
+
+                              <FormField
+                                control={form.control}
+                                name="confirm_domain"
+                                render={({ field }) => (
+                                  <FormItem>
+                                    <div className="flex items-start gap-3">
+                                      <FormControl>
+                                        <input
+                                          type="checkbox"
+                                          checked={field.value || false}
+                                          onChange={(e) => {
+                                            field.onChange(e.target.checked);
+                                          }}
+                                          className="mt-1 h-4 w-4 rounded border-white/30 text-[var(--color-primary,#38bdf8)] focus:ring-[var(--color-primary)]"
+                                          disabled={!selectedDomain}
+                                        />
+                                      </FormControl>
+                                      <div className="flex-1">
+                                        <FormLabel className="text-sm font-medium cursor-pointer">
+                                          I confirm this domain
+                                        </FormLabel>
+                                      </div>
+                                    </div>
+                                    <FormMessage />
+                                  </FormItem>
+                                )}
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* 2 — Reminder emails (optional) */}
+                      <div className={publishCardClass}>
+                        <div className="flex gap-4">
+                          <span className={publishStepBadgeClass}>2</span>
+                          <div className="min-w-0 flex-1 space-y-4">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <Mail
+                                className="h-5 w-5 shrink-0 text-amber-400/90"
+                                aria-hidden
+                              />
+                              <h3 className="text-base font-semibold tracking-tight text-white">
+                                Balance reminder emails
+                              </h3>
+                              <span className="rounded-full border border-white/10 bg-white/[0.04] px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-slate-400">
+                                Optional
+                              </span>
+                            </div>
+                            <p className="text-sm leading-relaxed text-slate-400">
+                              Send a reminder before the event so guests can pay
+                              any remaining balance. You can change this later.
+                            </p>
                             <FormField
                               control={form.control}
-                              name="domain"
+                              name="reminder_email_before_days"
                               render={({ field }) => (
-                                <FormItem className="hidden">
+                                <FormItem className="relative">
+                                  <p className="text-sm font-medium text-slate-300">
+                                    Send reminders?
+                                  </p>
                                   <FormControl>
-                                    <Input {...field} />
+                                    <RadioGroup
+                                      onValueChange={(value) => {
+                                        if (value === "yes") {
+                                          field.onChange(10);
+                                        } else {
+                                          field.onChange(undefined);
+                                        }
+                                      }}
+                                      defaultValue={
+                                        field.value !== undefined ? "yes" : "no"
+                                      }
+                                      className="flex items-center space-x-4 mt-4"
+                                    >
+                                      <FormItem className="flex items-center space-x-3 space-y-0">
+                                        <FormControl>
+                                          <RadioGroupItem
+                                            value="yes"
+                                            className="text-[#47aab8] border-[#47aab8] focus:ring-[#47aab8] data-[state=checked]:bg-[var(--color-secondary,#009ead)] data-[state=checked]:text-white"
+                                          />
+                                        </FormControl>
+                                        <RadioButtonLabel>
+                                          Yes, set up reminders
+                                        </RadioButtonLabel>
+                                      </FormItem>
+                                      <FormItem className="flex items-center space-x-3 space-y-0">
+                                        <FormControl>
+                                          <RadioGroupItem
+                                            value="no"
+                                            className="text-[#47aab8] border-[#47aab8] focus:ring-[#47aab8] data-[state=checked]:bg-[var(--color-secondary,#009ead)] data-[state=checked]:text-white"
+                                          />
+                                        </FormControl>
+                                        <RadioButtonLabel>
+                                          Not now
+                                        </RadioButtonLabel>
+                                      </FormItem>
+                                    </RadioGroup>
                                   </FormControl>
                                   <FormMessage />
                                 </FormItem>
                               )}
                             />
 
-                            <FormField
-                              control={form.control}
-                              name="confirm_domain"
-                              render={({ field }) => (
-                                <FormItem>
-                                  <div className="flex items-start gap-3">
-                                    <FormControl>
-                                      <input
-                                        type="checkbox"
-                                        checked={field.value || false}
-                                        onChange={(e) => {
-                                          field.onChange(e.target.checked);
+                            {showReminderDays && (
+                              <FormField
+                                control={form.control}
+                                name="reminder_email_before_days"
+                                render={({ field }) => {
+                                  // Convert the value to string for the Select component
+                                  const defaultValue =
+                                    field.value !== undefined
+                                      ? field.value.toString()
+                                      : "10";
+
+                                  return (
+                                    <FormItem className="relative">
+                                      <p className="text-sm font-medium text-slate-300">
+                                        How many days before the event?
+                                      </p>
+                                      <Select
+                                        onValueChange={(value) => {
+                                          const numValue = parseInt(value, 10);
+                                          field.onChange(numValue);
                                         }}
-                                        className="mt-1 h-4 w-4 rounded border-white/30 text-[var(--color-primary,#38bdf8)] focus:ring-[var(--color-primary)]"
-                                        disabled={!selectedDomain}
-                                      />
-                                    </FormControl>
-                                    <div className="flex-1">
-                                      <FormLabel className="text-sm font-medium cursor-pointer">
-                                        I confirm this domain
-                                      </FormLabel>
-                                    </div>
-                                  </div>
-                                  <FormMessage />
-                                </FormItem>
-                              )}
-                            />
+                                        value={defaultValue}
+                                      >
+                                        <FormControl>
+                                          <SelectTrigger className="w-full h-10 bg-white/5 border-white/10 mt-4">
+                                            <SelectValue placeholder="Days" />
+                                          </SelectTrigger>
+                                        </FormControl>
+
+                                        <SelectContent className="w-full">
+                                          {[
+                                            ...days,
+                                            ...extraOptions.map((o) => o.value),
+                                          ].map((day) => {
+                                            const extra = extraOptions.find(
+                                              (o) => o.value === day,
+                                            );
+                                            return (
+                                              <SelectItem
+                                                key={day}
+                                                value={day.toString()}
+                                              >
+                                                {extra
+                                                  ? extra.label
+                                                  : `${day} ${
+                                                      day === 1 ? "Day" : "Days"
+                                                    }`}
+                                              </SelectItem>
+                                            );
+                                          })}
+                                        </SelectContent>
+                                      </Select>
+                                      <FormMessage />
+                                    </FormItem>
+                                  );
+                                }}
+                              />
+                            )}
                           </div>
                         </div>
                       </div>
-                    </div>
 
-                    {/* 2 — Reminder emails (optional) */}
-                    <div className={publishCardClass}>
-                      <div className="flex gap-4">
-                        <span className={publishStepBadgeClass}>2</span>
-                        <div className="min-w-0 flex-1 space-y-4">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <Mail
-                              className="h-5 w-5 shrink-0 text-amber-400/90"
-                              aria-hidden
-                            />
-                            <h3 className="text-base font-semibold tracking-tight text-white">
-                              Balance reminder emails
-                            </h3>
-                            <span className="rounded-full border border-white/10 bg-white/[0.04] px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-slate-400">
-                              Optional
-                            </span>
-                          </div>
-                          <p className="text-sm leading-relaxed text-slate-400">
-                            Send a reminder before the event so guests can pay
-                            any remaining balance. You can change this later.
-                          </p>
-                          <FormField
-                            control={form.control}
-                            name="reminder_email_before_days"
-                            render={({ field }) => (
-                              <FormItem className="relative">
-                                <p className="text-sm font-medium text-slate-300">
-                                  Send reminders?
-                                </p>
-                                <FormControl>
-                                  <RadioGroup
-                                    onValueChange={(value) => {
-                                      if (value === "yes") {
-                                        field.onChange(10);
-                                      } else {
-                                        field.onChange(undefined);
-                                      }
-                                    }}
-                                    defaultValue={
-                                      field.value !== undefined ? "yes" : "no"
-                                    }
-                                    className="flex items-center space-x-4 mt-4"
-                                  >
-                                    <FormItem className="flex items-center space-x-3 space-y-0">
-                                      <FormControl>
-                                        <RadioGroupItem
-                                          value="yes"
-                                          className="text-[#47aab8] border-[#47aab8] focus:ring-[#47aab8] data-[state=checked]:bg-[var(--color-secondary,#009ead)] data-[state=checked]:text-white"
-                                        />
-                                      </FormControl>
-                                      <RadioButtonLabel>
-                                        Yes, set up reminders
-                                      </RadioButtonLabel>
-                                    </FormItem>
-                                    <FormItem className="flex items-center space-x-3 space-y-0">
-                                      <FormControl>
-                                        <RadioGroupItem
-                                          value="no"
-                                          className="text-[#47aab8] border-[#47aab8] focus:ring-[#47aab8] data-[state=checked]:bg-[var(--color-secondary,#009ead)] data-[state=checked]:text-white"
-                                        />
-                                      </FormControl>
-                                      <RadioButtonLabel>
-                                        Not now
-                                      </RadioButtonLabel>
-                                    </FormItem>
-                                  </RadioGroup>
-                                </FormControl>
-                                <FormMessage />
-                              </FormItem>
-                            )}
-                          />
-
-                          {showReminderDays && (
-                            <FormField
-                              control={form.control}
-                              name="reminder_email_before_days"
-                              render={({ field }) => {
-                                // Convert the value to string for the Select component
-                                const defaultValue =
-                                  field.value !== undefined
-                                    ? field.value.toString()
-                                    : "10";
-
-                                return (
-                                  <FormItem className="relative">
-                                    <p className="text-sm font-medium text-slate-300">
-                                      How many days before the event?
-                                    </p>
-                                    <Select
-                                      onValueChange={(value) => {
-                                        const numValue = parseInt(value, 10);
-                                        field.onChange(numValue);
-                                      }}
-                                      value={defaultValue}
-                                    >
-                                      <FormControl>
-                                        <SelectTrigger className="w-full h-10 bg-white/5 border-white/10 mt-4">
-                                          <SelectValue placeholder="Days" />
-                                        </SelectTrigger>
-                                      </FormControl>
-
-                                      <SelectContent className="w-full">
-                                        {[
-                                          ...days,
-                                          ...extraOptions.map((o) => o.value),
-                                        ].map((day) => {
-                                          const extra = extraOptions.find(
-                                            (o) => o.value === day
-                                          );
-                                          return (
-                                            <SelectItem
-                                              key={day}
-                                              value={day.toString()}
-                                            >
-                                              {extra
-                                                ? extra.label
-                                                : `${day} ${
-                                                    day === 1 ? "Day" : "Days"
-                                                  }`}
-                                            </SelectItem>
-                                          );
-                                        })}
-                                      </SelectContent>
-                                    </Select>
-                                    <FormMessage />
-                                  </FormItem>
-                                );
-                              }}
-                            />
-                          )}
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* 3 — Copy event to another venue (multi-location only) */}
-                    {showDuplicateEventOptions && (
-                    <div className={publishCardClass}>
-                      <div className="flex gap-4">
-                        <span className={publishStepBadgeClass}>3</span>
-                        <div className="min-w-0 flex-1 space-y-4">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <MapPin
-                              className="h-5 w-5 shrink-0 text-violet-400/90"
-                              aria-hidden
-                            />
-                            <h3 className="text-base font-semibold tracking-tight text-white">
-                              Another venue?
-                            </h3>
-                          </div>
-                          <p className="text-sm leading-relaxed text-slate-400">
-                            Only if you run more than one location: duplicate
-                            this event and attach it to a different address.
-                            You can edit everything in the dashboard.
-                          </p>
-                          <FormField
-                            control={form.control}
-                            name="submit_type"
-                            render={({ field }) => (
-                              <FormItem className="relative">
-                                <p className="text-sm font-medium text-slate-300">
-                                  Duplicate this event for another location?{" "}
-                                  <span className="text-red-400">*</span>
-                                </p>
-                                <FormControl>
-                                  <RadioGroup
-                                    onValueChange={(value) => {
-                                      field.onChange(value);
-                                      // Force re-render by setting state directly
-                                      form.setValue(
-                                        "submit_type",
-                                        value as "duplicate" | "submit"
-                                      );
-                                    }}
-                                    defaultValue={field.value || "submit"}
-                                    className="flex items-center space-x-4 mt-4"
-                                  >
-                                    <FormItem className="flex items-center space-x-3 space-y-0">
-                                      <FormControl>
-                                        <RadioGroupItem
-                                          value="duplicate"
-                                          className="text-[#47aab8] border-[#47aab8] focus:ring-[#47aab8] data-[state=checked]:bg-[var(--color-secondary,#009ead)] data-[state=checked]:text-white"
-                                        />
-                                      </FormControl>
-                                      <RadioButtonLabel>
-                                        Yes, duplicate
-                                      </RadioButtonLabel>
-                                    </FormItem>
-                                    <FormItem className="flex items-center space-x-3 space-y-0">
-                                      <FormControl>
-                                        <RadioGroupItem
-                                          value="submit"
-                                          className="text-[#47aab8] border-[#47aab8] focus:ring-[#47aab8] data-[state=checked]:bg-[var(--color-secondary,#009ead)] data-[state=checked]:text-white"
-                                        />
-                                      </FormControl>
-                                      <RadioButtonLabel>
-                                        No, only this event
-                                      </RadioButtonLabel>
-                                    </FormItem>
-                                  </RadioGroup>
-                                </FormControl>
-                                <FormMessage />
-                              </FormItem>
-                            )}
-                          />
-
-                          {form.watch("submit_type") === "duplicate" && (
-                            <div className="space-y-4 border-t border-white/10 pt-6">
-                              <p className="text-sm font-medium text-slate-200">
-                                Other venue address &amp; contact
+                      {/* 3 — Copy event to another venue (multi-location only) */}
+                      {showDuplicateEventOptions && (
+                        <div className={publishCardClass}>
+                          <div className="flex gap-4">
+                            <span className={publishStepBadgeClass}>3</span>
+                            <div className="min-w-0 flex-1 space-y-4">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <MapPin
+                                  className="h-5 w-5 shrink-0 text-violet-400/90"
+                                  aria-hidden
+                                />
+                                <h3 className="text-base font-semibold tracking-tight text-white">
+                                  Another venue?
+                                </h3>
+                              </div>
+                              <p className="text-sm leading-relaxed text-slate-400">
+                                Only if you run more than one location:
+                                duplicate this event and attach it to a
+                                different address. You can edit everything in
+                                the dashboard.
                               </p>
                               <FormField
                                 control={form.control}
-                                name="address"
+                                name="submit_type"
                                 render={({ field }) => (
-                                  <FormItem>
-                                    <FormLabel className="text-sm font-medium text-slate-300">
-                                      Address{" "}
+                                  <FormItem className="relative">
+                                    <p className="text-sm font-medium text-slate-300">
+                                      Duplicate this event for another location?{" "}
                                       <span className="text-red-400">*</span>
-                                    </FormLabel>
+                                    </p>
                                     <FormControl>
-                                      <GoogleLocationSearch
-                                        apiKey={
-                                          env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY
-                                        }
-                                        value={field.value || ""}
-                                        onChange={(value) =>
-                                          field.onChange(value)
-                                        }
-                                        onSelect={(placeId) =>
-                                          fetchLocationDetails(form, placeId)
-                                        }
-                                        placeholder="Search for a location..."
-                                        variant="dark"
-                                      />
-                                    </FormControl>
-                                    <FormMessage />
-                                  </FormItem>
-                                )}
-                              />
-
-                              <FormField
-                                control={form.control}
-                                name="city"
-                                render={({ field }) => (
-                                  <FormItem>
-                                    <FormLabel className="text-sm font-medium text-slate-300">
-                                      City{" "}
-                                      <span className="text-red-400">*</span>
-                                    </FormLabel>
-                                    <FormControl>
-                                      <Input
-                                        {...field}
-                                        placeholder="City"
-                                        className="h-10 border-white/10 bg-white/5"
-                                      />
-                                    </FormControl>
-                                    <FormMessage />
-                                  </FormItem>
-                                )}
-                              />
-
-                              <FormField
-                                control={form.control}
-                                name="contact_number"
-                                render={({ field }) => (
-                                  <FormItem>
-                                    <FormLabel className="text-sm font-medium text-slate-300">
-                                      Contact number{" "}
-                                      <span className="text-red-400">*</span>
-                                    </FormLabel>
-                                    <FormControl>
-                                      <Input
-                                        {...field}
-                                        type="tel"
-                                        inputMode="numeric"
-                                        placeholder="Phone number"
-                                        className="h-10 border-white/10 bg-white/5"
-                                        onChange={(e) => {
-                                          const value = e.target.value.replace(
-                                            /[^0-9+\-() ]/g,
-                                            ""
-                                          );
+                                      <RadioGroup
+                                        onValueChange={(value) => {
                                           field.onChange(value);
+                                          // Force re-render by setting state directly
+                                          form.setValue(
+                                            "submit_type",
+                                            value as "duplicate" | "submit",
+                                          );
                                         }}
-                                      />
+                                        defaultValue={field.value || "submit"}
+                                        className="flex items-center space-x-4 mt-4"
+                                      >
+                                        <FormItem className="flex items-center space-x-3 space-y-0">
+                                          <FormControl>
+                                            <RadioGroupItem
+                                              value="duplicate"
+                                              className="text-[#47aab8] border-[#47aab8] focus:ring-[#47aab8] data-[state=checked]:bg-[var(--color-secondary,#009ead)] data-[state=checked]:text-white"
+                                            />
+                                          </FormControl>
+                                          <RadioButtonLabel>
+                                            Yes, duplicate
+                                          </RadioButtonLabel>
+                                        </FormItem>
+                                        <FormItem className="flex items-center space-x-3 space-y-0">
+                                          <FormControl>
+                                            <RadioGroupItem
+                                              value="submit"
+                                              className="text-[#47aab8] border-[#47aab8] focus:ring-[#47aab8] data-[state=checked]:bg-[var(--color-secondary,#009ead)] data-[state=checked]:text-white"
+                                            />
+                                          </FormControl>
+                                          <RadioButtonLabel>
+                                            No, only this event
+                                          </RadioButtonLabel>
+                                        </FormItem>
+                                      </RadioGroup>
                                     </FormControl>
                                     <FormMessage />
                                   </FormItem>
                                 )}
                               />
+
+                              {form.watch("submit_type") === "duplicate" && (
+                                <div className="space-y-4 border-t border-white/10 pt-6">
+                                  <p className="text-sm font-medium text-slate-200">
+                                    Other venue address &amp; contact
+                                  </p>
+                                  <FormField
+                                    control={form.control}
+                                    name="address"
+                                    render={({ field }) => (
+                                      <FormItem>
+                                        <FormLabel className="text-sm font-medium text-slate-300">
+                                          Address{" "}
+                                          <span className="text-red-400">
+                                            *
+                                          </span>
+                                        </FormLabel>
+                                        <FormControl>
+                                          <GoogleLocationSearch
+                                            apiKey={
+                                              env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY
+                                            }
+                                            value={field.value || ""}
+                                            onChange={(value) =>
+                                              field.onChange(value)
+                                            }
+                                            onSelect={(placeId) =>
+                                              fetchLocationDetails(
+                                                form,
+                                                placeId,
+                                              )
+                                            }
+                                            placeholder="Search for a location..."
+                                            variant="dark"
+                                          />
+                                        </FormControl>
+                                        <FormMessage />
+                                      </FormItem>
+                                    )}
+                                  />
+
+                                  <FormField
+                                    control={form.control}
+                                    name="city"
+                                    render={({ field }) => (
+                                      <FormItem>
+                                        <FormLabel className="text-sm font-medium text-slate-300">
+                                          City{" "}
+                                          <span className="text-red-400">
+                                            *
+                                          </span>
+                                        </FormLabel>
+                                        <FormControl>
+                                          <Input
+                                            {...field}
+                                            placeholder="City"
+                                            className="h-10 border-white/10 bg-white/5"
+                                          />
+                                        </FormControl>
+                                        <FormMessage />
+                                      </FormItem>
+                                    )}
+                                  />
+
+                                  <FormField
+                                    control={form.control}
+                                    name="contact_number"
+                                    render={({ field }) => (
+                                      <FormItem>
+                                        <FormLabel className="text-sm font-medium text-slate-300">
+                                          Contact number{" "}
+                                          <span className="text-red-400">
+                                            *
+                                          </span>
+                                        </FormLabel>
+                                        <FormControl>
+                                          <Input
+                                            {...field}
+                                            type="tel"
+                                            inputMode="numeric"
+                                            placeholder="Phone number"
+                                            className="h-10 border-white/10 bg-white/5"
+                                            onChange={(e) => {
+                                              const value =
+                                                e.target.value.replace(
+                                                  /[^0-9+\-() ]/g,
+                                                  "",
+                                                );
+                                              field.onChange(value);
+                                            }}
+                                          />
+                                        </FormControl>
+                                        <FormMessage />
+                                      </FormItem>
+                                    )}
+                                  />
+                                </div>
+                              )}
                             </div>
-                          )}
+                          </div>
                         </div>
-                      </div>
-                    </div>
-                    )}
-                  </section>
-                    )}
-                  </WholeStepGuidedShell>
-                </form>
+                      )}
+                    </section>
+                  )}
+                </WholeStepGuidedShell>
+              </form>
             </Form>
           </CardContent>
         </OnboardingCard>

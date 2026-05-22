@@ -28,12 +28,16 @@ export interface EventApiResponse {
   errors?: string[];
 }
 export interface EventItem {
+  updated_at?: string | Date | null;
   id: number;
   name: string;
   slug: string;
   image: string | null;
   status: string;
-  event_date: string;
+  /** Legacy: single date (older APIs) */
+  event_date?: string;
+  /** Current: multiple event dates (newer APIs) */
+  event_dates?: string[];
   // Legacy fields for backward compatibility
   current_step?: number;
   event_id?: number;
@@ -218,11 +222,21 @@ export interface EventCategoryPayload {
 }
 
 /**
+ * Query params for listing event menu categories
+ */
+export interface EventMenuCategoryQueryParams {
+  /** When multi-room / event spaces are enabled */
+  room_id?: number;
+}
+
+/**
  * Payload for creating event menu categories
  */
 export interface EventMenuCategoryPayload {
   vendor_event_id: number;
   name: string;
+  /** Required when the event uses the room system */
+  room_id?: number;
 }
 
 /**

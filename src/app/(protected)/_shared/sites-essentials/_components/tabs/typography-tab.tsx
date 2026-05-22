@@ -29,6 +29,7 @@ import { SiteEssentialsGoogleFontsLoader } from "@/components/shared/site-essent
 import { SITE_ESSENTIALS_GOOGLE_FONTS_UI } from "@/lib/site-typography-google-fonts";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import { useSiteEssentialsUpdateGate } from "../../_lib/site-essentials-update-context";
 
 // Common web-safe fonts
 const webSafeFonts = [
@@ -59,6 +60,7 @@ function getPresetFontLabel(stack: string | undefined | null): string | null {
 }
 
 export function TypographyTab() {
+  const { readOnly } = useSiteEssentialsUpdateGate();
   const form = useFormContext<SiteEssentialsFormValues>();
 
   const headingStack = form.watch("typography.fontFamily.heading") ?? "";
@@ -168,12 +170,14 @@ export function TypographyTab() {
             <TabsList className="grid w-full grid-cols-2">
               <TabsTrigger
                 value="preset"
+                disabled={readOnly}
                 className="data-[state=active]:ring-2 data-[state=active]:ring-[var(--color-primary)]/40"
               >
                 Preset Fonts
               </TabsTrigger>
               <TabsTrigger
                 value="custom"
+                disabled={readOnly}
                 className="data-[state=active]:ring-2 data-[state=active]:ring-[var(--color-primary)]/40"
               >
                 Custom Font
@@ -186,6 +190,7 @@ export function TypographyTab() {
                 name="typography.fontFamily.heading"
                 render={({ field }) => (
                   <Select
+                    disabled={readOnly}
                     onValueChange={field.onChange}
                     defaultValue={field.value}
                     value={field.value || undefined}
@@ -238,6 +243,7 @@ export function TypographyTab() {
                       <Input
                         placeholder="'My Font', sans-serif"
                         className="font-mono text-sm ring-2 ring-[var(--color-primary)]/25"
+                        disabled={readOnly}
                         {...field}
                         value={field.value ?? ""}
                       />
@@ -266,12 +272,14 @@ export function TypographyTab() {
             <TabsList className="grid w-full grid-cols-2">
               <TabsTrigger
                 value="preset"
+                disabled={readOnly}
                 className="data-[state=active]:ring-2 data-[state=active]:ring-[var(--color-primary)]/40"
               >
                 Preset Fonts
               </TabsTrigger>
               <TabsTrigger
                 value="custom"
+                disabled={readOnly}
                 className="data-[state=active]:ring-2 data-[state=active]:ring-[var(--color-primary)]/40"
               >
                 Custom Font
@@ -284,6 +292,7 @@ export function TypographyTab() {
                 name="typography.fontFamily.body"
                 render={({ field }) => (
                   <Select
+                    disabled={readOnly}
                     onValueChange={field.onChange}
                     defaultValue={field.value}
                     value={field.value || undefined}
@@ -336,6 +345,7 @@ export function TypographyTab() {
                       <Input
                         placeholder="'My Font', sans-serif"
                         className="font-mono text-sm ring-2 ring-[var(--color-primary)]/25"
+                        disabled={readOnly}
                         {...field}
                         value={field.value ?? ""}
                       />
@@ -374,6 +384,7 @@ export function TypographyTab() {
               <Textarea
                 rows={3}
                 placeholder="https://fonts.cdnfonts.com/css/brownhill-script"
+                disabled={readOnly}
                 value={Array.isArray(field.value) ? field.value.join("\n") : ""}
                 onChange={(e) => {
                   const lines = e.target.value

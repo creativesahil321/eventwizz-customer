@@ -11,12 +11,8 @@ import {
 } from "react";
 import { useForm, UseFormReturn, Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import {
-  OnboardingFormData,
-  onboardingSchema,
-  normalizeStepOneFromApi,
-  coerceHasMultipleLocationsFromApi,
-} from "./schema";
+import { OnboardingFormData, onboardingSchema } from "./schema";
+import { patchOnboardingPayloadFromApi } from "./hydrate-onboarding-from-api";
 import { defaultValues } from "./defaultValues";
 import { toast } from "sonner";
 import { onboardingService } from "@/services/vendor/onboarding/onboarding.service";
@@ -45,83 +41,49 @@ interface FormContextType {
 
 const FormContext = createContext<FormContextType | undefined>(undefined);
 
-function getStepElevenRecord(
-  data: Record<string, unknown>,
-): Record<string, unknown> | undefined {
-  const raw = data.stepEleven ?? data.step_eleven ?? data.step11;
-  if (raw && typeof raw === "object") {
-    return raw as Record<string, unknown>;
-  }
-  return undefined;
+/** Positive onboarding step from API fields, or 0 if unknown (never NaN). */
+function coercePositiveStep(value: unknown): number {
+  const n = Number(value);
+  return Number.isFinite(n) && n > 0 ? Math.min(11, Math.floor(n)) : 0;
 }
 
 /**
- * Hydrates `stepOne.has_multiple_locations` from persisted GET data.
- * Priority: root → stepOne → step 11 (API often stores the flag only on `stepEleven`).
+ * Furthest completed step for the stepper. Uses root `last_completed_step` when present,
+ * and always considers `default_venue_location.onboarding_step` (Laravel often keeps the
+ * canonical cursor there). Without that merge, AI flows can lose `last_completed_step` on
+ * the client while `explicitActive` stays at 2 — locking steps 3+ even though work through 9 exists.
  */
-function patchOnboardingPayloadFromApi(
-  raw: Record<string, unknown>,
-): Record<string, unknown> {
-  const dataAny = { ...raw };
-  const rootFlag = coerceHasMultipleLocationsFromApi(
-    dataAny.has_multiple_locations ?? dataAny.hasMultipleLocations,
-  );
-
-  const stepElevenRaw = getStepElevenRecord(dataAny);
-  const stepElevenFlag = coerceHasMultipleLocationsFromApi(
-    stepElevenRaw?.has_multiple_locations ??
-      stepElevenRaw?.hasMultipleLocations,
-  );
-
-  const normalizedStepOne = normalizeStepOneFromApi(dataAny.stepOne);
-  const stepOneSelfFlag = coerceHasMultipleLocationsFromApi(
-    normalizedStepOne.has_multiple_locations,
-  );
-
-  const persistedMulti =
-    rootFlag ?? stepOneSelfFlag ?? stepElevenFlag;
-
-  if (
-    dataAny.stepOne !== undefined ||
-    rootFlag !== undefined ||
-    stepElevenFlag !== undefined
-  ) {
-    dataAny.stepOne = {
-      ...defaultValues.stepOne,
-      ...(typeof dataAny.stepOne === "object" && dataAny.stepOne !== null
-        ? (dataAny.stepOne as object)
-        : {}),
-      ...normalizedStepOne,
-      ...(persistedMulti !== undefined
-        ? { has_multiple_locations: persistedMulti }
-        : {}),
-    };
-  }
-
-  return dataAny;
-}
-
 function parseLastCompletedStepFromPayload(
   dataAny: Record<string, unknown>,
-  stepFromData: number,
+  stepFromDataRaw: unknown,
 ): number {
+  const stepFromData = coercePositiveStep(stepFromDataRaw);
+
+  const def = dataAny.default_venue_location ?? dataAny.defaultVenueLocation;
+  const venueStep =
+    def && typeof def === "object"
+      ? coercePositiveStep(
+          (def as Record<string, unknown>).onboarding_step ??
+            (def as Record<string, unknown>).on_boarding_step,
+        )
+      : 0;
+
   const raw = dataAny.last_completed_step ?? dataAny.lastCompletedStep;
+  let n = venueStep;
   if (raw !== undefined && raw !== null && raw !== "") {
-    const n = Number(raw);
-    // Never return a value lower than the known active step — if the user
-    // is already on step N they must have completed steps 1…N.
-    if (!Number.isNaN(n) && n >= 0) return Math.max(n, stepFromData);
+    const parsed = Number(raw);
+    if (!Number.isNaN(parsed) && parsed >= 0) {
+      n = Math.max(n, parsed);
+    }
+  }
+  n = Math.max(n, stepFromData);
+
+  if (n > 0) {
+    return Math.min(11, Math.floor(n));
   }
   if (stepFromData > 0) return Math.max(stepFromData, 1);
   return 1;
 }
-
-// Simplified saveStepData function
-const saveStepData = async (): Promise<{ success: boolean }> => {
-  return new Promise((resolve) => {
-    setTimeout(() => resolve({ success: true }), 500);
-  });
-};
 
 export function FormProvider({
   children,
@@ -144,20 +106,16 @@ export function FormProvider({
   const [persistedProgressHydrated, setPersistedProgressHydrated] =
     useState(false);
   const [activeField, setActiveField] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [initialDataLoaded, setInitialDataLoaded] = useState(false);
+  /** Step save/next only; initial shell is gated by the parent onboarding query, not another artificial delay. */
+  const [isLoading, setIsLoading] = useState(false);
 
   const maxSteps = 11;
-  const isMounted = useRef(true);
   const dataLoadAttempted = useRef(false);
+  const didInitActiveStepFromServer = useRef(false);
 
   // Merge server data with default values
   const mergedDefaults = useMemo(() => {
-    // First, check if we have server data
     if (serverData) {
-      console.log("Raw server data:", serverData);
-
-      // Determine what structure we're dealing with
       const formData = serverData.data || serverData;
 
       if (formData && typeof formData === "object") {
@@ -191,26 +149,33 @@ export function FormProvider({
         form.reset(dataAny as unknown as OnboardingFormData);
         setPersistedProgressHydrated(true);
 
-        // Update active step if available
-        const stepFromData =
-          Number(dataAny.active_step) ||
-          Number(dataAny.activeStep) ||
-          Number(dataAny.step) ||
-          Number(dataAny.current_step);
+        // Only trust explicit “current step” keys — not `default_venue_location.onboarding_step`,
+        // which tracks furthest progress and would yank users off a step they opened to review.
+        const explicitActive =
+          coercePositiveStep(dataAny.active_step) ||
+          coercePositiveStep(dataAny.activeStep) ||
+          coercePositiveStep(dataAny.step) ||
+          coercePositiveStep(dataAny.current_step);
 
-        if (stepFromData && stepFromData > 0) {
-          setActiveStep(stepFromData);
+        // IMPORTANT: only initialize `activeStep` from persistence once.
+        // After that, refetches caused by "Save" must not snap the UI back to a stale `active_step`
+        // (AI onboarding commonly returns 2 even when the user is progressing through later steps).
+        if (!didInitActiveStepFromServer.current && explicitActive > 0) {
+          didInitActiveStepFromServer.current = true;
+          // Never allow first hydration to regress a newer in-memory step.
+          setActiveStep((prev) => Math.max(prev, explicitActive));
         }
 
         const lastCompleted = parseLastCompletedStepFromPayload(
           dataAny,
-          stepFromData,
+          explicitActive,
         );
-        // Use a functional updater so we never go *backwards* from a value
-        // that was already seeded by the session effect.
-        setLastCompletedStep((prev) =>
-          Math.max(prev, lastCompleted >= 0 ? lastCompleted : 1),
-        );
+        const safeLastCompleted =
+          Number.isFinite(lastCompleted) && lastCompleted >= 1
+            ? Math.min(11, Math.floor(lastCompleted))
+            : 1;
+        // Never drop below API progress; session bootstrap may run later with only the *viewing* step.
+        setLastCompletedStep((prev) => Math.max(prev, safeLastCompleted));
       }
     }
   }, [serverData, form]);
@@ -221,18 +186,21 @@ export function FormProvider({
       try {
         // First check session data (most authoritative source)
         if (session?.user?.on_boarding_step) {
-          const stepFromSession = Number(session.user.on_boarding_step);
-          if (!isNaN(stepFromSession) && stepFromSession > 0) {
-            setActiveStep(stepFromSession);
-            // Also seed lastCompletedStep so the stepper doesn't disable earlier steps.
-            // Prefer the session's own last_completed_step; fall back to the active step.
-            const sessionLastCompleted = session.user.last_completed_step
-              ? Number(session.user.last_completed_step)
-              : stepFromSession;
-            const safeLastCompleted = !isNaN(sessionLastCompleted) && sessionLastCompleted > 0
-              ? Math.max(sessionLastCompleted, stepFromSession)
-              : stepFromSession;
-            setLastCompletedStep(safeLastCompleted);
+          const stepFromSession = coercePositiveStep(session.user.on_boarding_step);
+          if (stepFromSession > 0) {
+            // Never regress an already-advanced in-memory step (common with late async resolution in prod).
+            setActiveStep((prev) => Math.max(prev, stepFromSession));
+            // Never overwrite a higher `lastCompletedStep` already set from GET (e.g. user refreshed on step 2 while API says 9).
+            setLastCompletedStep((prev) => {
+              const sessionLastCompleted = session.user.last_completed_step
+                ? coercePositiveStep(session.user.last_completed_step)
+                : stepFromSession;
+              const safeFromSession =
+                sessionLastCompleted > 0
+                  ? Math.max(sessionLastCompleted, stepFromSession)
+                  : stepFromSession;
+              return Math.max(prev, safeFromSession);
+            });
             return;
           }
         }
@@ -240,7 +208,8 @@ export function FormProvider({
         // Fall back to onboarding service
         const step = await onboardingService.getCurrentStep();
         if (step && step > 0) {
-          setActiveStep(step);
+          // Same guard for service fallback; this request may resolve after user already clicked next.
+          setActiveStep((prev) => Math.max(prev, step));
         }
       } catch (error) {
         console.error("Error loading initial step:", error);
@@ -254,6 +223,8 @@ export function FormProvider({
   const updateActiveStep = useCallback(
     async (step: number, options?: { skipSessionSync?: boolean }) => {
       setActiveField(null); // Reset active field when changing steps
+      // Once user/code drives navigation, don't let later refetches re-init from stale payloads.
+      didInitActiveStepFromServer.current = true;
 
       // Update step immediately - no delay, no blank screen
       setActiveStep(step);
@@ -288,39 +259,10 @@ export function FormProvider({
     }
   }, []);
 
-  // Set a timeout to ensure we don't get stuck in loading
+  // Keep RHF state aligned with provider state so any watcher-based logic sees the same step.
   useEffect(() => {
-    const timeout = setTimeout(() => {
-      if (isLoading && !initialDataLoaded) {
-        if (isMounted.current) {
-          setInitialDataLoaded(true);
-          setIsLoading(false);
-        }
-      }
-    }, 3000); // 3 seconds max loading time
-
-    return () => clearTimeout(timeout);
-  }, [isLoading, initialDataLoaded]);
-
-  // Add auto-save functionality when fields change
-  const autoSave = useCallback((data: OnboardingFormData | unknown) => {
-    console.log("Auto-saving form data:", data);
-    // Implement your auto-save logic here
-    // e.g., onboardingService.saveStepData(activeStep, data[`step${activeStep}`])
-  }, []);
-
-  const debouncedSave = useMemo(() => debounce(autoSave, 2000), [autoSave]);
-
-  // Watch form changes for auto-save
-  useEffect(() => {
-    const subscription = form.watch((data) => {
-      if (form.formState.isDirty) {
-        debouncedSave(data);
-      }
-    });
-
-    return () => subscription.unsubscribe();
-  }, [form, form.watch, debouncedSave]);
+    form.setValue("activeStep", activeStep);
+  }, [form, activeStep]);
 
   const save = useCallback(async () => {
     if (isLoading) return;
@@ -335,7 +277,8 @@ export function FormProvider({
         return;
       }
 
-      await saveStepData();
+      // Global `save()` is a no-op persistence placeholder; step components call APIs directly.
+      await Promise.resolve();
 
       // Refresh data after saving
       invalidateCache();
@@ -455,16 +398,4 @@ export function useFormContext() {
     throw new Error("useFormContext must be used within a FormProvider");
   }
   return context;
-}
-
-// Simple debounce implementation
-function debounce<T extends (...args: unknown[]) => unknown>(
-  fn: T,
-  delay: number,
-): (...args: Parameters<T>) => void {
-  let timeoutId: NodeJS.Timeout;
-  return (...args: Parameters<T>) => {
-    clearTimeout(timeoutId);
-    timeoutId = setTimeout(() => fn(...args), delay);
-  };
 }

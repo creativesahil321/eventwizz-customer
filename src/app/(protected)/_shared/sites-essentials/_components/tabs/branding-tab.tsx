@@ -25,8 +25,9 @@ import { MapPin } from "lucide-react";
 import {
   BANNER_HEADING_MAX_WORDS,
   countWords,
-  truncateToMaxWords,
+  truncateToMaxWordsForInput,
 } from "@/lib/word-count";
+import { useSiteEssentialsUpdateGate } from "../../_lib/site-essentials-update-context";
 
 interface BrandingTabProps {
   /** Server values from API – source of truth after location switch so UI updates immediately */
@@ -38,6 +39,7 @@ export function BrandingTab({
   serverCoverImage,
   serverCoverVideo,
 }: BrandingTabProps) {
+  const { readOnly } = useSiteEssentialsUpdateGate();
   const form = useFormContext<SiteEssentialsFormValues>();
 
   // File objects for new uploads
@@ -295,6 +297,7 @@ export function BrandingTab({
                 <FormControl>
                   <Input
                     placeholder="© 2023 EventWizz, All Rights Reserved"
+                    disabled={readOnly}
                     {...field}
                   />
                 </FormControl>
@@ -326,8 +329,9 @@ export function BrandingTab({
                       />
                       <button
                         type="button"
+                        disabled={readOnly}
                         onClick={handleRemoveLogo}
-                        className="text-red-500 text-sm underline"
+                        className="text-red-500 text-sm underline disabled:pointer-events-none disabled:opacity-50"
                       >
                         Remove Logo
                       </button>
@@ -339,6 +343,7 @@ export function BrandingTab({
                       maxFileCount={1}
                       maxSize={2 * 1024 * 1024} // 2MB
                       onRemove={handleRemoveLogo}
+                      disabled={readOnly}
                       accept={{
                         "image/png": [],
                         "image/jpeg": [],
@@ -373,8 +378,9 @@ export function BrandingTab({
                       />
                       <button
                         type="button"
+                        disabled={readOnly}
                         onClick={handleRemoveFavicon}
-                        className="text-red-500 text-sm underline"
+                        className="text-red-500 text-sm underline disabled:pointer-events-none disabled:opacity-50"
                       >
                         Remove Favicon
                       </button>
@@ -386,6 +392,7 @@ export function BrandingTab({
                       maxFileCount={1}
                       maxSize={1 * 1024 * 1024} // 1MB
                       onRemove={handleRemoveFavicon}
+                      disabled={readOnly}
                       accept={{
                         "image/png": [],
                         "image/x-icon": [],
@@ -455,11 +462,12 @@ export function BrandingTab({
                     <FormControl>
                       <Input
                         placeholder="EventWizz Events"
+                        disabled={readOnly}
                         {...field}
                         value={field.value || ""}
                         onChange={(e) =>
                           field.onChange(
-                            truncateToMaxWords(
+                            truncateToMaxWordsForInput(
                               e.target.value,
                               BANNER_HEADING_MAX_WORDS
                             )
@@ -490,6 +498,7 @@ export function BrandingTab({
                     <FormControl>
                       <Input
                         placeholder="Discover amazing events"
+                        disabled={readOnly}
                         {...field}
                         value={field.value || ""}
                         maxLength={maxLength}
@@ -550,8 +559,9 @@ export function BrandingTab({
                             />
                             <button
                               type="button"
+                              disabled={readOnly}
                               onClick={handleRemoveLandingPageImage}
-                              className="text-red-500 text-sm underline"
+                              className="text-red-500 text-sm underline disabled:pointer-events-none disabled:opacity-50"
                             >
                               Remove Image
                             </button>
@@ -563,6 +573,7 @@ export function BrandingTab({
                             maxFileCount={1}
                             maxSize={2 * 1024 * 1024} // 2MB
                             onRemove={handleRemoveLandingPageImage}
+                            disabled={readOnly}
                             accept={{
                               "image/png": [],
                               "image/jpeg": [],
@@ -617,8 +628,9 @@ export function BrandingTab({
                               </video>
                               <button
                                 type="button"
+                                disabled={readOnly}
                                 onClick={handleRemoveLandingPageVideo}
-                                className="text-red-500 text-sm underline"
+                                className="text-red-500 text-sm underline disabled:pointer-events-none disabled:opacity-50"
                               >
                                 Remove Video
                               </button>
@@ -631,6 +643,7 @@ export function BrandingTab({
                                 maxFileCount={1}
                                 maxSize={10 * 1024 * 1024} // 10MB for banner video
                                 onRemove={handleRemoveLandingPageVideo}
+                                disabled={readOnly}
                                 accept={{
                                   "video/mp4": [],
                                 }}
@@ -696,6 +709,7 @@ export function BrandingTab({
                   <FormControl>
                     <Input
                       placeholder="About Us"
+                      disabled={readOnly}
                       {...field}
                       value={field.value || ""}
                       maxLength={maxLength}
@@ -733,10 +747,9 @@ export function BrandingTab({
                     maxLength={340}
                     maxWords={50}
                     className="min-h-[120px]"
+                    readOnly={readOnly}
                     aiContext={{
                       title: form.watch("about_title") || undefined,
-                      ctaText: form.watch("about_link_title") || undefined,
-                      ctaUrl: form.watch("about_cta_link") || undefined,
                     }}
                   />
                 </FormControl>
@@ -744,60 +757,6 @@ export function BrandingTab({
               </FormItem>
             )}
           />
-
-          <div className="grid gap-6 md:grid-cols-2">
-            <FormField
-              control={form.control}
-              name="about_link_title"
-              render={({ field }) => {
-                const currentLength = field.value?.length || 0;
-                const maxLength = 18;
-                return (
-                  <FormItem>
-                    <FormLabel>About Section CTA Text</FormLabel>
-                    <FormControl>
-                      <Input
-                        placeholder="Learn More"
-                        {...field}
-                        value={field.value || ""}
-                        maxLength={maxLength}
-                        onChange={(e) => field.onChange(e.target.value)}
-                      />
-                    </FormControl>
-                    <div className="text-xs text-muted-foreground mt-1">
-                      <span
-                        className={
-                          currentLength > maxLength ? "text-destructive" : ""
-                        }
-                      >
-                        {currentLength}/{maxLength} characters
-                      </span>
-                    </div>
-                    <FormMessage />
-                  </FormItem>
-                );
-              }}
-            />
-
-            <FormField
-              control={form.control}
-              name="about_cta_link"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>About Section CTA URL</FormLabel>
-                  <FormControl>
-                    <Input
-                      placeholder="/about"
-                      {...field}
-                      value={field.value || ""}
-                      onChange={(e) => field.onChange(e.target.value)}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-          </div>
 
           <Separator className="my-4" />
 
@@ -819,6 +778,7 @@ export function BrandingTab({
                     <FormControl>
                       <Input
                         placeholder="Upcoming Events"
+                        disabled={readOnly}
                         {...field}
                         value={field.value || ""}
                         maxLength={maxLength}
@@ -852,6 +812,7 @@ export function BrandingTab({
                     <FormControl>
                       <Input
                         placeholder="Top Picks"
+                        disabled={readOnly}
                         {...field}
                         value={field.value || ""}
                         maxLength={maxLength}
@@ -894,6 +855,7 @@ export function BrandingTab({
                     <FormControl>
                       <Input
                         placeholder="Event Gallery"
+                        disabled={readOnly}
                         {...field}
                         value={field.value || ""}
                         maxLength={maxLength}

@@ -13,8 +13,10 @@ import { Input } from "@/components/ui/input";
 import { Facebook, Twitter, Instagram, Linkedin, Youtube } from "lucide-react";
 import { SectionTitle } from "../ui/section-title";
 import { Separator } from "@/components/ui/separator";
+import { useSiteEssentialsUpdateGate } from "../../_lib/site-essentials-update-context";
 
 export function SocialMediaTab() {
+  const { readOnly } = useSiteEssentialsUpdateGate();
   const form = useFormContext<SiteEssentialsFormValues>();
 
   return (
@@ -37,6 +39,7 @@ export function SocialMediaTab() {
               <FormControl>
                 <Input
                   type="url"
+                  disabled={readOnly}
                   placeholder="https://facebook.com/eventwizz"
                   {...field}
                 />
@@ -58,6 +61,7 @@ export function SocialMediaTab() {
               <FormControl>
                 <Input
                   type="url"
+                  disabled={readOnly}
                   placeholder="https://twitter.com/eventwizz"
                   {...field}
                 />
@@ -79,6 +83,7 @@ export function SocialMediaTab() {
               <FormControl>
                 <Input
                   type="url"
+                  disabled={readOnly}
                   placeholder="https://instagram.com/eventwizz"
                   {...field}
                 />
@@ -100,6 +105,7 @@ export function SocialMediaTab() {
               <FormControl>
                 <Input
                   type="url"
+                  disabled={readOnly}
                   placeholder="https://linkedin.com/company/eventwizz"
                   {...field}
                 />
@@ -121,6 +127,7 @@ export function SocialMediaTab() {
               <FormControl>
                 <Input
                   type="url"
+                  disabled={readOnly}
                   placeholder="https://youtube.com/c/eventwizz"
                   {...field}
                 />
