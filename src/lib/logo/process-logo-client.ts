@@ -1,6 +1,6 @@
 /**
  * Sends an uploaded logo to the Next.js processing route and returns a PNG
- * optimized for the white vendor site header (transparent background).
+ * optimized for the vendor site header (transparent background + contrast).
  */
 export type ProcessLogoFileResult = {
   file: File;
@@ -11,16 +11,22 @@ export type ProcessLogoFileResult = {
   backgroundRemovalError?: string;
 };
 
-export async function processLogoFile(
-  file: File,
-  options?: { headerBackgroundColor?: string },
-): Promise<ProcessLogoFileResult> {
-  const formData = new FormData();
-  formData.append("logo", file);
+type ProcessLogoOptions = {
+  headerBackgroundColor?: string;
+};
+
+function appendHeaderBackground(
+  formData: FormData,
+  options?: ProcessLogoOptions,
+): void {
   if (options?.headerBackgroundColor) {
     formData.append("header_background", options.headerBackgroundColor);
   }
+}
 
+async function postLogoProcessFormData(
+  formData: FormData,
+): Promise<Response> {
   const response = await fetch("/api/logo/process", {
     method: "POST",
     body: formData,
@@ -33,27 +39,40 @@ export async function processLogoFile(
     throw new Error(payload?.error ?? "Logo processing failed");
   }
 
+  return response;
+}
+
+export async function processLogoFile(
+  file: File,
+  options?: ProcessLogoOptions,
+): Promise<ProcessLogoFileResult> {
+  const formData = new FormData();
+  formData.append("logo", file);
+  appendHeaderBackground(formData, options);
+
+  const response = await postLogoProcessFormData(formData);
   const blob = await response.blob();
   const baseName = file.name.replace(/\.[^.]+$/, "") || "logo";
-  const invertedForContrast =
-    response.headers.get("X-Logo-Inverted-For-Contrast") === "true";
-  const headerIsLight =
-    response.headers.get("X-Logo-Header-Is-Light") !== "false";
-  const processMethod =
-    (response.headers.get("X-Logo-Process-Method") as
-      | ProcessLogoFileResult["processMethod"]
-      | null) ?? "sharp";
-  const backgroundRemovalFailed =
-    response.headers.get("X-Logo-Background-Removal-Failed") === "true";
-  const backgroundRemovalError =
-    response.headers.get("X-Logo-Background-Removal-Error") ?? undefined;
 
-  return {
-    file: new File([blob], `${baseName}.png`, { type: "image/png" }),
-    invertedForContrast,
-    headerIsLight,
-    processMethod,
-    backgroundRemovalFailed,
-    backgroundRemovalError,
-  };
+  const { parseProcessLogoResponse } = await import("./parse-process-logo-response");
+  return parseProcessLogoResponse(response, blob, baseName);
+}
+
+/** Re-process an existing logo already stored on the server (Sites Essentials saved URL). */
+export async function processLogoFromUrl(
+  logoUrl: string,
+  options?: ProcessLogoOptions,
+): Promise<ProcessLogoFileResult> {
+  const formData = new FormData();
+  formData.append("logo_url", logoUrl);
+  appendHeaderBackground(formData, options);
+
+  const response = await postLogoProcessFormData(formData);
+  const blob = await response.blob();
+  const baseName =
+    logoUrl.split("/").pop()?.split("?")[0]?.replace(/\.[^.]+$/, "") ||
+    "logo";
+
+  const { parseProcessLogoResponse } = await import("./parse-process-logo-response");
+  return parseProcessLogoResponse(response, blob, baseName);
 }

@@ -10,6 +10,12 @@ export const LOGO_WHITE_THRESHOLD = 235;
 /** Extra tolerance when matching flat bright backgrounds. */
 export const LOGO_WHITE_FUZZ = 18;
 
+/** Pixels at or below this RGB value are treated as flat black background. */
+export const LOGO_BLACK_THRESHOLD = 20;
+
+/** Extra tolerance when matching flat dark backgrounds. */
+export const LOGO_BLACK_FUZZ = 18;
+
 /** Max upload size accepted by the logo process API (5 MB). */
 export const LOGO_PROCESS_MAX_BYTES = 5 * 1024 * 1024;
 

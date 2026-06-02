@@ -386,7 +386,7 @@ export default function TabEventForm() {
 
   const roomRecords = useMemo<RoomRecord[]>(() => {
     if (localIsRooms === 1) {
-      return resolvedStepTwoRooms.map((room, index) => {
+      return resolvedStepTwoRooms.slice(0, EVENT_ROOM_MAX_COUNT).map((room, index) => {
         const resolvedName =
           String(room?.name || "").trim() || `Room ${index + 1}`;
         const isComplete =
@@ -503,7 +503,10 @@ export default function TabEventForm() {
   const handleVenueRoomCreated = useCallback((room: VendorRoomOption) => {
     setVendorRooms((prev) => {
       if (prev.some((r) => r.id === room.id)) return prev;
-      return [...prev, room].sort((a, b) => a.name.localeCompare(b.name));
+      if (prev.length >= EVENT_ROOM_MAX_COUNT) return prev;
+      return [...prev, room]
+        .sort((a, b) => a.name.localeCompare(b.name))
+        .slice(0, EVENT_ROOM_MAX_COUNT);
     });
   }, []);
 
@@ -569,7 +572,7 @@ export default function TabEventForm() {
             (room) =>
               room.name.length > 0 && Number.isFinite(room.id) && room.id > 0,
           );
-        setVendorRooms(fromApi);
+        setVendorRooms(fromApi.slice(0, EVENT_ROOM_MAX_COUNT));
       })
       .catch((error) => {
         if (cancelled) return;
@@ -832,7 +835,7 @@ export default function TabEventForm() {
                     <p className="mt-4 rounded-lg bg-[#EAF7F8] px-3 py-2 text-[11px] text-[#0B6A75]">
                       {localIsRooms === 1
                         ? selectedRoomIds.length < EVENT_ROOM_MAX_COUNT
-                          ? `Each room has its own package, dates, menu, and brochure (${EVENT_ROOM_MIN_COUNT}–${EVENT_ROOM_MAX_COUNT} per event). Select venue rooms from the list; create a new one only when none are left to pick.`
+                          ? `Each room has its own package, dates, menu, and brochure (${EVENT_ROOM_MIN_COUNT}–${EVENT_ROOM_MAX_COUNT} per event). Select from your venue rooms — new rooms can only be created if you have fewer than ${EVENT_ROOM_MAX_COUNT} in total.`
                           : `Each room has its own package, dates, menu, other packages, and brochure. Use ${EVENT_ROOM_MIN_COUNT}–${EVENT_ROOM_MAX_COUNT} rooms per event.`
                         : "Click a room below to edit its details for this step. Change room selection on the Package tab."}
                     </p>
@@ -848,102 +851,102 @@ export default function TabEventForm() {
                     </div>
                   )}
 
-                  <div className="space-y-6 relative min-h-[400px]">
+              <div className="space-y-6 relative min-h-[400px]">
                     <TabsContent value="event-name" className="mt-0 w-full">
                       <div className="bg-white rounded-lg">
-                        <Suspense fallback={<TabContentLoader />}>
-                          <EventNameTab />
-                        </Suspense>
-                      </div>
-                    </TabsContent>
+                    <Suspense fallback={<TabContentLoader />}>
+                      <EventNameTab />
+                    </Suspense>
+                  </div>
+                </TabsContent>
 
                     <TabsContent value="package" className="mt-0 w-full">
                       <div className="bg-white rounded-lg">
-                        <Suspense fallback={<TabContentLoader />}>
-                          <PackageTab />
-                        </Suspense>
-                      </div>
-                    </TabsContent>
+                    <Suspense fallback={<TabContentLoader />}>
+                      <PackageTab />
+                    </Suspense>
+                  </div>
+                </TabsContent>
 
                     <TabsContent value="dates" className="mt-0 w-full">
                       <div className="bg-white rounded-lg">
-                        <Suspense fallback={<TabContentLoader />}>
-                          <DatesTab />
-                        </Suspense>
-                      </div>
-                    </TabsContent>
+                    <Suspense fallback={<TabContentLoader />}>
+                      <DatesTab />
+                    </Suspense>
+                  </div>
+                </TabsContent>
 
                     <TabsContent value="menu" className="mt-0 w-full">
                       <div className="bg-white rounded-lg">
-                        <Suspense fallback={<TabContentLoader />}>
-                          <CateringTab />
-                        </Suspense>
-                      </div>
-                    </TabsContent>
+                    <Suspense fallback={<TabContentLoader />}>
+                      <CateringTab />
+                    </Suspense>
+                  </div>
+                </TabsContent>
 
                     <TabsContent value="more-info" className="mt-0 w-full">
                       <div className="bg-white rounded-lg">
-                        <Suspense fallback={<TabContentLoader />}>
+                    <Suspense fallback={<TabContentLoader />}>
                           <MoreInfoTab />
-                        </Suspense>
-                      </div>
-                    </TabsContent>
+                    </Suspense>
+                  </div>
+                </TabsContent>
 
                     <TabsContent value="drinks" className="mt-0 w-full">
                       <div className="bg-white rounded-lg">
-                        <Suspense fallback={<TabContentLoader />}>
+                    <Suspense fallback={<TabContentLoader />}>
                           <DrinksTab />
-                        </Suspense>
-                      </div>
-                    </TabsContent>
+                    </Suspense>
+                  </div>
+                </TabsContent>
 
                     <TabsContent value="faqs" className="mt-0 w-full">
                       <div className="bg-white rounded-lg">
-                        <Suspense fallback={<TabContentLoader />}>
-                          <FaqsTab />
-                        </Suspense>
-                      </div>
-                    </TabsContent>
+                    <Suspense fallback={<TabContentLoader />}>
+                      <FaqsTab />
+                    </Suspense>
+                  </div>
+                </TabsContent>
 
                     <TabsContent value="publish" className="mt-0 w-full">
                       <div className="bg-white rounded-lg">
-                        <Suspense fallback={<TabContentLoader />}>
-                          <PublishTab />
-                        </Suspense>
-                      </div>
-                    </TabsContent>
-
-                    {/* Live Preview (read-only) */}
-                    <TabsContent value="preview" className="mt-0 w-full">
-                      <div className="bg-white rounded-lg p-0 sm:p-0">
-                        <EventPreview
-                          data={(eventData as { data?: object })?.data || {}}
-                          embedInShell
-                        />
-                      </div>
-                    </TabsContent>
+                    <Suspense fallback={<TabContentLoader />}>
+                      <PublishTab />
+                    </Suspense>
                   </div>
+                </TabsContent>
 
-                  {/* Tab Navigation */}
+                {/* Live Preview (read-only) */}
+                    <TabsContent value="preview" className="mt-0 w-full">
+                  <div className="bg-white rounded-lg p-0 sm:p-0">
+                    <EventPreview
+                      data={(eventData as { data?: object })?.data || {}}
+                      embedInShell
+                    />
+                  </div>
+                </TabsContent>
+              </div>
+
+              {/* Tab Navigation */}
                   <div className="flex flex-wrap items-center justify-between gap-3 mt-6">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={navigateToPreviousTab}
-                      disabled={activeTab === "event-name"}
-                      className="flex items-center gap-2 text-xs sm:text-sm"
-                      size="sm"
-                    >
-                      <ArrowLeft size={14} />
-                      <span className="hidden sm:inline">Previous</span>
-                      <span className="sm:hidden">Prev</span>
-                    </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={navigateToPreviousTab}
+                  disabled={activeTab === "event-name"}
+                  className="flex items-center gap-2 text-xs sm:text-sm"
+                  size="sm"
+                >
+                  <ArrowLeft size={14} />
+                  <span className="hidden sm:inline">Previous</span>
+                  <span className="sm:hidden">Prev</span>
+                </Button>
 
                     <div className="flex items-center gap-3">
                       {currentStep ? (
-                        <div className="text-xs sm:text-sm text-muted-foreground flex items-center">
-                          <span className="hidden sm:inline">Step </span>
-                          {currentStep}/8
+                  <div className="text-xs sm:text-sm text-muted-foreground flex items-center">
+                    <span className="hidden sm:inline">Step </span>
+                    {currentStep}/8
                         </div>
                       ) : null}
                       <Button

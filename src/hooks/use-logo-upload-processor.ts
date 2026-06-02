@@ -1,8 +1,11 @@
 "use client";
 
 import { useCallback, useState } from "react";
-import { toast } from "sonner";
-import { processLogoFile } from "@/lib/logo/process-logo-client";
+import {
+  processLogoFile,
+  processLogoFromUrl,
+} from "@/lib/logo/process-logo-client";
+import { showLogoProcessToasts } from "@/lib/logo/parse-process-logo-response";
 
 type UseLogoUploadProcessorOptions = {
   headerBackgroundColor?: string;
@@ -19,29 +22,11 @@ export function useLogoUploadProcessor(
       setIsProcessing(true);
       try {
         const result = await processLogoFile(file, { headerBackgroundColor });
-
-        if (result.backgroundRemovalFailed) {
-          toast.warning("Background could not be removed", {
-            description:
-              result.backgroundRemovalError ??
-              "remove.bg is unavailable. Only plain white backgrounds are cleaned automatically — upload a PNG with transparency for best results.",
-            duration: 8000,
-          });
-        } else if (result.invertedForContrast) {
-          toast.success(
-            result.headerIsLight
-              ? "Logo adjusted for light header visibility"
-              : "Logo adjusted for dark header visibility",
-          );
-        } else if (result.processMethod === "remove-bg") {
-          toast.success("Logo background removed");
-        } else {
-          toast.success("Logo ready for your site header");
-        }
-
+        showLogoProcessToasts(result);
         return result.file;
       } catch (error) {
         console.error("Logo processing failed:", error);
+        const { toast } = await import("sonner");
         toast.message("Using original logo", {
           description: "Background cleanup was skipped.",
         });
@@ -53,5 +38,29 @@ export function useLogoUploadProcessor(
     [headerBackgroundColor],
   );
 
-  return { processUpload, isProcessing };
+  const reprocessExistingUrl = useCallback(
+    async (logoUrl: string): Promise<File | null> => {
+      setIsProcessing(true);
+      try {
+        const result = await processLogoFromUrl(logoUrl, {
+          headerBackgroundColor,
+        });
+        showLogoProcessToasts(result);
+        return result.file;
+      } catch (error) {
+        console.error("Logo re-processing failed:", error);
+        const { toast } = await import("sonner");
+        toast.error("Could not optimize logo", {
+          description:
+            error instanceof Error ? error.message : "Please try again.",
+        });
+        return null;
+      } finally {
+        setIsProcessing(false);
+      }
+    },
+    [headerBackgroundColor],
+  );
+
+  return { processUpload, reprocessExistingUrl, isProcessing };
 }

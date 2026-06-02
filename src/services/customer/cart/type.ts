@@ -14,6 +14,8 @@ import { ApiResponse as BaseApiResponse } from "@/services/core/api-client";
 export interface CartRequest {
   slug: string;
   event_date: string;
+  /** Required when the event uses the multi-room system. */
+  room_id?: number;
   people_quantity?: number;
   special_request?: string;
   drink_package?: Array<{

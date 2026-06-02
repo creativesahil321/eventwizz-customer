@@ -156,45 +156,28 @@ export interface EventsResponseData {
 export type EventsResponse = BaseApiResponse<EventsResponseData>;
 
 /**
- * Event detail type definition for single event page
+ * Per-room payload on the public event detail API when `is_rooms` is enabled.
  */
-export interface EventDetail {
-  event_schedular_background_image: string | null;
-  menu_background_image: string | null;
-  address: string;
-  phone: string;
-  email: string;
-  package_title: string;
-  /** Legacy / alternate API key; prefer `package_description` (matches vendor + onboarding). */
-  package_sub_title: string;
-  package_description?: string | null;
-  dates: DatesSectionType | undefined;
-  logo: string | File | null | undefined;
-  event_name: string;
-  slug: string;
-  event_banner_image: string;
-  event_banner_video: string | null;
-  event_banner_heading: string;
-  /** Optional substring of the hero line: accent tail (heading font + primary) when theme uses accent_tail */
-  event_banner_heading_accent?: string | null;
-  event_banner_sub_heading: string;
-  about_event_heading: string;
-  about_event_sub_heading: string;
-  about_event_description: string;
+export interface EventDetailRoom {
+  room_id: number;
   event_schedular_title: string;
+  event_schedular_background_image: string | null;
   event_schedular: Array<{
     time: string;
     title: string;
   }>;
+  package_title: string;
+  package_description?: string | null;
   package_image: string;
   package_details: Array<{
     title: string;
   }>;
-  package_button_name: string;
+  dates: DatesSectionType | undefined;
   event_galley: Array<{
     url: string;
   }>;
   menu_title: string;
+  menu_background_image: string | null;
   menu_description: string;
   menus: Array<{
     name: string;
@@ -212,8 +195,77 @@ export interface EventDetail {
     price: string;
     available_quantity?: number;
   }>;
+  event_address?: string | null;
+  lat?: string | number | null;
+  long?: string | number | null;
   brochure_pdf: string | null;
   brochure_pdf_2: string | null;
+}
+
+/**
+ * Event detail type definition for single event page
+ */
+export interface EventDetail {
+  /** When true, room-specific sections live under `rooms` keyed by room name. */
+  is_rooms?: boolean | number | string;
+  /** Room-keyed payloads returned by the public event detail API. */
+  rooms?: Record<string, EventDetailRoom>;
+  /** Present on single-room events; room-mode payloads use `rooms` instead. */
+  event_schedular_background_image?: string | null;
+  menu_background_image?: string | null;
+  address: string;
+  phone: string;
+  email: string;
+  package_title?: string;
+  /** Legacy / alternate API key; prefer `package_description` (matches vendor + onboarding). */
+  package_sub_title?: string;
+  package_description?: string | null;
+  dates?: DatesSectionType | undefined;
+  logo: string | File | null | undefined;
+  event_name: string;
+  slug: string;
+  event_banner_image: string;
+  event_banner_video: string | null;
+  event_banner_heading: string;
+  /** Optional substring of the hero line: accent tail (heading font + primary) when theme uses accent_tail */
+  event_banner_heading_accent?: string | null;
+  event_banner_sub_heading: string;
+  about_event_heading: string;
+  about_event_sub_heading: string;
+  about_event_description: string;
+  event_schedular_title?: string;
+  event_schedular?: Array<{
+    time: string;
+    title: string;
+  }>;
+  package_image?: string;
+  package_details?: Array<{
+    title: string;
+  }>;
+  package_button_name?: string;
+  event_galley?: Array<{
+    url: string;
+  }>;
+  menu_title?: string;
+  menu_description?: string;
+  menus?: Array<{
+    name: string;
+    items: Array<{
+      title: string;
+      description: string;
+    }>;
+  }>;
+  drink_title?: string;
+  drink_description?: string;
+  packages?: Array<{
+    id: number;
+    title: string;
+    description: string;
+    price: string;
+    available_quantity?: number;
+  }>;
+  brochure_pdf?: string | null;
+  brochure_pdf_2?: string | null;
   faq_pdf: string | null;
   event_address?: string | null;
   lat?: string | number | null;

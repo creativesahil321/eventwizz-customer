@@ -29,8 +29,11 @@ import {
 } from "@/lib/word-count";
 import { useSiteEssentialsUpdateGate } from "../../_lib/site-essentials-update-context";
 import { useLogoUploadProcessor } from "@/hooks/use-logo-upload-processor";
-import { Loader2 } from "lucide-react";
+import { Loader2, Sparkles } from "lucide-react";
 import { defaultThemeConstants } from "@/services/common/theme/constants/theme";
+import { ensureFilePreview, revokeFilePreview } from "@/lib/file-preview";
+import { Button } from "@/components/ui/button";
+import { optimizeLogoFromSources, isLocalLogoUrl } from "@/lib/logo/optimize-logo-from-sources";
 
 interface BrandingTabProps {
   /** Server values from API – source of truth after location switch so UI updates immediately */
@@ -47,7 +50,7 @@ export function BrandingTab({
   const headerBackgroundColor =
     useWatch({ control: form.control, name: "colors.header" }) ??
     defaultThemeConstants.colors.header;
-  const { processUpload: processLogoUpload, isProcessing: isProcessingLogo } =
+  const { processUpload: processLogoUpload, reprocessExistingUrl, isProcessing: isProcessingLogo } =
     useLogoUploadProcessor({ headerBackgroundColor });
 
   // File objects for new uploads
@@ -96,10 +99,13 @@ export function BrandingTab({
 
   // Sync logo/favicon from form; for cover_image/cover_video only sync when user has selected a File (so we show their upload), otherwise server props drive banner
   useEffect(() => {
-    if (typeof watchedLogo === "string" && watchedLogo) {
+    if (watchedLogo instanceof File) {
+      setLogoFiles([ensureFilePreview(watchedLogo)]);
+      setLogoUrl("");
+    } else if (typeof watchedLogo === "string" && watchedLogo) {
       setLogoFiles([]);
       setLogoUrl(watchedLogo);
-    } else if (watchedLogo !== undefined && !(watchedLogo instanceof File)) {
+    } else if (watchedLogo !== undefined) {
       setLogoFiles([]);
       setLogoUrl("");
     }
@@ -134,9 +140,44 @@ export function BrandingTab({
     if (!files.length) return;
 
     const processed = await processLogoUpload(files[0]);
-    setLogoFiles([processed]);
+    const fileWithPreview = ensureFilePreview(processed);
+    setLogoFiles([fileWithPreview]);
     setLogoUrl("");
-    form.setValue("logo", processed);
+    form.setValue("logo", fileWithPreview);
+  };
+
+  const handleOptimizeExistingLogo = async () => {
+    if (readOnly || isProcessingLogo) return;
+
+    const formLogo = form.getValues("logo");
+    const logoFile =
+      logoFiles[0] ?? (formLogo instanceof File ? formLogo : null);
+
+    if (!logoFile && !logoUrl) return;
+
+    try {
+      const processed = await optimizeLogoFromSources({
+        logoUrl: logoUrl || undefined,
+        logoFile,
+        processUpload: processLogoUpload,
+        reprocessExistingUrl,
+      });
+
+      if (!processed) return;
+
+      revokeFilePreview(logoFiles[0]);
+      const fileWithPreview = ensureFilePreview(processed);
+      setLogoFiles([fileWithPreview]);
+      setLogoUrl("");
+      form.setValue("logo", fileWithPreview);
+    } catch (error) {
+      console.error("Logo optimize failed:", error);
+      const { toast } = await import("sonner");
+      toast.error("Could not optimize logo", {
+        description:
+          error instanceof Error ? error.message : "Please try again.",
+      });
+    }
   };
 
   const handleFaviconFileChange = (files: File[]) => {
@@ -220,6 +261,7 @@ export function BrandingTab({
   };
 
   const handleRemoveLogo = () => {
+    revokeFilePreview(logoFiles[0]);
     setLogoFiles([]);
     setLogoUrl("");
     form.setValue("logo", null);
@@ -326,9 +368,9 @@ export function BrandingTab({
               <FormItem>
                 <FormLabel>Logo</FormLabel>
                 <FormDescription>
-                  Upload your site logo (PNG or JPG, max 2MB). Recommended
-                  dimensions: 240×60px. Images will be constrained to a
-                  reasonable size on the site.
+                  Upload your site logo (PNG or JPG, max 2MB). We automatically
+                  remove the background and adjust contrast for your header
+                  color. Recommended dimensions: 240×60px.
                 </FormDescription>
                 <FormControl>
                   {isProcessingLogo ? (
@@ -343,19 +385,35 @@ export function BrandingTab({
                         style={{ backgroundColor: headerBackgroundColor }}
                       >
                         <img
-                          src={addCacheBusting(logoUrl)}
+                          src={
+                            isLocalLogoUrl(logoUrl)
+                              ? logoUrl
+                              : addCacheBusting(logoUrl)
+                          }
                           alt="Logo preview"
                           className="max-h-40 w-full object-contain"
                         />
                       </div>
-                      <button
-                        type="button"
-                        disabled={readOnly}
-                        onClick={handleRemoveLogo}
-                        className="text-red-500 text-sm underline disabled:pointer-events-none disabled:opacity-50"
-                      >
-                        Remove Logo
-                      </button>
+                      <div className="flex flex-wrap items-center gap-3">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          disabled={readOnly || isProcessingLogo}
+                          onClick={() => void handleOptimizeExistingLogo()}
+                        >
+                          <Sparkles className="mr-1.5 h-4 w-4" />
+                          Optimize for header
+                        </Button>
+                        <button
+                          type="button"
+                          disabled={readOnly}
+                          onClick={handleRemoveLogo}
+                          className="text-red-500 text-sm underline disabled:pointer-events-none disabled:opacity-50"
+                        >
+                          Remove Logo
+                        </button>
+                      </div>
                     </div>
                   ) : logoFiles.length > 0 ? (
                     <div className="space-y-2">
@@ -364,19 +422,34 @@ export function BrandingTab({
                         style={{ backgroundColor: headerBackgroundColor }}
                       >
                         <img
-                          src={URL.createObjectURL(logoFiles[0])}
+                          src={
+                            (logoFiles[0] as File & { preview?: string })
+                              .preview ?? ""
+                          }
                           alt="Logo preview"
                           className="max-h-40 w-full object-contain"
                         />
                       </div>
-                      <button
-                        type="button"
-                        disabled={readOnly}
-                        onClick={handleRemoveLogo}
-                        className="text-red-500 text-sm underline disabled:pointer-events-none disabled:opacity-50"
-                      >
-                        Remove Logo
-                      </button>
+                      <div className="flex flex-wrap items-center gap-3">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          disabled={readOnly || isProcessingLogo}
+                          onClick={() => void handleOptimizeExistingLogo()}
+                        >
+                          <Sparkles className="mr-1.5 h-4 w-4" />
+                          Optimize for header
+                        </Button>
+                        <button
+                          type="button"
+                          disabled={readOnly}
+                          onClick={handleRemoveLogo}
+                          className="text-red-500 text-sm underline disabled:pointer-events-none disabled:opacity-50"
+                        >
+                          Remove Logo
+                        </button>
+                      </div>
                     </div>
                   ) : (
                     <FileUploader

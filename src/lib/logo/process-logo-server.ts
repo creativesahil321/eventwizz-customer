@@ -4,6 +4,8 @@ import {
   LOGO_DARK_AVG_LUMINANCE,
   LOGO_DARK_MONOCHROME_RATIO,
   LOGO_DARK_PIXEL_RATIO,
+  LOGO_BLACK_FUZZ,
+  LOGO_BLACK_THRESHOLD,
   LOGO_DEFAULT_HEADER_BACKGROUND,
   LOGO_LIGHT_AVG_LUMINANCE,
   LOGO_LIGHT_MONOCHROME_RATIO,
@@ -66,6 +68,42 @@ function removeNearWhiteBackground(
     if (isBright || isFlatBright) {
       data[i + 3] = 0;
     }
+  }
+}
+
+function removeNearDarkBackground(data: Buffer, channels: number): void {
+  if (channels < 4) return;
+
+  for (let i = 0; i < data.length; i += channels) {
+    const r = data[i]!;
+    const g = data[i + 1]!;
+    const b = data[i + 2]!;
+
+    const threshold = LOGO_BLACK_THRESHOLD + LOGO_BLACK_FUZZ;
+    const isDark = r <= threshold && g <= threshold && b <= threshold;
+    const maxDiff = Math.max(
+      Math.abs(r - g),
+      Math.abs(g - b),
+      Math.abs(r - b),
+    );
+    const isFlatDark = maxDiff < 24 && r < 45 && g < 45 && b < 45;
+
+    if (isDark || isFlatDark) {
+      data[i + 3] = 0;
+    }
+  }
+}
+
+function removeSolidBackgroundsForHeader(
+  data: Buffer,
+  channels: number,
+  headerBackgroundColor: string,
+): void {
+  if (isLightHeaderBackground(headerBackgroundColor)) {
+    removeNearWhiteBackground(data, channels);
+    removeNearDarkBackground(data, channels);
+  } else {
+    removeNearWhiteBackground(data, channels);
   }
 }
 
@@ -221,7 +259,11 @@ async function normalizeLogoBuffer(
       info.height,
     )
   ) {
-    removeNearWhiteBackground(pixelData, info.channels);
+    removeSolidBackgroundsForHeader(
+      pixelData,
+      info.channels,
+      headerBackgroundColor,
+    );
   }
 
   const trimmed = await sharp(pixelData, {

@@ -56,7 +56,9 @@ export function EventRoomMultiSelect({
   const [creating, setCreating] = React.useState(false);
 
   const atMax = value.length >= maxSelection;
-  const canCreateMore = allowCreate && !atMax && !disabled && !loading;
+  const venueRoomCapReached = rooms.length >= maxSelection;
+  const canCreateMore =
+    allowCreate && !atMax && !venueRoomCapReached && !disabled && !loading;
   const canSubmitNewRoom = newRoomName.trim().length > 0 && !creating;
   const pickerDisabled =
     disabled || loading || (!allowCreate && rooms.length === 0);
@@ -68,9 +70,14 @@ export function EventRoomMultiSelect({
     () => rooms.filter((room) => !value.includes(room.id)),
     [rooms, value],
   );
-  /** Create only when the catalog is empty or every venue room is already selected for this event. */
+  /**
+   * Create only when under the venue room cap AND (catalog empty OR every
+   * existing venue room is already selected for this event).
+   */
   const showCreateForm =
-    canCreateMore && (rooms.length === 0 || unselectedRooms.length === 0);
+    canCreateMore &&
+    !venueRoomCapReached &&
+    (rooms.length === 0 || unselectedRooms.length === 0);
 
   const triggerLabel = React.useMemo(() => {
     if (loading) return "Loading venue rooms…";
@@ -89,6 +96,13 @@ export function EventRoomMultiSelect({
   const handleCreateRoom = async () => {
     const name = newRoomName.trim();
     if (!name || creating || atMax) return;
+
+    if (rooms.length >= maxSelection) {
+      toast.error(
+        `You can have at most ${maxSelection} venue rooms. Select from your existing rooms for this event.`,
+      );
+      return;
+    }
 
     setCreating(true);
     try {
@@ -246,11 +260,13 @@ export function EventRoomMultiSelect({
               Pick {minSelection}–{maxSelection} for this event
               {atMax
                 ? " · maximum reached"
-                : value.length < minSelection
-                  ? ` · select at least ${minSelection - value.length} more`
-                  : unselectedRooms.length > 0
-                    ? ` · select ${unselectedRooms.map((r) => r.name).join(", ")}`
-                    : ` · create a new venue room below`}
+                : venueRoomCapReached && unselectedRooms.length > 0
+                  ? ` · select ${unselectedRooms.map((r) => r.name).join(", ")}`
+                  : value.length < minSelection
+                    ? ` · select at least ${minSelection - value.length} more`
+                    : unselectedRooms.length > 0
+                      ? ` · select ${unselectedRooms.map((r) => r.name).join(", ")}`
+                      : ` · create a new venue room below`}
             </p>
           </div>
 
@@ -340,15 +356,19 @@ export function EventRoomMultiSelect({
             isLight ? "text-muted-foreground" : "text-slate-500",
           )}
         >
-          {canCreateMore
+          {canCreateMore && !venueRoomCapReached
             ? rooms.length === 0
               ? `Create at least ${minSelection} venue rooms using the form above.`
               : unselectedRooms.length > 0
                 ? `Select ${unselectedRooms.map((r) => r.name).join(" or ")} from the list to reach up to ${maxSelection} rooms for this event.`
                 : `All venue rooms are selected — create another below if you need ${maxSelection} for this event.`
-            : atMax
-              ? `${maxSelection} rooms selected for this event.`
-              : `Select at least ${minSelection} rooms for this event.`}
+            : venueRoomCapReached
+              ? value.length < maxSelection
+                ? `You have ${maxSelection} venue rooms — select ${unselectedRooms.map((r) => r.name).join(" or ") || "from the list"} for this event (up to ${maxSelection}).`
+                : `${maxSelection} rooms selected for this event.`
+              : atMax
+                ? `${maxSelection} rooms selected for this event.`
+                : `Select at least ${minSelection} rooms for this event.`}
         </p>
       )}
     </div>

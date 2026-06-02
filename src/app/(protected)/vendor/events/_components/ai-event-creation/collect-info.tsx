@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import { useFieldArray, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -65,7 +65,7 @@ const collectInfoSchema = z
     guestCount: z.string().optional(),
     priceRange: z.string().optional(),
     hasRoomSystem: z.enum(["yes", "no"]),
-    /** `select` when vendor already has 3 venue rooms — pick only, no rename. */
+    /** `select` when vendor already has venue rooms — pick from catalog (+ create 3rd if under cap). */
     roomInputMode: z.enum(["select", "edit"]).optional(),
     selectedRoomIds: z.array(z.number()).optional(),
     rooms: z.array(
@@ -178,6 +178,7 @@ export default function AIEventCollectInfo({
   const [categoriesLoading, setCategoriesLoading] = useState(true);
   const [roomsLoading, setRoomsLoading] = useState(false);
   const [vendorRooms, setVendorRooms] = useState<VendorRoomOption[]>([]);
+  const vendorRoomsRef = useRef<VendorRoomOption[]>([]);
 
   const form = useForm<CollectInfoForm>({
     resolver: zodResolver(collectInfoSchema),
@@ -286,6 +287,7 @@ export default function AIEventCollectInfo({
     if (hasRoomSystem !== "yes") {
       setRoomsLoading(false);
       setVendorRooms([]);
+      vendorRoomsRef.current = [];
       form.setValue("roomInputMode", "edit");
       form.setValue("selectedRoomIds", []);
       return;
@@ -296,6 +298,7 @@ export default function AIEventCollectInfo({
 
     const setDefaultRooms = () => {
       setVendorRooms([]);
+      vendorRoomsRef.current = [];
       form.setValue("roomInputMode", "edit");
       form.setValue("selectedRoomIds", []);
       form.setValue("rooms", [{ name: "Room 1" }, { name: "Room 2" }], {
@@ -322,32 +325,24 @@ export default function AIEventCollectInfo({
           .slice(0, AI_EVENT_MAX_ROOMS);
 
         setVendorRooms(fromApi);
+        vendorRoomsRef.current = fromApi;
 
-        if (fromApi.length >= AI_EVENT_MAX_ROOMS) {
+        if (fromApi.length >= 1) {
           form.setValue("roomInputMode", "select");
-          syncSelectedRoomsToForm([], fromApi);
+
+          const defaultSelectedIds =
+            fromApi.length >= AI_EVENT_MAX_ROOMS
+              ? []
+              : fromApi.length >= AI_EVENT_MIN_ROOMS
+                ? fromApi.map((room) => room.id)
+                : [fromApi[0].id];
+
+          syncSelectedRoomsToForm(defaultSelectedIds, fromApi);
           return;
         }
 
         form.setValue("roomInputMode", "edit");
         form.setValue("selectedRoomIds", []);
-
-        if (fromApi.length >= AI_EVENT_MIN_ROOMS) {
-          form.setValue(
-            "rooms",
-            fromApi.map((room) => ({ id: room.id, name: room.name })),
-            { shouldValidate: true, shouldDirty: true },
-          );
-          return;
-        }
-        if (fromApi.length === 1) {
-          form.setValue(
-            "rooms",
-            [{ id: fromApi[0].id, name: fromApi[0].name }, { name: "Room 2" }],
-            { shouldValidate: true, shouldDirty: true },
-          );
-          return;
-        }
         setDefaultRooms();
       })
       .catch(() => {
@@ -708,20 +703,40 @@ export default function AIEventCollectInfo({
                             value={field.value ?? []}
                             onChange={(ids) => {
                               field.onChange(ids);
-                              syncSelectedRoomsToForm(ids, vendorRooms);
+                              syncSelectedRoomsToForm(
+                                ids,
+                                vendorRoomsRef.current,
+                              );
+                            }}
+                            onRoomCreated={(room) => {
+                              const next = vendorRoomsRef.current.some(
+                                (entry) => entry.id === room.id,
+                              )
+                                ? vendorRoomsRef.current
+                                : [...vendorRoomsRef.current, room].slice(
+                                    0,
+                                    AI_EVENT_MAX_ROOMS,
+                                  );
+                              vendorRoomsRef.current = next;
+                              setVendorRooms(next);
                             }}
                             loading={roomsLoading}
                             disabled={roomsLoading}
                             minSelection={AI_EVENT_MIN_ROOMS}
                             maxSelection={AI_EVENT_MAX_ROOMS}
+                            allowCreate={
+                              vendorRooms.length < AI_EVENT_MAX_ROOMS
+                            }
                             placeholder={`Choose ${AI_EVENT_MIN_ROOMS}–${AI_EVENT_MAX_ROOMS} rooms`}
                           />
                         </FormControl>
                       )}
                       <FormDescription className="text-xs text-slate-500">
-                        Your venue has {AI_EVENT_MAX_ROOMS} rooms. Select which
-                        ones apply to this event — names are managed in Site
-                        Essentials.
+                        {vendorRooms.length >= AI_EVENT_MAX_ROOMS
+                          ? `Your venue has ${AI_EVENT_MAX_ROOMS} rooms. Select which ones apply to this event — names are managed in Site Essentials.`
+                          : vendorRooms.length >= AI_EVENT_MIN_ROOMS
+                            ? `Select your ${vendorRooms.length} venue rooms below. Use the add field to create a third room if needed (${AI_EVENT_MIN_ROOMS}–${AI_EVENT_MAX_ROOMS} total).`
+                            : `Select your venue room below, then add another using the field underneath (${AI_EVENT_MIN_ROOMS}–${AI_EVENT_MAX_ROOMS} total).`}
                       </FormDescription>
                       <FormMessage className="text-xs" />
                     </FormItem>

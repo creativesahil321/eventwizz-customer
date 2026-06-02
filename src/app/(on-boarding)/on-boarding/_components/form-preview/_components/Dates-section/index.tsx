@@ -41,6 +41,8 @@ type DatesSectionProps = {
   eventSlug?: string;
   eventName?: string;
   eventImage?: string;
+  /** Multi-room events: scope booking to the selected room. */
+  roomId?: number;
 };
 
 export default function DatesSection({
@@ -48,6 +50,7 @@ export default function DatesSection({
   eventSlug,
   eventName,
   eventImage,
+  roomId,
 }: DatesSectionProps) {
   const currencySymbol = useCurrencySymbol();
   const router = useRouter();
@@ -225,6 +228,7 @@ export default function DatesSection({
         const cartData: CartRequest = {
           slug: normalizeSlug(eventData.event_slug),
           event_date: eventData.event_date,
+          ...(roomId != null && roomId > 0 ? { room_id: roomId } : {}),
           // Initially empty - user will add items in checkout page
           drink_package: selectedDrinks.filter((drink) => drink.quantity > 0),
           tables: [],
