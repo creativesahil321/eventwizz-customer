@@ -43,6 +43,7 @@ export const API_ENDPOINTS = {
     ROOM_BY_ID: "/vendor/rooms/{room_id}",
     ONBOARDING: {
       STEPS: "/vendor/onboarding/store",
+      CHECK_BRAND_NAME: "/vendor/onboarding/check-brand-name",
       GET_ALL_STEPS: "/vendor/onboarding/steps/{location_id}/{is_rooms}",
       PAYMENT_GATEWAYS: "/vendor/onboarding/payment-gateway-connect",
       PAYMENT_RETURN: "/vendor/onboarding/return",
@@ -61,7 +62,7 @@ export const API_ENDPOINTS = {
     },
     EVENT: {
       GET_EVENTS: "/vendor/events",
-      GET_EVENT: "/vendor/events/show/{eventId}",
+      GET_EVENT: "/vendor/events/show/{eventId}/{is_rooms}",
       CREATE_EVENT: "/vendor/events/store",
       UPDATE_EVENT: "/vendor/events/update/{eventId}",
       DELETE_EVENT: "/vendor/events/delete/{eventId}",
@@ -73,6 +74,7 @@ export const API_ENDPOINTS = {
       BULK_DELETE: "/vendor/events/bulk-delete",
       GET_EVENT_OVERVIEW:
         "/vendor/events/{eventId}/overview?date_status={date_status}&date_filter={date_filter}",
+      CHECK_EVENT_NAME: "/vendor/events/check-name",
     },
     TABLE_ASSIGNMENTS: {
       LIST: "/vendor/table-assignments",

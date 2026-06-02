@@ -168,6 +168,12 @@ export interface ApiResponse<T = unknown> {
   errors: string[];
 }
 
+export interface RequestOptions extends AxiosRequestConfig {
+  returnFullResponse?: boolean;
+  /** Skip global error toasts — caller shows inline validation instead. */
+  suppressErrorToast?: boolean;
+}
+
 // Create axios instance with default config
 const apiClient: AxiosInstance = axios.create({
   baseURL: env.NEXT_PUBLIC_API_URL,
@@ -387,6 +393,14 @@ apiClient.interceptors.response.use(
       if (isUnauthorizedMessage) {
         handleUnauthorizedAccess(message, isSecurityViolation);
         return Promise.reject(response.data);
+      }
+
+      const suppressErrorToast = (
+        response.config as RequestOptions | undefined
+      )?.suppressErrorToast;
+
+      if (suppressErrorToast) {
+        return response;
       }
 
       // For other status:false responses, show error toast
@@ -619,10 +633,6 @@ apiClient.interceptors.response.use(
     return Promise.reject(error);
   }
 );
-
-interface RequestOptions extends AxiosRequestConfig {
-  returnFullResponse?: boolean;
-}
 
 // Generic request method with type safety
 export const request = async <T>(config: RequestOptions): Promise<T> => {

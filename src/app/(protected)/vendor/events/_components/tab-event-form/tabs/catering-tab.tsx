@@ -1,9 +1,32 @@
 "use client";
 
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+import React, {
+  useState,
+  useEffect,
+  useCallback,
+  useMemo,
+  useRef,
+} from "react";
 import { useForm, useFieldArray, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { eventsService } from "@/services/vendor/events/events.service";
+import {
+  eventsService,
+  type StepFourSavePayload,
+} from "@/services/vendor/events/events.service";
+import {
+  capEventRoomList,
+  normalizeVendorStepTwoRooms,
+} from "@/lib/event-form-limits";
+import {
+  cloneVendorStepFourRoomMenu,
+  findStepFourMenuForRoom,
+  isVendorRoomMenuStepComplete,
+  normalizeCateringOptionFlag,
+  normalizeVendorStepFourRooms,
+  roomEntryToStepFourFields,
+  stepFourFieldsToRoomEntry,
+  syncStepFourRoomsFromStepTwo,
+} from "@/app/(protected)/vendor/events/_lib/vendor-step-four-rooms";
 import { Button } from "@/components/ui/button";
 import { Form } from "@/components/ui/form";
 import { StepFourType, stepFourSchema } from "../schema";
@@ -20,12 +43,23 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Input } from "@/components/ui/input";
 import { X, PlusCircle } from "lucide-react";
 import { Label } from "@/components/ui/label";
-import { useEventMenuCategories } from "@/services/vendor/events/query";
+import {
+  eventKeys,
+  useEventMenuCategories,
+  type NormalizedMenuCategoryResponse,
+} from "@/services/vendor/events/query";
 import { EventMenuCategory } from "@/services/vendor/events/type";
+import { useQueryClient } from "@tanstack/react-query";
+import { dedupeMenuCategoriesById } from "@/lib/event-menu-categories";
 import MenuCategoryDropdown from "@/app/(on-boarding)/on-boarding/_components/steps/step-6/menu-category-dropdown";
 import { FileUploader } from "@/components/ui/file-uploader";
 import { addCacheBusting } from "@/lib/image-utils";
-import { RICH_DESCRIPTION_MAX_CHARS } from "@/lib/event-form-limits";
+import {
+  createDefaultMenuItemRow,
+  menuItemTitleLabel,
+  menuItemTitlePlaceholder,
+  RICH_DESCRIPTION_MAX_CHARS,
+} from "@/lib/event-form-limits";
 
 const MENU_TITLE_MAX = 40;
 const MENU_DESCRIPTION_MAX = RICH_DESCRIPTION_MAX_CHARS;
@@ -33,12 +67,13 @@ const MENU_ITEM_TITLE_MAX = 40;
 
 export default function CateringTab() {
   const [isLoading, setIsLoading] = useState(false);
-  const { form: globalForm, save, readOnly } = useEventFormContext();
+  const { form: globalForm, advanceStep, readOnly } = useEventFormContext();
   const [menuBackgroundImage, setMenuBackgroundImage] = useState<File[] | null>(
-    null
+    null,
   );
+  const previousRoomIndexRef = useRef<number | null>(null);
+  const lastHydratedRoomIndexRef = useRef<number | null>(null);
 
-  // Get event_id from global form
   const getEventId = (): number => {
     const stepOne = globalForm.getValues().stepOne;
     return typeof stepOne === "object" && "event_id" in stepOne
@@ -46,22 +81,63 @@ export default function CateringTab() {
       : 0;
   };
 
-  // Initialize form with combined step data
-  const stepFourDefaults = globalForm.getValues().stepFour;
-  const eventId = getEventId();
+  const isRoomsEnabled = globalForm.watch("stepTwo.is_rooms") === 1;
+  const activeRoomIndex = globalForm.watch("stepTwo.active_room_index") ?? 0;
+  const stepTwoRooms = capEventRoomList(
+    normalizeVendorStepTwoRooms(globalForm.getValues().stepTwo?.rooms),
+  );
+  const resolvedRoomIndex =
+    stepTwoRooms.length > 0
+      ? Math.min(
+          Math.max(activeRoomIndex, 0),
+          Math.max(stepTwoRooms.length - 1, 0),
+        )
+      : 0;
+  const activeRoomId = Number(stepTwoRooms[resolvedRoomIndex]?.room_id) || 0;
+  const activeRoomIdForCategories = useMemo(() => {
+    if (!isRoomsEnabled) return undefined;
+    const id = Number(stepTwoRooms[resolvedRoomIndex]?.room_id);
+    return Number.isFinite(id) && id > 0 ? id : undefined;
+  }, [isRoomsEnabled, stepTwoRooms, resolvedRoomIndex]);
 
-  // Setup form with the new schema structure
-  const form = useForm<StepFourType>({
-    resolver: zodResolver(stepFourSchema),
-    defaultValues: {
-      step: 4,
-      event_id: eventId,
+  const queryClient = useQueryClient();
+
+  const resolveInitialMenuFields = () => {
+    const stepFourDefaults = globalForm.getValues().stepFour;
+    if (isRoomsEnabled && activeRoomId > 0) {
+      const syncedRooms = syncStepFourRoomsFromStepTwo(
+        stepTwoRooms,
+        normalizeVendorStepFourRooms(stepFourDefaults?.rooms),
+      );
+      return roomEntryToStepFourFields(
+        findStepFourMenuForRoom(syncedRooms, activeRoomId),
+      );
+    }
+    return {
       catering_option: stepFourDefaults?.catering_option || 0,
       menu_title: stepFourDefaults?.menu_title || "",
       menu_description: stepFourDefaults?.menu_description || "",
       event_menu_category_id: stepFourDefaults?.event_menu_category_id || 0,
       menus: stepFourDefaults?.menus || [],
       menu_background_image: stepFourDefaults?.menu_background_image || null,
+    };
+  };
+
+  const initialMenu = resolveInitialMenuFields();
+  const stepFourDefaults = globalForm.getValues().stepFour;
+  const eventId = getEventId();
+
+  const form = useForm<StepFourType>({
+    resolver: zodResolver(stepFourSchema),
+    defaultValues: {
+      step: 4,
+      event_id: eventId,
+      is_rooms: isRoomsEnabled ? 1 : 0,
+      ...initialMenu,
+      rooms: syncStepFourRoomsFromStepTwo(
+        stepTwoRooms,
+        normalizeVendorStepFourRooms(stepFourDefaults?.rooms),
+      ),
     } as StepFourType,
     mode: "onChange",
   });
@@ -71,37 +147,118 @@ export default function CateringTab() {
     form.setValue("event_id", eventId);
   }, [eventId, form]);
 
-  const { control, watch, setValue } = form;
-  const [showMenuSection, setShowMenuSection] = useState(false);
+  const { control, watch, setValue, getValues, reset, trigger } = form;
+
+  const persistActiveRoomMenuToGlobal = useCallback(
+    (roomIndex: number, data: StepFourType) => {
+      if (!isRoomsEnabled || stepTwoRooms.length === 0) return;
+      const existing = syncStepFourRoomsFromStepTwo(
+        stepTwoRooms,
+        normalizeVendorStepFourRooms(globalForm.getValues().stepFour?.rooms),
+      );
+      const roomId = Number(stepTwoRooms[roomIndex]?.room_id);
+      if (!roomId) return;
+      const snapshot = stepFourFieldsToRoomEntry(roomId, data);
+      const nextRooms = existing.map((entry) =>
+        entry.room_id === roomId ? snapshot : entry,
+      );
+      globalForm.setValue("stepFour.rooms", nextRooms, {
+        shouldDirty: true,
+        shouldValidate: false,
+      });
+    },
+    [globalForm, isRoomsEnabled, stepTwoRooms],
+  );
+
+  useEffect(() => {
+    if (!isRoomsEnabled || stepTwoRooms.length === 0) {
+      previousRoomIndexRef.current = null;
+      lastHydratedRoomIndexRef.current = null;
+      return;
+    }
+
+    const prevIndex = previousRoomIndexRef.current;
+    if (
+      prevIndex !== null &&
+      prevIndex >= 0 &&
+      prevIndex < stepTwoRooms.length &&
+      prevIndex !== resolvedRoomIndex
+    ) {
+      persistActiveRoomMenuToGlobal(prevIndex, getValues());
+    }
+
+    const shouldHydrate =
+      lastHydratedRoomIndexRef.current === null ||
+      lastHydratedRoomIndexRef.current !== resolvedRoomIndex;
+
+    if (shouldHydrate) {
+      const syncedRooms = syncStepFourRoomsFromStepTwo(
+        stepTwoRooms,
+        normalizeVendorStepFourRooms(globalForm.getValues().stepFour?.rooms),
+      );
+      const incoming = findStepFourMenuForRoom(
+        syncedRooms,
+        Number(stepTwoRooms[resolvedRoomIndex]?.room_id),
+      );
+      const fields = roomEntryToStepFourFields(incoming);
+      const bg =
+        fields.menu_background_image instanceof File
+          ? [fields.menu_background_image]
+          : null;
+      setMenuBackgroundImage(bg);
+      reset({
+        ...getValues(),
+        is_rooms: 1,
+        ...fields,
+        rooms: syncedRooms,
+      });
+      lastHydratedRoomIndexRef.current = resolvedRoomIndex;
+    }
+
+    previousRoomIndexRef.current = resolvedRoomIndex;
+  }, [
+    getValues,
+    globalForm,
+    isRoomsEnabled,
+    persistActiveRoomMenuToGlobal,
+    reset,
+    resolvedRoomIndex,
+    stepTwoRooms,
+  ]);
+
+  const canApplyToAllRooms = useMemo(() => {
+    if (!isRoomsEnabled || stepTwoRooms.length < 2) return false;
+    return true;
+  }, [isRoomsEnabled, stepTwoRooms.length]);
   const [localMenuCategories, setLocalMenuCategories] = useState<
     EventMenuCategory[]
   >([]);
 
   // Fetch menu categories from API
-  const {
-    data: menuCategoriesResponse,
-    isLoading: isMenuCategoriesLoading,
-    refetch: refetchMenuCategories,
-  } = useEventMenuCategories();
+  const { data: menuCategoriesResponse, isLoading: isMenuCategoriesLoading } =
+    useEventMenuCategories({
+      eventId,
+      roomId: activeRoomIdForCategories,
+    });
 
-  // Extract menu categories from response
   const eventMenuCategories = useMemo(
     () => menuCategoriesResponse?.data || [],
-    [menuCategoriesResponse?.data]
+    [menuCategoriesResponse],
   );
 
-  // Update local state when API data changes
   useEffect(() => {
     if (eventMenuCategories.length > 0) {
-      setLocalMenuCategories(eventMenuCategories);
+      setLocalMenuCategories(dedupeMenuCategoriesById(eventMenuCategories));
+      return;
     }
-  }, [eventMenuCategories]);
+    if (isRoomsEnabled) {
+      setLocalMenuCategories([]);
+    }
+  }, [eventMenuCategories, isRoomsEnabled, activeRoomIdForCategories]);
 
-  // Set showMenuSection based on catering_option value
+  // Keep menu details visibility in sync with catering_option (room switches, API hydrate).
   const cateringOption = watch("catering_option");
-  useEffect(() => {
-    setShowMenuSection(cateringOption === 1);
-  }, [cateringOption]);
+  const showMenuSection = normalizeCateringOptionFlag(cateringOption) === 1;
 
   // Clamp menu copy loaded from API (controlled inputs can show values longer than maxLength until edited).
   useEffect(() => {
@@ -113,7 +270,7 @@ export default function CateringTab() {
     if (rawMenuDesc.length > MENU_DESCRIPTION_MAX) {
       form.setValue(
         "menu_description",
-        rawMenuDesc.slice(0, MENU_DESCRIPTION_MAX)
+        rawMenuDesc.slice(0, MENU_DESCRIPTION_MAX),
       );
     }
     const menus = form.getValues("menus");
@@ -130,8 +287,8 @@ export default function CateringTab() {
       m.items.some(
         (it, ii) =>
           it.title !== next[mi].items[ii].title ||
-          it.description !== next[mi].items[ii].description
-      )
+          it.description !== next[mi].items[ii].description,
+      ),
     );
     if (changed) {
       form.setValue("menus", next);
@@ -154,7 +311,7 @@ export default function CateringTab() {
       // Remove from local form
       removeMenuField(menuIndex);
     },
-    [removeMenuField]
+    [removeMenuField],
   );
 
   const appendItem = useCallback(
@@ -167,11 +324,14 @@ export default function CateringTab() {
         return;
       }
 
-      const newItems = [...currentItems, { title: "", description: "" }];
+      const newItems = [
+        ...currentItems,
+        createDefaultMenuItemRow(currentItems.length),
+      ];
 
       setValue(`menus.${menuIndex}.items`, newItems);
     },
-    [watch, setValue]
+    [watch, setValue],
   );
 
   const handleRemoveItem = useCallback(
@@ -179,35 +339,45 @@ export default function CateringTab() {
       const currentItems = watch(`menus.${menuIndex}.items`);
       if (currentItems && currentItems.length > 1) {
         const newItems = currentItems.filter(
-          (_: unknown, index: number) => index !== itemIndex
+          (_: unknown, index: number) => index !== itemIndex,
         );
         setValue(`menus.${menuIndex}.items`, newItems);
       } else {
         removeMenu(menuIndex);
       }
     },
-    [watch, setValue, removeMenu]
+    [watch, setValue, removeMenu],
   );
 
   // Function to create a new menu entry
   const createMenuEntry = useCallback(
     (categoryName: string) => {
-      // Check if we've reached the maximum limit of 4 menu categories
-      if (menuFields.length >= 4) {
+      const normalizedCategoryName = categoryName.trim().toLowerCase();
+      const currentMenus = getValues("menus") || [];
+      const alreadyExists = currentMenus.some(
+        (menu) =>
+          String(menu?.name ?? "")
+            .trim()
+            .toLowerCase() === normalizedCategoryName,
+      );
+      if (alreadyExists) {
         return null;
       }
 
-      // Create a new menu entry for this category
+      if (currentMenus.length >= 4) {
+        toast.error("Maximum of 4 menu categories allowed");
+        return null;
+      }
+
       const newMenu = {
         name: categoryName,
-        items: [{ title: "", description: "" }],
+        items: [createDefaultMenuItemRow(0)],
       };
 
-      // Add to local form
       appendMenu(newMenu);
       return newMenu;
     },
-    [menuFields.length, appendMenu]
+    [appendMenu, getValues],
   );
 
   // Auto-create menu entry when category is already selected on load
@@ -227,14 +397,16 @@ export default function CateringTab() {
       showMenuSection
     ) {
       const selectedCategory = localMenuCategories.find(
-        (cat) => cat.id === Number(categoryId)
+        (cat) => cat.id === Number(categoryId),
       );
 
       if (selectedCategory) {
-        const existingMenuIndex = menuFields.findIndex((field, index) => {
-          const menuName = watch(`menus.${index}.name`);
-          return menuName === selectedCategory.name;
-        });
+        const existingMenuIndex = (getValues("menus") || []).findIndex(
+          (menu) =>
+            String(menu?.name ?? "")
+              .trim()
+              .toLowerCase() === selectedCategory.name.trim().toLowerCase(),
+        );
 
         if (existingMenuIndex === -1) {
           createMenuEntry(selectedCategory.name);
@@ -244,119 +416,249 @@ export default function CateringTab() {
   }, [
     form,
     localMenuCategories,
-    menuFields,
+    menuFields.length,
     showMenuSection,
     createMenuEntry,
-    watch,
+    getValues,
   ]);
 
-  // Function to handle refreshing menu categories after creating a new one
   const handleMenuCategoryCreated = useCallback(
     (newCategory?: { id: number; name: string }) => {
-      // If we have the new category details, add it to local state immediately
-      if (newCategory) {
-        setLocalMenuCategories((prev) => [...prev, newCategory]);
+      if (!newCategory) return;
 
-        // Auto-select the new category
-        setValue("event_menu_category_id", newCategory.id);
+      const category: EventMenuCategory = {
+        id: newCategory.id,
+        name: newCategory.name,
+      };
 
-        // Create a menu entry for this category
-        const existingMenuIndex = menuFields.findIndex((field, index) => {
-          const menuName = watch(`menus.${index}.name`);
-          return menuName === newCategory.name;
-        });
+      queryClient.setQueryData<NormalizedMenuCategoryResponse>(
+        eventKeys.menuCategories(eventId, activeRoomIdForCategories),
+        (previous) => {
+          const existing = previous?.data ?? [];
+          if (existing.some((cat) => Number(cat.id) === Number(category.id))) {
+            return (
+              previous ?? {
+                status: true,
+                message: "Success",
+                data: existing,
+                errors: [],
+              }
+            );
+          }
+          return {
+            status: true,
+            message: "Success",
+            data: [...existing, category],
+            errors: [],
+          };
+        },
+      );
 
-        if (existingMenuIndex === -1) {
-          createMenuEntry(newCategory.name);
+      setLocalMenuCategories((prev) => {
+        if (prev.some((cat) => Number(cat.id) === Number(category.id))) {
+          return prev;
         }
-      }
-
-      // Also refresh from API to ensure we have latest data
-      refetchMenuCategories().then(() => {
-        console.log("Categories refreshed from API:", eventMenuCategories);
+        return [...prev, category];
       });
+
+      setValue("event_menu_category_id", newCategory.id);
+
+      const existingMenuIndex = (getValues("menus") || []).findIndex(
+        (menu) =>
+          String(menu?.name ?? "")
+            .trim()
+            .toLowerCase() === newCategory.name.trim().toLowerCase(),
+      );
+
+      if (existingMenuIndex === -1) {
+        createMenuEntry(newCategory.name);
+      }
     },
     [
-      refetchMenuCategories,
-      setValue,
-      menuFields,
-      watch,
+      activeRoomIdForCategories,
       createMenuEntry,
-      eventMenuCategories,
-    ]
+      eventId,
+      getValues,
+      queryClient,
+      setValue,
+    ],
   );
 
-  // Handle form submission
+  const focusFirstMenuValidationError = useCallback(() => {
+    const errors = form.formState.errors;
+    const messages: string[] = [];
+    const walk = (node: unknown, prefix: string) => {
+      if (!node || typeof node !== "object") return;
+      const err = node as { message?: string; [key: string]: unknown };
+      if (typeof err.message === "string" && err.message.trim()) {
+        messages.push(err.message);
+      }
+      for (const [key, value] of Object.entries(err)) {
+        if (key === "message" || key === "type" || key === "ref") continue;
+        walk(value, prefix ? `${prefix}.${key}` : key);
+      }
+    };
+    walk(errors, "");
+    if (messages.length > 0) {
+      toast.error(messages.slice(0, 3).join("; "));
+    } else {
+      toast.error("Please complete all required menu fields for this room.");
+    }
+
+    const firstKey = Object.keys(errors)[0];
+    if (firstKey) {
+      const errorElement = document.querySelector(`[name="${firstKey}"]`);
+      if (errorElement) {
+        (errorElement as HTMLElement).focus();
+        errorElement.scrollIntoView({ behavior: "smooth", block: "center" });
+      }
+    }
+  }, [form.formState.errors]);
+
   const handleSubmit = useCallback(
-    async (data: StepFourType) => {
+    async (data: StepFourType, options?: { applyToAllRooms?: boolean }) => {
+      const applyToAllRooms = options?.applyToAllRooms === true;
       setIsLoading(true);
 
       try {
-        // Manually re-trigger validation on all fields to force error display
-        const isValid = await form.trigger();
+        const roomsEnabled = globalForm.getValues().stepTwo?.is_rooms === 1;
+        const stepTwoRoomsForSave = capEventRoomList(
+          normalizeVendorStepTwoRooms(globalForm.getValues().stepTwo?.rooms),
+        );
 
-        // If form is not valid, only highlight fields - no toast
-        if (!isValid) {
-          // Get all validation errors
-          const errors = form.formState.errors;
-          const errorFields = Object.keys(errors);
+        let cleanedData: StepFourSavePayload;
+        let mergedRoomsGlobal = syncStepFourRoomsFromStepTwo(
+          stepTwoRoomsForSave,
+          normalizeVendorStepFourRooms(globalForm.getValues().stepFour?.rooms),
+        );
 
-          // Find the first error field and scroll to it
-          if (errorFields.length > 0) {
-            // Try to find and focus the field with an error
-            const errorElement = document.querySelector(
-              `[name="${errorFields[0]}"]`
+        if (roomsEnabled && stepTwoRoomsForSave.length > 0) {
+          persistActiveRoomMenuToGlobal(resolvedRoomIndex, data);
+          const activeSnapshot = stepFourFieldsToRoomEntry(
+            Number(stepTwoRoomsForSave[resolvedRoomIndex]?.room_id),
+            data,
+          );
+          const menuClone = cloneVendorStepFourRoomMenu(activeSnapshot);
+
+          mergedRoomsGlobal = syncStepFourRoomsFromStepTwo(
+            stepTwoRoomsForSave,
+            normalizeVendorStepFourRooms(
+              globalForm.getValues().stepFour?.rooms,
+            ),
+          ).map((entry, roomIndex) =>
+            applyToAllRooms || roomIndex === resolvedRoomIndex
+              ? { ...entry, ...menuClone, room_id: entry.room_id }
+              : entry,
+          );
+
+          const activeRoomIdForSave = Number(
+            stepTwoRoomsForSave[resolvedRoomIndex]?.room_id,
+          );
+          const roomsForApi = applyToAllRooms
+            ? mergedRoomsGlobal
+            : mergedRoomsGlobal.filter(
+                (entry) => entry.room_id === activeRoomIdForSave,
+              );
+
+          cleanedData = {
+            step: 4,
+            event_id: data.event_id,
+            is_rooms: 1,
+            rooms: roomsForApi,
+            catering_option: data.catering_option,
+            menu_title: data.menu_title,
+            menu_description: data.menu_description,
+            event_menu_category_id: data.event_menu_category_id,
+            menus: data.menus,
+            menu_background_image: data.menu_background_image,
+          };
+        } else {
+          const { rooms: _rooms, ...flatMenu } = data;
+          cleanedData = {
+            ...flatMenu,
+            is_rooms: 0,
+            event_menu_category_id: data.event_menu_category_id || 0,
+          };
+        }
+
+        globalForm.setValue("stepFour", {
+          ...globalForm.getValues().stepFour,
+          ...cleanedData,
+          ...(cleanedData.is_rooms === 1
+            ? {
+                rooms: mergedRoomsGlobal,
+                ...roomEntryToStepFourFields(
+                  findStepFourMenuForRoom(
+                    mergedRoomsGlobal,
+                    Number(stepTwoRoomsForSave[resolvedRoomIndex]?.room_id),
+                  ),
+                ),
+              }
+            : {}),
+        } as StepFourType);
+
+        const response = await eventsService.storeStepFourData(cleanedData);
+
+        if (response && response.status) {
+          if (
+            roomsEnabled &&
+            stepTwoRoomsForSave.length > 0 &&
+            !applyToAllRooms
+          ) {
+            const nextIncompleteIndex = stepTwoRoomsForSave.findIndex(
+              (room, index) =>
+                index !== resolvedRoomIndex &&
+                !isVendorRoomMenuStepComplete(
+                  findStepFourMenuForRoom(
+                    mergedRoomsGlobal,
+                    Number(room.room_id),
+                  ),
+                ),
             );
-            if (errorElement) {
-              (errorElement as HTMLElement).focus();
-              errorElement.scrollIntoView({
-                behavior: "smooth",
-                block: "center",
-              });
+            if (nextIncompleteIndex !== -1) {
+              globalForm.setValue(
+                "stepTwo.active_room_index",
+                nextIncompleteIndex,
+                { shouldDirty: false, shouldTouch: false },
+              );
+              return;
             }
           }
 
-          setIsLoading(false);
-          return;
-        }
-
-        // Update global form with all fields
-        const formData = {
-          ...globalForm.getValues().stepFour,
-          ...data,
-          event_menu_category_id: data.event_menu_category_id || 0,
-        };
-        globalForm.setValue("stepFour", formData as StepFourType);
-
-        // Call the API directly using eventsService
-        const response = await eventsService.storeStepFourData(data);
-
-        if (response && response.status) {
-          // Success message is handled by axios interceptor
-          // Move to the next step
-          await save();
-        } else {
-          const errorMessage =
-            response?.message ||
-            "Failed to save catering details. Please try again.";
-          toast.error("Error saving catering details", {
-            description: errorMessage,
-          });
+          await advanceStep(4);
         }
       } catch (error) {
         console.error("Error saving catering details:", error);
-        toast.error("Failed to save catering details");
       } finally {
         setIsLoading(false);
       }
     },
-    [form, globalForm, save]
+    [globalForm, persistActiveRoomMenuToGlobal, resolvedRoomIndex, advanceStep],
+  );
+
+  const attemptSubmit = useCallback(
+    async (applyToAllRooms: boolean) => {
+      const isValid = await form.trigger();
+      if (!isValid) {
+        focusFirstMenuValidationError();
+        return;
+      }
+      await handleSubmit(getValues(), { applyToAllRooms });
+    },
+    [focusFirstMenuValidationError, form, getValues, handleSubmit],
   );
 
   return (
     <div className="space-y-8">
       <Form {...form}>
-        <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-8">
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            void attemptSubmit(false);
+          }}
+          className="space-y-8"
+          noValidate
+        >
           {/* Menu Options Section */}
           <div className="space-y-4">
             <h2 className="text-xl font-bold title-header">Menu Options</h2>
@@ -377,13 +679,12 @@ export default function CateringTab() {
                       onValueChange={(value) => {
                         const numValue = Number(value);
                         field.onChange(numValue);
-                        setShowMenuSection(numValue === 1);
                         if (numValue === 0) {
                           setValue("menus", []);
                           globalForm.setValue("stepFour.menus", []);
                         }
                       }}
-                      defaultValue={String(field.value)}
+                      value={String(field.value ?? 0)}
                       className="flex mt-4 space-x-6"
                     >
                       <FormItem className="flex items-center space-x-3 space-y-0">
@@ -439,7 +740,7 @@ export default function CateringTab() {
                               value={v}
                               onChange={(e) =>
                                 field.onChange(
-                                  e.target.value.slice(0, MENU_TITLE_MAX)
+                                  e.target.value.slice(0, MENU_TITLE_MAX),
                                 )
                               }
                             />
@@ -473,7 +774,7 @@ export default function CateringTab() {
                               value={v}
                               onChange={(e) =>
                                 field.onChange(
-                                  e.target.value.slice(0, MENU_DESCRIPTION_MAX)
+                                  e.target.value.slice(0, MENU_DESCRIPTION_MAX),
                                 )
                               }
                             />
@@ -505,15 +806,18 @@ export default function CateringTab() {
 
                             // Add the selected category to the menu items if it doesn't exist
                             const selectedCategory = localMenuCategories.find(
-                              (cat) => cat.id === Number(value)
+                              (cat) => cat.id === Number(value),
                             );
 
                             if (selectedCategory) {
-                              const existingMenuIndex = menuFields.findIndex(
-                                (field, index) => {
-                                  const menuName = watch(`menus.${index}.name`);
-                                  return menuName === selectedCategory.name;
-                                }
+                              const existingMenuIndex = (
+                                getValues("menus") || []
+                              ).findIndex(
+                                (menu) =>
+                                  String(menu?.name ?? "")
+                                    .trim()
+                                    .toLowerCase() ===
+                                  selectedCategory.name.trim().toLowerCase(),
                               );
 
                               if (existingMenuIndex === -1) {
@@ -522,10 +826,15 @@ export default function CateringTab() {
                             }
                           }}
                           isLoading={isMenuCategoriesLoading}
-                          initialValue={field.value}
+                          initialValue={
+                            typeof field.value === "number"
+                              ? field.value
+                              : undefined
+                          }
                           onCategoryCreated={handleMenuCategoryCreated}
                           disabled={menuFields.length >= 4}
                           eventId={eventId}
+                          roomId={activeRoomIdForCategories}
                         />
                       </FormControl>
                     )}
@@ -591,12 +900,14 @@ export default function CateringTab() {
                                     return (
                                       <FormItem>
                                         <FormLabel className="text-sm font-medium">
-                                          Item Title
+                                          {menuItemTitleLabel(itemIndex)}
                                         </FormLabel>
                                         <FormControl>
                                           <Input
                                             {...field}
-                                            placeholder="e.g., Chicken Curry"
+                                            placeholder={menuItemTitlePlaceholder(
+                                              itemIndex,
+                                            )}
                                             className="h-10 bg-[#F9FAFB] border-[#E5E7EB]"
                                             maxLength={MENU_ITEM_TITLE_MAX}
                                             value={v}
@@ -604,8 +915,8 @@ export default function CateringTab() {
                                               field.onChange(
                                                 e.target.value.slice(
                                                   0,
-                                                  MENU_ITEM_TITLE_MAX
-                                                )
+                                                  MENU_ITEM_TITLE_MAX,
+                                                ),
                                               )
                                             }
                                           />
@@ -640,8 +951,8 @@ export default function CateringTab() {
                                               field.onChange(
                                                 e.target.value.slice(
                                                   0,
-                                                  MENU_DESCRIPTION_MAX
-                                                )
+                                                  MENU_DESCRIPTION_MAX,
+                                                ),
                                               )
                                             }
                                           />
@@ -656,7 +967,7 @@ export default function CateringTab() {
                                   }}
                                 />
                               </div>
-                            )
+                            ),
                           )}
                           <Button
                             type="button"
@@ -706,7 +1017,7 @@ export default function CateringTab() {
                               setMenuBackgroundImage(null);
                               globalForm.setValue(
                                 "stepFour.menu_background_image",
-                                null
+                                null,
                               );
                             }}
                             className="mt-2"
@@ -723,7 +1034,7 @@ export default function CateringTab() {
                               field.onChange(files[0]);
                               globalForm.setValue(
                                 "stepFour.menu_background_image",
-                                files[0]
+                                files[0],
                               );
                             }
                           }}
@@ -734,7 +1045,7 @@ export default function CateringTab() {
                             setMenuBackgroundImage(null);
                             globalForm.setValue(
                               "stepFour.menu_background_image",
-                              null
+                              null,
                             );
                           }}
                           accept={{
@@ -751,9 +1062,34 @@ export default function CateringTab() {
               />
             </div>
           )}
-          <div className="flex justify-end gap-4 pt-4">
-            <Button type="submit" disabled={isLoading || readOnly} variant="event-primary">
-              {readOnly ? "View only" : isLoading ? "Saving..." : "Save & Next"}
+          <div className="flex flex-col sm:flex-row justify-end gap-2 sm:gap-3 pt-4">
+            {canApplyToAllRooms && (
+              <Button
+                type="button"
+                variant="outline"
+                disabled={isLoading || readOnly}
+                className="w-full sm:w-auto"
+                onClick={() => void attemptSubmit(true)}
+              >
+                {isLoading ? "Saving..." : "Apply to all rooms"}
+              </Button>
+            )}
+            <Button
+              type={isRoomsEnabled ? "button" : "submit"}
+              disabled={isLoading || readOnly}
+              variant="event-primary"
+              className="w-full sm:w-auto"
+              onClick={
+                isRoomsEnabled ? () => void attemptSubmit(false) : undefined
+              }
+            >
+              {readOnly
+                ? "View only"
+                : isLoading
+                  ? "Saving..."
+                  : isRoomsEnabled
+                    ? "Apply to this room only"
+                    : "Save & Next"}
             </Button>
           </div>
         </form>

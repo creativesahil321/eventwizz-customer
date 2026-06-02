@@ -16,6 +16,8 @@ export const env = createEnv({
     GOOGLE_CLIENT_SECRET: z.string().min(1),
     FACEBOOK_CLIENT_ID: z.string().min(1),
     FACEBOOK_CLIENT_SECRET: z.string().min(1),
+    /** Optional remove.bg API key for AI logo background removal */
+    REMOVE_BG_API_KEY: z.string().optional(),
   },
 
   /**
@@ -50,6 +52,7 @@ export const env = createEnv({
     GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET ?? "",
     FACEBOOK_CLIENT_ID: process.env.FACEBOOK_CLIENT_ID ?? "",
     FACEBOOK_CLIENT_SECRET: process.env.FACEBOOK_CLIENT_SECRET ?? "",
+    REMOVE_BG_API_KEY: process.env.REMOVE_BG_API_KEY,
     // Client
     NEXT_PUBLIC_NODE_ENV: process.env.NODE_ENV ?? "development", // copy of NODE_ENV
     NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL ?? "",

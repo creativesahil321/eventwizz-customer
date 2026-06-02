@@ -7,6 +7,57 @@ import { Area } from "react-easy-crop";
 import imageCompression from "browser-image-compression";
 import { CroppedImage, CropperConfig, DEFAULT_CROPPER_CONFIG } from "./types";
 
+/** Cap pixels for the crop UI — ~1.5× output size, max 1920px (onboarding-fast path). */
+export function resolveCropPreviewMaxDimension(config: CropperConfig): number {
+  const w = config.maxWidth ?? DEFAULT_CROPPER_CONFIG.maxWidth;
+  const h = config.maxHeight ?? DEFAULT_CROPPER_CONFIG.maxHeight;
+  return Math.min(Math.round(Math.max(w, h, 960) * 1.5), 1920);
+}
+
+/**
+ * Downscale very large sources before react-easy-crop so canvas crop + compress stay fast.
+ */
+export async function createDownscaledPreviewUrl(
+  file: File,
+  maxDimension: number,
+): Promise<{ url: string; revoke: () => void }> {
+  const objectUrl = URL.createObjectURL(file);
+  try {
+    const image = await createImage(objectUrl);
+    const longest = Math.max(image.naturalWidth, image.naturalHeight);
+    if (longest <= maxDimension) {
+      return { url: objectUrl, revoke: () => URL.revokeObjectURL(objectUrl) };
+    }
+
+    const scale = maxDimension / longest;
+    const width = Math.round(image.naturalWidth * scale);
+    const height = Math.round(image.naturalHeight * scale);
+    const canvas = document.createElement("canvas");
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) {
+      throw new Error("Failed to get canvas context");
+    }
+    ctx.drawImage(image, 0, 0, width, height);
+    URL.revokeObjectURL(objectUrl);
+
+    const blob = await new Promise<Blob>((resolve, reject) => {
+      canvas.toBlob(
+        (result) =>
+          result ? resolve(result) : reject(new Error("Canvas is empty")),
+        "image/jpeg",
+        0.92,
+      );
+    });
+    const url = URL.createObjectURL(blob);
+    return { url, revoke: () => URL.revokeObjectURL(url) };
+  } catch (error) {
+    URL.revokeObjectURL(objectUrl);
+    throw error;
+  }
+}
+
 /**
  * Creates a HTMLImageElement from a file or URL
  */
@@ -113,28 +164,49 @@ export async function getCroppedImg(
         });
       },
       "image/jpeg",
-      0.95
+      0.88
     );
   });
 }
 
-/**
- * Resize image to fit within max dimensions while maintaining aspect ratio
- */
-function resizeImage(
-  canvas: HTMLCanvasElement,
+/** Shrink crop output before library compression (fewer pixels = faster). */
+async function resizeBlobToFit(
+  blob: Blob,
+  width: number,
+  height: number,
   maxWidth: number,
-  maxHeight: number
-): { width: number; height: number } {
-  let { width, height } = canvas;
-
-  if (width > maxWidth || height > maxHeight) {
-    const ratio = Math.min(maxWidth / width, maxHeight / height);
-    width = Math.floor(width * ratio);
-    height = Math.floor(height * ratio);
+  maxHeight: number,
+): Promise<{ blob: Blob; width: number; height: number }> {
+  if (width <= maxWidth && height <= maxHeight) {
+    return { blob, width, height };
   }
 
-  return { width, height };
+  const ratio = Math.min(maxWidth / width, maxHeight / height);
+  const nextWidth = Math.max(1, Math.floor(width * ratio));
+  const nextHeight = Math.max(1, Math.floor(height * ratio));
+
+  const bitmap = await createImageBitmap(blob);
+  try {
+    const canvas = document.createElement("canvas");
+    canvas.width = nextWidth;
+    canvas.height = nextHeight;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) {
+      return { blob, width, height };
+    }
+    ctx.drawImage(bitmap, 0, 0, nextWidth, nextHeight);
+    const resized = await new Promise<Blob>((resolve, reject) => {
+      canvas.toBlob(
+        (result) =>
+          result ? resolve(result) : reject(new Error("Canvas is empty")),
+        "image/jpeg",
+        0.88,
+      );
+    });
+    return { blob: resized, width: nextWidth, height: nextHeight };
+  } finally {
+    bitmap.close();
+  }
 }
 
 /**
@@ -145,22 +217,31 @@ async function compressImageBlob(
   originalFilename: string,
   config: CropperConfig
 ): Promise<File> {
+  const maxWidth = config.maxWidth || DEFAULT_CROPPER_CONFIG.maxWidth;
+  const maxHeight = config.maxHeight || DEFAULT_CROPPER_CONFIG.maxHeight;
+  const targetBytes =
+    (config.maxSizeKB || DEFAULT_CROPPER_CONFIG.maxSizeKB) * 1024;
+
+  if (blob.size <= targetBytes) {
+    return new File([blob], originalFilename, {
+      type: blob.type || "image/jpeg",
+      lastModified: Date.now(),
+    });
+  }
+
   const options = {
-    maxSizeMB: (config.maxSizeKB || DEFAULT_CROPPER_CONFIG.maxSizeKB) / 1024, // Convert KB to MB
-    maxWidthOrHeight:
-      config.maxWidth || config.maxHeight || DEFAULT_CROPPER_CONFIG.maxWidth,
+    maxSizeMB: targetBytes / (1024 * 1024),
+    maxWidthOrHeight: Math.max(maxWidth, maxHeight),
     useWebWorker: true,
     initialQuality: config.quality || DEFAULT_CROPPER_CONFIG.quality,
   };
 
   try {
-    // Convert blob to file for compression
     const file = new File([blob], originalFilename, {
       type: blob.type,
       lastModified: Date.now(),
     });
 
-    // Compress
     const compressedFile = await imageCompression(file, options);
 
     // ENSURE we return a proper File object (not a Blob)
@@ -173,7 +254,6 @@ async function compressImageBlob(
       });
     }
 
-    console.log("✅ Compression successful, returning File:", compressedFile);
     return compressedFile;
   } catch (error) {
     console.error("Compression error:", error);
@@ -199,25 +279,22 @@ export async function getCroppedAndCompressedImage(
   // Merge with default config
   const mergedConfig = { ...DEFAULT_CROPPER_CONFIG, ...config };
 
-  // Step 1: Crop the image
-  const { blob, url, width, height } = await getCroppedImg(
+  const maxWidth = mergedConfig.maxWidth ?? DEFAULT_CROPPER_CONFIG.maxWidth;
+  const maxHeight = mergedConfig.maxHeight ?? DEFAULT_CROPPER_CONFIG.maxHeight;
+
+  const { blob: croppedBlob, url, width, height } = await getCroppedImg(
     imageSrc,
     croppedAreaPixels,
-    rotation
+    rotation,
   );
 
-  // Step 2: Resize if needed (already handled by getCroppedImg, but we could add additional logic here)
-  const dimensions = resizeImage(
-    document.createElement("canvas"),
-    mergedConfig.maxWidth,
-    mergedConfig.maxHeight
-  );
+  const { blob: sizedBlob, width: outWidth, height: outHeight } =
+    await resizeBlobToFit(croppedBlob, width, height, maxWidth, maxHeight);
 
-  // Step 3: Compress the cropped image
   const compressedFile = await compressImageBlob(
-    blob,
+    sizedBlob,
     originalFile.name,
-    mergedConfig
+    mergedConfig,
   );
 
   // Calculate compression ratio
@@ -231,8 +308,8 @@ export async function getCroppedAndCompressedImage(
     originalSize,
     croppedSize,
     compressionRatio,
-    width: dimensions.width || width,
-    height: dimensions.height || height,
+    width: outWidth,
+    height: outHeight,
   };
 }
 

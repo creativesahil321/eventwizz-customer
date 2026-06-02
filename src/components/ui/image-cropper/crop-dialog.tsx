@@ -24,9 +24,11 @@ import {
 } from "lucide-react";
 import { ImageCropperProps, CropState, DEFAULT_CROPPER_CONFIG } from "./types";
 import {
+  createDownscaledPreviewUrl,
   getCroppedAndCompressedImage,
   formatFileSize,
   formatCompressionRatio,
+  resolveCropPreviewMaxDimension,
 } from "./crop-utils";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -44,6 +46,7 @@ export function CropDialog({
 }: ImageCropperProps) {
   const [isOpen, setIsOpen] = useState(true);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [previewLoading, setPreviewLoading] = useState(false);
 
   // Merge with default config
   const mergedConfig = { ...DEFAULT_CROPPER_CONFIG, ...config };
@@ -60,18 +63,37 @@ export function CropDialog({
   const [imageSrc, setImageSrc] = useState<string>("");
   const [originalFile, setOriginalFile] = useState<File | null>(null);
 
-  // Initialize image source
+  // Initialize image source (downscale huge files before crop UI — matches onboarding speed)
   useEffect(() => {
     if (image instanceof File) {
-      const url = URL.createObjectURL(image);
-      setImageSrc(url);
       setOriginalFile(image);
+      setImageSrc("");
+      setPreviewLoading(true);
+      let revokePreview = () => {};
 
-      return () => URL.revokeObjectURL(url);
-    } else if (typeof image === "string") {
-      setImageSrc(image);
+      const maxDim = resolveCropPreviewMaxDimension(mergedConfig);
+      void createDownscaledPreviewUrl(image, maxDim)
+        .then(({ url, revoke }) => {
+          revokePreview = revoke;
+          setImageSrc(url);
+        })
+        .catch(() => {
+          const url = URL.createObjectURL(image);
+          revokePreview = () => URL.revokeObjectURL(url);
+          setImageSrc(url);
+        })
+        .finally(() => setPreviewLoading(false));
+
+      return () => {
+        revokePreview();
+        setPreviewLoading(false);
+      };
     }
-  }, [image]);
+    if (typeof image === "string") {
+      setImageSrc(image);
+      setPreviewLoading(false);
+    }
+  }, [image, mergedConfig.maxWidth, mergedConfig.maxHeight]);
 
   // Handle crop change
   const onCropChange = useCallback((location: { x: number; y: number }) => {
@@ -172,7 +194,13 @@ export function CropDialog({
 
         {/* Cropper Area */}
         <div className="relative flex-1 bg-black/5 rounded-lg overflow-hidden">
-          {imageSrc && (
+          {previewLoading ? (
+            <div className="flex h-full min-h-[280px] items-center justify-center gap-2 text-sm text-muted-foreground">
+              <Loader2 className="h-5 w-5 animate-spin" />
+              Preparing image…
+            </div>
+          ) : null}
+          {imageSrc && !previewLoading ? (
             <Cropper
               image={imageSrc}
               crop={cropState.crop}
@@ -190,7 +218,7 @@ export function CropDialog({
                 },
               }}
             />
-          )}
+          ) : null}
         </div>
 
         {/* Controls */}
@@ -255,13 +283,15 @@ export function CropDialog({
             type="button"
             variant="event-primary"
             onClick={handleSave}
-            disabled={isProcessing || !cropState.croppedAreaPixels}
+            disabled={
+              isProcessing || previewLoading || !cropState.croppedAreaPixels
+            }
             className="gap-2"
           >
             {isProcessing ? (
               <>
                 <Loader2 className="h-4 w-4 animate-spin" />
-                Processing...
+                Optimizing image…
               </>
             ) : (
               <>

@@ -184,19 +184,17 @@ export function GuidedSectionCoreActions({ guided }: CoreActionsProps) {
 
   return (
     <div className="inline-flex max-w-full flex-none flex-row flex-nowrap items-center gap-3">
-      <Button
-        type="button"
-        variant="event-outline"
-        className={guidedOnboardingApproveStepButtonClass}
-        disabled={
-          !guided.currentSection ||
-          (!!guided.currentSection &&
-            guided.approvedSections.has(guided.currentSection.id))
-        }
-        onClick={() => void guided.handleApproveSection()}
-      >
-        {approved ? "Step approved" : "Approve step"}
-      </Button>
+      {!approved && (
+        <Button
+          type="button"
+          variant="event-outline"
+          className={guidedOnboardingApproveStepButtonClass}
+          disabled={!guided.currentSection}
+          onClick={() => void guided.handleApproveSection()}
+        >
+          Approve step
+        </Button>
+      )}
       {guided.currentSectionIndex < guided.sectionFlow.length - 1 &&
         guided.currentSection &&
         guided.approvedSections.has(guided.currentSection.id) && (

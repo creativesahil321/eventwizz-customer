@@ -18,7 +18,6 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Switch } from "@/components/ui/switch";
 import AddressAutocomplete from "@/app/(protected)/vendor/events/_components/tab-event-form/tabs/_components/address-autocomplete";
 import type {
   AIEventInput,
@@ -72,7 +71,7 @@ interface ReviewContentProps {
   content: AIEventGeneratedContent;
   eventInput: AIEventInput;
   categoryId: number;
-  onComplete: (eventId: number) => void;
+  onComplete: (eventId: number, isRooms: boolean) => void;
   onRegenerate: () => void;
   onBack: () => void;
 }
@@ -147,7 +146,7 @@ export default function AIEventReviewContent({
       setApplyStep(-1);
       setApplyDone(false);
 
-      const eventId = await applyAIGeneratedEventToBackend({
+      const { eventId, isRooms } = await applyAIGeneratedEventToBackend({
         content: editedContent,
         eventInput,
         categoryId,
@@ -156,7 +155,7 @@ export default function AIEventReviewContent({
       });
 
       setApplyDone(true);
-      setTimeout(() => onComplete(eventId), 2500);
+      setTimeout(() => onComplete(eventId, isRooms), 2500);
     } catch (err) {
       console.error("Error applying AI event content:", err);
       setIsApplying(false);
@@ -617,12 +616,6 @@ function StepTwoEditor({
         maxLength={160}
         multiline
       />
-      <EditableField
-        label="Button Text"
-        value={content.package_button_name}
-        onChange={(v) => onChange("package_button_name", v)}
-        maxLength={18}
-      />
 
       <div>
         <div className="flex items-center justify-between mb-2">
@@ -1079,23 +1072,6 @@ function StepThreeEditor({
 
               {date.payment_type === "deposit" && (
                 <div className="space-y-3 pt-2 border-t border-white/5">
-                  {/* Enable deposit toggle */}
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <span className="text-xs text-slate-300 block">Enable deposit</span>
-                      <span className="text-[10px] text-slate-500">
-                        Allow customers to pay a deposit for this date
-                      </span>
-                    </div>
-                    <Switch
-                      checked={date.is_deposit_enabled ?? true}
-                      onCheckedChange={(v) => updateDateField(dateIdx, "is_deposit_enabled", v)}
-                      className="data-[state=checked]:bg-blue-500"
-                    />
-                  </div>
-
-                  {date.is_deposit_enabled && (
-                    <>
                       {/* Deposit type */}
                       <div>
                         <label className="text-[10px] text-slate-500 block mb-1.5">
@@ -1183,8 +1159,6 @@ function StepThreeEditor({
                           />
                         </div>
                       </div>
-                    </>
-                  )}
                 </div>
               )}
             </div>
@@ -1428,7 +1402,6 @@ function StepSixEditor({
   content: AIEventGeneratedContent["stepSix"];
   onChange: (f: string, v: unknown) => void;
 }) {
-  const currencySymbol = useCurrencySymbol();
   return (
     <>
       <div className="space-y-1.5">
@@ -1443,17 +1416,6 @@ function StepSixEditor({
           className="w-full"
         />
       </div>
-      <EditableField
-        label={`Price Starting From (${currencySymbol})`}
-        value={content.price_start_from}
-        onChange={(v) => onChange("price_start_from", v)}
-      />
-      <EditableField
-        label="Button Text"
-        value={content.price_start_from_button_text}
-        onChange={(v) => onChange("price_start_from_button_text", v)}
-        maxLength={18}
-      />
     </>
   );
 }

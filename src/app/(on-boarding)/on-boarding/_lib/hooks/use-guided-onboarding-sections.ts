@@ -302,6 +302,27 @@ export function useGuidedOnboardingSections<T extends FieldValues>({
     setCurrentSectionIndex(0);
   }, []);
 
+  /**
+   * Clears in-session section approvals and returns to the first block.
+   * Call when the scoped data changes (e.g. multi-room tab) so approvals from
+   * another room do not leak into the active room.
+   */
+  const resetSectionProgress = useCallback(
+    (options?: { reapplyPersistedApproved?: boolean }) => {
+      setCurrentSectionIndex(0);
+      if (
+        options?.reapplyPersistedApproved &&
+        persistedStepApproved &&
+        sectionFlow.length > 0
+      ) {
+        setApprovedSections(new Set(sectionFlow.map((s) => s.id)));
+        return;
+      }
+      setApprovedSections(new Set());
+    },
+    [persistedStepApproved, sectionFlow],
+  );
+
   return {
     sectionFlow,
     currentSectionIndex,
@@ -315,5 +336,6 @@ export function useGuidedOnboardingSections<T extends FieldValues>({
     handleChipClick,
     handleUnlockSection,
     resetToFirstSection,
+    resetSectionProgress,
   };
 }

@@ -9,10 +9,16 @@ import { useAIEventCreation } from "../../_lib/hooks/useAIEventCreation";
 import type { AIEventInput } from "@/app/api/ai/generate-event/route";
 import type { AIEventGeneratedContent } from "@/app/api/ai/generate-event/route";
 import { applyAIGeneratedEventToBackend } from "../../_lib/apply-ai-generated-event";
+import {
+  clearAiEventDraftId,
+  persistAiEventDraftId,
+  readAiEventDraftId,
+  resolveAiDraftEventId,
+} from "../../_lib/ai-event-draft-storage";
 
 interface AIEventCreationFlowProps {
-  onComplete: (eventId: number) => void;
-  onSwitchToManual: () => void;
+  onComplete: (eventId: number, isRooms: boolean) => void;
+  onSwitchToManual: (draftEventId?: number) => void;
   venueInfo?: { name?: string; city?: string; address?: string };
 }
 
@@ -23,8 +29,15 @@ export default function AIEventCreationFlow({
   onSwitchToManual,
   venueInfo,
 }: AIEventCreationFlowProps) {
-  const { step, content, error, isGenerating, generateContent, setStep, reset } =
-    useAIEventCreation();
+  const {
+    step,
+    content,
+    error,
+    isGenerating,
+    generateContent,
+    setStep,
+    reset,
+  } = useAIEventCreation();
   const [eventInput, setEventInput] = useState<AIEventInput | null>(null);
   const [categoryId, setCategoryId] = useState<number>(0);
   const [applyStep, setApplyStep] = useState(-1);
@@ -34,12 +47,24 @@ export default function AIEventCreationFlow({
   const lastGenRef = useRef<AIEventGeneratedContent | null>(null);
   const lastInputRef = useRef<AIEventInput | null>(null);
   const lastCatRef = useRef(0);
+  const draftEventIdRef = useRef<number | null>(
+    readAiEventDraftId(),
+  );
+
+  const openManualEditor = useCallback(
+    (draftEventId?: number) => {
+      onSwitchToManual(
+        resolveAiDraftEventId(draftEventId, draftEventIdRef.current),
+      );
+    },
+    [onSwitchToManual],
+  );
 
   const runPersistGeneratedEvent = useCallback(
     async (
       gen: AIEventGeneratedContent,
       input: AIEventInput,
-      catId: number
+      catId: number,
     ): Promise<void> => {
       lastGenRef.current = gen;
       lastInputRef.current = input;
@@ -48,23 +73,30 @@ export default function AIEventCreationFlow({
       setApplyStep(-1);
       setApplyDone(false);
       try {
-        const eventId = await applyAIGeneratedEventToBackend({
+        const { eventId, isRooms } = await applyAIGeneratedEventToBackend({
           content: gen,
           eventInput: input,
           categoryId: catId,
           onProgress: setApplyStep,
+          onEventCreated: (id) => {
+            draftEventIdRef.current = id;
+            persistAiEventDraftId(id);
+          },
         });
         setApplyDone(true);
         await sleep(2500);
-        onComplete(eventId);
+        clearAiEventDraftId();
+        onComplete(eventId, isRooms);
       } catch (err) {
         console.error("Error applying AI event content:", err);
         const message =
-          err instanceof Error ? err.message : "Could not create your event. Please try again.";
+          err instanceof Error
+            ? err.message
+            : "Could not create your event. Please try again.";
         setApplyError(message);
       }
     },
-    [onComplete]
+    [onComplete],
   );
 
   const handleCollectComplete = async (input: AIEventInput, catId: number) => {
@@ -95,11 +127,17 @@ export default function AIEventCreationFlow({
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <div
           className="absolute -top-40 -right-40 w-80 h-80 rounded-full blur-3xl animate-pulse"
-          style={{ backgroundColor: "color-mix(in srgb, var(--color-primary, #3b82f6) 10%, transparent)" }}
+          style={{
+            backgroundColor:
+              "color-mix(in srgb, var(--color-primary, #3b82f6) 10%, transparent)",
+          }}
         />
         <div
           className="absolute -bottom-40 -left-40 w-80 h-80 rounded-full blur-3xl animate-pulse"
-          style={{ backgroundColor: "color-mix(in srgb, var(--color-secondary, #8b5cf6) 10%, transparent)" }}
+          style={{
+            backgroundColor:
+              "color-mix(in srgb, var(--color-secondary, #8b5cf6) 10%, transparent)",
+          }}
         />
       </div>
 
@@ -114,7 +152,7 @@ export default function AIEventCreationFlow({
           >
             <AIEventCollectInfo
               onSubmit={handleCollectComplete}
-              onSwitchToManual={onSwitchToManual}
+              onSwitchToManual={() => openManualEditor()}
               isLoading={isGenerating}
               initialData={eventInput}
               venueInfo={venueInfo}
@@ -174,11 +212,21 @@ export default function AIEventCreationFlow({
                     >
                       Edit details
                     </button>
+                    <button
+                      type="button"
+                      onClick={() => openManualEditor()}
+                      className="min-h-[44px] px-6 py-2.5 rounded-full text-slate-400 hover:text-white text-sm font-medium transition-colors touch-manipulation"
+                    >
+                      Manual Setup
+                    </button>
                   </div>
                 </div>
               </div>
             ) : (
-              <AIEventApplyOverlay applyStep={applyStep} applyDone={applyDone} />
+              <AIEventApplyOverlay
+                applyStep={applyStep}
+                applyDone={applyDone}
+              />
             )}
           </motion.div>
         )}
@@ -198,7 +246,9 @@ export default function AIEventCreationFlow({
               <h2 className="text-xl sm:text-2xl font-bold text-white mb-2 sm:mb-3">
                 Generation Failed
               </h2>
-              <p className="text-slate-400 mb-4 sm:mb-6 text-xs sm:text-sm break-words">{error}</p>
+              <p className="text-slate-400 mb-4 sm:mb-6 text-xs sm:text-sm break-words">
+                {error}
+              </p>
               <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-2 sm:gap-3">
                 <button
                   onClick={handleRetry}
@@ -216,7 +266,7 @@ export default function AIEventCreationFlow({
                   Go Back
                 </button>
                 <button
-                  onClick={onSwitchToManual}
+                  onClick={() => openManualEditor()}
                   className="min-h-[44px] px-6 py-2.5 rounded-full text-slate-400 hover:text-white text-sm font-medium transition-colors touch-manipulation"
                 >
                   Manual Setup

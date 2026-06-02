@@ -16,6 +16,16 @@ import {
   PACKAGE_DETAIL_LINE_MAX_CHARS,
   RICH_DESCRIPTION_MAX_CHARS,
 } from "@/lib/event-form-limits";
+import {
+  buildAiOnboardingSystemPrompt,
+  buildAiOnboardingUserPrompt,
+  ensureStepFiveRooms,
+  ensureStepSevenRooms,
+  normalizeAIDatePaymentFields,
+  normalizeAiRoomNames,
+  parseVendorDescriptionHints,
+  sanitizeVendorDescription,
+} from "@/app/(on-boarding)/on-boarding/_lib/ai-onboarding-sanitize";
 
 export interface AIOnboardingInput {
   venueName: string;
@@ -68,6 +78,18 @@ export interface AIRoomDates {
   dates: AIDate[];
 }
 
+export interface AIRoomDrinks {
+  room_name: string;
+  drink_title: string;
+  drink_description: string;
+  packages: Array<{
+    title: string;
+    description: string;
+    price: number;
+    available_quantity: number;
+  }>;
+}
+
 export interface AIGeneratedContent {
   stepTwo: {
     banner_heading: string;
@@ -114,6 +136,7 @@ export interface AIGeneratedContent {
       price: number;
       available_quantity: number;
     }>;
+    rooms?: AIRoomDrinks[];
   };
   stepEight: {
     event_address: string;
@@ -137,6 +160,11 @@ export async function POST(req: NextRequest) {
     }
 
     const input: AIOnboardingInput = await req.json();
+    input.description = sanitizeVendorDescription(input.description);
+    const vendorHints = parseVendorDescriptionHints(
+      input.description,
+      input.room_names,
+    );
 
     if (!input.venueName || !input.venueType) {
       return NextResponse.json(
@@ -145,47 +173,9 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const systemPrompt = `You are an expert event venue marketing copywriter. Generate professional, engaging content for an event venue website. 
+    const systemPrompt = buildAiOnboardingSystemPrompt(STEP_NINE_MAX_FAQS);
 
-CRITICAL RULES:
-1. Return ONLY valid JSON, no explanations or markdown
-2. Respect ALL character limits exactly
-3. All text must be professional, engaging, and relevant to the venue type
-4. Times must be in HH:mm 24-hour format
-5. Prices must be realistic whole numbers
-6. FAQ answers should be helpful and detailed but within limits
-7. Descriptions should be compelling and SEO-friendly
-8. Do NOT include any HTML tags in text fields unless specifically stated
-9. IMPORTANT: If the vendor provides specific details about tickets, tables, pricing, seating, food, or capacity in the "Additional Info", use those EXACT numbers and specifications in stepFive (dates/tickets/tables), stepSix (menu), and stepSeven (drinks). Always honor the vendor's stated preferences over defaults.
-10. For dates with booking_type "tables" or "both": include payment_type ("full" or "deposit"). If deposit is used, set is_deposit_enabled true and include deposit_type ("amount" or "percentage"), deposit_value (e.g. "50" for £50 or "25" for 25%), and deposit_due_date (YYYY-MM-DD, before event_date).
-11. stepFive.dates: event_date must be YYYY-MM-DD. List dates in chronological ascending order (earliest first). No duplicate event_dates. Each event_date should be today or in the future.
-12. If room system is "Yes", include stepFive.rooms with one object per provided room_name. Each room must have its own dates array (can differ by room).
-13. stepSix (menu) is OPTIONAL: some venues have no catering. If the venue type or vendor info suggests no food/catering, set menus to an empty array [] and keep menu_title/menu_description short; the vendor can also remove the menu section in review.
-14. stepSeven (drinks) is OPTIONAL: some venues have no drink packages. If the venue type or vendor info suggests no drinks/beverage packages, set packages to an empty array [] and keep drink_title/drink_description short; the vendor can also remove the drinks section in review.
-15. stepNine.faqs: include at most ${STEP_NINE_MAX_FAQS} FAQ objects (hard limit). Prefer 5–8 high-quality FAQs over many short ones. Never return more than ${STEP_NINE_MAX_FAQS} items.`;
-
-    const businessContext =
-      input.has_multiple_locations === true
-        ? `This is a MULTI-LOCATION BRAND. The name below is the BRAND NAME as entered by the vendor (it may be any trading name, not necessarily a Google listing). Use city and address as their main or head-office context. Write copy suitable for a brand that may run events across several sites; keep tone professional and scalable (avoid implying only one physical room unless it fits).`
-        : `This is a single event venue. Write copy specific to this one location.`;
-
-    const userPrompt = `Generate complete event venue website content for:
-
-VENUE INFO:
-${businessContext}
-- Name: "${input.venueName}"
-- Type: "${input.venueType}"
-- City: "${input.city}"
-- Address: "${input.address}"
-${input.eventType ? `- Event Type: "${input.eventType}"` : ""}
-${input.guestCount ? `- Typical Guest Count: "${input.guestCount}"` : ""}
-${input.priceRange ? `- Price Range: "${input.priceRange}"` : ""}
-${input.description ? `\nVENDOR'S DETAILED REQUIREMENTS (USE THESE EXACT SPECS FOR TICKETS/TABLES/PRICING):\n"${input.description}"` : ""}
-- Room system (multiple event spaces): "${input.has_room_system === true ? "Yes" : "No"}"
-${input.has_room_system === true ? `- Room names: "${(input.room_names ?? []).join(", ")}"` : ""}
-- StepFive room output rule: ${input.has_room_system === true ? "Include stepFive.rooms with one entry per room_name and room-specific dates" : "Return stepFive.rooms as []"}
-
-Generate this EXACT JSON structure:
+    const jsonSchemaBlock = `Generate this EXACT JSON structure:
 
 {
   "stepTwo": {
@@ -278,17 +268,17 @@ Generate this EXACT JSON structure:
       {
         "name": "string (max 40 chars, category name like 'Starters')",
         "items": [
-          {"title": "string (max 40 chars)", "description": "string (max 160 chars)"},
-          {"title": "string (max 40 chars)", "description": "string (max 160 chars)"},
-          {"title": "string (max 40 chars)", "description": "string (max 160 chars)"}
+          {"title": "Item Title 1 (max 40 chars)", "description": "string (max 160 chars)"},
+          {"title": "Item Title 2 (max 40 chars)", "description": "string (max 160 chars)"},
+          {"title": "Item Title 3 (max 40 chars)", "description": "string (max 160 chars)"}
         ]
       },
       {
         "name": "string (max 40 chars, category name like 'Main Course')",
         "items": [
-          {"title": "string (max 40 chars)", "description": "string (max 160 chars)"},
-          {"title": "string (max 40 chars)", "description": "string (max 160 chars)"},
-          {"title": "string (max 40 chars)", "description": "string (max 160 chars)"}
+          {"title": "Item Title 1 (max 40 chars)", "description": "string (max 160 chars)"},
+          {"title": "Item Title 2 (max 40 chars)", "description": "string (max 160 chars)"},
+          {"title": "Item Title 3 (max 40 chars)", "description": "string (max 160 chars)"}
         ]
       }
     ]
@@ -297,7 +287,17 @@ Generate this EXACT JSON structure:
     "drink_title": "string (max 40 chars, drinks section title)",
     "drink_description": "string (max 160 chars, drinks section description)",
     "packages": "array of drink packages, OR empty array [] if venue has no drink packages",
-    "packages item": {"title": "string (max 25 chars)", "description": "string (max 160 chars)", "price": number, "available_quantity": number}
+    "packages item": {"title": "string (max 25 chars)", "description": "string (max 160 chars)", "price": number, "available_quantity": number},
+    "rooms": [
+      {
+        "room_name": "string (must match provided room name exactly)",
+        "drink_title": "string",
+        "drink_description": "string",
+        "packages": [
+          {"title": "string", "description": "string", "price": number, "available_quantity": number}
+        ]
+      }
+    ]
   },
   "stepEight": {
     "event_address": "${input.address || input.city}",
@@ -321,7 +321,14 @@ Generate this EXACT JSON structure:
 
 The stepNine.faqs array MUST contain at most ${STEP_NINE_MAX_FAQS} items (hard cap). Prefer 5–8 strong FAQs rather than many weak ones.
 
-Make times chronologically ascending. Make prices realistic for the venue type and location. Return ONLY the JSON.`;
+Make times chronologically ascending. Make prices realistic for the venue type and location.`;
+
+    const userPrompt = buildAiOnboardingUserPrompt(
+      input,
+      vendorHints,
+      jsonSchemaBlock,
+      STEP_NINE_MAX_FAQS,
+    );
 
     const result: FallbackResult = await tryModelsWithFallback(apiKey, {
       messages: [
@@ -447,7 +454,10 @@ Make times chronologically ascending. Make prices realistic for the venue type a
         }
       }
 
-      const sanitizeAIDates = (dates: AIDate[] | undefined, fallbackMonthOffset = 2): AIDate[] => {
+      const sanitizeAIDates = (
+        dates: AIDate[] | undefined,
+        fallbackMonthOffset = 2,
+      ): AIDate[] => {
         const now = new Date();
         const inputDates = Array.isArray(dates) ? dates : [];
         const normalized = inputDates.map((date, idx) => {
@@ -464,9 +474,25 @@ Make times chronologically ascending. Make prices realistic for the venue type a
             isValidDate && eventTime >= todayStart ? date.event_date : fallbackDate;
 
           const validBookingTypes = ["tickets", "tables", "both"];
-          const bookingType = validBookingTypes.includes(date.booking_type)
+          let bookingType = validBookingTypes.includes(date.booking_type)
             ? date.booking_type
             : "tickets";
+          if (vendorHints.prefersTicketsOnly) {
+            bookingType = "tickets";
+          } else if (
+            vendorHints.prefersTablesBooking &&
+            bookingType === "tickets"
+          ) {
+            bookingType = "tables";
+          }
+          if (
+            vendorHints.prefersDepositPayment &&
+            (bookingType === "tables" || bookingType === "both") &&
+            date.payment_type !== "full"
+          ) {
+            date.payment_type = "deposit";
+            date.is_deposit_enabled = true;
+          }
 
           const tickets = (date.tickets || []).map((t) => ({
             title: truncate(t.title || "General Admission", 25),
@@ -486,16 +512,7 @@ Make times chronologically ascending. Make prices realistic for the venue type a
             ),
           }));
 
-          const isTablesOrBoth = bookingType === "tables" || bookingType === "both";
-          const paymentType = (date.payment_type === "deposit" ? "deposit" : "full") as
-            | "full"
-            | "deposit";
-          const isDepositEnabled =
-            isTablesOrBoth &&
-            paymentType === "deposit" &&
-            date.is_deposit_enabled === true;
-
-          return {
+          const draft: AIDate = {
             event_date: eventDate,
             booking_type: bookingType as "tickets" | "tables" | "both",
             tickets:
@@ -524,25 +541,18 @@ Make times chronologically ascending. Make prices realistic for the venue type a
                       },
                     ]
                   : [],
-            payment_type: isTablesOrBoth ? paymentType : "full",
-            is_deposit_enabled: isTablesOrBoth
-              ? isDepositEnabled && paymentType === "deposit"
-              : false,
-            deposit_type:
-              isTablesOrBoth && isDepositEnabled
-                ? date.deposit_type === "percentage"
-                  ? "percentage"
-                  : "amount"
-                : undefined,
-            deposit_value:
-              isTablesOrBoth && isDepositEnabled && date.deposit_value
-                ? String(date.deposit_value)
-                : "",
-            deposit_due_date:
-              isTablesOrBoth && isDepositEnabled && date.deposit_due_date
-                ? String(date.deposit_due_date)
-                : "",
-          } as AIDate;
+            payment_type: date.payment_type,
+            is_deposit_enabled: date.is_deposit_enabled,
+            deposit_type: date.deposit_type,
+            deposit_value: date.deposit_value
+              ? String(date.deposit_value)
+              : "",
+            deposit_due_date: date.deposit_due_date
+              ? String(date.deposit_due_date)
+              : "",
+          };
+
+          return normalizeAIDatePaymentFields(draft);
         });
 
         const seen = new Set<string>();
@@ -601,13 +611,25 @@ Make times chronologically ascending. Make prices realistic for the venue type a
         };
       }
 
-      if (Array.isArray(content.stepFive?.rooms)) {
-        content.stepFive.rooms = content.stepFive.rooms
-          .map((room, roomIdx) => ({
-            room_name: truncate(String(room.room_name || "").trim(), 80),
-            dates: sanitizeAIDates(room.dates, 2 + roomIdx),
-          }))
-          .filter((room) => room.room_name.length > 0);
+      if (input.has_room_system === true) {
+        const filteredRooms = Array.isArray(content.stepFive?.rooms)
+          ? content.stepFive.rooms
+              .map((room, roomIdx) => ({
+                room_name: truncate(String(room.room_name || "").trim(), 80),
+                dates: sanitizeAIDates(room.dates, 2 + roomIdx),
+              }))
+              .filter((room) => room.room_name.length > 0)
+          : [];
+
+        content.stepFive.rooms = ensureStepFiveRooms(
+          filteredRooms,
+          normalizeAiRoomNames(input.room_names),
+          content.stepFive?.dates ?? [],
+          vendorHints,
+          sanitizeAIDates,
+        );
+      } else if (Array.isArray(content.stepFive?.rooms)) {
+        content.stepFive.rooms = [];
       }
 
       if (content.stepSeven) {
@@ -632,6 +654,62 @@ Make times chronologically ascending. Make prices realistic for the venue type a
             ),
           }))
           : [];
+
+        if (input.has_room_system === true) {
+          const rawRooms = Array.isArray(content.stepSeven.rooms)
+            ? content.stepSeven.rooms
+            : [];
+          const filteredRooms = rawRooms
+            .map((room) => ({
+              room_name: truncate(String(room.room_name || "").trim(), 80),
+              drink_title: truncate(
+                String(room.drink_title || content.stepSeven.drink_title || ""),
+                40,
+              ),
+              drink_description: truncate(
+                String(
+                  room.drink_description ||
+                    content.stepSeven.drink_description ||
+                    "",
+                ),
+                160,
+              ),
+              packages: Array.isArray(room.packages)
+                ? room.packages.map((p) => ({
+                    title: truncate(p.title, DRINK_PACKAGE_ITEM_TITLE_MAX_CHARS),
+                    description: truncate(p.description, RICH_DESCRIPTION_MAX_CHARS),
+                    price: Math.max(
+                      1,
+                      Math.min(
+                        DRINK_PACKAGE_PRICE_MAX,
+                        Math.round(Number(p.price) || 50),
+                      ),
+                    ),
+                    available_quantity: Math.max(
+                      1,
+                      Math.min(
+                        DRINK_PACKAGE_QTY_MAX,
+                        Math.round(Number(p.available_quantity) || 100),
+                      ),
+                    ),
+                  }))
+                : [],
+            }))
+            .filter((room) => room.room_name.length > 0);
+
+          content.stepSeven.rooms = ensureStepSevenRooms(
+            filteredRooms,
+            normalizeAiRoomNames(input.room_names),
+            {
+              drink_title: content.stepSeven.drink_title,
+              drink_description: content.stepSeven.drink_description,
+              packages: content.stepSeven.packages,
+            },
+            vendorHints,
+          );
+        } else if (Array.isArray(content.stepSeven.rooms)) {
+          content.stepSeven.rooms = [];
+        }
       } else {
         content.stepSeven = {
           drink_title: "Drinks & Packages",

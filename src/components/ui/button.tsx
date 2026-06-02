@@ -21,11 +21,11 @@ const buttonVariants = cva(
           "hover:bg-accent hover:text-accent-foreground dark:hover:bg-accent/50 cursor-pointer",
         link: "text-primary underline-offset-4 hover:underline cursor-pointer",
         "event-primary":
-          "bg-[var(--color-primary)] hover:bg-[var(--color-primary-hover)] text-[var(--color-on-header)] border-[var(--color-primary)] hover:scale-[1.03] transition-all duration-200 shadow-sm hover:shadow-md cursor-pointer",
+          "bg-[var(--color-primary)] hover:bg-[var(--color-primary-hover)] text-[var(--color-primary-foreground)] border-[var(--color-primary)] hover:scale-[1.03] transition-all duration-200 shadow-sm hover:shadow-md cursor-pointer",
         "event-secondary":
           "bg-[var(--color-secondary)] hover:bg-[var(--color-secondary-hover)] text-[var(--color-secondary-foreground)] border-[var(--color-secondary)] hover:scale-[1.03] transition-all duration-200 shadow-sm hover:shadow-md cursor-pointer",
         "event-outline":
-          "bg-[#f8fafa] border border-[var(--color-primary)] text-[var(--color-primary)] shadow-xs hover:bg-[var(--color-primary)] hover:text-[var(--color-on-header)] hover:scale-[1.02] hover:border-[var(--color-primary-hover)] transition-all duration-200 cursor-pointer shadow-sm hover:shadow-md ",
+          "bg-[#f8fafa] border border-[var(--color-primary)] text-[var(--color-primary)] shadow-xs hover:bg-[var(--color-primary)] hover:text-[var(--color-primary-foreground)] hover:scale-[1.02] hover:border-[var(--color-primary-hover)] transition-all duration-200 cursor-pointer shadow-sm hover:shadow-md ",
         "event-ghost":
           "text-[var(--color-primary)] hover:text-[var(--color-primary-hover)] hover:underline hover:bg-[#f8fafa] transition-all duration-200 cursor-pointer",
         "event-social":

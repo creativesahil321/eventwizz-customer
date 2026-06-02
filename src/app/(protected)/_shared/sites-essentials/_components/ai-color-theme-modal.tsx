@@ -22,7 +22,6 @@ import {
   Star,
   TreePine,
   Zap,
-  Globe,
 } from "lucide-react";
 import { useColorThemeAI } from "@/hooks/useColorThemeAI";
 import { SiteEssentialsFormValues } from "../_lib/schema";
@@ -39,13 +38,12 @@ export function AIColorThemeModal({
   const form = useFormContext<SiteEssentialsFormValues>();
   const { generateColorTheme, isGenerating } = useColorThemeAI();
 
-  const [inputMode, setInputMode] = useState<"suggestions" | "custom" | "website">(
-    "suggestions"
+  const [inputMode, setInputMode] = useState<"suggestions" | "custom">(
+    "suggestions",
   );
   const [selectedTheme, setSelectedTheme] = useState("");
   const [customTheme, setCustomTheme] = useState("");
   const [existingBrand, setExistingBrand] = useState("");
-  const [websiteUrl, setWebsiteUrl] = useState("");
   const [logoColorTone, setLogoColorTone] = useState<
     "dark" | "light" | "colorful" | "unsure"
   >("unsure");
@@ -221,18 +219,15 @@ export function AIColorThemeModal({
       themeToGenerate = theme ? theme.label : selectedTheme;
     } else if (inputMode === "custom" && customTheme.trim()) {
       themeToGenerate = customTheme.trim();
-    } else if (inputMode === "website" && websiteUrl.trim()) {
-      themeToGenerate = "Website-inspired theme";
     } else {
       return; // No theme selected
     }
 
     const colorTheme = await generateColorTheme({
-      customTheme: inputMode === "website" ? undefined : themeToGenerate,
+      customTheme: themeToGenerate,
       existingBrand: existingBrand.trim() || undefined,
       logoColorTone,
       logoColorHex: logoColorHex.trim() || undefined,
-      websiteUrl: inputMode === "website" ? websiteUrl.trim() : undefined,
     });
 
     if (colorTheme) {
@@ -273,7 +268,6 @@ export function AIColorThemeModal({
       setSelectedTheme("");
       setCustomTheme("");
       setExistingBrand("");
-      setWebsiteUrl("");
       setLogoColorTone("unsure");
       setLogoColorHex("");
     }
@@ -315,16 +309,6 @@ export function AIColorThemeModal({
             >
               <Wand2 className="h-4 w-4 mr-2" />
               Custom Input
-            </Button>
-            <Button
-              type="button"
-              variant={inputMode === "website" ? "event-primary" : "ghost"}
-              size="sm"
-              onClick={() => setInputMode("website")}
-              className="flex-1"
-            >
-              <Globe className="h-4 w-4 mr-2" />
-              Website URL
             </Button>
           </div>
 
@@ -401,22 +385,6 @@ export function AIColorThemeModal({
             </div>
           )}
 
-          {inputMode === "website" && (
-            <div className="space-y-3">
-              <Label htmlFor="website-url">Reference website URL</Label>
-              <Input
-                id="website-url"
-                placeholder="https://example.com"
-                value={websiteUrl}
-                onChange={(e) => setWebsiteUrl(e.target.value)}
-              />
-              <p className="text-xs text-muted-foreground">
-                We&apos;ll analyze the page colors and generate a clean theme inspired
-                by that website while keeping readability safe.
-              </p>
-            </div>
-          )}
-
           {/* Existing Brand Colors */}
           <div className="space-y-3 rounded-lg border border-slate-200 p-3">
             <div className="space-y-1">
@@ -482,8 +450,7 @@ export function AIColorThemeModal({
               disabled={
                 isGenerating ||
                 (inputMode === "suggestions" && !selectedTheme) ||
-                (inputMode === "custom" && !customTheme.trim()) ||
-                (inputMode === "website" && !websiteUrl.trim())
+                (inputMode === "custom" && !customTheme.trim())
               }
               className="flex-1"
               variant="event-primary"

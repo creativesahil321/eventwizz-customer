@@ -14,14 +14,6 @@ export const initialData: EventSchemaType = {
     about_event_heading: "",
     about_event_sub_heading: "",
     about_event_description: "",
-    event_schedular_title: "",
-    event_schedular: [
-      {
-        title: "",
-        time: "",
-      },
-    ],
-    event_schedular_background_image: undefined as unknown as File,
   },
 
   stepTwo: {
@@ -33,13 +25,16 @@ export const initialData: EventSchemaType = {
     package_image: null,
     package_title: "",
     package_description: "",
-    package_button_name: "",
-    package_button_link: "",
-    package_details: [
+    package_details: [{ title: "Package 1" }],
+    event_schedular_title: "",
+    event_schedule_subtitle: "",
+    event_schedular: [
       {
         title: "",
+        time: "",
       },
     ],
+    event_schedular_background_image: undefined as unknown as File,
   },
 
   stepThree: {
@@ -77,7 +72,7 @@ export const initialData: EventSchemaType = {
         name: "",
         items: [
           {
-            title: "",
+            title: "Item Title 1",
             description: "",
           },
         ],
@@ -91,10 +86,7 @@ export const initialData: EventSchemaType = {
     event_id: 0,
     brochure_pdf: null,
     brochure_pdf_2: null,
-    faq_pdf: null,
     event_address: "",
-    price_start_from: "",
-    price_start_from_button_text: "",
     location: {
       title: "",
       description: "",

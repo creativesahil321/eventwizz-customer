@@ -1,4 +1,5 @@
 import { api } from "@/services/core/api-client";
+import type { ApiResponse as CoreApiResponse } from "@/services/core/api-client";
 import { API_ENDPOINTS } from "@/services/core/endpoints";
 import { authService } from "@/services/common/auth/auth.service";
 import { request } from "@/services/core/api-client";
@@ -17,6 +18,11 @@ import {
   StepElevenType,
 } from "./type";
 import type { RoomType } from "@/app/(on-boarding)/on-boarding/_components/form-provider/schema";
+import { EVENT_GALLERY_MAX_IMAGES } from "@/lib/event-form-limits";
+import {
+  parseCheckEventNameResponse,
+  type CheckEventNameAvailability,
+} from "@/lib/parse-check-event-name";
 // import { OnBoardingPreviewType } from "@/app/(on-boarding)/on-boarding/_components/form-provider/schema";
 
 /** Reads the persisted onboarding mode from sessionStorage (client-only, safe). */
@@ -140,6 +146,15 @@ function toSafeNumber(value: unknown): number {
   return 0;
 }
 
+function resolveStepFiveEventDate(
+  date: StepFiveType["dates"][number],
+): string {
+  const raw =
+    date.event_date ??
+    (date as StepFiveType["dates"][number] & { date?: unknown }).date;
+  return String(raw ?? "").trim();
+}
+
 function normalizeStepFiveDatePayload(
   date: StepFiveType["dates"][number],
 ): Record<string, unknown> {
@@ -147,6 +162,7 @@ function normalizeStepFiveDatePayload(
     generate_qr_code?: boolean;
     show_on_frontend?: boolean;
   };
+  const eventDate = resolveStepFiveEventDate(date);
   const bookingType = date.booking_type ?? "tickets";
   const tickets =
     bookingType !== "tables"
@@ -168,7 +184,8 @@ function normalizeStepFiveDatePayload(
       : [];
 
   const payload: Record<string, unknown> = {
-    date: date.event_date,
+    event_date: eventDate,
+    date: eventDate,
     booking_type: bookingType,
     total_table_types: tables.length,
     tables,
@@ -181,7 +198,9 @@ function normalizeStepFiveDatePayload(
   if (bookingType !== "tickets") {
     const paymentType = date.payment_type ?? "full";
     payload.payment_type = paymentType;
-    if (paymentType === "deposit" && date.is_deposit_enabled !== false) {
+
+    if (paymentType === "deposit") {
+      payload.is_deposit_enabled = true;
       const depositValue = toSafeNumber(date.deposit_value);
       payload.deposit_type =
         date.deposit_type === "percentage" ? "percentage" : "amount";
@@ -189,13 +208,35 @@ function normalizeStepFiveDatePayload(
       // Keep legacy key for backward compatibility with any backend variants.
       payload.deposit_amount = depositValue;
       payload.deposit_due_date = date.deposit_due_date ?? "";
+    } else {
+      payload.is_deposit_enabled = false;
     }
   }
 
   return payload;
 }
 
+export type CheckBrandNameAvailability = CheckEventNameAvailability;
+
 export const onboardingService = {
+  /**
+   * Check whether a brand or venue name is available during onboarding.
+   */
+  checkBrandName: async (
+    name: string,
+  ): Promise<CheckBrandNameAvailability> => {
+    const trimmed = name.trim();
+    const response = await api.get<CoreApiResponse<Record<string, unknown>>>(
+      API_ENDPOINTS.VENDOR.ONBOARDING.CHECK_BRAND_NAME,
+      {
+        params: { name: trimmed },
+        returnFullResponse: true,
+        suppressErrorToast: true,
+      },
+    );
+    return parseCheckEventNameResponse(response);
+  },
+
   /**
    * Check if response indicates onboarding is already completed
    * If so, update session and redirect to welcome page
@@ -481,16 +522,6 @@ export const onboardingService = {
       formData.append("remove_event_banner_video", "true");
     }
 
-    // Add banner image - handle both File and Blob
-    if (data.event_banner_image) {
-      if (
-        data.event_banner_image instanceof File ||
-        data.event_banner_image instanceof Blob
-      ) {
-        formData.append("event_banner_image", data.event_banner_image);
-      }
-    }
-
     appendManualIsApprovedToFormData(formData, data.isApproved);
 
     const response = await request<ApiResponse>({
@@ -555,7 +586,10 @@ export const onboardingService = {
     // Handle gallery images - both new files and existing backend images (see docs/backend-api/GALLERY_API_FRONTEND_GUIDE.md)
     appendStepFourGalleryPayload(
       formData,
-      ((data.gallery ?? []) as unknown as StepFourGalleryItem[]).slice(0, 8),
+      ((data.gallery ?? []) as unknown as StepFourGalleryItem[]).slice(
+        0,
+        EVENT_GALLERY_MAX_IMAGES,
+      ),
       {
         deleteGallery: anyStepFour.delete_gallery,
         replaceGallery: anyStepFour.replace_gallery,
@@ -662,20 +696,38 @@ export const onboardingService = {
           detail?.title ?? "",
         );
       });
-      (p.event_schedular ?? []).forEach((schedule, scheduleIndex) => {
-        formData.append(
-          `rooms[${key}][event_schedular][${scheduleIndex}][title]`,
-          schedule?.title ?? "",
-        );
-        formData.append(
-          `rooms[${key}][event_schedular][${scheduleIndex}][time]`,
-          schedule?.time ?? "",
-        );
-      });
+      const schedulerTitle = String(p.event_schedular_title ?? "").trim();
+      if (schedulerTitle.length > 0) {
+        // Optional timeline: drop untouched placeholder rows so backend date_format
+        // rules don't run against empty `{ title: "", time: "" }`.
+        const normalizedSchedules = (p.event_schedular ?? [])
+          .map((schedule) => ({
+            title: String(schedule?.title ?? "").trim(),
+            time: String(schedule?.time ?? "").trim(),
+          }))
+          .filter(
+            (schedule) =>
+              schedule.title.length > 0 || schedule.time.length > 0,
+          );
+
+        normalizedSchedules.forEach((schedule, scheduleIndex) => {
+          formData.append(
+            `rooms[${key}][event_schedular][${scheduleIndex}][title]`,
+            schedule.title,
+          );
+          formData.append(
+            `rooms[${key}][event_schedular][${scheduleIndex}][time]`,
+            schedule.time,
+          );
+        });
+      }
 
       appendStepFourGalleryPayload(
         formData,
-        ((p.gallery ?? []) as unknown as StepFourGalleryItem[]).slice(0, 8),
+        ((p.gallery ?? []) as unknown as StepFourGalleryItem[]).slice(
+          0,
+          EVENT_GALLERY_MAX_IMAGES,
+        ),
         {
           roomKey: key,
           deleteGallery:
@@ -727,13 +779,22 @@ export const onboardingService = {
       };
 
       if (bookingType !== "tickets") {
+        const paymentType = date.payment_type ?? "full";
+        if (paymentType === "deposit") {
+          return {
+            ...base,
+            payment_type: paymentType,
+            is_deposit_enabled: true,
+            deposit_type: date.deposit_type || "amount",
+            deposit_value: date.deposit_value || 0,
+            deposit_due_date: date.deposit_due_date || "",
+          };
+        }
+
         return {
           ...base,
-          payment_type: date.payment_type,
-          is_deposit_enabled: date.is_deposit_enabled ?? true,
-          deposit_type: date.deposit_type || "amount",
-          deposit_value: date.deposit_value || 0,
-          deposit_due_date: date.deposit_due_date || "",
+          payment_type: paymentType,
+          is_deposit_enabled: false,
         };
       }
 
@@ -788,9 +849,9 @@ export const onboardingService = {
       .filter((room) => Number.isFinite(Number(room.id)) && Number(room.id) > 0)
       .map((room) => ({
         room_id: Number(room.id),
-        dates: ((room.dates?.dates ?? []) as StepFiveType["dates"]).map(
-          normalizeStepFiveDatePayload,
-        ),
+        dates: ((room.dates?.dates ?? []) as StepFiveType["dates"])
+          .filter((date) => resolveStepFiveEventDate(date).length > 0)
+          .map(normalizeStepFiveDatePayload),
       }));
 
     const firstDate = roomBlocks[0]?.dates?.[0] as
@@ -1134,6 +1195,7 @@ export const onboardingService = {
           {
             step: data.step,
             event_id: data.event_id,
+            is_rooms: 0,
             drink_title: data.drink_title,
             drink_description: data.drink_description,
             packages: data.packages,
@@ -1158,6 +1220,61 @@ export const onboardingService = {
     }
 
     // Notify that data has changed if successful
+    if (response.status) {
+      await onboardingService.notifyDataChanged();
+    }
+
+    return response;
+  },
+
+  /**
+   * Store step 8 onboarding data in multi-room mode (drinks per room).
+   * Backend expects `is_rooms: 1` and a rooms array payload.
+   */
+  storeStepEightRoomsData: async (payload: {
+    event_id: number;
+    isApproved?: boolean;
+    rooms: RoomType[];
+  }): Promise<ApiResponse> => {
+    const rooms = payload.rooms
+      .map((room) => {
+        const roomId = Number(room.id);
+        if (!Number.isFinite(roomId) || roomId <= 0) return null;
+        const drinks = room.drinks ?? {};
+        return {
+          room_id: roomId,
+          drink_title: String(drinks.drink_title ?? ""),
+          drink_description: String(drinks.drink_description ?? ""),
+          packages: Array.isArray(drinks.packages) ? drinks.packages : [],
+        };
+      })
+      .filter((room): room is NonNullable<typeof room> => room !== null);
+
+    const body = mergeManualIsApproved(
+      {
+        step: 8,
+        event_id: payload.event_id,
+        is_rooms: 1,
+        rooms,
+      },
+      payload.isApproved,
+    );
+
+    const response = await api.post<ApiResponse>(
+      API_ENDPOINTS.VENDOR.ONBOARDING.STEPS,
+      body,
+      {
+        returnFullResponse: true,
+      },
+    );
+
+    const isCompleted = await onboardingService.checkOnboardingCompleted(
+      response,
+    );
+    if (isCompleted) {
+      return response;
+    }
+
     if (response.status) {
       await onboardingService.notifyDataChanged();
     }

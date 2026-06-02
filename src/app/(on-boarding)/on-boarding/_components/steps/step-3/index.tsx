@@ -682,6 +682,112 @@ export default function StepThree() {
                       "pointer-events-none",
                   )}
                 >
+                  <FormField
+                    control={form.control}
+                    name="event_banner_heading"
+                    render={({ field }) => {
+                      const text =
+                        typeof field.value === "string" ? field.value : "";
+                      const headingWordCount = countWords(text);
+                      return (
+                        <FormItem>
+                          <FormLabel className="text-sm font-medium">
+                            Banner Heading{" "}
+                            <span className="text-red-400">*</span>
+                          </FormLabel>
+                          <FormControl>
+                            <Input
+                              className="h-11 bg-white/5 border-white/10"
+                              placeholder="Enter banner heading"
+                              {...field}
+                              value={
+                                typeof field.value === "string"
+                                  ? field.value
+                                  : ""
+                              }
+                              onFocus={() =>
+                                handleFieldFocus("event_banner_heading")
+                              }
+                              onChange={(e) => {
+                                const next = truncateToMaxWordsForInput(
+                                  e.target.value,
+                                  BANNER_HEADING_MAX_WORDS,
+                                );
+                                field.onChange(next);
+                                globalForm.setValue(
+                                  "stepThree.event_banner_heading",
+                                  next,
+                                );
+                              }}
+                            />
+                          </FormControl>
+                          <div className="text-xs text-muted-foreground mt-1">
+                            <span>
+                              {headingWordCount}/{BANNER_HEADING_MAX_WORDS}{" "}
+                              words
+                            </span>
+                          </div>
+                          <FormMessage />
+                        </FormItem>
+                      );
+                    }}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="event_banner_sub_heading"
+                    render={({ field }) => {
+                      const currentLength = field.value?.length || 0;
+                      const maxLength = 80;
+                      return (
+                        <FormItem>
+                          <FormLabel className="text-sm font-medium">
+                            Banner Subheading{" "}
+                            <span className="text-red-400">*</span>
+                          </FormLabel>
+                          <FormControl>
+                            <Input
+                              className="h-11 bg-white/5 border-white/10"
+                              placeholder="Enter banner subheading"
+                              {...field}
+                              value={
+                                typeof field.value === "string"
+                                  ? field.value
+                                  : ""
+                              }
+                              maxLength={maxLength}
+                              onFocus={() =>
+                                handleFieldFocus("event_banner_sub_heading")
+                              }
+                              onChange={(e) => {
+                                field.onChange(e);
+                                globalForm.setValue(
+                                  "stepThree.event_banner_sub_heading",
+                                  e.target.value,
+                                );
+                              }}
+                            />
+                          </FormControl>
+                          <div className="text-xs text-muted-foreground mt-1">
+                            <span
+                              className={
+                                currentLength > maxLength
+                                  ? "text-destructive"
+                                  : ""
+                              }
+                            >
+                              {currentLength}/{maxLength} characters
+                            </span>
+                          </div>
+                          <FormMessage />
+                        </FormItem>
+                      );
+                    }}
+                  />
+
+                  <OnboardingFieldGroupTitle>
+                    Banner Image <span className="text-red-400">*</span>
+                  </OnboardingFieldGroupTitle>
+
                   <Tabs
                     value={bannerType}
                     onValueChange={(v) => setBannerType(v as "image" | "video")}
@@ -862,107 +968,6 @@ export default function StepThree() {
                     </TabsContent>
                   </Tabs>
 
-                  <FormField
-                    control={form.control}
-                    name="event_banner_heading"
-                    render={({ field }) => {
-                      const text =
-                        typeof field.value === "string" ? field.value : "";
-                      const headingWordCount = countWords(text);
-                      return (
-                        <FormItem>
-                          <FormLabel className="text-sm font-medium">
-                            Banner Heading{" "}
-                            <span className="text-red-400">*</span>
-                          </FormLabel>
-                          <FormControl>
-                            <Input
-                              className="h-11 bg-white/5 border-white/10"
-                              placeholder="Enter event title"
-                              {...field}
-                              value={
-                                typeof field.value === "string"
-                                  ? field.value
-                                  : ""
-                              }
-                              onFocus={() =>
-                                handleFieldFocus("event_banner_heading")
-                              }
-                              onChange={(e) => {
-                                const next = truncateToMaxWordsForInput(
-                                  e.target.value,
-                                  BANNER_HEADING_MAX_WORDS,
-                                );
-                                field.onChange(next);
-                                globalForm.setValue(
-                                  "stepThree.event_banner_heading",
-                                  next,
-                                );
-                              }}
-                            />
-                          </FormControl>
-                          <div className="text-xs text-muted-foreground mt-1">
-                            <span>
-                              {headingWordCount}/{BANNER_HEADING_MAX_WORDS}{" "}
-                              words
-                            </span>
-                          </div>
-                          <FormMessage />
-                        </FormItem>
-                      );
-                    }}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="event_banner_sub_heading"
-                    render={({ field }) => {
-                      const currentLength = field.value?.length || 0;
-                      const maxLength = 80;
-                      return (
-                        <FormItem>
-                          <FormLabel className="text-sm font-medium">
-                            Write banner Sub-heading{" "}
-                            <span className="text-red-400">*</span>
-                          </FormLabel>
-                          <FormControl>
-                            <Input
-                              className="h-11 bg-white/5 border-white/10"
-                              placeholder="Enter event title"
-                              {...field}
-                              value={
-                                typeof field.value === "string"
-                                  ? field.value
-                                  : ""
-                              }
-                              maxLength={maxLength}
-                              onFocus={() =>
-                                handleFieldFocus("event_banner_sub_heading")
-                              }
-                              onChange={(e) => {
-                                field.onChange(e);
-                                globalForm.setValue(
-                                  "stepThree.event_banner_sub_heading",
-                                  e.target.value,
-                                );
-                              }}
-                            />
-                          </FormControl>
-                          <div className="text-xs text-muted-foreground mt-1">
-                            <span
-                              className={
-                                currentLength > maxLength
-                                  ? "text-destructive"
-                                  : ""
-                              }
-                            >
-                              {currentLength}/{maxLength} characters
-                            </span>
-                          </div>
-                          <FormMessage />
-                        </FormItem>
-                      );
-                    }}
-                  />
                   <GuidedSectionActionFooter
                     isActive={guided.currentSectionIndex === 0}
                     hideSectionMeta

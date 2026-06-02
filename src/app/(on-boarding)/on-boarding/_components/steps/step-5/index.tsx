@@ -150,6 +150,7 @@ export default function StepFive() {
     : stepFivePersistedApprovedSingle === true;
   const isRoomSwitchHydratingRef = useRef(false);
   const previousRoomIndexRef = useRef(currentRoomIndex);
+  const lastHydratedRoomIndexRef = useRef<number | null>(null);
   const activeScopedDates = roomScope.isMultiRoom
     ? (rooms[currentRoomIndex]?.dates?.dates as StepFiveType["dates"] | undefined)
     : (stepFiveScopedData?.dates as StepFiveType["dates"] | undefined);
@@ -178,8 +179,8 @@ export default function StepFive() {
           };
         }
 
-        // If payment type is full or deposit is disabled, clean deposit fields
-        if (date.payment_type === "full" || date.is_deposit_enabled === false) {
+        // If payment type is full, clean deposit fields
+        if (date.payment_type === "full" || date.payment_type === undefined) {
           return {
             ...date,
             is_deposit_enabled: false,
@@ -189,7 +190,10 @@ export default function StepFive() {
           };
         }
 
-        return date;
+        return {
+          ...date,
+          is_deposit_enabled: true,
+        };
       });
     },
     [],
@@ -212,21 +216,6 @@ export default function StepFive() {
     form.setValue("event_id", eventId);
   }, [eventId, form]);
 
-  // Clean up dates when stepFiveDefaults change (e.g., when loading from API)
-  // This ensures payment fields are removed for tickets booking type
-  useEffect(() => {
-    if (stepFiveDefaults?.dates && stepFiveDefaults.dates.length > 0) {
-      const cleanedDates = cleanDatesData(stepFiveDefaults.dates);
-      // Only update if dates have actually changed to avoid infinite loops
-      const currentDates = form.getValues("dates");
-      const datesChanged =
-        JSON.stringify(currentDates) !== JSON.stringify(cleanedDates);
-      if (datesChanged) {
-        form.setValue("dates", cleanedDates, { shouldValidate: false });
-      }
-    }
-  }, [stepFiveDefaults?.dates, cleanDatesData, form]);
-
   // Rehydrate local form from the active room-scoped step payload on room switch / API hydration.
   // Without this reset, Step 5 can keep stale local values even though `multiSpace.rooms[*].dates`
   // and `stepFive` were updated by `useRoomScopeSync`.
@@ -245,14 +234,17 @@ export default function StepFive() {
         ) as StepFiveType["dates"] | undefined) ?? [];
 
       // Persist the outgoing room snapshot before hydrating the incoming room.
-      // Guard: never overwrite already-meaningful previous room data with blank defaults.
-      if (
-        hasMeaningfulDateData(localDates) ||
-        !hasMeaningfulDateData(existingPreviousDates)
-      ) {
+      // Guard: never store blank default rows on never-configured rooms.
+      if (hasMeaningfulDateData(localDates)) {
         globalForm.setValue(
           `multiSpace.rooms.${previousRoomIndex}.dates`,
           { dates: localDates },
+          { shouldValidate: false, shouldDirty: true },
+        );
+      } else if (!hasMeaningfulDateData(existingPreviousDates)) {
+        globalForm.setValue(
+          `multiSpace.rooms.${previousRoomIndex}.dates`,
+          { dates: [] },
           { shouldValidate: false, shouldDirty: true },
         );
       }
@@ -261,23 +253,44 @@ export default function StepFive() {
     previousRoomIndexRef.current = currentRoomIndex;
   }, [roomScope.isMultiRoom, currentRoomIndex]);
 
+  // Hydrate the local form only when switching rooms (or on first load).
+  // Do NOT re-run when pushToGlobal updates `multiSpace.rooms[*].dates` — that was
+  // Do NOT re-run when pushToGlobal updates `multiSpace.rooms[*].dates`.
   useEffect(() => {
-    const incomingDates = cleanDatesData(activeScopedDates);
-    const currentDates = form.getValues("dates");
-    if (JSON.stringify(currentDates) === JSON.stringify(incomingDates)) {
+    if (!roomScope.isMultiRoom) return;
+
+    const shouldHydrateFromPersisted =
+      persistedProgressHydrated &&
+      lastHydratedRoomIndexRef.current === null;
+    const switchedRoom = lastHydratedRoomIndexRef.current !== currentRoomIndex;
+
+    if (!shouldHydrateFromPersisted && !switchedRoom) {
       isRoomSwitchHydratingRef.current = false;
       return;
     }
+
+    const incomingDates = cleanDatesData(
+      rooms[currentRoomIndex]?.dates?.dates as StepFiveType["dates"] | undefined,
+    );
+    const currentDates = form.getValues("dates");
+    if (JSON.stringify(currentDates) === JSON.stringify(incomingDates)) {
+      lastHydratedRoomIndexRef.current = currentRoomIndex;
+      isRoomSwitchHydratingRef.current = false;
+      return;
+    }
+
     form.reset({
       step: 5,
       event_id: eventId,
       dates: incomingDates,
     });
+    lastHydratedRoomIndexRef.current = currentRoomIndex;
     isRoomSwitchHydratingRef.current = false;
   }, [
-    activeScopedDates,
-    roomScope.currentRoomId,
     roomScope.isMultiRoom,
+    currentRoomIndex,
+    persistedProgressHydrated,
+    rooms,
     eventId,
     cleanDatesData,
     form,
@@ -298,8 +311,6 @@ export default function StepFive() {
   });
 
   // Keep deposit defaults in sync with schema expectations.
-  // Without this, UI can show "Fixed Amount" while underlying `deposit_type`
-  // stays undefined (triggering the red "Deposit type is required" error).
   useEffect(() => {
     if (!Array.isArray(watchedDates)) return;
     watchedDates.forEach((date, index) => {
@@ -315,32 +326,10 @@ export default function StepFive() {
 
       if (date.payment_type !== "deposit") return;
 
-      if (date.is_deposit_enabled === undefined) {
+      if (date.is_deposit_enabled !== true) {
         form.setValue(`dates.${index}.is_deposit_enabled`, true, {
           shouldValidate: false,
         });
-      }
-
-      // When vendor explicitly disables deposit for this date, keep all deposit fields cleared.
-      // This prevents a normalization loop where `deposit_type` is repeatedly set back to "amount"
-      // while cleanup logic keeps removing it.
-      if (date.is_deposit_enabled === false) {
-        if (date.deposit_type !== undefined) {
-          form.setValue(`dates.${index}.deposit_type`, undefined, {
-            shouldValidate: false,
-          });
-        }
-        if (date.deposit_value !== undefined && date.deposit_value !== "") {
-          form.setValue(`dates.${index}.deposit_value`, undefined, {
-            shouldValidate: false,
-          });
-        }
-        if (date.deposit_due_date !== undefined && date.deposit_due_date !== "") {
-          form.setValue(`dates.${index}.deposit_due_date`, undefined, {
-            shouldValidate: false,
-          });
-        }
-        return;
       }
 
       const normalizedType = normalizeDepositType(date.deposit_type);
@@ -352,6 +341,43 @@ export default function StepFive() {
     });
   }, [watchedDates, form]);
 
+  const syncDatesFromFieldPaths = useCallback(
+    (dates: StepFiveType["dates"] | undefined): StepFiveType["dates"] => {
+      if (!dates || dates.length === 0) {
+        return [getDefaultDate("tickets")];
+      }
+
+      return dates.map((fallbackDate, index) => {
+        const dateEntry =
+          (form.getValues(`dates.${index}`) as
+            | StepFiveType["dates"][number]
+            | undefined) ?? fallbackDate;
+        const paymentType = form.getValues(`dates.${index}.payment_type`);
+        const isDepositPayment = paymentType === "deposit";
+        const depositType = form.getValues(`dates.${index}.deposit_type`);
+        const depositValue =
+          form.getValues(`dates.${index}.deposit_value`) ??
+          dateEntry.deposit_value;
+        const depositDueDate =
+          form.getValues(`dates.${index}.deposit_due_date`) ??
+          dateEntry.deposit_due_date;
+
+        return {
+          ...fallbackDate,
+          ...dateEntry,
+          payment_type: paymentType ?? dateEntry.payment_type,
+          is_deposit_enabled: isDepositPayment,
+          deposit_type: isDepositPayment
+            ? normalizeDepositType(depositType ?? dateEntry.deposit_type)
+            : undefined,
+          deposit_value: isDepositPayment ? depositValue : undefined,
+          deposit_due_date: isDepositPayment ? depositDueDate : undefined,
+        };
+      });
+    },
+    [form],
+  );
+
   // Keep global onboarding form in sync so the split preview (FormPreview) updates live.
   // Previously stepFive was only written on Save & Next, so duplicate/add date never appeared in preview.
   useEffect(() => {
@@ -361,8 +387,9 @@ export default function StepFive() {
       }
 
       const data = form.getValues();
+      const syncedDates = syncDatesFromFieldPaths(data.dates);
+      const localDates = cleanDatesData(syncedDates);
       const incomingDates = cleanDatesData(activeScopedDates);
-      const localDates = cleanDatesData(data.dates);
 
       // Do not clobber hydrated room data with the temporary blank default on first mount.
       if (
@@ -376,6 +403,7 @@ export default function StepFive() {
       const currentGlobalStepFive = globalForm.getValues("stepFive");
       const nextGlobalStepFive = {
         ...data,
+        dates: syncedDates,
         event_id: eventId,
       };
       const shouldWriteStepFive =
@@ -394,8 +422,8 @@ export default function StepFive() {
         const currentRoomDates = globalForm.getValues(
           `multiSpace.rooms.${currentRoomIndex}.dates`,
         ) as { dates?: StepFiveType["dates"] } | undefined;
-        const roomDatesFromStore = cleanDatesData(currentRoomDates?.dates);
-        const localHasData = hasMeaningfulDateData(localDates);
+        const roomDatesFromStore = currentRoomDates?.dates ?? [];
+        const localHasData = hasMeaningfulDateData(syncedDates);
         const roomHasData = hasMeaningfulDateData(roomDatesFromStore);
 
         // Critical hydration guard:
@@ -405,13 +433,17 @@ export default function StepFive() {
           return;
         }
 
+        if (!localHasData) {
+          return;
+        }
+
         const shouldWriteRoomDates =
           JSON.stringify(roomDatesFromStore ?? []) !==
-          JSON.stringify(localDates);
+          JSON.stringify(syncedDates);
         if (shouldWriteRoomDates) {
           globalForm.setValue(
             `multiSpace.rooms.${currentRoomIndex}.dates`,
-            { dates: localDates },
+            { dates: syncedDates },
             { shouldValidate: false, shouldDirty: true },
           );
         }
@@ -433,6 +465,7 @@ export default function StepFive() {
     currentRoomIndex,
     cleanDatesData,
     activeScopedDates,
+    syncDatesFromFieldPaths,
   ]);
 
   // Update dates when booking type changes for a specific date
@@ -494,9 +527,9 @@ export default function StepFive() {
         form.setValue(`dates.${dateIndex}.tickets`, []);
         form.setValue(`dates.${dateIndex}.payment_type`, "full");
         form.setValue(`dates.${dateIndex}.is_deposit_enabled`, false);
-        form.setValue(`dates.${dateIndex}.deposit_type`, "amount");
-        form.setValue(`dates.${dateIndex}.deposit_value`, "");
-        form.setValue(`dates.${dateIndex}.deposit_due_date`, "");
+        form.setValue(`dates.${dateIndex}.deposit_type`, undefined);
+        form.setValue(`dates.${dateIndex}.deposit_value`, undefined);
+        form.setValue(`dates.${dateIndex}.deposit_due_date`, undefined);
       } else {
         // both
         form.setValue(
@@ -539,9 +572,9 @@ export default function StepFive() {
         // Set default payment fields for both
         form.setValue(`dates.${dateIndex}.payment_type`, "full");
         form.setValue(`dates.${dateIndex}.is_deposit_enabled`, false);
-        form.setValue(`dates.${dateIndex}.deposit_type`, "amount");
-        form.setValue(`dates.${dateIndex}.deposit_value`, "");
-        form.setValue(`dates.${dateIndex}.deposit_due_date`, "");
+        form.setValue(`dates.${dateIndex}.deposit_type`, undefined);
+        form.setValue(`dates.${dateIndex}.deposit_value`, undefined);
+        form.setValue(`dates.${dateIndex}.deposit_due_date`, undefined);
       }
     },
     [form],
@@ -1358,16 +1391,32 @@ export default function StepFive() {
                                 value={field.value}
                                 onValueChange={(value: "full" | "deposit") => {
                                   field.onChange(value);
-                                  // Update is_deposit_enabled based on payment type
                                   if (value === "full") {
                                     form.setValue(
                                       `dates.${dateIndex}.is_deposit_enabled`,
                                       false,
                                     );
-                                  } else if (value === "deposit") {
+                                    form.setValue(
+                                      `dates.${dateIndex}.deposit_type`,
+                                      undefined,
+                                    );
+                                    form.setValue(
+                                      `dates.${dateIndex}.deposit_value`,
+                                      undefined,
+                                    );
+                                    form.setValue(
+                                      `dates.${dateIndex}.deposit_due_date`,
+                                      undefined,
+                                    );
+                                  } else {
                                     form.setValue(
                                       `dates.${dateIndex}.is_deposit_enabled`,
                                       true,
+                                    );
+                                    form.setValue(
+                                      `dates.${dateIndex}.deposit_type`,
+                                      "amount",
+                                      { shouldValidate: false },
                                     );
                                   }
                                   handleFieldFocus(
@@ -1404,79 +1453,11 @@ export default function StepFive() {
                     {form.watch(`dates.${dateIndex}.payment_type`) ===
                       "deposit" && (
                       <div className="space-y-4 border-t border-white/10 pt-4">
-                        {/* Enable/Disable Deposit Toggle */}
+                        {/* Deposit Type Selection */}
                         <FormField
                           control={form.control}
-                          name={`dates.${dateIndex}.is_deposit_enabled`}
+                          name={`dates.${dateIndex}.deposit_type`}
                           render={({ field }) => (
-                            <FormItem className="flex flex-row items-center justify-between rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2.5">
-                              <div className="space-y-0.5">
-                                <FormLabel>Enable Deposit</FormLabel>
-                                <div className="text-sm text-muted-foreground">
-                                  Allow customers to pay deposit for this date
-                                </div>
-                              </div>
-                              <FormControl>
-                                <div className="inline-flex items-center rounded-lg border border-white/10 bg-white/[0.04] p-1">
-                                  <Button
-                                    type="button"
-                                    size="sm"
-                                    variant="ghost"
-                                    onClick={() => field.onChange(true)}
-                                    className={
-                                      field.value !== false
-                                        ? "h-7 px-3 text-xs font-semibold bg-[var(--color-secondary,var(--color-primary))] text-white hover:bg-[var(--color-secondary,var(--color-primary))]"
-                                        : "h-7 px-3 text-xs font-medium text-slate-300 hover:bg-white/10"
-                                    }
-                                  >
-                                    Yes
-                                  </Button>
-                                  <Button
-                                    type="button"
-                                    size="sm"
-                                    variant="ghost"
-                                    onClick={() => {
-                                      field.onChange(false);
-                                      form.setValue(
-                                        `dates.${dateIndex}.deposit_type`,
-                                        undefined,
-                                        { shouldValidate: false },
-                                      );
-                                      form.setValue(
-                                        `dates.${dateIndex}.deposit_value`,
-                                        undefined,
-                                        { shouldValidate: false },
-                                      );
-                                      form.setValue(
-                                        `dates.${dateIndex}.deposit_due_date`,
-                                        undefined,
-                                        { shouldValidate: false },
-                                      );
-                                    }}
-                                    className={
-                                      field.value === false
-                                        ? "h-7 px-3 text-xs font-semibold bg-[var(--color-secondary,var(--color-primary))] text-white hover:bg-[var(--color-secondary,var(--color-primary))]"
-                                        : "h-7 px-3 text-xs font-medium text-slate-300 hover:bg-white/10"
-                                    }
-                                  >
-                                    No
-                                  </Button>
-                                </div>
-                              </FormControl>
-                            </FormItem>
-                          )}
-                        />
-
-                        {/* Only show deposit fields if enabled */}
-                        {form.watch(
-                          `dates.${dateIndex}.is_deposit_enabled`,
-                        ) && (
-                          <>
-                            {/* Deposit Type Selection */}
-                            <FormField
-                              control={form.control}
-                              name={`dates.${dateIndex}.deposit_type`}
-                              render={({ field }) => (
                                 <FormItem>
                                   <FormLabel className="text-md font-medium">
                                     Deposit Type
@@ -1639,8 +1620,6 @@ export default function StepFive() {
                                 )}
                               />
                             </div>
-                          </>
-                        )}
                       </div>
                     )}
                   </div>
@@ -1690,90 +1669,68 @@ export default function StepFive() {
   const handleSubmit = async (applyToAllRooms = false) => {
     setLoading(true);
     try {
-      // Get form data
       const formData = form.getValues();
-
-      // Clean up payment fields for tickets booking type and deposit fields when payment is full
-      const data = {
-        ...formData,
-        dates: cleanDatesData(formData.dates),
+      const syncedDates = syncDatesFromFieldPaths(formData.dates);
+      const validationPayload = {
+        step: 5 as const,
+        event_id: eventId,
+        dates: syncedDates,
       };
 
-      // Update form with cleaned data
-      form.setValue("dates", data.dates, { shouldValidate: false });
+      const validation = stepFiveSchema.safeParse(validationPayload);
 
-      // Ensure we're using the latest event_id
-      data.event_id = eventId;
+      if (!validation.success) {
+        form.clearErrors("dates");
+        validation.error.issues.forEach((issue) => {
+          if (issue.path[0] !== "dates") return;
+          const fieldPath = issue.path.join(".");
+          form.setError(fieldPath as never, {
+            type: "manual",
+            message: issue.message,
+          });
+        });
 
-      // Update global form
-      globalForm.setValue("stepFive", data);
+        const dateErrors: string[] = [];
+        const FIELD_LABELS: Record<string, string> = {
+          event_date: "event date",
+          booking_type: "booking type",
+          payment_type: "payment type",
+          deposit_type: "deposit type",
+          deposit_value: "deposit amount",
+          deposit_due_date: "balance due date",
+          tickets: "ticket info",
+          tables: "table info",
+        };
 
-      // Validate the form after cleaning
-      const isValid = await form.trigger();
-
-      // Check for any errors in the form state (including manual errors)
-      const hasErrors = Object.keys(form.formState.errors).length > 0;
-
-      if (!isValid || hasErrors) {
-        const errors = form.formState.errors;
-
-        const errorMessages: string[] = [];
-
-        if (errors.dates) {
-          const FIELD_LABELS: Record<string, string> = {
-            event_date: "event date",
-            booking_type: "booking type",
-            payment_type: "payment type",
-            deposit_type: "deposit type",
-            deposit_value: "deposit amount",
-            deposit_due_date: "balance due date",
-            tickets: "ticket info",
-            tables: "table info",
-          };
-
-          const dateErrors: string[] = [];
-
-          if (Array.isArray(errors.dates)) {
-            errors.dates.forEach((dateError, index) => {
-              if (!dateError || typeof dateError !== "object") return;
-
-              const de = dateError as Record<string, unknown>;
-              const badFields = Object.keys(de)
-                .filter((k) => de[k] !== undefined && de[k] !== null)
-                .map((k) => FIELD_LABELS[k] ?? k.replace(/_/g, " "));
-
-              if (badFields.length > 0) {
-                const shown = badFields.slice(0, 3).join(", ");
-                const extra =
-                  badFields.length > 3 ? ` +${badFields.length - 3} more` : "";
-                dateErrors.push(`Date ${index + 1}: ${shown}${extra}`);
-              } else {
-                dateErrors.push(`Date ${index + 1}: incomplete`);
-              }
-            });
+        validation.error.issues.forEach((issue) => {
+          if (issue.path[0] !== "dates" || typeof issue.path[1] !== "number") {
+            return;
           }
+          const fieldKey = String(issue.path[2] ?? "general");
+          const label = FIELD_LABELS[fieldKey] ?? fieldKey.replace(/_/g, " ");
+          dateErrors.push(`Date ${issue.path[1] + 1}: ${label}`);
+        });
 
-          errorMessages.push(
-            dateErrors.length > 0
-              ? `Please fix — ${dateErrors.join(" | ")}`
-              : "Please complete all date entries before saving",
-          );
-        }
-
-        const otherErrorFields = Object.keys(errors).filter(
-          (k) => k !== "dates",
+        toast.error(
+          dateErrors.length > 0
+            ? `Please fix — ${Array.from(new Set(dateErrors)).join(" | ")}`
+            : "Please complete all date entries before saving",
         );
-        if (otherErrorFields.length > 0) {
-          errorMessages.push(`Please correct: ${otherErrorFields.join(", ")}`);
-        }
-
-        if (errorMessages.length > 0) {
-          toast.error(errorMessages.join("; "));
-        }
 
         setLoading(false);
         return;
       }
+
+      form.clearErrors("dates");
+      form.setValue("dates", syncedDates, { shouldValidate: false });
+
+      const data = {
+        ...formData,
+        event_id: eventId,
+        dates: cleanDatesData(syncedDates),
+      };
+
+      globalForm.setValue("stepFive", data);
 
       // Branch on multi-room mode. In single-room mode this calls the existing endpoint
       // unchanged; in multi-room mode it dispatches to the room-scoped endpoint and mirrors

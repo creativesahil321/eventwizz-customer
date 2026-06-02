@@ -119,30 +119,36 @@ export function patchOnboardingPayloadFromApi(
   if (hydratedMultiSpace) {
     dataAny.multiSpace = hydratedMultiSpace;
 
-    // Mirror shared catering menus onto stepSix so Step 6 binds the same data in every room tab.
-    let sharedMenus: unknown[] = [];
-    let sharedCategoryId: number | undefined;
-    for (const room of hydratedMultiSpace.rooms) {
-      const catering = room.catering as Record<string, unknown> | undefined;
-      if (!catering) continue;
-      const menus = catering.menus;
-      if (Array.isArray(menus) && menus.length > sharedMenus.length) {
-        sharedMenus = menus;
-        if (typeof catering.event_menu_category_id === "number") {
-          sharedCategoryId = catering.event_menu_category_id;
-        }
-      }
-    }
-    if (sharedMenus.length > 0) {
+    // Bind stepSix to the active room's catering — menus are per-room, not shared.
+    const activeIdx = Math.min(
+      hydratedMultiSpace.currentRoomIndex ?? 0,
+      Math.max(hydratedMultiSpace.rooms.length - 1, 0),
+    );
+    const activeCatering = hydratedMultiSpace.rooms[activeIdx]?.catering as
+      | Record<string, unknown>
+      | undefined;
+    if (activeCatering) {
       const existingStepSix =
         typeof dataAny.stepSix === "object" && dataAny.stepSix !== null
           ? (dataAny.stepSix as Record<string, unknown>)
           : {};
       dataAny.stepSix = {
         ...existingStepSix,
-        menus: sharedMenus,
-        ...(sharedCategoryId !== undefined
-          ? { event_menu_category_id: sharedCategoryId }
+        catering_option:
+          typeof activeCatering.catering_option === "number"
+            ? activeCatering.catering_option
+            : existingStepSix.catering_option,
+        menu_title:
+          typeof activeCatering.menu_title === "string"
+            ? activeCatering.menu_title
+            : "",
+        menu_description:
+          typeof activeCatering.menu_description === "string"
+            ? activeCatering.menu_description
+            : "",
+        menus: Array.isArray(activeCatering.menus) ? activeCatering.menus : [],
+        ...(typeof activeCatering.event_menu_category_id === "number"
+          ? { event_menu_category_id: activeCatering.event_menu_category_id }
           : {}),
       };
     }
@@ -219,6 +225,22 @@ function hydrateMultiSpaceFromApi(
   const stepSevenRooms = isRecord((payload.stepSeven as Record<string, unknown> | undefined)?.rooms)
     ? ((payload.stepSeven as Record<string, unknown>).rooms as Record<string, unknown>)
     : undefined;
+  const stepEightRawRooms = (payload.stepEight as Record<string, unknown> | undefined)?.rooms;
+  const stepEightRooms = isRecord(stepEightRawRooms)
+    ? (stepEightRawRooms as Record<string, unknown>)
+    : Array.isArray(stepEightRawRooms)
+      ? Object.fromEntries(
+        stepEightRawRooms
+          .filter((room): room is Record<string, unknown> => isRecord(room))
+          .map((room, index) => {
+            const name =
+              typeof room.name === "string" && room.name.trim()
+                ? room.name.trim()
+                : `Room ${index + 1}`;
+            return [name, room];
+          }),
+      )
+      : undefined;
 
   if (
     !enabled &&
@@ -226,7 +248,8 @@ function hydrateMultiSpaceFromApi(
     !stepFourRooms &&
     !stepFiveRooms &&
     !stepSixRooms &&
-    !stepSevenRooms
+    !stepSevenRooms &&
+    !stepEightRooms
   ) {
     return undefined;
   }
@@ -250,10 +273,12 @@ function hydrateMultiSpaceFromApi(
       isApprovedBrochure: Boolean(
         r.isApprovedBrochure ?? r.is_approved_brochure,
       ),
+      isApprovedDrinks: Boolean(r.isApprovedDrinks ?? r.is_approved_drinks),
       package: (r.package as Record<string, unknown>) ?? {},
       dates: (r.dates as Record<string, unknown>) ?? { dates: [] },
       catering: (r.catering as Record<string, unknown>) ?? {},
       brochure: (r.brochure as Record<string, unknown>) ?? {},
+      drinks: (r.drinks as Record<string, unknown>) ?? {},
     }));
 
   const roomMap = new Map<string, Record<string, unknown> & { id?: number; name: string }>();
@@ -272,10 +297,12 @@ function hydrateMultiSpaceFromApi(
       isApprovedDates: Boolean(existing?.isApprovedDates),
       isApprovedCatering: Boolean(existing?.isApprovedCatering),
       isApprovedBrochure: Boolean(existing?.isApprovedBrochure),
+      isApprovedDrinks: Boolean(existing?.isApprovedDrinks),
       package: (existing?.package as Record<string, unknown>) ?? {},
       dates: (existing?.dates as Record<string, unknown>) ?? { dates: [] },
       catering: (existing?.catering as Record<string, unknown>) ?? {},
       brochure: (existing?.brochure as Record<string, unknown>) ?? {},
+      drinks: (existing?.drinks as Record<string, unknown>) ?? {},
       ...existing,
       ...patch,
     });
@@ -355,6 +382,7 @@ function hydrateMultiSpaceFromApi(
   if (stepFiveRooms) {
     Object.entries(stepFiveRooms).forEach(([roomName, roomVal]) => {
       if (!isRecord(roomVal)) return;
+      const hydratedDates = Array.isArray(roomVal.dates) ? roomVal.dates : [];
       upsertRoomByName(roomName, {
         id:
           typeof roomVal.room_id === "number"
@@ -364,7 +392,10 @@ function hydrateMultiSpaceFromApi(
           (payload.stepFive as Record<string, unknown> | undefined)?.isApproved,
         ),
         dates: {
-          dates: Array.isArray(roomVal.dates) ? roomVal.dates : [],
+          dates: hydratedDates,
+        },
+        persistedDates: {
+          dates: JSON.parse(JSON.stringify(hydratedDates)),
         },
       });
     });
@@ -465,41 +496,58 @@ function hydrateMultiSpaceFromApi(
     });
   }
 
-  let rooms = Array.from(roomMap.values()).slice(0, MAX_ROOMS);
-
-  // Catering menus are shared across all rooms — use the fullest menus payload everywhere.
-  if (stepSixRooms && rooms.length > 0) {
-    let sharedMenus: unknown[] = [];
-    let sharedCategoryId: number | undefined;
-    for (const room of rooms) {
-      const catering = room.catering as Record<string, unknown> | undefined;
-      if (!catering) continue;
-      const menus = catering.menus;
-      if (Array.isArray(menus) && menus.length > sharedMenus.length) {
-        sharedMenus = menus;
-        if (typeof catering.event_menu_category_id === "number") {
-          sharedCategoryId = catering.event_menu_category_id;
-        }
-      }
-    }
-    if (sharedMenus.length > 0) {
-      rooms = rooms.map((room) => ({
-        ...room,
-        catering: {
-          ...(room.catering as Record<string, unknown>),
-          menus: sharedMenus,
-          ...(sharedCategoryId !== undefined
-            ? { event_menu_category_id: sharedCategoryId }
-            : {}),
+  if (stepEightRooms) {
+    Object.entries(stepEightRooms).forEach(([roomName, roomVal]) => {
+      if (!isRecord(roomVal)) return;
+      upsertRoomByName(roomName, {
+        id:
+          typeof roomVal.room_id === "number"
+            ? roomVal.room_id
+            : typeof roomVal.id === "number"
+              ? roomVal.id
+              : undefined,
+        isApprovedDrinks: Boolean(
+          (payload.stepEight as Record<string, unknown> | undefined)?.isApproved,
+        ),
+        drinks: {
+          drink_title:
+            typeof roomVal.drink_title === "string"
+              ? roomVal.drink_title
+              : typeof (payload.stepEight as Record<string, unknown> | undefined)
+                ?.drink_title === "string"
+                ? (payload.stepEight as Record<string, unknown>).drink_title
+                : "",
+          drink_description:
+            typeof roomVal.drink_description === "string"
+              ? roomVal.drink_description
+              : typeof (payload.stepEight as Record<string, unknown> | undefined)
+                ?.drink_description === "string"
+                ? (payload.stepEight as Record<string, unknown>).drink_description
+                : "",
+          packages: Array.isArray(roomVal.packages)
+            ? roomVal.packages
+            : Array.isArray(
+              (payload.stepEight as Record<string, unknown> | undefined)?.packages,
+            )
+              ? ((payload.stepEight as Record<string, unknown>).packages as unknown[])
+              : [],
         },
-      }));
-    }
+      });
+    });
   }
+
+  const rooms = Array.from(roomMap.values()).slice(0, MAX_ROOMS);
 
   return {
     enabled:
       enabled ||
-      Boolean(stepFourRooms || stepFiveRooms || stepSixRooms || stepSevenRooms),
+      Boolean(
+        stepFourRooms ||
+          stepFiveRooms ||
+          stepSixRooms ||
+          stepSevenRooms ||
+          stepEightRooms,
+      ),
     currentRoomIndex: Math.min(
       Number(direct?.currentRoomIndex ?? direct?.current_room_index ?? 0) || 0,
       Math.max(rooms.length - 1, 0),

@@ -12,8 +12,13 @@ export const eventKeys = {
   list: (filters: Record<string, unknown>) =>
     [...eventKeys.lists(), filters] as const,
   categories: () => [...eventKeys.all, "categories"] as const,
-  menuCategories: (roomId?: number | null) =>
-    [...eventKeys.all, "menuCategories", roomId ?? "event"] as const,
+  menuCategories: (eventId?: number | null, roomId?: number | null) =>
+    [
+      ...eventKeys.all,
+      "menuCategories",
+      eventId ?? "none",
+      roomId ?? "event",
+    ] as const,
   details: () => [...eventKeys.all, "detail"] as const,
   detail: (id: number) => [...eventKeys.details(), id] as const,
 };
@@ -78,6 +83,8 @@ export const useEventCategories = () => {
 };
 
 export type UseEventMenuCategoriesOptions = {
+  /** Vendor event id — required by GET /vendor/event-menus */
+  eventId?: number | null;
   /** Pass when multi-room / event spaces are enabled */
   roomId?: number | null;
   enabled?: boolean;
@@ -89,6 +96,10 @@ export type UseEventMenuCategoriesOptions = {
 export const useEventMenuCategories = (
   options: UseEventMenuCategoriesOptions = {},
 ) => {
+  const eventId =
+    options.eventId != null && options.eventId > 0
+      ? options.eventId
+      : undefined;
   const roomId =
     options.roomId != null && options.roomId > 0 ? options.roomId : undefined;
 
@@ -97,18 +108,19 @@ export const useEventMenuCategories = (
     Error,
     NormalizedMenuCategoryResponse
   >({
-    queryKey: eventKeys.menuCategories(roomId),
+    queryKey: eventKeys.menuCategories(eventId, roomId),
     queryFn: async () => {
       try {
-        const response = await eventsService.getEventMenuCategories(
-          roomId != null ? { room_id: roomId } : undefined,
-        );
+        const response = await eventsService.getEventMenuCategories({
+          event_id: eventId as number,
+          ...(roomId != null ? { room_id: roomId } : {}),
+        });
         return response;
       } catch (error) {
         throw error;
       }
     },
-    enabled: options.enabled !== false,
+    enabled: options.enabled !== false && eventId != null,
     select: (data) => {
       // Check if data is an array (direct response format)
       if (Array.isArray(data)) {

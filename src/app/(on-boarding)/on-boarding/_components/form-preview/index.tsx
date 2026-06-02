@@ -6,23 +6,20 @@ import React, {
   lazy,
   Suspense,
   useRef,
-  useContext,
   type CSSProperties,
 } from "react";
 import { useFormContext } from "../form-provider";
 import { OnboardingFormData, type StepFiveType } from "../form-provider/schema";
 import { Skeleton } from "@/components/ui/skeleton";
 import { PreviewProvider } from "@/contexts/preview-context";
-import CommonHeader from "@/components/shared/common-header";
-import { ServerContext } from "@/lib/server-context";
-import { ThemeSchema } from "@/types/theme.types";
 import type { SiteEssentialsFormValues } from "@/app/(protected)/_shared/sites-essentials/_lib/schema";
 import {
   buildOnboardingStepTwoSiteEssentialsValues,
   siteEssentialsToPreviewRootStyle,
 } from "../../_lib/onboarding-site-essentials-bridge";
+import { OnboardingPreviewHeader } from "./onboarding-preview-header";
+import { ONBOARDING_ROOM_SELECTOR_SCROLL_THRESHOLD_PX } from "./preview-layout-constants";
 import { SiteEssentialsGoogleFontsLoader } from "@/components/shared/site-essentials-google-fonts-loader";
-import { PreviewRoomFloatingSelector } from "../rooms/preview-room-floating-selector";
 import FooterSection from "@/app/(public)/vendor/_components/EventListPage/footer";
 import HeroBanner from "@/app/(public)/vendor/_components/EventListPage/hero-banner";
 import ExperienceSection from "@/app/(public)/vendor/_components/EventListPage/experience";
@@ -90,6 +87,10 @@ function resolveOnboardingLogoUrl(
 ): string | null {
   if (logo == null) return null;
   if (typeof logo === "string") return logo;
+  if (logo instanceof File) {
+    const preview = (logo as File & { preview?: string }).preview;
+    return preview ?? null;
+  }
   if (
     typeof logo === "object" &&
     "preview" in logo &&
@@ -102,26 +103,29 @@ function resolveOnboardingLogoUrl(
 
 /** Same steps as `form-layout` `splitLayoutSteps` — live preview with tenant theme styles. */
 const ONBOARDING_THEME_PREVIEW_STEPS = new Set([2, 3, 4, 5, 6, 7, 8, 9]);
-/** Steps where the per-room floating selector should appear in the live preview. Mirrors the
- *  steps that bind to `multiSpace.rooms[i]` data (Package, Dates, Catering, Brochure info). */
-const ROOM_FLOATING_SELECTOR_STEPS = new Set([4, 5, 6, 7]);
+/** Event preview onward — room floating selector is for event pages only, not Site (step 2). */
+const EVENT_PREVIEW_ROOM_SELECTOR_STEPS = new Set([3, 4, 5, 6, 7, 8, 9]);
 
 // Only load components needed for the current step
 export default function FormPreview() {
-  const { form, activeStep, activeField } = useFormContext();
+  const { form, activeStep, activeField, previewTheme } = useFormContext();
   const currencySymbol = useCurrencySymbol();
-  const { theme } = useContext(ServerContext);
   const [formState, setFormState] = useState<OnboardingFormData>(
     form.getValues(),
   );
+  const [formTick, setFormTick] = useState(0);
 
   const tryThemePreviewValues = useMemo((): SiteEssentialsFormValues | null => {
     if (!ONBOARDING_THEME_PREVIEW_STEPS.has(activeStep)) return null;
-    return buildOnboardingStepTwoSiteEssentialsValues(
-      formState,
-      theme as ThemeSchema | null | undefined,
-    );
-  }, [activeStep, formState.stepOne, formState.stepTwo, theme]);
+    return buildOnboardingStepTwoSiteEssentialsValues(formState, previewTheme);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    activeStep,
+    formState.stepOne,
+    formState.stepTwo,
+    previewTheme,
+    formTick,
+  ]);
 
   const tryHeroPreviewProps = useMemo(() => {
     if (
@@ -152,7 +156,8 @@ export default function FormPreview() {
       Math.max(rooms.length - 1, 0),
     );
     return rooms[idx]?.brochure ?? formState.stepSeven;
-  }, [formState.multiSpace, formState.stepSeven]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [formState.multiSpace, formState.stepSeven, formTick]);
 
   const activePreviewBrochureLocation = useMemo(() => {
     const location = activePreviewBrochure?.location;
@@ -169,7 +174,9 @@ export default function FormPreview() {
 
   const activePreviewBrochurePrice = useMemo(() => {
     const price = activePreviewBrochure?.price;
-    const startFrom = String(activePreviewBrochure?.price_start_from ?? "").trim();
+    const startFrom = String(
+      activePreviewBrochure?.price_start_from ?? "",
+    ).trim();
     return {
       title: price?.title || "",
       description:
@@ -260,7 +267,9 @@ export default function FormPreview() {
       if (
         field &&
         !alreadyRepresentedInDownloads &&
-        !downloads.some((d) => normalizeTitle(d.title) === normalizeTitle(title))
+        !downloads.some(
+          (d) => normalizeTitle(d.title) === normalizeTitle(title),
+        )
       ) {
         downloads.push({
           title,
@@ -294,31 +303,39 @@ export default function FormPreview() {
   const moreInfoRef = useRef<HTMLDivElement>(null);
   const faqRef = useRef<HTMLDivElement>(null);
   const previewContainerRef = useRef<HTMLDivElement>(null);
+  const [roomSelectorScrollVisible, setRoomSelectorScrollVisible] =
+    useState(false);
 
-  const [isPastTimeline, setIsPastTimeline] = useState(false);
+  const showRoomFloatingSelector = useMemo(() => {
+    const ms = formState.multiSpace;
+    return (
+      Boolean(ms?.enabled) &&
+      (ms?.rooms?.length ?? 0) > 0 &&
+      EVENT_PREVIEW_ROOM_SELECTOR_STEPS.has(activeStep)
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeStep, formState.multiSpace, formTick]);
+
   useEffect(() => {
-    const root = previewContainerRef.current;
-    const target = timelineRef.current;
-    if (!root || !target || !ROOM_FLOATING_SELECTOR_STEPS.has(activeStep)) {
-      setIsPastTimeline(false);
+    const container = previewContainerRef.current;
+    if (!container || !showRoomFloatingSelector) {
+      setRoomSelectorScrollVisible(false);
       return;
     }
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (!entry || !entry.rootBounds) return;
-        const pastTop =
-          !entry.isIntersecting &&
-          entry.boundingClientRect.bottom <= entry.rootBounds.top;
-        // Show the room selector from the timeline section onward:
-        // - while timeline is visible
-        // - and after timeline has scrolled past the top
-        setIsPastTimeline(entry.isIntersecting || pastTop);
-      },
-      { root, threshold: 0 },
+
+    const threshold = Math.max(
+      ONBOARDING_ROOM_SELECTOR_SCROLL_THRESHOLD_PX,
+      container.clientHeight * 0.22,
     );
-    observer.observe(target);
-    return () => observer.disconnect();
-  }, [activeStep]);
+
+    const handleScroll = () => {
+      setRoomSelectorScrollVisible(container.scrollTop >= threshold);
+    };
+
+    handleScroll();
+    container.addEventListener("scroll", handleScroll, { passive: true });
+    return () => container.removeEventListener("scroll", handleScroll);
+  }, [showRoomFloatingSelector, activeStep]);
 
   const activePreviewPackage = useMemo(() => {
     const ms = formState.multiSpace;
@@ -331,7 +348,8 @@ export default function FormPreview() {
       Math.max(rooms.length - 1, 0),
     );
     return rooms[idx]?.package ?? formState.stepFour;
-  }, [formState.multiSpace, formState.stepFour]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [formState.multiSpace, formState.stepFour, formTick]);
 
   const activePreviewDates = useMemo(() => {
     const ms = formState.multiSpace;
@@ -348,7 +366,8 @@ export default function FormPreview() {
       return roomDates as StepFiveType["dates"];
     }
     return formState.stepFive?.dates;
-  }, [formState.multiSpace, formState.stepFive?.dates]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [formState.multiSpace, formState.stepFive?.dates, formTick]);
 
   const activePreviewCatering = useMemo(() => {
     const ms = formState.multiSpace;
@@ -360,72 +379,111 @@ export default function FormPreview() {
       ms.currentRoomIndex ?? 0,
       Math.max(rooms.length - 1, 0),
     );
-    return rooms[idx]?.catering ?? formState.stepSix;
-  }, [formState.multiSpace, formState.stepSix]);
+    const roomCatering = rooms[idx]?.catering;
+    if (roomCatering) {
+      return roomCatering;
+    }
+    return {
+      catering_option: formState.stepSix?.catering_option ?? 0,
+      menu_title: "",
+      menu_description: "",
+      menus: [],
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [formState.multiSpace, formState.stepSix?.catering_option, formTick]);
+
+  const activePreviewDrinks = useMemo(() => {
+    const ms = formState.multiSpace;
+    const rooms = ms?.rooms ?? [];
+    if (!ms?.enabled || rooms.length === 0) {
+      return formState.stepEight;
+    }
+    const idx = Math.min(
+      ms.currentRoomIndex ?? 0,
+      Math.max(rooms.length - 1, 0),
+    );
+    return rooms[idx]?.drinks ?? formState.stepEight;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [formState.multiSpace, formState.stepEight, formTick]);
 
   // Stable gallery for preview: reuse File.preview when set (avoids new blob URLs on reorder so preview updates instantly)
   const galleryPreviewItems = useMemo(() => {
     const gallery = activePreviewPackage?.gallery;
-    const fallbackImage = {
-      path: "/assets/images/gallery-image.png",
-      relativePath: "/assets/images/gallery-image.png",
-      preview: "/assets/images/gallery-image.png",
-    };
     if (!gallery || gallery.length === 0) {
       return [];
     }
-    return gallery.map((image) => {
-      if (typeof image === "string") {
-        return {
-          path: image,
-          relativePath: image,
-          preview: image,
-        };
-      }
-
-      if (image instanceof File) {
-        const fileWithPreview = image as File & { preview?: string };
-        return {
-          path: image.name,
-          relativePath: image.name,
-          preview: fileWithPreview.preview || URL.createObjectURL(image),
-        };
-      }
-
-      if (typeof image === "object" && image !== null && "url" in image) {
-        const galleryItem = image as { id: number; url: string };
-        return {
-          path: galleryItem.url,
-          relativePath: galleryItem.url,
-          preview: galleryItem.url,
-        };
-      }
-
-      if (typeof image === "object" && image !== null) {
-        const anyImage = image as {
-          preview?: string;
-          path?: string;
-          relativePath?: string;
-        };
-        const src =
-          anyImage.preview || anyImage.path || anyImage.relativePath || "";
-        if (src) {
+    return gallery
+      .map((image) => {
+        if (typeof image === "string") {
+          const value = String(image).trim();
+          if (!value) return null;
           return {
-            path: anyImage.path || src,
-            relativePath: anyImage.relativePath || src,
-            preview: anyImage.preview || src,
+            path: value,
+            relativePath: value,
+            preview: value,
           };
         }
-      }
 
-      return fallbackImage;
-    });
-  }, [activePreviewPackage?.gallery]);
+        if (image instanceof File) {
+          const fileWithPreview = image as File & { preview?: string };
+          return {
+            path: image.name,
+            relativePath: image.name,
+            preview: fileWithPreview.preview || URL.createObjectURL(image),
+          };
+        }
 
-  // Force re-render when form data changes
+        if (typeof image === "object" && image !== null && "url" in image) {
+          const galleryItem = image as { id: number; url: string };
+          const value = String(galleryItem.url ?? "").trim();
+          if (!value) return null;
+          return {
+            path: value,
+            relativePath: value,
+            preview: value,
+          };
+        }
+
+        if (typeof image === "object" && image !== null) {
+          const anyImage = image as {
+            preview?: string;
+            path?: string;
+            relativePath?: string;
+          };
+          const src =
+            anyImage.preview || anyImage.path || anyImage.relativePath || "";
+          if (src) {
+            return {
+              path: anyImage.path || src,
+              relativePath: anyImage.relativePath || src,
+              preview: anyImage.preview || src,
+            };
+          }
+        }
+
+        return null;
+      })
+      .filter(
+        (
+          item,
+        ): item is {
+          path: string;
+          relativePath: string;
+          preview: string;
+        } => item !== null,
+      );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activePreviewPackage?.gallery, formTick]);
+
+  // Force re-render when form data changes.
+  // RHF's watch callback can return the same mutable reference — the tick
+  // counter guarantees React schedules a re-render even when the top-level
+  // object identity is unchanged, so every useMemo that includes `formTick`
+  // in its deps list will re-evaluate.
   useEffect(() => {
     const subscription = form.watch((value) => {
       setFormState(value as OnboardingFormData);
+      setFormTick((t) => t + 1);
     });
 
     return () => subscription.unsubscribe();
@@ -587,19 +645,15 @@ export default function FormPreview() {
       ? "bg-none text-[var(--color-text)] font-body"
       : "bg-[var(--color-background)] text-[var(--color-text)] font-body";
 
-    const themeTyped = theme as ThemeSchema | null | undefined;
     const sectionPopular =
       (typeof tv.event_title_1 === "string" && tv.event_title_1.trim()) ||
-      themeTyped?.event_title_1?.trim() ||
       "Popular Events";
     const sectionUpcoming =
       (typeof tv.event_title_2 === "string" && tv.event_title_2.trim()) ||
-      themeTyped?.event_title_2?.trim() ||
       "Upcoming Events";
     const galleryTitle =
       (typeof tv.event_gallery_title === "string" &&
         tv.event_gallery_title.trim()) ||
-      themeTyped?.event_gallery_title?.trim() ||
       "Recent Events Glimpse";
 
     const getMediaPreviewUrl = (
@@ -615,10 +669,10 @@ export default function FormPreview() {
 
     return (
       <div className="event-detail-page">
-        <CommonHeader
+        <OnboardingPreviewHeader
+          scrollContainerRef={previewContainerRef}
           contact_number={formState.stepOne?.contact_number || ""}
           logo={formState.stepTwo?.logo || null}
-          variant="default"
         />
 
         <div
@@ -710,17 +764,33 @@ export default function FormPreview() {
       typeof formState.stepThree?.event_banner_video === "string"
         ? formState.stepThree.event_banner_video
         : undefined;
-    const legacyStepThreeTimeline = formState.stepThree as unknown as {
-      event_schedular_title?: string;
-      event_schedule_subtitle?: string;
-      event_schedular_custom_copy?: string;
-      event_schedular?: Array<{ title: string; time: string }>;
-    };
+    const datesEventImage = eventBannerImageStr ?? eventBannerVideoStr;
     const activePreviewPackageLegacy =
       activePreviewPackage as typeof activePreviewPackage & {
         event_schedular_custom_copy?: string;
       };
-    const datesEventImage = eventBannerImageStr ?? eventBannerVideoStr;
+    const timelineRows = Array.isArray(activePreviewPackage?.event_schedular)
+      ? (activePreviewPackage.event_schedular as Array<{
+          title?: string;
+          time?: string;
+        }>)
+      : [];
+    const hasTimelineTitle =
+      String(activePreviewPackage?.event_schedular_title ?? "").trim().length >
+      0;
+    const hasTimelineSubtitle =
+      String(
+        activePreviewPackage?.event_schedule_subtitle ||
+          activePreviewPackageLegacy?.event_schedular_custom_copy ||
+          "",
+      ).trim().length > 0;
+    const hasTimelineRows = timelineRows.some(
+      (row) =>
+        String(row?.title ?? "").trim().length > 0 ||
+        String(row?.time ?? "").trim().length > 0,
+    );
+    const showTimelineSection =
+      hasTimelineTitle || hasTimelineSubtitle || hasTimelineRows;
 
     return (
       <div className="event-detail-page">
@@ -732,19 +802,20 @@ export default function FormPreview() {
           intensity="medium"
         />
         {/* Same header chrome as live event detail (`EventDetailClient`); non-interactive when inside PreviewProvider. */}
-        <CommonHeader
+        <OnboardingPreviewHeader
+          scrollContainerRef={previewContainerRef}
           contact_number={formState.stepOne?.contact_number || ""}
           logo={formState.stepTwo?.logo || null}
-          variant="default"
           headerDownloads={previewHeaderDownloads}
+          showRoomSelector={showRoomFloatingSelector}
+          roomSelectorVisible={roomSelectorScrollVisible}
         />
 
         <div
           ref={eventHeroRef}
-          className={`transition-all duration-300 ${getHighlightClass(
-            3,
-            "banner",
-          )}`}
+          className={`transition-all duration-300 ${
+            showRoomFloatingSelector && roomSelectorScrollVisible ? "-mt-12" : ""
+          } ${getHighlightClass(3, "banner")}`}
         >
           <EventHeroBand
             title={
@@ -804,35 +875,34 @@ export default function FormPreview() {
         </div>
 
         {/* Event Schedular */}
-        <div
-          ref={timelineRef}
-          className={`transition-all duration-300 ${getHighlightClass(
-            4,
-            "event_schedular",
-          )}`}
-        >
-          <Suspense fallback={<SectionLoader />}>
-            <Timeline
-              eventSchedularTitle={
-                activePreviewPackage?.event_schedular_title ||
-                legacyStepThreeTimeline.event_schedular_title ||
-                ""
-              }
-              eventSchedularCopy={
-                activePreviewPackage?.event_schedule_subtitle ||
-                activePreviewPackageLegacy?.event_schedular_custom_copy ||
-                legacyStepThreeTimeline.event_schedule_subtitle ||
-                legacyStepThreeTimeline.event_schedular_custom_copy ||
-                ""
-              }
-              eventSchedular={
-                activePreviewPackage?.event_schedular ||
-                legacyStepThreeTimeline.event_schedular ||
-                []
-              }
-            />
-          </Suspense>
-        </div>
+        {showTimelineSection && (
+          <div
+            ref={timelineRef}
+            className={`transition-all duration-300 ${getHighlightClass(
+              4,
+              "event_schedular",
+            )}`}
+          >
+            <Suspense fallback={<SectionLoader />}>
+              <Timeline
+                eventSchedularTitle={
+                  activePreviewPackage?.event_schedular_title || ""
+                }
+                eventSchedularCopy={
+                  activePreviewPackage?.event_schedule_subtitle ||
+                  activePreviewPackageLegacy?.event_schedular_custom_copy ||
+                  ""
+                }
+                eventSchedular={
+                  timelineRows as Array<{
+                    title: string;
+                    time: string;
+                  }>
+                }
+              />
+            </Suspense>
+          </div>
+        )}
 
         {/* Package */}
         <div
@@ -894,23 +964,11 @@ export default function FormPreview() {
             "gallery",
           )}`}
         >
-          {galleryPreviewItems.length > 0 ? (
+          {galleryPreviewItems.length > 0 && (
             <Suspense fallback={<SectionLoader />}>
               <EventGallery gallery={galleryPreviewItems} />
             </Suspense>
-          ) : activeField?.includes("gallery") ? (
-            <section className="w-full bg-[color:var(--color-background)] py-16 px-4">
-              <div className="max-w-7xl mx-auto text-center">
-                <ImageIcon
-                  className="mx-auto mb-3 h-10 w-10 text-[var(--color-textDimmed,#64748b)] opacity-50"
-                  aria-hidden
-                />
-                <p className="text-sm text-[var(--color-textDimmed,#64748b)]">
-                  Gallery is optional. Uploaded images will appear here.
-                </p>
-              </div>
-            </section>
-          ) : null}
+          )}
         </div>
 
         {/* Catering Options — same visibility rule as live event page */}
@@ -952,13 +1010,13 @@ export default function FormPreview() {
             "other-packages",
           )}`}
         >
-          {(formState.stepEight?.packages?.length ?? 0) > 0 && (
+          {(activePreviewDrinks?.packages?.length ?? 0) > 0 && (
             <Suspense fallback={<SectionLoader />}>
               <DrinkSection
-                title={formState.stepEight?.drink_title || ""}
-                description={formState.stepEight?.drink_description || ""}
+                title={activePreviewDrinks?.drink_title || ""}
+                description={activePreviewDrinks?.drink_description || ""}
                 packages={
-                  formState.stepEight?.packages.map((pkg) => ({
+                  activePreviewDrinks?.packages?.map((pkg) => ({
                     title: pkg.title,
                     description: pkg.description,
                     price: Number(pkg.price),
@@ -1003,9 +1061,8 @@ export default function FormPreview() {
           ref={previewContainerRef}
           className="max-w-full min-h-0 flex-1 overflow-y-auto overflow-x-hidden scroll-smooth"
         >
-          {/* No transform here — Tailwind `scale-*` sets `transform` and can trap `position:fixed` inside this box.
-              Avoid overflow-x-hidden on this inner wrapper: with overflow-y visible, CSS forces overflow-y:auto here → extra scrollbar. */}
-          <div className="w-full min-h-0 min-w-0 max-w-full origin-top scale-100">
+          {/* Avoid transform on this wrapper — it breaks sticky/fixed header inside the scroll panel. */}
+          <div className="w-full min-h-0 min-w-0 max-w-full">
             {/* Room floating selector is rendered outside the scroll container (see below) */}
             {ONBOARDING_THEME_PREVIEW_STEPS.has(activeStep) &&
             tryThemePreviewValues ? (
@@ -1033,11 +1090,7 @@ export default function FormPreview() {
           </div>
         </div>
 
-        {/* Room floating selector — outside the scroll container so it never affects CommonHeader layout.
-            Absolutely positioned within the <section> (which is `relative`), sitting just below the header. */}
-        {ROOM_FLOATING_SELECTOR_STEPS.has(activeStep) && (
-          <PreviewRoomFloatingSelector visible={isPastTimeline} />
-        )}
+        {/* Room floating selector lives inside event preview header chrome (see OnboardingPreviewHeader). */}
       </section>
     </PreviewProvider>
   );

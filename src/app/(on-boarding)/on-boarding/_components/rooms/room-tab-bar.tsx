@@ -109,6 +109,10 @@ export function RoomTabBar({ section, className }: RoomTabBarProps) {
   const completedCount = section
     ? rooms.filter((room) => isRoomSectionComplete(room, section)).length
     : rooms.filter((r) => Boolean(r.id)).length;
+  const pendingDeleteRoomName =
+    pendingDeleteIndex !== null
+      ? String(rooms[pendingDeleteIndex]?.name || "").trim()
+      : "";
 
   return (
     <>
@@ -299,8 +303,9 @@ export function RoomTabBar({ section, className }: RoomTabBarProps) {
           <AlertDialogHeader>
             <AlertDialogTitle>Remove this room?</AlertDialogTitle>
             <AlertDialogDescription>
-              All data you&apos;ve entered for this room (package, dates,
-              catering, brochure) will be removed. This cannot be undone.
+              {pendingDeleteRoomName ? `"${pendingDeleteRoomName}"` : "This room"}{" "}
+              and all its data (package, dates, catering, other packages,
+              brochure) will be removed permanently. This cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

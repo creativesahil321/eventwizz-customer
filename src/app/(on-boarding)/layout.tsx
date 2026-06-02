@@ -5,12 +5,14 @@ import "@/assets/scss/app.scss";
 import { tiemposHeadline } from "@/lib/fonts-tiempos";
 import { cn } from "@/lib/utils";
 import { ServerContextProvider } from "@/lib/server-context";
-import {
-  getRequestHost,
-  getSubdomainFromDomain,
-  fetchServerTheme,
-} from "@/lib/server-theme";
+import { getRequestHost, getSubdomainFromDomain } from "@/lib/server-theme";
 import { ThemeSchema } from "@/types/theme.types";
+
+/** Admin chrome only (stepper / mode selection) — vendor site preview uses persistence `default_theme`. */
+const ONBOARDING_SHELL_THEME: ThemeSchema = {
+  logo: "/assets/images/logos/eventwizz-logo.png",
+  name: "EventWizz",
+};
 
 export default async function OnboardingLayout({
   children,
@@ -33,61 +35,23 @@ export default async function OnboardingLayout({
     redirect("/vendor/dashboard");
   }
 
-  // Get domain information from the request
   const host = await getRequestHost();
   const subdomain = getSubdomainFromDomain(host);
 
-  // Fetch actual vendor theme from API
-  let vendorTheme = null;
-  try {
-    vendorTheme = await fetchServerTheme(host);
-
-    if (!vendorTheme) {
-      console.warn(
-        "Onboarding: Theme fetching failed, using default EventWizz theme"
-      );
-    }
-  } catch (error) {
-    console.error("Onboarding: Failed to fetch vendor theme:", error);
-  }
-
-  // Fallback theme if vendor theme is not available
-  const defaultTheme = {
-    colors: {
-      primary: "#0F172A",
-      secondary: "#64748B",
-      header: "#FFFFFF",
-      footer: "#0F172A",
-      background: "#F8FAFC",
-      surface: "#FFFFFF",
-      text: "#0F172A",
-      textDimmed: "#64748B",
-    },
-    typography: {
-      fontFamily: {
-        heading: "'Inter', sans-serif",
-        body: "'Inter', sans-serif",
-      },
-    },
-    logo: "/assets/images/logos/eventwizz-logo.png",
-    name: "EventWizz",
-    contactDetails: {
-      phoneNumber: "+1 (123) 456-7890",
-    },
-  };
-
-  // Use vendor theme if available, otherwise use default
-  const themeToUse = vendorTheme || defaultTheme;
-
   return (
-    <ServerContextProvider value={{ theme: themeToUse as unknown as ThemeSchema, host, subdomain }}>
+    <ServerContextProvider
+      value={{
+        theme: ONBOARDING_SHELL_THEME,
+        host,
+        subdomain,
+      }}
+    >
       <section
         className={cn(
           "flex min-h-screen w-full flex-col",
-          tiemposHeadline.variable
+          tiemposHeadline.variable,
         )}
       >
-        {/* <PreloadAssets /> */}
         {children}
       </section>
     </ServerContextProvider>

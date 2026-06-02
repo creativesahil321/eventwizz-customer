@@ -23,7 +23,12 @@ import { Trash2 } from "lucide-react";
 
 export default function FaqsTab() {
   const [isLoading, setIsLoading] = useState(false);
-  const { form: globalForm, save, setActiveField, readOnly } = useEventFormContext();
+  const {
+    form: globalForm,
+    advanceStep,
+    setActiveField,
+    readOnly,
+  } = useEventFormContext();
 
   // Get event_id from global form
   const getEventId = (): number => {
@@ -67,7 +72,7 @@ export default function FaqsTab() {
     (fieldName: string) => {
       setActiveField?.(fieldName);
     },
-    [setActiveField]
+    [setActiveField],
   );
 
   // Sync local form with global form
@@ -94,12 +99,12 @@ export default function FaqsTab() {
         !faq.question ||
         faq.question.trim() === "" ||
         !faq.answer ||
-        faq.answer.trim() === ""
+        faq.answer.trim() === "",
     );
 
     if (hasEmptyFields) {
       toast.error(
-        "Please fill in all existing FAQ fields before adding a new one"
+        "Please fill in all existing FAQ fields before adding a new one",
       );
       return;
     }
@@ -134,7 +139,7 @@ export default function FaqsTab() {
 
             // Try to find and focus the field with an error
             const errorElement = document.querySelector(
-              `[name="${errorFields[0]}"]`
+              `[name="${errorFields[0]}"]`,
             );
             if (errorElement) {
               (errorElement as HTMLElement).focus();
@@ -161,7 +166,7 @@ export default function FaqsTab() {
         if (response && response.status) {
           // Success message is handled by axios interceptor
           // Move to the next step
-          await save();
+          await advanceStep(7);
         } else {
           const errorMessage =
             response?.message ||
@@ -177,7 +182,7 @@ export default function FaqsTab() {
         setIsLoading(false);
       }
     },
-    [form, globalForm, save, setActiveField]
+    [form, globalForm, advanceStep, setActiveField],
   );
 
   return (
@@ -291,7 +296,11 @@ export default function FaqsTab() {
           </div>
 
           <div className="flex justify-end gap-4 pt-4">
-            <Button type="submit" disabled={isLoading || readOnly} variant="event-primary">
+            <Button
+              type="submit"
+              disabled={isLoading || readOnly}
+              variant="event-primary"
+            >
               {readOnly ? "View only" : isLoading ? "Saving..." : "Save & Next"}
             </Button>
           </div>

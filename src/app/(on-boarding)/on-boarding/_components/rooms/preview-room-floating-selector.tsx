@@ -2,6 +2,7 @@
 
 import { cn } from "@/lib/utils";
 import { useRoomManager } from "./use-room-manager";
+import { ONBOARDING_PREVIEW_HEADER_OFFSET } from "../form-preview/preview-layout-constants";
 
 /**
  * Stable per-room accent color so the dot next to each room name is consistent across the
@@ -46,52 +47,31 @@ interface PreviewRoomFloatingSelectorProps {
    * Controls whether the bar is shown. The host (form preview) computes this from a scroll
    * trigger (e.g. "user has scrolled past the timeline") so the bar fades in smoothly
    * instead of being visible from the top of the page.
-   * Defaults to `true` for backwards compatibility.
+   * Defaults to `false` — host reveals after the user scrolls the preview pane.
    */
   visible?: boolean;
 }
-
-/**
- * Floating room selector that lives inside the live preview column.
- *
- * Behaviour:
- *  - Renders nothing when multi-space mode is off (preview shows the single-room layout).
- *  - When on, displays a sticky pill bar:
- *     • a "CURRENTLY VIEWING · {room name}" label on the left (matches the reference site)
- *     • clickable room dots on the right that switch the active room
- *  - Clicking a room dot updates `multiSpace.currentRoomIndex`, which both Step 4–7 forms
- *    AND the preview already react to — so the entire experience switches in sync.
- *
- * This is purely a *view* of the same `useRoomManager` state used by the form-side tab bar,
- * so the two stay perfectly synchronised by construction (no extra wiring needed).
- */
 export function PreviewRoomFloatingSelector({
   className,
-  visible = true,
+  visible = false,
 }: PreviewRoomFloatingSelectorProps) {
   const { enabled, rooms, currentRoomIndex, setCurrentRoomIndex } =
     useRoomManager();
 
-  if (!enabled || rooms.length === 0) return null;
+  if (!enabled || rooms.length === 0 || !visible) return null;
 
   const activeRoom = rooms[currentRoomIndex];
 
   return (
     <div
-      aria-hidden={!visible}
       className={cn(
-        "absolute inset-x-0 top-[62px] z-40 mx-auto flex max-w-7xl items-center justify-between gap-3 px-4 py-2 sm:px-6",
-        "pointer-events-none transition-all duration-300 ease-out",
-        visible ? "opacity-100 translate-y-0" : "opacity-0 -translate-y-2",
+        "sticky z-[45] mx-auto flex w-full max-w-7xl items-center justify-between gap-3 px-4 py-2 sm:px-6",
+        "animate-in fade-in slide-in-from-top-2 duration-300 ease-out",
         className,
       )}
+      style={{ top: ONBOARDING_PREVIEW_HEADER_OFFSET }}
     >
-      <div
-        className={cn(
-          "flex items-center gap-2 rounded-full border border-white/10 bg-slate-950/70 px-4 py-1.5 backdrop-blur-md shadow-lg",
-          visible ? "pointer-events-auto" : "pointer-events-none",
-        )}
-      >
+      <div className="flex items-center gap-2 rounded-full border border-white/10 bg-slate-950/70 px-4 py-1.5 backdrop-blur-md shadow-lg">
         <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-emerald-300/90">
           ◉ Currently viewing
         </span>
@@ -101,12 +81,7 @@ export function PreviewRoomFloatingSelector({
         </span>
       </div>
 
-      <div
-        className={cn(
-          "flex items-center gap-2 rounded-full border border-white/10 bg-slate-950/70 px-2 py-1.5 backdrop-blur-md shadow-lg",
-          visible ? "pointer-events-auto" : "pointer-events-none",
-        )}
-      >
+      <div className="flex items-center gap-2 rounded-full border border-white/10 bg-slate-950/70 px-2 py-1.5 backdrop-blur-md shadow-lg">
         {rooms.map((room, index) => {
           const accent = ROOM_ACCENTS[index % ROOM_ACCENTS.length];
           const isActive = index === currentRoomIndex;

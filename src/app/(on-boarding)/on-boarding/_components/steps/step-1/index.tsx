@@ -37,6 +37,7 @@ import {
 import { guidedSectionSurfaceClass } from "../../guided-section-surface";
 import { GuidedSectionTitleBar } from "../../guided-section-title-bar";
 import { cn } from "@/lib/utils";
+import { useBrandNameAvailability } from "@/hooks/use-brand-name-availability";
 
 const RESOLVE_STEP_ONE_ERROR_INDEX = (keys: string[]) =>
   keys.some((k) => k === "name" || k === "has_multiple_locations") ? 0 : 1;
@@ -107,6 +108,22 @@ export default function StepOne() {
   }, [globalHasMultiple, globalForm, form]);
 
   const isBrandMode = hasMultipleLocations === true;
+
+  const nameValue = useWatch({
+    control: form.control,
+    name: "name",
+  });
+
+  const {
+    status: brandNameCheckStatus,
+    message: brandNameCheckMessage,
+    isChecking: brandNameChecking,
+    isTaken: brandNameTaken,
+  } = useBrandNameAvailability(nameValue ?? "", {
+    takenFallback: isBrandMode
+      ? "This brand name is already in use"
+      : "This venue name is already in use",
+  });
 
   const sectionConfigs = useMemo(
     (): GuidedSectionConfig<StepOneType>[] => [
@@ -182,6 +199,7 @@ export default function StepOne() {
   };
 
   const handleContinue = async () => {
+    if (brandNameTaken || brandNameChecking) return;
     if (!guided.allSectionsApproved) {
       const ok = await guided.handleApproveAllSections();
       if (!ok) return;
@@ -315,6 +333,26 @@ export default function StepOne() {
                                   ? "ⓘ Type your trading or brand name — it does not need to match a Google listing."
                                   : "ⓘ Only verified venues from Google Places can be selected"}
                               </p>
+                              {brandNameChecking ? (
+                                <p className="text-xs text-muted-foreground mt-1">
+                                  Checking name availability…
+                                </p>
+                              ) : null}
+                              {brandNameCheckStatus === "available" &&
+                              (nameValue?.trim().length ?? 0) >= 2 ? (
+                                <p className="text-xs text-emerald-400/90 mt-1">
+                                  {isBrandMode
+                                    ? "This brand name is available."
+                                    : "This venue name is available."}
+                                </p>
+                              ) : null}
+                              {brandNameCheckStatus === "taken" &&
+                              (nameValue?.trim().length ?? 0) >= 2 &&
+                              brandNameCheckMessage ? (
+                                <p className="text-xs text-red-400/90 mt-1">
+                                  {brandNameCheckMessage}
+                                </p>
+                              ) : null}
                               <FormMessage />
                             </FormItem>
                           )}
@@ -475,6 +513,7 @@ export default function StepOne() {
                     allSectionsApproved={guided.allSectionsApproved}
                     loading={loading}
                     onContinue={handleContinue}
+                    continueDisabled={brandNameTaken || brandNameChecking}
                   />
                 </form>
               </Form>

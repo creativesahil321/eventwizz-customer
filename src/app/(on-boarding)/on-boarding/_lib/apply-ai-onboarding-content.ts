@@ -18,92 +18,27 @@ import {
 import { onboardingService } from "@/services/vendor/onboarding/onboarding.service";
 import { roomService } from "@/services/vendor/onboarding/room.service";
 import { eventsService } from "@/services/vendor/events/events.service";
-import type { EventMenuCategory } from "@/services/vendor/events/type";
+import { ensureEventMenuCategoriesForRoom } from "@/lib/event-menu-categories";
+import {
+  AI_ONBOARDING_MAX_ROOMS,
+  formatAIDateForStepFive,
+  normalizeAiRoomNames,
+} from "./ai-onboarding-sanitize";
+import {
+  EVENT_GALLERY_MAX_IMAGES,
+  resolveEventSchedulerItems,
+} from "@/lib/event-form-limits";
 
-function extractMenuCategoriesList(response: unknown): EventMenuCategory[] {
-  if (!response || typeof response !== "object") return [];
-  if ("data" in response && Array.isArray((response as { data: unknown }).data)) {
-    return (response as { data: EventMenuCategory[] }).data;
-  }
-  if (Array.isArray(response)) return response as EventMenuCategory[];
-  return [];
-}
-
-function extractCreatedMenuCategory(response: unknown): EventMenuCategory | null {
-  if (!response || typeof response !== "object") return null;
-  if (
-    "status" in response &&
-    (response as { status?: boolean }).status &&
-    "data" in response
-  ) {
-    const data = (response as { data: EventMenuCategory }).data;
-    if (data?.id && data?.name) return data;
-  }
-  if ("id" in response && "name" in response) {
-    return {
-      id: (response as { id: number }).id,
-      name: (response as { name: string }).name,
-    };
-  }
-  return null;
-}
-
-/**
- * Manual step 6 creates categories first via POST /vendor/event-menus/store, then saves menus.
- * With multi-room, pass room_id so categories are scoped per room (not duplicated per step 6 save).
- */
-async function ensureEventMenuCategoriesForRoom(
-  eventId: number,
-  roomId: number | undefined,
-  menus: StepSixType["menus"] | undefined,
-): Promise<number | undefined> {
-  const uniqueNames = [
-    ...new Set(
-      (menus ?? [])
-        .map((menu) => String(menu?.name ?? "").trim())
-        .filter((name) => name.length > 0),
-    ),
-  ];
-  if (uniqueNames.length === 0) return undefined;
-
-  const scopedRoomId =
-    roomId != null && roomId > 0 ? roomId : undefined;
-
-  let existing: EventMenuCategory[] = [];
-  try {
-    const response = await eventsService.getEventMenuCategories(
-      scopedRoomId != null ? { room_id: scopedRoomId } : undefined,
-    );
-    existing = extractMenuCategoriesList(response);
-  } catch (error) {
-    console.warn("Failed to load menu categories before AI step 6:", error);
-  }
-
-  const byNameLower = new Map(
-    existing.map((category) => [
-      category.name.trim().toLowerCase(),
-      category,
-    ]),
+/** Remove stale vendor rooms so AI apply always starts from the names the user entered. */
+async function resetVendorRoomsBeforeAiApply(): Promise<void> {
+  const listed = await roomService.listVendorRooms();
+  const existing = listed?.data ?? [];
+  await Promise.allSettled(
+    existing
+      .map((room) => Number(room.id))
+      .filter((id) => Number.isFinite(id) && id > 0)
+      .map((id) => roomService.remove(id)),
   );
-
-  for (const name of uniqueNames) {
-    const key = name.toLowerCase();
-    if (byNameLower.has(key)) continue;
-    try {
-      const response = await eventsService.createEventMenuCategory({
-        vendor_event_id: eventId,
-        name,
-        ...(scopedRoomId != null ? { room_id: scopedRoomId } : {}),
-      });
-      const created = extractCreatedMenuCategory(response);
-      if (created) byNameLower.set(key, created);
-    } catch (error) {
-      console.warn(`Failed to create menu category "${name}":`, error);
-    }
-  }
-
-  const firstMenuKey = uniqueNames[0]?.toLowerCase();
-  return firstMenuKey ? byNameLower.get(firstMenuKey)?.id : undefined;
 }
 
 export const AI_ONBOARDING_APPLY_STEPS = [
@@ -182,6 +117,17 @@ export async function applyAIGeneratedOnboardingContent({
       description: string;
       price: number;
       available_quantity: number;
+    }>;
+    rooms?: Array<{
+      room_name?: string;
+      drink_title?: string;
+      drink_description?: string;
+      packages?: Array<{
+        title: string;
+        description: string;
+        price: number;
+        available_quantity: number;
+      }>;
     }>;
   };
   const stepSevenRaw = editedContent.stepSeven as unknown as Record<
@@ -318,11 +264,15 @@ export async function applyAIGeneratedOnboardingContent({
       editedContent.stepFour.event_schedule_subtitle ||
       editedContent.stepFour.event_schedular_custom_copy ||
       "",
-    event_schedular: editedContent.stepFour.event_schedular || [],
-    gallery: galleryFiles,
+    event_schedular: resolveEventSchedulerItems(
+      editedContent.stepFour.event_schedular,
+    ),
+    gallery: galleryFiles.slice(0, EVENT_GALLERY_MAX_IMAGES),
   };
 
-  const useRoomSystem = venueInput.has_room_system === true;
+  const normalizedRoomNames = normalizeAiRoomNames(venueInput.room_names);
+  const useRoomSystem =
+    venueInput.has_room_system === true && normalizedRoomNames.length >= 2;
   if (typeof window !== "undefined") {
     sessionStorage.setItem(
       "onboarding_is_rooms",
@@ -345,20 +295,10 @@ export async function applyAIGeneratedOnboardingContent({
     };
   }> = [];
   if (useRoomSystem) {
-    const inputNames = (venueInput.room_names ?? [])
-      .map((n) => n.trim())
-      .filter((n) => n.length > 0)
-      .slice(0, 3);
-    // Defensive fallback: AI room creation must always create at least 2 rooms.
-    const roomNames =
-      inputNames.length >= 2
-        ? inputNames
-        : inputNames.length === 1
-          ? [inputNames[0], "Room 2"]
-          : ["Room 1", "Room 2"];
+    await resetVendorRoomsBeforeAiApply();
 
     const createdRooms: Array<{ id: number; name: string }> = [];
-    for (const name of roomNames) {
+    for (const name of normalizedRoomNames) {
       const created = await roomService.create({ name });
       if (!created?.status || !created.data?.id) {
         throw new Error("Failed to create rooms for AI room system");
@@ -383,8 +323,10 @@ export async function applyAIGeneratedOnboardingContent({
           editedContent.stepFour.event_schedule_subtitle ||
           editedContent.stepFour.event_schedular_custom_copy ||
           "",
-        event_schedular: editedContent.stepFour.event_schedular || [],
-        gallery: galleryFiles,
+        event_schedular: resolveEventSchedulerItems(
+          editedContent.stepFour.event_schedular,
+        ),
+        gallery: galleryFiles.slice(0, EVENT_GALLERY_MAX_IMAGES),
       },
     }));
 
@@ -426,42 +368,9 @@ export async function applyAIGeneratedOnboardingContent({
       return true;
     });
   })();
-  const formattedDates = aiDates.map((d) => {
-    const bookingType = d.booking_type || "tickets";
-    const tickets = (bookingType !== "tables" ? d.tickets || [] : []).map(
-      (t) => ({
-        title: t.title,
-        description: t.description,
-        total_capacity: t.total_capacity,
-        price: t.price,
-      }),
-    );
-    const tables = (bookingType !== "tickets" ? d.tables || [] : []).map(
-      (t) => ({
-        min_persons: t.min_persons,
-        max_persons: t.max_persons,
-        price: t.price,
-        total_tables: t.total_tables,
-      }),
-    );
-
-    const base: Record<string, unknown> = {
-      event_date: d.event_date,
-      booking_type: bookingType as "tickets" | "tables" | "both",
-      total_ticket_types: tickets.length,
-      total_table_types: tables.length,
-      tickets,
-      tables,
-    };
-    if (bookingType !== "tickets") {
-      base.payment_type = (d.payment_type || "full") as "full" | "deposit";
-      base.is_deposit_enabled = d.is_deposit_enabled ?? false;
-      base.deposit_type = d.deposit_type ?? "amount";
-      base.deposit_value = d.deposit_value ?? "";
-      base.deposit_due_date = d.deposit_due_date ?? "";
-    }
-    return base;
-  });
+  const formattedDates = aiDates.map((d) =>
+    formatAIDateForStepFive(d),
+  );
 
   const stepFiveData: StepFiveType = {
     step: 5,
@@ -493,11 +402,21 @@ export async function applyAIGeneratedOnboardingContent({
   globalForm.setValue("stepFive", stepFiveData);
   const roomStepFiveByName = useRoomSystem
     ? new Map(
-        (editedContent.stepFive as { rooms?: Array<{ room_name?: string; dates?: StepFiveType["dates"] }> } | undefined)
-          ?.rooms?.map((room) => [
-            (room.room_name ?? "").trim().toLowerCase(),
-            room.dates ?? [],
-          ]) ?? [],
+        (
+          editedContent.stepFive as
+            | {
+                rooms?: Array<{
+                  room_name?: string;
+                  dates?: import("@/app/api/ai/generate-onboarding/route").AIDate[];
+                }>;
+              }
+            | undefined
+        )?.rooms?.map((room) => [
+          (room.room_name ?? "").trim().toLowerCase(),
+          (room.dates ?? []).map((d) =>
+            formatAIDateForStepFive(d),
+          ) as StepFiveType["dates"],
+        ]) ?? [],
       )
     : new Map<string, StepFiveType["dates"]>();
   const step5RoomsPayload = useRoomSystem
@@ -703,8 +622,9 @@ export async function applyAIGeneratedOnboardingContent({
   const step7RoomsPayload = useRoomSystem
     ? ((globalForm.getValues("multiSpace")?.rooms ?? []).map((room) => ({
         ...room,
+        isApprovedBrochure: true,
         brochure: {
-          ...(room as any).brochure,
+          ...(room as { brochure?: Record<string, unknown> }).brochure,
           event_address: stepSevenData.event_address,
           latitude: stepSevenData.latitude,
           longitude: stepSevenData.longitude,
@@ -724,8 +644,15 @@ export async function applyAIGeneratedOnboardingContent({
         rooms: step7RoomsPayload,
         isApproved: true,
       })
-    : await onboardingService.storeStepSevenData(stepSevenData);
+    : await onboardingService.storeStepSevenData({
+        ...stepSevenData,
+        isApproved: true,
+      });
   if (step7Response.status) {
+    if (useRoomSystem) {
+      globalForm.setValue("multiSpace.rooms", step7RoomsPayload as never);
+    }
+    globalForm.setValue("stepSeven", { ...stepSevenData, isApproved: true });
     await updateSession({ on_boarding_step: 8 });
   }
 
@@ -745,8 +672,64 @@ export async function applyAIGeneratedOnboardingContent({
   };
   globalForm.setValue("stepEight", stepEightData);
   if (!drinksRemoved && hasDrinkPackages) {
-    const step8Response =
-      await onboardingService.storeStepEightData(stepEightData);
+    const roomDrinksByName = useRoomSystem
+      ? new Map(
+          (drinksSource.rooms ?? []).map((room) => [
+            String(room.room_name ?? "").trim().toLowerCase(),
+            {
+              drink_title: room.drink_title ?? stepEightData.drink_title,
+              drink_description:
+                room.drink_description ?? stepEightData.drink_description,
+              packages:
+                Array.isArray(room.packages) && room.packages.length > 0
+                  ? room.packages
+                  : stepEightData.packages,
+            },
+          ]),
+        )
+      : new Map<
+          string,
+          {
+            drink_title: string;
+            drink_description: string;
+            packages: typeof stepEightData.packages;
+          }
+        >();
+
+    const step8RoomsPayload = useRoomSystem
+      ? ((globalForm.getValues("multiSpace")?.rooms ?? []).map((room) => ({
+          ...room,
+          drinks: {
+            ...(roomDrinksByName.get(
+              String((room as { name?: string }).name ?? "")
+                .trim()
+                .toLowerCase(),
+            ) ?? {
+              drink_title: stepEightData.drink_title,
+              drink_description: stepEightData.drink_description,
+              packages: stepEightData.packages,
+            }),
+          },
+        })) as any)
+      : [];
+    const hasValidRoomIdsForStep8 =
+      useRoomSystem &&
+      Array.isArray(step8RoomsPayload) &&
+      step8RoomsPayload.some(
+        (room) =>
+          Number.isFinite(Number((room as { id?: number }).id)) &&
+          Number((room as { id?: number }).id) > 0,
+      );
+    if (useRoomSystem) {
+      globalForm.setValue("multiSpace.rooms", step8RoomsPayload as any);
+    }
+    const step8Response = hasValidRoomIdsForStep8
+      ? await onboardingService.storeStepEightRoomsData({
+          event_id: eventId,
+          rooms: step8RoomsPayload,
+          isApproved: true,
+        })
+      : await onboardingService.storeStepEightData(stepEightData);
     if (step8Response.status) {
       await updateSession({ on_boarding_step: 9 });
     }

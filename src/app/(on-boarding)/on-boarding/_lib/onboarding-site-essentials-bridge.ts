@@ -1,15 +1,16 @@
-import type { CSSProperties } from "react";
 import type { OnboardingFormData } from "../_components/form-provider/schema";
 import type { SiteEssentialsFormValues } from "@/app/(protected)/_shared/sites-essentials/_lib/schema";
+import { siteEssentialsToPreviewRootStyle } from "@/app/(protected)/_shared/sites-essentials/_lib/preview-root-style";
 import type { ThemeSchema } from "@/types/theme.types";
-import { defaultThemeConstants } from "@/services/common/theme/constants/theme";
-import { pickReadableForeground } from "@/lib/color-contrast";
+import { ONBOARDING_DEFAULT_THEME } from "./onboarding-default-theme";
+
+export { siteEssentialsToPreviewRootStyle };
 
 function themeColorsToFormColors(
   theme: ThemeSchema | null | undefined,
 ): SiteEssentialsFormValues["colors"] {
   const c = theme?.colors;
-  const d = defaultThemeConstants.colors;
+  const d = ONBOARDING_DEFAULT_THEME.colors!;
   return {
     primary: c?.primary ?? d.primary,
     secondary: c?.secondary ?? d.secondary,
@@ -45,21 +46,26 @@ export function buildOnboardingStepTwoSiteEssentialsValues(
       fontFamily: {
         heading:
           theme?.typography?.fontFamily?.heading ??
-          defaultThemeConstants.typography.fontFamily.heading,
+          ONBOARDING_DEFAULT_THEME.typography?.fontFamily?.heading ??
+          "Space Grotesk, sans-serif",
         body:
           theme?.typography?.fontFamily?.body ??
-          defaultThemeConstants.typography.fontFamily.body,
+          ONBOARDING_DEFAULT_THEME.typography?.fontFamily?.body ??
+          "Inter, sans-serif",
       },
       customFontStylesheetUrls:
         theme?.typography?.customFontStylesheetUrls ?? [],
-      headingEmphasis: theme?.typography?.headingEmphasis ?? "uniform",
+      headingEmphasis:
+        theme?.typography?.headingEmphasis ??
+        ONBOARDING_DEFAULT_THEME.typography?.headingEmphasis ??
+        "accent_tail",
     },
     socialLinks: {
-      facebook: "",
-      twitter: "",
-      instagram: "",
-      linkedin: "",
-      youtube: "",
+      facebook: theme?.socialLinks?.facebook ?? "",
+      twitter: theme?.socialLinks?.twitter ?? "",
+      instagram: theme?.socialLinks?.instagram ?? "",
+      linkedin: theme?.socialLinks?.linkedin ?? "",
+      youtube: theme?.socialLinks?.youtube ?? "",
     },
     seo: {
       title: "",
@@ -92,40 +98,3 @@ export function buildOnboardingStepTwoSiteEssentialsValues(
   };
 }
 
-/** Same variable bundle as `SitePreview` so onboarding preview picks up Try theme. */
-export function siteEssentialsToPreviewRootStyle(
-  formValues: SiteEssentialsFormValues,
-): CSSProperties {
-  const primary = formValues.colors?.primary || "#0F172A";
-  const secondary = formValues.colors?.secondary || "#64748B";
-  const header = formValues.colors?.header || "#FFFFFF";
-  const footer = formValues.colors?.footer || "#0F172A";
-  const background = formValues.colors?.background || "#F8FAFC";
-  const surface = formValues.colors?.surface || "#FFFFFF";
-  const text = formValues.colors?.text || "#0F172A";
-  const textDimmed = formValues.colors?.textDimmed || "#64748B";
-
-  return {
-    "--color-primary": primary,
-    "--color-secondary": secondary,
-    "--color-header": header,
-    "--color-footer": footer,
-    "--color-background": background,
-    "--color-text": text,
-    "--color-text-dimmed": textDimmed,
-    "--color-surface": surface,
-    /** Subtle dividers in package cards etc. (matches public pages using `--color-border`). */
-    "--color-border": `color-mix(in srgb, ${text} 18%, transparent)`,
-    "--color-primary-foreground": pickReadableForeground(primary),
-    "--color-secondary-foreground": pickReadableForeground(secondary),
-    "--color-on-header": pickReadableForeground(header),
-    "--color-on-footer": pickReadableForeground(footer),
-    "--color-on-surface": pickReadableForeground(surface),
-    "--color-on-background": pickReadableForeground(background),
-    "--font-heading":
-      formValues.typography?.fontFamily?.heading || "'Inter', sans-serif",
-    "--font-body":
-      formValues.typography?.fontFamily?.body || "'Inter', sans-serif",
-    fontFamily: "var(--font-body)",
-  } as CSSProperties;
-}

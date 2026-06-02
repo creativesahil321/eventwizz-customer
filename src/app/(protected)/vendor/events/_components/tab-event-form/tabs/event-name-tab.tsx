@@ -1,7 +1,7 @@
 "use client";
 
-import React, { useState, useEffect, useCallback, useRef } from "react";
-import { useForm, useFieldArray } from "react-hook-form";
+import React, { useState, useEffect, useCallback } from "react";
+import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useSession } from "next-auth/react";
 import { Button } from "@/components/ui/button";
@@ -17,7 +17,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { FileUploader } from "@/components/ui/file-uploader";
 import { TiptapEditor } from "@/components/ui/tiptap-editor";
-import { Plus, X, AlertCircle } from "lucide-react";
+import { AlertCircle } from "lucide-react";
 import { useEventCategories } from "@/services/vendor/events/query";
 import {
   Select,
@@ -38,6 +38,8 @@ import {
   countWords,
   truncateToMaxWordsForInput,
 } from "@/lib/word-count";
+import { mapGlobalStepOneToLocal } from "../../../_lib/map-global-step-to-local";
+import { useSyncStepFormFromGlobal } from "../../../_lib/use-sync-step-form-from-global";
 
 export default function EventNameTab() {
   // No need to use session update as we get data from API
@@ -45,10 +47,11 @@ export default function EventNameTab() {
   // Access the GLOBAL form context
   const {
     form: globalForm,
-    save,
+    advanceStep,
     isLoading: globalLoading,
     setActiveField,
     readOnly,
+    persistedHydrated,
   } = useEventFormContext();
 
   // Get event categories
@@ -62,11 +65,6 @@ export default function EventNameTab() {
   const [bannerImageUploading, setBannerImageUploading] = useState(false);
   const [bannerVideoUploading, setBannerVideoUploading] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [eventSchedularBackgroundImage, setEventSchedularBackgroundImage] =
-    useState<File[] | null>(null);
-  const [schedulerValidationErrors, setSchedulerValidationErrors] = useState<{
-    [key: string]: string;
-  }>({});
 
   // URL strings from backend for existing videos/images
   const [bannerImageUrl, setBannerImageUrl] = useState<string>("");
@@ -99,16 +97,33 @@ export default function EventNameTab() {
       about_event_heading: stepOneDefaults?.about_event_heading || "",
       about_event_sub_heading: stepOneDefaults?.about_event_sub_heading || "",
       about_event_description: stepOneDefaults?.about_event_description || "",
-      event_schedular_title: stepOneDefaults?.event_schedular_title || "",
-      event_schedular: stepOneDefaults?.event_schedular || [
-        { title: "", time: "" },
-      ],
-      event_schedular_background_image:
-        stepOneDefaults?.event_schedular_background_image,
       remove_event_banner_image: false,
       remove_event_banner_video: false,
     } as StepOneType,
     mode: "onChange",
+  });
+
+  useSyncStepFormFromGlobal({
+    globalForm,
+    localForm: form,
+    stepKey: "stepOne",
+    enabled: persistedHydrated,
+    toLocalValues: (stepOne) =>
+      mapGlobalStepOneToLocal(stepOne, vendorLocationId),
+    onAfterSync: (values) => {
+      const bannerImage = values.event_banner_image;
+      if (typeof bannerImage === "string" && bannerImage) {
+        setBannerImageUrl(bannerImage);
+        setBannerType("image");
+        setBannerImageFile([]);
+      }
+      const bannerVideo = values.event_banner_video;
+      if (typeof bannerVideo === "string" && bannerVideo) {
+        setBannerVideoUrl(bannerVideo);
+        setBannerType("video");
+        setBannerVideoFile([]);
+      }
+    },
   });
 
   // Update form when vendor_location_id changes
@@ -156,23 +171,6 @@ export default function EventNameTab() {
     } else {
       setBannerVideoUrl("");
     }
-
-    // Handle event scheduler background image
-    const eventSchedularBackgroundImage = form.watch(
-      "event_schedular_background_image"
-    );
-    if (eventSchedularBackgroundImage) {
-      if (typeof eventSchedularBackgroundImage === "string") {
-        // Don't set as File if it's a URL
-        setEventSchedularBackgroundImage(null);
-      } else {
-        setEventSchedularBackgroundImage([
-          eventSchedularBackgroundImage as unknown as File,
-        ]);
-      }
-    } else {
-      setEventSchedularBackgroundImage(null);
-    }
   }, [form]);
 
   // Cleanup object URLs to prevent memory leaks
@@ -186,109 +184,12 @@ export default function EventNameTab() {
     };
   }, [bannerVideoFile]);
 
-  // Validation helper function for time sequence
-  const validateTimeSequence = useCallback(
-    (schedules: Array<{ title: string; time: string }>): boolean => {
-      if (schedules.length <= 1) return true;
-
-      const validSchedules = schedules.filter(
-        (schedule) => schedule.time && schedule.title
-      );
-      if (validSchedules.length <= 1) return true;
-
-      for (let i = 0; i < validSchedules.length - 1; i++) {
-        const currentTime = validSchedules[i].time;
-        const nextTime = validSchedules[i + 1].time;
-
-        if (!currentTime || !nextTime) continue;
-
-        const [currentHours, currentMinutes] = currentTime
-          .split(":")
-          .map(Number);
-        const [nextHours, nextMinutes] = nextTime.split(":").map(Number);
-
-        const currentTotalMinutes = currentHours * 60 + currentMinutes;
-        const nextTotalMinutes = nextHours * 60 + nextMinutes;
-
-        if (nextTotalMinutes <= currentTotalMinutes) {
-          return false;
-        }
-      }
-
-      return true;
-    },
-    []
-  );
-
-  // Debounced validation and global form update
-  const validateAndUpdateScheduler = useCallback(
-    (schedulers: Array<{ title: string; time: string }>) => {
-      // Validate the scheduler
-      const errors: { [key: string]: string } = {};
-      if (!validateTimeSequence(schedulers)) {
-        errors.sequence = "Times must be in ascending order";
-      }
-      setSchedulerValidationErrors(errors);
-
-      // Update global form (debounced)
-      const currentStepOne = globalForm.getValues().stepOne || {};
-      globalForm.setValue("stepOne", {
-        ...currentStepOne,
-        event_schedular: schedulers,
-      });
-    },
-    [globalForm, validateTimeSequence]
-  );
-
-  // Debounce timer ref
-  const validationTimerRef = useRef<NodeJS.Timeout | null>(null);
-
-  // Debounced validation function
-  const debouncedValidate = useCallback(
-    (schedulers: Array<{ title: string; time: string }>) => {
-      if (validationTimerRef.current) {
-        clearTimeout(validationTimerRef.current);
-      }
-      validationTimerRef.current = setTimeout(() => {
-        validateAndUpdateScheduler(schedulers);
-      }, 300); // 300ms debounce
-    },
-    [validateAndUpdateScheduler]
-  );
-
-  // Field array for scheduler items
-  const {
-    fields: schedulerFields,
-    append,
-    remove,
-  } = useFieldArray({
-    control: form.control,
-    name: "event_schedular",
-  });
-
-  // Validate scheduler on mount and when scheduler changes
-  useEffect(() => {
-    const currentSchedulers = form.getValues("event_schedular") || [];
-    if (currentSchedulers.length > 0) {
-      validateAndUpdateScheduler(currentSchedulers);
-    }
-  }, [form, validateAndUpdateScheduler, schedulerFields.length]);
-
-  // Cleanup debounce timer on unmount
-  useEffect(() => {
-    return () => {
-      if (validationTimerRef.current) {
-        clearTimeout(validationTimerRef.current);
-      }
-    };
-  }, []);
-
   // Handle field focus for tracking active field
   const handleFieldFocus = useCallback(
     (fieldName: string) => {
       setActiveField?.(fieldName);
     },
-    [setActiveField]
+    [setActiveField],
   );
 
   // Handle banner image change
@@ -330,7 +231,7 @@ export default function EventNameTab() {
         setBannerImageUploading(false);
       }
     },
-    [form, globalForm]
+    [form, globalForm],
   );
 
   // Handle banner video change
@@ -406,7 +307,7 @@ export default function EventNameTab() {
         setBannerVideoUploading(false);
       }
     },
-    [form, globalForm]
+    [form, globalForm],
   );
 
   // Handle banner image removal
@@ -491,7 +392,7 @@ export default function EventNameTab() {
 
             // Try to find and focus the field with an error
             const errorElement = document.querySelector(
-              `[name="${errorFields[0]}"]`
+              `[name="${errorFields[0]}"]`,
             );
             if (errorElement) {
               (errorElement as HTMLElement).focus();
@@ -504,38 +405,6 @@ export default function EventNameTab() {
 
           setIsLoading(false);
           return;
-        }
-
-        // Validate event scheduler times
-        if (data.event_schedular && data.event_schedular.length > 0) {
-          // Check for sequence
-          const validSchedules = data.event_schedular.filter(
-            (schedule) => schedule.time && schedule.title
-          );
-          for (let i = 0; i < validSchedules.length - 1; i++) {
-            const currentTime = validSchedules[i].time;
-            const nextTime = validSchedules[i + 1].time;
-
-            if (!currentTime || !nextTime) continue;
-
-            const [currentHours, currentMinutes] = currentTime
-              .split(":")
-              .map(Number);
-            const [nextHours, nextMinutes] = nextTime.split(":").map(Number);
-
-            const currentTotalMinutes = currentHours * 60 + currentMinutes;
-            const nextTotalMinutes = nextHours * 60 + nextMinutes;
-
-            if (nextTotalMinutes <= currentTotalMinutes) {
-              toast.error("Event times must be in ascending order.", {
-                description:
-                  "Please arrange the times from earliest to latest.",
-                duration: 5000,
-              });
-              setIsLoading(false);
-              return;
-            }
-          }
         }
 
         // Continue with valid data - don't include vendor_location_id as it's sent in headers
@@ -552,16 +421,6 @@ export default function EventNameTab() {
           formData.event_banner_image = bannerImageFile[0];
         }
 
-        // SAFETY CHECK: Ensure scheduler background image is included if we have it in state
-        if (
-          eventSchedularBackgroundImage &&
-          eventSchedularBackgroundImage.length > 0 &&
-          !formData.event_schedular_background_image
-        ) {
-          formData.event_schedular_background_image =
-            eventSchedularBackgroundImage[0];
-        }
-
         // Update global form with all fields
         globalForm.setValue("stepOne", {
           ...globalForm.getValues().stepOne,
@@ -569,7 +428,7 @@ export default function EventNameTab() {
         });
 
         // Save data using the global save function
-        await save();
+        await advanceStep(1);
 
         // Update global form
         globalForm.setValue("stepOne", formData);
@@ -594,7 +453,7 @@ export default function EventNameTab() {
             .event_id === "number"
             ? String(
                 (globalForm.getValues().stepOne as Record<string, unknown>)
-                  .event_id
+                  .event_id,
               )
             : undefined;
 
@@ -616,7 +475,7 @@ export default function EventNameTab() {
 
           response = await eventsService.updateStepOneData(
             formDataWithId,
-            existingEventId.toString()
+            existingEventId.toString(),
           );
           console.log("Update response:", response);
         } else {
@@ -640,7 +499,7 @@ export default function EventNameTab() {
             if (Array.isArray(response.data)) {
               // If it's an array, we can't extract an ID directly
               console.log(
-                "Response data is an array, can't extract ID directly"
+                "Response data is an array, can't extract ID directly",
               );
 
               // Try to get event_id from URL
@@ -688,7 +547,7 @@ export default function EventNameTab() {
               eventId = Number(matches[1]);
               console.log(
                 "Last resort: Extracted event ID from current URL:",
-                eventId
+                eventId,
               );
             }
           }
@@ -725,15 +584,7 @@ export default function EventNameTab() {
         setIsLoading(false);
       }
     },
-    [
-      globalForm,
-      save,
-      form,
-      setActiveField,
-      router,
-      bannerImageFile,
-      eventSchedularBackgroundImage,
-    ]
+    [globalForm, advanceStep, form, setActiveField, router, bannerImageFile],
   );
 
   return (
@@ -754,89 +605,89 @@ export default function EventNameTab() {
           autoComplete="off"
         >
           <div className="space-y-4 sm:space-y-6">
-            {/* Event Details Section */}
+            {/* Banner — heading, subheading, then image (onboarding order) */}
             <div className="space-y-4 sm:space-y-6">
               <div className="flex items-center gap-3 title-header">
-                <h2 className="text-xl font-bold">Event Details</h2>
+                <h2 className="text-xl font-bold">Banner</h2>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
-                <FormField
-                  control={form.control}
-                  name="event_name"
-                  render={({ field }) => (
-                    <FormItem className="w-full">
+              <FormField
+                control={form.control}
+                name="event_banner_heading"
+                render={({ field }) => {
+                  const wc = countWords(field.value || "");
+                  return (
+                    <FormItem>
                       <FormLabel className="text-sm font-medium">
-                        Event Name <span className="text-red-500">*</span>
+                        Banner Heading <span className="text-red-500">*</span>
                       </FormLabel>
                       <FormControl>
                         <Input
                           {...field}
-                          placeholder="Enter your event name"
-                          className="h-11 bg-[#F9FAFB] border-[#E5E7EB] w-full"
-                          onFocus={() => handleFieldFocus("event_name")}
+                          placeholder="Enter banner heading"
+                          className="h-11 bg-[#F9FAFB] border-[#E5E7EB]"
+                          onFocus={() =>
+                            handleFieldFocus("event_banner_heading")
+                          }
                           onChange={(e) => {
-                            field.onChange(e);
+                            const next = truncateToMaxWordsForInput(
+                              e.target.value,
+                              BANNER_HEADING_MAX_WORDS,
+                            );
+                            field.onChange(next);
                             globalForm.setValue(
-                              "stepOne.event_name",
-                              e.target.value
+                              "stepOne.event_banner_heading",
+                              next,
                             );
                           }}
-                          onBlur={field.onBlur} // Important for onBlur validation
+                          onBlur={field.onBlur}
                         />
                       </FormControl>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        <span>
+                          {wc}/{BANNER_HEADING_MAX_WORDS} words
+                        </span>
+                      </p>
                       <FormMessage />
                     </FormItem>
-                  )}
-                />
+                  );
+                }}
+              />
 
-                <FormField
-                  control={form.control}
-                  name="event_category_id"
-                  render={({ field }) => (
-                    <FormItem className="w-full">
-                      <FormLabel className="text-sm font-medium">
-                        Event Category <span className="text-red-500">*</span>
-                      </FormLabel>
-                      <Select
-                        onValueChange={(value) => {
-                          field.onChange(Number(value));
+              <FormField
+                control={form.control}
+                name="event_banner_sub_heading"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-sm font-medium">
+                      Banner Subheading <span className="text-red-500">*</span>
+                    </FormLabel>
+                    <FormControl>
+                      <Input
+                        {...field}
+                        placeholder="Enter banner subheading"
+                        className="h-11 bg-[#F9FAFB] border-[#E5E7EB]"
+                        onFocus={() =>
+                          handleFieldFocus("event_banner_sub_heading")
+                        }
+                        onChange={(e) => {
+                          field.onChange(e);
                           globalForm.setValue(
-                            "stepOne.event_category_id",
-                            Number(value)
+                            "stepOne.event_banner_sub_heading",
+                            e.target.value,
                           );
                         }}
-                        value={field.value ? field.value.toString() : undefined}
-                        disabled={isEventCategoriesLoading}
-                        onOpenChange={() => field.onBlur()} // Trigger validation when dropdown closes
-                      >
-                        <FormControl>
-                          <SelectTrigger className="h-11 bg-[#F9FAFB] border-[#E5E7EB] w-full">
-                            <SelectValue placeholder="Select event category" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {eventCategories?.data?.map(
-                            (category: { id: number; name: string }) => (
-                              <SelectItem
-                                key={category.id}
-                                value={category.id.toString()}
-                              >
-                                {category.name}
-                              </SelectItem>
-                            )
-                          )}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
+                        onBlur={field.onBlur}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
 
               <div className="space-y-4" data-banner-section>
                 <h3 className="text-lg font-semibold title-header">
-                  Add a Cover Photo or Video
+                  Banner Image
                 </h3>
 
                 {/* Show validation error for banner image/video above tabs */}
@@ -1005,7 +856,7 @@ export default function EventNameTab() {
                                       >
                                         <source
                                           src={URL.createObjectURL(
-                                            bannerVideoFile[0]
+                                            bannerVideoFile[0],
                                           )}
                                           type="video/mp4"
                                         />
@@ -1025,78 +876,82 @@ export default function EventNameTab() {
                   </TabsContent>
                 </Tabs>
               </div>
+            </div>
+
+            {/* Event Details Section */}
+            <div className="space-y-4 sm:space-y-6">
+              <div className="flex items-center gap-3 title-header">
+                <h2 className="text-xl font-bold">Event Details</h2>
+              </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
                 <FormField
                   control={form.control}
-                  name="event_banner_heading"
-                  render={({ field }) => {
-                    const wc = countWords(field.value || "");
-                    return (
-                      <FormItem>
-                        <FormLabel className="text-sm font-medium">
-                          Banner Heading <span className="text-red-500">*</span>
-                        </FormLabel>
-                        <FormControl>
-                          <Input
-                            {...field}
-                            placeholder="Enter event title"
-                            className="h-11 bg-[#F9FAFB] border-[#E5E7EB]"
-                            onFocus={() =>
-                              handleFieldFocus("event_banner_heading")
-                            }
-                            onChange={(e) => {
-                              const next = truncateToMaxWordsForInput(
-                                e.target.value,
-                                BANNER_HEADING_MAX_WORDS
-                              );
-                              field.onChange(next);
-                              globalForm.setValue(
-                                "stepOne.event_banner_heading",
-                                next
-                              );
-                            }}
-                            onBlur={field.onBlur}
-                          />
-                        </FormControl>
-                        <p className="text-xs text-muted-foreground mt-1">
-                          <span>
-                            {wc}/{BANNER_HEADING_MAX_WORDS} words
-                          </span>
-                        </p>
-                        <FormMessage />
-                      </FormItem>
-                    );
-                  }}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="event_banner_sub_heading"
+                  name="event_name"
                   render={({ field }) => (
-                    <FormItem>
+                    <FormItem className="w-full">
                       <FormLabel className="text-sm font-medium">
-                        Write banner Sub-heading{" "}
-                        <span className="text-red-500">*</span>
+                        Event Name <span className="text-red-500">*</span>
                       </FormLabel>
                       <FormControl>
                         <Input
                           {...field}
-                          placeholder="Enter event subtitle"
-                          className="h-11 bg-[#F9FAFB] border-[#E5E7EB]"
-                          onFocus={() =>
-                            handleFieldFocus("event_banner_sub_heading")
-                          }
+                          placeholder="Enter your event name"
+                          className="h-11 bg-[#F9FAFB] border-[#E5E7EB] w-full"
+                          onFocus={() => handleFieldFocus("event_name")}
                           onChange={(e) => {
                             field.onChange(e);
                             globalForm.setValue(
-                              "stepOne.event_banner_sub_heading",
-                              e.target.value
+                              "stepOne.event_name",
+                              e.target.value,
                             );
                           }}
-                          onBlur={field.onBlur}
+                          onBlur={field.onBlur} // Important for onBlur validation
                         />
                       </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="event_category_id"
+                  render={({ field }) => (
+                    <FormItem className="w-full">
+                      <FormLabel className="text-sm font-medium">
+                        Event Category <span className="text-red-500">*</span>
+                      </FormLabel>
+                      <Select
+                        onValueChange={(value) => {
+                          field.onChange(Number(value));
+                          globalForm.setValue(
+                            "stepOne.event_category_id",
+                            Number(value),
+                          );
+                        }}
+                        value={field.value ? field.value.toString() : undefined}
+                        disabled={isEventCategoriesLoading}
+                        onOpenChange={() => field.onBlur()} // Trigger validation when dropdown closes
+                      >
+                        <FormControl>
+                          <SelectTrigger className="h-11 bg-[#F9FAFB] border-[#E5E7EB] w-full">
+                            <SelectValue placeholder="Select event category" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {eventCategories?.data?.map(
+                            (category: { id: number; name: string }) => (
+                              <SelectItem
+                                key={category.id}
+                                value={category.id.toString()}
+                              >
+                                {category.name}
+                              </SelectItem>
+                            ),
+                          )}
+                        </SelectContent>
+                      </Select>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -1133,7 +988,7 @@ export default function EventNameTab() {
                             field.onChange(e);
                             globalForm.setValue(
                               "stepOne.about_event_heading",
-                              e.target.value
+                              e.target.value,
                             );
                           }}
                           onBlur={field.onBlur}
@@ -1164,7 +1019,7 @@ export default function EventNameTab() {
                             field.onChange(e);
                             globalForm.setValue(
                               "stepOne.about_event_sub_heading",
-                              e.target.value
+                              e.target.value,
                             );
                           }}
                           onBlur={field.onBlur}
@@ -1191,7 +1046,7 @@ export default function EventNameTab() {
                           field.onChange(value);
                           globalForm.setValue(
                             "stepOne.about_event_description",
-                            value
+                            value,
                           );
                         }}
                         placeholder="Write a compelling description..."
@@ -1215,266 +1070,6 @@ export default function EventNameTab() {
               />
             </div>
 
-            {/* Event Scheduler Section */}
-            <div className="space-y-4 sm:space-y-6">
-              <div className="flex items-center gap-3 title-header">
-                <h2 className="text-xl font-bold">Event Schedule</h2>
-              </div>
-
-              <FormField
-                control={form.control}
-                name="event_schedular_title"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-sm font-medium">
-                      Event Scheduler Title
-                    </FormLabel>
-                    <FormControl>
-                      <Input
-                        {...field}
-                        placeholder="e.g. Event Schedule"
-                        className="h-11 bg-[#F9FAFB] border-[#E5E7EB]"
-                        onFocus={() =>
-                          handleFieldFocus("event_schedular_title")
-                        }
-                        onChange={(e) => {
-                          field.onChange(e);
-                          globalForm.setValue(
-                            "stepOne.event_schedular_title",
-                            e.target.value
-                          );
-                        }}
-                        onBlur={field.onBlur}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <div className="space-y-4">
-                <FormField
-                  control={form.control}
-                  name="event_schedular_background_image"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="text-base font-medium">
-                        Event Scheduler Background Image
-                      </FormLabel>
-                      <FormControl>
-                        {typeof field.value === "string" && field.value ? (
-                          <div className="relative w-full">
-                            <img
-                              src={addCacheBusting(field.value)}
-                              alt="Scheduler Background"
-                              width={400}
-                              height={200}
-                              className="max-h-60 object-contain mx-auto mb-2"
-                            />
-                            <Button
-                              type="button"
-                              variant="destructive"
-                              size="sm"
-                              onClick={() => {
-                                field.onChange(null); // instead of undefined
-                                setEventSchedularBackgroundImage(null);
-                                globalForm.setValue(
-                                  "stepOne.event_schedular_background_image",
-                                  null
-                                );
-                              }}
-                              className="mt-2"
-                            >
-                              Remove
-                            </Button>
-                          </div>
-                        ) : (
-                          <FileUploader
-                            value={eventSchedularBackgroundImage || []}
-                            onValueChange={(files) => {
-                              if (files.length > 0) {
-                                setEventSchedularBackgroundImage(files);
-                                field.onChange(files[0]);
-                                globalForm.setValue(
-                                  "stepOne.event_schedular_background_image",
-                                  files[0]
-                                );
-                              }
-                            }}
-                            maxFileCount={1}
-                            maxSize={2 * 1024 * 1024} // 2MB
-                            onRemove={() => {
-                              field.onChange(undefined);
-                              setEventSchedularBackgroundImage(null);
-                              globalForm.setValue(
-                                "stepOne.event_schedular_background_image",
-                                undefined
-                              );
-                            }}
-                            accept={{
-                              "image/png": [".png"],
-                              "image/jpeg": [".jpg", ".jpeg"],
-                              "image/webp": [".webp"],
-                            }}
-                            enableCropping={true}
-                            aspectRatio={undefined}
-                            cropConfig={{
-                              maxSizeKB: 400,
-                              quality: 0.9,
-                              maxWidth: 1920,
-                              maxHeight: 1920,
-                            }}
-                          />
-                        )}
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-              <div className="space-y-4">
-                {/* Validation error for sequence */}
-                {schedulerValidationErrors.sequence && (
-                  <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-md">
-                    <AlertCircle className="h-4 w-4 text-red-500" />
-                    <span className="text-sm text-red-600">
-                      {schedulerValidationErrors.sequence}
-                    </span>
-                  </div>
-                )}
-
-                {schedulerFields.map((field, index) => (
-                  <div
-                    key={field.id}
-                    className="flex items-center justify-between gap-4 p-4 border border-[#E5E7EB] rounded-md bg-white"
-                  >
-                    <div className="flex-1">
-                      <FormField
-                        control={form.control}
-                        name={`event_schedular.${index}.title`}
-                        render={({ field: itemField }) => (
-                          <FormItem>
-                            <FormControl>
-                              <Input
-                                {...itemField}
-                                placeholder="Event Title"
-                                className="h-11 bg-[#F9FAFB] border-[#E5E7EB]"
-                                onFocus={() =>
-                                  handleFieldFocus("event_schedular")
-                                }
-                                onChange={(e) => {
-                                  // Update form immediately for responsive typing
-                                  itemField.onChange(e);
-
-                                  // Debounce validation and global form update
-                                  // Use setTimeout to ensure form state is updated first
-                                  setTimeout(() => {
-                                    const currentSchedulers =
-                                      form.getValues("event_schedular") || [];
-                                    debouncedValidate(currentSchedulers);
-                                  }, 0);
-                                }}
-                                onBlur={itemField.onBlur}
-                              />
-                            </FormControl>
-                            <FormMessage className="text-red-500 font-semibold mt-1" />
-                          </FormItem>
-                        )}
-                      />
-                    </div>
-                    <div className="flex-1">
-                      <FormField
-                        control={form.control}
-                        name={`event_schedular.${index}.time`}
-                        render={({ field: itemField }) => (
-                          <FormItem>
-                            <FormControl>
-                              <div className="relative">
-                                <Input
-                                  {...itemField}
-                                  type="time"
-                                  className="h-11 bg-[#F9FAFB] border-[#E5E7EB] pr-10"
-                                  onFocus={() =>
-                                    handleFieldFocus("event_schedular")
-                                  }
-                                  onChange={(e) => {
-                                    // Update form immediately for responsive typing
-                                    itemField.onChange(e.target.value);
-
-                                    // Validate immediately for time fields (no debounce, but defer to ensure form state is updated)
-                                    setTimeout(() => {
-                                      const currentSchedulers =
-                                        form.getValues("event_schedular") || [];
-                                      validateAndUpdateScheduler(
-                                        currentSchedulers
-                                      );
-                                    }, 0);
-                                  }}
-                                  onBlur={itemField.onBlur}
-                                />
-                              </div>
-                            </FormControl>
-                            <FormMessage className="text-red-500 font-semibold mt-1" />
-                          </FormItem>
-                        )}
-                      />
-                    </div>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => {
-                        remove(index);
-                        const updatedSchedulers = form
-                          .getValues("event_schedular")
-                          .filter((_, i) => i !== index);
-                        const currentStepOne =
-                          globalForm.getValues().stepOne || {};
-                        globalForm.setValue("stepOne", {
-                          ...currentStepOne,
-                          event_schedular: updatedSchedulers,
-                        });
-
-                        // Re-validate after removal
-                        const errors: { [key: string]: string } = {};
-                        if (!validateTimeSequence(updatedSchedulers)) {
-                          errors.sequence = "Times must be in ascending order";
-                        }
-                        setSchedulerValidationErrors(errors);
-                      }}
-                      disabled={schedulerFields.length === 1}
-                      className="h-11 w-11 p-0 text-red-500 hover:bg-red-50"
-                    >
-                      <X className="h-4 w-4" />
-                    </Button>
-                  </div>
-                ))}
-              </div>
-
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => {
-                  const newItem = { title: "", time: "" };
-                  append(newItem);
-                  const updatedSchedulers = [
-                    ...form.getValues("event_schedular"),
-                    newItem,
-                  ];
-                  const currentStepOne = globalForm.getValues().stepOne || {};
-                  globalForm.setValue("stepOne", {
-                    ...currentStepOne,
-                    event_schedular: updatedSchedulers,
-                  });
-                  handleFieldFocus("event_schedular");
-                }}
-                className="flex items-center gap-2"
-              >
-                <Plus className="h-4 w-4" />
-                Add Schedule
-              </Button>
-            </div>
-
             {/* Submit Button */}
             <div className="flex justify-end mt-6">
               <Button
@@ -1489,7 +1084,7 @@ export default function EventNameTab() {
                     // Attempt to focus the first error field
                     if (errorFields.length > 0) {
                       const firstErrorElement = document.querySelector(
-                        `[name="${errorFields[0]}"]`
+                        `[name="${errorFields[0]}"]`,
                       );
                       if (firstErrorElement) {
                         (firstErrorElement as HTMLElement).focus();
@@ -1506,7 +1101,11 @@ export default function EventNameTab() {
                 disabled={isLoading || globalLoading || readOnly}
                 variant="event-primary"
               >
-                {readOnly ? "View only" : isLoading || globalLoading ? "Saving..." : "Save & Next"}
+                {readOnly
+                  ? "View only"
+                  : isLoading || globalLoading
+                    ? "Saving..."
+                    : "Save & Next"}
               </Button>
             </div>
           </div>

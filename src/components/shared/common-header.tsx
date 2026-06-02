@@ -16,7 +16,7 @@ import {
   FileText,
 } from "lucide-react";
 import Link from "next/link";
-import { useContext, useState, useEffect } from "react";
+import { useContext, useState, useEffect, type RefObject } from "react";
 import { ServerContext } from "@/lib/server-context";
 import { LucideIcon } from "lucide-react";
 import { useSession } from "next-auth/react";
@@ -28,6 +28,8 @@ import {
 } from "./vendor-public-location-book-now";
 import { addCacheBusting } from "@/lib/image-utils";
 import { cn } from "@/lib/utils";
+import { getAnchorColor, relativeLuminance } from "@/lib/color-contrast";
+import { useMediaPreviewUrl } from "@/hooks/use-media-preview-url";
 import { useIsPreviewModeFromProvider } from "@/contexts/preview-context";
 import type { HeaderDownloadLink } from "@/lib/event-header-downloads";
 import {
@@ -72,6 +74,11 @@ interface CommonHeaderProps {
   hideHeaderPhone?: boolean;
   /** One “Account” control instead of separate Log in + Register pills (desktop). */
   compactGuestAuth?: boolean;
+  /**
+   * When the header sits inside a nested scroll panel (onboarding preview), listen here
+   * instead of `window` so the floating bar shadow activates on scroll.
+   */
+  scrollContainerRef?: RefObject<HTMLElement | null>;
 }
 
 export default function CommonHeader({
@@ -85,6 +92,7 @@ export default function CommonHeader({
   hideBrowseEvents = false,
   hideHeaderPhone = false,
   compactGuestAuth = false,
+  scrollContainerRef,
 }: CommonHeaderProps) {
   const { theme } = useContext(ServerContext);
   const isPreviewFromProvider = useIsPreviewModeFromProvider();
@@ -94,29 +102,37 @@ export default function CommonHeader({
   const isAuthenticated = status === "authenticated";
   // const isPreviewMode = useIsPreviewMode(); // Currently unused but available for future use
 
-  // Handle scroll effect
+  // Handle scroll effect (window or embedded preview scroll container)
   useEffect(() => {
+    const scrollRoot = scrollContainerRef?.current;
+
     const handleScroll = () => {
-      setIsScrolled(window.scrollY > 50);
+      const scrollTop = scrollRoot ? scrollRoot.scrollTop : window.scrollY;
+      setIsScrolled(scrollTop > 50);
     };
 
-    window.addEventListener("scroll", handleScroll);
-    return () => window.removeEventListener("scroll", handleScroll);
-  }, []);
+    handleScroll();
+    scrollRoot?.addEventListener("scroll", handleScroll, { passive: true });
+    if (!scrollRoot) {
+      window.addEventListener("scroll", handleScroll, { passive: true });
+    }
+
+    return () => {
+      scrollRoot?.removeEventListener("scroll", handleScroll);
+      if (!scrollRoot) {
+        window.removeEventListener("scroll", handleScroll);
+      }
+    };
+  }, [scrollContainerRef]);
 
   // Cast theme to our known structure
   const vendorTheme = theme as ThemeSchema;
 
-  // Handle logo source - support both string URLs and File objects
-  const logoSrc =
-    typeof logo === "string"
-      ? logo
-      : logo && typeof logo === "object" && "preview" in logo
-        ? logo.preview
-        : null;
+  // Handle logo source - support string URLs, File blobs, and File.preview
+  const resolvedLogoSrc = useMediaPreviewUrl(logo ?? null);
 
   // Prioritize passed logo prop over theme logo
-  const logoToUse = logoSrc || theme?.logo;
+  const logoToUse = resolvedLogoSrc || theme?.logo;
   const logoPath =
     logoToUse &&
     typeof logoToUse === "string" &&
@@ -190,23 +206,32 @@ export default function CommonHeader({
     setMobileMenuOpen(!mobileMenuOpen);
   };
 
+  /** Light header themes (e.g. Clean White `#ffffff`) use on-header text — never glass-over-hero. */
+  const headerIsLight = (() => {
+    const configuredHeader = vendorTheme?.colors?.header ?? "#FFFFFF";
+    try {
+      return relativeLuminance(getAnchorColor(configuredHeader)) >= 0.88;
+    } catch {
+      return true;
+    }
+  })();
+
+  const solidHeaderBarStyles = (scrolled: boolean) => ({
+    container: cn(
+      "bg-[color:var(--color-header)]",
+      scrolled ? "shadow-md" : "shadow-sm",
+    ),
+    textColor: "text-[var(--color-on-header)]",
+    borderColor: "border-[color:var(--color-primary)]",
+    hoverColor:
+      "hover:opacity-90 hover:underline hover:decoration-2 hover:underline-offset-2 hover:decoration-[color:var(--color-primary)]",
+  });
+
   // Determine styling based on variant
   const getVariantStyles = () => {
     switch (variant) {
       case "preview":
-        return {
-          // Always solid: transparent bar sits over dark hero but still used --color-on-header
-          // from the theme token (e.g. light header → dark text) → unreadable. Same in admin review embed.
-          container: cn(
-            "bg-[color:var(--color-header)]",
-            isScrolled ? "shadow-md" : "shadow-sm",
-          ),
-          textColor: "text-[var(--color-on-header)]",
-          borderColor: "border-[color:var(--color-primary)]",
-          // Base text must use on-header (not primary): white primary on light header was invisible until hover.
-          hoverColor:
-            "hover:opacity-90 hover:underline hover:decoration-2 hover:underline-offset-2 hover:decoration-[color:var(--color-primary)]",
-        };
+        return solidHeaderBarStyles(isScrolled);
       case "onboarding":
         return {
           container: "bg-transparent",
@@ -217,8 +242,10 @@ export default function CommonHeader({
             : "hover:text-black/80",
         };
       default: {
-        // Transparent bar sits over hero (event + location pages): on-header is derived from
-        // solid header fill, so dark-on-dark when the bar is clear. Match location-selection-header.
+        if (headerIsLight) {
+          return solidHeaderBarStyles(isScrolled);
+        }
+        // Dark header: transparent bar over hero until scroll (white nav pills).
         const overDarkHero = !isScrolled;
         return {
           container: isScrolled
@@ -237,9 +264,9 @@ export default function CommonHeader({
   };
 
   const styles = getVariantStyles();
-  /** Glass pills over imagery: live location/event pages + onboarding homepage with cover. */
+  /** Glass pills over imagery: dark-header live pages over hero + onboarding homepage with cover. */
   const pillGlassOnHero =
-    (variant === "default" && !isScrolled) ||
+    (variant === "default" && !isScrolled && !headerIsLight) ||
     (variant === "onboarding" && hasBackgroundImage);
   const topBarPillClass = cn(
     "rounded-full border px-3 py-1 text-sm transition-colors whitespace-nowrap backdrop-blur-md",
@@ -263,7 +290,8 @@ export default function CommonHeader({
   /** Live look (`default`) but no real navigation — e.g. onboarding form preview inside PreviewProvider. */
   const useNonInteractiveChrome =
     variant === "onboarding" ||
-    (variant === "default" && isPreviewFromProvider);
+    (variant === "default" && isPreviewFromProvider) ||
+    (variant === "preview" && isPreviewFromProvider);
 
   const sessionPending = status === "loading";
   const commerceSlotLoading =
@@ -354,10 +382,15 @@ export default function CommonHeader({
       ? "dark:bg-background"
       : "dark:bg-[color:var(--color-header)]";
 
+  /** Nested onboarding/site preview scrolls inside a panel — sticky, not viewport-fixed. */
+  const usesEmbeddedScrollPanel = Boolean(scrollContainerRef);
+
   return (
     <section
       className={cn(
-        "fixed top-0 left-0 right-0 z-50 transition-all duration-300",
+        usesEmbeddedScrollPanel
+          ? "sticky top-0 z-50 w-full transition-all duration-300"
+          : "fixed top-0 left-0 right-0 z-50 transition-all duration-300",
         styles.container,
         variant !== "default" && styles.textColor,
         headerDarkModeBg,

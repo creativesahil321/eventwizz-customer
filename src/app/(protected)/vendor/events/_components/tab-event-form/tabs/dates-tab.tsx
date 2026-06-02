@@ -1,9 +1,15 @@
 "use client";
 
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { useRouter } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
-import { useForm, useFieldArray, Resolver } from "react-hook-form";
+import { useForm, useFieldArray, useWatch, Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
   eventsService,
@@ -13,6 +19,17 @@ import { Button } from "@/components/ui/button";
 import { Form } from "@/components/ui/form";
 import { StepThreeType, stepThreeSchema } from "../schema";
 import { useEventFormContext } from "../../events-form-provider";
+import {
+  capEventRoomList,
+  normalizeVendorStepTwoRooms,
+} from "@/lib/event-form-limits";
+import {
+  cleanVendorStepThreeDatesForForm,
+  findStepThreeDatesForRoom,
+  hasMeaningfulVendorDates,
+  normalizeVendorStepThreeRooms,
+  syncStepThreeRoomsFromStepTwo,
+} from "@/app/(protected)/vendor/events/_lib/vendor-step-three-rooms";
 import { eventKeys as vendorEventDetailKeys } from "../../../_lib/hooks/useEventData";
 import { eventKeys as vendorEventsListKeys } from "../../../_lib/queries";
 import { toast } from "sonner";
@@ -86,7 +103,7 @@ const formatDateDisplay = (dateString: string | undefined | null): string => {
 
 // Helper function to get default date structure
 const getDefaultDate = (
-  bookingType: "tickets" | "tables" | "both" = "tickets"
+  bookingType: "tickets" | "tables" | "both" = "tickets",
 ) => {
   const baseDate = {
     event_date: "",
@@ -170,15 +187,19 @@ export default function DatesTab() {
   const [emptyDatesConfirmOpen, setEmptyDatesConfirmOpen] = useState(false);
   const [cancelReasonDialogOpen, setCancelReasonDialogOpen] = useState(false);
   const [cancelReasonText, setCancelReasonText] = useState("");
-  const [cancelReasonError, setCancelReasonError] = useState<string | null>(null);
-  const [targetCancelDateIndex, setTargetCancelDateIndex] = useState<number | null>(
-    null
+  const [cancelReasonError, setCancelReasonError] = useState<string | null>(
+    null,
   );
+  const [targetCancelDateIndex, setTargetCancelDateIndex] = useState<
+    number | null
+  >(null);
   const skipEmptyDatesConfirmRef = useRef(false);
   const prevDateFieldCountRef = useRef<number | undefined>(undefined);
+  const previousRoomIndexRef = useRef<number | null>(null);
+  const lastHydratedRoomIndexRef = useRef<number | null>(null);
   /** Row open state keyed by useFieldArray `field.id` (same collapse pattern as onboarding step 5). */
   const [openDateRowIds, setOpenDateRowIds] = useState<string[]>([]);
-  const { form: globalForm, save, readOnly } = useEventFormContext();
+  const { form: globalForm, advanceStep, readOnly } = useEventFormContext();
 
   // Get event_id from global form
   const getEventId = (): number => {
@@ -186,6 +207,44 @@ export default function DatesTab() {
     return typeof stepOne === "object" && "event_id" in stepOne
       ? Number(stepOne.event_id)
       : 0;
+  };
+
+  const isRoomsEnabled = globalForm.watch("stepTwo.is_rooms") === 1;
+  const activeRoomIndex = globalForm.watch("stepTwo.active_room_index") ?? 0;
+  const watchedStepTwoRooms = useWatch({
+    control: globalForm.control,
+    name: "stepTwo.rooms",
+  });
+  const stepTwoRooms = useMemo(
+    () => capEventRoomList(normalizeVendorStepTwoRooms(watchedStepTwoRooms)),
+    [watchedStepTwoRooms],
+  );
+  const resolvedRoomIndex =
+    stepTwoRooms.length > 0
+      ? Math.min(
+          Math.max(activeRoomIndex, 0),
+          Math.max(stepTwoRooms.length - 1, 0),
+        )
+      : 0;
+  const activeRoomId = Number(stepTwoRooms[resolvedRoomIndex]?.room_id) || 0;
+
+  const resolveInitialDates = (): StepThreeType["dates"] => {
+    const stepThreeDefaults = globalForm.getValues().stepThree;
+    if (isRoomsEnabled && activeRoomId > 0) {
+      const syncedRooms = syncStepThreeRoomsFromStepTwo(
+        stepTwoRooms,
+        normalizeVendorStepThreeRooms(stepThreeDefaults?.rooms),
+      );
+      const roomDates = findStepThreeDatesForRoom(syncedRooms, activeRoomId);
+      if (roomDates.length > 0) {
+        return cleanVendorStepThreeDatesForForm(roomDates);
+      }
+      return [getDefaultDate("tickets")];
+    }
+    if (stepThreeDefaults?.dates && stepThreeDefaults.dates.length > 0) {
+      return cleanVendorStepThreeDatesForForm(stepThreeDefaults.dates);
+    }
+    return [getDefaultDate("tickets")];
   };
 
   // Initialize form with combined step data
@@ -205,10 +264,12 @@ export default function DatesTab() {
         (stepOneLocationId && stepOneLocationId >= 1
           ? stepOneLocationId
           : undefined),
-      dates:
-        stepThreeDefaults?.dates && stepThreeDefaults.dates.length > 0
-          ? stepThreeDefaults.dates
-          : [getDefaultDate("tickets")],
+      is_rooms: isRoomsEnabled ? 1 : 0,
+      dates: resolveInitialDates(),
+      rooms: syncStepThreeRoomsFromStepTwo(
+        stepTwoRooms,
+        normalizeVendorStepThreeRooms(stepThreeDefaults?.rooms),
+      ),
     } as StepThreeType,
     mode: "onChange",
   });
@@ -225,7 +286,94 @@ export default function DatesTab() {
     }
   }, [watchedStepOneLocation, form]);
 
-  const { control, watch, setValue, setError, trigger } = form;
+  const { control, watch, setValue, setError, trigger, getValues, reset } =
+    form;
+
+  const canApplyToAllRooms = useMemo(() => {
+    if (!isRoomsEnabled || stepTwoRooms.length < 2) return false;
+    return true;
+  }, [isRoomsEnabled, stepTwoRooms.length]);
+
+  const persistActiveRoomDatesToGlobal = useCallback(
+    (roomIndex: number, dates: StepThreeType["dates"]) => {
+      if (!isRoomsEnabled || stepTwoRooms.length === 0) return;
+      const existing = syncStepThreeRoomsFromStepTwo(
+        stepTwoRooms,
+        normalizeVendorStepThreeRooms(globalForm.getValues().stepThree?.rooms),
+      );
+      const roomId = Number(stepTwoRooms[roomIndex]?.room_id);
+      if (!roomId) return;
+      const cleaned = cleanVendorStepThreeDatesForForm(dates);
+      const nextRooms = existing.map((entry) =>
+        entry.room_id === roomId
+          ? {
+              ...entry,
+              dates: hasMeaningfulVendorDates(cleaned) ? cleaned : [],
+            }
+          : entry,
+      );
+      globalForm.setValue("stepThree.rooms", nextRooms, {
+        shouldDirty: true,
+        shouldValidate: false,
+      });
+    },
+    [globalForm, isRoomsEnabled, stepTwoRooms],
+  );
+
+  // Rehydrate local dates when switching rooms in room system mode.
+  useEffect(() => {
+    if (!isRoomsEnabled || stepTwoRooms.length === 0) {
+      previousRoomIndexRef.current = null;
+      lastHydratedRoomIndexRef.current = null;
+      return;
+    }
+
+    const prevIndex = previousRoomIndexRef.current;
+    if (
+      prevIndex !== null &&
+      prevIndex >= 0 &&
+      prevIndex < stepTwoRooms.length &&
+      prevIndex !== resolvedRoomIndex
+    ) {
+      persistActiveRoomDatesToGlobal(prevIndex, getValues("dates"));
+    }
+
+    const shouldHydrate =
+      lastHydratedRoomIndexRef.current === null ||
+      lastHydratedRoomIndexRef.current !== resolvedRoomIndex;
+
+    if (shouldHydrate) {
+      const syncedRooms = syncStepThreeRoomsFromStepTwo(
+        stepTwoRooms,
+        normalizeVendorStepThreeRooms(globalForm.getValues().stepThree?.rooms),
+      );
+      const incoming = findStepThreeDatesForRoom(
+        syncedRooms,
+        Number(stepTwoRooms[resolvedRoomIndex]?.room_id),
+      );
+      const nextDates =
+        incoming.length > 0
+          ? cleanVendorStepThreeDatesForForm(incoming)
+          : [getDefaultDate("tickets")];
+      reset({
+        ...getValues(),
+        is_rooms: 1,
+        dates: nextDates,
+        rooms: syncedRooms,
+      });
+      lastHydratedRoomIndexRef.current = resolvedRoomIndex;
+    }
+
+    previousRoomIndexRef.current = resolvedRoomIndex;
+  }, [
+    getValues,
+    globalForm,
+    isRoomsEnabled,
+    persistActiveRoomDatesToGlobal,
+    reset,
+    resolvedRoomIndex,
+    stepTwoRooms,
+  ]);
 
   // Setup field array for dates
   const {
@@ -247,7 +395,7 @@ export default function DatesTab() {
       const lastField = dateFields[len - 1];
       if (lastField) {
         setOpenDateRowIds((prev) =>
-          prev.includes(lastField.id) ? prev : [...prev, lastField.id]
+          prev.includes(lastField.id) ? prev : [...prev, lastField.id],
         );
       }
     }
@@ -263,14 +411,16 @@ export default function DatesTab() {
       setCancelReasonError(null);
       setCancelReasonDialogOpen(true);
     },
-    [readOnly, watch]
+    [readOnly, watch],
   );
 
   const confirmCancelDate = useCallback(() => {
     if (targetCancelDateIndex === null) return;
     const reason = cancelReasonText.trim();
     if (!reason) {
-      setCancelReasonError("Please provide a reason before cancelling this date.");
+      setCancelReasonError(
+        "Please provide a reason before cancelling this date.",
+      );
       return;
     }
 
@@ -292,7 +442,7 @@ export default function DatesTab() {
       if (bookingType === "tickets") {
         setValue(
           `dates.${dateIndex}.total_ticket_types`,
-          currentDate.tickets?.length || 1
+          currentDate.tickets?.length || 1,
         );
         setValue(`dates.${dateIndex}.total_table_types`, 0);
 
@@ -314,7 +464,7 @@ export default function DatesTab() {
         setValue(`dates.${dateIndex}.total_ticket_types`, 0);
         setValue(
           `dates.${dateIndex}.total_table_types`,
-          currentDate.tables?.length || 1
+          currentDate.tables?.length || 1,
         );
 
         // Make sure we have at least one table
@@ -335,11 +485,11 @@ export default function DatesTab() {
         // both
         setValue(
           `dates.${dateIndex}.total_ticket_types`,
-          currentDate.tickets?.length || 1
+          currentDate.tickets?.length || 1,
         );
         setValue(
           `dates.${dateIndex}.total_table_types`,
-          currentDate.tables?.length || 1
+          currentDate.tables?.length || 1,
         );
 
         // Make sure we have at least one ticket
@@ -364,7 +514,7 @@ export default function DatesTab() {
         setValue(`dates.${dateIndex}.deposit_due_date`, "");
       }
     },
-    [watch, setValue]
+    [watch, setValue],
   );
 
   // Add date with default booking type of tickets
@@ -383,7 +533,7 @@ export default function DatesTab() {
       // Check for duplicate dates
       if (otherDates.includes(newDate)) {
         toast.error(
-          "This date is already selected. Please choose a different date."
+          "This date is already selected. Please choose a different date.",
         );
         return false;
       }
@@ -394,14 +544,14 @@ export default function DatesTab() {
 
       if (JSON.stringify(sortedDates) !== JSON.stringify(currentOrder)) {
         toast.warning(
-          "Dates should be in ascending order. Please arrange them chronologically."
+          "Dates should be in ascending order. Please arrange them chronologically.",
         );
         return false;
       }
 
       return true;
     },
-    [watch]
+    [watch],
   );
 
   // Sort dates in ascending order whenever dates change
@@ -416,7 +566,7 @@ export default function DatesTab() {
 
       // Only update if order actually changed
       const hasChanged = sortedDates.some(
-        (date, index) => date.event_date !== currentDates[index]?.event_date
+        (date, index) => date.event_date !== currentDates[index]?.event_date,
       );
 
       if (hasChanged) {
@@ -519,15 +669,15 @@ export default function DatesTab() {
                             watch(`dates.${dateIndex}.tickets`) || [];
                           if (tickets.length > 1) {
                             const updatedTickets = tickets.filter(
-                              (_: unknown, i: number) => i !== ticketIndex
+                              (_: unknown, i: number) => i !== ticketIndex,
                             );
                             setValue(
                               `dates.${dateIndex}.tickets`,
-                              updatedTickets
+                              updatedTickets,
                             );
                             setValue(
                               `dates.${dateIndex}.total_ticket_types`,
-                              updatedTickets.length
+                              updatedTickets.length,
                             );
                           }
                         }}
@@ -580,7 +730,7 @@ export default function DatesTab() {
                       name={`dates.${dateIndex}.tickets.${ticketIndex}.total_capacity`}
                       render={({ field }) => {
                         const currentTicket = watch(
-                          `dates.${dateIndex}.tickets.${ticketIndex}`
+                          `dates.${dateIndex}.tickets.${ticketIndex}`,
                         );
                         const soldTickets =
                           currentTicket && "sold_tickets" in currentTicket
@@ -626,12 +776,12 @@ export default function DatesTab() {
                                           {
                                             type: "manual",
                                             message: `Total capacity cannot be less than sold tickets (${soldTickets})`,
-                                          }
+                                          },
                                         );
                                       } else {
                                         // Clear error if valid
                                         trigger(
-                                          `dates.${dateIndex}.tickets.${ticketIndex}.total_capacity`
+                                          `dates.${dateIndex}.tickets.${ticketIndex}.total_capacity`,
                                         );
                                       }
                                       // Cap at 100000
@@ -646,7 +796,7 @@ export default function DatesTab() {
                                 onBlur={async () => {
                                   field.onBlur();
                                   await trigger(
-                                    `dates.${dateIndex}.tickets.${ticketIndex}.total_capacity`
+                                    `dates.${dateIndex}.tickets.${ticketIndex}.total_capacity`,
                                   );
                                 }}
                               />
@@ -697,14 +847,14 @@ export default function DatesTab() {
                       )}
                     />
                   </div>
-                )
+                ),
               )}
             </div>
           </div>
         </>
       );
     },
-    [control, watch, setValue, setError, trigger]
+    [control, watch, setValue, setError, trigger],
   );
 
   // Create custom field arrays for tables - now checks individual date's booking type
@@ -786,12 +936,12 @@ export default function DatesTab() {
                         const tables = watch(`dates.${dateIndex}.tables`) || [];
                         if (tables.length > 1) {
                           const updatedTables = tables.filter(
-                            (_: unknown, i: number) => i !== tableIndex
+                            (_: unknown, i: number) => i !== tableIndex,
                           );
                           setValue(`dates.${dateIndex}.tables`, updatedTables);
                           setValue(
                             `dates.${dateIndex}.total_table_types`,
-                            updatedTables.length
+                            updatedTables.length,
                           );
                         }
                       }}
@@ -843,10 +993,10 @@ export default function DatesTab() {
                             onBlur={async () => {
                               // Validate cross-field comparison on blur
                               const currentMin = watch(
-                                `dates.${dateIndex}.tables.${tableIndex}.min_persons`
+                                `dates.${dateIndex}.tables.${tableIndex}.min_persons`,
                               );
                               const maxPersons = watch(
-                                `dates.${dateIndex}.tables.${tableIndex}.max_persons`
+                                `dates.${dateIndex}.tables.${tableIndex}.max_persons`,
                               );
 
                               if (
@@ -860,12 +1010,12 @@ export default function DatesTab() {
                                     type: "manual",
                                     message:
                                       "Minimum people cannot be greater than maximum people",
-                                  }
+                                  },
                                 );
                               } else {
                                 // Clear error if valid
                                 await trigger(
-                                  `dates.${dateIndex}.tables.${tableIndex}.min_persons`
+                                  `dates.${dateIndex}.tables.${tableIndex}.min_persons`,
                                 );
                               }
                             }}
@@ -917,10 +1067,10 @@ export default function DatesTab() {
                             onBlur={async () => {
                               // Validate cross-field comparison on blur
                               const minPersons = watch(
-                                `dates.${dateIndex}.tables.${tableIndex}.min_persons`
+                                `dates.${dateIndex}.tables.${tableIndex}.min_persons`,
                               );
                               const currentMax = watch(
-                                `dates.${dateIndex}.tables.${tableIndex}.max_persons`
+                                `dates.${dateIndex}.tables.${tableIndex}.max_persons`,
                               );
 
                               if (
@@ -934,12 +1084,12 @@ export default function DatesTab() {
                                     type: "manual",
                                     message:
                                       "Maximum people cannot be less than minimum people",
-                                  }
+                                  },
                                 );
                               } else {
                                 // Clear error if valid
                                 await trigger(
-                                  `dates.${dateIndex}.tables.${tableIndex}.max_persons`
+                                  `dates.${dateIndex}.tables.${tableIndex}.max_persons`,
                                 );
                               }
                             }}
@@ -992,7 +1142,7 @@ export default function DatesTab() {
                     name={`dates.${dateIndex}.tables.${tableIndex}.total_tables`}
                     render={({ field }) => {
                       const currentTable = watch(
-                        `dates.${dateIndex}.tables.${tableIndex}`
+                        `dates.${dateIndex}.tables.${tableIndex}`,
                       );
                       const soldTables =
                         currentTable && "sold_tables" in currentTable
@@ -1038,12 +1188,12 @@ export default function DatesTab() {
                                         {
                                           type: "manual",
                                           message: `Total tables cannot be less than sold tables (${soldTables})`,
-                                        }
+                                        },
                                       );
                                     } else {
                                       // Clear error if valid
                                       trigger(
-                                        `dates.${dateIndex}.tables.${tableIndex}.total_tables`
+                                        `dates.${dateIndex}.tables.${tableIndex}.total_tables`,
                                       );
                                     }
                                     // Cap at 5000
@@ -1058,7 +1208,7 @@ export default function DatesTab() {
                               onBlur={async () => {
                                 field.onBlur();
                                 await trigger(
-                                  `dates.${dateIndex}.tables.${tableIndex}.total_tables`
+                                  `dates.${dateIndex}.tables.${tableIndex}.total_tables`,
                                 );
                               }}
                             />
@@ -1069,13 +1219,13 @@ export default function DatesTab() {
                     }}
                   />
                 </div>
-              )
+              ),
             )}
           </div>
         </div>
       );
     },
-    [control, watch, setValue, setError, trigger]
+    [control, watch, setValue, setError, trigger],
   );
 
   const renderDateFields = useCallback(
@@ -1095,7 +1245,7 @@ export default function DatesTab() {
                   setOpenDateRowIds((prev) =>
                     isOpen
                       ? prev.filter((id) => id !== dateRowId)
-                      : [...prev, dateRowId]
+                      : [...prev, dateRowId],
                   );
                 }}
                 className="flex items-center gap-2 text-left hover:text-blue-600 transition-colors min-w-0 flex-1"
@@ -1125,13 +1275,14 @@ export default function DatesTab() {
             <div className="flex items-center gap-2 w-full sm:w-auto shrink-0">
               {(() => {
                 const cancellationPending = watch(
-                  `dates.${dateIndex}.cancellation_request_pending`
+                  `dates.${dateIndex}.cancellation_request_pending`,
                 );
                 const useCancelAction =
                   watch(`dates.${dateIndex}.use_cancel_date_action`) === true;
                 const hasFinancial =
                   watch(`dates.${dateIndex}.has_financial_bookings`) === true;
-                const hasBookings = watch(`dates.${dateIndex}.has_bookings`) === true;
+                const hasBookings =
+                  watch(`dates.${dateIndex}.has_bookings`) === true;
                 const showCancelDateFlow =
                   useCancelAction || hasFinancial || hasBookings;
 
@@ -1152,7 +1303,9 @@ export default function DatesTab() {
                       }
                       size="sm"
                       onClick={() => {
-                        const isCancelled = watch(`dates.${dateIndex}.cancelled`);
+                        const isCancelled = watch(
+                          `dates.${dateIndex}.cancelled`,
+                        );
                         if (!isCancelled) {
                           requestCancelDate(dateIndex);
                           return;
@@ -1182,7 +1335,7 @@ export default function DatesTab() {
                     onClick={() => {
                       remove(dateIndex);
                       setOpenDateRowIds((prev) =>
-                        prev.filter((id) => id !== dateRowId)
+                        prev.filter((id) => id !== dateRowId),
                       );
                     }}
                   >
@@ -1197,185 +1350,162 @@ export default function DatesTab() {
 
           {isOpen && (
             <div className="p-4 sm:p-5">
-          <div className="grid grid-cols-1 gap-4 sm:gap-5 mb-4">
-            <FormField
-              control={control}
-              name={`dates.${dateIndex}.event_date`}
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel className="text-sm sm:text-md font-medium">
-                    Event Date
-                  </FormLabel>
-                  <FormControl>
-                    <div className="relative w-full">
-                      <Input
-                        type="date"
-                        placeholder="Select date"
-                        {...field}
-                        min={getTodayDateString()} // Add min attribute to prevent past dates
-                        className="w-full h-10 sm:h-11 bg-[#F9FAFB] border-[#E5E7EB] focus:ring-2 focus:ring-blue-500 text-sm sm:text-base"
-                        onChange={(e) => {
-                          const newDate = e.target.value;
-                          if (
-                            newDate &&
-                            !validateDateUniqueness(dateIndex, newDate)
-                          ) {
-                            return; // Don't update if validation fails
-                          }
-                          field.onChange(newDate);
-                        }}
-                      />
-                      {!field.value && (
-                        <span
-                          className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-500 sm:hidden"
-                          aria-hidden
-                        >
-                          dd-mm-yyyy
-                        </span>
-                      )}
-                    </div>
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            {/* Booking type dropdown for each date */}
-            <FormField
-              control={control}
-              name={`dates.${dateIndex}.booking_type`}
-              render={({ field }) => (
-                <FormItem className="w-full">
-                  <FormLabel className="text-sm sm:text-md font-medium">
-                    Is it a ticketed or seated event?
-                  </FormLabel>
-                  <FormControl>
-                    <Select
-                      value={field.value}
-                      onValueChange={(value: "tickets" | "tables" | "both") => {
-                        field.onChange(value);
-                        // Update the date structure based on the new booking type
-                        updateDate(dateIndex, value);
-                      }}
-                    >
-                      <SelectTrigger className="w-full h-10 sm:h-12 bg-[#F9FAFB] border-[#E5E7EB] text-sm sm:text-base">
-                        <SelectValue placeholder="Select booking type" />
-                      </SelectTrigger>
-                      <SelectContent className="w-full">
-                        <SelectItem value="tickets">Tickets</SelectItem>
-                        <SelectItem value="tables">Tables</SelectItem>
-                        <SelectItem value="both">Both</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-          </div>
-
-          {/* Tickets/Tables based on booking type */}
-          {createTicketFields(dateIndex)}
-          {createTableFields(dateIndex)}
-
-          {/* Payment & Display Settings section - only show for tables/both booking types */}
-          {(watch(`dates.${dateIndex}.booking_type`) === "tables" ||
-            watch(`dates.${dateIndex}.booking_type`) === "both") && (
-            <>
-              <div className="text-base sm:text-lg font-semibold mt-6 mb-2">
-                Table Payment Settings
-              </div>
-              <p className="text-xs sm:text-sm text-gray-600 mb-4">
-                Configure payment options for table bookings (deposit or full
-                payment)
-              </p>
-              <div className="mt-6 bg-gray-50 rounded-lg p-4 sm:p-5">
-                <div className="bg-gray-50 rounded-lg p-4 sm:p-5">
-                  {/* Payment Type */}
-                  <div className="mb-5">
-                    <FormField
-                      control={control}
-                      name={`dates.${dateIndex}.payment_type`}
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel className="text-sm sm:text-md font-medium text-gray-700">
-                            Payment Type
-                          </FormLabel>
-                          <FormControl>
-                            <RadioGroup
-                              value={field.value}
-                              onValueChange={(value: "full" | "deposit") => {
-                                field.onChange(value);
-                                // Update is_deposit_enabled based on payment type
-                                if (value === "full") {
-                                  setValue(
-                                    `dates.${dateIndex}.is_deposit_enabled`,
-                                    false
-                                  );
-                                } else if (value === "deposit") {
-                                  setValue(
-                                    `dates.${dateIndex}.is_deposit_enabled`,
-                                    true
-                                  );
-                                }
-                              }}
-                              className="flex flex-col sm:flex-row gap-3 sm:gap-4 sm:space-x-4 pt-2"
+              <div className="grid grid-cols-1 gap-4 sm:gap-5 mb-4">
+                <FormField
+                  control={control}
+                  name={`dates.${dateIndex}.event_date`}
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-sm sm:text-md font-medium">
+                        Event Date
+                      </FormLabel>
+                      <FormControl>
+                        <div className="relative w-full">
+                          <Input
+                            type="date"
+                            placeholder="Select date"
+                            {...field}
+                            min={getTodayDateString()} // Add min attribute to prevent past dates
+                            className="w-full h-10 sm:h-11 bg-[#F9FAFB] border-[#E5E7EB] focus:ring-2 focus:ring-blue-500 text-sm sm:text-base"
+                            onChange={(e) => {
+                              const newDate = e.target.value;
+                              if (
+                                newDate &&
+                                !validateDateUniqueness(dateIndex, newDate)
+                              ) {
+                                return; // Don't update if validation fails
+                              }
+                              field.onChange(newDate);
+                            }}
+                          />
+                          {!field.value && (
+                            <span
+                              className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-500 sm:hidden"
+                              aria-hidden
                             >
-                              <FormItem className="flex items-center space-x-2 space-y-0">
-                                <FormControl>
-                                  <RadioGroupItem value="full" />
-                                </FormControl>
-                                <Label className="font-normal cursor-pointer">
-                                  Full Payment
-                                </Label>
-                              </FormItem>
-                              <FormItem className="flex items-center space-x-2 space-y-0">
-                                <FormControl>
-                                  <RadioGroupItem value="deposit" />
-                                </FormControl>
-                                <Label className="font-normal cursor-pointer">
-                                  Deposit
-                                </Label>
-                              </FormItem>
-                            </RadioGroup>
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
+                              dd-mm-yyyy
+                            </span>
+                          )}
+                        </div>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                {/* Booking type dropdown for each date */}
+                <FormField
+                  control={control}
+                  name={`dates.${dateIndex}.booking_type`}
+                  render={({ field }) => (
+                    <FormItem className="w-full">
+                      <FormLabel className="text-sm sm:text-md font-medium">
+                        Is it a ticketed or seated event?
+                      </FormLabel>
+                      <FormControl>
+                        <Select
+                          value={field.value}
+                          onValueChange={(
+                            value: "tickets" | "tables" | "both",
+                          ) => {
+                            field.onChange(value);
+                            // Update the date structure based on the new booking type
+                            updateDate(dateIndex, value);
+                          }}
+                        >
+                          <SelectTrigger className="w-full h-10 sm:h-12 bg-[#F9FAFB] border-[#E5E7EB] text-sm sm:text-base">
+                            <SelectValue placeholder="Select booking type" />
+                          </SelectTrigger>
+                          <SelectContent className="w-full">
+                            <SelectItem value="tickets">Tickets</SelectItem>
+                            <SelectItem value="tables">Tables</SelectItem>
+                            <SelectItem value="both">Both</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              {/* Tickets/Tables based on booking type */}
+              {createTicketFields(dateIndex)}
+              {createTableFields(dateIndex)}
+
+              {/* Payment & Display Settings section - only show for tables/both booking types */}
+              {(watch(`dates.${dateIndex}.booking_type`) === "tables" ||
+                watch(`dates.${dateIndex}.booking_type`) === "both") && (
+                <>
+                  <div className="text-base sm:text-lg font-semibold mt-6 mb-2">
+                    Table Payment Settings
                   </div>
-
-                  {/* Conditional deposit fields */}
-                  {watch(`dates.${dateIndex}.payment_type`) === "deposit" && (
-                    <div className="space-y-4 mb-5 p-3 sm:p-4 bg-white rounded-md border border-gray-100">
-                      {/* Enable/Disable Deposit Toggle */}
-                      <FormField
-                        control={control}
-                        name={`dates.${dateIndex}.is_deposit_enabled`}
-                        render={({ field }) => (
-                          <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 sm:p-4 shadow-sm gap-3">
-                            <div className="space-y-0.5 flex-1 min-w-0">
-                              <FormLabel className="text-sm sm:text-base">
-                                Enable Deposit
+                  <p className="text-xs sm:text-sm text-gray-600 mb-4">
+                    Configure payment options for table bookings (deposit or
+                    full payment)
+                  </p>
+                  <div className="mt-6 bg-gray-50 rounded-lg p-4 sm:p-5">
+                    <div className="bg-gray-50 rounded-lg p-4 sm:p-5">
+                      {/* Payment Type */}
+                      <div className="mb-5">
+                        <FormField
+                          control={control}
+                          name={`dates.${dateIndex}.payment_type`}
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel className="text-sm sm:text-md font-medium text-gray-700">
+                                Payment Type
                               </FormLabel>
-                              <div className="text-xs sm:text-sm text-gray-500">
-                                Allow customers to pay deposit for this date
-                              </div>
-                            </div>
-                            <FormControl>
-                              <Switch
-                                checked={field.value ?? true}
-                                onCheckedChange={field.onChange}
-                                className="flex-shrink-0"
-                              />
-                            </FormControl>
-                          </FormItem>
-                        )}
-                      />
+                              <FormControl>
+                                <RadioGroup
+                                  value={field.value}
+                                  onValueChange={(
+                                    value: "full" | "deposit",
+                                  ) => {
+                                    field.onChange(value);
+                                    // Update is_deposit_enabled based on payment type
+                                    if (value === "full") {
+                                      setValue(
+                                        `dates.${dateIndex}.is_deposit_enabled`,
+                                        false,
+                                      );
+                                    } else if (value === "deposit") {
+                                      setValue(
+                                        `dates.${dateIndex}.is_deposit_enabled`,
+                                        true,
+                                      );
+                                    }
+                                  }}
+                                  className="flex flex-col sm:flex-row gap-3 sm:gap-4 sm:space-x-4 pt-2"
+                                >
+                                  <FormItem className="flex items-center space-x-2 space-y-0">
+                                    <FormControl>
+                                      <RadioGroupItem value="full" />
+                                    </FormControl>
+                                    <Label className="font-normal cursor-pointer">
+                                      Full Payment
+                                    </Label>
+                                  </FormItem>
+                                  <FormItem className="flex items-center space-x-2 space-y-0">
+                                    <FormControl>
+                                      <RadioGroupItem value="deposit" />
+                                    </FormControl>
+                                    <Label className="font-normal cursor-pointer">
+                                      Deposit
+                                    </Label>
+                                  </FormItem>
+                                </RadioGroup>
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </div>
 
-                      {/* Only show deposit fields if enabled */}
-                      {watch(`dates.${dateIndex}.is_deposit_enabled`) && (
-                        <>
+                      {/* Deposit fields when Payment Type is Deposit */}
+                      {watch(`dates.${dateIndex}.payment_type`) ===
+                        "deposit" && (
+                        <div className="space-y-4 mb-5 p-3 sm:p-4 bg-white rounded-md border border-gray-100">
                           {/* Deposit Type Selection */}
                           <FormField
                             control={control}
@@ -1389,14 +1519,14 @@ export default function DatesTab() {
                                   <RadioGroup
                                     value={field.value ?? "amount"}
                                     onValueChange={(
-                                      value: "amount" | "percentage"
+                                      value: "amount" | "percentage",
                                     ) => {
                                       field.onChange(value);
                                       // Clear the other field when switching type
                                       if (value === "amount") {
                                         setValue(
                                           `dates.${dateIndex}.deposit_value`,
-                                          ""
+                                          "",
                                         );
                                       }
                                     }}
@@ -1434,7 +1564,7 @@ export default function DatesTab() {
                                 <FormItem>
                                   <FormLabel>
                                     {watch(
-                                      `dates.${dateIndex}.deposit_type`
+                                      `dates.${dateIndex}.deposit_type`,
                                     ) === "amount"
                                       ? "Deposit Amount/Person"
                                       : "Deposit Percentage (%)"}
@@ -1444,14 +1574,14 @@ export default function DatesTab() {
                                       type="number"
                                       min={
                                         watch(
-                                          `dates.${dateIndex}.deposit_type`
+                                          `dates.${dateIndex}.deposit_type`,
                                         ) === "percentage"
                                           ? "20"
                                           : "1"
                                       }
                                       max={
                                         watch(
-                                          `dates.${dateIndex}.deposit_type`
+                                          `dates.${dateIndex}.deposit_type`,
                                         ) === "percentage"
                                           ? "80"
                                           : undefined
@@ -1459,7 +1589,7 @@ export default function DatesTab() {
                                       step="1"
                                       placeholder={
                                         watch(
-                                          `dates.${dateIndex}.deposit_type`
+                                          `dates.${dateIndex}.deposit_type`,
                                         ) === "amount"
                                           ? "Enter deposit amount"
                                           : "Enter percentage (20-80)"
@@ -1470,7 +1600,7 @@ export default function DatesTab() {
                                       onChange={(e) => {
                                         const value = e.target.value;
                                         const depositType = watch(
-                                          `dates.${dateIndex}.deposit_type`
+                                          `dates.${dateIndex}.deposit_type`,
                                         );
 
                                         // Allow empty value
@@ -1482,7 +1612,7 @@ export default function DatesTab() {
                                         // Remove any decimal points and non-numeric characters except digits
                                         const cleanedValue = value.replace(
                                           /[^\d]/g,
-                                          ""
+                                          "",
                                         );
 
                                         if (cleanedValue === "") {
@@ -1492,7 +1622,7 @@ export default function DatesTab() {
 
                                         const numValue = parseInt(
                                           cleanedValue,
-                                          10
+                                          10,
                                         );
 
                                         if (!isNaN(numValue) && numValue >= 0) {
@@ -1547,38 +1677,38 @@ export default function DatesTab() {
                               )}
                             />
                           </div>
-                        </>
+                        </div>
                       )}
                     </div>
-                  )}
-                </div>
-              </div>
-            </>
-          )}
+                  </div>
+                </>
+              )}
 
-          {/* Duplicate Date Button */}
-          <div className="flex justify-end mt-4">
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              disabled={readOnly}
-              className="text-blue-600 border-blue-600 hover:bg-blue-50 w-full sm:w-auto"
-              onClick={() => {
-                const currentDate = watch(`dates.${dateIndex}`);
-                const duplicable = { ...currentDate };
-                delete (duplicable as { id?: number }).id;
-                append({
-                  ...duplicable,
-                  event_date: "",
-                });
-                toast.success("Date duplicated! Please set a new event date.");
-              }}
-            >
-              <PlusCircle className="h-4 w-4 mr-2" />
-              Duplicate
-            </Button>
-          </div>
+              {/* Duplicate Date Button */}
+              <div className="flex justify-end mt-4">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={readOnly}
+                  className="text-blue-600 border-blue-600 hover:bg-blue-50 w-full sm:w-auto"
+                  onClick={() => {
+                    const currentDate = watch(`dates.${dateIndex}`);
+                    const duplicable = { ...currentDate };
+                    delete (duplicable as { id?: number }).id;
+                    append({
+                      ...duplicable,
+                      event_date: "",
+                    });
+                    toast.success(
+                      "Date duplicated! Please set a new event date.",
+                    );
+                  }}
+                >
+                  <PlusCircle className="h-4 w-4 mr-2" />
+                  Duplicate
+                </Button>
+              </div>
             </div>
           )}
         </div>
@@ -1597,12 +1727,16 @@ export default function DatesTab() {
       requestCancelDate,
       readOnly,
       openDateRowIds,
-    ]
+    ],
   );
+
+  const cloneDatesForRooms = (dates: StepThreeType["dates"]) =>
+    JSON.parse(JSON.stringify(dates)) as StepThreeType["dates"];
 
   // Handle form submission
   const handleSubmit = useCallback(
-    async (data: StepThreeType) => {
+    async (data: StepThreeType, options?: { applyToAllRooms?: boolean }) => {
+      const applyToAllRooms = options?.applyToAllRooms === true;
       if (data.dates.length === 0 && !skipEmptyDatesConfirmRef.current) {
         setEmptyDatesConfirmOpen(true);
         return;
@@ -1614,7 +1748,7 @@ export default function DatesTab() {
         globalForm.getValues().stepOne?.vendor_location_id;
       if (!vendor_location_id || vendor_location_id < 1) {
         toast.error(
-          "Select a venue location in event basics (step 1) before saving dates."
+          "Select a venue location in event basics (step 1) before saving dates.",
         );
         return;
       }
@@ -1622,87 +1756,103 @@ export default function DatesTab() {
       setIsLoading(true);
 
       try {
-        // Clean up payment fields for tickets booking type and deposit fields when payment is full
         const latestDates = form.getValues("dates");
-        const cleanedData: StepThreeSavePayload = {
-          ...data,
-          vendor_location_id,
-          dates: latestDates.map((date) => {
-            // Clear payment fields for tickets-only booking type
-            if (date.booking_type === "tickets") {
-              return {
-                ...date,
-                payment_type: undefined,
-                is_deposit_enabled: undefined,
-                deposit_type: undefined,
-                deposit_value: undefined,
-                deposit_due_date: undefined,
-              };
-            }
-
-            // If payment type is full or deposit is disabled, clean deposit fields
-            if (
-              date.payment_type === "full" ||
-              date.is_deposit_enabled === false
-            ) {
-              return {
-                ...date,
-                is_deposit_enabled: false,
-                deposit_type: undefined,
-                deposit_value: undefined,
-                deposit_due_date: undefined,
-              };
-            }
-
-            return date;
-          }),
-        };
-
-        // Update form with cleaned data before validation
-        form.reset(cleanedData);
-
-        // Manually re-trigger validation on all fields to force error display
-        const isValid = await form.trigger();
-
-        // Check for any errors in the form state (including manual errors)
-        const hasErrors = Object.keys(form.formState.errors).length > 0;
-
-        // If form is not valid or has manual errors, stop submission
-        if (!isValid || hasErrors) {
-          // Get all validation errors
-          const errors = form.formState.errors;
-          const errorFields = Object.keys(errors);
-
-          // Find the first error field and scroll to it
-          if (errorFields.length > 0) {
-            // Try to find and focus the field with an error
-            const errorElement = document.querySelector(
-              `[name="${errorFields[0]}"]`
-            );
-            if (errorElement) {
-              (errorElement as HTMLElement).focus();
-              errorElement.scrollIntoView({
-                behavior: "smooth",
-                block: "center",
-              });
-            }
+        const cleanedDates = latestDates.map((date) => {
+          // Clear payment fields for tickets-only booking type
+          if (date.booking_type === "tickets") {
+            return {
+              ...date,
+              payment_type: undefined,
+              is_deposit_enabled: undefined,
+              deposit_type: undefined,
+              deposit_value: undefined,
+              deposit_due_date: undefined,
+            };
           }
 
-          setIsLoading(false);
-          return;
+          if (date.payment_type === "full") {
+            return {
+              ...date,
+              is_deposit_enabled: false,
+              deposit_type: undefined,
+              deposit_value: undefined,
+              deposit_due_date: undefined,
+            };
+          }
+
+          if (date.payment_type === "deposit") {
+            return {
+              ...date,
+              is_deposit_enabled: true,
+            };
+          }
+
+          return date;
+        });
+
+        const roomsEnabled = globalForm.getValues().stepTwo?.is_rooms === 1;
+        const stepTwoRoomsForSave = capEventRoomList(
+          normalizeVendorStepTwoRooms(globalForm.getValues().stepTwo?.rooms),
+        );
+
+        let cleanedData: StepThreeSavePayload;
+        let mergedRoomsGlobal: ReturnType<
+          typeof syncStepThreeRoomsFromStepTwo
+        > = [];
+
+        if (roomsEnabled && stepTwoRoomsForSave.length > 0) {
+          persistActiveRoomDatesToGlobal(resolvedRoomIndex, cleanedDates);
+          mergedRoomsGlobal = syncStepThreeRoomsFromStepTwo(
+            stepTwoRoomsForSave,
+            normalizeVendorStepThreeRooms(
+              globalForm.getValues().stepThree?.rooms,
+            ),
+          ).map((entry, roomIndex) =>
+            applyToAllRooms || roomIndex === resolvedRoomIndex
+              ? { ...entry, dates: cloneDatesForRooms(cleanedDates) }
+              : entry,
+          );
+
+          const activeRoomIdForSave = Number(
+            stepTwoRoomsForSave[resolvedRoomIndex]?.room_id,
+          );
+          const roomsForApi = applyToAllRooms
+            ? mergedRoomsGlobal
+            : mergedRoomsGlobal.filter(
+                (entry) => entry.room_id === activeRoomIdForSave,
+              );
+
+          cleanedData = {
+            step: 3,
+            event_id: data.event_id,
+            vendor_location_id,
+            is_rooms: 1,
+            rooms: roomsForApi,
+            dates: cleanedDates,
+          };
+        } else {
+          cleanedData = {
+            ...data,
+            vendor_location_id,
+            is_rooms: 0,
+            dates: cleanedDates,
+          };
         }
 
-        // Update global form with cleaned data
         globalForm.setValue("stepThree", {
           ...globalForm.getValues().stepThree,
           ...cleanedData,
+          ...(cleanedData.is_rooms === 1
+            ? { rooms: mergedRoomsGlobal, dates: cleanedDates }
+            : { dates: cleanedDates }),
         } as StepThreeType);
 
-        // Call the API directly using eventsService
         const response = await eventsService.storeStepThreeData(cleanedData);
 
         if (response && response.status) {
-          const resData = response.data as { event_deleted?: boolean } | undefined;
+          const resData = response.data as
+            | { event_deleted?: boolean }
+            | undefined;
           if (resData?.event_deleted) {
             const removedId = String(cleanedData.event_id);
             queryClient.removeQueries({
@@ -1719,15 +1869,128 @@ export default function DatesTab() {
             router.push("/vendor/events");
             return;
           }
-          await save();
+
+          if (
+            roomsEnabled &&
+            stepTwoRoomsForSave.length > 0 &&
+            !applyToAllRooms
+          ) {
+            const nextUnfilledIndex = stepTwoRoomsForSave.findIndex(
+              (room, index) =>
+                index !== resolvedRoomIndex &&
+                !hasMeaningfulVendorDates(
+                  findStepThreeDatesForRoom(
+                    mergedRoomsGlobal,
+                    Number(room.room_id),
+                  ),
+                ),
+            );
+            if (nextUnfilledIndex !== -1) {
+              globalForm.setValue(
+                "stepTwo.active_room_index",
+                nextUnfilledIndex,
+                {
+                  shouldDirty: false,
+                  shouldTouch: false,
+                },
+              );
+              toast.info("Saved. Continue with the next room.");
+              return;
+            }
+          }
+
+          toast.success(
+            applyToAllRooms
+              ? "Dates applied to all rooms."
+              : "Dates saved for all rooms.",
+          );
+          await advanceStep(3);
+        } else {
+          toast.error("Could not save dates. Check the form and try again.");
         }
       } catch (error) {
         console.error("Error saving event dates:", error);
+        toast.error("Failed to save dates. Please try again.");
       } finally {
         setIsLoading(false);
       }
     },
-    [form, globalForm, queryClient, router, save]
+    [
+      globalForm,
+      persistActiveRoomDatesToGlobal,
+      queryClient,
+      form,
+      resolvedRoomIndex,
+      router,
+      advanceStep,
+    ],
+  );
+
+  const focusFirstDateValidationError = useCallback(() => {
+    const errors = form.formState.errors;
+    const messages: string[] = [];
+    const walk = (node: unknown, prefix: string) => {
+      if (!node || typeof node !== "object") return;
+      const err = node as { message?: string; [key: string]: unknown };
+      if (typeof err.message === "string" && err.message.trim()) {
+        messages.push(err.message);
+      }
+      for (const [key, value] of Object.entries(err)) {
+        if (key === "message" || key === "type" || key === "ref") continue;
+        walk(value, prefix ? `${prefix}.${key}` : key);
+      }
+    };
+    walk(errors.dates, "dates");
+    if (messages.length > 0) {
+      toast.error(messages.slice(0, 3).join("; "));
+    } else {
+      toast.error("Please complete all required fields for this room's dates.");
+    }
+
+    const firstPath = (() => {
+      const stack: Array<{ node: unknown; path: string }> = [
+        { node: errors.dates, path: "dates" },
+      ];
+      while (stack.length > 0) {
+        const { node, path } = stack.shift()!;
+        if (!node || typeof node !== "object") continue;
+        const err = node as { message?: string; [key: string]: unknown };
+        if (typeof err.message === "string") return path;
+        for (const [key, value] of Object.entries(err)) {
+          if (key === "message" || key === "type" || key === "ref") continue;
+          stack.push({ node: value, path: `${path}.${key}` });
+        }
+      }
+      return null;
+    })();
+
+    if (firstPath) {
+      const errorElement = document.querySelector(`[name="${firstPath}"]`);
+      if (errorElement) {
+        (errorElement as HTMLElement).focus();
+        errorElement.scrollIntoView({ behavior: "smooth", block: "center" });
+      }
+    }
+  }, [form.formState.errors]);
+
+  const attemptSubmit = useCallback(
+    async (applyToAllRooms: boolean) => {
+      const isValid = isRoomsEnabled
+        ? await form.trigger("dates")
+        : await form.trigger();
+      if (!isValid) {
+        focusFirstDateValidationError();
+        return;
+      }
+      await handleSubmit(getValues(), { applyToAllRooms });
+    },
+    [
+      focusFirstDateValidationError,
+      form,
+      getValues,
+      handleSubmit,
+      isRoomsEnabled,
+    ],
   );
 
   return (
@@ -1740,10 +2003,9 @@ export default function DatesTab() {
           <AlertDialogHeader>
             <AlertDialogTitle>Save with no event dates?</AlertDialogTitle>
             <AlertDialogDescription>
-              This event doesn&apos;t have any dates scheduled. If you save
-              now, the event may be removed from your dashboard. To keep it,
-              add at least one date first, or use Go back to return to the
-              form.
+              This event doesn&apos;t have any dates scheduled. If you save now,
+              the event may be removed from your dashboard. To keep it, add at
+              least one date first, or use Go back to return to the form.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -1752,7 +2014,7 @@ export default function DatesTab() {
               onClick={() => {
                 skipEmptyDatesConfirmRef.current = true;
                 setEmptyDatesConfirmOpen(false);
-                void form.handleSubmit(handleSubmit)();
+                void attemptSubmit(false);
               }}
             >
               Save anyway
@@ -1775,8 +2037,8 @@ export default function DatesTab() {
           <AlertDialogHeader>
             <AlertDialogTitle>Confirm date cancellation</AlertDialogTitle>
             <AlertDialogDescription>
-              Cancelled dates may impact your bookings and customer communication.
-              Please provide a clear reason before continuing.
+              Cancelled dates may impact your bookings and customer
+              communication. Please provide a clear reason before continuing.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <div className="space-y-2 text-black">
@@ -1813,21 +2075,15 @@ export default function DatesTab() {
 
       <Form {...form}>
         <form
-          onSubmit={async (e) => {
+          onSubmit={(e) => {
             e.preventDefault();
-
-            // Check for manual errors before triggering React Hook Form validation
             const hasManualErrors =
               Object.keys(form.formState.errors).length > 0;
-            if (hasManualErrors) {
-              setIsLoading(false);
-              return;
-            }
-
-            // Let React Hook Form handle validation and call our handler
-            await form.handleSubmit(handleSubmit)(e);
+            if (hasManualErrors) return;
+            void attemptSubmit(false);
           }}
           className="space-y-8"
+          noValidate
         >
           {/* Event Dates & Pricing Section */}
           <div className="mt-6 sm:mt-8">
@@ -1850,9 +2106,7 @@ export default function DatesTab() {
             </p>
           </div>
 
-          {dateFields.map((field, index) =>
-            renderDateFields(index, field.id)
-          )}
+          {dateFields.map((field, index) => renderDateFields(index, field.id))}
 
           <Button
             type="button"
@@ -1865,14 +2119,34 @@ export default function DatesTab() {
             Add Another Date
           </Button>
 
-          <div className="flex flex-col sm:flex-row justify-end gap-3 sm:gap-4 pt-4">
+          <div className="flex flex-col sm:flex-row justify-end gap-2 sm:gap-3 pt-4">
+            {canApplyToAllRooms && (
+              <Button
+                type="button"
+                variant="outline"
+                disabled={isLoading || readOnly}
+                className="w-full sm:w-auto"
+                onClick={() => void attemptSubmit(true)}
+              >
+                {isLoading ? "Saving..." : "Apply to all rooms"}
+              </Button>
+            )}
             <Button
-              type="submit"
+              type={isRoomsEnabled ? "button" : "submit"}
               disabled={isLoading || readOnly}
               variant="event-primary"
               className="w-full sm:w-auto"
+              onClick={
+                isRoomsEnabled ? () => void attemptSubmit(false) : undefined
+              }
             >
-              {readOnly ? "View only" : isLoading ? "Saving..." : "Save & Next"}
+              {readOnly
+                ? "View only"
+                : isLoading
+                  ? "Saving..."
+                  : isRoomsEnabled
+                    ? "Apply to this room only"
+                    : "Save & Next"}
             </Button>
           </div>
         </form>

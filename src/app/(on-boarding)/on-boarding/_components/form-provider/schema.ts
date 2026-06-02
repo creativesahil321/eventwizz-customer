@@ -155,38 +155,6 @@ export type StepTwoType = z.infer<typeof stepTwoSchema>;
 
 //#===step-3===#
 
-// Validation functions for event scheduler
-// Removed future time validation - only keeping sequence validation
-const validateTimeSequence: (
-  schedules: Array<{ title: string; time: string }>
-) => boolean = (schedules) => {
-  if (schedules.length <= 1) return true;
-
-  const validSchedules = schedules.filter(
-    (schedule) => schedule.time && schedule.title
-  );
-  if (validSchedules.length <= 1) return true;
-
-  for (let i = 0; i < validSchedules.length - 1; i++) {
-    const currentTime = validSchedules[i].time;
-    const nextTime = validSchedules[i + 1].time;
-
-    if (!currentTime || !nextTime) continue;
-
-    const [currentHours, currentMinutes] = currentTime.split(":").map(Number);
-    const [nextHours, nextMinutes] = nextTime.split(":").map(Number);
-
-    const currentTotalMinutes = currentHours * 60 + currentMinutes;
-    const nextTotalMinutes = nextHours * 60 + nextMinutes;
-
-    if (nextTotalMinutes <= currentTotalMinutes) {
-      return false;
-    }
-  }
-
-  return true;
-};
-
 export const stepThreeSchema = z.object({
   isApproved: z.boolean().optional(),
   step: z.literal(3),
@@ -290,23 +258,6 @@ export const stepFourSchema = z
           const hasTitle = Boolean(schedule.title?.trim());
           const hasTime = Boolean(schedule.time?.trim());
 
-          if (hasTitle !== hasTime) {
-            if (!hasTitle) {
-              ctx.addIssue({
-                code: z.ZodIssueCode.custom,
-                message: "Title is required when time is set",
-                path: [index, "title"],
-              });
-            }
-            if (!hasTime) {
-              ctx.addIssue({
-                code: z.ZodIssueCode.custom,
-                message: "Time is required when title is set",
-                path: [index, "time"],
-              });
-            }
-          }
-
           if (
             hasTime &&
             !/^([01]\d|2[0-3]):([0-5]\d)$/.test(schedule.time!.trim())
@@ -319,20 +270,6 @@ export const stepFourSchema = z
           }
         });
 
-        const filled = schedules
-          .filter((schedule) => schedule.title?.trim() && schedule.time?.trim())
-          .map((schedule) => ({
-            title: schedule.title!.trim(),
-            time: schedule.time!.trim(),
-          }));
-
-        if (filled.length > 1 && !validateTimeSequence(filled)) {
-          ctx.addIssue({
-            code: z.ZodIssueCode.custom,
-            message: "Times must be in ascending order",
-            path: [],
-          });
-        }
       }),
     gallery: z
       .array(
@@ -383,28 +320,21 @@ export function normalizeEventSchedularForSave(
 
 // Create a validation function for reuse across schemas
 const validateDepositDueDate = (data: unknown) => {
-  const { booking_type, payment_type, deposit_due_date, is_deposit_enabled } =
-    data as {
-      booking_type: string;
-      payment_type: string;
-      deposit_due_date: string | undefined;
-      is_deposit_enabled?: boolean;
-    };
+  const { booking_type, payment_type, deposit_due_date } = data as {
+    booking_type: string;
+    payment_type: string;
+    deposit_due_date: string | undefined;
+  };
   // Only validate payment fields for tables/both booking types
   if (booking_type === "tickets") {
     return true;
   }
 
-  if (is_deposit_enabled === false) {
+  if (payment_type !== "deposit") {
     return true;
   }
 
-  // If payment type is deposit, require deposit_due_date
-  if (payment_type === "deposit") {
-    return deposit_due_date && deposit_due_date.trim() !== "";
-  }
-
-  return true;
+  return deposit_due_date && deposit_due_date.trim() !== "";
 };
 
 const depositDueDateMessage = {
@@ -515,10 +445,6 @@ const dateSchema = baseDateSchema
       return;
     }
 
-    if (data.is_deposit_enabled === false) {
-      return;
-    }
-
     if (data.payment_type !== "deposit") {
       return;
     }
@@ -608,7 +534,6 @@ const dateSchema = baseDateSchema
     // Only validate if payment type is deposit or deposit is enabled
     if (
       data.payment_type === "deposit" &&
-      data.is_deposit_enabled &&
       data.deposit_due_date &&
       data.event_date
     ) {
@@ -750,10 +675,7 @@ export const getDefaultDate = (
       return {
         ...baseDate,
         payment_type: "full" as const,
-        is_deposit_enabled: true,
-        deposit_type: "amount" as const,
-        deposit_value: "",
-        deposit_due_date: "",
+        is_deposit_enabled: false,
         total_table_types: 1,
         tables: [
           { min_persons: "", max_persons: "", price: "", total_tables: "", discount_type: "none", discount_value: "" },
@@ -765,10 +687,7 @@ export const getDefaultDate = (
       return {
         ...baseDate,
         payment_type: "full" as const,
-        is_deposit_enabled: true,
-        deposit_type: "amount" as const,
-        deposit_value: "",
-        deposit_due_date: "",
+        is_deposit_enabled: false,
         total_table_types: 1,
         tables: [
           { min_persons: "", max_persons: "", price: "", total_tables: "", discount_type: "none", discount_value: "" },
@@ -845,7 +764,10 @@ export const stepSixSchema = z
         });
       }
 
-      if (!data.event_menu_category_id || data.event_menu_category_id < 1) {
+      if (
+        (!data.event_menu_category_id || data.event_menu_category_id < 1) &&
+        (!data.menus || data.menus.length === 0)
+      ) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           message: "Menu category is required when catering option is Yes",
@@ -1364,6 +1286,23 @@ const roomBrochureSchema = z.object({
   more_info: z.array(z.any()).optional().default([]),
 });
 
+const roomDrinksSchema = z.object({
+  drink_title: z.string().optional().default(""),
+  drink_description: z.string().optional().default(""),
+  packages: z
+    .array(
+      z.object({
+        id: z.number().optional(),
+        title: z.string().optional().default(""),
+        description: z.string().optional().default(""),
+        price: z.union([z.number(), z.string()]).optional(),
+        available_quantity: z.union([z.number(), z.string()]).optional(),
+      }),
+    )
+    .optional()
+    .default([]),
+});
+
 export const roomSchema = z.object({
   /** Backend room id (assigned after first save). */
   id: z.number().optional(),
@@ -1377,10 +1316,14 @@ export const roomSchema = z.object({
   isApprovedDates: z.boolean().optional(),
   isApprovedCatering: z.boolean().optional(),
   isApprovedBrochure: z.boolean().optional(),
+  isApprovedDrinks: z.boolean().optional(),
   package: roomPackageSchema.default({}),
   dates: roomDatesSchema.default({ dates: [] }),
+  /** Last dates payload successfully persisted to the API for this room. */
+  persistedDates: roomDatesSchema.optional(),
   catering: roomCateringSchema.default({}),
   brochure: roomBrochureSchema.default({}),
+  drinks: roomDrinksSchema.default({}),
 });
 export type RoomType = z.infer<typeof roomSchema>;
 

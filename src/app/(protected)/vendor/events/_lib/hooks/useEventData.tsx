@@ -7,11 +7,12 @@ import {
   type QueryClient,
 } from "@tanstack/react-query";
 import { request } from "@/services/core/api-client";
-import { API_ENDPOINTS } from "@/services/core/endpoints";
 import { ApiResponse } from "@/services/core/api-client";
 import { useSession } from "next-auth/react";
 import { useEffect } from "react";
 import { useIsPreviewModeFromProvider } from "@/contexts/preview-context";
+import { buildVendorEventGetUrl } from "@/services/vendor/events/build-vendor-event-get-url";
+import { parseEventIsRoomsFlag } from "@/lib/event-form-limits";
 import { eventKeys as vendorEventsListKeys } from "../queries";
 
 // Define query key for event data
@@ -21,6 +22,18 @@ export const eventKeys = {
 };
 
 const EVENT_DATA_CHANGED = "event-data-changed";
+
+function parseIsRoomsFromEventApiPayload(data: unknown): 0 | 1 {
+  if (!data || typeof data !== "object") return 0;
+  const root = data as {
+    is_rooms?: boolean | number | string;
+    stepOne?: { is_rooms?: boolean | number | string };
+    stepTwo?: { is_rooms?: boolean | number | string };
+  };
+  return parseEventIsRoomsFlag(
+    root.is_rooms ?? root.stepTwo?.is_rooms ?? root.stepOne?.is_rooms,
+  );
+}
 
 /** One listener for the whole app — avoids N refetches when N components use `useEventData`. */
 let eventDataChangedSubscribers = 0;
@@ -49,6 +62,7 @@ function detachEventDataChangedListener() {
 async function fetchEventData(
   token: string,
   eventId: string,
+  isRooms?: boolean,
 ): Promise<ApiResponse | null> {
   if (!token || !eventId) {
     console.warn("Missing token or eventId for event data fetch:", {
@@ -74,17 +88,25 @@ async function fetchEventData(
   };
 
   try {
-    const endpoint = API_ENDPOINTS.VENDOR.EVENT.GET_EVENT.replace(
-      "{eventId}",
-      eventId,
-    );
+    const fetchByMode = async (roomsMode: boolean) =>
+      request<ApiResponse>({
+        url: buildVendorEventGetUrl(eventId, roomsMode),
+        method: "GET",
+        headers,
+        returnFullResponse: true,
+      });
 
-    const response = await request<ApiResponse>({
-      url: endpoint,
-      method: "GET",
-      headers,
-      returnFullResponse: true,
-    });
+    const response =
+      typeof isRooms === "boolean"
+        ? await fetchByMode(isRooms)
+        : await fetchByMode(false).then(async (flatRes) => {
+            if (!flatRes?.status) return fetchByMode(true);
+            if (parseIsRoomsFromEventApiPayload(flatRes.data) === 1) {
+              const roomsRes = await fetchByMode(true);
+              return roomsRes?.status ? roomsRes : flatRes;
+            }
+            return flatRes;
+          });
 
     if (response.status) {
       if (!response.data) {
@@ -117,11 +139,22 @@ async function fetchEventData(
   }
 }
 
-export function useEventData(eventId?: string) {
+export function useEventData(
+  eventId?: string,
+  /** `true` → `.../true`; `false` → `.../false`; omit/`undefined` probes true then false. */
+  isRooms?: boolean,
+  options?: {
+    enabled?: boolean;
+    /** Allow fetch on `/preview/event` inside PreviewProvider */ allowFetchInPreview?: boolean;
+    /** Skip TanStack stale cache — refetch persistence GET every time (preview sync). */
+    alwaysFresh?: boolean;
+  },
+) {
   const { data: session } = useSession();
   const queryClient = useQueryClient();
   const token = session?.user?.token;
   const isPreviewFromProvider = useIsPreviewModeFromProvider();
+  const alwaysFresh = options?.alwaysFresh === true;
 
   // Validate eventId before making the query
   const isValidEventId =
@@ -139,12 +172,21 @@ export function useEventData(eventId?: string) {
     error,
     refetch,
   } = useQuery({
-    queryKey: eventKeys.data(eventId),
-    queryFn: () => fetchEventData(token as string, eventId as string),
+    queryKey: [
+      ...eventKeys.data(eventId),
+      isRooms === true ? "rooms" : isRooms === false ? "base" : "probe",
+    ],
+    queryFn: () => fetchEventData(token as string, eventId as string, isRooms),
     // Do not use URL `/preview/…` here — that blocked `/preview/event?id=` from loading.
     // Only skip when an ancestor PreviewProvider opts in (none today for useEventData call sites).
-    enabled: !!token && !!isValidEventId && !isPreviewFromProvider,
-    staleTime: 1000 * 60 * 5, // 5 minutes
+    enabled:
+      options?.enabled !== false &&
+      !!token &&
+      !!isValidEventId &&
+      (!isPreviewFromProvider || options?.allowFetchInPreview === true),
+    staleTime: alwaysFresh ? 0 : 1000 * 60 * 5,
+    gcTime: alwaysFresh ? 1000 * 60 : 1000 * 60 * 10,
+    refetchOnMount: alwaysFresh ? "always" : true,
     refetchOnWindowFocus: false,
   });
 

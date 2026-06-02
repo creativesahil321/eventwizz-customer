@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useCallback, useState, useEffect, useMemo } from "react";
+import React, { useCallback, useState, useEffect, useRef } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm, useFieldArray, useWatch } from "react-hook-form";
 import { Button } from "@/components/ui/button";
@@ -27,7 +27,10 @@ import {
 } from "../../form-provider/schema";
 import { FileUploader } from "@/components/ui/file-uploader";
 import { Trash, PlusCircle } from "lucide-react";
-import { OnboardingTitle } from "@/components/ui/typography";
+import {
+  OnboardingFieldGroupTitle,
+  OnboardingTitle,
+} from "@/components/ui/typography";
 import { toast } from "sonner";
 import { onboardingService } from "@/services/vendor/onboarding/onboarding.service";
 import { roomService } from "@/services/vendor/onboarding/room.service";
@@ -36,38 +39,26 @@ import GalleryUploader from "./gallery-uploader";
 import { useSession } from "next-auth/react";
 import { useEventId } from "../../../_lib/hooks/useEventId";
 import { addCacheBusting } from "@/lib/image-utils";
-import { cn } from "@/lib/utils";
-import { useGuidedOnboardingSections } from "../../../_lib/hooks/use-guided-onboarding-sections";
-import type { GuidedSectionConfig } from "../../../_lib/hooks/use-guided-onboarding-sections";
-import { GuidedMultiSectionBottomActions } from "../../guided-section-chips";
-import {
-  GuidedSectionActionFooter,
-  GuidedSectionCoreActions,
-  guidedOnboardingSkipButtonClass,
-} from "../../guided-sticky-approval-bar";
-import { guidedSectionSurfaceClass } from "../../guided-section-surface";
-import { GuidedSectionTitleBar } from "../../guided-section-title-bar";
+import { WholeStepGuidedShell } from "../../whole-step-guided-shell";
+import { GuidedWholeStepBottomActions } from "../../guided-section-chips";
+import { guidedOnboardingSkipButtonClass } from "../../guided-sticky-approval-bar";
+import { guidedInsetSectionSurfaceClass } from "../../guided-section-surface";
 import { useCurrencySymbol } from "@/hooks/use-currency-format";
 import {
+  createDefaultPackageDetailRow,
+  EVENT_GALLERY_MAX_IMAGES,
   EVENT_PACKAGE_MAIN_HEADING_MAX_CHARS,
   EVENT_PACKAGE_SUB_HEADING_MAX_CHARS,
   PACKAGE_DETAIL_LINE_MAX_CHARS,
+  packageDetailLabel,
+  packageDetailPlaceholder,
+  resolveEventSchedulerItems,
 } from "@/lib/event-form-limits";
 import {
   isRoomSectionComplete,
   useRoomManager,
 } from "../../rooms/use-room-manager";
 import { MultiSpaceHeader } from "../../rooms/multi-space-header";
-
-function resolveStepFourErrorIndex(keys: string[]) {
-  if (keys.some((k) => k.startsWith("event_schedular"))) return 0;
-  if (keys.some((k) => k === "package_title" || k === "package_description"))
-    return 1;
-  if (keys.some((k) => k === "__extra_validation__" || k === "package_image"))
-    return 2;
-  if (keys.some((k) => k.startsWith("package_details"))) return 3;
-  return 4;
-}
 
 /** IDs of persisted gallery rows still in the final list (backend `replace_gallery`). */
 function collectReplaceGalleryIds(
@@ -165,17 +156,15 @@ const StepFour = () => {
         stepFourDefaults?.package_details &&
         stepFourDefaults.package_details.length > 0
           ? stepFourDefaults.package_details
-          : [{ title: "" }],
+          : [createDefaultPackageDetailRow(0)],
       event_schedular_title: stepFourDefaults?.event_schedular_title || "",
       event_schedule_subtitle:
         stepFourDefaults?.event_schedule_subtitle ||
         stepFourDefaultsLegacy?.event_schedular_custom_copy ||
         "",
-      event_schedular:
-        stepFourDefaults?.event_schedular &&
-        stepFourDefaults.event_schedular.length > 0
-          ? stepFourDefaults.event_schedular
-          : [],
+      event_schedular: resolveEventSchedulerItems(
+        stepFourDefaults?.event_schedular,
+      ),
       gallery: stepFourDefaults?.gallery || [],
     },
     mode: "onChange",
@@ -186,10 +175,49 @@ const StepFour = () => {
   const [loading, setLoading] = useState(false);
   const [deleteGalleryIds, setDeleteGalleryIds] = useState<number[]>([]);
 
-  // When the user switches room tab (or flips the multi-space toggle), reload the form
-  // with that room's data so the inputs reflect the new scope. Single-room ↔ multi-room
-  // transitions also flow through here.
+  const prevRoomIndexRef = useRef<number | null>(null);
+  const prevIsMultiRoomRef = useRef<boolean>(isMultiRoom);
+
+  // Persist outgoing room's form data back into multiSpace before switching tabs,
+  // then hydrate the incoming room. This mirrors what useRoomScopeSync does for Steps 5-7.
   useEffect(() => {
+    const wasMultiRoom = prevIsMultiRoomRef.current;
+
+    // When toggling out of multi-room mode, clear room-tab tracking so we don't
+    // accidentally push single-room form values into a stale room slot on re-enable.
+    if (!isMultiRoom) {
+      prevRoomIndexRef.current = null;
+      prevIsMultiRoomRef.current = false;
+    }
+
+    if (isMultiRoom) {
+      const prevIndex = prevRoomIndexRef.current;
+      if (
+        wasMultiRoom &&
+        prevIndex !== null &&
+        prevIndex !== currentRoomIndex &&
+        prevIndex >= 0 &&
+        prevIndex < rooms.length
+      ) {
+        const currentFormValues = form.getValues();
+        globalForm.setValue(
+          `multiSpace.rooms.${prevIndex}.package` as never,
+          {
+            package_image: currentFormValues.package_image,
+            package_title: currentFormValues.package_title,
+            package_description: currentFormValues.package_description,
+            package_button_name: currentFormValues.package_button_name,
+            package_details: currentFormValues.package_details,
+            event_schedular_title: currentFormValues.event_schedular_title,
+            event_schedule_subtitle: currentFormValues.event_schedule_subtitle,
+            event_schedular: currentFormValues.event_schedular,
+            gallery: currentFormValues.gallery,
+          } as never,
+          { shouldDirty: false },
+        );
+      }
+    }
+
     const nextDefaults = isMultiRoom
       ? rooms[currentRoomIndex]?.package
       : globalForm.getValues("stepFour");
@@ -206,19 +234,18 @@ const StepFour = () => {
       package_details:
         nextDefaults?.package_details && nextDefaults.package_details.length > 0
           ? (nextDefaults.package_details as Array<{ title: string }>)
-          : [{ title: "" }],
+          : [createDefaultPackageDetailRow(0)],
       event_schedular_title: nextDefaults?.event_schedular_title || "",
       event_schedule_subtitle:
         nextDefaults?.event_schedule_subtitle ||
         nextDefaultsLegacy?.event_schedular_custom_copy ||
         "",
-      event_schedular:
-        nextDefaults?.event_schedular && nextDefaults.event_schedular.length > 0
-          ? (nextDefaults.event_schedular as Array<{
-              title: string;
-              time: string;
-            }>)
-          : [],
+      event_schedular: resolveEventSchedulerItems(
+        nextDefaults?.event_schedular as Array<{
+          title: string;
+          time: string;
+        }> | undefined,
+      ),
       gallery: (nextDefaults?.gallery as StepFourType["gallery"]) || [],
     });
     const img = nextDefaults?.package_image;
@@ -231,6 +258,11 @@ const StepFour = () => {
     } else {
       setPackageImageUrl(null);
       setPackageImage([]);
+    }
+
+    if (isMultiRoom) {
+      prevRoomIndexRef.current = currentRoomIndex;
+      prevIsMultiRoomRef.current = true;
     }
     // We intentionally only react to scope changes, not every form keystroke.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -295,95 +327,66 @@ const StepFour = () => {
     [],
   );
 
-  const sectionConfigs = useMemo((): GuidedSectionConfig<StepFourType>[] => {
-    return [
-      {
-        id: "timeline",
-        label: "Timeline",
-        description:
-          "Optional timeline title, subtitle, and schedule rows for your event.",
-        fields: [
-          "event_schedular_title",
-          "event_schedule_subtitle",
-          "event_schedular",
-        ],
-      },
-      {
-        id: "package-copy",
-        label: "Package",
-        description: "Main heading and sub-heading for your packages section.",
-        fields: ["package_title", "package_description"],
-      },
-      {
-        id: "package-media",
-        label: "Image",
-        description: "Hero image for your package block.",
-        fields: ["package_image"],
-        validate: async () => {
-          const img = form.getValues("package_image");
-          const hasImage = Boolean(
-            packageImage.length > 0 ||
-            packageImageUrl ||
-            img instanceof File ||
-            (typeof img === "string" && img.length > 0),
-          );
-          if (!hasImage) {
-            toast.error("Please upload a package image.");
-            return false;
+  const validateEditedSchedulerRows = useCallback(
+    (schedules: StepFourType["event_schedular"] | undefined): boolean => {
+      const rows = Array.isArray(schedules) ? schedules : [];
+      const dirtyRows = form.formState.dirtyFields
+        .event_schedular as Array<
+        | {
+            title?: boolean;
+            time?: boolean;
           }
-          return true;
-        },
-      },
-      {
-        id: "package-details",
-        label: "Package details",
-        description: "Bullet points that appear under your package.",
-        fields: ["package_details"],
-      },
-      {
-        id: "gallery",
-        label: "Gallery",
-        description: "Optional gallery images (up to 8).",
-        fields: ["gallery"],
-      },
-    ];
-  }, [form, packageImage.length, packageImageUrl]);
+        | undefined
+      >;
 
-  const validateFullStepFour = useCallback(async () => {
-    const img = form.getValues("package_image");
-    const hasImage = Boolean(
-      packageImage.length > 0 ||
-      packageImageUrl ||
-      img instanceof File ||
-      (typeof img === "string" && img.length > 0),
-    );
-    if (!hasImage) {
-      toast.error("Please upload a package image.");
+      form.clearErrors("event_schedular");
+
+      let hasPartialEditedRow = false;
+
+      rows.forEach((row, index) => {
+        const rowDirty = dirtyRows?.[index];
+        const touched = Boolean(rowDirty?.title || rowDirty?.time);
+        if (!touched) return;
+
+        const hasTitle = String(row?.title ?? "").trim().length > 0;
+        const hasTime = String(row?.time ?? "").trim().length > 0;
+        if (hasTitle === hasTime) return;
+
+        hasPartialEditedRow = true;
+        if (!hasTitle) {
+          form.setError(`event_schedular.${index}.title`, {
+            type: "manual",
+            message: "Title is required when time is set",
+          });
+        }
+        if (!hasTime) {
+          form.setError(`event_schedular.${index}.time`, {
+            type: "manual",
+            message: "Time is required when title is set",
+          });
+        }
+      });
+
+      if (hasPartialEditedRow) {
+        toast.error("Complete both title and time for each edited timeline row.");
       return false;
     }
+
     return true;
-  }, [form, packageImage.length, packageImageUrl]);
-
-  const guided = useGuidedOnboardingSections({
-    form,
-    sections: sectionConfigs,
-    resolveErrorSectionIndex: resolveStepFourErrorIndex,
-    validateFullStep: validateFullStepFour,
-    persistenceHydrated: persistedProgressHydrated,
-    persistedStepApproved: stepFourPersistedApproved === true,
-  });
-
-  // When switching room tabs, start at the first guided section for that room
-  // instead of keeping the previous room's last active section (often Gallery).
-  useEffect(() => {
-    guided.resetToFirstSection();
-  }, [scopePrefix, guided.resetToFirstSection]);
+    },
+    [form],
+  );
 
   const handleSubmit = useCallback(
     async (data: StepFourType, options?: { applyToAllRooms?: boolean }) => {
       const applyToAllRooms = options?.applyToAllRooms === true;
       setLoading(true);
       try {
+        if (!validateEditedSchedulerRows(data.event_schedular)) {
+          setLoading(false);
+          return;
+        }
+
         const isValid = await form.trigger();
         if (!isValid) {
           const errors = form.formState.errors;
@@ -444,7 +447,18 @@ const StepFour = () => {
             gallery: [...(data.gallery ?? [])],
           };
 
-          const stagedRooms = rooms.map((room, index) => {
+          // Flush the active room's latest form data into multiSpace so that
+          // `rooms` is fresh before we build `stagedRooms`.
+          globalForm.setValue(
+            `multiSpace.rooms.${currentRoomIndex}.package` as never,
+            nextPackageFromForm as never,
+            { shouldDirty: false },
+          );
+          const freshRooms =
+            (globalForm.getValues("multiSpace")?.rooms as typeof rooms) ??
+            rooms;
+
+          const stagedRooms = freshRooms.map((room, index) => {
             const shouldMirrorFromActive =
               index === currentRoomIndex ||
               (applyToAllRooms && !isRoomSectionComplete(room, "package"));
@@ -469,20 +483,29 @@ const StepFour = () => {
             replace_gallery: collectReplaceGalleryIds(data.gallery),
           });
 
-          if (response?.status) {
+        if (response?.status) {
             setDeleteGalleryIds([]);
             const currentMultiSpace = globalForm.getValues("multiSpace");
             if (currentMultiSpace) {
-              globalForm.setValue("multiSpace", {
-                ...currentMultiSpace,
-                rooms: stagedRooms.map((room, index) => ({
-                  ...room,
+              // Use the latest rooms from globalForm (preserves other step data) and
+              // merge package updates from stagedRooms + set approval flags.
+              const latestRooms = currentMultiSpace.rooms ?? [];
+              const mergedRooms = latestRooms.map((existingRoom, index) => {
+                const staged = stagedRooms[index];
+                if (!staged) return existingRoom;
+                return {
+                  ...existingRoom,
+                  package: staged.package,
                   isApprovedPackage: applyToAllRooms
-                    ? isRoomSectionComplete(room, "package")
+                    ? isRoomSectionComplete(staged, "package")
                     : index === currentRoomIndex
                       ? true
-                      : room.isApprovedPackage === true,
-                })),
+                      : (existingRoom as typeof staged).isApprovedPackage === true,
+                };
+              });
+              globalForm.setValue("multiSpace", {
+                ...currentMultiSpace,
+                rooms: mergedRooms as typeof stagedRooms,
               });
             }
             const updatedRooms =
@@ -544,11 +567,11 @@ const StepFour = () => {
             );
           }
 
-          // Cap at 8; backend may return more until delete logic is fixed.
+          // Cap at max; backend may return more until delete logic is fixed.
           if (responseData?.gallery && Array.isArray(responseData.gallery)) {
             const cappedGallery = (
               responseData.gallery as (File | { id: number; url: string })[]
-            ).slice(0, 8);
+            ).slice(0, EVENT_GALLERY_MAX_IMAGES);
             globalForm.setValue("stepFour.gallery", cappedGallery);
           }
 
@@ -581,24 +604,18 @@ const StepFour = () => {
       packageImage,
       setScopedValue,
       setCurrentRoomIndex,
+      validateEditedSchedulerRows,
     ],
   );
 
   const handleContinue = useCallback(async () => {
-    // Multi-space validation: vendor must create at least 2 rooms when opting into multiple spaces.
-    // (Backend-driven rooms; we no longer seed a default room.)
     if (multiSpaceEnabled && rooms.length < 2) {
       toast.error("Please add at least 2 rooms to continue.");
       return;
     }
-    if (!guided.allSectionsApproved) {
-      const ok = await guided.handleApproveAllSections();
-      if (!ok) return;
-    }
     setActiveField(null);
     await handleSubmit(form.getValues(), { applyToAllRooms: false });
   }, [
-    guided,
     setActiveField,
     handleSubmit,
     form,
@@ -608,13 +625,9 @@ const StepFour = () => {
 
   const handleApplyToAllRooms = useCallback(async () => {
     if (!isMultiRoom) return;
-    if (!guided.allSectionsApproved) {
-      const ok = await guided.handleApproveAllSections();
-      if (!ok) return;
-    }
     setActiveField(null);
     await handleSubmit(form.getValues(), { applyToAllRooms: true });
-  }, [form, guided, handleSubmit, isMultiRoom, setActiveField]);
+  }, [form, handleSubmit, isMultiRoom, setActiveField]);
 
   const handleFileChange = useCallback(
     (files: FileWithPreview[], onChange: (file: File | null) => void) => {
@@ -720,407 +733,64 @@ const StepFour = () => {
                   )}
                 />
 
-                <section
-                  data-guided-section="package-copy"
-                  tabIndex={-1}
-                  className={guidedSectionSurfaceClass(
-                    guided.allSectionsApproved ||
-                      guided.currentSectionIndex === 1,
-                    "mb-4 w-full space-y-6 order-2",
-                  )}
-                >
-                  <GuidedSectionTitleBar
-                    sectionIndex={1}
-                    sectionId="package-copy"
-                    guided={guided}
-                    title="Package"
-                  />
-                  <fieldset
-                    disabled={
-                      !guided.allSectionsApproved &&
-                      guided.currentSectionIndex !== 1
-                    }
-                    className={cn(
-                      "min-w-0 border-0 p-0 m-0 space-y-6",
-                      !guided.allSectionsApproved &&
-                        guided.currentSectionIndex !== 1 &&
-                        "pointer-events-none",
-                    )}
-                  >
-                    <div className="mt-4">
-                      <FormField
-                        control={form.control}
-                        name="package_title"
-                        render={({ field }) => {
-                          const currentLength = field.value?.length || 0;
-                          const maxLength =
-                            EVENT_PACKAGE_MAIN_HEADING_MAX_CHARS;
-                          return (
-                            <FormItem className="mb-4">
-                              <FormLabel className="text-base font-medium">
-                                Event Package Main Heading
-                              </FormLabel>
-                              <FormControl>
-                                <Input
-                                  {...field}
-                                  placeholder="e.g., The Package"
-                                  className="h-11 bg-white/5 border-white/10"
-                                  maxLength={maxLength}
-                                  onFocus={() =>
-                                    handleFieldFocus("package_title")
-                                  }
-                                  onChange={(e) => {
-                                    field.onChange(e);
-                                    setScopedValue(
-                                      "package_title",
-                                      e.target.value,
-                                    );
-                                  }}
-                                />
-                              </FormControl>
-                              <div className="text-xs text-muted-foreground mt-1">
-                                <span
-                                  className={
-                                    currentLength > maxLength
-                                      ? "text-destructive"
-                                      : ""
-                                  }
-                                >
-                                  {currentLength}/{maxLength} characters
-                                </span>
-                              </div>
-                              <FormMessage />
-                            </FormItem>
-                          );
-                        }}
-                      />
-
-                      <FormField
-                        control={form.control}
-                        name="package_description"
-                        render={({ field }) => {
-                          const currentLength = field.value?.length || 0;
-                          const maxLength = EVENT_PACKAGE_SUB_HEADING_MAX_CHARS;
-                          return (
-                            <FormItem className="mb-4">
-                              <FormLabel className="text-base font-medium">
-                                Sub Heading
-                              </FormLabel>
-                              <FormControl>
-                                <Input
-                                  {...field}
-                                  placeholder={`e.g., Prices From ${currencySymbol}65 Plus VAT Include:`}
-                                  className="h-11 bg-white/5 border-white/10"
-                                  maxLength={maxLength}
-                                  onFocus={() =>
-                                    handleFieldFocus("package_description")
-                                  }
-                                  onChange={(e) => {
-                                    field.onChange(e);
-                                    setScopedValue(
-                                      "package_description",
-                                      e.target.value,
-                                    );
-                                  }}
-                                />
-                              </FormControl>
-                              <div className="text-xs text-muted-foreground mt-1">
-                                <span
-                                  className={
-                                    currentLength > maxLength
-                                      ? "text-destructive"
-                                      : ""
-                                  }
-                                >
-                                  {currentLength}/{maxLength} characters
-                                </span>
-                              </div>
-                              <FormMessage />
-                            </FormItem>
-                          );
-                        }}
-                      />
-                    </div>
-                    <GuidedSectionActionFooter
-                      isActive={guided.currentSectionIndex === 1}
-                      hideSectionMeta
-                    >
-                      <GuidedSectionCoreActions guided={guided} />
-                    </GuidedSectionActionFooter>
-                  </fieldset>
-                </section>
-
-                <section
-                  data-guided-section="package-media"
-                  tabIndex={-1}
-                  className={guidedSectionSurfaceClass(
-                    guided.allSectionsApproved ||
-                      guided.currentSectionIndex === 2,
-                    "mb-4 w-full space-y-6 order-3",
-                  )}
-                >
-                  <GuidedSectionTitleBar
-                    sectionIndex={2}
-                    sectionId="package-media"
-                    guided={guided}
-                    title="Image"
-                  />
-                  <fieldset
-                    disabled={
-                      !guided.allSectionsApproved &&
-                      guided.currentSectionIndex !== 2
-                    }
-                    className={cn(
-                      "min-w-0 border-0 p-0 m-0 space-y-6",
-                      !guided.allSectionsApproved &&
-                        guided.currentSectionIndex !== 2 &&
-                        "pointer-events-none",
-                    )}
-                  >
-                    <FormField
-                      control={form.control}
-                      name="package_image"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel className="text-base font-medium">
-                            Package Image
-                          </FormLabel>
-                          <FormControl>
-                            <div
-                              onClick={() => handleFieldFocus("package_image")}
-                            >
-                              {packageImageUrl ? (
-                                <div className="relative w-full">
-                                  <img
-                                    src={addCacheBusting(packageImageUrl)}
-                                    alt="Package Image"
-                                    className="max-h-60 object-contain mx-auto mb-2"
-                                    width={100}
-                                    height={100}
-                                  />
-                                  <Button
-                                    type="button"
-                                    variant="destructive"
-                                    size="sm"
-                                    onClick={() => {
-                                      setPackageImageUrl(null);
-                                      field.onChange(null);
-                                      setScopedValue("package_image", null);
-                                    }}
-                                    className="mt-2"
-                                  >
-                                    Remove
-                                  </Button>
-                                </div>
-                              ) : (
-                                <FileUploader
-                                  value={packageImage}
-                                  onValueChange={(files) =>
-                                    handleFileChange(files, field.onChange)
-                                  }
-                                  maxFileCount={1}
-                                  maxSize={10 * 1024 * 1024}
-                                  onRemove={() =>
-                                    handleRemovePackage(field.onChange)
-                                  }
-                                  className="h-60"
-                                  accept={["image/*"] as unknown as Accept}
-                                  enableCropping={true}
-                                  aspectRatio={4 / 3}
-                                  cropConfig={{
-                                    maxSizeKB: 500,
-                                    quality: 0.9,
-                                    maxWidth: 1200,
-                                    maxHeight: 900,
-                                  }}
-                                />
-                              )}
-                            </div>
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <GuidedSectionActionFooter
-                      isActive={guided.currentSectionIndex === 2}
-                      hideSectionMeta
-                    >
-                      <GuidedSectionCoreActions guided={guided} />
-                    </GuidedSectionActionFooter>
-                  </fieldset>
-                </section>
-
-                <section
-                  data-guided-section="package-details"
-                  tabIndex={-1}
-                  className={guidedSectionSurfaceClass(
-                    guided.allSectionsApproved ||
-                      guided.currentSectionIndex === 3,
-                    "mb-4 w-full space-y-6 order-4",
-                  )}
-                >
-                  <GuidedSectionTitleBar
-                    sectionIndex={3}
-                    sectionId="package-details"
-                    guided={guided}
-                    title="Package details"
-                  />
-                  <fieldset
-                    disabled={
-                      !guided.allSectionsApproved &&
-                      guided.currentSectionIndex !== 3
-                    }
-                    className={cn(
-                      "min-w-0 border-0 p-0 m-0 space-y-4",
-                      !guided.allSectionsApproved &&
-                        guided.currentSectionIndex !== 3 &&
-                        "pointer-events-none",
-                    )}
-                  >
-                    <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end">
-                      {fields.length < 10 && (
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          className="shrink-0 border-white/20 bg-white/[0.04] text-foreground hover:bg-white/[0.08]"
-                          onClick={() => {
-                            append({ title: "" });
-                            const updatedDetails = [
-                              ...(form.getValues("package_details") || []),
-                              { title: "" },
-                            ];
-                            setScopedValue("package_details", updatedDetails);
-                            handleFieldFocus("package_details");
-                          }}
-                        >
-                          <PlusCircle className="h-4 w-4 mr-2" />
-                          Add Detail
-                        </Button>
-                      )}
-                    </div>
-
-                    {fields.map((item, index) => (
-                      <Card
-                        key={item.id}
-                        className="mb-4 rounded-lg border border-white/10 bg-white/[0.03] p-4"
-                      >
-                        <CardContent className="p-0 flex items-center gap-4">
-                          <FormField
-                            control={form.control}
-                            name={`package_details.${index}.title`}
-                            render={({ field }) => {
-                              const currentLength = field.value?.length || 0;
-                              const maxLength = PACKAGE_DETAIL_LINE_MAX_CHARS;
-                              return (
-                                <FormItem className="flex-1">
-                                  <FormControl>
-                                    <div>
-                                      <Input
-                                        {...field}
-                                        placeholder="e.g.- VIP entrance with photo opportunities"
-                                        className="h-11 bg-white/5 border-white/10"
-                                        maxLength={maxLength}
-                                        onFocus={() =>
-                                          handleFieldFocus("package_details")
-                                        }
-                                        onChange={(e) => {
-                                          field.onChange(e);
-                                          const updatedDetails = [
-                                            ...(form.getValues(
-                                              "package_details",
-                                            ) || []),
-                                          ];
-                                          updatedDetails[index].title =
-                                            e.target.value;
-                                          setScopedValue(
-                                            "package_details",
-                                            updatedDetails,
-                                          );
-                                        }}
-                                      />
-                                      <div className="text-xs text-muted-foreground mt-1">
-                                        <span
-                                          className={
-                                            currentLength > maxLength
-                                              ? "text-destructive"
-                                              : ""
-                                          }
-                                        >
-                                          {currentLength}/{maxLength} characters
-                                        </span>
-                                      </div>
-                                    </div>
-                                  </FormControl>
-                                  <FormMessage />
-                                </FormItem>
-                              );
-                            }}
-                          />
-
+                <WholeStepGuidedShell
+                  form={form}
+                  sectionId="step-four-timeline-package"
+                  chipLabel="Timeline & package"
+                  chipDescription="Schedule, package copy, image, details, and gallery."
+                  persistenceHydrated={persistedProgressHydrated}
+                  persistedStepApproved={stepFourPersistedApproved === true}
+                  renderFooter={({ guided }) => (
+                    <GuidedWholeStepBottomActions
+                      guided={guided}
+                      loading={loading}
+                      alwaysShowReadyLabel={isMultiRoom}
+                      labelWhenReady={
+                        isMultiRoom ? "Apply to this room only" : "Save & continue"
+                      }
+                      onContinue={() => void handleContinue()}
+                      extraActions={
+                        isMultiRoom &&
+                        isRoomSectionComplete(
+                          rooms[currentRoomIndex],
+                          "package",
+                        ) &&
+                        rooms.some(
+                          (room, index) =>
+                            index !== currentRoomIndex &&
+                            !isRoomSectionComplete(room, "package"),
+                        ) ? (
                           <Button
+                            variant="event-outline"
                             type="button"
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => {
-                              // Check if this would leave us with no package details
-                              if (fields.length <= 1) {
-                                toast.error(
-                                  "At least one package detail is required",
-                                );
-                                return;
-                              }
-
-                              remove(index);
-                              const updatedDetails = [
-                                ...form.getValues("package_details"),
-                              ].filter((_, i) => i !== index);
-                              setScopedValue("package_details", updatedDetails);
-                            }}
-                            disabled={fields.length <= 1}
-                            className="text-red-400 h-11 w-11 disabled:opacity-50 disabled:cursor-not-allowed"
+                            onClick={() => void handleApplyToAllRooms()}
+                            className={guidedOnboardingSkipButtonClass}
                           >
-                            <Trash className="h-4 w-4" />
+                            Apply to all rooms
                           </Button>
-                        </CardContent>
-                      </Card>
-                    ))}
-                    <GuidedSectionActionFooter
-                      isActive={guided.currentSectionIndex === 3}
-                      hideSectionMeta
-                    >
-                      <GuidedSectionCoreActions guided={guided} />
-                    </GuidedSectionActionFooter>
-                  </fieldset>
-                </section>
-
-                <section
-                  data-guided-section="timeline"
-                  tabIndex={-1}
-                  className={guidedSectionSurfaceClass(
-                    guided.allSectionsApproved ||
-                      guided.currentSectionIndex === 0,
-                    "mb-4 w-full space-y-6 order-1",
+                        ) : !isMultiRoom ? (
+                          <Button
+                            variant="event-outline"
+                            type="button"
+                            onClick={() => setActiveStep(5)}
+                            className={guidedOnboardingSkipButtonClass}
+                          >
+                            Skip
+                          </Button>
+                        ) : null
+                      }
+                    />
                   )}
                 >
-                  <GuidedSectionTitleBar
-                    sectionIndex={0}
-                    sectionId="timeline"
-                    guided={guided}
-                    title="Timeline"
-                  />
-                  <fieldset
-                    disabled={
-                      !guided.allSectionsApproved &&
-                      guided.currentSectionIndex !== 0
-                    }
-                    className={cn(
-                      "min-w-0 border-0 p-0 m-0 space-y-4",
-                      !guided.allSectionsApproved &&
-                        guided.currentSectionIndex !== 0 &&
-                        "pointer-events-none",
-                    )}
-                  >
+                  {(_guided) => (
+                    <>
+                <section
+                  className={guidedInsetSectionSurfaceClass(
+                    "mb-4 w-full space-y-6",
+                  )}
+                >
+                  <OnboardingFieldGroupTitle>Timeline</OnboardingFieldGroupTitle>
+                  <div className="mt-4 space-y-4 min-w-0">
                     <FormField
                       control={form.control}
                       name="event_schedular_title"
@@ -1300,7 +970,7 @@ const StepFour = () => {
                               ].filter((_, i) => i !== index);
                               setScopedValue("event_schedular", updated);
                             }}
-                            className="text-red-400 h-11 w-11 disabled:opacity-50"
+                            className="text-red-400 h-11 w-11"
                           >
                             <Trash className="h-4 w-4" />
                           </Button>
@@ -1322,100 +992,333 @@ const StepFour = () => {
                         Add Schedule
                       </Button>
                     </div>
-                    <GuidedSectionActionFooter
-                      isActive={guided.currentSectionIndex === 0}
-                      hideSectionMeta
-                    >
-                      <GuidedSectionCoreActions guided={guided} />
-                    </GuidedSectionActionFooter>
-                  </fieldset>
+                  </div>
                 </section>
 
                 <section
-                  data-guided-section="gallery"
-                  tabIndex={-1}
-                  className={guidedSectionSurfaceClass(
-                    guided.allSectionsApproved ||
-                      guided.currentSectionIndex === 4,
-                    "w-full order-5",
+                  className={guidedInsetSectionSurfaceClass(
+                    "mb-4 w-full space-y-6",
                   )}
                 >
-                  <GuidedSectionTitleBar
-                    sectionIndex={4}
-                    sectionId="gallery"
-                    guided={guided}
-                    title="Gallery"
-                  />
-                  <fieldset
-                    disabled={
-                      !guided.allSectionsApproved &&
-                      guided.currentSectionIndex !== 4
-                    }
-                    className={cn(
-                      "min-w-0 border-0 p-0 m-0",
-                      !guided.allSectionsApproved &&
-                        guided.currentSectionIndex !== 4 &&
-                        "pointer-events-none",
-                    )}
-                  >
+                  <OnboardingFieldGroupTitle>Package</OnboardingFieldGroupTitle>
+                  <div className="mt-4 space-y-6 min-w-0">
                     <FormField
                       control={form.control}
-                      name="gallery"
-                      render={({ field }) => (
-                        <div onClick={() => handleFieldFocus("gallery")}>
+                      name="package_title"
+                      render={({ field }) => {
+                        const currentLength = field.value?.length || 0;
+                          const maxLength =
+                            EVENT_PACKAGE_MAIN_HEADING_MAX_CHARS;
+                        return (
+                          <FormItem className="mb-4">
+                            <FormLabel className="text-base font-medium">
+                                Event Package Main Heading
+                            </FormLabel>
+                            <FormControl>
+                              <Input
+                                {...field}
+                                placeholder="e.g., The Package"
+                                className="h-11 bg-white/5 border-white/10"
+                                maxLength={maxLength}
+                                onFocus={() =>
+                                  handleFieldFocus("package_title")
+                                }
+                                onChange={(e) => {
+                                  field.onChange(e);
+                                    setScopedValue(
+                                      "package_title",
+                                      e.target.value,
+                                  );
+                                }}
+                              />
+                            </FormControl>
+                            <div className="text-xs text-muted-foreground mt-1">
+                              <span
+                                className={
+                                  currentLength > maxLength
+                                    ? "text-destructive"
+                                    : ""
+                                }
+                              >
+                                {currentLength}/{maxLength} characters
+                              </span>
+                            </div>
+                            <FormMessage />
+                          </FormItem>
+                        );
+                      }}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="package_description"
+                      render={({ field }) => {
+                        const currentLength = field.value?.length || 0;
+                        const maxLength = EVENT_PACKAGE_SUB_HEADING_MAX_CHARS;
+                        return (
+                          <FormItem className="mb-4">
+                            <FormLabel className="text-base font-medium">
+                              Sub Heading
+                            </FormLabel>
+                            <FormControl>
+                              <Input
+                                {...field}
+                                placeholder={`e.g., Prices From ${currencySymbol}65 Plus VAT Include:`}
+                                className="h-11 bg-white/5 border-white/10"
+                                maxLength={maxLength}
+                                onFocus={() =>
+                                  handleFieldFocus("package_description")
+                                }
+                                onChange={(e) => {
+                                  field.onChange(e);
+                                    setScopedValue(
+                                      "package_description",
+                                      e.target.value,
+                                  );
+                                }}
+                              />
+                            </FormControl>
+                            <div className="text-xs text-muted-foreground mt-1">
+                              <span
+                                className={
+                                  currentLength > maxLength
+                                    ? "text-destructive"
+                                    : ""
+                                }
+                              >
+                                {currentLength}/{maxLength} characters
+                              </span>
+                            </div>
+                            <FormMessage />
+                          </FormItem>
+                        );
+                      }}
+                    />
+                  </div>
+                </section>
+
+                <section
+                  className={guidedInsetSectionSurfaceClass(
+                    "mb-4 w-full space-y-6",
+                  )}
+                >
+                  <OnboardingFieldGroupTitle>Image</OnboardingFieldGroupTitle>
+                  <div className="mt-4 space-y-6 min-w-0">
+                  <FormField
+                    control={form.control}
+                    name="package_image"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-base font-medium">
+                          Package Image
+                        </FormLabel>
+                        <FormControl>
+                          <div
+                            onClick={() => handleFieldFocus("package_image")}
+                          >
+                            {packageImageUrl ? (
+                              <div className="relative w-full">
+                                <img
+                                  src={addCacheBusting(packageImageUrl)}
+                                  alt="Package Image"
+                                  className="max-h-60 object-contain mx-auto mb-2"
+                                  width={100}
+                                  height={100}
+                                />
+                                <Button
+                                  type="button"
+                                  variant="destructive"
+                                  size="sm"
+                                  onClick={() => {
+                                    setPackageImageUrl(null);
+                                    field.onChange(null);
+                                      setScopedValue("package_image", null);
+                                  }}
+                                  className="mt-2"
+                                >
+                                  Remove
+                                </Button>
+                              </div>
+                            ) : (
+                              <FileUploader
+                                value={packageImage}
+                                onValueChange={(files) =>
+                                  handleFileChange(files, field.onChange)
+                                }
+                                maxFileCount={1}
+                                  maxSize={10 * 1024 * 1024}
+                                onRemove={() =>
+                                  handleRemovePackage(field.onChange)
+                                }
+                                className="h-60"
+                                accept={["image/*"] as unknown as Accept}
+                                enableCropping={true}
+                                aspectRatio={4 / 3}
+                                cropConfig={{
+                                  maxSizeKB: 500,
+                                  quality: 0.9,
+                                  maxWidth: 1200,
+                                  maxHeight: 900,
+                                }}
+                              />
+                            )}
+                          </div>
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                          </div>
+                </section>
+
+                <section
+                  className={guidedInsetSectionSurfaceClass(
+                    "mb-4 w-full space-y-6",
+                  )}
+                >
+                  <OnboardingFieldGroupTitle>Package details</OnboardingFieldGroupTitle>
+                  <div className="mt-4 space-y-4 min-w-0">
+                  <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end">
+                    {fields.length < 10 && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="shrink-0 border-white/20 bg-white/[0.04] text-foreground hover:bg-white/[0.08]"
+                        onClick={() => {
+                            const nextIndex = fields.length;
+                            const newRow = createDefaultPackageDetailRow(nextIndex);
+                            append(newRow);
+                          const updatedDetails = [
+                            ...(form.getValues("package_details") || []),
+                              newRow,
+                          ];
+                            setScopedValue("package_details", updatedDetails);
+                          handleFieldFocus("package_details");
+                        }}
+                      >
+                        <PlusCircle className="h-4 w-4 mr-2" />
+                        Add Detail
+                      </Button>
+                    )}
+                  </div>
+
+                  {fields.map((item, index) => (
+                    <Card
+                      key={item.id}
+                      className="mb-4 rounded-lg border border-white/10 bg-white/[0.03] p-4"
+                    >
+                      <CardContent className="p-0 flex items-center gap-4">
+                        <FormField
+                          control={form.control}
+                          name={`package_details.${index}.title`}
+                          render={({ field }) => {
+                            const currentLength = field.value?.length || 0;
+                            const maxLength = PACKAGE_DETAIL_LINE_MAX_CHARS;
+                            return (
+                              <FormItem className="flex-1">
+                                  <FormLabel className="text-sm font-medium">
+                                    {packageDetailLabel(index)}
+                                  </FormLabel>
+                                <FormControl>
+                                  <div>
+                                    <Input
+                                      {...field}
+                                        placeholder={packageDetailPlaceholder(
+                                          index,
+                                        )}
+                                      className="h-11 bg-white/5 border-white/10"
+                                      maxLength={maxLength}
+                                      onFocus={() =>
+                                        handleFieldFocus("package_details")
+                                      }
+                                      onChange={(e) => {
+                                        field.onChange(e);
+                                        const updatedDetails = [
+                                          ...(form.getValues(
+                                              "package_details",
+                                          ) || []),
+                                        ];
+                                        updatedDetails[index].title =
+                                          e.target.value;
+                                          setScopedValue(
+                                            "package_details",
+                                            updatedDetails,
+                                        );
+                                      }}
+                                    />
+                                    <div className="text-xs text-muted-foreground mt-1">
+                                      <span
+                                        className={
+                                          currentLength > maxLength
+                                            ? "text-destructive"
+                                            : ""
+                                        }
+                                      >
+                                        {currentLength}/{maxLength} characters
+                                      </span>
+                                    </div>
+                                  </div>
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            );
+                          }}
+                        />
+
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => {
+                            // Check if this would leave us with no package details
+                            if (fields.length <= 1) {
+                              toast.error(
+                                  "At least one package detail is required",
+                              );
+                              return;
+                            }
+
+                            remove(index);
+                            const updatedDetails = [
+                              ...form.getValues("package_details"),
+                            ].filter((_, i) => i !== index);
+                              setScopedValue("package_details", updatedDetails);
+                          }}
+                          disabled={fields.length <= 1}
+                          className="text-red-400 h-11 w-11 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          <Trash className="h-4 w-4" />
+                        </Button>
+                      </CardContent>
+                    </Card>
+                  ))}
+                  </div>
+                </section>
+
+                <section
+                  className={guidedInsetSectionSurfaceClass("w-full mb-4")}
+                >
+                  <OnboardingFieldGroupTitle>Gallery</OnboardingFieldGroupTitle>
+                  <div className="mt-4 min-w-0">
+                <FormField
+                  control={form.control}
+                  name="gallery"
+                  render={({ field }) => (
+                    <div onClick={() => handleFieldFocus("gallery")}>
                           <GalleryUploader
                             field={field}
                             scopedGalleryPath={`${scopePrefix}.gallery`}
                             onExistingItemRemove={handleExistingGalleryRemove}
                           />
-                        </div>
-                      )}
-                    />
-                    <GuidedSectionActionFooter
-                      isActive={guided.currentSectionIndex === 4}
-                      hideSectionMeta
-                    >
-                      <GuidedSectionCoreActions guided={guided} />
-                    </GuidedSectionActionFooter>
-                  </fieldset>
-                </section>
-                <GuidedMultiSectionBottomActions
-                  className="order-6"
-                  onApproveAll={guided.handleApproveAllSections}
-                  allSectionsApproved={guided.allSectionsApproved}
-                  loading={loading}
-                  labelWhenReady={
-                    isMultiRoom ? "Apply to this room only" : "Save & continue"
-                  }
-                  onContinue={() => void handleContinue()}
-                  extraActions={
-                    isMultiRoom &&
-                    isRoomSectionComplete(rooms[currentRoomIndex], "package") &&
-                    rooms.some(
-                      (room, index) =>
-                        index !== currentRoomIndex &&
-                        !isRoomSectionComplete(room, "package"),
-                    ) ? (
-                      <Button
-                        variant="event-outline"
-                        type="button"
-                        onClick={() => void handleApplyToAllRooms()}
-                        className={guidedOnboardingSkipButtonClass}
-                      >
-                        Apply to all rooms
-                      </Button>
-                    ) : !isMultiRoom ? (
-                      <Button
-                        variant="event-outline"
-                        type="button"
-                        onClick={() => setActiveStep(5)}
-                        className={guidedOnboardingSkipButtonClass}
-                      >
-                        Skip
-                      </Button>
-                    ) : null
-                  }
+                    </div>
+                  )}
                 />
+                  </div>
+                </section>
+                    </>
+                  )}
+                </WholeStepGuidedShell>
               </form>
             </Form>
           </CardContent>

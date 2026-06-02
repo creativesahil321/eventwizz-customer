@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { CheckCircle2, FileText, Upload, X } from "lucide-react";
+import { CheckCircle2, FileText, Loader2, Upload, X } from "lucide-react";
 import Dropzone, {
   type DropzoneProps,
   type FileRejection,
@@ -18,7 +18,10 @@ import {
   CropperConfig,
   CroppedImage,
 } from "@/components/ui/image-cropper/types";
-import { autoCompressImages } from "@/components/ui/image-cropper/auto-compress";
+import {
+  autoCompressImage,
+  autoCompressImages,
+} from "@/components/ui/image-cropper/auto-compress";
 
 /** Group dropzone rejections so "too many files" variants always merge (avoids toast spam). */
 function aggregateRejectionKey(error: {
@@ -162,6 +165,9 @@ interface FileUploaderProps extends React.HTMLAttributes<HTMLDivElement> {
    * @default false
    */
   moreLabel?: boolean;
+
+  /** Fires while drop → crop → optimize is in progress (for parent overlays). */
+  onBusyChange?: (busy: boolean) => void;
 }
 
 export function FileUploader(props: FileUploaderProps) {
@@ -181,12 +187,21 @@ export function FileUploader(props: FileUploaderProps) {
     enableCropping = false,
     aspectRatio,
     cropConfig = {},
-    autoCompress = true,
+    autoCompress: autoCompressProp,
     autoCompressMaxSizeMB = 2,
     moreLabel = false,
+    onBusyChange,
     className,
     ...dropzoneProps
   } = props;
+
+  /**
+   * One compress pass after crop when cropping is on.
+   * Ignores `autoCompress={true}` with `enableCropping` so profile/onboarding stay fast.
+   */
+  const autoCompress = enableCropping
+    ? false
+    : (autoCompressProp ?? true);
 
   // Detect if video types are in the accept prop
   const isVideoUploader = React.useMemo(() => {
@@ -220,6 +235,15 @@ export function FileUploader(props: FileUploaderProps) {
   const [cropDialogOpen, setCropDialogOpen] = React.useState(false);
   const [fileToCrop, setFileToCrop] = React.useState<File | null>(null);
   const [pendingFiles, setPendingFiles] = React.useState<File[]>([]);
+  const [imageWorkflowBusy, setImageWorkflowBusy] = React.useState(false);
+
+  const setImageWorkflowBusyState = React.useCallback(
+    (busy: boolean) => {
+      setImageWorkflowBusy(busy);
+      onBusyChange?.(busy);
+    },
+    [onBusyChange],
+  );
 
   // const onDrop = React.useCallback(
   //     (acceptedFiles: File[], rejectedFiles: FileRejection[]) => {
@@ -301,7 +325,16 @@ export function FileUploader(props: FileUploaderProps) {
         setPendingFiles(rest);
         setFileToCrop(nextFile);
         setCropDialogOpen(true);
-      } else if (
+        setImageWorkflowBusyState(true);
+      } else {
+        setImageWorkflowBusyState(false);
+      }
+
+      if (pendingFiles.length > 0) {
+        return;
+      }
+
+      if (
         onUpload &&
         updatedFiles.length > 0 &&
         updatedFiles.length <= maxFileCount
@@ -319,7 +352,14 @@ export function FileUploader(props: FileUploaderProps) {
         });
       }
     },
-    [files, pendingFiles, maxFileCount, onUpload, setFiles, onValueChange],
+    [
+      files,
+      pendingFiles,
+      maxFileCount,
+      onUpload,
+      setFiles,
+      setImageWorkflowBusyState,
+    ],
   );
 
   // Handle cropping cancellation
@@ -327,8 +367,9 @@ export function FileUploader(props: FileUploaderProps) {
     setCropDialogOpen(false);
     setFileToCrop(null);
     setPendingFiles([]);
+    setImageWorkflowBusyState(false);
     toast.info("Image upload cancelled");
-  }, []);
+  }, [setImageWorkflowBusyState]);
 
   const onDrop = React.useCallback(
     async (acceptedFiles: File[], rejectedFiles: FileRejection[]) => {
@@ -342,11 +383,20 @@ export function FileUploader(props: FileUploaderProps) {
         return;
       }
 
-      // AUTO-COMPRESS: Handle rejected image files that were rejected due to size
-      // Compress them automatically and add to accepted files
-      let processedFiles = [...acceptedFiles];
+      // When cropping is enabled, compress only once after crop (faster — onboarding path).
+      const shouldPreCompress = autoCompress && !enableCropping;
+      const willOpenCropper =
+        enableCropping && acceptedFiles.some((file) => isImageFile(file));
 
-      if (autoCompress && rejectedFiles.length > 0) {
+      if (willOpenCropper || shouldPreCompress) {
+        setImageWorkflowBusyState(true);
+      }
+
+      let processedFiles = [...acceptedFiles];
+      let openedCropper = false;
+
+      try {
+      if (shouldPreCompress && rejectedFiles.length > 0) {
         const rejectedImageFiles: File[] = [];
         type OtherRejectionAgg = {
           message: string;
@@ -438,72 +488,79 @@ export function FileUploader(props: FileUploaderProps) {
         }
       }
 
-      // Also compress accepted image files that exceed the target size
-      if (autoCompress && processedFiles.length > 0) {
+      if (shouldPreCompress && processedFiles.length > 0) {
         try {
-          const largeImages = processedFiles.filter(
-            (file) =>
-              isImageFile(file) &&
-              file.size > autoCompressMaxSizeMB * 1024 * 1024,
+          const thresholdBytes = autoCompressMaxSizeMB * 1024 * 1024;
+          const compressOpts = {
+            maxSizeMB: autoCompressMaxSizeMB,
+            maxWidthOrHeight: 1920,
+            quality: 0.85,
+            useWebWorker: true,
+          };
+          const hasLarge = processedFiles.some(
+            (file) => isImageFile(file) && file.size > thresholdBytes,
           );
 
-          if (largeImages.length > 0) {
-            // Compress large accepted images silently (no toast, already accepted)
-            processedFiles = await autoCompressImages(processedFiles, {
-              maxSizeMB: autoCompressMaxSizeMB,
-              maxWidthOrHeight: 1920,
-              quality: 0.85,
-              useWebWorker: true,
-            });
+          if (hasLarge) {
+            processedFiles = await Promise.all(
+              processedFiles.map((file) =>
+                isImageFile(file) && file.size > thresholdBytes
+                  ? autoCompressImage(file, compressOpts)
+                  : file,
+              ),
+            );
           }
         } catch (error) {
           console.warn("Auto-compression failed, using original files:", error);
         }
       }
 
-      // Check if we need cropping for images
-      if (enableCropping && processedFiles.length > 0) {
-        // Filter only image files for cropping
-        const imagesToCrop = processedFiles.filter(isImageFile);
-        const otherFiles = processedFiles.filter((f) => !isImageFile(f));
+        // Check if we need cropping for images
+        if (enableCropping && processedFiles.length > 0) {
+          const imagesToCrop = processedFiles.filter(isImageFile);
+          const otherFiles = processedFiles.filter((f) => !isImageFile(f));
 
-        if (imagesToCrop.length > 0) {
-          // Start cropping workflow
-          const [firstImage, ...restImages] = imagesToCrop;
-          setFileToCrop(firstImage);
-          setPendingFiles([...restImages, ...otherFiles]);
-          setCropDialogOpen(true);
-          return;
+          if (imagesToCrop.length > 0) {
+            openedCropper = true;
+            const [firstImage, ...restImages] = imagesToCrop;
+            setFileToCrop(firstImage);
+            setPendingFiles([...restImages, ...otherFiles]);
+            setCropDialogOpen(true);
+            return;
+          }
         }
-      }
 
-      // Normal flow (no cropping or non-image files)
-      const newFiles = processedFiles.map((file) =>
-        Object.assign(file, {
-          preview: URL.createObjectURL(file),
-        }),
-      );
+        const newFiles = processedFiles.map((file) =>
+          Object.assign(file, {
+            preview: URL.createObjectURL(file),
+          }),
+        );
 
-      const updatedFiles = files ? [...files, ...newFiles] : newFiles;
+        const updatedFiles = files ? [...files, ...newFiles] : newFiles;
 
-      setFiles(updatedFiles);
+        setFiles(updatedFiles);
 
-      if (
-        onUpload &&
-        updatedFiles.length > 0 &&
-        updatedFiles.length <= maxFileCount
-      ) {
-        const target =
-          updatedFiles.length > 0 ? `${updatedFiles.length} files` : `file`;
+        if (
+          onUpload &&
+          updatedFiles.length > 0 &&
+          updatedFiles.length <= maxFileCount
+        ) {
+          const target =
+            updatedFiles.length > 0 ? `${updatedFiles.length} files` : `file`;
 
-        toast.promise(onUpload(updatedFiles), {
-          loading: `Uploading ${target}...`,
-          success: () => {
-            setFiles([]);
-            return `${target} uploaded`;
-          },
-          error: `Failed to upload ${target}`,
-        });
+          toast.promise(onUpload(updatedFiles), {
+            loading: `Uploading ${target}...`,
+            success: () => {
+              setFiles([]);
+              return `${target} uploaded`;
+            },
+            error: `Failed to upload ${target}`,
+          });
+        }
+      } finally {
+        if (!cropDialogOpen && !enableCropping) {
+          setImageWorkflowBusyState(false);
+        }
       }
     },
     [
@@ -512,11 +569,11 @@ export function FileUploader(props: FileUploaderProps) {
       multiple,
       onUpload,
       setFiles,
-      maxSize,
       enableCropping,
-      aspectRatio,
       autoCompress,
       autoCompressMaxSizeMB,
+      cropDialogOpen,
+      setImageWorkflowBusyState,
     ],
   );
   function onRemove(index: number) {
@@ -542,7 +599,13 @@ export function FileUploader(props: FileUploaderProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const isDisabled = disabled || (files?.length ?? 0) >= maxFileCount;
+  const isDisabled =
+    disabled ||
+    (files?.length ?? 0) >= maxFileCount ||
+    imageWorkflowBusy;
+
+  const showDropzoneBusyOverlay =
+    imageWorkflowBusy && (files?.length ?? 0) === 0;
 
   return (
     <>
@@ -575,6 +638,28 @@ export function FileUploader(props: FileUploaderProps) {
               {...dropzoneProps}
             >
               <input {...getInputProps()} />
+              {showDropzoneBusyOverlay ? (
+                <div
+                  className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 rounded-lg bg-background/90 px-4"
+                  aria-live="polite"
+                  aria-busy="true"
+                >
+                  <Loader2
+                    className="size-10 animate-spin text-primary"
+                    aria-hidden="true"
+                  />
+                  <div className="space-y-1 text-center">
+                    <p className="text-sm font-semibold text-foreground">
+                      Processing image…
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {enableCropping
+                        ? "Opening crop & optimize — please wait"
+                        : "Optimizing — please wait"}
+                    </p>
+                  </div>
+                </div>
+              ) : null}
               {isDragActive ? (
                 <div className="flex flex-col items-center justify-center gap-4 sm:px-5">
                   <div className="rounded-full border border-dashed p-3 shrink-0">

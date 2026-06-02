@@ -81,3 +81,26 @@ export function contrastBand(ratio: number): ContrastBand {
   if (ratio >= 3) return "large-only";
   return "fail";
 }
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(Math.max(value, min), max);
+}
+
+/** Darkens a hex color by a fraction (default 12%). Used for hover states on theme tokens. */
+export function darkenHex(hexColor: string, amount = 0.12): string {
+  const hex = normalizeHex(getAnchorColor(hexColor));
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+
+  const darkenChannel = (channel: number) =>
+    clamp(Math.round(channel * (1 - amount)), 0, 255);
+
+  const nr = darkenChannel(r);
+  const ng = darkenChannel(g);
+  const nb = darkenChannel(b);
+
+  return `#${nr.toString(16).padStart(2, "0")}${ng
+    .toString(16)
+    .padStart(2, "0")}${nb.toString(16).padStart(2, "0")}`;
+}

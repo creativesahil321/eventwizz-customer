@@ -68,14 +68,12 @@ export default function HeroBanner({
   const bannerHeading =
     propBannerHeading ||
     vendorTheme?.banner_heading ||
-    (locationName
-      ? `Find Something Great To Do in ${locationName}`
-      : "Find Something Great To Do");
+    (locationName ? `${locationName} Events` : "Events");
 
   const bannerSubheading =
     propBannerSubHeading ||
     vendorTheme?.banner_sub_heading ||
-    "Discover amazing events that match your interests";
+    "Check out our latest events";
 
   const bannerAccentHint =
     bannerHeadingAccent !== undefined

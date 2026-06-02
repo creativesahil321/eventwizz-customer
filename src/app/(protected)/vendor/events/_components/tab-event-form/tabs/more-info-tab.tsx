@@ -1,9 +1,31 @@
 "use client";
 
-import React, { useState, useEffect, useCallback, useRef } from "react";
+import React, {
+  useState,
+  useEffect,
+  useCallback,
+  useRef,
+  useMemo,
+} from "react";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { eventsService } from "@/services/vendor/events/events.service";
+import {
+  eventsService,
+  type StepFiveSavePayload,
+} from "@/services/vendor/events/events.service";
+import {
+  capEventRoomList,
+  normalizeVendorStepTwoRooms,
+} from "@/lib/event-form-limits";
+import {
+  cloneVendorStepFiveRoomBrochure,
+  findStepFiveBrochureForRoom,
+  isVendorRoomBrochureStepComplete,
+  normalizeVendorStepFiveRooms,
+  roomEntryToStepFiveBrochureFields,
+  stepFiveBrochureFieldsToRoomEntry,
+  syncStepFiveRoomsFromStepTwo,
+} from "@/app/(protected)/vendor/events/_lib/vendor-step-five-rooms";
 import { Button } from "@/components/ui/button";
 import { Form } from "@/components/ui/form";
 import { StepFiveType, stepFiveSchema } from "../schema";
@@ -16,7 +38,6 @@ import {
   FormControl,
   FormMessage,
 } from "@/components/ui/form";
-import { Input } from "@/components/ui/input";
 import { FileUploader } from "@/components/ui/file-uploader";
 import AddressAutocomplete from "./_components/address-autocomplete";
 import EventLocationMap from "./_components/event-location-map";
@@ -25,14 +46,13 @@ export default function MoreInfoTab() {
   const [isLoading, setIsLoading] = useState(false);
   const {
     form: globalForm,
-    save,
+    advanceStep,
     setActiveField,
     readOnly,
   } = useEventFormContext();
 
   // Track if we have string URLs from backend
   const [brochurePdfUrl, setBrochurePdfUrl] = useState<string | null>(null);
-  const [faqPdfUrl, setFaqPdfUrl] = useState<string | null>(null);
   const [brochurePdfUrl2, setBrochurePdfUrl2] = useState<string | null>(null);
 
   // Address search function ref for map integration
@@ -47,26 +67,63 @@ export default function MoreInfoTab() {
       : 0;
   };
 
-  // Initialize form with combined step data
+  const isRoomsEnabled = globalForm.watch("stepTwo.is_rooms") === 1;
+  const activeRoomIndex = globalForm.watch("stepTwo.active_room_index") ?? 0;
+  const stepTwoRooms = capEventRoomList(
+    normalizeVendorStepTwoRooms(globalForm.getValues().stepTwo?.rooms),
+  );
+  const resolvedRoomIndex =
+    stepTwoRooms.length > 0
+      ? Math.min(
+          Math.max(activeRoomIndex, 0),
+          Math.max(stepTwoRooms.length - 1, 0),
+        )
+      : 0;
+  const activeRoomId = Number(stepTwoRooms[resolvedRoomIndex]?.room_id) || 0;
+  const previousRoomIndexRef = useRef<number | null>(null);
+  const lastHydratedRoomIndexRef = useRef<number | null>(null);
+
   const stepFiveDefaults = globalForm.getValues().stepFive;
   const eventId = getEventId();
 
-  // Setup form with the new schema structure
+  const resolveInitialBrochureFields = () => {
+    const defaults = globalForm.getValues().stepFive;
+    if (isRoomsEnabled && activeRoomId > 0) {
+      const syncedRooms = syncStepFiveRoomsFromStepTwo(
+        stepTwoRooms,
+        normalizeVendorStepFiveRooms(defaults?.rooms),
+      );
+      const incoming = findStepFiveBrochureForRoom(syncedRooms, activeRoomId);
+      return {
+        ...roomEntryToStepFiveBrochureFields(incoming),
+        rooms: syncedRooms,
+      };
+    }
+    return {
+      brochure_pdf: defaults?.brochure_pdf || null,
+      brochure_pdf_2: defaults?.brochure_pdf_2 || null,
+      remove_brochure_pdf: defaults?.remove_brochure_pdf ?? false,
+      remove_brochure_pdf_2: defaults?.remove_brochure_pdf_2 ?? false,
+    };
+  };
+
+  const initialBrochure = resolveInitialBrochureFields();
+
   const form = useForm<StepFiveType>({
     resolver: zodResolver(stepFiveSchema),
     mode: "onChange",
     defaultValues: {
       step: 5,
       event_id: eventId,
-      brochure_pdf: stepFiveDefaults?.brochure_pdf || null,
-      brochure_pdf_2: stepFiveDefaults?.brochure_pdf_2 || null,
-      faq_pdf: stepFiveDefaults?.faq_pdf || null,
+      is_rooms: isRoomsEnabled ? 1 : 0,
+      rooms: (initialBrochure as unknown as StepFiveType)?.rooms ?? [],
+      brochure_pdf: initialBrochure.brochure_pdf ?? null,
+      brochure_pdf_2: initialBrochure.brochure_pdf_2 ?? null,
+      remove_brochure_pdf: initialBrochure.remove_brochure_pdf ?? false,
+      remove_brochure_pdf_2: initialBrochure.remove_brochure_pdf_2 ?? false,
       event_address: stepFiveDefaults?.event_address || "",
       latitude: stepFiveDefaults?.latitude || undefined,
       longitude: stepFiveDefaults?.longitude || undefined,
-      price_start_from: stepFiveDefaults?.price_start_from || "",
-      price_start_from_button_text:
-        stepFiveDefaults?.price_start_from_button_text || "Book Now",
       location: stepFiveDefaults?.location || {
         title: "LOCATION",
         description: "",
@@ -80,7 +137,139 @@ export default function MoreInfoTab() {
     form.setValue("event_id", eventId);
   }, [eventId, form]);
 
-  const { control } = form;
+  const { control, watch, setValue, getValues, reset } = form;
+  const watchedBrochurePdf = watch("brochure_pdf");
+  const watchedBrochurePdf2 = watch("brochure_pdf_2");
+  const watchedEventAddress = watch("event_address");
+
+  const resolveBrochureFieldsForSubmit = useCallback(
+    (data: StepFiveType): StepFiveType => {
+      const next = { ...data };
+      if (!next.brochure_pdf && brochurePdfUrl) {
+        next.brochure_pdf = brochurePdfUrl;
+      }
+      if (!next.brochure_pdf_2 && brochurePdfUrl2) {
+        next.brochure_pdf_2 = brochurePdfUrl2;
+      }
+      return next;
+    },
+    [brochurePdfUrl, brochurePdfUrl2],
+  );
+
+  const syncBrochureUrlState = useCallback(
+    (brochurePdf: unknown, brochurePdf2: unknown) => {
+      setBrochurePdfUrl(
+        typeof brochurePdf === "string" && brochurePdf.trim()
+          ? brochurePdf
+          : null,
+      );
+      setBrochurePdfUrl2(
+        typeof brochurePdf2 === "string" && brochurePdf2.trim()
+          ? brochurePdf2
+          : null,
+      );
+    },
+    [],
+  );
+
+  const persistActiveRoomBrochureToGlobal = useCallback(
+    (roomIndex: number, data: StepFiveType) => {
+      if (!isRoomsEnabled || stepTwoRooms.length === 0) return;
+      const existing = syncStepFiveRoomsFromStepTwo(
+        stepTwoRooms,
+        normalizeVendorStepFiveRooms(globalForm.getValues().stepFive?.rooms),
+      );
+      const roomId = Number(stepTwoRooms[roomIndex]?.room_id);
+      if (!roomId) return;
+      const snapshot = stepFiveBrochureFieldsToRoomEntry(roomId, data);
+      const nextRooms = existing.map((entry) =>
+        entry.room_id === roomId ? snapshot : entry,
+      );
+      globalForm.setValue("stepFive.rooms", nextRooms, {
+        shouldDirty: true,
+        shouldValidate: false,
+      });
+    },
+    [globalForm, isRoomsEnabled, stepTwoRooms],
+  );
+
+  useEffect(() => {
+    if (!isRoomsEnabled || stepTwoRooms.length === 0) {
+      previousRoomIndexRef.current = null;
+      lastHydratedRoomIndexRef.current = null;
+      return;
+    }
+
+    const prevIndex = previousRoomIndexRef.current;
+    if (
+      prevIndex !== null &&
+      prevIndex >= 0 &&
+      prevIndex < stepTwoRooms.length &&
+      prevIndex !== resolvedRoomIndex
+    ) {
+      persistActiveRoomBrochureToGlobal(prevIndex, getValues());
+    }
+
+    const shouldHydrate =
+      lastHydratedRoomIndexRef.current === null ||
+      lastHydratedRoomIndexRef.current !== resolvedRoomIndex;
+
+    if (shouldHydrate) {
+      const syncedRooms = syncStepFiveRoomsFromStepTwo(
+        stepTwoRooms,
+        normalizeVendorStepFiveRooms(globalForm.getValues().stepFive?.rooms),
+      );
+      const incoming = findStepFiveBrochureForRoom(
+        syncedRooms,
+        Number(stepTwoRooms[resolvedRoomIndex]?.room_id),
+      );
+      const fields = roomEntryToStepFiveBrochureFields(incoming);
+      syncBrochureUrlState(fields.brochure_pdf, fields.brochure_pdf_2);
+      reset({
+        ...getValues(),
+        is_rooms: 1,
+        ...fields,
+        rooms: syncedRooms,
+        event_address: globalForm.getValues().stepFive?.event_address || "",
+        latitude: globalForm.getValues().stepFive?.latitude,
+        longitude: globalForm.getValues().stepFive?.longitude,
+        location: globalForm.getValues().stepFive?.location,
+      });
+      lastHydratedRoomIndexRef.current = resolvedRoomIndex;
+    }
+
+    previousRoomIndexRef.current = resolvedRoomIndex;
+  }, [
+    getValues,
+    globalForm,
+    isRoomsEnabled,
+    persistActiveRoomBrochureToGlobal,
+    reset,
+    resolvedRoomIndex,
+    stepTwoRooms,
+    syncBrochureUrlState,
+  ]);
+
+  const canApplyToAllRooms = useMemo(() => {
+    if (!isRoomsEnabled || stepTwoRooms.length < 2) return false;
+
+    const resolvedBrochure =
+      watchedBrochurePdf ?? brochurePdfUrl ?? null;
+    const hasBrochure = isVendorRoomBrochureStepComplete({
+      room_id: activeRoomId,
+      brochure_pdf: resolvedBrochure,
+    });
+    const hasAddress = String(watchedEventAddress || "").trim().length > 0;
+
+    return hasBrochure && hasAddress;
+  }, [
+    isRoomsEnabled,
+    stepTwoRooms.length,
+    watchedBrochurePdf,
+    brochurePdfUrl,
+    watchedEventAddress,
+    activeRoomId,
+  ]);
 
   // Handle field focus for tracking active field
   const handleFieldFocus = useCallback(
@@ -93,16 +282,11 @@ export default function MoreInfoTab() {
   // Initialize URL values from global form on mount
   useEffect(() => {
     const brochurePdf = globalForm.getValues("stepFive.brochure_pdf");
-    const faqPdf = globalForm.getValues("stepFive.faq_pdf");
     const brochurePdf2 = globalForm.getValues("stepFive.brochure_pdf_2");
 
     // Check if values are string URLs
     if (typeof brochurePdf === "string" && brochurePdf) {
       setBrochurePdfUrl(brochurePdf);
-    }
-
-    if (typeof faqPdf === "string" && faqPdf) {
-      setFaqPdfUrl(faqPdf);
     }
 
     if (typeof brochurePdf2 === "string" && brochurePdf2) {
@@ -133,29 +317,6 @@ export default function MoreInfoTab() {
     }
   };
 
-  // Handle file upload for FAQ PDF
-  const handleFaqUpload = (file: File | null) => {
-    // Check if file is PDF
-    if (file && file.type !== "application/pdf") {
-      toast.error("Only PDF files are allowed");
-      return;
-    }
-
-    form.setValue("faq_pdf", file || null);
-    // When new file is uploaded, clear the URL
-    if (file) {
-      setFaqPdfUrl(null);
-      // Clear removal flag when new file is uploaded
-      form.setValue("remove_faq_pdf", false);
-      globalForm.setValue("stepFive.remove_faq_pdf", false);
-    } else {
-      setFaqPdfUrl(null);
-      // Set removal flag when file is removed
-      form.setValue("remove_faq_pdf", true);
-      globalForm.setValue("stepFive.remove_faq_pdf", true);
-    }
-  };
-
   // Handle file upload for brochure PDF 2
   const handleBrochureUpload2 = (file: File | null) => {
     form.setValue("brochure_pdf_2", file || null);
@@ -176,28 +337,33 @@ export default function MoreInfoTab() {
   useEffect(() => {
     const subscription = form.watch((value) => {
       if (value) {
-        globalForm.setValue("stepFive", {
-          ...value,
-          price_start_from_button_text:
-            value.price_start_from_button_text || "Book Now",
-        } as StepFiveType);
+        globalForm.setValue("stepFive", value as StepFiveType);
       }
     });
 
     return () => subscription.unsubscribe();
   }, [form, globalForm]);
 
-  // Handle form submission
   const handleSubmit = useCallback(
-    async (data: StepFiveType) => {
+    async (data: StepFiveType, options?: { applyToAllRooms?: boolean }) => {
+      const applyToAllRooms = options?.applyToAllRooms === true;
       setIsLoading(true);
 
       try {
+        const submission = resolveBrochureFieldsForSubmit(data);
+
+        if (submission.brochure_pdf !== form.getValues().brochure_pdf) {
+          form.setValue("brochure_pdf", submission.brochure_pdf ?? null);
+        }
+        if (submission.brochure_pdf_2 !== form.getValues().brochure_pdf_2) {
+          form.setValue("brochure_pdf_2", submission.brochure_pdf_2 ?? null);
+        }
+
         // Manually re-trigger validation on all fields to force error display
         const isValid = await form.trigger();
 
         // Custom validation for required brochure PDF
-        if (!data.brochure_pdf && !brochurePdfUrl) {
+        if (!submission.brochure_pdf && !brochurePdfUrl) {
           toast.error("Event Brochure PDF is required", {
             description: "Please upload a brochure PDF for your event.",
             duration: 5000,
@@ -218,9 +384,9 @@ export default function MoreInfoTab() {
 
         // Custom validation for required event address
         if (
-          !data.event_address ||
-          (typeof data.event_address === "string" &&
-            data.event_address.trim().length === 0)
+          !submission.event_address ||
+          (typeof submission.event_address === "string" &&
+            submission.event_address.trim().length === 0)
         ) {
           toast.error("Event address is required", {
             description: "Please provide an exact event location address.",
@@ -296,21 +462,129 @@ export default function MoreInfoTab() {
           return;
         }
 
-        // Update global form with all fields
+        const roomsEnabled = globalForm.getValues().stepTwo?.is_rooms === 1;
+        const stepTwoRoomsForSave = capEventRoomList(
+          normalizeVendorStepTwoRooms(globalForm.getValues().stepTwo?.rooms),
+        );
+
+        let cleanedData: StepFiveSavePayload;
+        let mergedRoomsGlobal = syncStepFiveRoomsFromStepTwo(
+          stepTwoRoomsForSave,
+          normalizeVendorStepFiveRooms(globalForm.getValues().stepFive?.rooms),
+        );
+
+        if (roomsEnabled && stepTwoRoomsForSave.length > 0) {
+          persistActiveRoomBrochureToGlobal(resolvedRoomIndex, submission);
+          const activeSnapshot = stepFiveBrochureFieldsToRoomEntry(
+            Number(stepTwoRoomsForSave[resolvedRoomIndex]?.room_id),
+            submission,
+          );
+          const brochureClone = cloneVendorStepFiveRoomBrochure(activeSnapshot);
+
+          if (
+            applyToAllRooms &&
+            !isVendorRoomBrochureStepComplete(activeSnapshot)
+          ) {
+            toast.error(
+              "Upload a brochure PDF for this room before applying to all rooms.",
+            );
+            setIsLoading(false);
+            return;
+          }
+
+          mergedRoomsGlobal = syncStepFiveRoomsFromStepTwo(
+            stepTwoRoomsForSave,
+            normalizeVendorStepFiveRooms(
+              globalForm.getValues().stepFive?.rooms,
+            ),
+          ).map((entry, roomIndex) => {
+            if (!applyToAllRooms && roomIndex !== resolvedRoomIndex) {
+              return entry;
+            }
+            return { ...entry, ...brochureClone, room_id: entry.room_id };
+          });
+
+          const activeRoomIdForSave = Number(
+            stepTwoRoomsForSave[resolvedRoomIndex]?.room_id,
+          );
+          const roomsForApi = applyToAllRooms
+            ? mergedRoomsGlobal
+            : mergedRoomsGlobal.filter(
+                (entry) => entry.room_id === activeRoomIdForSave,
+              );
+
+          cleanedData = {
+            step: 5,
+            event_id: submission.event_id,
+            is_rooms: 1,
+            rooms: roomsForApi,
+            event_address: submission.event_address,
+            latitude: submission.latitude,
+            longitude: submission.longitude,
+            location: submission.location,
+            brochure_pdf: submission.brochure_pdf,
+            brochure_pdf_2: submission.brochure_pdf_2,
+            remove_brochure_pdf: submission.remove_brochure_pdf,
+            remove_brochure_pdf_2: submission.remove_brochure_pdf_2,
+          };
+        } else {
+          const { rooms: _rooms, is_rooms: _isRooms, ...flatData } = submission;
+          cleanedData = {
+            ...flatData,
+            is_rooms: 0,
+          };
+        }
+
         globalForm.setValue("stepFive", {
           ...globalForm.getValues().stepFive,
-          ...data,
-          price_start_from_button_text:
-            data.price_start_from_button_text || "Book Now",
+          ...cleanedData,
+          ...(cleanedData.is_rooms === 1
+            ? {
+                rooms: mergedRoomsGlobal,
+                ...roomEntryToStepFiveBrochureFields(
+                  findStepFiveBrochureForRoom(
+                    mergedRoomsGlobal,
+                    Number(stepTwoRoomsForSave[resolvedRoomIndex]?.room_id),
+                  ),
+                ),
+              }
+            : {}),
         } as StepFiveType);
 
-        // Call the API directly using eventsService
-        const response = await eventsService.storeStepFiveData(data);
+        const response = await eventsService.storeStepFiveData(cleanedData);
 
         if (response && response.status) {
-          // Success message is handled by axios interceptor
-          // Move to the next step
-          await save();
+          if (
+            roomsEnabled &&
+            stepTwoRoomsForSave.length > 0 &&
+            !applyToAllRooms
+          ) {
+            const nextIncompleteIndex = stepTwoRoomsForSave.findIndex(
+              (room, index) =>
+                index !== resolvedRoomIndex &&
+                !isVendorRoomBrochureStepComplete(
+                  findStepFiveBrochureForRoom(
+                    mergedRoomsGlobal,
+                    Number(room.room_id),
+                  ),
+                ),
+            );
+            if (nextIncompleteIndex !== -1) {
+              globalForm.setValue(
+                "stepTwo.active_room_index",
+                nextIncompleteIndex,
+                { shouldDirty: false, shouldTouch: false },
+              );
+              toast.info("Saved. Continue with the next room.");
+              return;
+            }
+          }
+
+          if (applyToAllRooms && roomsEnabled) {
+            toast.success("Brochure applied to all rooms.");
+          }
+
+          await advanceStep(5);
         } else {
           const errorMessage =
             response?.message ||
@@ -326,13 +600,51 @@ export default function MoreInfoTab() {
         setIsLoading(false);
       }
     },
-    [brochurePdfUrl, form, globalForm, save, setActiveField],
+    [
+      brochurePdfUrl,
+      brochurePdfUrl2,
+      form,
+      globalForm,
+      persistActiveRoomBrochureToGlobal,
+      resolveBrochureFieldsForSubmit,
+      resolvedRoomIndex,
+      advanceStep,
+      setActiveField,
+    ],
+  );
+
+  const attemptSubmit = useCallback(
+    (applyToAllRooms: boolean) => {
+      const current = getValues();
+      const merged = resolveBrochureFieldsForSubmit(current);
+      if (merged.brochure_pdf !== current.brochure_pdf) {
+        setValue("brochure_pdf", merged.brochure_pdf ?? null);
+      }
+      if (merged.brochure_pdf_2 !== current.brochure_pdf_2) {
+        setValue("brochure_pdf_2", merged.brochure_pdf_2 ?? null);
+      }
+
+      void form.handleSubmit(
+        (data) => handleSubmit(data, { applyToAllRooms }),
+        () => {
+          toast.error(
+            "Please complete the required brochure and address fields for this room.",
+          );
+        },
+      )();
+    },
+    [form, getValues, setValue, resolveBrochureFieldsForSubmit, handleSubmit],
   );
 
   return (
     <div className="space-y-8">
       <Form {...form}>
-        <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-8">
+        <form
+          onSubmit={form.handleSubmit((data) =>
+            handleSubmit(data as StepFiveType, { applyToAllRooms: false }),
+          )}
+          className="space-y-8"
+        >
           {/* Document Uploads Section */}
           <div className="space-y-4">
             <h2 className="text-xl font-bold title-header">
@@ -498,85 +810,6 @@ export default function MoreInfoTab() {
                   </FormItem>
                 )}
               />
-
-              <FormField
-                control={control}
-                name="faq_pdf"
-                render={() => (
-                  <FormItem>
-                    <FormLabel className="text-sm font-medium">
-                      FAQ (PDF only) (Optional)
-                    </FormLabel>
-                    <FormControl>
-                      {faqPdfUrl ? (
-                        <div className="w-full">
-                          <div className="flex items-center justify-between bg-gray-100 p-4 rounded-md mb-2">
-                            <div className="flex items-center">
-                              <svg
-                                width="24"
-                                height="24"
-                                viewBox="0 0 32 32"
-                                fill="none"
-                                xmlns="http://www.w3.org/2000/svg"
-                              >
-                                <path
-                                  d="M20 2H8C6.9 2 6 2.9 6 4V28C6 29.1 6.9 30 8 30H24C25.1 30 26 29.1 26 28V8L20 2Z"
-                                  fill="#2196F3"
-                                />
-                                <path d="M20 2V8H26L20 2Z" fill="#90CAF9" />
-                                <path d="M14 13H18V15H14V13Z" fill="white" />
-                                <path d="M14 17H18V19H14V17Z" fill="white" />
-                                <path d="M14 21H18V23H14V21Z" fill="white" />
-                              </svg>
-                              <span className="ml-2 text-sm">
-                                {faqPdfUrl.split("/").pop()}
-                              </span>
-                            </div>
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => {
-                                setFaqPdfUrl(null);
-                                form.setValue("faq_pdf", null);
-                                form.setValue("remove_faq_pdf", true);
-                                globalForm.setValue(
-                                  "stepFive.remove_faq_pdf",
-                                  true,
-                                );
-                                handleFaqUpload(null);
-                              }}
-                            >
-                              Remove
-                            </Button>
-                          </div>
-                        </div>
-                      ) : (
-                        <Controller
-                          name="faq_pdf"
-                          control={control}
-                          render={({ field: { value } }) => (
-                            <FileUploader
-                              value={value instanceof File ? [value] : []}
-                              onValueChange={(files) =>
-                                handleFaqUpload(files[0] || null)
-                              }
-                              maxFileCount={1}
-                              maxSize={1 * 1024 * 1024} // 1MB
-                              onRemove={() => handleFaqUpload(null)}
-                              accept={{ "application/pdf": [".pdf"] }}
-                            />
-                          )}
-                        />
-                      )}
-                    </FormControl>
-                    <FormMessage />
-                    <p className="text-xs text-gray-500 mt-1">
-                      Upload your FAQ document (PDF only)
-                    </p>
-                  </FormItem>
-                )}
-              />
             </div>
           </div>
 
@@ -681,91 +914,32 @@ export default function MoreInfoTab() {
             </div>
           </div>
 
-          {/* Price Information Section */}
-          <div className="space-y-4">
-            <h2 className="text-xl font-bold title-header">
-              Price Information
-            </h2>
-            <p className="text-sm text-gray-500 mt-1 mb-4">
-              Set pricing details for your event
-            </p>
-
-            <div className="space-y-4 border border-[#E5E7EB] p-6 rounded-md bg-white">
-              <FormField
-                control={control}
-                name="price_start_from"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-sm font-medium">
-                      Prices Start From <span className="text-red-500">*</span>
-                    </FormLabel>
-                    <FormControl>
-                      <Input
-                        {...field}
-                        placeholder="e.g. 50"
-                        className="h-10 bg-[#F9FAFB] border-[#E5E7EB]"
-                        type="text"
-                        onFocus={() => handleFieldFocus("price_start_from")}
-                        onChange={(e) => {
-                          const val = e.target.value.replace(/[^0-9.]/g, "");
-                          field.onChange(val);
-                        }}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                    <p className="text-xs text-gray-500 mt-1">
-                      Enter the starting price (numbers only)
-                    </p>
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={control}
-                name="price_start_from_button_text"
-                render={({ field }) => {
-                  const currentLength = field.value?.length || 0;
-                  const maxLength = 18;
-                  return (
-                    <FormItem>
-                      <FormLabel className="text-sm font-medium">
-                        Button Text
-                      </FormLabel>
-                      <FormControl>
-                        <Input
-                          {...field}
-                          placeholder="e.g. Book Now"
-                          className="h-10 bg-[#F9FAFB] border-[#E5E7EB]"
-                          maxLength={maxLength}
-                          onFocus={() =>
-                            handleFieldFocus("price_start_from_button_text")
-                          }
-                        />
-                      </FormControl>
-                      <div className="text-xs text-gray-500 mt-1">
-                        <span
-                          className={
-                            currentLength > maxLength ? "text-red-500" : ""
-                          }
-                        >
-                          {currentLength}/{maxLength} characters
-                        </span>
-                      </div>
-                      <FormMessage />
-                    </FormItem>
-                  );
-                }}
-              />
-            </div>
-          </div>
-
-          <div className="flex justify-end gap-4 pt-4">
+          <div className="flex flex-col sm:flex-row justify-end gap-2 sm:gap-3 pt-4">
+            {canApplyToAllRooms && (
+              <Button
+                type="button"
+                variant="outline"
+                disabled={isLoading || readOnly}
+                className="w-full sm:w-auto"
+                onClick={() => attemptSubmit(true)}
+              >
+                {isLoading ? "Saving..." : "Apply to all rooms"}
+              </Button>
+            )}
             <Button
-              type="submit"
+              type={isRoomsEnabled ? "button" : "submit"}
               disabled={isLoading || readOnly}
               variant="event-primary"
+              className="w-full sm:w-auto"
+              onClick={isRoomsEnabled ? () => attemptSubmit(false) : undefined}
             >
-              {readOnly ? "View only" : isLoading ? "Saving..." : "Save & Next"}
+              {readOnly
+                ? "View only"
+                : isLoading
+                  ? "Saving..."
+                  : isRoomsEnabled
+                    ? "Apply to this room only"
+                    : "Save & Next"}
             </Button>
           </div>
         </form>

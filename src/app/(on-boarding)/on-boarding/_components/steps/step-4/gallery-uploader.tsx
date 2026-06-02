@@ -4,6 +4,7 @@ import { ControllerRenderProps } from "react-hook-form";
 import React, { useEffect, useRef, useState, DragEvent } from "react";
 import { StepFourType } from "../../form-provider/schema";
 import { useFormContext } from "../../form-provider";
+import { EVENT_GALLERY_MAX_IMAGES } from "@/lib/event-form-limits";
 import { OnboardingFieldGroupTitle } from "@/components/ui/typography";
 import { Button } from "@/components/ui/button";
 import { Trash, GripVertical } from "lucide-react";
@@ -59,13 +60,15 @@ const GalleryUploader: React.FC<GalleryUploaderProps> = ({
     null,
   );
 
-  // Initialize galleryItems from field.value on mount and when field.value changes (cap at 8)
+  // Initialize galleryItems from field.value on mount and when field.value changes
   useEffect(() => {
     if (field.value && Array.isArray(field.value)) {
       const capped =
-        field.value.length > 8 ? field.value.slice(0, 8) : field.value;
+        field.value.length > EVENT_GALLERY_MAX_IMAGES
+          ? field.value.slice(0, EVENT_GALLERY_MAX_IMAGES)
+          : field.value;
       setGalleryItems(capped);
-      if (field.value.length > 8) {
+      if (field.value.length > EVENT_GALLERY_MAX_IMAGES) {
         field.onChange(capped);
         globalForm.setValue(scopedGalleryPath as never, capped as never);
       }
@@ -97,8 +100,10 @@ const GalleryUploader: React.FC<GalleryUploaderProps> = ({
     // Append new files to existing gallery (keep all: backend items + existing Files)
     const updatedGalleryItems = [...baseItems, ...filesWithPreviews];
 
-    // Limit to maximum 8 items
-    const limitedGalleryItems = updatedGalleryItems.slice(0, 8);
+    const limitedGalleryItems = updatedGalleryItems.slice(
+      0,
+      EVENT_GALLERY_MAX_IMAGES,
+    );
 
     setGalleryItems(limitedGalleryItems);
     field.onChange(limitedGalleryItems);
@@ -262,14 +267,13 @@ const GalleryUploader: React.FC<GalleryUploaderProps> = ({
         </div>
       )}
 
-      {/* Only show uploader if less than 8 images — use value={[]} so FileUploader is dropzone-only; gallery grid above shows all items (avoids duplicate file list) */}
-      {galleryItems.length < 8 && (
+      {galleryItems.length < EVENT_GALLERY_MAX_IMAGES && (
         <FormControl>
           <article className="w-full">
             <FileUploader
               value={[]}
               onValueChange={handleGalleryChange as (files: File[]) => void}
-              maxFileCount={8 - galleryItems.length}
+              maxFileCount={EVENT_GALLERY_MAX_IMAGES - galleryItems.length}
               maxSize={5 * 1024 * 1024}
               disabled={galleryUploading}
               moreLabel
@@ -292,9 +296,10 @@ const GalleryUploader: React.FC<GalleryUploaderProps> = ({
         </FormControl>
       )}
 
-      {galleryItems.length >= 8 && (
+      {galleryItems.length >= EVENT_GALLERY_MAX_IMAGES && (
         <p className="text-amber-600 text-sm mt-2">
-          Maximum of 8 images reached. Remove some images to add more.
+          Maximum of {EVENT_GALLERY_MAX_IMAGES} images reached. Remove some
+          images to add more.
         </p>
       )}
 

@@ -4,10 +4,14 @@ import type {
 } from "@/app/api/ai/generate-event/route";
 import { api } from "@/services/core/api-client";
 import type { ApiResponse } from "@/services/core/api-client";
-import { API_ENDPOINTS } from "@/services/core/endpoints";
+import { buildVendorEventGetUrl } from "@/services/vendor/events/build-vendor-event-get-url";
 import { eventsService } from "@/services/vendor/events/events.service";
+import { roomService } from "@/services/vendor/onboarding/room.service";
 import type { EventDetailData } from "@/services/vendor/events/type";
-import type { StepOneType } from "@/app/(protected)/vendor/events/_components/tab-event-form/schema";
+import type {
+  StepOneType,
+  StepTwoType,
+} from "@/app/(protected)/vendor/events/_components/tab-event-form/schema";
 import { STEP_NINE_MAX_FAQS } from "@/app/(on-boarding)/on-boarding/_components/form-provider/schema";
 import {
   getDummyImages,
@@ -17,6 +21,20 @@ import {
   createPlaceholderEventBanner,
   createPlaceholderPackageImage,
 } from "@/app/(on-boarding)/on-boarding/_lib/constants/dummy-images";
+import {
+  EVENT_GALLERY_MAX_IMAGES,
+  resolveEventSchedulerItems,
+} from "@/lib/event-form-limits";
+import { filterSchedulerRowsForApi } from "@/app/(protected)/vendor/events/_lib/normalize-step-two-fields";
+import {
+  cleanVendorStepThreeDatesForForm,
+  formatVendorStepThreeDateForApi,
+} from "@/app/(protected)/vendor/events/_lib/vendor-step-three-rooms";
+import type { VendorStepFourRoomEntry } from "@/app/(protected)/vendor/events/_lib/vendor-step-four-rooms";
+import { ensureEventMenuCategoriesForRoom } from "@/lib/event-menu-categories";
+import type { StepFiveSavePayload } from "@/services/vendor/events/events.service";
+import { persistAiEventDraftId } from "./ai-event-draft-storage";
+import type { StepThreeType } from "@/app/(protected)/vendor/events/_components/tab-event-form/schema";
 
 export const AI_EVENT_APPLY_STEPS = [
   { label: "Event details & schedule", icon: "📅" },
@@ -32,13 +50,90 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 export type ApplyAIEventProgress = (stepIndex: number) => void;
 
+export type ApplyAIGeneratedEventResult = {
+  eventId: number;
+  isRooms: boolean;
+};
+
+const AI_EVENT_MIN_ROOMS = 2;
+const AI_EVENT_MAX_ROOMS = 3;
+
+type AiStepTwoPackageFields = {
+  package_title: string;
+  package_description: string;
+  package_button_link: string;
+  package_details: Array<{ title: string }>;
+  package_image: File;
+  gallery: File[];
+  event_schedular_title: string;
+  event_schedule_subtitle: string;
+  event_schedular: Array<{ title: string; time: string }>;
+  event_schedular_background_image?: File;
+};
+
+function buildAiStepTwoPackageFields(params: {
+  content: AIEventGeneratedContent;
+  removedSections: Set<string>;
+  packageImage: File;
+  galleryFiles: File[];
+  schedulerBgFile: File | null;
+}): AiStepTwoPackageFields {
+  const { content: s, removedSections, packageImage, galleryFiles, schedulerBgFile } =
+    params;
+  const removed = removedSections.has("stepTwo");
+
+  const schedularSource = resolveEventSchedulerItems(
+    !removed &&
+      Array.isArray(s.stepTwo.event_schedular) &&
+      s.stepTwo.event_schedular.length > 0
+      ? s.stepTwo.event_schedular
+      : [{ title: "Main Event", time: "19:00" }],
+  );
+  const event_schedular = filterSchedulerRowsForApi(schedularSource);
+  const resolvedSchedular =
+    event_schedular.length > 0
+      ? event_schedular
+      : [{ title: "Main Event", time: "19:00" }];
+
+  return {
+    package_title: removed ? "Package" : s.stepTwo.package_title,
+    package_description: removed ? "Package details" : s.stepTwo.package_description,
+    package_button_link: "",
+    package_details: removed ? [{ title: "VIP Access" }] : s.stepTwo.package_details,
+    package_image: packageImage,
+    gallery: galleryFiles,
+    event_schedular_title: removed
+      ? "Event Schedule"
+      : s.stepTwo.event_schedular_title || "Event Schedule",
+    event_schedule_subtitle: removed ? "" : s.stepTwo.event_schedule_subtitle || "",
+    event_schedular: resolvedSchedular,
+    event_schedular_background_image: schedulerBgFile ?? undefined,
+  };
+}
+
+function normalizeAiEventRoomNames(roomNames: string[] | undefined): string[] {
+  const unique = Array.from(
+    new Set(
+      (roomNames ?? [])
+        .map((name) => String(name || "").trim())
+        .filter((name) => name.length > 0),
+    ),
+  ).slice(0, AI_EVENT_MAX_ROOMS);
+
+  if (unique.length >= AI_EVENT_MIN_ROOMS) return unique;
+  if (unique.length === 1) return [unique[0], "Room 2"];
+  return ["Room 1", "Room 2"];
+}
+
 export async function applyAIGeneratedEventToBackend(params: {
   content: AIEventGeneratedContent;
   eventInput: AIEventInput;
   categoryId: number;
   removedSections?: Set<string>;
   onProgress?: ApplyAIEventProgress;
-}): Promise<number> {
+  /** Fired after step 1 succeeds so UI can open the draft in manual editor if later steps fail. */
+  onEventCreated?: (eventId: number) => void;
+}): Promise<ApplyAIGeneratedEventResult> {
   const { content: s, eventInput, categoryId, onProgress } = params;
   const removedSections = params.removedSections ?? new Set<string>();
 
@@ -55,23 +150,26 @@ export async function applyAIGeneratedEventToBackend(params: {
   const schedulerBgUrl = (dummyImages as { scheduler_background?: string }).scheduler_background;
   const schedulerBgFile = schedulerBgUrl
     ? (await urlToImageFile(schedulerBgUrl, "event-scheduler-background")) ??
-      (await createPlaceholderEventBanner(`${s.stepOne.event_name} · schedule`))
+    (await createPlaceholderEventBanner(`${s.stepOne.event_name} · schedule`))
     : null;
+
+  const normalizedRoomNames = normalizeAiEventRoomNames(eventInput.room_names);
+  const useRoomSystem =
+    eventInput.has_room_system === true &&
+    normalizedRoomNames.length >= AI_EVENT_MIN_ROOMS;
 
   const stepOneData: StepOneType = {
     step: 1 as const,
     event_category_id: categoryId,
+    is_rooms: useRoomSystem ? 1 : 0,
     event_name: s.stepOne.event_name,
     event_banner_heading: s.stepOne.event_banner_heading,
     event_banner_sub_heading: s.stepOne.event_banner_sub_heading,
     about_event_heading: s.stepOne.about_event_heading,
     about_event_sub_heading: s.stepOne.about_event_sub_heading,
     about_event_description: s.stepOne.about_event_description,
-    event_schedular_title: s.stepOne.event_schedular_title,
-    event_schedular: s.stepOne.event_schedular,
     event_banner_image: bannerFile,
     event_banner_video: null,
-    event_schedular_background_image: schedulerBgFile ?? undefined,
   };
 
   const step1Res = await eventsService.storeStepOneData(stepOneData);
@@ -81,9 +179,12 @@ export async function applyAIGeneratedEventToBackend(params: {
 
   if (!eventId) throw new Error("Failed to create event — no event_id returned");
 
+  persistAiEventDraftId(eventId);
+  params.onEventCreated?.(eventId);
+
   const detailRes = await api.get<ApiResponse<EventDetailData>>(
-    API_ENDPOINTS.VENDOR.EVENT.GET_EVENT.replace("{eventId}", String(eventId)),
-    { returnFullResponse: true }
+    buildVendorEventGetUrl(eventId, useRoomSystem),
+    { returnFullResponse: true },
   );
   const vendorLocationId =
     detailRes?.data?.vendor_location_id ?? detailRes?.data?.stepOne?.vendor_location_id;
@@ -100,22 +201,84 @@ export async function applyAIGeneratedEventToBackend(params: {
       removedSections.has("stepTwo") ? "Package" : s.stepTwo.package_title
     ));
 
-  const galleryUrls = dummyImages.gallery ?? [];
-  const galleryFiles =
-    galleryUrls.length > 0
-      ? await fetchGalleryFiles(galleryUrls).then((files) => files.slice(0, 8))
-      : [];
+  let galleryFiles: File[] = [];
+  try {
+    const galleryUrls = dummyImages.gallery ?? [];
+    if (galleryUrls.length > 0) {
+      galleryFiles = (
+        await fetchGalleryFiles(galleryUrls)
+      ).slice(0, EVENT_GALLERY_MAX_IMAGES);
+    }
+  } catch {
+    console.warn("Failed to fetch gallery images for AI event, skipping");
+  }
 
-  await eventsService.storeStepTwoData({
-    step: 2 as const,
-    event_id: eventId,
-    package_title: removedSections.has("stepTwo") ? "Package" : s.stepTwo.package_title,
-    package_description: removedSections.has("stepTwo") ? "Package details" : s.stepTwo.package_description,
-    package_button_name: removedSections.has("stepTwo") ? "Book Now" : s.stepTwo.package_button_name,
-    package_details: removedSections.has("stepTwo") ? [{ title: "VIP Access" }] : s.stepTwo.package_details,
-    package_image: packageImage,
-    gallery: galleryFiles,
+  const createdRooms: Array<{ id: number; name: string }> = [];
+
+  if (useRoomSystem) {
+    const selectedIds = (eventInput.selected_room_ids ?? []).filter(
+      (id) => Number.isFinite(id) && id > 0,
+    );
+
+    if (selectedIds.length >= AI_EVENT_MIN_ROOMS) {
+      const listed = await roomService.listVendorRooms();
+      const catalog = Array.isArray(listed?.data) ? listed.data : [];
+      createdRooms.push(
+        ...catalog
+          .map((room) => ({
+            id: Number(room.id),
+            name: String(room?.name ?? "").trim(),
+          }))
+          .filter(
+            (room) =>
+              selectedIds.includes(room.id) &&
+              room.name.length > 0 &&
+              Number.isFinite(room.id) &&
+              room.id > 0,
+          )
+          .slice(0, AI_EVENT_MAX_ROOMS),
+      );
+      if (createdRooms.length < AI_EVENT_MIN_ROOMS) {
+        throw new Error(
+          "Selected venue rooms could not be loaded. Refresh and try again.",
+        );
+      }
+    } else {
+      for (const name of normalizedRoomNames) {
+        const created = await roomService.create({ name });
+        const createdId = Number(created?.data?.id);
+        if (!Number.isFinite(createdId) || createdId <= 0) {
+          throw new Error(`Failed to create room "${name}" during AI setup.`);
+        }
+        createdRooms.push({ id: createdId, name });
+      }
+    }
+  }
+
+  const stepTwoPackage = buildAiStepTwoPackageFields({
+    content: s,
+    removedSections,
+    packageImage,
+    galleryFiles,
+    schedulerBgFile,
   });
+
+  const stepTwoPayload: StepTwoType = {
+    step: 2,
+    event_id: eventId,
+    is_rooms: useRoomSystem ? 1 : 0,
+    active_room_index: useRoomSystem ? 0 : undefined,
+    ...stepTwoPackage,
+    rooms: useRoomSystem
+      ? createdRooms.map((room) => ({
+          room_id: room.id,
+          name: room.name,
+          ...stepTwoPackage,
+        }))
+      : undefined,
+  };
+
+  await eventsService.storeStepTwoData(stepTwoPayload);
   await sleep(300);
 
   onProgress?.(2);
@@ -134,32 +297,36 @@ export async function applyAIGeneratedEventToBackend(params: {
         return true;
       });
     })();
+    const defaultRoomId =
+      useRoomSystem && createdRooms[0]?.id ? createdRooms[0].id : undefined;
+
     const dates = sortedUniqueDates.map((d) => {
       const tickets =
         d.booking_type !== "tables"
           ? (d.tickets || []).map((t) => ({
-              title: t.title,
-              description: t.description,
-              total_capacity: parseInt(t.total_capacity) || 100,
-              price: parseInt(t.price) || 50,
-              sold_tickets: 0,
-            }))
+            title: t.title,
+            description: t.description,
+            total_capacity: parseInt(t.total_capacity) || 100,
+            price: parseInt(t.price) || 50,
+            sold_tickets: 0,
+          }))
           : [];
 
       const tables =
         d.booking_type !== "tickets"
           ? (d.tables || []).map((t) => ({
-              min_persons: parseInt(t.min_persons) || 2,
-              max_persons: parseInt(t.max_persons) || 6,
-              price: parseInt(t.price) || 100,
-              total_tables: parseInt(t.total_tables) || 10,
-              sold_tables: 0,
-            }))
+            min_persons: parseInt(t.min_persons) || 2,
+            max_persons: parseInt(t.max_persons) || 6,
+            price: parseInt(t.price) || 100,
+            total_tables: parseInt(t.total_tables) || 10,
+            sold_tables: 0,
+          }))
           : [];
 
       return {
         event_date: d.event_date,
         booking_type: d.booking_type,
+        ...(defaultRoomId ? { room_id: defaultRoomId } : {}),
         tickets,
         tables,
         total_ticket_types: d.booking_type !== "tables" ? tickets.length : 0,
@@ -174,33 +341,124 @@ export async function applyAIGeneratedEventToBackend(params: {
       };
     });
 
-    await eventsService.storeStepThreeData({
-      step: 3 as const,
-      event_id: eventId,
-      vendor_location_id: vendorLocationId,
-      dates,
-    });
+    const datesForForm = cleanVendorStepThreeDatesForForm(
+      dates as StepThreeType["dates"],
+    );
+    const datesForApi = datesForForm.map((date) =>
+      formatVendorStepThreeDateForApi(date),
+    );
+
+    if (useRoomSystem && createdRooms.length > 0) {
+      await eventsService.storeStepThreeData({
+        step: 3 as const,
+        event_id: eventId,
+        vendor_location_id: vendorLocationId,
+        is_rooms: 1,
+        rooms: createdRooms.map((room) => ({
+          room_id: room.id,
+          dates: datesForApi,
+        })),
+        dates: datesForForm,
+      });
+    } else {
+      await eventsService.storeStepThreeData({
+        step: 3 as const,
+        event_id: eventId,
+        vendor_location_id: vendorLocationId,
+        is_rooms: 0,
+        dates: datesForForm,
+      });
+    }
   }
   await sleep(300);
 
   onProgress?.(3);
-  const hasCatering = !removedSections.has("stepFour") && s.stepFour.catering_option === 1;
+  const cateringOption = removedSections.has("stepFour")
+    ? 0
+    : s.stepFour.catering_option === 1
+      ? 1
+      : 0;
+  const hasCatering = cateringOption === 1;
+  const menus = hasCatering ? (s.stepFour.menus ?? []) : [];
+
+  let primaryMenuCategoryId: number | undefined;
+  const menuCategoryIdByRoomId = new Map<number, number>();
+
+  if (hasCatering && eventId) {
+    if (useRoomSystem && createdRooms.length > 0) {
+      for (const room of createdRooms) {
+        const categoryId = await ensureEventMenuCategoriesForRoom(
+          eventId,
+          room.id,
+          menus,
+        );
+        if (categoryId != null) {
+          menuCategoryIdByRoomId.set(room.id, categoryId);
+        }
+      }
+    } else {
+      primaryMenuCategoryId = await ensureEventMenuCategoriesForRoom(
+        eventId,
+        undefined,
+        menus,
+      );
+    }
+  }
+
+  const defaultMenuCategoryId =
+    primaryMenuCategoryId ??
+    menuCategoryIdByRoomId.values().next().value ??
+    0;
+
   const menuBgUrl = hasCatering
     ? (dummyImages as { menu_background?: string }).menu_background
     : null;
   const menuBgFile = menuBgUrl
     ? (await urlToImageFile(menuBgUrl, "menu-background")) ??
-      (await createPlaceholderPackageImage(s.stepFour.menu_title || "Menu"))
+    (await createPlaceholderPackageImage(s.stepFour.menu_title || "Menu"))
     : null;
-  await eventsService.storeStepFourData({
-    step: 4 as const,
-    event_id: eventId,
-    catering_option: removedSections.has("stepFour") ? 0 : s.stepFour.catering_option,
-    menu_title: hasCatering ? s.stepFour.menu_title : undefined,
-    menu_description: hasCatering ? s.stepFour.menu_description : undefined,
-    menus: hasCatering ? s.stepFour.menus : undefined,
-    menu_background_image: menuBgFile ?? undefined,
+
+  const buildStepFourRoomEntry = (roomId: number): VendorStepFourRoomEntry => ({
+    room_id: roomId,
+    catering_option: cateringOption as 0 | 1,
+    menu_title: hasCatering ? s.stepFour.menu_title : "",
+    menu_description: hasCatering ? s.stepFour.menu_description : "",
+    event_menu_category_id:
+      menuCategoryIdByRoomId.get(roomId) ?? defaultMenuCategoryId,
+    menus,
+    menu_background_image: menuBgFile ?? null,
   });
+
+  if (useRoomSystem && createdRooms.length > 0) {
+    const roomMenus = createdRooms.map((room) =>
+      buildStepFourRoomEntry(room.id),
+    );
+    const activeMenu = roomMenus[0];
+    await eventsService.storeStepFourData({
+      step: 4 as const,
+      event_id: eventId,
+      is_rooms: 1,
+      rooms: roomMenus,
+      catering_option: activeMenu.catering_option,
+      menu_title: activeMenu.menu_title,
+      menu_description: activeMenu.menu_description,
+      event_menu_category_id: activeMenu.event_menu_category_id,
+      menus: activeMenu.menus,
+      menu_background_image: activeMenu.menu_background_image ?? undefined,
+    });
+  } else {
+    await eventsService.storeStepFourData({
+      step: 4 as const,
+      event_id: eventId,
+      is_rooms: 0,
+      catering_option: cateringOption,
+      menu_title: hasCatering ? s.stepFour.menu_title : undefined,
+      menu_description: hasCatering ? s.stepFour.menu_description : undefined,
+      event_menu_category_id: hasCatering ? defaultMenuCategoryId : undefined,
+      menus: hasCatering ? menus : undefined,
+      menu_background_image: menuBgFile ?? undefined,
+    });
+  }
   await sleep(300);
 
   const stepFiveAny = s.stepFive as Record<string, unknown>;
@@ -210,8 +468,6 @@ export async function applyAIGeneratedEventToBackend(params: {
 
   const brochureSource = (legacyAiShape ? stepSixAny : stepFiveAny) as {
     event_address?: string;
-    price_start_from?: string;
-    price_start_from_button_text?: string;
   };
   const drinksSource = (legacyAiShape ? stepFiveAny : stepSixAny) as {
     drink_title?: string;
@@ -233,24 +489,48 @@ export async function applyAIGeneratedEventToBackend(params: {
 
   onProgress?.(4);
   if (!brochureSectionRemoved) {
-    const stepFiveFD = new FormData();
-    stepFiveFD.append("step", "5");
-    stepFiveFD.append("event_id", String(eventId));
-    stepFiveFD.append(
-      "event_address",
-      String(brochureSource.event_address || eventInput.venueAddress || "")
+    const brochureAddress = String(
+      brochureSource.event_address || eventInput.venueAddress || "",
     );
-    stepFiveFD.append(
-      "price_start_from",
-      String(brochureSource.price_start_from || "0")
-    );
-    stepFiveFD.append(
-      "price_start_from_button_text",
-      String(brochureSource.price_start_from_button_text || "Book Now")
-    );
-    stepFiveFD.append("lat", "51.5074");
-    stepFiveFD.append("long", "-0.1278");
-    await eventsService.storeStepFiveData(stepFiveFD as unknown as never);
+    const brochureLat =
+      typeof (brochureSource as { latitude?: number }).latitude === "number"
+        ? String((brochureSource as { latitude?: number }).latitude)
+        : "51.5074";
+    const brochureLong =
+      typeof (brochureSource as { longitude?: number }).longitude === "number"
+        ? String((brochureSource as { longitude?: number }).longitude)
+        : "-0.1278";
+
+    if (useRoomSystem && createdRooms.length > 0) {
+      const roomPayload: StepFiveSavePayload = {
+        step: 5,
+        event_id: eventId,
+        is_rooms: 1,
+        event_address: brochureAddress,
+        latitude: Number(brochureLat) || undefined,
+        longitude: Number(brochureLong) || undefined,
+        location: {
+          title: "LOCATION",
+          description: brochureAddress,
+          icon: "MapPin",
+        },
+        rooms: createdRooms.map((room) => ({
+          room_id: room.id,
+          brochure_pdf: null,
+          brochure_pdf_2: null,
+        })),
+      };
+      await eventsService.storeStepFiveData(roomPayload);
+    } else {
+      const stepFiveFD = new FormData();
+      stepFiveFD.append("step", "5");
+      stepFiveFD.append("event_id", String(eventId));
+      stepFiveFD.append("is_rooms", "0");
+      stepFiveFD.append("event_address", brochureAddress);
+      stepFiveFD.append("lat", brochureLat);
+      stepFiveFD.append("long", brochureLong);
+      await eventsService.storeStepFiveData(stepFiveFD as unknown as never);
+    }
   }
   await sleep(300);
 
@@ -278,15 +558,49 @@ export async function applyAIGeneratedEventToBackend(params: {
     },
   ];
 
-  await eventsService.storeStepSixData({
-    step: 6 as const,
-    event_id: eventId,
-    drink_title: hasUsableDrinksContent ? String(drinksSource.drink_title).trim() : "Drinks",
-    drink_description: hasUsableDrinksContent
-      ? String(drinksSource.drink_description).trim()
-      : "Drink packages",
-    packages: hasUsableDrinksContent ? mappedDrinkPackages : placeholderDrinkPackages,
-  } as never);
+  await eventsService.storeStepSixData(
+    useRoomSystem && createdRooms.length > 0
+      ? {
+          step: 6 as const,
+          event_id: eventId,
+          is_rooms: 1,
+          rooms: createdRooms.map((room) => ({
+            room_id: room.id,
+            drink_title: hasUsableDrinksContent
+              ? String(drinksSource.drink_title).trim()
+              : "Drinks",
+            drink_description: hasUsableDrinksContent
+              ? String(drinksSource.drink_description).trim()
+              : "Drink packages",
+            packages: hasUsableDrinksContent
+              ? mappedDrinkPackages
+              : placeholderDrinkPackages,
+          })),
+          drink_title: hasUsableDrinksContent
+            ? String(drinksSource.drink_title).trim()
+            : "Drinks",
+          drink_description: hasUsableDrinksContent
+            ? String(drinksSource.drink_description).trim()
+            : "Drink packages",
+          packages: hasUsableDrinksContent
+            ? mappedDrinkPackages
+            : placeholderDrinkPackages,
+        }
+      : {
+          step: 6 as const,
+          event_id: eventId,
+          is_rooms: 0,
+          drink_title: hasUsableDrinksContent
+            ? String(drinksSource.drink_title).trim()
+            : "Drinks",
+          drink_description: hasUsableDrinksContent
+            ? String(drinksSource.drink_description).trim()
+            : "Drink packages",
+          packages: hasUsableDrinksContent
+            ? mappedDrinkPackages
+            : placeholderDrinkPackages,
+        },
+  );
   await sleep(300);
 
   onProgress?.(6);
@@ -301,5 +615,5 @@ export async function applyAIGeneratedEventToBackend(params: {
   onProgress?.(AI_EVENT_APPLY_STEPS.length);
   await sleep(400);
 
-  return eventId;
+  return { eventId, isRooms: useRoomSystem };
 }

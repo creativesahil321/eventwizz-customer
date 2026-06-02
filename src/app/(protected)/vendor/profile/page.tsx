@@ -215,10 +215,11 @@ export default function ProfilePage() {
                       enableCropping={true}
                       aspectRatio={1}
                       cropConfig={{
+                        maxSizeKB: 400,
                         quality: 0.9,
+                        maxWidth: 800,
+                        maxHeight: 800,
                       }}
-                      autoCompress={true}
-                      autoCompressMaxSizeMB={1}
                     />
                     <p className="text-xs text-gray-500 mt-2">
                       Recommended: Square image, at least 200x200px

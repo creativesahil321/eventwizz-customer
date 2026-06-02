@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 
 import type { DownloadItem } from "@/app/(on-boarding)/on-boarding/_components/form-preview/_components/brochure-section";
 import AboutEventSec from "@/app/(on-boarding)/on-boarding/_components/form-preview/_components/About-event-sec";
@@ -32,6 +32,12 @@ import { EventHeroBand } from "@/components/public/event-hero-band";
 import { normalizeHeadingEmphasis } from "@/lib/heading-emphasis";
 import { headerLinksFromDownloadItems } from "@/lib/event-header-downloads";
 import { EVENT_BOOKING_SECTION_CLASSNAME } from "@/lib/event-booking-section-layout";
+import { ONBOARDING_ROOM_SELECTOR_SCROLL_THRESHOLD_PX } from "@/app/(on-boarding)/on-boarding/_components/form-preview/preview-layout-constants";
+import {
+  isVendorEventRoomPreviewMode,
+  resolveVendorPreviewActiveSlices,
+} from "../_lib/resolve-vendor-preview-room-slices";
+import { VendorPreviewRoomSelector } from "./vendor-preview-room-selector";
 
 import "@/app/(public)/[locationSlug]/events/[eventSlug]/event-detail.css";
 
@@ -45,6 +51,40 @@ interface EventPreviewProps {
   embedInShell?: boolean;
 }
 
+function mapGalleryForPreview(
+  gallery: Array<string | File | { id: number; url: string }> | undefined,
+) {
+  if (!gallery || gallery.length === 0) return undefined;
+
+  return gallery.map((image) => {
+    if (typeof image === "string") {
+      return {
+        path: image,
+        relativePath: image,
+        preview: image,
+      };
+    }
+    if (image instanceof File) {
+      return {
+        path: image.name,
+        relativePath: image.name,
+        preview: URL.createObjectURL(image),
+      };
+    }
+    if (typeof image === "object" && image !== null && "url" in image) {
+      const galleryItem = image as { id: number; url: string };
+      return {
+        path: galleryItem.url,
+        relativePath: galleryItem.url,
+        preview: galleryItem.url,
+      };
+    }
+    const o = image as { path?: string; preview?: string };
+    const src = o.preview || o.path || "";
+    return { path: src, relativePath: src, preview: src };
+  });
+}
+
 /** Mirrors `EventDetailClient` section order, hero, conditionals, and brochure/footer so vendor + admin preview match the live event page. */
 export function EventPreview({
   data,
@@ -52,6 +92,73 @@ export function EventPreview({
   embedInShell = false,
 }: EventPreviewProps) {
   const { format: formatMoney } = useCurrencyFormat();
+  const previewContainerRef = useRef<HTMLDivElement>(null);
+  const [currentRoomIndex, setCurrentRoomIndex] = useState(0);
+  const [roomSelectorScrollVisible, setRoomSelectorScrollVisible] =
+    useState(false);
+
+  const roomPreviewMode = isVendorEventRoomPreviewMode(data);
+
+  useEffect(() => {
+    setCurrentRoomIndex(0);
+  }, [data.stepOne?.event_id, roomPreviewMode]);
+
+  const slices = useMemo(
+    () => resolveVendorPreviewActiveSlices(data, currentRoomIndex),
+    [data, currentRoomIndex],
+  );
+
+  const showRoomSelector = roomPreviewMode && slices.rooms.length >= 2;
+
+  /** Fade in after ~2–3 scrolls (onboarding preview parity). */
+  const roomSelectorVisible = showRoomSelector && roomSelectorScrollVisible;
+
+  useEffect(() => {
+    if (!showRoomSelector) {
+      setRoomSelectorScrollVisible(false);
+      return;
+    }
+
+    const threshold = ONBOARDING_ROOM_SELECTOR_SCROLL_THRESHOLD_PX;
+
+    const isScrollableContainer = (el: HTMLElement) =>
+      el.scrollHeight > el.clientHeight + 1;
+
+    const getScrollTop = () => {
+      const container = previewContainerRef.current;
+      if (container && isScrollableContainer(container)) {
+        return container.scrollTop;
+      }
+      return typeof window !== "undefined" ? window.scrollY : 0;
+    };
+
+    const getViewportHeight = () => {
+      const container = previewContainerRef.current;
+      if (container && isScrollableContainer(container)) {
+        return container.clientHeight;
+      }
+      return typeof window !== "undefined" ? window.innerHeight : 0;
+    };
+
+    const handleScroll = () => {
+      const scrollTop = getScrollTop();
+      const height = getViewportHeight();
+      setRoomSelectorScrollVisible(
+        scrollTop >= Math.max(threshold, height * 0.22),
+      );
+    };
+
+    handleScroll();
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    const container = previewContainerRef.current;
+    container?.addEventListener("scroll", handleScroll, { passive: true });
+
+    return () => {
+      window.removeEventListener("scroll", handleScroll);
+      container?.removeEventListener("scroll", handleScroll);
+    };
+  }, [showRoomSelector]);
+
   const contactNumber =
     data.contact_number || data.stepEight?.contact_number || "";
 
@@ -126,31 +233,29 @@ export function EventPreview({
 
   const s1 = data.stepOne;
   const s2 = data.stepTwo;
-  const s3 = data.stepThree;
-  const s4 = data.stepFour;
-  const s5 = data.stepFive;
-  const s6 = data.stepSix;
   const s7 = data.stepSeven;
   const s8 = data.stepEight;
 
+  const activePackage = slices.roomMode ? slices.package : s2;
+  const activeMenu = slices.roomMode ? slices.menu : data.stepFour;
+  const activeDrinks = slices.roomMode ? slices.drinks : data.stepFive;
+  const activeBrochure = slices.roomMode ? slices.brochure : data.stepSix;
+
   /** Same rows as `BrochureSection` so header (single link vs menu) stays in sync with the page. */
-  const eventBrochureDownloads = React.useMemo(
+  const eventBrochureDownloads = useMemo(
     () =>
       [
-        ...(s6?.brochure_pdf
-          ? [{ title: "Event brochure", download_link: [s6.brochure_pdf] }]
+        ...(activeBrochure?.brochure_pdf
+          ? [{ title: "Event brochure", download_link: [activeBrochure.brochure_pdf] }]
           : []),
-        ...(s6?.faq_pdf
-          ? [{ title: "FAQ Details", download_link: [s6.faq_pdf] }]
-          : []),
-        ...(s6?.brochure_pdf_2
-          ? [{ title: "Event Flayer", download_link: [s6.brochure_pdf_2] }]
+        ...(activeBrochure?.brochure_pdf_2
+          ? [{ title: "Event Flayer", download_link: [activeBrochure.brochure_pdf_2] }]
           : []),
       ] as DownloadItem[],
-    [s6?.brochure_pdf, s6?.faq_pdf, s6?.brochure_pdf_2],
+    [activeBrochure?.brochure_pdf, activeBrochure?.brochure_pdf_2],
   );
 
-  const headerDownloads = React.useMemo(
+  const headerDownloads = useMemo(
     () => headerLinksFromDownloadItems(eventBrochureDownloads),
     [eventBrochureDownloads],
   );
@@ -173,26 +278,32 @@ export function EventPreview({
       ? s1.event_banner_heading_accent.trim()
       : null;
 
-  const datesForSection =
-    s3?.dates?.map((date) => {
-      const ticketPrices = (date.tickets ?? [])
-        .map((t) => Number(t.price))
-        .filter((n) => !Number.isNaN(n) && n >= 0);
-      const tablePrices = (date.tables ?? [])
-        .map((t) => Number(t.price))
-        .filter((n) => !Number.isNaN(n) && n >= 0);
-      const allPrices = [...ticketPrices, ...tablePrices];
-      const price = allPrices.length > 0 ? Math.min(...allPrices) : 0;
-      return {
-        event_date: date.event_date,
-        price,
-      };
-    }) || [];
+  const datesForSection = useMemo(() => {
+    const dates = slices.roomMode
+      ? slices.dates
+      : data.stepThree?.dates;
+    return (
+      dates?.map((date) => {
+        const ticketPrices = (date.tickets ?? [])
+          .map((t) => Number(t.price))
+          .filter((n) => !Number.isNaN(n) && n >= 0);
+        const tablePrices = (date.tables ?? [])
+          .map((t) => Number(t.price))
+          .filter((n) => !Number.isNaN(n) && n >= 0);
+        const allPrices = [...ticketPrices, ...tablePrices];
+        const price = allPrices.length > 0 ? Math.min(...allPrices) : 0;
+        return {
+          event_date: date.event_date,
+          price,
+        };
+      }) ?? []
+    );
+  }, [slices.dates, slices.roomMode, data.stepThree?.dates]);
 
-  const menus = s4?.menus ?? [];
+  const menus = activeMenu?.menus ?? [];
   const showMenu = menus.length > 0;
 
-  const drinkPackages = (s5?.packages ?? []).map((p) => ({
+  const drinkPackages = (activeDrinks?.packages ?? []).map((p) => ({
     id: p.id,
     title: p.title,
     description: p.description,
@@ -205,64 +316,50 @@ export function EventPreview({
   const faqs = s7?.faqs ?? [];
   const showFaqs = faqs.length > 0;
 
-  const firstPkg = s5?.packages?.[0];
+  const firstPkg = activeDrinks?.packages?.[0];
   const brochureFallbackAmount =
     firstPkg != null
       ? typeof firstPkg.price === "number"
         ? firstPkg.price
         : parseFloat(String(firstPkg.price || 0)) || 45
       : 45;
-  // `price_start_from` is stored as a plain number string (e.g. "50") — always format with tenant currency like onboarding / live brochure.
-  const rawPriceFrom = s6?.price_start_from?.trim() ?? "";
-  const parsedFromField =
-    rawPriceFrom !== ""
-      ? parseFloat(rawPriceFrom.replace(/[^0-9.-]/g, ""))
-      : NaN;
-  const brochureAmount =
-    rawPriceFrom !== "" &&
-    Number.isFinite(parsedFromField) &&
-    parsedFromField >= 0
-      ? parsedFromField
-      : brochureFallbackAmount;
+  const brochureAmount = brochureFallbackAmount;
   const brochurePriceDescription = `${formatMoney(brochureAmount)} PP exc VAT`;
 
   const bannerImage = s1?.event_banner_image || "";
   const bannerVideo = s1?.event_banner_video || null;
 
-  const galleryImages =
-    s2?.gallery && s2.gallery.length > 0
-      ? s2.gallery.map((image) => {
-          if (typeof image === "string") {
-            return {
-              path: image,
-              relativePath: image,
-              preview: image,
-            };
-          }
-          if (image instanceof File) {
-            return {
-              path: image.name,
-              relativePath: image.name,
-              preview: URL.createObjectURL(image),
-            };
-          }
-          if (typeof image === "object" && image !== null && "url" in image) {
-            const galleryItem = image as { id: number; url: string };
-            return {
-              path: galleryItem.url,
-              relativePath: galleryItem.url,
-              preview: galleryItem.url,
-            };
-          }
-          const o = image as { path?: string; preview?: string };
-          const src = o.preview || o.path || "";
-          return { path: src, relativePath: src, preview: src };
-        })
-      : undefined;
+  const galleryImages = useMemo(() => {
+    const gallery = slices.roomMode
+      ? activePackage?.gallery
+      : s2?.gallery;
+    return mapGalleryForPreview(gallery);
+  }, [slices.roomMode, activePackage?.gallery, s2?.gallery]);
+
+  const timelineRows = useMemo(() => {
+    const rows = activePackage?.event_schedular ?? [];
+    return rows
+      .map((item) => ({
+        title: String(item.title ?? "").trim(),
+        time: String(item.time ?? "").trim(),
+      }))
+      .filter((item) => item.title || item.time);
+  }, [activePackage?.event_schedular]);
+
+  const showTimeline =
+    String(activePackage?.event_schedular_title ?? "").trim().length > 0 ||
+    timelineRows.length > 0;
+
+  const brochureAddress =
+    slices.eventAddress ||
+    activeBrochure?.event_address ||
+    data.stepSix?.event_address ||
+    "";
 
   return (
     <CartConflictProvider>
       <div
+        ref={previewContainerRef}
         className={`event-detail-page ${
           themeColors.background?.includes("linear-gradient")
             ? "bg-none"
@@ -300,8 +397,24 @@ export function EventPreview({
           previewBackButtonOffset={!embedInShell}
           className={embedInShell ? "px-3 sm:px-4 md:px-6" : ""}
           headerDownloads={headerDownloads}
+          scrollContainerRef={previewContainerRef}
         />
 
+        {showRoomSelector ? (
+          <VendorPreviewRoomSelector
+            rooms={slices.rooms}
+            currentRoomIndex={currentRoomIndex}
+            onRoomChange={setCurrentRoomIndex}
+            visible={roomSelectorScrollVisible}
+            layout="sticky"
+          />
+        ) : null}
+
+        <div
+          className={
+            roomSelectorVisible ? "-mt-12 transition-all duration-300" : ""
+          }
+        >
         <EventHeroBand
           title={heroTitle || eventName}
           subHeading={s1?.event_banner_sub_heading || null}
@@ -314,6 +427,7 @@ export function EventPreview({
           cacheBustImage
           imageAlt={eventName}
         />
+        </div>
 
         <AboutEventSec
           about_event_heading={s1?.about_event_heading || ""}
@@ -323,23 +437,29 @@ export function EventPreview({
           aboutHeadingAccentHint={heroAccentHint}
         />
 
-        <Timeline
-          eventSchedular={s1?.event_schedular || []}
-          eventSchedularTitle={s1?.event_schedular_title || ""}
-          eventSchedularBackgroundImage={
-            typeof s1?.event_schedular_background_image === "string"
-              ? s1.event_schedular_background_image
-              : undefined
-          }
-        />
+        {showTimeline ? (
+          <Timeline
+            eventSchedular={timelineRows}
+            eventSchedularTitle={activePackage?.event_schedular_title || ""}
+            eventSchedularCopy={activePackage?.event_schedule_subtitle || ""}
+            eventSchedularBackgroundImage={
+              typeof activePackage?.event_schedular_background_image ===
+              "string"
+                ? activePackage.event_schedular_background_image
+                : undefined
+            }
+          />
+        ) : null}
 
         <PackageSec
-          heading={s2?.package_title || ""}
-          subHeading={s2?.package_description || ""}
-          buttonName={s2?.package_button_name || "Book Now"}
-          buttonLink="#booking"
-          image={s2?.package_image || null}
-          packageDetails={s2?.package_details || []}
+          heading={activePackage?.package_title || ""}
+          subHeading={activePackage?.package_description || ""}
+          image={activePackage?.package_image || null}
+          packageDetails={(activePackage?.package_details ?? []).map(
+            (detail) => ({
+              title: String(detail.title ?? ""),
+            }),
+          )}
           headingEmphasis={headingEmphasisForHero}
         />
 
@@ -358,22 +478,22 @@ export function EventPreview({
 
         {showMenu && (
           <LazyMenuSection
-            menu_title={s4?.menu_title || ""}
-            menu_description={s4?.menu_description || ""}
+            menu_title={activeMenu?.menu_title || ""}
+            menu_description={activeMenu?.menu_description || ""}
             menus={menus}
             catering_option={1}
             menu_background_image={
-              typeof s4?.menu_background_image === "string"
-                ? s4.menu_background_image
-                : (s4?.menu_background_image ?? undefined)
+              typeof activeMenu?.menu_background_image === "string"
+                ? activeMenu.menu_background_image
+                : (activeMenu?.menu_background_image ?? undefined)
             }
           />
         )}
 
         {showDrinks && (
           <LazyDrinkSection
-            title={s5?.drink_title || ""}
-            description={s5?.drink_description || ""}
+            title={activeDrinks?.drink_title || ""}
+            description={activeDrinks?.drink_description || ""}
             packages={drinkPackages}
             eventSlug={eventSlug}
           />
@@ -384,7 +504,7 @@ export function EventPreview({
           location={{
             title: "EVENT LOCATION",
             description:
-              s6?.event_address || "Event location will be displayed here",
+              brochureAddress || "Event location will be displayed here",
             icon: "MapPin",
             latitude: data.lat ?? s8?.latitude ?? null,
             longitude: data.long ?? s8?.longitude ?? null,

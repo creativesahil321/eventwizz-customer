@@ -159,6 +159,7 @@ export function GuidedMultiSectionBottomActions({
   allSectionsApproved,
   onContinue,
   loading = false,
+  continueDisabled = false,
   labelWhenReady,
   extraActions,
   className,
@@ -167,6 +168,7 @@ export function GuidedMultiSectionBottomActions({
   allSectionsApproved: boolean;
   onContinue: () => void | Promise<void>;
   loading?: boolean;
+  continueDisabled?: boolean;
   labelWhenReady?: string;
   extraActions?: ReactNode;
   className?: string;
@@ -175,7 +177,7 @@ export function GuidedMultiSectionBottomActions({
   const busy = loading || approving;
 
   const handlePrimaryClick = async () => {
-    if (busy) return;
+    if (busy || continueDisabled) return;
     if (!allSectionsApproved) {
       setApproving(true);
       try {
@@ -210,7 +212,7 @@ export function GuidedMultiSectionBottomActions({
         <Button
           type="button"
           variant="event-primary"
-          disabled={busy}
+          disabled={busy || continueDisabled}
           className={guidedOnboardingSaveNextButtonClass}
           onClick={() => void handlePrimaryClick()}
         >

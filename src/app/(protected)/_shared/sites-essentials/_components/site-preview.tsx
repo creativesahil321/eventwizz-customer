@@ -9,7 +9,7 @@ import ExperienceSection from "@/app/(public)/vendor/_components/EventListPage/e
 import ContactFormSection from "@/app/(public)/vendor/_components/EventListPage/contact-form-section";
 import FooterSection from "@/app/(public)/vendor/_components/EventListPage/footer";
 import { LocationMarketingBody } from "@/components/public/location-marketing-sections";
-import { pickReadableForeground } from "@/lib/color-contrast";
+import { siteEssentialsToPreviewRootStyle } from "../_lib/preview-root-style";
 import { SiteEssentialsGoogleFontsLoader } from "@/components/shared/site-essentials-google-fonts-loader";
 // ServerContext removed - already provided at layout level
 
@@ -18,36 +18,7 @@ interface SitePreviewProps {
 }
 
 export function SitePreview({ formValues }: Readonly<SitePreviewProps>) {
-  const primary = formValues.colors?.primary || "#0F172A";
-  const secondary = formValues.colors?.secondary || "#64748B";
-  const header = formValues.colors?.header || "#FFFFFF";
-  const footer = formValues.colors?.footer || "#0F172A";
-  const background = formValues.colors?.background || "#F8FAFC";
-  const surface = formValues.colors?.surface || "#FFFFFF";
-  const text = formValues.colors?.text || "#0F172A";
-  const textDimmed = formValues.colors?.textDimmed || "#64748B";
-
-  // Apply the site theme to the preview content
-  const previewStyles = {
-    "--color-primary": primary,
-    "--color-secondary": secondary,
-    "--color-header": header,
-    "--color-footer": footer,
-    "--color-background": background,
-    "--color-text": text,
-    "--color-text-dimmed": textDimmed,
-    "--color-surface": surface,
-    "--color-primary-foreground": pickReadableForeground(primary),
-    "--color-secondary-foreground": pickReadableForeground(secondary),
-    "--color-on-header": pickReadableForeground(header),
-    "--color-on-footer": pickReadableForeground(footer),
-    "--color-on-surface": pickReadableForeground(surface),
-    "--color-on-background": pickReadableForeground(background),
-    "--font-heading":
-      formValues.typography?.fontFamily?.heading || "'Inter', sans-serif",
-    "--font-body":
-      formValues.typography?.fontFamily?.body || "'Inter', sans-serif",
-  } as React.CSSProperties;
+  const previewStyles = siteEssentialsToPreviewRootStyle(formValues);
 
   // Helper function to convert File objects to blob URLs for preview
   const getPreviewUrl = (
@@ -77,14 +48,7 @@ export function SitePreview({ formValues }: Readonly<SitePreviewProps>) {
 
   return (
     <div
-      style={{
-        ...previewStyles,
-        // Must set font-family here (not only --font-body): descendants inherit
-        // computed font from this subtree. Otherwise plain <p> text walks up past
-        // this div and uses <body>'s global theme font while SiteHeading still
-        // updates via inline var(--font-heading).
-        fontFamily: "var(--font-body)",
-      }}
+      style={previewStyles}
       className="text-[color:var(--color-text)] font-body"
     >
       <SiteEssentialsGoogleFontsLoader

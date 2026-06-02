@@ -25,7 +25,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Eye } from "lucide-react";
 import { env } from "@/env";
 import GoogleLocationSearch from "@/app/(on-boarding)/on-boarding/_components/steps/step-11/google-location-search";
 import { fetchLocationDetails } from "@/app/(on-boarding)/on-boarding/_components/steps/step-11/_lib/actions";
@@ -48,7 +47,7 @@ export default function PublishTab() {
   const router = useRouter();
   const {
     form: globalForm,
-    save,
+    advanceStep,
     setActiveField,
     readOnly,
   } = useEventFormContext();
@@ -108,7 +107,7 @@ export default function PublishTab() {
   const eventId = Array.isArray(params?.eventID)
     ? params?.eventID[0]
     : params?.eventID;
-  const { invalidateCache, eventData } = useEventData(eventId);
+  const { invalidateCache, eventData } = useEventData(eventId, false);
 
   // Handle form submission
   const handleSubmit = useCallback(
@@ -172,7 +171,7 @@ export default function PublishTab() {
 
         if (response && response.status) {
           // Success message is handled by axios interceptor
-          await save();
+          await advanceStep(8);
           await invalidateCache?.();
           router.push("/vendor/events");
         } else {
@@ -190,7 +189,7 @@ export default function PublishTab() {
         setIsLoading(false);
       }
     },
-    [form, globalForm, save, setActiveField, invalidateCache, router],
+    [form, globalForm, advanceStep, setActiveField, invalidateCache, router],
   );
 
   // Check if event is cancelled
@@ -201,18 +200,6 @@ export default function PublishTab() {
     typeof eventData.data.status === "string"
       ? (eventData.data as { status: string }).status === "cancelled"
       : false;
-
-  const handlePreviewClick = useCallback(async () => {
-    try {
-      await invalidateCache?.();
-    } catch {
-      // ignore
-    }
-    if (eventId) {
-      // Redirect to the dedicated preview page with the event ID as a query parameter
-      router.push(`/preview/event?id=${eventId}`);
-    }
-  }, [invalidateCache, router, eventId]);
 
   return (
     <div className="space-y-8">
@@ -491,14 +478,6 @@ export default function PublishTab() {
             )}
 
             <div className="flex justify-end gap-4 pt-4">
-              <Button
-                type="button"
-                variant="event-outline"
-                onClick={handlePreviewClick}
-              >
-                <Eye />
-                Preview
-              </Button>
               <Button
                 type="submit"
                 disabled={isLoading || isEventCancelled || readOnly}

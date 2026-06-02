@@ -1,6 +1,12 @@
 "use client";
 
-import React, { useEffect, useRef, useState, useCallback } from "react";
+import React, {
+  useEffect,
+  useRef,
+  useState,
+  useCallback,
+  useMemo,
+} from "react";
 import { useForm, useFieldArray, type Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -22,6 +28,7 @@ import { env } from "@/env";
 import type { AIOnboardingInput } from "@/app/api/ai/generate-onboarding/route";
 import { useEventCategories } from "@/services/vendor/events/query";
 import { useCurrencySymbol } from "@/hooks/use-currency-format";
+import { useBrandNameAvailability } from "@/hooks/use-brand-name-availability";
 
 const themeAccent = {
   badge: {
@@ -481,26 +488,66 @@ export default function AICollectInfo({
     setIsPlaceSelected(false);
   };
 
+  const venueNameValue = form.watch("venueName");
+  const isBrandMode = form.watch("has_multiple_locations") === true;
+  const {
+    status: brandNameCheckStatus,
+    message: brandNameCheckMessage,
+    isChecking: brandNameChecking,
+    isTaken: brandNameTaken,
+  } = useBrandNameAvailability(venueNameValue ?? "", {
+    takenFallback: isBrandMode
+      ? "This brand name is already in use"
+      : "This venue name is already in use",
+  });
+
   const handleFormSubmit = (data: CollectInfoForm) => {
+    if (brandNameTaken || brandNameChecking) return;
     const { selectedPlaceId: _, ...rest } = data;
     const categoryId = data.venueType ? Number(data.venueType) : undefined;
     const category = eventCategories.find((c) => c.id === categoryId);
+    const normalizedRoomNames = data.room_names
+      .map((r) => r.name.trim())
+      .filter((n) => n.length > 0)
+      .slice(0, 3);
+    const hasValidRoomSystem =
+      data.has_room_system === true && normalizedRoomNames.length >= 2;
     const payload: AIOnboardingInput = {
       ...rest,
       venueType: category?.name ?? data.venueType,
       event_category_id: categoryId,
       has_multiple_locations: data.has_multiple_locations,
-      has_room_system: data.has_room_system,
-      room_names: data.room_names
-        .map((r) => r.name.trim())
-        .filter((n) => n.length > 0)
-        .slice(0, 3),
+      has_room_system: hasValidRoomSystem,
+      room_names: hasValidRoomSystem ? normalizedRoomNames : [],
     };
     onSubmit(payload);
   };
 
-  const isBrandMode = form.watch("has_multiple_locations") === true;
   const hasRoomSystem = form.watch("has_room_system");
+  const roomNameFields = form.watch("room_names");
+
+  const descriptionPlaceholder = useMemo(() => {
+    if (hasRoomSystem !== true) {
+      return `e.g. "Tickets ${currencySymbol}50 and VIP ${currencySymbol}120, tables for 6–10 at ${currencySymbol}150, deposit 25% due 2 weeks before event. Soft drinks package ${currencySymbol}50…"`;
+    }
+
+    const namedRooms = (roomNameFields ?? [])
+      .map((entry) => String(entry?.name ?? "").trim())
+      .filter((name) => name.length > 0);
+
+    if (namedRooms.length >= 2) {
+      const [first, second] = namedRooms;
+      return `e.g. "${first} tickets ${currencySymbol}25, ${second} tables ${currencySymbol}150 with 25% deposit due 2 weeks before, same date July 21 for both spaces. Soft drinks ${currencySymbol}50…"`;
+    }
+
+    if (namedRooms.length === 1) {
+      const first = namedRooms[0];
+      return `e.g. "${first} tickets ${currencySymbol}25, other space tables ${currencySymbol}150 with deposit, same date for all spaces. Soft drinks ${currencySymbol}50…"`;
+    }
+
+    return `e.g. "Main Hall tickets ${currencySymbol}25, Garden tables ${currencySymbol}150 with 25% deposit due 2 weeks before, same date July 21 for both spaces. Soft drinks ${currencySymbol}50…"`;
+  }, [currencySymbol, hasRoomSystem, roomNameFields]);
+
   const setRoomSystem = (value: boolean) => {
     form.setValue("has_room_system", value, { shouldValidate: true });
     const current = form.getValues("room_names");
@@ -693,6 +740,26 @@ export default function AICollectInfo({
                   </p>
                 </>
               )}
+              {brandNameChecking ? (
+                <p className="text-xs text-slate-500 mt-1.5">
+                  Checking name availability…
+                </p>
+              ) : null}
+              {brandNameCheckStatus === "available" &&
+              (venueNameValue?.trim().length ?? 0) >= 2 ? (
+                <p className="text-xs text-emerald-400/90 mt-1.5">
+                  {isBrandMode
+                    ? "This brand name is available."
+                    : "This venue name is available."}
+                </p>
+              ) : null}
+              {brandNameCheckStatus === "taken" &&
+              (venueNameValue?.trim().length ?? 0) >= 2 &&
+              brandNameCheckMessage ? (
+                <p className="text-xs text-red-400/90 mt-1.5">
+                  {brandNameCheckMessage}
+                </p>
+              ) : null}
               {form.formState.errors.venueName && (
                 <p className="text-red-400 text-xs mt-1.5">
                   {form.formState.errors.venueName.message}
@@ -1025,14 +1092,26 @@ export default function AICollectInfo({
               </label>
 
               <p className="text-slate-500 text-xs mb-2.5 leading-relaxed">
-                The more detail you give, the better AI generates your site.
-                Include ticket types, table configurations, pricing, food
-                preferences, guest count, etc.
+                Write anything — casual notes are fine. Mention tickets, tables,
+                prices, deposit vs full payment, and food/drinks if you have them.
+                {hasRoomSystem === true ? (
+                  <>
+                    {" "}
+                    Because you enabled multiple event spaces, you can also say
+                    which space gets which dates, tickets, or tables (e.g.
+                    &quot;same dates for every space&quot; or different setups per
+                    space).
+                  </>
+                ) : null}{" "}
+                We&apos;ll use your notes to pre-fill tickets, tables, pricing,
+                and other details. You can review and adjust everything before
+                you publish—and if anything is missing, you can complete or
+                change it manually in the onboarding steps at any time.
               </p>
 
               <textarea
                 {...form.register("description")}
-                placeholder={`Example: "We host premium wedding events for 200+ guests. We offer 2 ticket types: General (${currencySymbol}50) and VIP (${currencySymbol}120, includes dinner). We have 50 tables…"`}
+                placeholder={descriptionPlaceholder}
                 rows={5}
                 maxLength={800}
                 className={`${INPUT_CLASS} resize-none`}
@@ -1057,7 +1136,7 @@ export default function AICollectInfo({
 
               <button
                 type="submit"
-                disabled={isLoading}
+                disabled={isLoading || brandNameChecking || brandNameTaken}
                 className="flex items-center gap-2 px-8 py-3 rounded-full text-white text-sm font-semibold shadow-lg disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300"
                 style={themeAccent.button}
               >

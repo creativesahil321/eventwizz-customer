@@ -1,3 +1,7 @@
+import {
+  createDefaultMenuItemRow,
+  createDefaultPackageDetailRow,
+} from "@/lib/event-form-limits";
 import { OnboardingFormData } from "./schema";
 
 export const defaultValues: OnboardingFormData = {
@@ -54,14 +58,10 @@ export const defaultValues: OnboardingFormData = {
     package_title: "",
     package_description: "",
     package_button_name: "",
-    package_details: [
-      {
-        title: "",
-      },
-    ],
+    package_details: [createDefaultPackageDetailRow(0)],
     event_schedular_title: "",
     event_schedule_subtitle: "",
-    event_schedular: [],
+    event_schedular: [{ title: "", time: "" }],
   },
   stepFive: {
     isApproved: false,
@@ -96,12 +96,7 @@ export const defaultValues: OnboardingFormData = {
     menus: [
       {
         name: "",
-        items: [
-          {
-            title: "",
-            description: "",
-          },
-        ],
+        items: [createDefaultMenuItemRow(0)],
       },
     ],
   },

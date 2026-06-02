@@ -226,12 +226,12 @@ export default function MenuCategoryDropdown({
               Add New
             </Button>
           </DialogTrigger>
-          <DialogContent>
+          <DialogContent className="text-black">
             <DialogHeader>
               <DialogTitle className="text-2xl text-black">
                 Create New Menu Category
               </DialogTitle>
-              <DialogDescription>
+              <DialogDescription className="text-muted-foreground">
                 Add a new menu category that will be available for selection.
               </DialogDescription>
             </DialogHeader>
@@ -253,7 +253,9 @@ export default function MenuCategoryDropdown({
                     const currentLength = field.value?.length || 0;
                     return (
                       <FormItem>
-                        <FormLabel>Category Name</FormLabel>
+                        <FormLabel className="text-black">
+                          Category Name
+                        </FormLabel>
                         <FormControl>
                           <Input
                             placeholder="Enter menu category name"

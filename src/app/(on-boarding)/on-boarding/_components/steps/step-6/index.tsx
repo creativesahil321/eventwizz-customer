@@ -1,6 +1,12 @@
 "use client";
 
-import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
+import React, {
+  useState,
+  useEffect,
+  useMemo,
+  useCallback,
+  useRef,
+} from "react";
 import { useForm, useFieldArray, Controller, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { CardContent, CardHeader, OnboardingCard } from "@/components/ui/card";
@@ -45,7 +51,12 @@ import {
 } from "@/services/vendor/events/query";
 import { useQueryClient } from "@tanstack/react-query";
 import { EventMenuCategory } from "@/services/vendor/events/type";
-import { RICH_DESCRIPTION_MAX_CHARS } from "@/lib/event-form-limits";
+import {
+  createDefaultMenuItemRow,
+  menuItemTitleLabel,
+  menuItemTitlePlaceholder,
+  RICH_DESCRIPTION_MAX_CHARS,
+} from "@/lib/event-form-limits";
 
 // Define a type for the menu structure based on the schema
 type MenuType = {
@@ -109,11 +120,14 @@ export default function StepSix() {
     return Number.isFinite(id) && id > 0 ? id : undefined;
   }, [roomScope.isMultiRoom, rooms, currentRoomIndex]);
 
+  const eventId = useEventId(globalForm, "stepSix");
+
   // Fetch menu categories from API (scoped by room when multi-room is on)
   const { data: menuCategoriesResponse, isLoading: isMenuCategoriesLoading } =
     useEventMenuCategories({
+      eventId,
       roomId: activeRoomId,
-      enabled: true,
+      enabled: eventId > 0,
     });
 
   // Extract menu categories from response
@@ -125,9 +139,7 @@ export default function StepSix() {
   // Update local state when API data changes (per-room list when multi-room is on)
   useEffect(() => {
     if (eventMenuCategories.length > 0) {
-      setLocalMenuCategories(
-        dedupeMenuCategoriesById(eventMenuCategories),
-      );
+      setLocalMenuCategories(dedupeMenuCategoriesById(eventMenuCategories));
       return;
     }
     if (roomScope.isMultiRoom) {
@@ -136,23 +148,17 @@ export default function StepSix() {
   }, [eventMenuCategories, roomScope.isMultiRoom, activeRoomId]);
 
   const initialEventId = useEventId(globalForm, "stepSix");
+  const activeScopedCatering = roomScope.isMultiRoom
+    ? rooms[currentRoomIndex]?.catering
+    : globalForm.getValues("stepSix");
 
-  // Menus are shared across all rooms — resolve from stepSix first, then any room slot.
+  // Resolve menus from the currently active scope only (single-room or active room).
   const filteredMenus = useMemo(() => {
-    let existingMenus = globalForm.getValues("stepSix.menus") || [];
-    if (
-      (!Array.isArray(existingMenus) || existingMenus.length === 0) &&
-      roomScope.isMultiRoom
-    ) {
-      const allRooms = globalForm.getValues("multiSpace")?.rooms ?? [];
-      for (const room of allRooms) {
-        const roomMenus = room.catering?.menus;
-        if (Array.isArray(roomMenus) && roomMenus.length > 0) {
-          existingMenus = roomMenus;
-          break;
-        }
-      }
-    }
+    const existingMenus = roomScope.isMultiRoom
+      ? Array.isArray(activeScopedCatering?.menus)
+        ? activeScopedCatering.menus
+        : []
+      : globalForm.getValues("stepSix.menus") || [];
 
     // Only use existing menus if they exist
     return existingMenus.length > 0
@@ -160,13 +166,14 @@ export default function StepSix() {
           .map((menu) => ({
             ...menu,
             items: menu.items.filter(
-              (item) =>
-                item.title.trim() !== "" || item.description?.trim() !== "",
+              (item: { title?: string; description?: string }) =>
+                String(item.title || "").trim() !== "" ||
+                String(item.description || "").trim() !== "",
             ),
           }))
           .filter((menu) => menu.name.trim() !== "" && menu.items.length > 0)
       : [];
-  }, [globalForm, roomScope.isMultiRoom]);
+  }, [activeScopedCatering?.menus, globalForm, roomScope.isMultiRoom]);
 
   const form = useForm<StepSixType>({
     resolver: zodResolver(stepSixSchema),
@@ -186,9 +193,6 @@ export default function StepSix() {
   });
 
   const currentEventId = useEventId(globalForm, "stepSix");
-  const activeScopedCatering = roomScope.isMultiRoom
-    ? rooms[currentRoomIndex]?.catering
-    : globalForm.getValues("stepSix");
 
   // Get current event_id from form (most up-to-date) or globalForm or session
   const getCurrentEventId = useCallback((): number => {
@@ -217,65 +221,6 @@ export default function StepSix() {
     });
   }, [activeScopedCatering]);
 
-  const getSharedMenus = useCallback((): MenuType[] => {
-    const fromStepSix = globalForm.getValues("stepSix.menus");
-    if (Array.isArray(fromStepSix) && fromStepSix.length > 0) {
-      return fromStepSix as MenuType[];
-    }
-    if (roomScope.isMultiRoom) {
-      for (const room of rooms) {
-        const roomMenus = room.catering?.menus;
-        if (Array.isArray(roomMenus) && roomMenus.length > 0) {
-          return roomMenus as MenuType[];
-        }
-      }
-    }
-    return [];
-  }, [globalForm, roomScope.isMultiRoom, rooms]);
-
-  const getSharedMenuCategoryId = useCallback((): number | undefined => {
-    const fromStepSix = globalForm.getValues("stepSix.event_menu_category_id");
-    if (typeof fromStepSix === "number" && fromStepSix > 0) return fromStepSix;
-    if (roomScope.isMultiRoom) {
-      for (const room of rooms) {
-        const id = room.catering?.event_menu_category_id;
-        if (typeof id === "number" && id > 0) return id;
-      }
-    }
-    return undefined;
-  }, [globalForm, roomScope.isMultiRoom, rooms]);
-
-  /** Menus + category are event-wide — mirror to stepSix and every room slot. */
-  const syncSharedMenusToAllRooms = useCallback(
-    (menus: MenuType[], categoryId?: number) => {
-      globalForm.setValue("stepSix.menus", menus, {
-        shouldValidate: false,
-        shouldDirty: true,
-      });
-      if (categoryId !== undefined && categoryId > 0) {
-        globalForm.setValue("stepSix.event_menu_category_id", categoryId, {
-          shouldValidate: false,
-          shouldDirty: true,
-        });
-      }
-      if (!roomScope.isMultiRoom) return;
-      const multiSpace = globalForm.getValues("multiSpace");
-      if (!multiSpace?.rooms?.length) return;
-      const updatedRooms = multiSpace.rooms.map((room) => ({
-        ...room,
-        catering: {
-          ...room.catering,
-          menus,
-          ...(categoryId !== undefined && categoryId > 0
-            ? { event_menu_category_id: categoryId }
-            : {}),
-        },
-      }));
-      globalForm.setValue("multiSpace", { ...multiSpace, rooms: updatedRooms });
-    },
-    [globalForm, roomScope.isMultiRoom],
-  );
-
   // Persist outgoing room draft before switching tabs, then rehydrate the incoming room.
   // Runs on `currentRoomIndex` change so it always fires on tab switch — no object-ref issues.
   useEffect(() => {
@@ -286,10 +231,7 @@ export default function StepSix() {
 
     isRoomSwitchHydratingRef.current = true;
 
-    const sharedMenus = getSharedMenus();
-    const sharedCategoryId = getSharedMenuCategoryId();
-
-    // 1. Save the outgoing room's room-specific fields (menus stay shared).
+    // 1. Save the outgoing room's room-specific fields.
     const previousRoomIndex = previousRoomIndexRef.current;
     if (
       previousRoomIndex !== currentRoomIndex &&
@@ -305,15 +247,18 @@ export default function StepSix() {
           catering_option: normalizeCateringOption(outgoing.catering_option),
           menu_title: outgoing.menu_title ?? "",
           menu_description: outgoing.menu_description ?? "",
-          menus: sharedMenus,
-          event_menu_category_id: sharedCategoryId,
+          menus: (outgoing.menus as MenuType[]) ?? [],
+          event_menu_category_id:
+            typeof outgoing.event_menu_category_id === "number"
+              ? outgoing.event_menu_category_id
+              : undefined,
         },
         { shouldValidate: false, shouldDirty: true },
       );
     }
     previousRoomIndexRef.current = currentRoomIndex;
 
-    // 2. Force-reset local form: per-room copy + shared menus/category.
+    // 2. Force-reset local form with the incoming room's own catering data.
     const scoped = rooms[currentRoomIndex]?.catering ?? {};
     form.reset({
       step: 6,
@@ -321,8 +266,14 @@ export default function StepSix() {
       catering_option: normalizeCateringOption(scoped.catering_option),
       menu_title: scoped.menu_title ?? "",
       menu_description: scoped.menu_description ?? "",
-      event_menu_category_id: sharedCategoryId,
-      menus: sharedMenus.length > 0 ? sharedMenus : emptyMenus,
+      event_menu_category_id:
+        typeof scoped.event_menu_category_id === "number"
+          ? scoped.event_menu_category_id
+          : undefined,
+      menus:
+        Array.isArray(scoped.menus) && scoped.menus.length > 0
+          ? (scoped.menus as MenuType[])
+          : emptyMenus,
     });
 
     isRoomSwitchHydratingRef.current = false;
@@ -331,19 +282,6 @@ export default function StepSix() {
 
   const setScopedCateringField = useCallback(
     (field: keyof StepSixType | "menus", value: unknown) => {
-      if (field === "menus" || field === "event_menu_category_id") {
-        const menus =
-          field === "menus"
-            ? (value as MenuType[])
-            : getSharedMenus();
-        const categoryId =
-          field === "event_menu_category_id"
-            ? (value as number | undefined)
-            : getSharedMenuCategoryId();
-        syncSharedMenusToAllRooms(menus, categoryId);
-        return;
-      }
-
       if (roomScope.isMultiRoom) {
         globalForm.setValue(
           `multiSpace.rooms.${currentRoomIndex}.catering.${field}` as never,
@@ -356,9 +294,6 @@ export default function StepSix() {
       globalForm,
       roomScope.isMultiRoom,
       currentRoomIndex,
-      getSharedMenus,
-      getSharedMenuCategoryId,
-      syncSharedMenusToAllRooms,
     ],
   );
 
@@ -366,7 +301,9 @@ export default function StepSix() {
     form.setValue("menu_title", "", { shouldValidate: false });
     form.setValue("menu_description", "", { shouldValidate: false });
     form.setValue("menus", [], { shouldValidate: false });
-    form.setValue("event_menu_category_id", undefined, { shouldValidate: false });
+    form.setValue("event_menu_category_id", undefined, {
+      shouldValidate: false,
+    });
     setScopedCateringField("menu_title", "");
     setScopedCateringField("menu_description", "");
     setScopedCateringField("menus", []);
@@ -415,7 +352,9 @@ export default function StepSix() {
       if (
         selectedCategory &&
         String(selectedCategory.name).trim().toLowerCase() ===
-          String(removedMenu.name ?? "").trim().toLowerCase()
+          String(removedMenu.name ?? "")
+            .trim()
+            .toLowerCase()
       ) {
         form.setValue("event_menu_category_id", undefined, {
           shouldValidate: false,
@@ -434,7 +373,10 @@ export default function StepSix() {
       return;
     }
 
-    const newItems = [...currentItems, { title: "", description: "" }];
+    const newItems = [
+      ...currentItems,
+      createDefaultMenuItemRow(currentItems.length),
+    ];
 
     form.setValue(`menus.${menuIndex}.items`, newItems);
 
@@ -476,7 +418,10 @@ export default function StepSix() {
     const normalizedCategoryName = categoryName.trim().toLowerCase();
     const currentMenus = form.getValues("menus") || [];
     const alreadyExists = currentMenus.some(
-      (menu) => String(menu?.name ?? "").trim().toLowerCase() === normalizedCategoryName,
+      (menu) =>
+        String(menu?.name ?? "")
+          .trim()
+          .toLowerCase() === normalizedCategoryName,
     );
     if (alreadyExists) {
       return null;
@@ -491,7 +436,7 @@ export default function StepSix() {
     // Create a new menu entry for this category
     const newMenu = {
       name: categoryName,
-      items: [{ title: "", description: "" }],
+      items: [createDefaultMenuItemRow(0)],
     };
 
     // Add to local form
@@ -554,16 +499,18 @@ export default function StepSix() {
 
     // Keep TanStack Query cache in sync for this room (fixes stale list after tab switch)
     queryClient.setQueryData<NormalizedMenuCategoryResponse>(
-      eventKeys.menuCategories(activeRoomId),
+      eventKeys.menuCategories(eventId, activeRoomId),
       (previous) => {
         const existing = previous?.data ?? [];
         if (existing.some((cat) => Number(cat.id) === Number(category.id))) {
-          return previous ?? {
-            status: true,
-            message: "Success",
-            data: existing,
-            errors: [],
-          };
+          return (
+            previous ?? {
+              status: true,
+              message: "Success",
+              data: existing,
+              errors: [],
+            }
+          );
         }
         return {
           status: true,
@@ -586,8 +533,9 @@ export default function StepSix() {
 
     const existingMenuIndex = (form.getValues("menus") || []).findIndex(
       (menu) =>
-        String(menu?.name ?? "").trim().toLowerCase() ===
-        newCategory.name.trim().toLowerCase(),
+        String(menu?.name ?? "")
+          .trim()
+          .toLowerCase() === newCategory.name.trim().toLowerCase(),
     );
 
     if (existingMenuIndex === -1) {
@@ -595,10 +543,7 @@ export default function StepSix() {
     }
   };
 
-  const onSubmit = async (
-    data: StepSixType,
-    applyToAllRooms = false,
-  ) => {
+  const onSubmit = async (data: StepSixType, applyToAllRooms = false) => {
     setLoading(true);
     try {
       // Validate the form
@@ -644,14 +589,6 @@ export default function StepSix() {
 
         setLoading(false);
         return;
-      }
-
-      // Menus/categories are event-wide — keep every room slot in sync before save.
-      if (data.catering_option === 1) {
-        syncSharedMenusToAllRooms(
-          (data.menus as MenuType[]) || [],
-          data.event_menu_category_id,
-        );
       }
 
       // Update global form with step 6 data
@@ -733,12 +670,11 @@ export default function StepSix() {
       clearActiveField();
       setActiveStep(7);
 
-      Promise.all([
-        save(),
-        updateSession({ on_boarding_step: 7 }),
-      ]).catch((error) => {
-        console.error("Background save error:", error);
-      });
+      Promise.all([save(), updateSession({ on_boarding_step: 7 })]).catch(
+        (error) => {
+          console.error("Background save error:", error);
+        },
+      );
     } catch (error) {
       console.error("Error during form submission:", error);
     } finally {
@@ -787,7 +723,9 @@ export default function StepSix() {
                           ? "Apply to this room only"
                           : "Save & continue"
                       }
-                      onContinue={() => void form.handleSubmit(onSubmit)()}
+                      onContinue={() =>
+                        void form.handleSubmit((data) => onSubmit(data, false))()
+                      }
                       extraActions={
                         roomScope.isMultiRoom &&
                         isRoomSectionComplete(
@@ -1127,13 +1065,16 @@ export default function StepSix() {
                                                 return (
                                                   <FormItem className="flex-1">
                                                     <FormLabel className="text-sm font-medium">
-                                                      Item Title{" "}
-                                                      {itemIndex + 1}
+                                                      {menuItemTitleLabel(
+                                                        itemIndex,
+                                                      )}
                                                     </FormLabel>
                                                     <FormControl>
                                                       <Input
                                                         {...field}
-                                                        placeholder="e.g., Chicken Curry"
+                                                        placeholder={menuItemTitlePlaceholder(
+                                                          itemIndex,
+                                                        )}
                                                         className="h-10 bg-white/5 border-white/10"
                                                         maxLength={maxLength}
                                                         onChange={(e) => {

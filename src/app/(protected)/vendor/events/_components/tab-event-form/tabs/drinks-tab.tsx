@@ -1,12 +1,28 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useForm, useFieldArray, Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { eventsService } from "@/services/vendor/events/events.service";
+import {
+  eventsService,
+  type StepSixSavePayload,
+} from "@/services/vendor/events/events.service";
+import {
+  capEventRoomList,
+  normalizeVendorStepTwoRooms,
+} from "@/lib/event-form-limits";
+import {
+  cloneVendorStepSixRoomDrinks,
+  findStepSixDrinksForRoom,
+  isVendorRoomDrinksStepComplete,
+  normalizeVendorStepSixRooms,
+  roomEntryToStepSixFields,
+  stepSixFieldsToRoomEntry,
+  syncStepSixRoomsFromStepTwo,
+} from "@/app/(protected)/vendor/events/_lib/vendor-step-six-rooms";
 import { Button } from "@/components/ui/button";
 import { Form } from "@/components/ui/form";
-import { StepFiveType, stepFiveSchema } from "../schema";
+import { StepSixType, stepSixSchema } from "../schema";
 import { useEventFormContext } from "../../events-form-provider";
 import { toast } from "sonner";
 import {
@@ -33,7 +49,12 @@ import {
 export default function DrinksTab() {
   const currencySymbol = useCurrencySymbol();
   const [isLoading, setIsLoading] = useState(false);
-  const { form: globalForm, save, setActiveField, readOnly } = useEventFormContext();
+  const {
+    form: globalForm,
+    advanceStep,
+    setActiveField,
+    readOnly,
+  } = useEventFormContext();
 
   // Get event_id from global form
   const getEventId = (): number => {
@@ -43,21 +64,70 @@ export default function DrinksTab() {
       : 0;
   };
 
-  // Create local form instance
-  const form = useForm<StepFiveType>({
-    resolver: zodResolver(stepFiveSchema) as Resolver<StepFiveType>,
+  const isRoomsEnabled = globalForm.watch("stepTwo.is_rooms") === 1;
+  const activeRoomIndex = globalForm.watch("stepTwo.active_room_index") ?? 0;
+  const stepTwoRooms = capEventRoomList(
+    normalizeVendorStepTwoRooms(globalForm.getValues().stepTwo?.rooms),
+  );
+  const resolvedRoomIndex =
+    stepTwoRooms.length > 0
+      ? Math.min(
+          Math.max(activeRoomIndex, 0),
+          Math.max(stepTwoRooms.length - 1, 0),
+        )
+      : 0;
+  const previousRoomIndexRef = useRef<number | null>(null);
+  const lastHydratedRoomIndexRef = useRef<number | null>(null);
+
+  const resolveInitialDrinkFields = () => {
+    const defaults = globalForm.getValues().stepSix;
+    if (isRoomsEnabled && Number(stepTwoRooms[resolvedRoomIndex]?.room_id) > 0) {
+      const syncedRooms = syncStepSixRoomsFromStepTwo(
+        stepTwoRooms,
+        normalizeVendorStepSixRooms(defaults?.rooms),
+      );
+      const incoming = findStepSixDrinksForRoom(
+        syncedRooms,
+        Number(stepTwoRooms[resolvedRoomIndex]?.room_id),
+      );
+      return {
+        ...roomEntryToStepSixFields(incoming),
+        rooms: syncedRooms,
+      };
+    }
+    return {
+      drink_title: defaults?.drink_title || "",
+      drink_description: defaults?.drink_description || "",
+      packages:
+        (defaults?.packages || []).length > 0
+          ? defaults?.packages
+          : [
+              {
+                title: "Premium Package",
+                description: "This is a premium service package",
+                price: 20,
+                available_quantity: 100,
+              },
+            ],
+    };
+  };
+
+  const initialDrinks = resolveInitialDrinkFields();
+
+  const form = useForm<StepSixType>({
+    resolver: zodResolver(stepSixSchema) as Resolver<StepSixType>,
     mode: "onChange",
     reValidateMode: "onChange",
     defaultValues: {
-      step: 5,
+      step: 6,
       event_id: getEventId() || 0,
-      drink_title: globalForm.getValues().stepFive?.drink_title || "",
-      drink_description:
-        globalForm.getValues().stepFive?.drink_description || "",
-      // Ensure at least one default package renders when API/global returns an empty array
+      is_rooms: isRoomsEnabled ? 1 : 0,
+      rooms: "rooms" in initialDrinks ? initialDrinks.rooms : undefined,
+      drink_title: initialDrinks.drink_title || "",
+      drink_description: initialDrinks.drink_description || "",
       packages:
-        (globalForm.getValues().stepFive?.packages || []).length > 0
-          ? globalForm.getValues().stepFive?.packages.map((pkg) => ({
+        (initialDrinks.packages || []).length > 0
+          ? initialDrinks.packages!.map((pkg) => ({
               ...pkg,
               available_quantity:
                 typeof pkg.available_quantity === "number"
@@ -75,7 +145,7 @@ export default function DrinksTab() {
     },
   });
 
-  const { control } = form;
+  const { control, getValues, reset } = form;
 
   // Setup field array for packages
   const {
@@ -92,42 +162,114 @@ export default function DrinksTab() {
     (fieldName: string) => {
       setActiveField?.(fieldName);
     },
-    [setActiveField]
+    [setActiveField],
   );
 
-  // Sync local form with global form
+  const persistActiveRoomDrinksToGlobal = useCallback(
+    (roomIndex: number, data: StepSixType) => {
+      if (!isRoomsEnabled || stepTwoRooms.length === 0) return;
+      const existing = syncStepSixRoomsFromStepTwo(
+        stepTwoRooms,
+        normalizeVendorStepSixRooms(globalForm.getValues().stepSix?.rooms),
+      );
+      const roomId = Number(stepTwoRooms[roomIndex]?.room_id);
+      if (!roomId) return;
+      const snapshot = stepSixFieldsToRoomEntry(roomId, data);
+      const nextRooms = existing.map((entry) =>
+        entry.room_id === roomId ? snapshot : entry,
+      );
+      globalForm.setValue("stepSix.rooms", nextRooms as StepSixType["rooms"], {
+        shouldDirty: true,
+        shouldValidate: false,
+      });
+    },
+    [globalForm, isRoomsEnabled, stepTwoRooms],
+  );
+
   useEffect(() => {
+    if (!isRoomsEnabled || stepTwoRooms.length === 0) {
+      previousRoomIndexRef.current = null;
+      lastHydratedRoomIndexRef.current = null;
+      return;
+    }
+
+    const prevIndex = previousRoomIndexRef.current;
+    if (
+      prevIndex !== null &&
+      prevIndex >= 0 &&
+      prevIndex < stepTwoRooms.length &&
+      prevIndex !== resolvedRoomIndex
+    ) {
+      persistActiveRoomDrinksToGlobal(prevIndex, getValues());
+    }
+
+    const shouldHydrate =
+      lastHydratedRoomIndexRef.current === null ||
+      lastHydratedRoomIndexRef.current !== resolvedRoomIndex;
+
+    if (shouldHydrate) {
+      const syncedRooms = syncStepSixRoomsFromStepTwo(
+        stepTwoRooms,
+        normalizeVendorStepSixRooms(globalForm.getValues().stepSix?.rooms),
+      );
+      const incoming = findStepSixDrinksForRoom(
+        syncedRooms,
+        Number(stepTwoRooms[resolvedRoomIndex]?.room_id),
+      );
+      const fields = roomEntryToStepSixFields(incoming);
+      reset({
+        ...getValues(),
+        is_rooms: 1,
+        ...fields,
+        rooms: syncedRooms as StepSixType["rooms"],
+      });
+      lastHydratedRoomIndexRef.current = resolvedRoomIndex;
+    }
+
+    previousRoomIndexRef.current = resolvedRoomIndex;
+  }, [
+    getValues,
+    globalForm,
+    isRoomsEnabled,
+    persistActiveRoomDrinksToGlobal,
+    reset,
+    resolvedRoomIndex,
+    stepTwoRooms,
+  ]);
+
+  const canApplyToAllRooms = useMemo(() => {
+    if (!isRoomsEnabled || stepTwoRooms.length < 2) return false;
+    return true;
+  }, [isRoomsEnabled, stepTwoRooms.length]);
+
+  // Sync local form with global form (flat mode only)
+  useEffect(() => {
+    if (isRoomsEnabled) return;
     const subscription = form.watch((value) => {
       if (value) {
-        globalForm.setValue("stepFive", value as StepFiveType);
+        globalForm.setValue("stepSix", value as StepSixType);
       }
     });
 
     return () => subscription.unsubscribe();
-  }, [form, globalForm]);
+  }, [form, globalForm, isRoomsEnabled]);
 
-  // Handle form submission
   const handleSubmit = useCallback(
-    async (data: StepFiveType) => {
+    async (data: StepSixType, options?: { applyToAllRooms?: boolean }) => {
+      const applyToAllRooms = options?.applyToAllRooms === true;
       setIsLoading(true);
 
       try {
-        // Manually re-trigger validation on all fields to force error display
         const isValid = await form.trigger();
 
-        // If form is not valid, only highlight fields - no toast
         if (!isValid) {
-          // Get all validation errors
           const errors = form.formState.errors;
           const errorFields = Object.keys(errors);
 
-          // Find the first error field and scroll to it
           if (errorFields.length > 0) {
             setActiveField(errorFields[0]);
-
-            // Try to find and focus the field with an error
             const errorElement = document.querySelector(
-              `[name="${errorFields[0]}"]`
+              `[name="${errorFields[0]}"]`,
             );
             if (errorElement) {
               (errorElement as HTMLElement).focus();
@@ -142,19 +284,105 @@ export default function DrinksTab() {
           return;
         }
 
-        // Update global form with all fields
-        globalForm.setValue("stepFive", {
-          ...globalForm.getValues().stepFive,
-          ...data,
-        } as StepFiveType);
+        const roomsEnabled = globalForm.getValues().stepTwo?.is_rooms === 1;
+        const stepTwoRoomsForSave = capEventRoomList(
+          normalizeVendorStepTwoRooms(globalForm.getValues().stepTwo?.rooms),
+        );
 
-        // Call the API directly using eventsService
-        const response = await eventsService.storeStepFiveData(data);
+        let cleanedData: StepSixSavePayload;
+        let mergedRoomsGlobal = syncStepSixRoomsFromStepTwo(
+          stepTwoRoomsForSave,
+          normalizeVendorStepSixRooms(globalForm.getValues().stepSix?.rooms),
+        );
+
+        if (roomsEnabled && stepTwoRoomsForSave.length > 0) {
+          persistActiveRoomDrinksToGlobal(resolvedRoomIndex, data);
+          const activeSnapshot = stepSixFieldsToRoomEntry(
+            Number(stepTwoRoomsForSave[resolvedRoomIndex]?.room_id),
+            data,
+          );
+          const drinksClone = cloneVendorStepSixRoomDrinks(activeSnapshot);
+
+          mergedRoomsGlobal = syncStepSixRoomsFromStepTwo(
+            stepTwoRoomsForSave,
+            normalizeVendorStepSixRooms(globalForm.getValues().stepSix?.rooms),
+          ).map((entry, roomIndex) =>
+            applyToAllRooms || roomIndex === resolvedRoomIndex
+              ? { ...entry, ...drinksClone, room_id: entry.room_id }
+              : entry,
+          );
+
+          const activeRoomIdForSave = Number(
+            stepTwoRoomsForSave[resolvedRoomIndex]?.room_id,
+          );
+          const roomsForApi = applyToAllRooms
+            ? mergedRoomsGlobal
+            : mergedRoomsGlobal.filter(
+                (entry) => entry.room_id === activeRoomIdForSave,
+              );
+
+          cleanedData = {
+            step: 6,
+            event_id: data.event_id,
+            is_rooms: 1,
+            rooms: roomsForApi,
+            drink_title: data.drink_title,
+            drink_description: data.drink_description,
+            packages: data.packages,
+          };
+        } else {
+          const { rooms: _rooms, is_rooms: _isRooms, ...flatData } = data;
+          cleanedData = {
+            ...flatData,
+            is_rooms: 0,
+          };
+        }
+
+        globalForm.setValue("stepSix", {
+          ...globalForm.getValues().stepSix,
+          ...cleanedData,
+          ...(cleanedData.is_rooms === 1
+            ? {
+                rooms: mergedRoomsGlobal as StepSixType["rooms"],
+                ...roomEntryToStepSixFields(
+                  findStepSixDrinksForRoom(
+                    mergedRoomsGlobal,
+                    Number(stepTwoRoomsForSave[resolvedRoomIndex]?.room_id),
+                  ),
+                ),
+              }
+            : {}),
+        } as StepSixType);
+
+        const response = await eventsService.storeStepSixData(cleanedData);
 
         if (response && response.status) {
-          // Success message is handled by axios interceptor
-          // Move to the next step
-          await save();
+          if (
+            roomsEnabled &&
+            stepTwoRoomsForSave.length > 0 &&
+            !applyToAllRooms
+          ) {
+            const nextIncompleteIndex = stepTwoRoomsForSave.findIndex(
+              (room, index) =>
+                index !== resolvedRoomIndex &&
+                !isVendorRoomDrinksStepComplete(
+                  findStepSixDrinksForRoom(
+                    mergedRoomsGlobal,
+                    Number(room.room_id),
+                  ),
+                ),
+            );
+            if (nextIncompleteIndex !== -1) {
+              globalForm.setValue(
+                "stepTwo.active_room_index",
+                nextIncompleteIndex,
+                { shouldDirty: false, shouldTouch: false },
+              );
+              return;
+            }
+          }
+
+          await advanceStep(6);
         } else {
           const errorMessage =
             response?.message ||
@@ -170,13 +398,35 @@ export default function DrinksTab() {
         setIsLoading(false);
       }
     },
-    [form, globalForm, save, setActiveField]
+    [
+      form,
+      globalForm,
+      advanceStep,
+      persistActiveRoomDrinksToGlobal,
+      resolvedRoomIndex,
+      setActiveField,
+    ],
+  );
+
+  const attemptSubmit = useCallback(
+    (applyToAllRooms: boolean) => {
+      void form.handleSubmit((data) =>
+        handleSubmit(data, { applyToAllRooms }),
+      )();
+    },
+    [form, handleSubmit],
   );
 
   return (
     <div className="space-y-8">
       <Form {...form}>
-        <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-8">
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            attemptSubmit(false);
+          }}
+          className="space-y-8"
+        >
           {/* Package Options Section */}
           <div className="space-y-6">
             <div className="flex items-center gap-3">
@@ -207,7 +457,11 @@ export default function DrinksTab() {
                         />
                       </FormControl>
                       <div className="text-xs text-gray-500 mt-1">
-                        <span className={currentLength > maxLength ? "text-red-500" : ""}>
+                        <span
+                          className={
+                            currentLength > maxLength ? "text-red-500" : ""
+                          }
+                        >
                           {currentLength}/{maxLength} characters
                         </span>
                       </div>
@@ -238,7 +492,11 @@ export default function DrinksTab() {
                         />
                       </FormControl>
                       <div className="text-xs text-gray-500 mt-1">
-                        <span className={currentLength > maxLength ? "text-red-500" : ""}>
+                        <span
+                          className={
+                            currentLength > maxLength ? "text-red-500" : ""
+                          }
+                        >
                           {currentLength}/{maxLength} characters
                         </span>
                       </div>
@@ -325,7 +583,11 @@ export default function DrinksTab() {
                             />
                           </FormControl>
                           <div className="text-xs text-gray-500 mt-1">
-                            <span className={currentLength > maxLength ? "text-red-500" : ""}>
+                            <span
+                              className={
+                                currentLength > maxLength ? "text-red-500" : ""
+                              }
+                            >
                               {currentLength}/{maxLength} characters
                             </span>
                           </div>
@@ -355,7 +617,11 @@ export default function DrinksTab() {
                             />
                           </FormControl>
                           <div className="text-xs text-gray-500 mt-1">
-                            <span className={currentLength > maxLength ? "text-red-500" : ""}>
+                            <span
+                              className={
+                                currentLength > maxLength ? "text-red-500" : ""
+                              }
+                            >
                               {currentLength}/{maxLength} characters
                             </span>
                           </div>
@@ -378,7 +644,7 @@ export default function DrinksTab() {
                             type="number"
                             className="h-10 bg-[#F9FAFB] border-[#E5E7EB]"
                             placeholder={`${currencySymbol}0.00`}
-                            value={field.value === 0 ? "" : field.value ?? ""}
+                            value={field.value === 0 ? "" : (field.value ?? "")}
                             onFocus={() =>
                               handleFieldFocus(`packages.${index}.price`)
                             }
@@ -423,7 +689,7 @@ export default function DrinksTab() {
                             max={DRINK_PACKAGE_QTY_MAX}
                             onFocus={() =>
                               handleFieldFocus(
-                                `packages.${index}.available_quantity`
+                                `packages.${index}.available_quantity`,
                               )
                             }
                             onChange={(e) => {
@@ -447,9 +713,34 @@ export default function DrinksTab() {
             </div>
           </div>
 
-          <div className="flex justify-end gap-4 pt-4">
-            <Button type="submit" disabled={isLoading || readOnly} variant="event-primary">
-              {readOnly ? "View only" : isLoading ? "Saving..." : "Save & Next"}
+          <div className="flex flex-col sm:flex-row justify-end gap-2 sm:gap-3 pt-4">
+            {canApplyToAllRooms && (
+              <Button
+                type="button"
+                variant="outline"
+                disabled={isLoading || readOnly}
+                className="w-full sm:w-auto"
+                onClick={() => attemptSubmit(true)}
+              >
+                {isLoading ? "Saving..." : "Apply to all rooms"}
+              </Button>
+            )}
+            <Button
+              type={isRoomsEnabled ? "button" : "submit"}
+              disabled={isLoading || readOnly}
+              variant="event-primary"
+              className="w-full sm:w-auto"
+              onClick={
+                isRoomsEnabled ? () => attemptSubmit(false) : undefined
+              }
+            >
+              {readOnly
+                ? "View only"
+                : isLoading
+                  ? "Saving..."
+                  : isRoomsEnabled
+                    ? "Apply to this room only"
+                    : "Save & Next"}
             </Button>
           </div>
         </form>

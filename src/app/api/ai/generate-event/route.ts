@@ -24,6 +24,27 @@ export interface AIEventInput {
   venueName?: string;
   venueCity?: string;
   venueAddress?: string;
+  has_room_system?: boolean;
+  room_names?: string[];
+  /** Existing venue room ids when user picked rooms in AI create (multiselect). */
+  selected_room_ids?: number[];
+}
+
+const AI_EVENT_MIN_ROOMS = 2;
+const AI_EVENT_MAX_ROOMS = 3;
+
+function normalizeAiEventRoomNames(roomNames: string[] | undefined): string[] {
+  const unique = Array.from(
+    new Set(
+      (roomNames ?? [])
+        .map((name) => String(name || "").trim())
+        .filter((name) => name.length > 0),
+    ),
+  ).slice(0, AI_EVENT_MAX_ROOMS);
+
+  if (unique.length >= AI_EVENT_MIN_ROOMS) return unique;
+  if (unique.length === 1) return [unique[0], "Room 2"];
+  return ["Room 1", "Room 2"];
 }
 
 export interface AIEventTicket {
@@ -60,14 +81,14 @@ export interface AIEventGeneratedContent {
     about_event_heading: string;
     about_event_sub_heading: string;
     about_event_description: string;
-    event_schedular_title: string;
-    event_schedular: Array<{ title: string; time: string }>;
   };
   stepTwo: {
     package_title: string;
     package_description: string;
-    package_button_name: string;
     package_details: Array<{ title: string }>;
+    event_schedular_title: string;
+    event_schedule_subtitle: string;
+    event_schedular: Array<{ title: string; time: string }>;
   };
   stepThree: {
     dates: AIEventDate[];
@@ -128,6 +149,11 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    const normalizedRoomNames = normalizeAiEventRoomNames(input.room_names);
+    const hasRoomSystem =
+      input.has_room_system === true &&
+      normalizedRoomNames.length >= AI_EVENT_MIN_ROOMS;
+
     const systemPrompt = `You are an expert event venue marketing copywriter. Generate professional, engaging content for a single event listing on a venue booking platform (same quality bar as full venue onboarding).
 
 CRITICAL RULES:
@@ -144,7 +170,14 @@ CRITICAL RULES:
 11. stepThree.dates: event_date must be YYYY-MM-DD. List dates in chronological ascending order (earliest first). No duplicate event_dates. Each event_date should be today or in the future.
 12. stepFour (menu) is OPTIONAL: If the event type or vendor requirements suggest no food/catering, set catering_option to 0 and menus to an empty array []. Keep menu_title/menu_description minimal when skipped.
 13. stepFive (drinks) is OPTIONAL: If the event type or vendor requirements suggest no drink packages, set packages to an empty array []. Keep drink_title/drink_description minimal when skipped.
-14. stepSeven.faqs: When vendor requirements exist, include FAQs that accurately reflect them (pricing, refunds, what's included, accessibility) without inventing policies that contradict the vendor text.`;
+14. stepSeven.faqs: When vendor requirements exist, include FAQs that accurately reflect them (pricing, refunds, what's included, accessibility) without inventing policies that contradict the vendor text.
+15. Ignore unrelated/unknown noise. Use only vendor event facts and explicit requirements.
+16. ROOM SYSTEM:
+   - If ROOM SYSTEM is YES in the prompt, generate content that works room-wise.
+   - Follow provided room names exactly (spelling/casing). Do not invent extra rooms.
+   - Keep stepTwo package/timeline content generic enough to be valid for each room.
+   - stepThree dates/tickets/tables should follow vendor event constraints and remain consistent for room-based setup.
+   - When ROOM SYSTEM is YES and the event includes food/catering, stepFour MUST use catering_option 1 with menu_title, menu_description, and menus categories (e.g. Starters, Main Courses, Desserts). Within each category use item titles exactly "Item Title 1", "Item Title 2", "Item Title 3" (descriptions are real menu copy).`;
 
     const vendorReq =
       typeof input.eventDescription === "string"
@@ -162,11 +195,15 @@ ${input.venueCity ? `- City: "${input.venueCity}"` : ""}
 ${input.venueAddress ? `- Address: "${input.venueAddress}"` : ""}
 ${input.guestCount ? `- Expected Guests: "${input.guestCount}"` : ""}
 ${input.priceRange ? `- Price Range: "${input.priceRange}"` : ""}
-${
-  hasVendorRequirements
-    ? `\nVENDOR'S DETAILED REQUIREMENTS (HARD CONSTRAINTS — USE THESE EXACT SPECS FOR TICKETS/TABLES/MENU/DRINKS/PRICING AND ALL RELEVANT COPY):\n"${vendorReq}"\n`
-    : ""
-}
+ROOM SYSTEM: ${hasRoomSystem ? "YES" : "NO"}
+${hasRoomSystem
+        ? `- Room names (use exactly): ${normalizedRoomNames.map((name) => `"${name}"`).join(", ")}`
+        : "- No room names"
+      }
+${hasVendorRequirements
+        ? `\nVENDOR'S DETAILED REQUIREMENTS (HARD CONSTRAINTS — USE THESE EXACT SPECS FOR TICKETS/TABLES/MENU/DRINKS/PRICING AND ALL RELEVANT COPY):\n"${vendorReq}"\n`
+        : ""
+      }
 Use one object inside stepThree.dates unless the vendor requirements clearly describe multiple distinct event dates (then add more objects, chronological, no duplicate event_date).
 
 Generate this EXACT JSON structure:
@@ -179,24 +216,23 @@ Generate this EXACT JSON structure:
     "about_event_heading": "string (max 50 chars, about section heading)",
     "about_event_sub_heading": "string (max 80 chars, about section subheading)",
     "about_event_description": "string (max 340 chars, event description, no HTML)",
-    "event_schedular_title": "string (max 40 chars, schedule section title)",
-    "event_schedular": [
-      {"title": "string (max 40 chars)", "time": "HH:mm"},
-      {"title": "string (max 40 chars)", "time": "HH:mm"},
-      {"title": "string (max 40 chars)", "time": "HH:mm"},
-      {"title": "string (max 40 chars)", "time": "HH:mm"}
-    ]
+    
   },
   "stepTwo": {
     "package_title": "string (max 40 chars, packages section title)",
     "package_description": "string (max 160 chars, packages description)",
-    "package_button_name": "string (max 18 chars, CTA button text)",
     "package_details": [
       {"title": "string (max 40 chars, package feature)"},
       {"title": "string (max 40 chars, package feature)"},
       {"title": "string (max 40 chars, package feature)"},
       {"title": "string (max 40 chars, package feature)"},
       {"title": "string (max 40 chars, package feature)"}
+    ],
+    "event_schedular_title": "string (max 40 chars, schedule section title)",
+    "event_schedule_subtitle": "string (max 160 chars, schedule section subtitle)",
+    "event_schedular": [
+      {"title": "string (max 40 chars)", "time": "HH:mm"},
+      {"title": "string (max 40 chars)", "time": "HH:mm"}
     ]
   },
   "stepThree": {
@@ -226,10 +262,27 @@ Generate this EXACT JSON structure:
     "menu_description": "string (max 160 chars)",
     "menus": [
       {
-        "name": "string (max 40 chars, category like 'Starters')",
+        "name": "Starters",
         "items": [
-          {"title": "string (max 40 chars)", "description": "string (max 160 chars)"},
-          {"title": "string (max 40 chars)", "description": "string (max 160 chars)"}
+          {"title": "Item Title 1", "description": "string (max 160 chars)"},
+          {"title": "Item Title 2", "description": "string (max 160 chars)"},
+          {"title": "Item Title 3", "description": "string (max 160 chars)"}
+        ]
+      },
+      {
+        "name": "Main Courses",
+        "items": [
+          {"title": "Item Title 1", "description": "string (max 160 chars)"},
+          {"title": "Item Title 2", "description": "string (max 160 chars)"},
+          {"title": "Item Title 3", "description": "string (max 160 chars)"}
+        ]
+      },
+      {
+        "name": "Desserts",
+        "items": [
+          {"title": "Item Title 1", "description": "string (max 160 chars)"},
+          {"title": "Item Title 2", "description": "string (max 160 chars)"},
+          {"title": "Item Title 3", "description": "string (max 160 chars)"}
         ]
       }
     ]
@@ -258,11 +311,10 @@ Generate this EXACT JSON structure:
 }
 
 Make times chronologically ascending. Make prices realistic for the event type and consistent with vendor requirements when provided.
-${
-  hasVendorRequirements
-    ? `\nFINAL CHECK: Every ticket/table/menu/drink/FAQ item must be consistent with the vendor requirements quoted above. Do not invent conflicting prices, capacities, or policies.\n`
-    : ""
-}
+${hasVendorRequirements
+        ? `\nFINAL CHECK: Every ticket/table/menu/drink/FAQ item must be consistent with the vendor requirements quoted above. Do not invent conflicting prices, capacities, or policies.\n`
+        : ""
+      }
 Return ONLY the JSON.`;
 
     const result: FallbackResult = await tryModelsWithFallback(apiKey, {
@@ -315,28 +367,29 @@ Return ONLY the JSON.`;
         content.stepOne.about_event_heading = truncate(content.stepOne.about_event_heading, 50);
         content.stepOne.about_event_sub_heading = truncate(content.stepOne.about_event_sub_heading, 80);
         content.stepOne.about_event_description = truncate(content.stepOne.about_event_description, 340);
-        content.stepOne.event_schedular_title = truncate(content.stepOne.event_schedular_title, 40);
-        if (content.stepOne.event_schedular) {
-          content.stepOne.event_schedular = content.stepOne.event_schedular.map((s) => ({
-            title: truncate(s.title, 40),
-            time: /^([01]\d|2[0-3]):([0-5]\d)$/.test(s.time) ? s.time : "12:00",
-          }));
-          content.stepOne.event_schedular.sort((a, b) => {
-            const [ha, ma] = a.time.split(":").map(Number);
-            const [hb, mb] = b.time.split(":").map(Number);
-            return ha * 60 + ma - (hb * 60 + mb);
-          });
-        }
+
       }
 
       if (content.stepTwo) {
         content.stepTwo.package_title = truncate(content.stepTwo.package_title, 40);
         content.stepTwo.package_description = truncate(content.stepTwo.package_description, 160);
-        content.stepTwo.package_button_name = truncate(content.stepTwo.package_button_name, 18);
         if (content.stepTwo.package_details) {
           content.stepTwo.package_details = content.stepTwo.package_details.map((d) => ({
             title: truncate(d.title, 40),
           }));
+          content.stepTwo.event_schedular_title = truncate(content.stepTwo.event_schedular_title, 40);
+          content.stepTwo.event_schedule_subtitle = truncate(content.stepTwo.event_schedule_subtitle, 160);
+          if (content.stepTwo.event_schedular) {
+            content.stepTwo.event_schedular = content.stepTwo.event_schedular.map((s) => ({
+              title: truncate(s.title, 40),
+              time: /^([01]\d|2[0-3]):([0-5]\d)$/.test(s.time) ? s.time : "12:00",
+            }));
+          }
+          content.stepTwo.event_schedular.sort((a, b) => {
+            const [ha, ma] = a.time.split(":").map(Number);
+            const [hb, mb] = b.time.split(":").map(Number);
+            return ha * 60 + ma - (hb * 60 + mb);
+          });
         }
       }
 
@@ -454,23 +507,23 @@ Return ONLY the JSON.`;
         const rawPkgs = content.stepFive.packages;
         content.stepFive.packages = Array.isArray(rawPkgs) && rawPkgs.length > 0
           ? rawPkgs.map((p) => ({
-              title: truncate(p.title, DRINK_PACKAGE_ITEM_TITLE_MAX_CHARS),
-              description: truncate(p.description, RICH_DESCRIPTION_MAX_CHARS),
-              price: Math.max(
-                1,
-                Math.min(
-                  DRINK_PACKAGE_PRICE_MAX,
-                  Math.round(Number(p.price) || 50)
-                )
-              ),
-              available_quantity: Math.max(
-                1,
-                Math.min(
-                  DRINK_PACKAGE_QTY_MAX,
-                  Math.round(Number(p.available_quantity) || 100)
-                )
-              ),
-            }))
+            title: truncate(p.title, DRINK_PACKAGE_ITEM_TITLE_MAX_CHARS),
+            description: truncate(p.description, RICH_DESCRIPTION_MAX_CHARS),
+            price: Math.max(
+              1,
+              Math.min(
+                DRINK_PACKAGE_PRICE_MAX,
+                Math.round(Number(p.price) || 50)
+              )
+            ),
+            available_quantity: Math.max(
+              1,
+              Math.min(
+                DRINK_PACKAGE_QTY_MAX,
+                Math.round(Number(p.available_quantity) || 100)
+              )
+            ),
+          }))
           : [];
       } else {
         content.stepFive = { drink_title: "Drinks & Packages", drink_description: "", packages: [] };

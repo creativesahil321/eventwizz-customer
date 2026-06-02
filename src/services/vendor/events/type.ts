@@ -70,9 +70,12 @@ export interface EventDetailStepTwo {
   package_image?: string | null;
   package_title?: string;
   package_description?: string;
-  package_button_name?: string;
   package_details?: Array<{ title: string }>;
   gallery?: Array<string | { id: number; url: string }>;
+  event_schedular_title?: string;
+  event_schedule_subtitle?: string;
+  event_schedular?: Array<{ time: string; title: string }>;
+  event_schedular_background_image?: string | null;
 }
 
 export interface EventDetailStepThree {
@@ -178,6 +181,9 @@ export interface EventDetailData {
   lat?: string | number | null;
   long?: string | number | null;
   current_step?: number;
+  /** Persisted when step 1 is saved with room system enabled (AI + manual). */
+  is_rooms?: boolean | number | string;
+  approval_status?: string;
   vendor_location_id?: number;
   logo?: string | null;
   email?: string;
@@ -225,6 +231,8 @@ export interface EventCategoryPayload {
  * Query params for listing event menu categories
  */
 export interface EventMenuCategoryQueryParams {
+  /** Vendor event id — required by GET /vendor/event-menus */
+  event_id: number;
   /** When multi-room / event spaces are enabled */
   room_id?: number;
 }

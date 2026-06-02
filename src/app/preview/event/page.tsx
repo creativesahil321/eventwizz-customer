@@ -1,7 +1,7 @@
 "use client";
 
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useCallback, useEffect, useMemo, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import {
@@ -18,6 +18,14 @@ import { EventPreview } from "@/app/(protected)/vendor/events/_components/event-
 import { Skeleton } from "@/components/ui/skeleton";
 import { EventDetailData } from "@/services/vendor/events/type";
 import { useEventData } from "@/app/(protected)/vendor/events/_lib/hooks/useEventData";
+import {
+  subscribeVendorEventIsRoomsFlag,
+} from "@/app/(protected)/vendor/events/_lib/vendor-event-is-rooms";
+import {
+  getEventPreviewUrl,
+  parsePreviewRoomsSearchParam,
+  resolvePreviewRoomsForFetch,
+} from "@/app/(protected)/vendor/events/_lib/open-event-preview-tab";
 import { eventsService } from "@/services/vendor/events/events.service";
 import { stepEightSchema } from "@/app/(protected)/vendor/events/_components/tab-event-form/schema";
 import { useSitePreviewStore } from "@/store/site-preview.store";
@@ -32,18 +40,94 @@ import { PreviewThemeCustomizer } from "@/components/preview/preview-theme-custo
 import { themeKeys } from "@/hooks/use-theme-query";
 import { useToast } from "@/components/ui/use-toast";
 
+function EventPreviewPageLoadingShell() {
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-gray-50">
+      <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+    </div>
+  );
+}
+
 export default function EventPreviewPage() {
+  return (
+    <Suspense fallback={<EventPreviewPageLoadingShell />}>
+      <EventPreviewPageContent />
+    </Suspense>
+  );
+}
+
+function EventPreviewPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const eventId = searchParams.get("id");
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const { mutateAsync: saveSiteEssentials, isPending: isSavingTheme } =
     useSiteEssentialsMutation();
 
-  const { eventData, isLoading, invalidateCache } = useEventData(
-    eventId || undefined,
+  const eventId = searchParams.get("id");
+  const urlRoomsParam = searchParams.get("rooms");
+  const [isRoomsForFetch, setIsRoomsForFetch] = useState<boolean | undefined>(
+    () => {
+      if (!eventId || !/^\d+$/.test(eventId)) return undefined;
+      return resolvePreviewRoomsForFetch(eventId, urlRoomsParam);
+    },
   );
+
+  useEffect(() => {
+    if (!eventId || !/^\d+$/.test(eventId)) return;
+
+    const resolved = resolvePreviewRoomsForFetch(eventId, urlRoomsParam);
+    setIsRoomsForFetch(resolved);
+
+    if (typeof resolved === "boolean") {
+      const urlValue = parsePreviewRoomsSearchParam(urlRoomsParam);
+      if (urlValue !== resolved) {
+        router.replace(getEventPreviewUrl(eventId, resolved), { scroll: false });
+      }
+    }
+  }, [eventId, urlRoomsParam, router]);
+
+  useEffect(() => {
+    if (!eventId || !/^\d+$/.test(eventId)) return;
+
+    return subscribeVendorEventIsRoomsFlag(eventId, (next) => {
+      setIsRoomsForFetch(next);
+      router.replace(getEventPreviewUrl(eventId, next), { scroll: false });
+    });
+  }, [eventId, router]);
+
+  const { eventData, isLoading, invalidateCache, refetch } = useEventData(
+    eventId || undefined,
+    isRoomsForFetch,
+    { allowFetchInPreview: true, alwaysFresh: true },
+  );
+
+  const prevRoomsForFetchRef = useRef<boolean | undefined>(undefined);
+
+  // Room mode changed (URL, storage, or editor toggle) → fresh persistence GET.
+  useEffect(() => {
+    if (!eventId || !/^\d+$/.test(eventId)) return;
+    if (typeof isRoomsForFetch !== "boolean") return;
+
+    if (prevRoomsForFetchRef.current === undefined) {
+      prevRoomsForFetchRef.current = isRoomsForFetch;
+      return;
+    }
+
+    if (prevRoomsForFetchRef.current === isRoomsForFetch) return;
+
+    prevRoomsForFetchRef.current = isRoomsForFetch;
+    void refetch();
+  }, [eventId, isRoomsForFetch, refetch]);
+
+  useEffect(() => {
+    const onPersistenceChanged = () => {
+      void refetch();
+    };
+    window.addEventListener("event-data-changed", onPersistenceChanged);
+    return () =>
+      window.removeEventListener("event-data-changed", onPersistenceChanged);
+  }, [refetch]);
 
   const [publishDialogOpen, setPublishDialogOpen] = useState(false);
   const [isPublishing, setIsPublishing] = useState(false);
@@ -139,7 +223,8 @@ export default function EventPreviewPage() {
     if (!eventId || !/^\d+$/.test(eventId) || !eventPayloadRoot) {
       toast({
         title: "Cannot publish",
-        description: "Event data is not loaded. Go back to the editor and try again.",
+        description:
+          "Event data is not loaded. Go back to the editor and try again.",
         variant: "destructive",
       });
       return;
@@ -185,7 +270,8 @@ export default function EventPreviewPage() {
         setPublishDialogOpen(false);
         toast({
           title: "Event published",
-          description: "Your event was submitted as live. Redirecting to events…",
+          description:
+            "Your event was submitted as live. Redirecting to events…",
         });
         router.push("/vendor/events");
       } else {
@@ -304,7 +390,10 @@ export default function EventPreviewPage() {
           />
         ) : null}
 
-        <AlertDialog open={publishDialogOpen} onOpenChange={setPublishDialogOpen}>
+        <AlertDialog
+          open={publishDialogOpen}
+          onOpenChange={setPublishDialogOpen}
+        >
           <AlertDialogContent>
             <AlertDialogHeader>
               <AlertDialogTitle>Publish this event?</AlertDialogTitle>
@@ -312,12 +401,14 @@ export default function EventPreviewPage() {
                 This uses the same action as the editor&apos;s Publish tab: the
                 event will be submitted as{" "}
                 <span className="font-medium text-foreground">live</span>{" "}
-                (reminder email settings from your last saved publish step apply).
-                You can still edit the event later from Events.
+                (reminder email settings from your last saved publish step
+                apply). You can still edit the event later from Events.
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
-              <AlertDialogCancel disabled={isPublishing}>Cancel</AlertDialogCancel>
+              <AlertDialogCancel disabled={isPublishing}>
+                Cancel
+              </AlertDialogCancel>
               <Button
                 type="button"
                 variant="event-primary"
@@ -348,9 +439,7 @@ export default function EventPreviewPage() {
               type="button"
               variant="event-primary"
               size="sm"
-              disabled={
-                !eventPayloadRoot || isEventCancelled || isPublishing
-              }
+              disabled={!eventPayloadRoot || isEventCancelled || isPublishing}
               onClick={() => setPublishDialogOpen(true)}
               className="shadow-md ring-1 ring-black/10"
             >

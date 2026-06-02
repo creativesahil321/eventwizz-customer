@@ -2,9 +2,12 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { openEventPreviewTab } from "../_lib/open-event-preview-tab";
+import { writeVendorEventIsRoomsFlag } from "../_lib/vendor-event-is-rooms";
 import { FormProvider } from "../_components/events-form-provider";
 import TabEventForm from "../_components/tab-event-form";
 import AIEventCreationFlow from "../_components/ai-event-creation";
+import { resolveAiDraftEventId } from "../_lib/ai-event-draft-storage";
 import { motion } from "framer-motion";
 import { Sparkles, PenTool, ArrowRight, Clock, Zap, CheckCircle2 } from "lucide-react";
 
@@ -31,8 +34,20 @@ export default function CreateEventClientWrapper() {
   const [mode, setMode] = useState<CreateMode>("selecting");
   const router = useRouter();
 
-  const handleAIComplete = (eventId: number) => {
-    router.push(`/preview/event?id=${eventId}`);
+  const handleAIComplete = (eventId: number, isRooms: boolean) => {
+    writeVendorEventIsRoomsFlag(eventId, isRooms);
+    if (!openEventPreviewTab(eventId, isRooms)) {
+      router.push(`/vendor/events/${eventId}`);
+    }
+  };
+
+  const handleSwitchToManual = (draftEventId?: number) => {
+    const resolvedId = resolveAiDraftEventId(draftEventId);
+    if (resolvedId && resolvedId > 0) {
+      router.push(`/vendor/events/${resolvedId}`);
+      return;
+    }
+    setMode("manual");
   };
 
   if (mode === "manual") {
@@ -51,7 +66,7 @@ export default function CreateEventClientWrapper() {
       <div className={fullBleedClass}>
         <AIEventCreationFlow
           onComplete={handleAIComplete}
-          onSwitchToManual={() => setMode("manual")}
+          onSwitchToManual={handleSwitchToManual}
         />
       </div>
     );

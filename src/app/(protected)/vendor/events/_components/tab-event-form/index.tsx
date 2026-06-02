@@ -7,16 +7,21 @@ import React, {
   Suspense,
   useMemo,
   useCallback,
+  useRef,
 } from "react";
-import { ArrowLeft, CheckCircle2, Plus, Pencil, Trash2 } from "lucide-react";
+import { ArrowLeft, CheckCircle2, Eye } from "lucide-react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { FormProvider as RHFFormProvider, useWatch } from "react-hook-form";
 import { useEventFormContext } from "../events-form-provider";
-import { roomService } from "@/services/vendor/onboarding/room.service";
 import { toast } from "sonner";
+import {
+  EventRoomMultiSelect,
+  type VendorRoomOption,
+} from "../ai-event-creation/event-room-multi-select";
+import { roomService } from "@/services/vendor/onboarding/room.service";
 
 // Lazy load Tab Components for better performance and smooth transitions
 const EventNameTab = lazy(() => import("./tabs/event-name-tab"));
@@ -29,7 +34,42 @@ const FaqsTab = lazy(() => import("./tabs/faqs-tab"));
 const PublishTab = lazy(() => import("./tabs/publish-tab"));
 import { EventPreview } from "../event-preview";
 import { useEventData } from "../../_lib/hooks/useEventData";
+import { useEventPreviewNavigation } from "../../_lib/use-event-preview-navigation";
 import { useParams } from "next/navigation";
+import {
+  capEventRoomList,
+  EVENT_ROOM_MAX_COUNT,
+  EVENT_ROOM_MIN_COUNT,
+  extractRoomIdsFromStepTwoRooms,
+  normalizeVendorStepTwoRooms,
+  parseEventIsRoomsFlag,
+  enrichStepTwoRoomsFromVenueCatalog,
+  resolveStepTwoRoomsForEditor,
+  stepTwoRoomsDifferFromCatalogEnrichment,
+  syncStepTwoRoomsFromCatalogSelection,
+  type VendorStepTwoRoomForm,
+} from "@/lib/event-form-limits";
+import { isVendorRoomPackageStepComplete } from "../../_lib/normalize-step-two-fields";
+import {
+  hasMeaningfulVendorDates,
+  normalizeVendorStepThreeRooms,
+  type VendorStepThreeRoomEntry,
+} from "../../_lib/vendor-step-three-rooms";
+import {
+  findStepFourMenuForRoom,
+  isVendorRoomMenuStepComplete,
+  normalizeVendorStepFourRooms,
+} from "../../_lib/vendor-step-four-rooms";
+import {
+  findStepFiveBrochureForRoom,
+  isVendorRoomBrochureStepComplete,
+  normalizeVendorStepFiveRooms,
+} from "../../_lib/vendor-step-five-rooms";
+import {
+  findStepSixDrinksForRoom,
+  isVendorRoomDrinksStepComplete,
+  normalizeVendorStepSixRooms,
+} from "../../_lib/vendor-step-six-rooms";
 
 // Import Step Icons
 import {
@@ -51,7 +91,12 @@ const steps = [
     icon: <PartyPopper size={16} />,
     value: "event-name",
   },
-  { id: 2, label: "Package", icon: <Package size={16} />, value: "package" },
+  {
+    id: 2,
+    label: "Timeline & package",
+    icon: <Package size={16} />,
+    value: "package",
+  },
   { id: 3, label: "Dates", icon: <CalendarDays size={16} />, value: "dates" },
   { id: 4, label: "Menu", icon: <Utensils size={16} />, value: "menu" },
   {
@@ -98,38 +143,38 @@ type EventEnvelope = {
   stepSeven?: { rooms?: Record<string, unknown> };
 };
 
-type StepTwoRoom = {
-  room_id?: number;
-  name?: string;
-  package_title?: string;
-  package_description?: string;
-  package_button_name?: string;
-  package_button_link?: string;
-  package_details?: Array<{ title?: string }>;
+type StepTwoRoom = VendorStepTwoRoomForm;
+
+const isRoomDatesFilled = (
+  roomId: number | undefined,
+  stepThreeRooms: VendorStepThreeRoomEntry[],
+): boolean => {
+  if (!roomId) return false;
+  const entry = stepThreeRooms.find(
+    (room) => Number(room.room_id) === Number(roomId),
+  );
+  return hasMeaningfulVendorDates(entry?.dates);
 };
 
-const isRoomPackageFilled = (room: StepTwoRoom | undefined): boolean => {
-  if (!room) return false;
-  const hasTitle = String(room.package_title || "").trim().length > 0;
-  const hasDescription =
-    String(room.package_description || "").trim().length > 0;
-  const hasButtonName =
-    String(room.package_button_name || "").trim().length > 0;
-  const hasDetails = Array.isArray(room.package_details)
-    ? room.package_details.some(
-        (detail) => String(detail?.title || "").trim().length > 0
-      )
-    : false;
-  return hasTitle && hasDescription && hasButtonName && hasDetails;
-};
+const isRoomPackageFilled = (room: StepTwoRoom | undefined): boolean =>
+  room ? isVendorRoomPackageStepComplete(room) : false;
 
-const ROOM_ENABLED_TABS = new Set(["package", "dates", "menu", "more-info"]);
+const ROOM_ENABLED_TABS = new Set([
+  "package",
+  "dates",
+  "menu",
+  "more-info",
+  "drinks",
+]);
+/** Venue room multiselect is only editable on step 2 (Package). */
+const ROOM_SELECTION_TAB = "package";
 
 const isMeaningfulValue = (value: unknown): boolean => {
   if (value === null || value === undefined) return false;
   if (typeof value === "string") return value.trim().length > 0;
   if (typeof value === "number" || typeof value === "boolean") return true;
-  if (Array.isArray(value)) return value.some((item) => isMeaningfulValue(item));
+  if (Array.isArray(value))
+    return value.some((item) => isMeaningfulValue(item));
   if (typeof value === "object") {
     return Object.entries(value as Record<string, unknown>)
       .filter(([key]) => key !== "room_id" && key !== "id")
@@ -142,12 +187,13 @@ const getStepRoomsForTab = (data: EventDataLike, tab: string) => {
   const sources: Record<string, Array<Record<string, unknown> | undefined>> = {
     package: [data.stepTwo?.rooms, data.stepFour?.rooms],
     dates: [data.stepThree?.rooms, data.stepFive?.rooms],
-    menu: [data.stepFour?.rooms, data.stepSix?.rooms],
-    "more-info": [data.stepSix?.rooms, data.stepSeven?.rooms],
+    menu: [data.stepFour?.rooms],
+    "more-info": [data.stepFive?.rooms],
+    drinks: [data.stepSix?.rooms],
   };
 
   return (sources[tab] || []).find(
-    (candidate) => candidate && Object.keys(candidate).length > 0
+    (candidate) => candidate && Object.keys(candidate).length > 0,
   );
 };
 
@@ -179,25 +225,68 @@ const TabContentLoader = () => (
   </div>
 );
 
+const TAB_TO_STEP: Record<string, number> = {
+  "event-name": 1,
+  package: 2,
+  dates: 3,
+  menu: 4,
+  "more-info": 5,
+  drinks: 6,
+  faqs: 7,
+  publish: 8,
+};
+
 export default function TabEventForm() {
-  const { form: formContext, currentStep, readOnly } = useEventFormContext();
+  const {
+    form: formContext,
+    currentStep,
+    readOnly,
+    persistedHydrated,
+    setActiveStep,
+  } = useEventFormContext();
+  const { openEventPreview, canPreview } = useEventPreviewNavigation();
 
   const [activeTab, setActiveTab] = useState("event-name");
-  const [newRoomName, setNewRoomName] = useState("");
-  const [editingRoomIndex, setEditingRoomIndex] = useState<number | null>(null);
-  const [editingRoomName, setEditingRoomName] = useState("");
+  const [vendorRooms, setVendorRooms] = useState<VendorRoomOption[]>([]);
+  const [vendorRoomsLoading, setVendorRoomsLoading] = useState(false);
   const localIsRooms = useWatch({
     control: formContext.control,
     name: "stepTwo.is_rooms",
   });
+  const stepOneIsRooms = useWatch({
+    control: formContext.control,
+    name: "stepOne.is_rooms",
+  });
   const watchedStepTwoRooms = useWatch({
     control: formContext.control,
     name: "stepTwo.rooms",
-  }) as StepTwoRoom[] | undefined;
+  }) as StepTwoRoom[] | Record<string, unknown> | undefined;
   const activeRoomIndex = useWatch({
     control: formContext.control,
     name: "stepTwo.active_room_index",
   });
+  const watchedStepThreeRooms = useWatch({
+    control: formContext.control,
+    name: "stepThree.rooms",
+  });
+  const watchedStepFourRooms = useWatch({
+    control: formContext.control,
+    name: "stepFour.rooms",
+  });
+  const watchedStepFiveRooms = useWatch({
+    control: formContext.control,
+    name: "stepFive.rooms",
+  });
+  const watchedStepSixRooms = useWatch({
+    control: formContext.control,
+    name: "stepSix.rooms",
+  });
+  const excessRoomsTrimmedRef = useRef(false);
+  const apiExcessRoomsWarnedRef = useRef(false);
+
+  const getStepTwoRooms = useCallback((): StepTwoRoom[] => {
+    return normalizeVendorStepTwoRooms(formContext.getValues("stepTwo.rooms"));
+  }, [formContext]);
 
   // Set active tab based on current step from server data
   useEffect(() => {
@@ -224,6 +313,10 @@ export default function TabEventForm() {
   // Handle tab navigation
   const handleTabChange = (value: string) => {
     setActiveTab(value);
+    const step = TAB_TO_STEP[value];
+    if (step) {
+      void setActiveStep(step);
+    }
   };
 
   const navigateToPreviousTab = () => {
@@ -237,7 +330,8 @@ export default function TabEventForm() {
   const eventId = Array.isArray(params?.eventID)
     ? params?.eventID[0]
     : params?.eventID;
-  const { eventData } = useEventData(eventId);
+  const fetchWithRoomPayload = localIsRooms === 1 || stepOneIsRooms === 1;
+  const { eventData } = useEventData(eventId, fetchWithRoomPayload);
 
   const normalizedEventData = useMemo(() => {
     const apiResponse = (eventData || {}) as { data?: EventEnvelope };
@@ -248,51 +342,131 @@ export default function TabEventForm() {
     return (levelTwo || levelOne || {}) as EventDataLike;
   }, [eventData]);
 
+  const resolvedStepTwoRooms = useMemo(
+    () =>
+      resolveStepTwoRoomsForEditor(
+        watchedStepTwoRooms,
+        normalizedEventData.stepTwo?.rooms,
+        vendorRooms,
+      ),
+    [watchedStepTwoRooms, normalizedEventData.stepTwo?.rooms, vendorRooms],
+  );
+
+  const stepThreeRoomsNormalized = useMemo(
+    () =>
+      normalizeVendorStepThreeRooms(
+        watchedStepThreeRooms ?? normalizedEventData.stepThree?.rooms,
+      ),
+    [watchedStepThreeRooms, normalizedEventData.stepThree?.rooms],
+  );
+
+  const stepFourRoomsNormalized = useMemo(
+    () =>
+      normalizeVendorStepFourRooms(
+        watchedStepFourRooms ?? normalizedEventData.stepFour?.rooms,
+      ),
+    [watchedStepFourRooms, normalizedEventData.stepFour?.rooms],
+  );
+
+  const stepFiveRoomsNormalized = useMemo(
+    () =>
+      normalizeVendorStepFiveRooms(
+        watchedStepFiveRooms ?? normalizedEventData.stepFive?.rooms,
+      ),
+    [watchedStepFiveRooms, normalizedEventData.stepFive?.rooms],
+  );
+
+  const stepSixRoomsNormalized = useMemo(
+    () =>
+      normalizeVendorStepSixRooms(
+        watchedStepSixRooms ?? normalizedEventData.stepSix?.rooms,
+      ),
+    [watchedStepSixRooms, normalizedEventData.stepSix?.rooms],
+  );
+
   const roomRecords = useMemo<RoomRecord[]>(() => {
     if (localIsRooms === 1) {
-      const formRooms = watchedStepTwoRooms ?? [];
-      return formRooms.map((room, index) => {
+      return resolvedStepTwoRooms.map((room, index) => {
         const resolvedName =
           String(room?.name || "").trim() || `Room ${index + 1}`;
+        const isComplete =
+          activeTab === "dates"
+            ? isRoomDatesFilled(room?.room_id, stepThreeRoomsNormalized)
+            : activeTab === "menu"
+              ? isVendorRoomMenuStepComplete(
+                  findStepFourMenuForRoom(
+                    stepFourRoomsNormalized,
+                    Number(room?.room_id),
+                  ),
+                )
+              : activeTab === "more-info"
+                ? isVendorRoomBrochureStepComplete(
+                    findStepFiveBrochureForRoom(
+                      stepFiveRoomsNormalized,
+                      Number(room?.room_id),
+                    ),
+                  ) &&
+                  String(
+                    formContext.getValues("stepFive.event_address") ?? "",
+                  ).trim().length > 0
+                : activeTab === "drinks"
+                  ? isVendorRoomDrinksStepComplete(
+                      findStepSixDrinksForRoom(
+                        stepSixRoomsNormalized,
+                        Number(room?.room_id),
+                      ),
+                    )
+                  : isRoomPackageFilled(room);
         return {
           name: resolvedName,
           roomId: room?.room_id,
-          isComplete: isRoomPackageFilled(room),
+          isComplete,
         };
       });
     }
 
-    const roomsForActiveTab = getStepRoomsForTab(normalizedEventData, activeTab);
+    const roomsForActiveTab = getStepRoomsForTab(
+      normalizedEventData,
+      activeTab,
+    );
     if (!roomsForActiveTab) return [];
 
-    return Object.entries(roomsForActiveTab).map(([name, payload]) => {
-      const payloadObj = (payload || {}) as Record<string, unknown>;
-      const roomId =
-        typeof payloadObj.room_id === "number"
-          ? payloadObj.room_id
-          : typeof payloadObj.room_id === "string"
-          ? Number(payloadObj.room_id)
-          : undefined;
+    return Object.entries(roomsForActiveTab)
+      .slice(0, EVENT_ROOM_MAX_COUNT)
+      .map(([name, payload]) => {
+        const payloadObj = (payload || {}) as Record<string, unknown>;
+        const roomId =
+          typeof payloadObj.room_id === "number"
+            ? payloadObj.room_id
+            : typeof payloadObj.room_id === "string"
+              ? Number(payloadObj.room_id)
+              : undefined;
 
-      return {
-        name,
-        roomId,
-        isComplete: isMeaningfulValue(payloadObj),
-      };
-    });
-  }, [normalizedEventData, activeTab, localIsRooms, watchedStepTwoRooms]);
+        return {
+          name,
+          roomId,
+          isComplete: isMeaningfulValue(payloadObj),
+        };
+      });
+  }, [
+    normalizedEventData,
+    activeTab,
+    localIsRooms,
+    resolvedStepTwoRooms,
+    stepThreeRoomsNormalized,
+    stepFourRoomsNormalized,
+    stepFiveRoomsNormalized,
+    stepSixRoomsNormalized,
+    formContext,
+    activeTab,
+  ]);
 
-  const isRoomsFlagRaw = normalizedEventData.is_rooms;
-  const isRoomsFlag =
-    isRoomsFlagRaw === true ||
-    isRoomsFlagRaw === 1 ||
-    isRoomsFlagRaw === "1";
-
-  const isRoomsMode =
-    isRoomsFlag || localIsRooms === 1 || roomRecords.length > 0;
-  const showRoomSidebar = isRoomsMode && ROOM_ENABLED_TABS.has(activeTab);
-  const canAddRoom = localIsRooms === 1 && roomRecords.length < 3;
-  const canDeleteRoom = localIsRooms === 1 && roomRecords.length > 2;
+  const showRoomSidebar =
+    localIsRooms === 1 && ROOM_ENABLED_TABS.has(activeTab);
+  const selectedRoomIds = useMemo(
+    () => extractRoomIdsFromStepTwoRooms(resolvedStepTwoRooms),
+    [resolvedStepTwoRooms],
+  );
   const resolvedActiveRoomIndex =
     typeof activeRoomIndex === "number" && activeRoomIndex >= 0
       ? Math.min(activeRoomIndex, Math.max(roomRecords.length - 1, 0))
@@ -323,137 +497,42 @@ export default function TabEventForm() {
         shouldTouch: false,
       });
     },
-    [formContext, localIsRooms]
+    [formContext, localIsRooms],
   );
 
-  const addRoom = useCallback(async () => {
-    if (localIsRooms !== 1) return;
-    const name = newRoomName.trim();
-    if (!name) return;
-
-    const existingRooms = (formContext.getValues("stepTwo.rooms") ||
-      []) as StepTwoRoom[];
-    if (existingRooms.length >= 3) {
-      toast.error("Maximum 3 rooms allowed.");
-      return;
-    }
-
-    const nextIndex = existingRooms.length;
-    const draftRoom: StepTwoRoom = {
-      name,
-      package_title: "",
-      package_description: "",
-      package_button_name: "",
-      package_button_link: "",
-      package_details: [{ title: "" }],
-    };
-
-    formContext.setValue("stepTwo.rooms", [...existingRooms, draftRoom], {
-      shouldDirty: true,
-      shouldTouch: false,
+  const handleVenueRoomCreated = useCallback((room: VendorRoomOption) => {
+    setVendorRooms((prev) => {
+      if (prev.some((r) => r.id === room.id)) return prev;
+      return [...prev, room].sort((a, b) => a.name.localeCompare(b.name));
     });
-    formContext.setValue("stepTwo.active_room_index", nextIndex, {
-      shouldDirty: false,
-      shouldTouch: false,
-    });
-    setNewRoomName("");
-
-    try {
-      const response = await roomService.create({ name });
-      const createdId = Number(response?.data?.id);
-      if (!Number.isFinite(createdId) || createdId <= 0) return;
-      const latest = (formContext.getValues("stepTwo.rooms") || []) as StepTwoRoom[];
-      if (!latest[nextIndex]) return;
-      const updated = latest.map((room, idx) =>
-        idx === nextIndex ? { ...room, room_id: createdId } : room
-      );
-      formContext.setValue("stepTwo.rooms", updated, {
-        shouldDirty: true,
-        shouldTouch: false,
-      });
-    } catch (error) {
-      console.error("Failed to create room:", error);
-      toast.error("Unable to create room right now.");
-    }
-  }, [formContext, localIsRooms, newRoomName]);
-
-  const startRenameRoom = useCallback(
-    (index: number) => {
-      const rooms = (formContext.getValues("stepTwo.rooms") || []) as StepTwoRoom[];
-      const target = rooms[index];
-      if (!target) return;
-      setEditingRoomIndex(index);
-      setEditingRoomName(String(target.name || "").trim());
-    },
-    [formContext]
-  );
-
-  const renameRoom = useCallback(
-    async (index: number, name: string) => {
-      if (localIsRooms !== 1) return;
-      const rooms = (formContext.getValues("stepTwo.rooms") || []) as StepTwoRoom[];
-      const target = rooms[index];
-      if (!target) return;
-      const nextName = String(name || "").trim();
-      if (!nextName || nextName === target.name) return;
-
-      const updatedRooms = rooms.map((room, idx) =>
-        idx === index ? { ...room, name: nextName } : room
-      );
-      formContext.setValue("stepTwo.rooms", updatedRooms, {
-        shouldDirty: true,
-        shouldTouch: false,
-      });
-
-      if (target.room_id) {
-        try {
-          await roomService.update(target.room_id, { name: nextName });
-        } catch (error) {
-          console.error("Failed to rename room:", error);
-          toast.error("Room rename failed.");
-        }
-      }
-    },
-    [formContext, localIsRooms]
-  );
-
-  const commitRenameRoom = useCallback(async () => {
-    if (editingRoomIndex === null) return;
-    const idx = editingRoomIndex;
-    const nextName = editingRoomName.trim();
-    setEditingRoomIndex(null);
-    setEditingRoomName("");
-    if (!nextName) return;
-    await renameRoom(idx, nextName);
-  }, [editingRoomIndex, editingRoomName, renameRoom]);
-
-  const cancelRenameRoom = useCallback(() => {
-    setEditingRoomIndex(null);
-    setEditingRoomName("");
   }, []);
 
-  const deleteRoom = useCallback(
-    async (index: number) => {
+  const showRoomPicker =
+    localIsRooms === 1 &&
+    (activeTab === ROOM_SELECTION_TAB ||
+      selectedRoomIds.length < EVENT_ROOM_MAX_COUNT);
+
+  const handleRoomSelectionChange = useCallback(
+    (ids: number[]) => {
       if (localIsRooms !== 1) return;
-      const rooms = (formContext.getValues("stepTwo.rooms") || []) as StepTwoRoom[];
-      const target = rooms[index];
-      if (!target) return;
-      if (rooms.length <= 2) {
-        toast.error("Minimum 2 rooms are required in room system mode.");
-        return;
+      const existing = getStepTwoRooms();
+      const updated = syncStepTwoRoomsFromCatalogSelection(
+        ids,
+        vendorRooms,
+        existing,
+      );
+      const prevIndex = formContext.getValues("stepTwo.active_room_index");
+      const safePrevIndex =
+        typeof prevIndex === "number" && prevIndex >= 0 ? prevIndex : 0;
+      const activeRoomId = existing[safePrevIndex]?.room_id;
+      let nextIndex = updated.findIndex(
+        (room) => Number(room.room_id) === Number(activeRoomId),
+      );
+      if (nextIndex < 0) {
+        nextIndex = Math.max(0, updated.length - 1);
       }
 
-      const updatedRooms = rooms.filter((_, idx) => idx !== index);
-      const nextIndex = Math.max(
-        0,
-        Math.min(
-          resolvedActiveRoomIndex > index
-            ? resolvedActiveRoomIndex - 1
-            : resolvedActiveRoomIndex,
-          updatedRooms.length - 1
-        )
-      );
-      formContext.setValue("stepTwo.rooms", updatedRooms, {
+      formContext.setValue("stepTwo.rooms", updated, {
         shouldDirty: true,
         shouldTouch: false,
       });
@@ -461,18 +540,152 @@ export default function TabEventForm() {
         shouldDirty: false,
         shouldTouch: false,
       });
-
-      if (target.room_id) {
-        try {
-          await roomService.remove(target.room_id);
-        } catch (error) {
-          console.error("Failed to delete room:", error);
-          toast.error("Room delete failed.");
-        }
-      }
     },
-    [formContext, localIsRooms, resolvedActiveRoomIndex]
+    [formContext, getStepTwoRooms, localIsRooms, vendorRooms],
   );
+
+  useEffect(() => {
+    if (localIsRooms !== 1) {
+      setVendorRooms([]);
+      setVendorRoomsLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+    setVendorRoomsLoading(true);
+
+    void roomService
+      .listVendorRooms()
+      .then((res) => {
+        if (cancelled) return;
+        const data = Array.isArray(res?.data) ? res.data : [];
+        const fromApi: VendorRoomOption[] = data
+          .map((room, index) => {
+            const id = Number(room.id);
+            const name = String(room?.name ?? "").trim() || `Room ${index + 1}`;
+            return { id, name };
+          })
+          .filter(
+            (room) =>
+              room.name.length > 0 && Number.isFinite(room.id) && room.id > 0,
+          );
+        setVendorRooms(fromApi);
+      })
+      .catch((error) => {
+        if (cancelled) return;
+        console.error("Failed to load venue rooms:", error);
+        setVendorRooms([]);
+        toast.error("Unable to load venue rooms.");
+      })
+      .finally(() => {
+        if (!cancelled) setVendorRoomsLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [localIsRooms]);
+
+  useEffect(() => {
+    if (localIsRooms !== 1 || vendorRooms.length === 0) return;
+
+    const current = getStepTwoRooms();
+    if (current.length === 0) return;
+
+    const enriched = enrichStepTwoRoomsFromVenueCatalog(current, vendorRooms);
+    if (!stepTwoRoomsDifferFromCatalogEnrichment(current, enriched)) return;
+
+    formContext.setValue("stepTwo.rooms", enriched, {
+      shouldDirty: false,
+      shouldTouch: false,
+    });
+  }, [
+    localIsRooms,
+    vendorRooms,
+    watchedStepTwoRooms,
+    getStepTwoRooms,
+    formContext,
+  ]);
+
+  useEffect(() => {
+    excessRoomsTrimmedRef.current = false;
+    apiExcessRoomsWarnedRef.current = false;
+  }, [eventId]);
+
+  useEffect(() => {
+    if (localIsRooms !== 1) return;
+    const rooms = getStepTwoRooms();
+    if (rooms.length <= EVENT_ROOM_MAX_COUNT) return;
+
+    const trimmed = capEventRoomList(rooms);
+    const currentIndex = formContext.getValues("stepTwo.active_room_index");
+    const nextIndex = Math.min(
+      typeof currentIndex === "number" ? currentIndex : 0,
+      Math.max(trimmed.length - 1, 0),
+    );
+    formContext.setValue("stepTwo.rooms", trimmed, {
+      shouldDirty: false,
+      shouldTouch: false,
+    });
+    formContext.setValue("stepTwo.active_room_index", nextIndex, {
+      shouldDirty: false,
+      shouldTouch: false,
+    });
+
+    if (!excessRoomsTrimmedRef.current) {
+      excessRoomsTrimmedRef.current = true;
+      toast.warning(
+        `Only ${EVENT_ROOM_MAX_COUNT} rooms can be managed per event. Extra rooms were hidden from this editor.`,
+      );
+    }
+  }, [localIsRooms, watchedStepTwoRooms, formContext, getStepTwoRooms]);
+
+  useEffect(() => {
+    if (localIsRooms !== 1) return;
+
+    const apiRoomsRaw = normalizedEventData.stepTwo?.rooms;
+    if (!apiRoomsRaw) return;
+
+    const mappedRooms = capEventRoomList(
+      normalizeVendorStepTwoRooms(apiRoomsRaw),
+    );
+    const apiRoomCount = Array.isArray(apiRoomsRaw)
+      ? apiRoomsRaw.length
+      : Object.keys(apiRoomsRaw as Record<string, unknown>).length;
+
+    if (
+      apiRoomCount > EVENT_ROOM_MAX_COUNT &&
+      !apiExcessRoomsWarnedRef.current
+    ) {
+      apiExcessRoomsWarnedRef.current = true;
+      toast.warning(
+        `This event has ${apiRoomCount} rooms. Only the first ${EVENT_ROOM_MAX_COUNT} are shown and editable.`,
+      );
+    }
+
+    if (mappedRooms.length === 0) return;
+
+    const currentRooms = getStepTwoRooms();
+    const formHasRoomIds = currentRooms.some(
+      (room) => Number(room.room_id) > 0,
+    );
+    if (formHasRoomIds) return;
+
+    formContext.setValue("stepTwo.rooms", mappedRooms, {
+      shouldDirty: false,
+      shouldTouch: false,
+    });
+    formContext.setValue("stepTwo.active_room_index", 0, {
+      shouldDirty: false,
+      shouldTouch: false,
+    });
+  }, [
+    localIsRooms,
+    normalizedEventData.stepTwo?.rooms,
+    formContext,
+    getStepTwoRooms,
+    persistedHydrated,
+  ]);
 
   return (
     <>
@@ -546,142 +759,82 @@ export default function TabEventForm() {
                         {roomRecords.length}
                       </span>
                     </div>
+                    {showRoomPicker && (
+                      <div className="mb-4">
+                        <EventRoomMultiSelect
+                          variant="light"
+                          rooms={vendorRooms}
+                          value={selectedRoomIds}
+                          onChange={handleRoomSelectionChange}
+                          onRoomCreated={handleVenueRoomCreated}
+                          disabled={readOnly}
+                          loading={vendorRoomsLoading}
+                          minSelection={EVENT_ROOM_MIN_COUNT}
+                          maxSelection={EVENT_ROOM_MAX_COUNT}
+                          placeholder="Select venue rooms"
+                        />
+                      </div>
+                    )}
+                    {localIsRooms === 1 &&
+                      !showRoomPicker &&
+                      roomRecords.length > 0 && (
+                        <div className="mb-4 flex flex-wrap gap-1.5">
+                          {roomRecords.map((room) => (
+                            <span
+                              key={`${room.roomId ?? room.name}-badge`}
+                              className="inline-flex max-w-full items-center rounded-full border border-[#D6ECEF] bg-[#EAF7F8] px-2.5 py-1 text-xs font-medium text-[#0B6A75]"
+                            >
+                              <span className="truncate">{room.name}</span>
+                            </span>
+                          ))}
+                        </div>
+                      )}
                     <div className="space-y-2">
                       {roomRecords.map((room, index) => (
-                        <div
+                        <button
                           key={`${room.roomId ?? room.name}-${room.name}`}
+                          type="button"
+                          onClick={() => setActiveRoom(index)}
                           className={`w-full rounded-xl border px-3 py-2.5 text-left transition-all ${
                             index === resolvedActiveRoomIndex
                               ? "border-[var(--color-primary)] bg-white shadow-sm"
                               : "border-transparent hover:border-[#D6ECEF] bg-white/70"
                           }`}
                         >
-                          {editingRoomIndex === index ? (
-                            <div className="space-y-2">
-                              <input
-                                value={editingRoomName}
-                                onChange={(e) => setEditingRoomName(e.target.value)}
-                                onKeyDown={(e) => {
-                                  if (e.key === "Enter") {
-                                    e.preventDefault();
-                                    void commitRenameRoom();
-                                  }
-                                  if (e.key === "Escape") {
-                                    e.preventDefault();
-                                    cancelRenameRoom();
-                                  }
-                                }}
-                                maxLength={40}
-                                className="h-8 w-full rounded-md border border-[#D6ECEF] bg-white px-2 text-sm outline-none focus:border-[var(--color-primary)]"
-                                autoFocus
-                              />
-                              <div className="flex justify-end gap-2">
-                                <Button
-                                  type="button"
-                                  variant="ghost"
-                                  className="h-7 px-2 text-xs"
-                                  onClick={cancelRenameRoom}
-                                >
-                                  Cancel
-                                </Button>
-                                <Button
-                                  type="button"
-                                  variant="event-primary"
-                                  className="h-7 px-2 text-xs"
-                                  onClick={() => void commitRenameRoom()}
-                                  disabled={editingRoomName.trim().length === 0}
-                                >
-                                  Save
-                                </Button>
-                              </div>
-                            </div>
-                          ) : (
-                            <button
-                              type="button"
-                              onClick={() => setActiveRoom(index)}
-                              className="w-full text-left"
-                            >
-                              <div className="flex items-center justify-between gap-2">
-                                <p className="text-sm font-semibold text-[#0F172A] truncate">
-                                  {room.name}
-                                </p>
-                                {room.isComplete && (
-                                  <CheckCircle2 className="h-4 w-4 text-emerald-500 shrink-0" />
-                                )}
-                              </div>
-                              <p className="text-[11px] mt-1 text-muted-foreground">
-                                {room.isComplete ? "Complete" : "Incomplete"}
-                              </p>
-                            </button>
-                          )}
-                          {localIsRooms === 1 && editingRoomIndex !== index && (
-                            <div className="mt-2 flex justify-end gap-1">
-                              <button
-                                type="button"
-                                onClick={() => startRenameRoom(index)}
-                                className="inline-flex h-6 w-6 items-center justify-center rounded-md text-[#0B6A75] hover:bg-[#EAF7F8]"
-                                aria-label="Rename room"
-                              >
-                                <Pencil className="h-3.5 w-3.5" />
-                              </button>
-                              {canDeleteRoom && (
-                                <button
-                                  type="button"
-                                  onClick={() => void deleteRoom(index)}
-                                  className="inline-flex h-6 w-6 items-center justify-center rounded-md text-rose-500 hover:bg-rose-50"
-                                  aria-label="Delete room"
-                                >
-                                  <Trash2 className="h-3.5 w-3.5" />
-                                </button>
-                              )}
-                            </div>
-                          )}
-                        </div>
+                          <div className="flex items-center justify-between gap-2">
+                            <p className="text-sm font-semibold text-[#0F172A] truncate">
+                              {room.name}
+                            </p>
+                            {room.isComplete && (
+                              <CheckCircle2 className="h-4 w-4 text-emerald-500 shrink-0" />
+                            )}
+                          </div>
+                          <p className="text-[11px] mt-1 text-muted-foreground">
+                            {room.isComplete ? "Complete" : "Incomplete"}
+                          </p>
+                        </button>
                       ))}
                       {roomRecords.length === 0 && (
                         <div className="rounded-xl border border-dashed border-[#D6ECEF] bg-white px-3 py-4 text-center">
                           <p className="text-sm font-medium text-[#0F172A]">
-                            Room system enabled
+                            {localIsRooms === 1
+                              ? "No rooms selected"
+                              : "Room system enabled"}
                           </p>
                           <p className="text-[11px] mt-1 text-muted-foreground">
-                            Add rooms to start room-wise configuration.
+                            {localIsRooms === 1
+                              ? `Choose ${EVENT_ROOM_MIN_COUNT}–${EVENT_ROOM_MAX_COUNT} venue rooms on the Package tab, or use the room picker above when fewer than ${EVENT_ROOM_MAX_COUNT} are selected.`
+                              : "Enable room system and select venue rooms to start."}
                           </p>
                         </div>
                       )}
                     </div>
-                    {canAddRoom && (
-                      <div className="mt-4 space-y-2">
-                        <input
-                          value={newRoomName}
-                          onChange={(e) => setNewRoomName(e.target.value)}
-                          maxLength={40}
-                          placeholder="Room name"
-                          className="h-9 w-full rounded-md border border-[#D6ECEF] bg-white px-2 text-sm outline-none focus:border-[var(--color-primary)]"
-                        />
-                        <div className="flex items-center gap-2">
-                          <Button
-                            type="button"
-                            variant="event-primary"
-                            className="h-8 flex-1"
-                            onClick={() => void addRoom()}
-                            disabled={newRoomName.trim().length === 0}
-                          >
-                            <Plus className="h-4 w-4 mr-1" />
-                            Add
-                          </Button>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            className="h-8"
-                            onClick={() => setNewRoomName("")}
-                          >
-                            Cancel
-                          </Button>
-                        </div>
-                      </div>
-                    )}
                     <p className="mt-4 rounded-lg bg-[#EAF7F8] px-3 py-2 text-[11px] text-[#0B6A75]">
-                      Each room has its own package, dates, menu and brochure.
+                      {localIsRooms === 1
+                        ? selectedRoomIds.length < EVENT_ROOM_MAX_COUNT
+                          ? `Each room has its own package, dates, menu, and brochure (${EVENT_ROOM_MIN_COUNT}–${EVENT_ROOM_MAX_COUNT} per event). Select venue rooms from the list; create a new one only when none are left to pick.`
+                          : `Each room has its own package, dates, menu, other packages, and brochure. Use ${EVENT_ROOM_MIN_COUNT}–${EVENT_ROOM_MAX_COUNT} rooms per event.`
+                        : "Click a room below to edit its details for this step. Change room selection on the Package tab."}
                     </p>
                   </aside>
                 )}
@@ -772,7 +925,7 @@ export default function TabEventForm() {
                   </div>
 
                   {/* Tab Navigation */}
-                  <div className="flex justify-between mt-6">
+                  <div className="flex flex-wrap items-center justify-between gap-3 mt-6">
                     <Button
                       type="button"
                       variant="outline"
@@ -786,13 +939,30 @@ export default function TabEventForm() {
                       <span className="sm:hidden">Prev</span>
                     </Button>
 
-                    {/* Show current step info */}
-                    {currentStep && (
-                      <div className="text-xs sm:text-sm text-muted-foreground flex items-center">
-                        <span className="hidden sm:inline">Step </span>
-                        {currentStep}/8
-                      </div>
-                    )}
+                    <div className="flex items-center gap-3">
+                      {currentStep ? (
+                        <div className="text-xs sm:text-sm text-muted-foreground flex items-center">
+                          <span className="hidden sm:inline">Step </span>
+                          {currentStep}/8
+                        </div>
+                      ) : null}
+                      <Button
+                        type="button"
+                        variant="event-outline"
+                        size="sm"
+                        className="flex items-center gap-2 text-xs sm:text-sm"
+                        disabled={!canPreview}
+                        onClick={openEventPreview}
+                        title={
+                          canPreview
+                            ? "Preview how this event will look to customers"
+                            : "Save step 1 to enable preview"
+                        }
+                      >
+                        <Eye size={14} />
+                        Preview
+                      </Button>
+                    </div>
                   </div>
                 </div>
               </div>

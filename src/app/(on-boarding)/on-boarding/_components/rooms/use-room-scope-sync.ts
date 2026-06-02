@@ -26,7 +26,14 @@ const SECTION_MAP = {
   dates: { roomKey: "dates", stepKey: "stepFive", approvalKey: "isApprovedDates" },
   catering: { roomKey: "catering", stepKey: "stepSix", approvalKey: "isApprovedCatering" },
   brochure: { roomKey: "brochure", stepKey: "stepSeven", approvalKey: "isApprovedBrochure" },
+  drinks: { roomKey: "drinks", stepKey: "stepEight", approvalKey: "isApprovedDrinks" },
 } as const;
+
+const cloneRoomDatesSection = (
+  dates: RoomType["dates"] | undefined,
+): RoomType["dates"] => {
+  return JSON.parse(JSON.stringify(dates ?? { dates: [] })) as RoomType["dates"];
+};
 
 interface RoomScopeSyncReturn {
   /** True when multi-room mode is active and the form should be treated as room-scoped. */
@@ -113,29 +120,9 @@ export function useRoomScopeSync(section: RoomSection): RoomScopeSyncReturn {
         void _step;
         void _eventId;
         void _isApproved;
-        let payloadForRoom = sectionPayload;
-        if (section === "catering") {
-          const stepSix = globalForm.getValues("stepSix") as
-            | Record<string, unknown>
-            | undefined;
-          const sharedMenus = Array.isArray(stepSix?.menus) ? stepSix.menus : [];
-          const sharedCategoryId =
-            typeof stepSix?.event_menu_category_id === "number"
-              ? stepSix.event_menu_category_id
-              : undefined;
-          payloadForRoom = {
-            ...sectionPayload,
-            menus:
-              sharedMenus.length > 0
-                ? sharedMenus
-                : (sectionPayload.menus ?? []),
-            event_menu_category_id:
-              sharedCategoryId ?? sectionPayload.event_menu_category_id,
-          };
-        }
         globalForm.setValue(
           `multiSpace.rooms.${prevIndex}.${roomKey}` as never,
-          payloadForRoom as never,
+          sectionPayload as never,
           { shouldDirty: false },
         );
       }
@@ -148,24 +135,6 @@ export function useRoomScopeSync(section: RoomSection): RoomScopeSyncReturn {
     const existing = (globalForm.getValues(stepKey as never) ??
       {}) as Record<string, unknown>;
     const merged = { ...existing, ...fromRoom };
-    if (section === "catering") {
-      const existingMenus = Array.isArray(existing.menus) ? existing.menus : [];
-      const fromRoomMenus = Array.isArray(fromRoom.menus) ? fromRoom.menus : [];
-      const sharedMenus =
-        existingMenus.length > 0
-          ? existingMenus
-          : fromRoomMenus.length > 0
-            ? fromRoomMenus
-            : [];
-      merged.menus = sharedMenus;
-      merged.event_menu_category_id =
-        (typeof existing.event_menu_category_id === "number"
-          ? existing.event_menu_category_id
-          : undefined) ??
-        (typeof fromRoom.event_menu_category_id === "number"
-          ? fromRoom.event_menu_category_id
-          : undefined);
-    }
     if (JSON.stringify(existing) !== JSON.stringify(merged)) {
       globalForm.setValue(
         stepKey as never,
@@ -219,17 +188,51 @@ export function useRoomScopeSync(section: RoomSection): RoomScopeSyncReturn {
       // Ensure the active room contributes its latest in-form values to the aggregate payload
       // before we send room-scoped step saves.
       const stagedRooms = allRooms.map((room, index) => {
-        const shouldMirrorFromActive =
-          index === currentRoomIndex ||
-          (applyToAllRooms && !isRoomSectionComplete(room, section));
-        if (!shouldMirrorFromActive) {
-          return room;
+        const isActiveRoom = index === currentRoomIndex;
+
+        if (isActiveRoom) {
+          return {
+            ...room,
+            [roomKey]: currentSectionPayload,
+            [approvalKey]: true,
+          } as RoomType;
         }
-        return {
-          ...room,
-          [roomKey]: currentSectionPayload,
-          [approvalKey]: true,
-        } as RoomType;
+
+        // Per-room save: keep other rooms on their last persisted API snapshot so
+        // unsaved tab edits (e.g. deposit toggled off) are not sent to the backend.
+        if (!applyToAllRooms && section === "dates") {
+          if (
+            room.isApprovedDates &&
+            room.persistedDates?.dates &&
+            room.persistedDates.dates.length > 0
+          ) {
+            return {
+              ...room,
+              dates: cloneRoomDatesSection(room.persistedDates),
+            };
+          }
+
+          // Never-configured rooms can pick up blank default rows from tab switches.
+          // Send persisted snapshot or an empty dates array instead of placeholders.
+          if (!isRoomSectionComplete(room, section)) {
+            return {
+              ...room,
+              dates: cloneRoomDatesSection(
+                room.persistedDates ?? { dates: [] },
+              ),
+            };
+          }
+        }
+
+        if (applyToAllRooms && !isRoomSectionComplete(room, section)) {
+          return {
+            ...room,
+            [roomKey]: currentSectionPayload,
+            [approvalKey]: true,
+          } as RoomType;
+        }
+
+        return room;
       });
       const missingRoomId = stagedRooms.some((room) => !room?.id);
       if (missingRoomId) {
@@ -268,16 +271,26 @@ export function useRoomScopeSync(section: RoomSection): RoomScopeSyncReturn {
 
       switch (section) {
         case "dates": {
-          // Step 5 contract: send complete rooms[] payload only after all room dates are filled.
-          if (!allRoomsCompleteForSection) {
+          // Backend replaces the full step-5 rooms[] graph — always send every room.
+          if (applyToAllRooms && !allRoomsCompleteForSection) {
             onMultiRoomSuccess?.();
             return true;
           }
+
           response = await onboardingService.storeStepFiveRoomsData({
             event_id: eventId,
             rooms: roomsWithIds,
             isApproved: true,
           });
+
+          if (response?.status) {
+            roomsWithIds.forEach((room, index) => {
+              globalForm.setValue(
+                `multiSpace.rooms.${index}.persistedDates` as never,
+                cloneRoomDatesSection(room.dates) as never,
+              );
+            });
+          }
           break;
         }
         case "catering": {

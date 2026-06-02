@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useFormContext } from "react-hook-form";
+import { useFormContext, useWatch } from "react-hook-form";
 import { SiteEssentialsFormValues } from "../../_lib/hooks";
 import { BANNER_SUB_HEADING_MAX_CHARS } from "../../_lib/schema";
 import {
@@ -28,6 +28,9 @@ import {
   truncateToMaxWordsForInput,
 } from "@/lib/word-count";
 import { useSiteEssentialsUpdateGate } from "../../_lib/site-essentials-update-context";
+import { useLogoUploadProcessor } from "@/hooks/use-logo-upload-processor";
+import { Loader2 } from "lucide-react";
+import { defaultThemeConstants } from "@/services/common/theme/constants/theme";
 
 interface BrandingTabProps {
   /** Server values from API – source of truth after location switch so UI updates immediately */
@@ -41,6 +44,11 @@ export function BrandingTab({
 }: BrandingTabProps) {
   const { readOnly } = useSiteEssentialsUpdateGate();
   const form = useFormContext<SiteEssentialsFormValues>();
+  const headerBackgroundColor =
+    useWatch({ control: form.control, name: "colors.header" }) ??
+    defaultThemeConstants.colors.header;
+  const { processUpload: processLogoUpload, isProcessing: isProcessingLogo } =
+    useLogoUploadProcessor({ headerBackgroundColor });
 
   // File objects for new uploads
   const [logoFiles, setLogoFiles] = useState<File[]>([]);
@@ -122,10 +130,13 @@ export function BrandingTab({
     }
   }, [watchedLogo, watchedFavicon, watchedCoverImage, watchedCoverVideo]);
 
-  const handleLogoFileChange = (files: File[]) => {
-    setLogoFiles(files);
-    setLogoUrl(""); // Clear URL when new file is uploaded
-    form.setValue("logo", files.length > 0 ? files[0] : null);
+  const handleLogoFileChange = async (files: File[]) => {
+    if (!files.length) return;
+
+    const processed = await processLogoUpload(files[0]);
+    setLogoFiles([processed]);
+    setLogoUrl("");
+    form.setValue("logo", processed);
   };
 
   const handleFaviconFileChange = (files: File[]) => {
@@ -320,13 +331,44 @@ export function BrandingTab({
                   reasonable size on the site.
                 </FormDescription>
                 <FormControl>
-                  {logoUrl ? (
+                  {isProcessingLogo ? (
+                    <div className="flex flex-col items-center justify-center gap-2 rounded-lg border border-dashed py-10 text-sm text-muted-foreground">
+                      <Loader2 className="h-6 w-6 animate-spin" />
+                      Optimizing logo for header…
+                    </div>
+                  ) : logoUrl ? (
                     <div className="space-y-2">
-                      <img
-                        src={addCacheBusting(logoUrl)}
-                        alt="Logo preview"
-                        className="max-h-40 object-contain mx-auto"
-                      />
+                      <div
+                        className="rounded-lg border p-4"
+                        style={{ backgroundColor: headerBackgroundColor }}
+                      >
+                        <img
+                          src={addCacheBusting(logoUrl)}
+                          alt="Logo preview"
+                          className="max-h-40 w-full object-contain"
+                        />
+                      </div>
+                      <button
+                        type="button"
+                        disabled={readOnly}
+                        onClick={handleRemoveLogo}
+                        className="text-red-500 text-sm underline disabled:pointer-events-none disabled:opacity-50"
+                      >
+                        Remove Logo
+                      </button>
+                    </div>
+                  ) : logoFiles.length > 0 ? (
+                    <div className="space-y-2">
+                      <div
+                        className="rounded-lg border p-4"
+                        style={{ backgroundColor: headerBackgroundColor }}
+                      >
+                        <img
+                          src={URL.createObjectURL(logoFiles[0])}
+                          alt="Logo preview"
+                          className="max-h-40 w-full object-contain"
+                        />
+                      </div>
                       <button
                         type="button"
                         disabled={readOnly}
@@ -339,11 +381,11 @@ export function BrandingTab({
                   ) : (
                     <FileUploader
                       value={logoFiles}
-                      onValueChange={handleLogoFileChange}
+                      onValueChange={(files) => void handleLogoFileChange(files)}
                       maxFileCount={1}
                       maxSize={2 * 1024 * 1024} // 2MB
                       onRemove={handleRemoveLogo}
-                      disabled={readOnly}
+                      disabled={readOnly || isProcessingLogo}
                       accept={{
                         "image/png": [],
                         "image/jpeg": [],

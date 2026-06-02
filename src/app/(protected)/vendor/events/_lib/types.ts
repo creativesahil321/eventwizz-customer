@@ -69,7 +69,6 @@ export interface EventPackage {
   package_image?: string;
   package_title?: string;
   package_description?: string;
-  package_button_name: string;
   package_button_link: string;
   package_details: string;
   created_at?: Date;

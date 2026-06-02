@@ -39,6 +39,10 @@ import {
 } from "../../guided-sticky-approval-bar";
 import { guidedSectionSurfaceClass } from "../../guided-section-surface";
 import { GuidedSectionTitleBar } from "../../guided-section-title-bar";
+import { useLogoUploadProcessor } from "@/hooks/use-logo-upload-processor";
+import { Loader2 } from "lucide-react";
+import { ensureFilePreview, revokeFilePreview } from "@/lib/file-preview";
+import { ONBOARDING_DEFAULT_THEME } from "../../../_lib/onboarding-default-theme";
 
 const resolveStepTwoErrorIndex = (keys: string[]) => {
   if (keys.some((k) => k === "__extra_validation__")) return 0;
@@ -54,6 +58,7 @@ export default function StepTwo() {
     setActiveStep,
     setActiveField,
     persistedProgressHydrated,
+    previewTheme,
   } = useFormContext();
 
   const stepTwoPersistedApproved = useWatch({
@@ -62,6 +67,12 @@ export default function StepTwo() {
   });
   const { update: updateSession } = useSession();
   const [loading, setLoading] = useState(false);
+  const headerBackgroundColor =
+    previewTheme.colors?.header ??
+    ONBOARDING_DEFAULT_THEME.colors?.header ??
+    "#ffffff";
+  const { processUpload: processLogoUpload, isProcessing: isProcessingLogo } =
+    useLogoUploadProcessor({ headerBackgroundColor });
 
   const form = useForm<StepTwoType>({
     resolver: zodResolver(stepTwoSchema),
@@ -184,28 +195,21 @@ export default function StepTwo() {
     persistedStepApproved: stepTwoPersistedApproved === true,
   });
 
-  const handleLogoFileChange = (
+  const handleLogoFileChange = async (
     files: File[],
     onChange: (file: File | undefined) => void,
   ) => {
     if (!files.length) return;
 
-    console.log("📸 Logo file received:", files[0]);
-    console.log("📸 Logo file type:", files[0].type);
-    console.log("📸 Logo file size:", files[0].size);
+    const processed = await processLogoUpload(files[0]);
+    const fileWithPreview = ensureFilePreview(processed);
 
-    setLogoFiles(files);
-    setLogoUrl(null); // Clear URL when new file is uploaded
+    setLogoFiles([fileWithPreview]);
+    setLogoUrl(null);
 
-    // Update React Hook Form field
-    onChange(files[0]);
-
-    // Update global form
-    globalForm.setValue("stepTwo.logo", files[0]);
-
-    // Force update form value
-    form.setValue("logo", files[0]);
-
+    onChange(fileWithPreview);
+    globalForm.setValue("stepTwo.logo", fileWithPreview);
+    form.setValue("logo", fileWithPreview);
     setActiveField("logo");
   };
 
@@ -235,6 +239,7 @@ export default function StepTwo() {
   };
 
   const handleRemoveLogo = (onChange: (value: File | undefined) => void) => {
+    revokeFilePreview(logoFiles[0]);
     setLogoFiles([]);
     setLogoUrl(null);
     onChange(undefined);
@@ -425,15 +430,25 @@ export default function StepTwo() {
                             className="flex flex-col justify-center items-center h-full space-y-2 bg-white/5 p-4 rounded-lg border border-white/10"
                             onClick={() => handleFieldFocus("logo")}
                           >
-                            {logoUrl ? (
-                              <div className="relative w-full">
-                                <img
-                                  src={addCacheBusting(logoUrl)}
-                                  alt="Logo"
-                                  className="max-h-40 object-contain mx-auto mb-2"
-                                  width={100}
-                                  height={100}
-                                />
+                            {isProcessingLogo ? (
+                              <div className="flex flex-col items-center justify-center gap-2 py-10 text-sm text-white/70">
+                                <Loader2 className="h-6 w-6 animate-spin" />
+                                Optimizing logo for header…
+                              </div>
+                            ) : logoUrl ? (
+                              <div className="relative w-full space-y-2">
+                                <div
+                                  className="rounded-lg p-4"
+                                  style={{ backgroundColor: headerBackgroundColor }}
+                                >
+                                  <img
+                                    src={addCacheBusting(logoUrl)}
+                                    alt="Logo"
+                                    className="max-h-40 w-full object-contain"
+                                    width={100}
+                                    height={100}
+                                  />
+                                </div>
                                 <Button
                                   type="button"
                                   variant="destructive"
@@ -441,7 +456,35 @@ export default function StepTwo() {
                                   onClick={() =>
                                     handleRemoveLogo(field.onChange)
                                   }
-                                  className="mt-2"
+                                >
+                                  Remove
+                                </Button>
+                              </div>
+                            ) : logoFiles.length > 0 ? (
+                              <div className="relative w-full space-y-2">
+                                <div
+                                  className="rounded-lg p-4"
+                                  style={{ backgroundColor: headerBackgroundColor }}
+                                >
+                                  <img
+                                    src={
+                                      (
+                                        logoFiles[0] as File & {
+                                          preview?: string;
+                                        }
+                                      ).preview ?? ""
+                                    }
+                                    alt="Logo preview"
+                                    className="max-h-40 w-full object-contain"
+                                  />
+                                </div>
+                                <Button
+                                  type="button"
+                                  variant="destructive"
+                                  size="sm"
+                                  onClick={() =>
+                                    handleRemoveLogo(field.onChange)
+                                  }
                                 >
                                   Remove
                                 </Button>
@@ -450,13 +493,17 @@ export default function StepTwo() {
                               <FileUploader
                                 value={logoFiles}
                                 onValueChange={(files) =>
-                                  handleLogoFileChange(files, field.onChange)
+                                  void handleLogoFileChange(
+                                    files,
+                                    field.onChange,
+                                  )
                                 }
                                 maxFileCount={1}
                                 maxSize={1 * 1024 * 1024}
                                 onRemove={() =>
                                   handleRemoveLogo(field.onChange)
                                 }
+                                disabled={isProcessingLogo}
                                 className="border-dashed"
                               />
                             )}

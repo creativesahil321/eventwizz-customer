@@ -1,7 +1,6 @@
 "use client";
 
 import { useFormContext } from "react-hook-form";
-import { SiteContrastPreview } from "../site-contrast-preview";
 import { SiteEssentialsFormValues } from "../../_lib/hooks";
 import {
   FormField,
@@ -249,7 +248,6 @@ export function ColorsTab() {
           </div>
         </CardHeader>
         <CardContent className="pt-6">
-          <SiteContrastPreview compact />
           <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
             <FormField
               control={form.control}

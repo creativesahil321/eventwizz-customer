@@ -8,7 +8,9 @@ import {
   DRINK_SECTION_TITLE_MAX_CHARS,
   EVENT_PACKAGE_MAIN_HEADING_MAX_CHARS,
   EVENT_PACKAGE_SUB_HEADING_MAX_CHARS,
-  PACKAGE_BUTTON_NAME_MAX_CHARS,
+  EVENT_ROOM_MAX_COUNT,
+  EVENT_ROOM_MIN_COUNT,
+  normalizeVendorStepTwoRooms,
   PACKAGE_DETAIL_LINE_MAX_CHARS,
 } from "@/lib/event-form-limits";
 import {
@@ -52,6 +54,37 @@ const validateTimeSequence = (
   return true;
 };
 
+/** Laravel may return `""` for optional media; Zod `.url()` treats that as invalid. */
+const coerceEmptyMediaToNull = (val: unknown) =>
+  val === "" || val === undefined ? null : val;
+
+const persistedMediaSchema = z.preprocess(
+  coerceEmptyMediaToNull,
+  z.union([z.instanceof(File), z.string().url(), z.null()]).nullable().optional(),
+);
+
+const galleryEntrySchema = z.union([
+  z.instanceof(File),
+  z.object({ id: z.number(), url: z.string().url() }),
+]);
+
+const gallerySchema = z.preprocess((val) => {
+  if (!Array.isArray(val)) return [];
+  return val.filter((item) => {
+    if (item instanceof File) return true;
+    if (!item || typeof item !== "object") return false;
+    const id = (item as { id?: unknown }).id;
+    const url = String((item as { url?: unknown }).url ?? "").trim();
+    if (typeof id !== "number" || !url) return false;
+    try {
+      z.string().url().parse(url);
+      return true;
+    } catch {
+      return false;
+    }
+  });
+}, z.array(galleryEntrySchema).optional());
+
 //=== Step 1 ===//
 export const stepOneSchema = z
   .object({
@@ -90,32 +123,9 @@ export const stepOneSchema = z
     about_event_description: z
       .string()
       .min(1, "About event description is required"),
-    event_schedular_title: z
-      .string()
-      .min(1, "Event schedular title is required")
-      .max(40, "Event schedular title must not exceed 40 characters"),
-    event_schedular_background_image: z
-      .union([z.instanceof(File), z.string().url(), z.null()])
-      .nullable()
-      .optional(),
-    event_schedular: z
-      .array(
-        z.object({
-          title: z
-            .string()
-            .min(1, "Title is required")
-            .max(40, "Schedule title must not exceed 40 characters"),
-          time: z
-            .string()
-            .min(1, "Time is required")
-            .regex(
-              /^([01]\d|2[0-3]):([0-5]\d)$/,
-              "Time must be in HH:mm format"
-            ),
-        })
-      )
-      .min(1, "At least one schedule is required")
-      .refine(validateTimeSequence, "Times must be in ascending order"),
+    /** Sent on step 1 create/update so persistence returns `is_rooms` on GET. */
+    is_rooms: z.union([z.literal(0), z.literal(1)]).optional(),
+
   })
   .superRefine((data, ctx) => {
     // Check if image/video were removed
@@ -163,9 +173,9 @@ export const stepTwoSchema = z
         z.object({
           room_id: z.number().optional(),
           name: z.string().optional(),
+          package_image: persistedMediaSchema,
           package_title: z.string().optional(),
           package_description: z.string().optional(),
-          package_button_name: z.string().optional(),
           package_button_link: z.string().optional(),
           package_details: z
             .array(
@@ -174,13 +184,22 @@ export const stepTwoSchema = z
               })
             )
             .optional(),
+          gallery: gallerySchema,
+          event_schedular_title: z.string().optional(),
+          event_schedule_subtitle: z.string().optional(),
+          event_schedular_background_image: persistedMediaSchema,
+          event_schedular: z
+            .array(
+              z.object({
+                title: z.string().optional(),
+                time: z.string().optional(),
+              })
+            )
+            .optional(),
         })
       )
       .optional(),
-    package_image: z
-      .union([z.instanceof(File), z.string().url(), z.null()])
-      .nullable()
-      .optional(),
+    package_image: persistedMediaSchema,
     package_title: z
       .string()
       .min(1, "Event main heading is required")
@@ -194,13 +213,6 @@ export const stepTwoSchema = z
       .max(
         EVENT_PACKAGE_SUB_HEADING_MAX_CHARS,
         `Event sub-heading must not exceed ${EVENT_PACKAGE_SUB_HEADING_MAX_CHARS} characters`
-      ),
-    package_button_name: z
-      .string()
-      .min(1, "Button name is required")
-      .max(
-        PACKAGE_BUTTON_NAME_MAX_CHARS,
-        `Button name must not exceed ${PACKAGE_BUTTON_NAME_MAX_CHARS} characters`
       ),
     package_button_link: z.string().optional(),
     package_details: z
@@ -216,29 +228,52 @@ export const stepTwoSchema = z
         })
       )
       .min(1, "At least one package detail is required"),
-    gallery: z
+    gallery: gallerySchema,
+
+    event_schedular_title: z
+      .string()
+      .min(1, "Event schedular title is required")
+      .max(40, "Event schedular title must not exceed 40 characters"),
+    event_schedule_subtitle: z
+      .string()
+      .max(160, "Custom copy must not exceed 160 characters"),
+    event_schedular_background_image: persistedMediaSchema,
+    event_schedular: z
       .array(
-        z.union([
-          z.instanceof(File),
-          z.object({ id: z.number(), url: z.string().url() }),
-        ])
+        z.object({
+          title: z
+            .string()
+            .min(1, "Title is required")
+            .max(40, "Schedule title must not exceed 40 characters"),
+          time: z
+            .string()
+            .min(1, "Time is required")
+            .regex(
+              /^([01]\d|2[0-3]):([0-5]\d)$/,
+              "Time must be in HH:mm format"
+            ),
+        })
       )
-      .optional(),
+      .min(1, "At least one schedule is required")
+      .refine(validateTimeSequence, "Times must be in ascending order"),
+    /** Venue room ids to detach when deselected in the Package tab room picker. */
+    removed_room_ids: z.array(z.number().int().positive()).optional(),
+
   })
   .superRefine((data, ctx) => {
     if (data.is_rooms === 1) {
       const roomsCount = Array.isArray(data.rooms) ? data.rooms.length : 0;
-      if (roomsCount < 2) {
+      if (roomsCount < EVENT_ROOM_MIN_COUNT) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
-          message: "At least 2 rooms are required in room system mode.",
+          message: `At least ${EVENT_ROOM_MIN_COUNT} rooms are required in room system mode.`,
           path: ["rooms"],
         });
       }
-      if (roomsCount > 3) {
+      if (roomsCount > EVENT_ROOM_MAX_COUNT) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
-          message: "Maximum 3 rooms are allowed.",
+          message: `Maximum ${EVENT_ROOM_MAX_COUNT} rooms are allowed.`,
           path: ["rooms"],
         });
       }
@@ -246,36 +281,41 @@ export const stepTwoSchema = z
   })
   .refine(
     (data) => {
-      // Check if package_image exists (either as File or URL string)
-      const hasImage =
-        data.package_image &&
-        (data.package_image instanceof File ||
-          (typeof data.package_image === "string" &&
-            data.package_image.length > 0));
-      return hasImage;
+      const hasPackageImage = (image: unknown) =>
+        !!image &&
+        (image instanceof File ||
+          (typeof image === "string" && image.length > 0));
+
+      if (hasPackageImage(data.package_image)) return true;
+
+      if (data.is_rooms === 1) {
+        const rooms = normalizeVendorStepTwoRooms(data.rooms);
+        const idx =
+          typeof data.active_room_index === "number" && data.active_room_index >= 0
+            ? Math.min(data.active_room_index, Math.max(rooms.length - 1, 0))
+            : 0;
+        return hasPackageImage(rooms[idx]?.package_image);
+      }
+
+      return false;
     },
     {
       message: "Package image is required",
       path: ["package_image"],
     }
-  );
+  )
+
+
 export type StepTwoType = z.infer<typeof stepTwoSchema>;
 
 //=== Step 3 ===//
 const validateDepositDueDate = (data: unknown) => {
-  const { booking_type, payment_type, deposit_due_date, is_deposit_enabled } =
-    data as {
-      booking_type: string;
-      payment_type: string;
-      deposit_due_date?: string;
-      is_deposit_enabled?: boolean;
-    };
-  // Only validate payment fields for tables/both booking types
+  const { booking_type, payment_type, deposit_due_date } = data as {
+    booking_type: string;
+    payment_type: string;
+    deposit_due_date?: string;
+  };
   if (booking_type === "tickets") {
-    return true;
-  }
-
-  if (is_deposit_enabled === false) {
     return true;
   }
 
@@ -300,6 +340,12 @@ const normalizeBoolean = (value: unknown) => {
   return undefined;
 };
 
+/** Laravel often returns 0/1 for boolean columns on persisted rows. */
+const optionalBooleanFromApi = z.preprocess(
+  normalizeBoolean,
+  z.boolean().optional(),
+);
+
 const normalizeDepositType = (value: unknown) => {
   if (typeof value !== "string") return undefined;
 
@@ -317,15 +363,15 @@ const baseDateSchema = z.object({
   id: z.number().optional(),
   event_date: z.string().min(1, "Date is required"),
   booking_type: z.enum(["tickets", "tables", "both"]),
-  has_bookings: z.boolean().optional(),
+  has_bookings: optionalBooleanFromApi,
   /** From GET show — prefer over has_bookings for cancel vs remove */
-  use_cancel_date_action: z.boolean().optional(),
-  cancellation_request_pending: z.boolean().optional(),
-  has_financial_bookings: z.boolean().optional(),
-  cancelled: z.boolean().optional(),
+  use_cancel_date_action: optionalBooleanFromApi,
+  cancellation_request_pending: optionalBooleanFromApi,
+  has_financial_bookings: optionalBooleanFromApi,
+  cancelled: optionalBooleanFromApi,
   cancel_reason: z.string().optional(),
   payment_type: z.enum(["deposit", "full"]).optional(),
-  is_deposit_enabled: z.preprocess(normalizeBoolean, z.boolean().optional()),
+  is_deposit_enabled: optionalBooleanFromApi,
   deposit_type: z.preprocess(
     normalizeDepositType,
     z.enum(["amount", "percentage"]).optional()
@@ -366,7 +412,7 @@ const dateSchema = baseDateSchema
               return !isNaN(num) && num >= 1 && num <= 9999;
             }, "Price must be between 1 and 9,999 (4 digits max)"),
             sold_tickets: z.number().optional(), // Read-only from API
-            status: z.boolean().optional(), // Read-only from API
+            status: optionalBooleanFromApi, // API may send 0/1
           })
           .superRefine((ticket, ctx) => {
             // Validate that total_capacity is not less than sold_tickets
@@ -417,7 +463,7 @@ const dateSchema = baseDateSchema
               return !isNaN(num) && num >= 1 && num <= 5000;
             }, "Total tables must be between 1 and 5,000"),
             sold_tables: z.number().optional(), // Read-only from API
-            status: z.boolean().optional(), // Read-only from API
+            status: optionalBooleanFromApi, // API may send 0/1
           })
           .superRefine((table, ctx) => {
             // Validate that total_tables is not less than sold_tables
@@ -444,10 +490,6 @@ const dateSchema = baseDateSchema
   .superRefine((data, ctx) => {
     // Only validate deposit fields for tables/both when deposit is selected
     if (!["tables", "both"].includes(data.booking_type)) {
-      return;
-    }
-
-    if (data.is_deposit_enabled === false) {
       return;
     }
 
@@ -537,11 +579,8 @@ const dateSchema = baseDateSchema
       }
     }
 
-    // Validate that deposit due date is before event date
-    // Only validate if payment type is deposit or deposit is enabled
     if (
       data.payment_type === "deposit" &&
-      data.is_deposit_enabled &&
       data.deposit_due_date &&
       data.event_date
     ) {
@@ -596,56 +635,70 @@ const dateSchema = baseDateSchema
     { message: "At least one table is required", path: ["tables"] }
   );
 
+/** Persisted per-room snapshots — validated via top-level `dates` while editing. */
+const stepThreeRoomEntrySchema = z.object({
+  room_id: z.number().min(1),
+  dates: z.array(z.record(z.string(), z.unknown())),
+});
+
 export const stepThreeSchema = z
   .object({
     step: z.literal(3),
     event_id: z.number().min(1, "Event ID is required"),
     /** Sent on save; may be filled from step 1 if omitted */
     vendor_location_id: z.number().min(1).optional(),
-    dates: z.array(dateSchema),
+    is_rooms: z.union([z.literal(0), z.literal(1)]).optional(),
+    /** Active room (room mode) or single-venue dates */
+    dates: z.array(dateSchema).default([]),
+    /** Persisted per-room snapshots; sent on save when `is_rooms === 1` */
+    rooms: z.array(stepThreeRoomEntrySchema).optional(),
   })
   .superRefine((data, ctx) => {
-    const dates = data.dates;
-    if (!dates || dates.length === 0) return;
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const todayTime = today.getTime();
-    for (let i = 0; i < dates.length; i++) {
-      const d = dates[i].event_date;
-      if (d && /^\d{4}-\d{2}-\d{2}$/.test(d)) {
-        const eventTime = new Date(d + "T00:00:00").getTime();
-        if (eventTime < todayTime) {
-          ctx.addIssue({
-            code: z.ZodIssueCode.custom,
-            message: "Event date must be today or in the future.",
-            path: ["dates", i, "event_date"],
-          });
+    // Room mode: only validate the active editor (`dates`), not every stored room slot.
+    const dateLists = [{ dates: data.dates, pathPrefix: ["dates"] as const }];
+
+    for (const { dates, pathPrefix } of dateLists) {
+      if (!dates || dates.length === 0) continue;
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const todayTime = today.getTime();
+      for (let i = 0; i < dates.length; i++) {
+        const d = dates[i].event_date;
+        if (d && /^\d{4}-\d{2}-\d{2}$/.test(d)) {
+          const eventTime = new Date(d + "T00:00:00").getTime();
+          if (eventTime < todayTime) {
+            ctx.addIssue({
+              code: z.ZodIssueCode.custom,
+              message: "Event date must be today or in the future.",
+              path: [...pathPrefix, i, "event_date"],
+            });
+          }
         }
       }
-    }
-    const eventDates = dates.map((d) => d.event_date).filter(Boolean);
-    const seen = new Set<string>();
-    for (let i = 0; i < eventDates.length; i++) {
-      if (seen.has(eventDates[i])) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          message: "Duplicate event dates are not allowed. Each date must be unique.",
-          path: ["dates", i, "event_date"],
-        });
-        return;
+      const eventDates = dates.map((d) => d.event_date).filter(Boolean);
+      const seen = new Set<string>();
+      for (let i = 0; i < eventDates.length; i++) {
+        if (seen.has(eventDates[i])) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: "Duplicate event dates are not allowed. Each date must be unique.",
+            path: [...pathPrefix, i, "event_date"],
+          });
+          return;
+        }
+        seen.add(eventDates[i]);
       }
-      seen.add(eventDates[i]);
-    }
-    for (let i = 0; i < eventDates.length - 1; i++) {
-      const a = new Date(eventDates[i] + "T00:00:00").getTime();
-      const b = new Date(eventDates[i + 1] + "T00:00:00").getTime();
-      if (!Number.isNaN(a) && !Number.isNaN(b) && b <= a) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          message: "Dates must be in chronological ascending order.",
-          path: ["dates"],
-        });
-        return;
+      for (let i = 0; i < eventDates.length - 1; i++) {
+        const a = new Date(eventDates[i] + "T00:00:00").getTime();
+        const b = new Date(eventDates[i + 1] + "T00:00:00").getTime();
+        if (!Number.isNaN(a) && !Number.isNaN(b) && b <= a) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: "Dates must be in chronological ascending order.",
+            path: [...pathPrefix],
+          });
+          return;
+        }
       }
     }
   });
@@ -706,10 +759,54 @@ export const getDefaultDate = (
 };
 
 //=== Step 4 ===//
+const stepFourMenusSchema = z
+  .array(
+    z.object({
+      name: z
+        .string()
+        .min(1, "Category name is required")
+        .max(40, "Category name must not exceed 40 characters"),
+      items: z
+        .array(
+          z.object({
+            title: z
+              .string()
+              .min(1, "Title is required")
+              .max(40, "Item title must not exceed 40 characters"),
+            description: z
+              .string()
+              .min(1, "Description is required")
+              .max(
+                RICH_DESCRIPTION_MAX_CHARS,
+                `Item description must not exceed ${RICH_DESCRIPTION_MAX_CHARS} characters`
+              ),
+          })
+        )
+        .min(1, "At least one item is required")
+        .max(10, "Maximum of 10 items allowed per category"),
+    })
+  )
+  .optional();
+
+/** Persisted per-room snapshots — validated via top-level fields while editing. */
+const stepFourRoomEntrySchema = z.object({
+  room_id: z.number().min(1),
+  catering_option: z.number().min(0).max(1).optional(),
+  menu_title: z.string().optional(),
+  menu_description: z.string().optional(),
+  event_menu_category_id: z.number().optional(),
+  menus: z.array(z.record(z.string(), z.unknown())).optional(),
+  menu_background_image: z
+    .union([z.instanceof(File), z.string().url(), z.null()])
+    .nullable()
+    .optional(),
+});
+
 export const stepFourSchema = z
   .object({
     step: z.literal(4),
     event_id: z.number().min(1, "Event ID is required"),
+    is_rooms: z.union([z.literal(0), z.literal(1)]).optional(),
     catering_option: z.number().min(0).max(1),
     menu_title: z
       .string()
@@ -720,38 +817,13 @@ export const stepFourSchema = z
       .max(160, "Menu description must not exceed 160 characters")
       .optional(),
     event_menu_category_id: z.number().optional(),
-    menus: z
-      .array(
-        z.object({
-          name: z
-            .string()
-            .min(1, "Category name is required")
-            .max(40, "Category name must not exceed 40 characters"),
-          items: z
-            .array(
-              z.object({
-                title: z
-                  .string()
-                  .min(1, "Title is required")
-                  .max(40, "Item title must not exceed 40 characters"),
-                description: z
-                  .string()
-                  .min(1, "Description is required")
-                  .max(
-                    RICH_DESCRIPTION_MAX_CHARS,
-                    `Item description must not exceed ${RICH_DESCRIPTION_MAX_CHARS} characters`
-                  ),
-              })
-            )
-            .min(1, "At least one item is required")
-            .max(10, "Maximum of 10 items allowed per category"),
-        })
-      )
-      .optional(),
+    menus: stepFourMenusSchema,
     menu_background_image: z
       .union([z.instanceof(File), z.string().url(), z.null()])
       .nullable()
       .optional(),
+    /** Persisted per-room snapshots; sent on save when `is_rooms === 1` */
+    rooms: z.array(stepFourRoomEntrySchema).optional(),
   })
   .superRefine((data, ctx) => {
     if (data.catering_option === 1) {
@@ -783,21 +855,31 @@ export const stepFourSchema = z
   });
 export type StepFourType = z.infer<typeof stepFourSchema>;
 
+const stepFiveRoomEntrySchema = z.object({
+  room_id: z.number(),
+  brochure_pdf: z
+    .union([z.instanceof(File), z.string().url(), z.null()])
+    .optional(),
+  brochure_pdf_2: z
+    .union([z.instanceof(File), z.string().url(), z.null()])
+    .optional(),
+  remove_brochure_pdf: z.boolean().optional(),
+  remove_brochure_pdf_2: z.boolean().optional(),
+});
+
 //=== Step 5 ===//
 export const stepFiveSchema = z
   .object({
     step: z.literal(5),
     event_id: z.number(),
+    is_rooms: z.union([z.literal(0), z.literal(1)]).optional(),
+    rooms: z.array(stepFiveRoomEntrySchema).optional(),
     remove_brochure_pdf: z.boolean().optional(),
     remove_brochure_pdf_2: z.boolean().optional(),
-    remove_faq_pdf: z.boolean().optional(),
     brochure_pdf: z
       .union([z.instanceof(File), z.string().url(), z.null()])
       .optional(),
     brochure_pdf_2: z
-      .union([z.instanceof(File), z.string().url(), z.null()])
-      .optional(),
-    faq_pdf: z
       .union([z.instanceof(File), z.string().url(), z.null()])
       .optional(),
     event_address: z
@@ -808,21 +890,6 @@ export const stepFiveSchema = z
       }),
     latitude: z.number().optional(),
     longitude: z.number().optional(),
-    price_start_from: z
-      .string()
-      .min(1, "Starting price is required")
-      .refine(
-        (val) => {
-          const num = Number(val);
-          return !Number.isNaN(num) && num >= 0 && num <= 999999;
-        },
-        { message: "Price must be between 0 and 999999" }
-      ),
-    price_start_from_button_text: z
-      .string()
-      .max(18, "Button text must not exceed 18 characters")
-      .optional()
-      .default("Book Now"),
     location: z.object({
       title: z
         .string()
@@ -901,82 +968,88 @@ export const stepFiveSchema = z
 
 export type StepFiveType = z.infer<typeof stepFiveSchema>;
 
+const stepSixPackageSchema = z.object({
+  id: z.number().optional(),
+  title: z
+    .string()
+    .min(1, "Package title is required")
+    .max(
+      DRINK_PACKAGE_ITEM_TITLE_MAX_CHARS,
+      `Package title must not exceed ${DRINK_PACKAGE_ITEM_TITLE_MAX_CHARS} characters`,
+    ),
+  description: z
+    .string()
+    .min(1, "Package description is required")
+    .refine(
+      (val) => plainTextCharCount(val) <= RICH_DESCRIPTION_MAX_CHARS,
+      {
+        message: `Package description must not exceed ${RICH_DESCRIPTION_MAX_CHARS} characters`,
+      },
+    ),
+  price: z.union([z.number(), z.string()]).refine(
+    (val) => {
+      if (val === "" || val === null || val === undefined) {
+        return false;
+      }
+      const num = typeof val === "string" ? Number.parseFloat(val) : val;
+      return (
+        !Number.isNaN(num) && num > 0 && num <= DRINK_PACKAGE_PRICE_MAX
+      );
+    },
+    {
+      message: `Package price is required and must be between 1 and ${DRINK_PACKAGE_PRICE_MAX}`,
+    },
+  ),
+  available_quantity: z
+    .union([z.number(), z.string()])
+    .transform((val) => {
+      if (typeof val === "string") {
+        if (val.trim() === "") {
+          return 100;
+        }
+        const num = Number.parseFloat(val);
+        return Number.isNaN(num) ? 100 : num;
+      }
+      return val || 100;
+    })
+    .refine((val) => val >= 1, {
+      message: "Available quantity must be at least 1",
+    })
+    .refine((val) => val <= DRINK_PACKAGE_QTY_MAX, {
+      message: `Available quantity cannot exceed ${DRINK_PACKAGE_QTY_MAX}`,
+    }),
+  sold_quantity: z.number().optional(),
+});
+
+const stepSixRoomEntrySchema = z.object({
+  room_id: z.number(),
+  drink_title: z.string().optional(),
+  drink_description: z.string().optional(),
+  packages: z.array(stepSixPackageSchema).optional(),
+});
+
 //=== Step 6 ===//
 export const stepSixSchema = z.object({
   step: z.literal(6),
   event_id: z.number(),
+  is_rooms: z.union([z.literal(0), z.literal(1)]).optional(),
+  rooms: z.array(stepSixRoomEntrySchema).optional(),
   drink_title: z
     .string()
     .min(1, "The drink title field is required")
     .max(
       DRINK_SECTION_TITLE_MAX_CHARS,
-      `Drink title must not exceed ${DRINK_SECTION_TITLE_MAX_CHARS} characters`
+      `Drink title must not exceed ${DRINK_SECTION_TITLE_MAX_CHARS} characters`,
     ),
   drink_description: z
     .string()
     .min(1, "The drink description field is required")
     .max(
       DRINK_SECTION_DESCRIPTION_MAX_CHARS,
-      `Drink description must not exceed ${DRINK_SECTION_DESCRIPTION_MAX_CHARS} characters`
+      `Drink description must not exceed ${DRINK_SECTION_DESCRIPTION_MAX_CHARS} characters`,
     ),
   packages: z
-    .array(
-      z.object({
-        id: z.number().optional(), // Optional for backward compatibility (required when from API)
-        title: z
-          .string()
-          .min(1, "Package title is required")
-          .max(
-            DRINK_PACKAGE_ITEM_TITLE_MAX_CHARS,
-            `Package title must not exceed ${DRINK_PACKAGE_ITEM_TITLE_MAX_CHARS} characters`
-          ),
-        description: z
-          .string()
-          .min(1, "Package description is required")
-          .refine(
-            (val) =>
-              plainTextCharCount(val) <= RICH_DESCRIPTION_MAX_CHARS,
-            {
-              message: `Package description must not exceed ${RICH_DESCRIPTION_MAX_CHARS} characters`,
-            }
-          ),
-        price: z.union([z.number(), z.string()]).refine(
-          (val) => {
-            // Check if value is empty, null, or undefined
-            if (val === "" || val === null || val === undefined) {
-              return false;
-            }
-            const num = typeof val === "string" ? Number.parseFloat(val) : val;
-            return (
-              !Number.isNaN(num) && num > 0 && num <= DRINK_PACKAGE_PRICE_MAX
-            );
-          },
-          {
-            message: `Package price is required and must be between 1 and ${DRINK_PACKAGE_PRICE_MAX}`,
-          }
-        ),
-        available_quantity: z
-          .union([z.number(), z.string()])
-          .transform((val) => {
-            if (typeof val === "string") {
-              // Handle empty string from API - default to 100
-              if (val.trim() === "") {
-                return 100;
-              }
-              const num = Number.parseFloat(val);
-              return Number.isNaN(num) ? 100 : num;
-            }
-            return val || 100;
-          })
-          .refine((val) => val >= 1, {
-            message: "Available quantity must be at least 1",
-          })
-          .refine((val) => val <= DRINK_PACKAGE_QTY_MAX, {
-            message: `Available quantity cannot exceed ${DRINK_PACKAGE_QTY_MAX}`,
-          }),
-        sold_quantity: z.number().optional(), // Read-only from API
-      })
-    )
+    .array(stepSixPackageSchema)
     .min(1, "At least one package is required"),
 });
 export type StepSixType = z.infer<typeof stepSixSchema>;

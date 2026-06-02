@@ -501,12 +501,12 @@ export default function StepSeven() {
           if (roomScope.isMultiRoom && !applyToAllRooms) {
             const updatedRooms = (globalForm.getValues("multiSpace")?.rooms ??
               []) as typeof rooms;
-            const nextIncompleteRoomIndex = updatedRooms.findIndex(
-              (room) => !isRoomSectionComplete(room, "brochure"),
+            const nextUnsavedRoomIndex = updatedRooms.findIndex(
+              (room) => room.isApprovedBrochure !== true,
             );
-            if (nextIncompleteRoomIndex !== -1) {
-              if (nextIncompleteRoomIndex !== currentRoomIndex) {
-                setCurrentRoomIndex(nextIncompleteRoomIndex);
+            if (nextUnsavedRoomIndex !== -1) {
+              if (nextUnsavedRoomIndex !== currentRoomIndex) {
+                setCurrentRoomIndex(nextUnsavedRoomIndex);
               }
               await save();
               return;

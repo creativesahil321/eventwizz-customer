@@ -12,6 +12,29 @@ import {
 import { ApiResponse, api, request } from "../../core/api-client";
 import { API_ENDPOINTS } from "../../core/endpoints";
 import {
+  parseCheckEventNameResponse,
+  type CheckEventNameAvailability,
+} from "@/lib/parse-check-event-name";
+import { isRoomsToFormDataValue } from "@/lib/event-form-limits";
+import { buildVendorEventGetUrl } from "./build-vendor-event-get-url";
+import { filterSchedulerRowsForApi } from "@/app/(protected)/vendor/events/_lib/normalize-step-two-fields";
+import {
+  cleanVendorStepThreeDatesForForm,
+  formatVendorStepThreeDateForApi,
+} from "@/app/(protected)/vendor/events/_lib/vendor-step-three-rooms";
+import {
+  appendVendorStepFourRoomToFormData,
+  type VendorStepFourRoomEntry,
+} from "@/app/(protected)/vendor/events/_lib/vendor-step-four-rooms";
+import {
+  appendVendorStepFiveRoomToFormData,
+  type VendorStepFiveRoomEntry,
+} from "@/app/(protected)/vendor/events/_lib/vendor-step-five-rooms";
+import {
+  mapVendorDrinkPackagesForApi,
+  type VendorStepSixRoomEntry,
+} from "@/app/(protected)/vendor/events/_lib/vendor-step-six-rooms";
+import {
   EventsQueryParams,
   EventItem,
   EventsResponse,
@@ -27,12 +50,47 @@ import {
 /** Step 3 API body requires a resolved venue id */
 export type StepThreeSavePayload = StepThreeType & {
   vendor_location_id: number;
+  is_rooms?: 0 | 1;
+  rooms?: Array<{
+    room_id: number;
+    dates: Array<Record<string, unknown>>;
+  }>;
+};
+
+export type StepFourSavePayload = StepFourType & {
+  is_rooms?: 0 | 1;
+  rooms?: VendorStepFourRoomEntry[];
+};
+
+export type StepFiveSavePayload = StepFiveType & {
+  is_rooms?: 0 | 1;
+  rooms?: VendorStepFiveRoomEntry[];
+};
+
+export type StepSixSavePayload = StepSixType & {
+  is_rooms?: 0 | 1;
+  rooms?: VendorStepSixRoomEntry[];
 };
 
 const isFileOrBlob = (value: unknown): value is File | Blob => {
   if (typeof value !== "object" || value === null) return false;
   return value instanceof File || value instanceof Blob;
 };
+
+/** New uploads as multipart files; persisted URLs as strings (onboarding parity). */
+function appendPackageImageField(
+  formData: FormData,
+  fieldName: string,
+  image: unknown,
+): void {
+  if (image && isFileOrBlob(image)) {
+    formData.append(fieldName, image);
+    return;
+  }
+  if (typeof image === "string" && image.trim().length > 0) {
+    formData.append(fieldName, image.trim());
+  }
+}
 
 export const eventsService = {
   // Get current onboarding step from session
@@ -50,12 +108,15 @@ export const eventsService = {
   /**
    * Get a single event by ID
    */
-  getEvent: async (id: number): Promise<ApiResponse<EventItem>> => {
+  getEvent: async (
+    id: number,
+    options?: { isRooms?: boolean },
+  ): Promise<ApiResponse<EventItem>> => {
     return api.get<ApiResponse<EventItem>>(
-      API_ENDPOINTS.VENDOR.EVENT.GET_EVENT.replace("{eventId}", id.toString()),
+      buildVendorEventGetUrl(id, options?.isRooms === true),
       {
         returnFullResponse: true,
-      }
+      },
     );
   },
 
@@ -135,6 +196,24 @@ export const eventsService = {
   },
 
   /**
+   * Check whether an event name is available for the current vendor location.
+   */
+  checkEventName: async (
+    eventName: string,
+  ): Promise<CheckEventNameAvailability> => {
+    const trimmed = eventName.trim();
+    const response = await api.get<ApiResponse<Record<string, unknown>>>(
+      API_ENDPOINTS.VENDOR.EVENT.CHECK_EVENT_NAME,
+      {
+        params: { event_name: trimmed },
+        returnFullResponse: true,
+        suppressErrorToast: true,
+      },
+    );
+    return parseCheckEventNameResponse(response);
+  },
+
+  /**
    * Get all event categories
    */
   getEventCategories: async (): Promise<
@@ -178,16 +257,19 @@ export const eventsService = {
    * Get all event menu categories (pass room_id when multi-room is enabled)
    */
   getEventMenuCategories: async (
-    params?: EventMenuCategoryQueryParams,
+    params: EventMenuCategoryQueryParams,
   ): Promise<ApiResponse<EventMenuCategory[]> | EventMenuCategory[]> => {
-    const roomId = params?.room_id;
+    const queryParams: Record<string, number> = {
+      event_id: params.event_id,
+    };
+    if (params.room_id != null && params.room_id > 0) {
+      queryParams.room_id = params.room_id;
+    }
     return api.get<ApiResponse<EventMenuCategory[]>>(
       API_ENDPOINTS.VENDOR.EVENT.GET_MENU_CATEGORIES,
       {
         returnFullResponse: true,
-        ...(roomId != null && roomId > 0
-          ? { params: { room_id: roomId } }
-          : {}),
+        params: queryParams,
       },
     );
   },
@@ -261,7 +343,6 @@ export const eventsService = {
     formData.append("about_event_heading", data.about_event_heading);
     formData.append("about_event_sub_heading", data.about_event_sub_heading);
     formData.append("about_event_description", data.about_event_description);
-    formData.append("event_schedular_title", data.event_schedular_title);
 
     // Add header banner if it exists - handle both File and Blob (cropped images)
     if (data.event_banner_image) {
@@ -276,20 +357,6 @@ export const eventsService = {
       }
     } else {
       formData.append("event_banner_image_unchanged", "1");
-    }
-
-    if (data.event_schedular_background_image) {
-      if (isFileOrBlob(data.event_schedular_background_image)) {
-        formData.append(
-          "event_schedular_background_image",
-          data.event_schedular_background_image
-        );
-      } else {
-        // If no file is provided, we need to inform the API that we're not updating this field
-        formData.append("event_schedular_background_image_unchanged", "1");
-      }
-    } else {
-      formData.append("event_schedular_background_image_unchanged", "1");
     }
 
     if (data.event_banner_video instanceof File) {
@@ -307,13 +374,8 @@ export const eventsService = {
       formData.append("remove_event_banner_video", "true");
     }
 
-    // Add event scheduler data
-    if (data.event_schedular && data.event_schedular.length > 0) {
-      // The API expects event_schedular[time] and event_schedular[title] format
-      data.event_schedular.forEach((schedule, index) => {
-        formData.append(`event_schedular[${index}][time]`, schedule.time);
-        formData.append(`event_schedular[${index}][title]`, schedule.title);
-      });
+    if (data.is_rooms === 0 || data.is_rooms === 1) {
+      formData.append("is_rooms", isRoomsToFormDataValue(data.is_rooms));
     }
 
     const response = await request<ApiResponse<EventItem>>({
@@ -355,7 +417,6 @@ export const eventsService = {
     formData.append("about_event_heading", data.about_event_heading);
     formData.append("about_event_sub_heading", data.about_event_sub_heading);
     formData.append("about_event_description", data.about_event_description);
-    formData.append("event_schedular_title", data.event_schedular_title);
 
     // Add header banner if it exists - handle both File and Blob (cropped images)
     if (data.event_banner_image) {
@@ -386,26 +447,8 @@ export const eventsService = {
       formData.append("remove_event_banner_video", "true");
     }
 
-    if (data.event_schedular_background_image) {
-      if (isFileOrBlob(data.event_schedular_background_image)) {
-        formData.append(
-          "event_schedular_background_image",
-          data.event_schedular_background_image
-        );
-      } else {
-        // If no file is provided, we need to inform the API that we're not updating this field
-        formData.append("event_schedular_background_image_unchanged", "1");
-      }
-    } else {
-      formData.append("event_schedular_background_image_unchanged", "1");
-    }
-    // Add event scheduler data
-    if (data.event_schedular && data.event_schedular.length > 0) {
-      // The API expects event_schedular[time] and event_schedular[title] format
-      data.event_schedular.forEach((schedule, index) => {
-        formData.append(`event_schedular[${index}][time]`, schedule.time);
-        formData.append(`event_schedular[${index}][title]`, schedule.title);
-      });
+    if (data.is_rooms === 0 || data.is_rooms === 1) {
+      formData.append("is_rooms", isRoomsToFormDataValue(data.is_rooms));
     }
 
     // Use the UPDATE endpoint instead of CREATE
@@ -441,6 +484,13 @@ export const eventsService = {
     formData.append("step", data.step.toString());
     formData.append("event_id", data.event_id.toString());
     formData.append("is_rooms", String(data.is_rooms === 1 ? 1 : 0));
+    if (data.is_rooms === 1 && Array.isArray(data.removed_room_ids)) {
+      data.removed_room_ids.forEach((roomId, index) => {
+        if (Number.isFinite(roomId) && roomId > 0) {
+          formData.append(`removed_room_ids[${index}]`, String(roomId));
+        }
+      });
+    }
     if (data.is_rooms === 1 && Array.isArray(data.rooms) && data.rooms.length > 0) {
       data.rooms.forEach((room, roomIndex) => {
         if (room.room_id) {
@@ -455,12 +505,13 @@ export const eventsService = {
           room.package_description || "",
         );
         formData.append(
-          `rooms[${roomIndex}][package_button_name]`,
-          room.package_button_name || "",
-        );
-        formData.append(
           `rooms[${roomIndex}][package_button_link]`,
           room.package_button_link || "",
+        );
+        appendPackageImageField(
+          formData,
+          `rooms[${roomIndex}][package_image]`,
+          room.package_image,
         );
 
         (room.package_details || []).forEach((detail, detailIndex) => {
@@ -469,23 +520,111 @@ export const eventsService = {
             detail.title || "",
           );
         });
+
+        formData.append(
+          `rooms[${roomIndex}][event_schedular_title]`,
+          room.event_schedular_title || "",
+        );
+        formData.append(
+          `rooms[${roomIndex}][event_schedule_subtitle]`,
+          room.event_schedule_subtitle || "",
+        );
+        filterSchedulerRowsForApi(room.event_schedular).forEach(
+          (schedule, scheduleIndex) => {
+            formData.append(
+              `rooms[${roomIndex}][event_schedular][${scheduleIndex}][time]`,
+              schedule.time,
+            );
+            formData.append(
+              `rooms[${roomIndex}][event_schedular][${scheduleIndex}][title]`,
+              schedule.title,
+            );
+          },
+        );
+
+        if (room.event_schedular_background_image) {
+          if (isFileOrBlob(room.event_schedular_background_image)) {
+            formData.append(
+              `rooms[${roomIndex}][event_schedular_background_image]`,
+              room.event_schedular_background_image,
+            );
+          } else {
+            formData.append(
+              `rooms[${roomIndex}][event_schedular_background_image_unchanged]`,
+              "1",
+            );
+          }
+        } else {
+          formData.append(
+            `rooms[${roomIndex}][event_schedular_background_image_unchanged]`,
+            "1",
+          );
+        }
+
+        const roomGallery = Array.isArray(room.gallery) ? room.gallery : [];
+        let roomFileIndex = 0;
+        let roomExistingIndex = 0;
+        const roomGalleryOrder: Array<
+          | { type: "existing"; id: number }
+          | { type: "new"; index: number }
+        > = [];
+
+        roomGallery.forEach((item) => {
+          if (item instanceof File || item instanceof Blob) {
+            formData.append(
+              `rooms[${roomIndex}][event_gallery_images][${roomFileIndex}]`,
+              item,
+            );
+            roomGalleryOrder.push({ type: "new", index: roomFileIndex });
+            roomFileIndex++;
+          } else if (
+            typeof item === "object" &&
+            item !== null &&
+            "id" in item &&
+            "url" in item
+          ) {
+            const existing = item as { id: number; url: string };
+            formData.append(
+              `rooms[${roomIndex}][existing_gallery_images][${roomExistingIndex}][id]`,
+              existing.id.toString(),
+            );
+            formData.append(
+              `rooms[${roomIndex}][existing_gallery_images][${roomExistingIndex}][url]`,
+              existing.url,
+            );
+            roomGalleryOrder.push({ type: "existing", id: existing.id });
+            roomExistingIndex++;
+          }
+        });
+
+        roomGalleryOrder.forEach((entry, orderIndex) => {
+          formData.append(
+            `rooms[${roomIndex}][gallery_order][${orderIndex}][type]`,
+            entry.type,
+          );
+          if (entry.type === "new") {
+            formData.append(
+              `rooms[${roomIndex}][gallery_order][${orderIndex}][index]`,
+              entry.index.toString(),
+            );
+          } else {
+            formData.append(
+              `rooms[${roomIndex}][gallery_order][${orderIndex}][id]`,
+              entry.id.toString(),
+            );
+          }
+        });
       });
     } else {
       formData.append("package_title", data.package_title);
       formData.append("package_description", data.package_description);
-      formData.append("package_button_name", data.package_button_name);
       if (data.package_button_link) {
         formData.append("package_button_link", data.package_button_link);
       }
     }
 
     if (data.is_rooms !== 1) {
-      // Add package image if it exists - handle both File and Blob (cropped images)
-      if (data.package_image) {
-        if (isFileOrBlob(data.package_image)) {
-          formData.append("package_image", data.package_image);
-        }
-      }
+      appendPackageImageField(formData, "package_image", data.package_image);
 
       // Add package details in the format package_details[0][title], package_details[1][title], etc.
       data.package_details.forEach((detail, index) => {
@@ -493,33 +632,66 @@ export const eventsService = {
       });
     }
 
-    // Handle gallery images - both new files and existing backend images (see docs/backend-api/GALLERY_API_FRONTEND_GUIDE.md)
-    if (data.gallery && data.gallery.length > 0) {
-      let fileIndex = 0;
-      let existingImageIndex = 0;
-      const galleryOrder: Array<{ type: "existing"; id: number } | { type: "new"; index: number }> = [];
-
-      data.gallery.forEach((item) => {
-        if (item instanceof File || item instanceof Blob) {
-          formData.append(`event_gallery_images[${fileIndex}]`, item);
-          galleryOrder.push({ type: "new", index: fileIndex });
-          fileIndex++;
-        } else if (
-          typeof item === "object" &&
-          item !== null &&
-          "id" in item &&
-          "url" in item
-        ) {
-          const existing = item as { id: number; url: string };
-          formData.append(`existing_gallery_images[${existingImageIndex}][id]`, existing.id.toString());
-          formData.append(`existing_gallery_images[${existingImageIndex}][url]`, existing.url);
-          galleryOrder.push({ type: "existing", id: existing.id });
-          existingImageIndex++;
-        }
+    if (data.is_rooms !== 1) {
+      // Timeline/scheduler now belongs to Step 2 (Package tab)
+      formData.append("event_schedular_title", data.event_schedular_title);
+      formData.append(
+        "event_schedule_subtitle",
+        data.event_schedule_subtitle || "",
+      );
+      filterSchedulerRowsForApi(data.event_schedular).forEach((schedule, index) => {
+        formData.append(`event_schedular[${index}][time]`, schedule.time);
+        formData.append(`event_schedular[${index}][title]`, schedule.title);
       });
+      if (data.event_schedular_background_image) {
+        if (isFileOrBlob(data.event_schedular_background_image)) {
+          formData.append(
+            "event_schedular_background_image",
+            data.event_schedular_background_image
+          );
+        } else {
+          formData.append("event_schedular_background_image_unchanged", "1");
+        }
+      } else {
+        formData.append("event_schedular_background_image_unchanged", "1");
+      }
 
-      if (galleryOrder.length > 0) {
-        formData.append("gallery_order", JSON.stringify(galleryOrder));
+      // Handle gallery images - both new files and existing backend images (see docs/backend-api/GALLERY_API_FRONTEND_GUIDE.md)
+      if (data.gallery && data.gallery.length > 0) {
+        let fileIndex = 0;
+        let existingImageIndex = 0;
+        const galleryOrder: Array<
+          { type: "existing"; id: number } | { type: "new"; index: number }
+        > = [];
+
+        data.gallery.forEach((item) => {
+          if (item instanceof File || item instanceof Blob) {
+            formData.append(`event_gallery_images[${fileIndex}]`, item);
+            galleryOrder.push({ type: "new", index: fileIndex });
+            fileIndex++;
+          } else if (
+            typeof item === "object" &&
+            item !== null &&
+            "id" in item &&
+            "url" in item
+          ) {
+            const existing = item as { id: number; url: string };
+            formData.append(
+              `existing_gallery_images[${existingImageIndex}][id]`,
+              existing.id.toString(),
+            );
+            formData.append(
+              `existing_gallery_images[${existingImageIndex}][url]`,
+              existing.url,
+            );
+            galleryOrder.push({ type: "existing", id: existing.id });
+            existingImageIndex++;
+          }
+        });
+
+        if (galleryOrder.length > 0) {
+          formData.append("gallery_order", JSON.stringify(galleryOrder));
+        }
       }
     }
 
@@ -552,72 +724,32 @@ export const eventsService = {
   storeStepThreeData: async (
     data: StepThreeSavePayload
   ): Promise<ApiResponse> => {
-    // Format dates to match API expectations
-    const formattedDates = data.dates?.map(
-      (date: StepThreeType["dates"][number]) => {
-        // Format deposit_due_date if present
-        let formattedDepositDueDate = "";
-        if (date.payment_type === "deposit" && date.deposit_due_date) {
-          try {
-            if (typeof date.deposit_due_date === "string") {
-              formattedDepositDueDate = date.deposit_due_date;
-            } else {
-              // Handle date objects if they come from a date picker
-              formattedDepositDueDate = new Date(date.deposit_due_date)
-                .toISOString()
-                .split("T")[0];
-            }
-          } catch (error) {
-            console.error("Error formatting deposit due date:", error);
-            formattedDepositDueDate = "";
-          }
-        }
+    const formatDates = (dates: StepThreeType["dates"] | undefined) =>
+      cleanVendorStepThreeDatesForForm(dates).map((date) =>
+        formatVendorStepThreeDateForApi(date),
+      );
 
-        // Return formatted date object for API
-        // Now using date.booking_type instead of data.booking_type
-        const baseDate = {
-          ...(typeof date.id === "number" &&
-            Number.isFinite(date.id) &&
-            date.id > 0 && { id: date.id }),
-          event_date: date.event_date,
-          booking_type: date.booking_type,
-          ...(date.cancelled === true && { cancelled: true }),
-          ...(date.cancelled === true &&
-            date.cancel_reason?.trim() && {
-            cancel_reason: date.cancel_reason.trim(),
-            cancellation_reason: date.cancel_reason.trim(),
-          }),
-          total_table_types:
-            date.booking_type !== "tickets" ? date.total_table_types : 0,
-          tables: date.booking_type !== "tickets" ? date.tables : [],
-          total_ticket_types:
-            date.booking_type !== "tables" ? date.total_ticket_types : 0,
-          tickets: date.booking_type !== "tables" ? date.tickets : [],
+    const payload =
+      data.is_rooms === 1 && Array.isArray(data.rooms) && data.rooms.length > 0
+        ? {
+          step: data.step,
+          vendor_location_id: data.vendor_location_id,
+          event_id: data.event_id,
+          is_rooms: 1 as const,
+          rooms: data.rooms
+            .filter((room) => Number(room.room_id) > 0)
+            .map((room) => ({
+              room_id: Number(room.room_id),
+              dates: formatDates(room.dates as StepThreeType["dates"]),
+            })),
+        }
+        : {
+          step: data.step,
+          vendor_location_id: data.vendor_location_id,
+          event_id: data.event_id,
+          is_rooms: 0 as const,
+          dates: formatDates(data.dates),
         };
-
-        // Only include payment fields for tables/both booking types
-        if (date.booking_type === "tables" || date.booking_type === "both") {
-          return {
-            ...baseDate,
-            payment_type: date.payment_type,
-            is_deposit_enabled: date.is_deposit_enabled ?? true,
-            deposit_type: date.deposit_type || "amount",
-            deposit_value: date.deposit_value || 0,
-            deposit_due_date: formattedDepositDueDate,
-          };
-        }
-
-        return baseDate;
-      }
-    );
-
-    // Create payload with all required data (matches backend step-3 contract)
-    const payload = {
-      step: data.step,
-      vendor_location_id: data.vendor_location_id,
-      event_id: data.event_id,
-      dates: formattedDates || [],
-    };
 
     const response = await api.post<ApiResponse<EventItem>>(
       API_ENDPOINTS.VENDOR.EVENT.UPDATE_EVENT.replace(
@@ -667,42 +799,57 @@ export const eventsService = {
    * @param data Step 6 data to be stored
    * @returns API response with status and message
    */
-  storeStepFourData: async (data: StepFourType): Promise<ApiResponse> => {
-    // Create FormData for file uploads
-    const formData = new FormData(); // Add basic fields
+  storeStepFourData: async (data: StepFourSavePayload): Promise<ApiResponse> => {
+    const formData = new FormData();
     formData.append("step", data.step.toString());
     formData.append("event_id", data.event_id.toString());
-    formData.append("catering_option", data.catering_option.toString());
 
-    if (data.menu_title) {
-      formData.append("menu_title", data.menu_title);
-    }
-    if (data.menu_description) {
-      formData.append("menu_description", data.menu_description);
-    }
+    const roomPayload =
+      data.is_rooms === 1 && Array.isArray(data.rooms) && data.rooms.length > 0;
 
-    if (data.menus) {
-      // Add menus with the required array-like notation
-      data.menus?.forEach((menu, menuIndex) => {
-        formData.append(`menus[${menuIndex}][name]`, menu.name);
-
-        menu.items.forEach((item, itemIndex) => {
-          formData.append(
-            `menus[${menuIndex}][items][${itemIndex}][title]`,
-            item.title
-          );
-          formData.append(
-            `menus[${menuIndex}][items][${itemIndex}][description]`,
-            item.description || ""
-          );
-        });
+    if (roomPayload) {
+      formData.append("is_rooms", "1");
+      data.rooms!.forEach((room, roomIndex) => {
+        appendVendorStepFourRoomToFormData(formData, roomIndex, room as VendorStepFourRoomEntry);
       });
-    }
-
-    if (data.menu_background_image instanceof File) {
-      formData.append("menu_background_image", data.menu_background_image);
     } else {
-      formData.append("menu_background_image_unchanged", "1");
+      formData.append("is_rooms", "0");
+      formData.append("catering_option", data.catering_option.toString());
+
+      if (data.menu_title) {
+        formData.append("menu_title", data.menu_title);
+      }
+      if (data.menu_description) {
+        formData.append("menu_description", data.menu_description);
+      }
+      if (Number(data.event_menu_category_id) > 0) {
+        formData.append(
+          "event_menu_category_id",
+          String(data.event_menu_category_id),
+        );
+      }
+
+      if (data.menus) {
+        data.menus.forEach((menu, menuIndex) => {
+          formData.append(`menus[${menuIndex}][name]`, menu.name);
+          menu.items.forEach((item, itemIndex) => {
+            formData.append(
+              `menus[${menuIndex}][items][${itemIndex}][title]`,
+              item.title,
+            );
+            formData.append(
+              `menus[${menuIndex}][items][${itemIndex}][description]`,
+              item.description || "",
+            );
+          });
+        });
+      }
+
+      if (data.menu_background_image instanceof File) {
+        formData.append("menu_background_image", data.menu_background_image);
+      } else {
+        formData.append("menu_background_image_unchanged", "1");
+      }
     }
 
     const response = await api.post<ApiResponse>(
@@ -733,66 +880,59 @@ export const eventsService = {
    * @returns API response with status and message
    */
   storeStepFiveData: async (
-    data: StepFiveType | FormData
+    data: StepFiveSavePayload | FormData
   ): Promise<ApiResponse> => {
     let formData: FormData;
 
     if (!(data instanceof FormData)) {
-      // Convert StepFiveType to FormData
       formData = new FormData();
 
-      // Add required fields
       formData.append("step", String(data.step || 5));
       formData.append("event_id", data.event_id.toString());
 
-      // Add files if available - only if they're actually File objects
-      // If they're URLs, don't send them - backend will keep existing files
-      if (data.brochure_pdf instanceof File) {
-        formData.append("brochure_pdf", data.brochure_pdf);
-      }
+      const roomPayload =
+        data.is_rooms === 1 &&
+        Array.isArray(data.rooms) &&
+        data.rooms.length > 0;
 
-      if (data.brochure_pdf_2 instanceof File) {
-        formData.append("brochure_pdf_2", data.brochure_pdf_2);
-      }
+      if (roomPayload) {
+        formData.append("is_rooms", "1");
+        if (data.event_address) {
+          formData.append("event_address", data.event_address);
+        }
+        if (data.latitude !== undefined && data.latitude !== null) {
+          formData.append("lat", data.latitude.toString());
+        }
+        if (data.longitude !== undefined && data.longitude !== null) {
+          formData.append("long", data.longitude.toString());
+        }
+        data.rooms!.forEach((room, roomIndex) => {
+          appendVendorStepFiveRoomToFormData(formData, roomIndex, room);
+        });
+      } else {
+        formData.append("is_rooms", "0");
 
-      if (data.faq_pdf instanceof File) {
-        formData.append("faq_pdf", data.faq_pdf);
-      }
-
-      // Add removal flags for PDFs
-      if (data.remove_brochure_pdf) {
-        formData.append("remove_brochure_pdf", "true");
-      }
-      if (data.remove_brochure_pdf_2) {
-        formData.append("remove_brochure_pdf_2", "true");
-      }
-      if (data.remove_faq_pdf) {
-        formData.append("remove_faq_pdf", "true");
-      }
-
-      // Add text fields
-      if (data.event_address) {
-        formData.append("event_address", data.event_address);
-      }
-
-      // Add latitude and longitude coordinates
-      if (data.latitude !== undefined && data.latitude !== null) {
-        formData.append("lat", data.latitude.toString());
-      }
-
-      if (data.longitude !== undefined && data.longitude !== null) {
-        formData.append("long", data.longitude.toString());
-      }
-
-      if (data.price_start_from) {
-        formData.append("price_start_from", data.price_start_from);
-      }
-
-      if (data.price_start_from_button_text) {
-        formData.append(
-          "price_start_from_button_text",
-          data.price_start_from_button_text
-        );
+        if (data.brochure_pdf instanceof File) {
+          formData.append("brochure_pdf", data.brochure_pdf);
+        }
+        if (data.brochure_pdf_2 instanceof File) {
+          formData.append("brochure_pdf_2", data.brochure_pdf_2);
+        }
+        if (data.remove_brochure_pdf) {
+          formData.append("remove_brochure_pdf", "true");
+        }
+        if (data.remove_brochure_pdf_2) {
+          formData.append("remove_brochure_pdf_2", "true");
+        }
+        if (data.event_address) {
+          formData.append("event_address", data.event_address);
+        }
+        if (data.latitude !== undefined && data.latitude !== null) {
+          formData.append("lat", data.latitude.toString());
+        }
+        if (data.longitude !== undefined && data.longitude !== null) {
+          formData.append("long", data.longitude.toString());
+        }
       }
     } else {
       formData = data;
@@ -827,24 +967,40 @@ export const eventsService = {
    * @param data Step 6 data to be stored
    * @returns API response with status and message
    */
-  storeStepSixData: async (data: StepSixType): Promise<ApiResponse> => {
-    const payload = {
-      step: data.step || 6,
-      event_id: data.event_id,
-      drink_title: data.drink_title,
-      drink_description: data.drink_description,
-      packages: data.packages,
-    };
+  storeStepSixData: async (data: StepSixSavePayload): Promise<ApiResponse> => {
+    const payload =
+      data.is_rooms === 1 && Array.isArray(data.rooms) && data.rooms.length > 0
+        ? {
+          step: data.step || 6,
+          event_id: data.event_id,
+          is_rooms: 1 as const,
+          rooms: data.rooms
+            .filter((room) => Number(room.room_id) > 0)
+            .map((room) => ({
+              room_id: Number(room.room_id),
+              drink_title: String(room.drink_title ?? "").trim(),
+              drink_description: String(room.drink_description ?? "").trim(),
+              packages: mapVendorDrinkPackagesForApi(room.packages),
+            })),
+        }
+        : {
+          step: data.step || 6,
+          event_id: data.event_id,
+          is_rooms: 0 as const,
+          drink_title: data.drink_title,
+          drink_description: data.drink_description,
+          packages: mapVendorDrinkPackagesForApi(data.packages),
+        };
 
     const response = await api.post<ApiResponse>(
       API_ENDPOINTS.VENDOR.EVENT.UPDATE_EVENT.replace(
         "{eventId}",
-        data.event_id.toString()
+        data.event_id.toString(),
       ),
       payload,
       {
         returnFullResponse: true,
-      }
+      },
     );
 
     // Notify that data has changed if successful

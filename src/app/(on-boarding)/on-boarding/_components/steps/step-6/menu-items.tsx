@@ -10,6 +10,11 @@ import { X } from "lucide-react";
 import { useEffect } from "react";
 import { Controller, useFieldArray, UseFormReturn } from "react-hook-form";
 import { StepSevenType } from "../../form-provider/schema";
+import {
+  createDefaultMenuItemRow,
+  menuItemTitleLabel,
+  menuItemTitlePlaceholder,
+} from "@/lib/event-form-limits";
 
 export default function MenuItems({
   menuIndex,
@@ -29,7 +34,7 @@ export default function MenuItems({
 
   useEffect(() => {
     if (itemFields.length === 0) {
-      appendItem({ title: "", description: "" });
+      appendItem(createDefaultMenuItemRow(0));
     }
   }, [itemFields, appendItem]);
 
@@ -43,9 +48,12 @@ export default function MenuItems({
             defaultValue={itemField.title || ""}
             render={({ field, fieldState: { error } }) => (
               <FormItem className="w-full">
-                <FormLabel>Item Title {itemIdx + 1}</FormLabel>
+                <FormLabel>{menuItemTitleLabel(itemIdx)}</FormLabel>
                 <FormControl>
-                  <Input placeholder="e.g. Chicken" {...field} />
+                  <Input
+                    placeholder={menuItemTitlePlaceholder(itemIdx)}
+                    {...field}
+                  />
                 </FormControl>
                 {error && <FormMessage>{error.message}</FormMessage>}
               </FormItem>
@@ -84,7 +92,9 @@ export default function MenuItems({
       ))}
       <Button
         type="button"
-        onClick={() => appendItem({ title: "", description: "" })}
+        onClick={() =>
+          appendItem(createDefaultMenuItemRow(itemFields.length))
+        }
       >
         Add Menu Item
       </Button>

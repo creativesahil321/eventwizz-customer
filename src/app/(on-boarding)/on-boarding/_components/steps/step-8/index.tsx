@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { useForm, useFieldArray, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { CardContent, CardHeader, OnboardingCard } from "@/components/ui/card";
@@ -40,6 +40,11 @@ import {
   DRINK_PACKAGE_PRICE_MAX,
   DRINK_PACKAGE_QTY_MAX,
 } from "@/lib/event-form-limits";
+import { MultiSpaceHeader } from "../../rooms/multi-space-header";
+import {
+  isRoomSectionComplete,
+  useRoomManager,
+} from "../../rooms/use-room-manager";
 
 export default function StepEight() {
   const currencySymbol = useCurrencySymbol();
@@ -50,10 +55,21 @@ export default function StepEight() {
     persistedProgressHydrated,
   } = useFormContext();
 
-  const stepEightPersistedApproved = useWatch({
+  const {
+    enabled: multiSpaceEnabled,
+    rooms,
+    currentRoomIndex,
+    setCurrentRoomIndex,
+  } = useRoomManager();
+  const isMultiRoom = multiSpaceEnabled && rooms.length > 0;
+
+  const stepEightPersistedApprovedSingle = useWatch({
     control: globalForm.control,
     name: "stepEight.isApproved",
   });
+  const stepEightPersistedApproved = isMultiRoom
+    ? rooms[currentRoomIndex]?.isApprovedDrinks
+    : stepEightPersistedApprovedSingle;
   const { handleFieldFocus } = useFieldFocusHandler();
   const [loading, setLoading] = useState(false);
   const { update: updateSession } = useSession();
@@ -69,29 +85,96 @@ export default function StepEight() {
   ];
 
   const eventId = useEventId(globalForm, "stepEight");
+  const scopedDrinksDefaults = isMultiRoom
+    ? rooms[currentRoomIndex]?.drinks
+    : globalForm.getValues("stepEight");
 
   const form = useForm({
     resolver: zodResolver(stepEightSchema),
     defaultValues: {
       step: 8 as unknown as number as StepEightType["step"],
       event_id: eventId,
-      drink_title: globalForm.getValues("stepEight.drink_title") || "",
-      drink_description:
-        globalForm.getValues("stepEight.drink_description") || "",
+      drink_title: scopedDrinksDefaults?.drink_title || "",
+      drink_description: scopedDrinksDefaults?.drink_description || "",
       packages:
-        globalForm.getValues("stepEight.packages")?.length > 0
-          ? globalForm.getValues("stepEight.packages")
+        scopedDrinksDefaults?.packages &&
+        scopedDrinksDefaults.packages.length > 0
+          ? scopedDrinksDefaults.packages
           : predefinedPackage,
     },
     mode: "onChange",
   });
+
+
+  useEffect(() => {
+    const scoped = isMultiRoom
+      ? (rooms[currentRoomIndex]?.drinks ?? {})
+      : globalForm.getValues("stepEight");
+
+    const resolvedValues = {
+      step: 8 as unknown as number as StepEightType["step"],
+      event_id: eventId,
+      drink_title: String(
+        (scoped as Record<string, unknown>)?.drink_title ?? "",
+      ),
+      drink_description: String(
+        (scoped as Record<string, unknown>)?.drink_description ?? "",
+      ),
+      packages:
+        Array.isArray((scoped as Record<string, unknown>)?.packages) &&
+        ((scoped as Record<string, unknown>).packages as unknown[]).length > 0
+          ? ((scoped as Record<string, unknown>).packages as StepEightType["packages"])
+          : predefinedPackage,
+    };
+
+    form.reset(resolvedValues);
+
+    globalForm.setValue("stepEight", resolvedValues, { shouldDirty: false });
+
+    if (isMultiRoom && rooms[currentRoomIndex]) {
+      globalForm.setValue(
+        `multiSpace.rooms.${currentRoomIndex}.drinks` as never,
+        {
+          drink_title: resolvedValues.drink_title,
+          drink_description: resolvedValues.drink_description,
+          packages: resolvedValues.packages,
+        } as never,
+        { shouldDirty: false },
+      );
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentRoomIndex, isMultiRoom]);
 
   const { fields, append, remove } = useFieldArray({
     control: form.control,
     name: "packages",
   });
 
-  const onSubmit = async (data: StepEightType) => {
+  const setScopedDrinksField = useCallback(
+    (
+      field: "drink_title" | "drink_description" | "packages",
+      value: string | StepEightType["packages"],
+    ) => {
+      globalForm.setValue(
+        `stepEight.${field}` as never,
+        value as never,
+        { shouldDirty: true },
+      );
+      if (isMultiRoom && rooms[currentRoomIndex]) {
+        globalForm.setValue(
+          `multiSpace.rooms.${currentRoomIndex}.drinks.${field}` as never,
+          value as never,
+          { shouldDirty: true },
+        );
+      }
+    },
+    [globalForm, isMultiRoom, rooms, currentRoomIndex],
+  );
+
+  const submitStepEight = async (
+    data: StepEightType,
+    applyToAllRooms = false,
+  ) => {
     setLoading(true);
     try {
       // Validate the form BEFORE updating global form state
@@ -158,7 +241,100 @@ export default function StepEight() {
         return;
       }
 
-      // Call the API using the service
+      if (isMultiRoom) {
+        const missingId = rooms.some((r) => !r.id);
+        if (missingId) {
+          toast.error("Please create your rooms first (missing room id).");
+          setLoading(false);
+          return;
+        }
+
+        const nextDrinksFromForm = {
+          drink_title: data.drink_title,
+          drink_description: data.drink_description,
+          packages: data.packages,
+        };
+
+        // Flush the active room's latest drinks data so freshRooms is up to date.
+        globalForm.setValue(
+          `multiSpace.rooms.${currentRoomIndex}.drinks` as never,
+          nextDrinksFromForm as never,
+          { shouldDirty: false },
+        );
+        const freshRooms =
+          (globalForm.getValues("multiSpace")?.rooms as typeof rooms) ?? rooms;
+
+        const stagedRooms = freshRooms.map((room, index) => {
+          const shouldMirrorFromActive =
+            index === currentRoomIndex ||
+            (applyToAllRooms && !isRoomSectionComplete(room, "drinks"));
+          if (!shouldMirrorFromActive) return room;
+          return {
+            ...room,
+            drinks: {
+              ...room.drinks,
+              ...nextDrinksFromForm,
+            },
+          };
+        });
+
+        const response = await onboardingService.storeStepEightRoomsData({
+          event_id: eventId,
+          isApproved: true,
+          rooms: (applyToAllRooms
+            ? stagedRooms
+            : [stagedRooms[currentRoomIndex]]) as any,
+        });
+
+        if (response?.status) {
+          const currentMultiSpace = globalForm.getValues("multiSpace");
+          if (currentMultiSpace) {
+            const latestRooms = currentMultiSpace.rooms ?? [];
+            const mergedRooms = latestRooms.map((existingRoom, index) => {
+              const staged = stagedRooms[index];
+              if (!staged) return existingRoom;
+              return {
+                ...existingRoom,
+                drinks: staged.drinks,
+                isApprovedDrinks: applyToAllRooms
+                  ? isRoomSectionComplete(staged, "drinks")
+                  : index === currentRoomIndex
+                    ? true
+                    : (existingRoom as typeof staged).isApprovedDrinks === true,
+              };
+            });
+            globalForm.setValue("multiSpace", {
+              ...currentMultiSpace,
+              rooms: mergedRooms as typeof stagedRooms,
+            });
+          }
+
+          const updatedRooms =
+            (globalForm.getValues("multiSpace")?.rooms as typeof rooms) ?? [];
+          const nextIncompleteRoomIndex = updatedRooms.findIndex(
+            (room) => !isRoomSectionComplete(room, "drinks"),
+          );
+
+          if (nextIncompleteRoomIndex !== -1) {
+            if (nextIncompleteRoomIndex !== currentRoomIndex) {
+              setCurrentRoomIndex(nextIncompleteRoomIndex);
+            }
+            await save();
+            return;
+          }
+
+          setActiveStep(9);
+          Promise.all([updateSession({ on_boarding_step: 9 }), save()]).catch(
+            (error) => {
+              console.error("Background save error:", error);
+            },
+          );
+        } else {
+          console.error("API Error:", response);
+        }
+        return;
+      }
+
       const response = await onboardingService.storeStepEightData({
         ...data,
         isApproved: true,
@@ -166,10 +342,7 @@ export default function StepEight() {
 
       if (response?.status) {
         globalForm.setValue("stepEight", { ...data, isApproved: true });
-        // INSTANT TRANSITION: Set active step FIRST for smooth UX
         setActiveStep(9);
-
-        // Then handle async operations in background
         Promise.all([updateSession({ on_boarding_step: 9 }), save()]).catch(
           (error) => {
             console.error("Background save error:", error);
@@ -186,6 +359,10 @@ export default function StepEight() {
     }
   };
 
+  const onSubmit = async (data: StepEightType) => {
+    await submitStepEight(data, false);
+  };
+
   return (
     <div className="flex flex-col items-center justify-start w-full min-h-screen bg-transparent">
       <div className="w-full min-w-0 max-w-none mx-auto relative">
@@ -200,6 +377,8 @@ export default function StepEight() {
                 <input type="hidden" {...form.register("step")} />
                 <input type="hidden" {...form.register("event_id")} />
 
+                <MultiSpaceHeader section="drinks" />
+
                 <WholeStepGuidedShell
                   form={form}
                   sectionId="step-eight-packages"
@@ -211,17 +390,44 @@ export default function StepEight() {
                     <GuidedWholeStepBottomActions
                       guided={guided}
                       loading={loading}
-                      labelWhenReady="Save & continue"
+                      alwaysShowReadyLabel={isMultiRoom}
+                      labelWhenReady={
+                        isMultiRoom ? "Apply to this room only" : "Save & continue"
+                      }
                       onContinue={() => void form.handleSubmit(onSubmit)()}
                       extraActions={
-                        <Button
-                          variant="event-outline"
-                          type="button"
-                          onClick={() => setActiveStep(9)}
-                          className={guidedOnboardingSkipButtonClass}
-                        >
-                          Skip
-                        </Button>
+                        isMultiRoom &&
+                        isRoomSectionComplete(
+                          rooms[currentRoomIndex],
+                          "drinks",
+                        ) &&
+                        rooms.some(
+                          (room, index) =>
+                            index !== currentRoomIndex &&
+                            !isRoomSectionComplete(room, "drinks"),
+                        ) ? (
+                          <Button
+                            variant="event-outline"
+                            type="button"
+                            onClick={() =>
+                              void form.handleSubmit((payload) =>
+                                submitStepEight(payload, true),
+                              )()
+                            }
+                            className={guidedOnboardingSkipButtonClass}
+                          >
+                            Apply to all rooms
+                          </Button>
+                        ) : !isMultiRoom ? (
+                          <Button
+                            variant="event-outline"
+                            type="button"
+                            onClick={() => setActiveStep(9)}
+                            className={guidedOnboardingSkipButtonClass}
+                          >
+                            Skip
+                          </Button>
+                        ) : undefined
                       }
                     />
                   )}
@@ -252,8 +458,8 @@ export default function StepEight() {
                                     maxLength={maxLength}
                                     onChange={(e) => {
                                       field.onChange(e);
-                                      globalForm.setValue(
-                                        "stepEight.drink_title",
+                                      setScopedDrinksField(
+                                        "drink_title",
                                         e.target.value,
                                       );
                                     }}
@@ -305,8 +511,8 @@ export default function StepEight() {
                                     maxLength={maxLength}
                                     onChange={(e) => {
                                       field.onChange(e);
-                                      globalForm.setValue(
-                                        "stepEight.drink_description",
+                                      setScopedDrinksField(
+                                        "drink_description",
                                         e.target.value,
                                       );
                                     }}
@@ -377,8 +583,8 @@ export default function StepEight() {
                                             ];
                                             updatedPackages[index].title =
                                               e.target.value;
-                                            globalForm.setValue(
-                                              "stepEight.packages",
+                                            setScopedDrinksField(
+                                              "packages",
                                               updatedPackages as StepEightType["packages"],
                                             );
                                           }}
@@ -440,8 +646,8 @@ export default function StepEight() {
                                             ];
                                             updatedPackages[index].description =
                                               e.target.value;
-                                            globalForm.setValue(
-                                              "stepEight.packages",
+                                            setScopedDrinksField(
+                                              "packages",
                                               updatedPackages as StepEightType["packages"],
                                             );
                                           }}
@@ -498,8 +704,8 @@ export default function StepEight() {
                                               ...currentPackages,
                                             ];
                                             updatedPackages[index].price = "";
-                                            globalForm.setValue(
-                                              "stepEight.packages",
+                                            setScopedDrinksField(
+                                              "packages",
                                               updatedPackages as StepEightType["packages"],
                                             );
                                             return;
@@ -522,8 +728,8 @@ export default function StepEight() {
                                             ...currentPackages,
                                           ];
                                           updatedPackages[index].price = capped;
-                                          globalForm.setValue(
-                                            "stepEight.packages",
+                                          setScopedDrinksField(
+                                            "packages",
                                             updatedPackages as StepEightType["packages"],
                                           );
                                         }}
@@ -578,8 +784,8 @@ export default function StepEight() {
                                               index
                                             ].available_quantity =
                                               undefined as unknown as number;
-                                            globalForm.setValue(
-                                              "stepEight.packages",
+                                            setScopedDrinksField(
+                                              "packages",
                                               updatedPackages as StepEightType["packages"],
                                             );
                                             return;
@@ -598,8 +804,8 @@ export default function StepEight() {
                                           updatedPackages[
                                             index
                                           ].available_quantity = capped;
-                                          globalForm.setValue(
-                                            "stepEight.packages",
+                                          setScopedDrinksField(
+                                            "packages",
                                             updatedPackages as StepEightType["packages"],
                                           );
                                         }}
@@ -626,7 +832,16 @@ export default function StepEight() {
                                     );
                                     return;
                                   }
+                                  const currentPackages =
+                                    form.getValues("packages") || [];
+                                  const updatedPackages = currentPackages.filter(
+                                    (_pkg, pkgIndex) => pkgIndex !== index,
+                                  );
                                   remove(index);
+                                  setScopedDrinksField(
+                                    "packages",
+                                    updatedPackages as StepEightType["packages"],
+                                  );
                                 }}
                                 disabled={fields.length <= 1}
                               >
@@ -639,14 +854,21 @@ export default function StepEight() {
                             <Button
                               type="button"
                               variant="outline"
-                              onClick={() =>
-                                append({
+                              onClick={() => {
+                                const newPackage = {
                                   title: `Package ${fields.length + 1}`,
                                   description: "",
                                   price: 0,
                                   available_quantity: 100,
-                                })
-                              }
+                                };
+                                const currentPackages =
+                                  form.getValues("packages") || [];
+                                append(newPackage);
+                                setScopedDrinksField("packages", [
+                                  ...currentPackages,
+                                  newPackage,
+                                ] as StepEightType["packages"]);
+                              }}
                               className="mt-4 border-white/20 bg-white/[0.04] text-sm hover:bg-white/[0.08]"
                             >
                               Add More Package

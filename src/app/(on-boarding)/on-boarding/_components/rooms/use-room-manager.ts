@@ -17,7 +17,12 @@ const ONBOARDING_IS_ROOMS_STORAGE_KEY = "onboarding_is_rooms";
  * Slot in `roomSchema` that a wizard step writes into.
  * Mirrors the four wizard steps the multi-space system fans out per room.
  */
-export type RoomSection = "package" | "dates" | "catering" | "brochure";
+export type RoomSection =
+  | "package"
+  | "dates"
+  | "catering"
+  | "brochure"
+  | "drinks";
 
 /**
  * Approval flag key on `RoomType` for a given section.
@@ -29,7 +34,8 @@ export const roomApprovalKey = (
   | "isApprovedPackage"
   | "isApprovedDates"
   | "isApprovedCatering"
-  | "isApprovedBrochure" => {
+  | "isApprovedBrochure"
+  | "isApprovedDrinks" => {
   switch (section) {
     case "package":
       return "isApprovedPackage";
@@ -39,6 +45,8 @@ export const roomApprovalKey = (
       return "isApprovedCatering";
     case "brochure":
       return "isApprovedBrochure";
+    case "drinks":
+      return "isApprovedDrinks";
   }
 };
 
@@ -55,7 +63,6 @@ export const isRoomSectionComplete = (
     );
     const hasTitle = String(pkg?.package_title ?? "").trim().length > 0;
     const hasDescription = String(pkg?.package_description ?? "").trim().length > 0;
-    const hasButton = String(pkg?.package_button_name ?? "").trim().length > 0;
     const hasDetails = Array.isArray(pkg?.package_details)
       ? pkg.package_details.some(
         (detail) => String(detail?.title ?? "").trim().length > 0,
@@ -65,7 +72,6 @@ export const isRoomSectionComplete = (
       hasImage &&
       hasTitle &&
       hasDescription &&
-      hasButton &&
       hasDetails
     );
   }
@@ -86,16 +92,38 @@ export const isRoomSectionComplete = (
     return Array.isArray(catering.menus) && catering.menus.length > 0;
   }
 
+  if (section === "drinks") {
+    const drinks = room.drinks;
+    if (!drinks) return false;
+    const hasTitle = String(drinks.drink_title ?? "").trim().length > 0;
+    const hasDescription =
+      String(drinks.drink_description ?? "").trim().length > 0;
+    const packages = Array.isArray(drinks.packages) ? drinks.packages : [];
+    const hasPackages = packages.some((pkg) => {
+      const hasPkgTitle = String(pkg?.title ?? "").trim().length > 0;
+      const hasPkgDescription =
+        String(pkg?.description ?? "").trim().length > 0;
+      const price = Number(pkg?.price ?? 0);
+      const quantity = Number(pkg?.available_quantity ?? 0);
+      return (
+        hasPkgTitle &&
+        hasPkgDescription &&
+        Number.isFinite(price) &&
+        price > 0 &&
+        Number.isFinite(quantity) &&
+        quantity > 0
+      );
+    });
+    return hasTitle && hasDescription && hasPackages;
+  }
+
+  if (room.isApprovedBrochure === true) return true;
+
   const brochure = room.brochure;
   if (!brochure) return false;
-  const hasAddress = String(brochure.event_address ?? "").trim().length > 0;
-  const hasBrochurePdf = Boolean(
-    brochure.brochure_pdf &&
-    ((typeof brochure.brochure_pdf === "string" &&
-      brochure.brochure_pdf.length > 0) ||
-      brochure.brochure_pdf instanceof File),
-  );
-  return hasAddress && hasBrochurePdf;
+
+  // Brochure PDF is optional (see stepSevenSchema). Only event address is required.
+  return String(brochure.event_address ?? "").trim().length > 0;
 };
 
 const blankRoom = (name: string): RoomType => ({
@@ -108,7 +136,7 @@ const blankRoom = (name: string): RoomType => ({
     package_details: [{ title: "" }],
     event_schedular_title: "",
     event_schedule_subtitle: "",
-    event_schedular: [],
+    event_schedular: [{ title: "", time: "" }],
     gallery: [],
   },
   dates: { dates: [] },
@@ -118,6 +146,18 @@ const blankRoom = (name: string): RoomType => ({
     menu_description: "",
     event_menu_category_id: 0,
     menus: [],
+  },
+  drinks: {
+    drink_title: "",
+    drink_description: "",
+    packages: [
+      {
+        title: "",
+        description: "",
+        price: 0,
+        available_quantity: 100,
+      },
+    ],
   },
   brochure: {
     brochure_pdf: null,
@@ -411,7 +451,8 @@ export function useRoomManager() {
         isRoomSectionComplete(room, "package") &&
         isRoomSectionComplete(room, "dates") &&
         isRoomSectionComplete(room, "catering") &&
-        isRoomSectionComplete(room, "brochure")
+        isRoomSectionComplete(room, "brochure") &&
+        isRoomSectionComplete(room, "drinks")
       );
     },
     [],

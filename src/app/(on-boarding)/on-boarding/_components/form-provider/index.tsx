@@ -20,6 +20,11 @@ import { useSession } from "next-auth/react";
 import { OnboardingFormSkeleton } from "@/components/ui/onboarding-skeleton";
 import { ApiResponse } from "@/services/vendor/onboarding/type";
 import { useOnboardingData } from "../../_lib/hooks/useOnboardingData";
+import type { ThemeSchema } from "@/types/theme.types";
+import {
+  extractOnboardingPreviewTheme,
+  ONBOARDING_DEFAULT_THEME,
+} from "../../_lib/onboarding-default-theme";
 
 interface FormContextType {
   form: UseFormReturn<OnboardingFormData>;
@@ -27,6 +32,8 @@ interface FormContextType {
   lastCompletedStep: number; // Add lastCompletedStep
   /** True after persistence GET was merged into the form (per-step `isApproved` is reliable). */
   persistedProgressHydrated: boolean;
+  /** Vendor-site preview theme from persistence `default_theme` (Clean White fallback). */
+  previewTheme: ThemeSchema;
   activeField: string | null;
   setActiveField: (fieldName: string | null) => void;
   setActiveStep: (
@@ -126,6 +133,15 @@ export function FormProvider({
     }
 
     return defaultValues;
+  }, [serverData]);
+
+  const previewTheme = useMemo((): ThemeSchema => {
+    if (!serverData) return ONBOARDING_DEFAULT_THEME;
+    const formData = serverData.data || serverData;
+    if (formData && typeof formData === "object") {
+      return extractOnboardingPreviewTheme(formData as Record<string, unknown>);
+    }
+    return ONBOARDING_DEFAULT_THEME;
   }, [serverData]);
 
   // Initialize the form
@@ -342,6 +358,7 @@ export function FormProvider({
       activeStep,
       lastCompletedStep,
       persistedProgressHydrated,
+      previewTheme,
       activeField,
       setActiveField,
       setActiveStep: updateActiveStep,
@@ -355,6 +372,7 @@ export function FormProvider({
       activeStep,
       lastCompletedStep,
       persistedProgressHydrated,
+      previewTheme,
       activeField,
       setActiveField,
       isLoading,
