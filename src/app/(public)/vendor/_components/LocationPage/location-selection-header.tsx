@@ -20,30 +20,18 @@ export default function LocationSelectionHeader({
   name,
 }: LocationSelectionHeaderProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [isScrolled, setIsScrolled] = useState(false);
   const { data: session, status: sessionStatus } = useSession();
   const isAuthenticated = sessionStatus === "authenticated";
   const accountType = session?.user?.account_type;
   const dashboardHref = accountType ? `/${accountType}/dashboard` : "/auth/login";
 
-  // Match CommonHeader: glass pills over hero; same pill family after scroll.
-  const pillGlassOnHero = !isScrolled;
-  const overDarkHero = pillGlassOnHero;
   const topBarChromeLinkClass = cn(
     "inline-flex items-center justify-center rounded-full border text-sm font-medium transition-colors whitespace-nowrap backdrop-blur-md px-3 py-1.5",
-    pillGlassOnHero
-      ? cn(
-          "border-[color:color-mix(in_srgb,var(--color-primary)_55%,white_18%)]",
-          "bg-white/10 hover:bg-white/15 text-white [text-shadow:0_1px_3px_rgba(0,0,0,0.55)]",
-          "shadow-[0_10px_30px_-18px_rgba(0,0,0,0.55)]",
-        )
-      : cn(
-          "border-[color:color-mix(in_srgb,var(--color-primary)_28%,var(--color-on-header)_16%)]",
-          "bg-[color:color-mix(in_srgb,var(--color-header)_72%,transparent)] hover:bg-[color:color-mix(in_srgb,var(--color-header)_82%,transparent)]",
-          "text-[var(--color-on-header)]",
-          "shadow-[0_12px_28px_-18px_rgba(15,23,42,0.22)]",
-          "hover:opacity-95 hover:underline hover:decoration-2 hover:underline-offset-2 hover:decoration-[color:var(--color-primary)]",
-        ),
+    "border-[color:color-mix(in_srgb,var(--color-primary)_28%,var(--color-on-header)_16%)]",
+    "bg-[color:color-mix(in_srgb,var(--color-header)_72%,transparent)] hover:bg-[color:color-mix(in_srgb,var(--color-header)_82%,transparent)]",
+    "text-[var(--color-on-header)]",
+    "shadow-[0_12px_28px_-18px_rgba(15,23,42,0.22)]",
+    "hover:opacity-95 hover:underline hover:decoration-2 hover:underline-offset-2 hover:decoration-[color:var(--color-primary)]",
   );
   const menuSurfaceChromeLinkClass = cn(
     "inline-flex items-center justify-center rounded-full border text-sm font-medium text-[var(--color-on-header)] transition-colors whitespace-nowrap px-4 py-2 backdrop-blur-sm",
@@ -51,11 +39,9 @@ export default function LocationSelectionHeader({
     "bg-[color:color-mix(in_srgb,var(--color-header)_55%,transparent)] hover:bg-[color:color-mix(in_srgb,var(--color-header)_70%,transparent)]",
     "hover:opacity-95 hover:underline hover:decoration-2 hover:underline-offset-2 hover:decoration-[color:var(--color-primary)]",
   );
-  /** Drawer sits on solid header surface — keep primary solid, still rounded-full. */
   const bookNowMobilePillClass =
     "!rounded-full h-9 gap-1 border-0 px-4 font-semibold shadow-sm";
 
-  // Close mobile menu if user clicks outside
   const handleClickOutside = useCallback(
     (event: MouseEvent) => {
       if (
@@ -70,33 +56,19 @@ export default function LocationSelectionHeader({
   );
 
   useEffect(() => {
-    // Listen for click events outside the menu to close it
     document.addEventListener("click", handleClickOutside);
     return () => {
       document.removeEventListener("click", handleClickOutside);
     };
   }, [handleClickOutside]);
 
-  useEffect(() => {
-    const handleScroll = () => {
-      setIsScrolled(window.scrollY > 50);
-    };
-
-    window.addEventListener("scroll", handleScroll);
-    return () => window.removeEventListener("scroll", handleScroll);
-  }, []);
-
   return (
     <header
       className={cn(
-        "fixed top-0 left-0 right-0 z-50 transition-all duration-300",
-        isScrolled
-          ? "bg-[color:var(--color-header)] shadow-md text-[var(--color-on-header)]"
-          : "bg-transparent",
+        "fixed top-0 left-0 right-0 z-50 bg-[color:var(--color-header)] shadow-md text-[var(--color-on-header)]",
       )}
     >
-      {/* Main header — light text over hero; scrolled state uses theme on-header */}
-      <div className={cn("py-4", overDarkHero && "text-white")}>
+      <div className="py-4">
         <div className="container mx-auto flex items-center justify-between px-4">
           <motion.div
             className="flex items-center"
@@ -122,11 +94,10 @@ export default function LocationSelectionHeader({
           </motion.div>
 
           <div className="flex items-center gap-3 md:gap-4">
-            {/* Desktop menu */}
             <div className="hidden md:flex items-center gap-3 lg:gap-4">
               <div className="flex items-center gap-2">
                 <VendorPublicLocationBookNow
-                  pillGlassOnHero={pillGlassOnHero}
+                  pillGlassOnHero={false}
                   onLocationNavigate={() => setMobileMenuOpen(false)}
                 />
               </div>
@@ -161,15 +132,9 @@ export default function LocationSelectionHeader({
                 ))}
             </div>
 
-            {/* Mobile menu button */}
             <button
               type="button"
-              className={cn(
-                "md:hidden rounded-full p-2 transition-colors",
-                pillGlassOnHero
-                  ? "border border-[color:color-mix(in_srgb,var(--color-primary)_55%,white_18%)] bg-white/10 text-white backdrop-blur-md hover:bg-white/15 [text-shadow:0_1px_3px_rgba(0,0,0,0.55)]"
-                  : "text-[var(--color-on-header)] hover:bg-[var(--color-primary)]/10",
-              )}
+              className="md:hidden rounded-full p-2 transition-colors text-[var(--color-on-header)] hover:bg-[var(--color-primary)]/10"
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
               aria-label={mobileMenuOpen ? "Close menu" : "Open menu"}
               aria-expanded={mobileMenuOpen}
@@ -180,7 +145,6 @@ export default function LocationSelectionHeader({
         </div>
       </div>
 
-      {/* Mobile menu */}
       {mobileMenuOpen && (
         <motion.div
           className="md:hidden absolute top-full left-0 w-full bg-[var(--color-header)]/95 backdrop-blur-sm border-b border-[var(--color-primary)]/30 shadow-lg mobile-dropdown"
