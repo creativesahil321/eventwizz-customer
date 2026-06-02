@@ -23,10 +23,12 @@ export default function LocationSelectionHeader({
   const { data: session, status: sessionStatus } = useSession();
   const isAuthenticated = sessionStatus === "authenticated";
   const accountType = session?.user?.account_type;
-  const dashboardHref = accountType ? `/${accountType}/dashboard` : "/auth/login";
+  const dashboardHref = accountType
+    ? `/${accountType}/dashboard`
+    : "/auth/login";
 
   const topBarChromeLinkClass = cn(
-    "inline-flex items-center justify-center rounded-full border text-sm font-medium transition-colors whitespace-nowrap backdrop-blur-md px-3 py-1.5",
+    "inline-flex items-center justify-center rounded-full border text-sm font-medium transition-colors whitespace-nowrap backdrop-blur-md px-3 py-1",
     "border-[color:color-mix(in_srgb,var(--color-primary)_28%,var(--color-on-header)_16%)]",
     "bg-[color:color-mix(in_srgb,var(--color-header)_72%,transparent)] hover:bg-[color:color-mix(in_srgb,var(--color-header)_82%,transparent)]",
     "text-[var(--color-on-header)]",
@@ -68,7 +70,7 @@ export default function LocationSelectionHeader({
         "fixed top-0 left-0 right-0 z-50 bg-[color:var(--color-header)] shadow-md text-[var(--color-on-header)]",
       )}
     >
-      <div className="py-4">
+      <div className="py-3">
         <div className="container mx-auto flex items-center justify-between px-4">
           <motion.div
             className="flex items-center"
@@ -76,17 +78,23 @@ export default function LocationSelectionHeader({
             animate={{ opacity: 1, x: 0 }}
             transition={{ duration: 0.5 }}
           >
-            <Link href="/" className="inline-flex items-center" aria-label="Home">
+            <Link
+              href="/"
+              className="inline-flex items-center"
+              aria-label="Home"
+            >
               {logo ? (
-                <img
-                  src={addCacheBusting(logo)}
-                  width={200}
-                  height={116}
-                  className="h-14 md:h-16 w-auto object-contain max-w-[200px]"
-                  alt={name || "EventWizz"}
-                />
+                <div className="flex h-10 items-center md:h-14">
+                  <img
+                    src={addCacheBusting(logo)}
+                    width={200}
+                    height={116}
+                    className="max-h-8 w-auto object-contain md:max-h-12"
+                    alt={name || "EventWizz"}
+                  />
+                </div>
               ) : (
-                <span className="text-xl font-bold">
+                <span className="text-lg font-bold md:text-xl">
                   {name || "EventWizz"}
                 </span>
               )}
@@ -105,7 +113,10 @@ export default function LocationSelectionHeader({
               {sessionStatus !== "loading" &&
                 (isAuthenticated ? (
                   <>
-                    <Link href={dashboardHref} className={topBarChromeLinkClass}>
+                    <Link
+                      href={dashboardHref}
+                      className={topBarChromeLinkClass}
+                    >
                       Dashboard
                     </Link>
                     <button
