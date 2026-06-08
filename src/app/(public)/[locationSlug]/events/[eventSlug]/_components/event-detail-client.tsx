@@ -134,11 +134,7 @@ export default function EventDetailClient({
         faq_pdf: eventData.faq_pdf,
         brochure_pdf_2: slices.brochure_pdf_2,
       }),
-    [
-      slices.brochure_pdf,
-      slices.brochure_pdf_2,
-      eventData.faq_pdf,
-    ],
+    [slices.brochure_pdf, slices.brochure_pdf_2, eventData.faq_pdf],
   );
 
   const timelineRows = useMemo(
@@ -267,8 +263,6 @@ export default function EventDetailClient({
             heading={slices.package_title}
             subHeading={slices.package_description}
             image={slices.package_image}
-            buttonName={slices.package_button_name || "Book Now"}
-            buttonLink="#booking"
             packageDetails={slices.package_details}
             headingEmphasis={headingEmphasisFromSite}
           />
@@ -327,8 +321,7 @@ export default function EventDetailClient({
             location={{
               title: "EVENT LOCATION",
               description:
-                slices.event_address ||
-                "Event location will be displayed here",
+                slices.event_address || "Event location will be displayed here",
               icon: "MapPin",
               latitude: slices.lat,
               longitude: slices.long,

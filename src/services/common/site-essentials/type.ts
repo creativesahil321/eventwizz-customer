@@ -1,3 +1,6 @@
+import type { Event, GalleryImage } from "@/services/common/events/type";
+import type { LocationData } from "@/types/theme.types";
+
 export interface SocialLoginColors {
   google: string;
   microsoft: string;
@@ -70,6 +73,20 @@ export interface SiteEssentials {
   event_gallery_title: string | null;
   cover_image: string | null;
   cover_video: string | null;
+  main_landing_cover_image?: string | null;
+  main_landing_banner_heading?: string | null;
+  main_landing_banner_sub_heading?: string | null;
+  main_landing_locations_list_title?: string | null;
+  main_landing_locations_list_subtitle?: string | null;
+  /** Read-only list for main landing preview */
+  locations?: LocationData[];
+  /** Read-only — location slug when GET includes `?slug=` */
+  slug?: string | null;
+  /** Read-only — marketing cards for location preview */
+  latest_events?: Event[];
+  upcoming_events?: Event[];
+  /** URL strings or `{ id, url }` objects */
+  event_gallery?: GalleryImage[] | string[];
 }
 
 export interface SiteEssentialsResponse {

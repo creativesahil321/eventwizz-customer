@@ -35,10 +35,8 @@ import AddressAutocomplete from "./address-autocomplete";
 import { useCurrencySymbol } from "@/hooks/use-currency-format";
 import { MultiSpaceHeader } from "../../rooms/multi-space-header";
 import { useRoomScopeSync } from "../../rooms/use-room-scope-sync";
-import {
-  isRoomSectionComplete,
-  useRoomManager,
-} from "../../rooms/use-room-manager";
+import { canShowApplyToAllButton, useRoomManager } from "../../rooms/use-room-manager";
+import { isVendorBrochureApplyToAllReady } from "@/app/(protected)/vendor/events/_lib/vendor-step-five-rooms";
 
 export default function StepSeven() {
   const currencySymbol = useCurrencySymbol();
@@ -105,6 +103,13 @@ export default function StepSeven() {
   // Track if we have string URLs from backend
   const [brochurePdfUrl, setBrochurePdfUrl] = useState<string | null>(null);
   const [brochurePdfUrl2, setBrochurePdfUrl2] = useState<string | null>(null);
+  const watchedEventAddress = useWatch({
+    control: form.control,
+    name: "event_address",
+  });
+  const addressReadyForApply = isVendorBrochureApplyToAllReady(
+    watchedEventAddress ?? "",
+  );
   const addressSearchFunctionRef = useRef<((address: string) => void) | null>(
     null,
   );
@@ -419,8 +424,9 @@ export default function StepSeven() {
 
   const handleSubmit = async (
     data: StepSevenType,
-    applyToAllRooms = false,
+    options?: { applyToAllRooms?: boolean },
   ) => {
+    const applyToAllRooms = options?.applyToAllRooms === true;
     setLoading(true);
     try {
       // Check for required fields manually before submission
@@ -438,9 +444,24 @@ export default function StepSeven() {
         return;
       }
 
+      const resolvePdfField = (
+        value: StepSevenType["brochure_pdf"],
+        fallbackUrl: string | null,
+      ): StepSevenType["brochure_pdf"] => {
+        if (value instanceof File) return value;
+        if (typeof value === "string" && value.trim().length > 0) return value;
+        return fallbackUrl && fallbackUrl.trim().length > 0 ? fallbackUrl : null;
+      };
+
+      const submissionData: StepSevenType = {
+        ...data,
+        brochure_pdf: resolvePdfField(data.brochure_pdf, brochurePdfUrl),
+        brochure_pdf_2: resolvePdfField(data.brochure_pdf_2, brochurePdfUrl2),
+      };
+
       // First ensure the preview data is properly formatted
       const formattedData = {
-        ...data,
+        ...submissionData,
         location: {
           title: "LOCATION",
           description: data.event_address || "",
@@ -478,11 +499,11 @@ export default function StepSeven() {
         // Branch on multi-room mode. Single-room mode hits the existing endpoint; multi-room
         // dispatches via the room-scoped endpoint and mirrors data into the active room slot.
         const succeeded = await roomScope.saveSection({
-          stepData: { ...data, isApproved: true } as StepSevenType,
+          stepData: { ...submissionData, isApproved: true } as StepSevenType,
           applyToAllRooms,
           singleRoomSave: async () => {
             const response = await onboardingService.storeStepSevenData({
-              ...data,
+              ...submissionData,
               isApproved: true,
             });
             if (response?.status) {
@@ -498,6 +519,8 @@ export default function StepSeven() {
         });
 
         if (succeeded) {
+          if (applyToAllRooms && roomScope.isMultiRoom) {
+          }
           if (roomScope.isMultiRoom && !applyToAllRooms) {
             const updatedRooms = (globalForm.getValues("multiSpace")?.rooms ??
               []) as typeof rooms;
@@ -508,7 +531,7 @@ export default function StepSeven() {
               if (nextUnsavedRoomIndex !== currentRoomIndex) {
                 setCurrentRoomIndex(nextUnsavedRoomIndex);
               }
-              await save();
+              toast.info("Saved. Continue with the next room.");
               return;
             }
           }
@@ -571,24 +594,19 @@ export default function StepSeven() {
                           ? "Apply to this room only"
                           : "Save & continue"
                       }
-                      onContinue={() => void form.handleSubmit(handleSubmit)()}
+                      onContinue={() =>
+                        void form.handleSubmit((data) =>
+                          handleSubmit(data),
+                        )()
+                      }
                       extraActions={
-                        roomScope.isMultiRoom &&
-                        isRoomSectionComplete(
-                          rooms[currentRoomIndex],
-                          "brochure",
-                        ) &&
-                        rooms.some(
-                          (room, index) =>
-                            index !== currentRoomIndex &&
-                            !isRoomSectionComplete(room, "brochure"),
-                        ) ? (
+                        canShowApplyToAllButton(rooms, addressReadyForApply) ? (
                           <Button
                             variant="event-outline"
                             type="button"
                             onClick={() =>
                               void form.handleSubmit((data) =>
-                                handleSubmit(data, true),
+                                handleSubmit(data, { applyToAllRooms: true }),
                               )()
                             }
                             className={guidedOnboardingSkipButtonClass}

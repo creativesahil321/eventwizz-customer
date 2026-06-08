@@ -26,8 +26,6 @@ import ExperienceSection from "@/app/(public)/vendor/_components/EventListPage/e
 import ContactFormSection from "@/app/(public)/vendor/_components/EventListPage/contact-form-section";
 
 import "@/app/(public)/[locationSlug]/events/[eventSlug]/event-detail.css";
-import { ThemeAnimationManager } from "@/components/theme-animations/theme-animation-manager";
-import { themeDetectionFromOnboardingStepThree } from "@/lib/theme-detection-source";
 import { headerLinksFromDownloadItems } from "@/lib/event-header-downloads";
 import { EVENT_BOOKING_SECTION_CLASSNAME } from "@/lib/event-booking-section-layout";
 import { EventHeroBand } from "@/components/public/event-hero-band";
@@ -794,13 +792,6 @@ export default function FormPreview() {
 
     return (
       <div className="event-detail-page">
-        <ThemeAnimationManager
-          themeDetectionSource={themeDetectionFromOnboardingStepThree(
-            formState.stepThree,
-          )}
-          enabled={true}
-          intensity="medium"
-        />
         {/* Same header chrome as live event detail (`EventDetailClient`); non-interactive when inside PreviewProvider. */}
         <OnboardingPreviewHeader
           scrollContainerRef={previewContainerRef}

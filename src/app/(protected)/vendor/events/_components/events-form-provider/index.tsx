@@ -199,7 +199,6 @@ export function FormProvider({
       await invalidateCache();
     } catch (error) {
       console.error("Error saving:", error);
-      toast.error("An error occurred while saving.");
     } finally {
       setIsLoading(false);
     }
@@ -231,12 +230,9 @@ export function FormProvider({
         form.setValue("currentStep", nextStep);
       } else if (response.success) {
         toast.info("Reached final step.");
-      } else {
-        toast.error("Failed to save changes.");
       }
     } catch (error) {
       console.error("Error in next function:", error);
-      toast.error("An error occurred while saving.");
     } finally {
       setIsLoading(false);
     }

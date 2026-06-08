@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useEffect, useCallback, useRef } from "react";
+import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useForm, useFieldArray, Resolver, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Button } from "@/components/ui/button";
@@ -46,8 +46,16 @@ import { MultiSpaceHeader } from "../../rooms/multi-space-header";
 import { useRoomScopeSync } from "../../rooms/use-room-scope-sync";
 import {
   isRoomSectionComplete,
+  canShowApplyToAllButton,
   useRoomManager,
 } from "../../rooms/use-room-manager";
+import { hasMeaningfulVendorDates } from "@/app/(protected)/vendor/events/_lib/vendor-step-three-rooms";
+import { focusNextIncompleteOnboardingRoom } from "../../../_lib/onboarding-multi-room-progress";
+import { EventDateInput } from "@/components/event-date-input";
+import {
+  hasEventDateOrderChanged,
+  sortDateFieldArrayWithIds,
+} from "@/lib/event-dates-sort";
 
 // Helper function to get today's date in YYYY-MM-DD format
 const getTodayDateString = () => {
@@ -139,12 +147,14 @@ export default function StepFive() {
   const { handleFieldFocus, clearActiveField } = useFieldFocusHandler();
   const [loading, setLoading] = useState(false);
   const [openAccordions, setOpenAccordions] = useState<string[]>([]);
+  const prevDateFieldCountRef = useRef<number | undefined>(undefined);
   const { update: updateSession } = useSession();
 
   // Multi-room sync: when enabled, the active room's `dates` slot drives the form below and
   // saves go through the room-scoped endpoint. Single-room mode is unchanged.
   const roomScope = useRoomScopeSync("dates");
-  const { currentRoomIndex, rooms, setCurrentRoomIndex } = useRoomManager();
+  const { currentRoomIndex, currentRoom, rooms, setCurrentRoomIndex } =
+    useRoomManager();
   const stepFivePersistedApproved = roomScope.isMultiRoom
     ? roomScope.persistedApproved
     : stepFivePersistedApprovedSingle === true;
@@ -301,6 +311,7 @@ export default function StepFive() {
     fields: dateFields,
     append,
     remove,
+    replace,
   } = useFieldArray({
     control: form.control,
     name: "dates",
@@ -309,6 +320,28 @@ export default function StepFive() {
     control: form.control,
     name: "dates",
   });
+
+  // Open newly added rows automatically (stable field.id keys).
+  useEffect(() => {
+    const len = dateFields.length;
+    if (
+      prevDateFieldCountRef.current !== undefined &&
+      len > prevDateFieldCountRef.current
+    ) {
+      const lastField = dateFields[len - 1];
+      if (lastField) {
+        setOpenAccordions((prev) =>
+          prev.includes(lastField.id) ? prev : [...prev, lastField.id],
+        );
+      }
+    }
+    prevDateFieldCountRef.current = len;
+  }, [dateFields]);
+
+  const canApplyToAllRooms = useMemo(() => {
+    if (!roomScope.isMultiRoom || rooms.length < 2) return false;
+    return hasMeaningfulVendorDates(watchedDates);
+  }, [roomScope.isMultiRoom, rooms.length, watchedDates]);
 
   // Keep deposit defaults in sync with schema expectations.
   useEffect(() => {
@@ -582,11 +615,8 @@ export default function StepFive() {
 
   // Add date with default booking type of tickets
   const handleAddDate = useCallback(() => {
-    const newIndex = dateFields.length;
     append(getDefaultDate("tickets"));
-    // Automatically open the new accordion
-    setOpenAccordions((prev) => [...prev, `date-${newIndex}`]);
-  }, [append, dateFields.length]);
+  }, [append]);
 
   // Helper function to validate date uniqueness and order
   const validateDateUniqueness = useCallback(
@@ -604,20 +634,34 @@ export default function StepFive() {
         return false;
       }
 
-      // Check if dates are in ascending order
-      const sortedDates = [...otherDates, newDate].sort();
-      const currentOrder = [...otherDates, newDate];
-
-      if (JSON.stringify(sortedDates) !== JSON.stringify(currentOrder)) {
-        toast.warning(
-          "Dates should be in ascending order. Please arrange them chronologically.",
-        );
-        return false;
-      }
-
       return true;
     },
     [form],
+  );
+
+  const sortDatesStable = useCallback(() => {
+    const currentDates = form.getValues("dates");
+    if (!currentDates || currentDates.length <= 1) return;
+
+    const sortedDates = sortDateFieldArrayWithIds(dateFields, currentDates);
+    if (!hasEventDateOrderChanged(currentDates, sortedDates)) return;
+
+    replace(sortedDates as StepFiveType["dates"]);
+  }, [dateFields, form, replace]);
+
+  const commitEventDate = useCallback(
+    (dateIndex: number, newDate: string) => {
+      if (newDate && !validateDateUniqueness(dateIndex, newDate)) {
+        return false;
+      }
+      form.setValue(`dates.${dateIndex}.event_date`, newDate, {
+        shouldValidate: true,
+        shouldDirty: true,
+      });
+      sortDatesStable();
+      return true;
+    },
+    [form, sortDatesStable, validateDateUniqueness],
   );
 
   // Create custom field arrays for tickets - now checks individual date's booking type
@@ -1222,17 +1266,16 @@ export default function StepFive() {
   );
 
   const renderDateFields = useCallback(
-    (dateIndex: number) => {
+    (dateIndex: number, dateRowId: string) => {
       const dateValue = form.watch(`dates.${dateIndex}.event_date`);
-      const accordionValue = `date-${dateIndex}`;
-      const isOpen = openAccordions.includes(accordionValue);
+      const isOpen = openAccordions.includes(dateRowId);
       const safeDepositType = normalizeDepositType(
         form.watch(`dates.${dateIndex}.deposit_type`),
       );
 
       return (
         <div
-          key={`date-${dateIndex}`}
+          key={dateRowId}
           className="mb-4 overflow-hidden rounded-xl border border-white/10 bg-white/[0.02] transition-colors hover:border-white/15"
         >
           <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 px-4 py-3 sm:px-5 sm:py-3.5">
@@ -1242,8 +1285,8 @@ export default function StepFive() {
                 onClick={() => {
                   setOpenAccordions((prev) =>
                     isOpen
-                      ? prev.filter((item) => item !== accordionValue)
-                      : [...prev, accordionValue],
+                      ? prev.filter((item) => item !== dateRowId)
+                      : [...prev, dateRowId],
                   );
                 }}
                 className="flex min-w-0 items-center gap-2 text-left transition-colors hover:text-[var(--color-primary,#3b82f6)]"
@@ -1285,25 +1328,19 @@ export default function StepFive() {
                       </FormLabel>
                       <FormControl>
                         <div className="relative w-full">
-                          <Input
-                            type="date"
+                          <EventDateInput
                             placeholder="Select date"
-                            {...field}
-                            min={getTodayDateString()} // Add min attribute to prevent past dates
+                            name={field.name}
+                            ref={field.ref}
+                            value={field.value ?? ""}
+                            min={getTodayDateString()}
                             className="w-full h-11 bg-white/5 border-white/10 focus:ring-2 focus:ring-blue-500"
                             onFocus={() =>
                               handleFieldFocus(`dates.${dateIndex}.event_date`)
                             }
-                            onChange={(e) => {
-                              const newDate = e.target.value;
-                              if (
-                                newDate &&
-                                !validateDateUniqueness(dateIndex, newDate)
-                              ) {
-                                return; // Don't update if validation fails
-                              }
-                              field.onChange(newDate);
-                            }}
+                            onValueCommit={(newDate) =>
+                              commitEventDate(dateIndex, newDate)
+                            }
                           />
                           {!field.value && (
                             <span
@@ -1654,6 +1691,7 @@ export default function StepFive() {
     },
     [
       append,
+      commitEventDate,
       createTableFields,
       createTicketFields,
       dateFields.length,
@@ -1662,7 +1700,6 @@ export default function StepFive() {
       openAccordions,
       remove,
       updateDate,
-      validateDateUniqueness,
     ],
   );
 
@@ -1756,14 +1793,14 @@ export default function StepFive() {
         if (roomScope.isMultiRoom && !applyToAllRooms) {
           const updatedRooms = (globalForm.getValues("multiSpace")?.rooms ??
             []) as typeof rooms;
-          const nextIncompleteRoomIndex = updatedRooms.findIndex(
-            (room) => !isRoomSectionComplete(room, "dates"),
-          );
-          if (nextIncompleteRoomIndex !== -1) {
-            if (nextIncompleteRoomIndex !== currentRoomIndex) {
-              setCurrentRoomIndex(nextIncompleteRoomIndex);
-            }
-            await save();
+          if (
+            focusNextIncompleteOnboardingRoom(
+              updatedRooms,
+              "dates",
+              currentRoomIndex,
+              setCurrentRoomIndex,
+            )
+          ) {
             return;
           }
         }
@@ -1816,16 +1853,7 @@ export default function StepFive() {
                     }
                     onContinue={() => void handleSubmit()}
                     extraActions={
-                      roomScope.isMultiRoom &&
-                      isRoomSectionComplete(
-                        rooms[currentRoomIndex],
-                        "dates",
-                      ) &&
-                      rooms.some(
-                        (room, index) =>
-                          index !== currentRoomIndex &&
-                          !isRoomSectionComplete(room, "dates"),
-                      ) ? (
+                      canShowApplyToAllButton(rooms, canApplyToAllRooms) ? (
                         <Button
                           variant="event-outline"
                           type="button"
@@ -1857,7 +1885,9 @@ export default function StepFive() {
                       </p>
                     </div>
 
-                    {dateFields.map((field, index) => renderDateFields(index))}
+                    {dateFields.map((field, index) =>
+                      renderDateFields(index, field.id),
+                    )}
 
                     <Button
                       type="button"

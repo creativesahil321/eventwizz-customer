@@ -62,7 +62,6 @@ import {
 } from "../../_lib/vendor-step-four-rooms";
 import {
   findStepFiveBrochureForRoom,
-  isVendorRoomBrochureStepComplete,
   normalizeVendorStepFiveRooms,
 } from "../../_lib/vendor-step-five-rooms";
 import {
@@ -400,13 +399,7 @@ export default function TabEventForm() {
                   ),
                 )
               : activeTab === "more-info"
-                ? isVendorRoomBrochureStepComplete(
-                    findStepFiveBrochureForRoom(
-                      stepFiveRoomsNormalized,
-                      Number(room?.room_id),
-                    ),
-                  ) &&
-                  String(
+                ? String(
                     formContext.getValues("stepFive.event_address") ?? "",
                   ).trim().length > 0
                 : activeTab === "drinks"

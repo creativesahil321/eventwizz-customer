@@ -16,6 +16,9 @@ import { useFormContext } from "../../form-provider";
 import { stepElevenSchema, StepElevenType } from "../../form-provider/schema";
 import { onboardingService } from "@/services/vendor/onboarding/onboarding.service";
 import { useSession } from "next-auth/react";
+import { useQueryClient } from "@tanstack/react-query";
+import { syncVendorLocationsCache } from "@/app/(protected)/vendor/venue-locations/_lib/queries";
+import { useUpdateSessionWithLocation } from "@/services/common/auth/auth-session";
 import { OnboardingTitle, RadioButtonLabel } from "@/components/ui/typography";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import {
@@ -108,6 +111,8 @@ export default function StepEleven() {
   });
   const { update } = useSession();
   const router = useRouter();
+  const queryClient = useQueryClient();
+  const updateSessionWithLocation = useUpdateSessionWithLocation();
   const [publishing, setPublishing] = useState(false);
   const [publishStep, setPublishStep] = useState(-1);
   const [publishDone, setPublishDone] = useState(false);
@@ -145,10 +150,11 @@ export default function StepEleven() {
   });
 
   // Reactive so subdomain can seed after persistence GET fills step one.
-  const venueName = useWatch({
-    control: globalForm.control,
-    name: "stepOne.name",
-  }) || "";
+  const venueName =
+    useWatch({
+      control: globalForm.control,
+      name: "stepOne.name",
+    }) || "";
   const venueType = "event venue"; // Could be enhanced to get from form data
   const venueLocation = globalForm.getValues("stepOne.city") || "";
   /** Set from step 1 save and from persistence GET (root `has_multiple_locations` merged into stepOne in FormProvider). */
@@ -280,6 +286,17 @@ export default function StepEleven() {
       if (!response?.status) throw new Error("Failed to publish");
 
       globalForm.setValue("stepEleven", { ...values, isApproved: true });
+
+      if (values.submit_type === "duplicate") {
+        const syncedLocations = await syncVendorLocationsCache(queryClient);
+        if (syncedLocations?.data?.length) {
+          await updateSessionWithLocation({
+            venue_locations: syncedLocations.data,
+            default_venue_location: syncedLocations.default_venue_location,
+          });
+        }
+        void queryClient.invalidateQueries({ queryKey: ["locations"] });
+      }
 
       // Step 3 — publishing site
       setPublishStep(3);

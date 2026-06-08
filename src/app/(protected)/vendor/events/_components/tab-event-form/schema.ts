@@ -1088,31 +1088,46 @@ export const stepEightSchema = z
     reminder_email_before_days: z.number().optional(),
     submit_type: z.enum(["draft", "active"]),
     is_duplicate: z.boolean(),
+    duplicate_target_type: z.enum(["existing", "new"]).optional(),
+    vendor_location_id: z.number().optional(),
     city: z.string().optional(),
     address: z.string().optional(),
     contact_number: z.string().optional(),
   })
   .superRefine((data, ctx) => {
-    if (data.is_duplicate === true) {
-      if (!data.city?.trim())
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          message: "City is required",
-          path: ["city"],
-        });
-      if (!data.address?.trim())
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          message: "Address is required",
-          path: ["address"],
-        });
-      if (!data.contact_number?.trim())
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          message: "Contact number is required",
-          path: ["contact_number"],
-        });
+    if (data.is_duplicate !== true) {
+      return;
     }
+
+    if (data.duplicate_target_type === "existing") {
+      if (!data.vendor_location_id || data.vendor_location_id < 1) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Select an existing location",
+          path: ["vendor_location_id"],
+        });
+      }
+      return;
+    }
+
+    if (!data.city?.trim())
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "City is required",
+        path: ["city"],
+      });
+    if (!data.address?.trim())
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Address is required",
+        path: ["address"],
+      });
+    if (!data.contact_number?.trim())
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Contact number is required",
+        path: ["contact_number"],
+      });
   });
 export type StepEightType = z.infer<typeof stepEightSchema>;
 

@@ -3,6 +3,7 @@ import {
   LOGO_DEFAULT_HEADER_BACKGROUND,
   LOGO_PROCESS_MAX_BYTES,
 } from "@/lib/logo/constants";
+import { isLogoSupportedMimeType, LOGO_SUPPORTED_FORMATS_LABEL } from "@/lib/logo/supported-formats";
 import { fetchLogoBufferFromUrl } from "@/lib/logo/fetch-logo-from-url";
 import { processLogoBuffer } from "@/lib/logo/process-logo-server";
 import { env } from "@/env";
@@ -15,16 +16,6 @@ function normalizeRemoveBgApiKey(value: string | undefined): string | undefined 
   return trimmed.replace(/^["']|["']$/g, "");
 }
 
-const ACCEPTED_TYPES = new Set([
-  "image/png",
-  "image/jpeg",
-  "image/jpg",
-  "image/webp",
-  "image/gif",
-  "image/bmp",
-  "image/tiff",
-]);
-
 function processLogoResponseHeaders(result: Awaited<ReturnType<typeof processLogoBuffer>>) {
   return {
     "Content-Type": result.contentType,
@@ -35,14 +26,7 @@ function processLogoResponseHeaders(result: Awaited<ReturnType<typeof processLog
     "X-Logo-Background-Removal-Failed": result.backgroundRemovalFailed
       ? "true"
       : "false",
-    ...(result.backgroundRemovalError
-      ? {
-          "X-Logo-Background-Removal-Error": result.backgroundRemovalError.slice(
-            0,
-            200,
-          ),
-        }
-      : {}),
+    "X-Logo-Process-Notice": result.processNotice ?? "none",
   };
 }
 
@@ -55,9 +39,11 @@ export async function POST(request: NextRequest) {
     let input: Buffer;
 
     if (logo instanceof File) {
-      if (!ACCEPTED_TYPES.has(logo.type)) {
+      if (!isLogoSupportedMimeType(logo.type)) {
         return NextResponse.json(
-          { error: "Unsupported image type. Use PNG, JPG, or WebP." },
+          {
+            error: `Unsupported image type. Use ${LOGO_SUPPORTED_FORMATS_LABEL}.`,
+          },
           { status: 400 },
         );
       }

@@ -1,3 +1,4 @@
+import type { LogoProcessNotice } from "./logo-process-notices";
 import type { ProcessLogoFileResult } from "./process-logo-client";
 
 export function parseProcessLogoResponse(
@@ -15,8 +16,17 @@ export function parseProcessLogoResponse(
       | null) ?? "sharp";
   const backgroundRemovalFailed =
     response.headers.get("X-Logo-Background-Removal-Failed") === "true";
-  const backgroundRemovalError =
-    response.headers.get("X-Logo-Background-Removal-Error") ?? undefined;
+  const processNoticeRaw = response.headers.get("X-Logo-Process-Notice");
+  const processNotice =
+    processNoticeRaw &&
+    processNoticeRaw !== "none" &&
+    [
+      "basic_cleanup",
+      "credits_unavailable",
+      "foreground_unrecognized",
+    ].includes(processNoticeRaw)
+      ? (processNoticeRaw as LogoProcessNotice)
+      : undefined;
 
   return {
     file: new File([blob], `${baseName}.png`, { type: "image/png" }),
@@ -24,36 +34,6 @@ export function parseProcessLogoResponse(
     headerIsLight,
     processMethod,
     backgroundRemovalFailed,
-    backgroundRemovalError,
+    processNotice,
   };
-}
-
-export function showLogoProcessToasts(result: ProcessLogoFileResult): void {
-  void import("sonner").then(({ toast }) => {
-    if (result.backgroundRemovalFailed) {
-      toast.warning("Background could not be removed", {
-        description:
-          result.backgroundRemovalError ??
-          "remove.bg is unavailable. Only plain white backgrounds are cleaned automatically — upload a PNG with transparency for best results.",
-        duration: 8000,
-      });
-      return;
-    }
-
-    if (result.invertedForContrast) {
-      toast.success(
-        result.headerIsLight
-          ? "Logo adjusted for light header visibility"
-          : "Logo adjusted for dark header visibility",
-      );
-      return;
-    }
-
-    if (result.processMethod === "remove-bg") {
-      toast.success("Logo background removed");
-      return;
-    }
-
-    toast.success("Logo ready for your site header");
-  });
 }

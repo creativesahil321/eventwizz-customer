@@ -985,6 +985,13 @@ export const onboardingService = {
           `rooms[${roomIndex}][menu_description]`,
           catering.menu_description ?? "",
         );
+        const categoryId = Number(catering.event_menu_category_id);
+        if (Number.isFinite(categoryId) && categoryId > 0) {
+          formData.append(
+            `rooms[${roomIndex}][event_menu_category_id]`,
+            String(categoryId),
+          );
+        }
 
         (catering.menus ?? []).forEach((menu, menuIndex) => {
           const m = menu as {
@@ -1146,18 +1153,58 @@ export const onboardingService = {
 
       if (brochure.brochure_pdf instanceof File) {
         formData.append(`rooms[${roomIndex}][brochure_pdf]`, brochure.brochure_pdf);
+      } else if (
+        typeof brochure.brochure_pdf === "string" &&
+        brochure.brochure_pdf.trim().length > 0
+      ) {
+        formData.append(
+          `rooms[${roomIndex}][brochure_pdf]`,
+          brochure.brochure_pdf.trim(),
+        );
       }
+
       if (brochure.brochure_pdf_2 instanceof File) {
         formData.append(
           `rooms[${roomIndex}][brochure_pdf_2]`,
           brochure.brochure_pdf_2,
         );
+      } else if (
+        typeof brochure.brochure_pdf_2 === "string" &&
+        brochure.brochure_pdf_2.trim().length > 0
+      ) {
+        formData.append(
+          `rooms[${roomIndex}][brochure_pdf_2]`,
+          brochure.brochure_pdf_2.trim(),
+        );
       }
+
+      if (brochure.faq_pdf instanceof File) {
+        formData.append(`rooms[${roomIndex}][faq_pdf]`, brochure.faq_pdf);
+      } else if (
+        typeof brochure.faq_pdf === "string" &&
+        brochure.faq_pdf.trim().length > 0
+      ) {
+        formData.append(
+          `rooms[${roomIndex}][faq_pdf]`,
+          brochure.faq_pdf.trim(),
+        );
+      }
+
+      if (brochure.price_start_from) {
+        formData.append(
+          `rooms[${roomIndex}][price_start_from]`,
+          String(brochure.price_start_from),
+        );
+      }
+
       if (brochure.remove_brochure_pdf) {
         formData.append(`rooms[${roomIndex}][remove_brochure_pdf]`, "true");
       }
       if (brochure.remove_brochure_pdf_2) {
         formData.append(`rooms[${roomIndex}][remove_brochure_pdf_2]`, "true");
+      }
+      if (brochure.remove_faq_pdf) {
+        formData.append(`rooms[${roomIndex}][remove_faq_pdf]`, "true");
       }
     });
 

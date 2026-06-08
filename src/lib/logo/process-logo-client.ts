@@ -8,7 +8,7 @@ export type ProcessLogoFileResult = {
   headerIsLight: boolean;
   processMethod: "sharp" | "remove-bg" | "passthrough";
   backgroundRemovalFailed: boolean;
-  backgroundRemovalError?: string;
+  processNotice?: import("./logo-process-notices").LogoProcessNotice;
 };
 
 type ProcessLogoOptions = {

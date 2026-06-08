@@ -111,7 +111,7 @@ export function EventRoomMultiSelect({
       const resolvedName = String(res?.data?.name ?? name).trim() || name;
 
       if (!Number.isFinite(id) || id <= 0) {
-        toast.error(res?.message || "Could not create venue room.");
+        console.error("Could not create venue room:", res);
         return;
       }
 
@@ -123,9 +123,8 @@ export function EventRoomMultiSelect({
       }
 
       setNewRoomName("");
-      toast.success(`"${resolvedName}" added to this event.`);
-    } catch {
-      toast.error("Failed to create venue room. Try again.");
+    } catch (error) {
+      console.error("Failed to create venue room:", error);
     } finally {
       setCreating(false);
     }

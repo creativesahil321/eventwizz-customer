@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState, useMemo } from "react";
 import { useForm, useFieldArray, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { CardContent, CardHeader, OnboardingCard } from "@/components/ui/card";
@@ -42,9 +42,16 @@ import {
 } from "@/lib/event-form-limits";
 import { MultiSpaceHeader } from "../../rooms/multi-space-header";
 import {
+  canShowApplyToAllButton,
   isRoomSectionComplete,
   useRoomManager,
 } from "../../rooms/use-room-manager";
+import {
+  cloneOnboardingDrinksForApplyAll,
+  selectOnboardingRoomsForApi,
+} from "../../../_lib/onboarding-room-save";
+import { isVendorRoomDrinksStepComplete } from "@/app/(protected)/vendor/events/_lib/vendor-step-six-rooms";
+import { focusNextIncompleteOnboardingRoom } from "../../../_lib/onboarding-multi-room-progress";
 
 export default function StepEight() {
   const currencySymbol = useCurrencySymbol();
@@ -59,6 +66,7 @@ export default function StepEight() {
     enabled: multiSpaceEnabled,
     rooms,
     currentRoomIndex,
+    currentRoom,
     setCurrentRoomIndex,
   } = useRoomManager();
   const isMultiRoom = multiSpaceEnabled && rooms.length > 0;
@@ -149,6 +157,34 @@ export default function StepEight() {
     control: form.control,
     name: "packages",
   });
+
+  const watchedDrinkTitle = useWatch({
+    control: form.control,
+    name: "drink_title",
+  });
+  const watchedDrinkDescription = useWatch({
+    control: form.control,
+    name: "drink_description",
+  });
+  const watchedPackages = useWatch({
+    control: form.control,
+    name: "packages",
+  });
+
+  const canApplyToAllRooms = useMemo(() => {
+    if (!isMultiRoom || rooms.length < 2) return false;
+    return isVendorRoomDrinksStepComplete({
+      drink_title: watchedDrinkTitle,
+      drink_description: watchedDrinkDescription,
+      packages: watchedPackages,
+    } as Parameters<typeof isVendorRoomDrinksStepComplete>[0]);
+  }, [
+    isMultiRoom,
+    rooms.length,
+    watchedDrinkTitle,
+    watchedDrinkDescription,
+    watchedPackages,
+  ]);
 
   const setScopedDrinksField = useCallback(
     (
@@ -264,26 +300,35 @@ export default function StepEight() {
         const freshRooms =
           (globalForm.getValues("multiSpace")?.rooms as typeof rooms) ?? rooms;
 
-        const stagedRooms = freshRooms.map((room, index) => {
-          const shouldMirrorFromActive =
-            index === currentRoomIndex ||
-            (applyToAllRooms && !isRoomSectionComplete(room, "drinks"));
-          if (!shouldMirrorFromActive) return room;
-          return {
-            ...room,
-            drinks: {
-              ...room.drinks,
-              ...nextDrinksFromForm,
-            },
-          };
-        });
+        const drinksClone = cloneOnboardingDrinksForApplyAll(
+          nextDrinksFromForm as Record<string, unknown>,
+        );
+        const stagedRooms = applyToAllRooms
+          ? freshRooms.map((room) => ({
+              ...room,
+              drinks: drinksClone,
+              isApprovedDrinks: true,
+            }))
+          : freshRooms.map((room, index) =>
+              index === currentRoomIndex
+                ? {
+                    ...room,
+                    drinks: drinksClone,
+                    isApprovedDrinks: true,
+                  }
+                : room,
+            );
+
+        const roomsForApi = selectOnboardingRoomsForApi(
+          stagedRooms,
+          currentRoomIndex,
+          applyToAllRooms,
+        );
 
         const response = await onboardingService.storeStepEightRoomsData({
           event_id: eventId,
           isApproved: true,
-          rooms: (applyToAllRooms
-            ? stagedRooms
-            : [stagedRooms[currentRoomIndex]]) as any,
+          rooms: roomsForApi as typeof stagedRooms,
         });
 
         if (response?.status) {
@@ -311,15 +356,14 @@ export default function StepEight() {
 
           const updatedRooms =
             (globalForm.getValues("multiSpace")?.rooms as typeof rooms) ?? [];
-          const nextIncompleteRoomIndex = updatedRooms.findIndex(
-            (room) => !isRoomSectionComplete(room, "drinks"),
-          );
-
-          if (nextIncompleteRoomIndex !== -1) {
-            if (nextIncompleteRoomIndex !== currentRoomIndex) {
-              setCurrentRoomIndex(nextIncompleteRoomIndex);
-            }
-            await save();
+          if (
+            focusNextIncompleteOnboardingRoom(
+              updatedRooms,
+              "drinks",
+              currentRoomIndex,
+              setCurrentRoomIndex,
+            )
+          ) {
             return;
           }
 
@@ -396,16 +440,7 @@ export default function StepEight() {
                       }
                       onContinue={() => void form.handleSubmit(onSubmit)()}
                       extraActions={
-                        isMultiRoom &&
-                        isRoomSectionComplete(
-                          rooms[currentRoomIndex],
-                          "drinks",
-                        ) &&
-                        rooms.some(
-                          (room, index) =>
-                            index !== currentRoomIndex &&
-                            !isRoomSectionComplete(room, "drinks"),
-                        ) ? (
+                        canShowApplyToAllButton(rooms, canApplyToAllRooms) ? (
                           <Button
                             variant="event-outline"
                             type="button"

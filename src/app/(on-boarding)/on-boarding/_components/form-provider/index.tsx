@@ -162,6 +162,28 @@ export function FormProvider({
         const dataAny = patchOnboardingPayloadFromApi({
           ...(formData as object),
         } as Record<string, unknown>);
+
+        // Refetches after per-room saves must not snap the active room tab back to index 0.
+        const previousMultiSpace = form.getValues("multiSpace");
+        const incomingMultiSpace = dataAny.multiSpace as
+          | { enabled?: boolean; currentRoomIndex?: number; rooms?: unknown[] }
+          | undefined;
+        if (
+          previousMultiSpace?.enabled === true &&
+          incomingMultiSpace &&
+          typeof incomingMultiSpace === "object"
+        ) {
+          const roomCount = incomingMultiSpace.rooms?.length ?? 0;
+          const prevIndex = previousMultiSpace.currentRoomIndex ?? 0;
+          dataAny.multiSpace = {
+            ...incomingMultiSpace,
+            currentRoomIndex: Math.min(
+              Math.max(prevIndex, 0),
+              Math.max(roomCount - 1, 0),
+            ),
+          };
+        }
+
         form.reset(dataAny as unknown as OnboardingFormData);
         setPersistedProgressHydrated(true);
 
@@ -300,7 +322,6 @@ export function FormProvider({
       invalidateCache();
     } catch (error) {
       console.error("Error saving:", error);
-      toast.error("An error occurred while saving.");
     } finally {
       setIsLoading(false);
     }
@@ -332,12 +353,9 @@ export function FormProvider({
         form.setValue("activeStep", nextStep);
       } else if (response.success) {
         toast.info("Reached final step.");
-      } else {
-        toast.error("Failed to save changes.");
       }
     } catch (error) {
       console.error("Error in next function:", error);
-      toast.error("An error occurred while saving.");
     } finally {
       setIsLoading(false);
     }

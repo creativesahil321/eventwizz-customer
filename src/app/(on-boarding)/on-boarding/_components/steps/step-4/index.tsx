@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useCallback, useState, useEffect, useRef } from "react";
+import React, { useCallback, useState, useEffect, useRef, useMemo } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm, useFieldArray, useWatch } from "react-hook-form";
 import { Button } from "@/components/ui/button";
@@ -56,9 +56,13 @@ import {
 } from "@/lib/event-form-limits";
 import {
   isRoomSectionComplete,
+  canShowApplyToAllButton,
   useRoomManager,
 } from "../../rooms/use-room-manager";
 import { MultiSpaceHeader } from "../../rooms/multi-space-header";
+import { selectOnboardingRoomsForApi } from "../../../_lib/onboarding-room-save";
+import { focusNextIncompleteOnboardingRoom } from "../../../_lib/onboarding-multi-room-progress";
+import { isVendorRoomPackageStepComplete } from "@/app/(protected)/vendor/events/_lib/normalize-step-two-fields";
 
 /** IDs of persisted gallery rows still in the final list (backend `replace_gallery`). */
 function collectReplaceGalleryIds(
@@ -98,6 +102,7 @@ const StepFour = () => {
     enabled: multiSpaceEnabled,
     rooms,
     currentRoomIndex,
+    currentRoom,
     setCurrentRoomIndex,
   } = useRoomManager();
   const isMultiRoom = multiSpaceEnabled && rooms.length > 0;
@@ -300,6 +305,58 @@ const StepFour = () => {
     name: "event_schedular",
   });
 
+  const watchedPackageTitle = useWatch({
+    control: form.control,
+    name: "package_title",
+  });
+  const watchedPackageDescription = useWatch({
+    control: form.control,
+    name: "package_description",
+  });
+  const watchedPackageDetails = useWatch({
+    control: form.control,
+    name: "package_details",
+  });
+  const watchedPackageImage = useWatch({
+    control: form.control,
+    name: "package_image",
+  });
+  const watchedSchedularTitle = useWatch({
+    control: form.control,
+    name: "event_schedular_title",
+  });
+  const watchedSchedular = useWatch({
+    control: form.control,
+    name: "event_schedular",
+  });
+
+  const canApplyToAllRooms = useMemo(() => {
+    if (!isMultiRoom || rooms.length < 2) return false;
+    const resolvedPackageImage =
+      packageImage.length > 0
+        ? packageImage[0]
+        : (watchedPackageImage ?? packageImageUrl);
+    return isVendorRoomPackageStepComplete({
+      package_title: watchedPackageTitle,
+      package_description: watchedPackageDescription,
+      package_details: watchedPackageDetails,
+      package_image: resolvedPackageImage,
+      event_schedular_title: watchedSchedularTitle,
+      event_schedular: watchedSchedular,
+    });
+  }, [
+    isMultiRoom,
+    rooms.length,
+    packageImage,
+    watchedPackageTitle,
+    watchedPackageDescription,
+    watchedPackageDetails,
+    watchedPackageImage,
+    packageImageUrl,
+    watchedSchedularTitle,
+    watchedSchedular,
+  ]);
+
   // Initialize URL value from the active scope (single-room or current room) on mount.
   useEffect(() => {
     const packageImageValue = getScopedValue<unknown>("package_image");
@@ -458,27 +515,39 @@ const StepFour = () => {
             (globalForm.getValues("multiSpace")?.rooms as typeof rooms) ??
             rooms;
 
-          const stagedRooms = freshRooms.map((room, index) => {
-            const shouldMirrorFromActive =
-              index === currentRoomIndex ||
-              (applyToAllRooms && !isRoomSectionComplete(room, "package"));
-            if (!shouldMirrorFromActive) return room;
-            return {
-              ...room,
-              package: {
-                ...room.package,
-                ...nextPackageFromForm,
-              },
-            } as typeof room;
-          });
+          const stagedRooms = applyToAllRooms
+            ? freshRooms.map((room) => ({
+                ...room,
+                package: {
+                  ...room.package,
+                  ...nextPackageFromForm,
+                },
+                isApprovedPackage: true,
+              }))
+            : freshRooms.map((room, index) =>
+                index === currentRoomIndex
+                  ? {
+                      ...room,
+                      package: {
+                        ...room.package,
+                        ...nextPackageFromForm,
+                      },
+                      isApprovedPackage: true,
+                    }
+                  : room,
+              );
+
+          const roomsForApi = selectOnboardingRoomsForApi(
+            stagedRooms,
+            currentRoomIndex,
+            applyToAllRooms,
+          );
 
           const response = await onboardingService.storeStepFourRoomsData({
             event_id: eventId,
             isApproved: true,
             currentRoomIndex,
-            rooms: (applyToAllRooms
-              ? stagedRooms
-              : [stagedRooms[currentRoomIndex]]) as any,
+            rooms: roomsForApi as typeof stagedRooms,
             delete_gallery: deleteGalleryIds,
             replace_gallery: collectReplaceGalleryIds(data.gallery),
           });
@@ -510,15 +579,14 @@ const StepFour = () => {
             }
             const updatedRooms =
               (globalForm.getValues("multiSpace")?.rooms as typeof rooms) ?? [];
-            const nextIncompleteRoomIndex = updatedRooms.findIndex(
-              (room) => !isRoomSectionComplete(room, "package"),
-            );
-
-            if (nextIncompleteRoomIndex !== -1) {
-              if (nextIncompleteRoomIndex !== currentRoomIndex) {
-                setCurrentRoomIndex(nextIncompleteRoomIndex);
-              }
-              await save();
+            if (
+              focusNextIncompleteOnboardingRoom(
+                updatedRooms,
+                "package",
+                currentRoomIndex,
+                setCurrentRoomIndex,
+              )
+            ) {
               return;
             }
 
@@ -750,16 +818,7 @@ const StepFour = () => {
                       }
                       onContinue={() => void handleContinue()}
                       extraActions={
-                        isMultiRoom &&
-                        isRoomSectionComplete(
-                          rooms[currentRoomIndex],
-                          "package",
-                        ) &&
-                        rooms.some(
-                          (room, index) =>
-                            index !== currentRoomIndex &&
-                            !isRoomSectionComplete(room, "package"),
-                        ) ? (
+                        canShowApplyToAllButton(rooms, canApplyToAllRooms) ? (
                           <Button
                             variant="event-outline"
                             type="button"

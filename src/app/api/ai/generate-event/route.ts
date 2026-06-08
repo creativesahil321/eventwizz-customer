@@ -14,6 +14,21 @@ import {
   DRINK_SECTION_TITLE_MAX_CHARS,
   RICH_DESCRIPTION_MAX_CHARS,
 } from "@/lib/event-form-limits";
+import type { AIDate, AIRoomDates, AIRoomDrinks } from "@/app/api/ai/generate-onboarding/route";
+import { normalizeAIDatePaymentFields } from "@/app/(on-boarding)/on-boarding/_lib/ai-onboarding-sanitize";
+import {
+  AI_EVENT_MAX_ROOMS,
+  AI_EVENT_MIN_ROOMS,
+  buildAiEventJsonSchemaBlock,
+  buildAiEventSystemPrompt,
+  buildAiEventUserPrompt,
+  ensureStepFiveEventDrinkRooms,
+  ensureStepThreeEventRooms,
+  parseAiEventVendorIntent,
+  type AIEventRoomBrochure,
+  type AIEventRoomMenu,
+  type AIEventRoomPackage,
+} from "@/app/(protected)/vendor/events/_lib/ai-event-vendor-intent";
 
 export interface AIEventInput {
   eventName: string;
@@ -30,8 +45,10 @@ export interface AIEventInput {
   selected_room_ids?: number[];
 }
 
-const AI_EVENT_MIN_ROOMS = 2;
-const AI_EVENT_MAX_ROOMS = 3;
+export type { AIEventRoomPackage, AIEventRoomMenu, AIEventRoomBrochure };
+
+const AI_EVENT_MIN_ROOMS_LOCAL = AI_EVENT_MIN_ROOMS;
+const AI_EVENT_MAX_ROOMS_LOCAL = AI_EVENT_MAX_ROOMS;
 
 function normalizeAiEventRoomNames(roomNames: string[] | undefined): string[] {
   const unique = Array.from(
@@ -40,9 +57,9 @@ function normalizeAiEventRoomNames(roomNames: string[] | undefined): string[] {
         .map((name) => String(name || "").trim())
         .filter((name) => name.length > 0),
     ),
-  ).slice(0, AI_EVENT_MAX_ROOMS);
+  ).slice(0, AI_EVENT_MAX_ROOMS_LOCAL);
 
-  if (unique.length >= AI_EVENT_MIN_ROOMS) return unique;
+  if (unique.length >= AI_EVENT_MIN_ROOMS_LOCAL) return unique;
   if (unique.length === 1) return [unique[0], "Room 2"];
   return ["Room 1", "Room 2"];
 }
@@ -89,9 +106,11 @@ export interface AIEventGeneratedContent {
     event_schedular_title: string;
     event_schedule_subtitle: string;
     event_schedular: Array<{ title: string; time: string }>;
+    rooms?: AIEventRoomPackage[];
   };
   stepThree: {
     dates: AIEventDate[];
+    rooms?: AIRoomDates[];
   };
   stepFour: {
     catering_option: number;
@@ -101,6 +120,7 @@ export interface AIEventGeneratedContent {
       name: string;
       items: Array<{ title: string; description: string }>;
     }>;
+    rooms?: AIEventRoomMenu[];
   };
   stepFive: {
     drink_title: string;
@@ -111,11 +131,13 @@ export interface AIEventGeneratedContent {
       price: number;
       available_quantity: number;
     }>;
+    rooms?: AIRoomDrinks[];
   };
   stepSix: {
     event_address: string;
     price_start_from: string;
     price_start_from_button_text: string;
+    rooms?: AIEventRoomBrochure[];
   };
   stepSeven: {
     faqs: Array<{ question: string; answer: string }>;
@@ -152,170 +174,29 @@ export async function POST(req: NextRequest) {
     const normalizedRoomNames = normalizeAiEventRoomNames(input.room_names);
     const hasRoomSystem =
       input.has_room_system === true &&
-      normalizedRoomNames.length >= AI_EVENT_MIN_ROOMS;
+      normalizedRoomNames.length >= AI_EVENT_MIN_ROOMS_LOCAL;
 
-    const systemPrompt = `You are an expert event venue marketing copywriter. Generate professional, engaging content for a single event listing on a venue booking platform (same quality bar as full venue onboarding).
+    const vendorHints = parseAiEventVendorIntent(
+      input.eventDescription,
+      normalizedRoomNames,
+    );
 
-CRITICAL RULES:
-1. Return ONLY valid JSON, no explanations or markdown
-2. Respect ALL character limits exactly
-3. All text must be professional, engaging, and relevant to the event type
-4. Times must be in HH:mm 24-hour format. event_schedular must be in chronological ascending order (earliest time first).
-5. Prices must be realistic whole numbers
-6. FAQ answers should be helpful and detailed but within limits
-7. Descriptions should be compelling and SEO-friendly
-8. Do NOT include any HTML tags in text fields
-9. IMPORTANT: If the vendor provides specific details in "Additional Details" / vendor requirements (tickets, tables, pricing, seating, food, drinks, capacity, dates, deposit rules, inclusions, exclusions, dress code, age limits, etc.), use those EXACT numbers and specifications in stepThree (dates/tickets/tables), stepFour (menu), stepFive (drinks), stepOne copy, stepTwo package_details, and stepSeven FAQs where relevant. Always honor the vendor's stated preferences over generic defaults. Never contradict the vendor requirements.
-10. For dates with booking_type "tables" or "both": include payment_type ("full" or "deposit"). If deposit is used, set is_deposit_enabled true and include deposit_type ("amount" or "percentage"), deposit_value (e.g. "50" for £50 or "25" for 25%), and deposit_due_date (YYYY-MM-DD, before event_date).
-11. stepThree.dates: event_date must be YYYY-MM-DD. List dates in chronological ascending order (earliest first). No duplicate event_dates. Each event_date should be today or in the future.
-12. stepFour (menu) is OPTIONAL: If the event type or vendor requirements suggest no food/catering, set catering_option to 0 and menus to an empty array []. Keep menu_title/menu_description minimal when skipped.
-13. stepFive (drinks) is OPTIONAL: If the event type or vendor requirements suggest no drink packages, set packages to an empty array []. Keep drink_title/drink_description minimal when skipped.
-14. stepSeven.faqs: When vendor requirements exist, include FAQs that accurately reflect them (pricing, refunds, what's included, accessibility) without inventing policies that contradict the vendor text.
-15. Ignore unrelated/unknown noise. Use only vendor event facts and explicit requirements.
-16. ROOM SYSTEM:
-   - If ROOM SYSTEM is YES in the prompt, generate content that works room-wise.
-   - Follow provided room names exactly (spelling/casing). Do not invent extra rooms.
-   - Keep stepTwo package/timeline content generic enough to be valid for each room.
-   - stepThree dates/tickets/tables should follow vendor event constraints and remain consistent for room-based setup.
-   - When ROOM SYSTEM is YES and the event includes food/catering, stepFour MUST use catering_option 1 with menu_title, menu_description, and menus categories (e.g. Starters, Main Courses, Desserts). Within each category use item titles exactly "Item Title 1", "Item Title 2", "Item Title 3" (descriptions are real menu copy).`;
+    const jsonSchemaBlock = buildAiEventJsonSchemaBlock(
+      input,
+      hasRoomSystem,
+      normalizedRoomNames,
+      STEP_NINE_MAX_FAQS,
+    );
 
-    const vendorReq =
-      typeof input.eventDescription === "string"
-        ? input.eventDescription.trim()
-        : "";
-    const hasVendorRequirements = vendorReq.length > 0;
-
-    const userPrompt = `Generate complete event content for:
-
-EVENT INFO:
-- Event Name: "${input.eventName}"
-- Event Type: "${input.eventType}"
-${input.venueName ? `- Venue: "${input.venueName}"` : ""}
-${input.venueCity ? `- City: "${input.venueCity}"` : ""}
-${input.venueAddress ? `- Address: "${input.venueAddress}"` : ""}
-${input.guestCount ? `- Expected Guests: "${input.guestCount}"` : ""}
-${input.priceRange ? `- Price Range: "${input.priceRange}"` : ""}
-ROOM SYSTEM: ${hasRoomSystem ? "YES" : "NO"}
-${hasRoomSystem
-        ? `- Room names (use exactly): ${normalizedRoomNames.map((name) => `"${name}"`).join(", ")}`
-        : "- No room names"
-      }
-${hasVendorRequirements
-        ? `\nVENDOR'S DETAILED REQUIREMENTS (HARD CONSTRAINTS — USE THESE EXACT SPECS FOR TICKETS/TABLES/MENU/DRINKS/PRICING AND ALL RELEVANT COPY):\n"${vendorReq}"\n`
-        : ""
-      }
-Use one object inside stepThree.dates unless the vendor requirements clearly describe multiple distinct event dates (then add more objects, chronological, no duplicate event_date).
-
-Generate this EXACT JSON structure:
-
-{
-  "stepOne": {
-    "event_name": "string (max 40 chars, the event name)",
-    "event_banner_heading": "string (max 30 words, compelling banner headline)",
-    "event_banner_sub_heading": "string (max 80 chars, engaging banner tagline)",
-    "about_event_heading": "string (max 50 chars, about section heading)",
-    "about_event_sub_heading": "string (max 80 chars, about section subheading)",
-    "about_event_description": "string (max 340 chars, event description, no HTML)",
-    
-  },
-  "stepTwo": {
-    "package_title": "string (max 40 chars, packages section title)",
-    "package_description": "string (max 160 chars, packages description)",
-    "package_details": [
-      {"title": "string (max 40 chars, package feature)"},
-      {"title": "string (max 40 chars, package feature)"},
-      {"title": "string (max 40 chars, package feature)"},
-      {"title": "string (max 40 chars, package feature)"},
-      {"title": "string (max 40 chars, package feature)"}
-    ],
-    "event_schedular_title": "string (max 40 chars, schedule section title)",
-    "event_schedule_subtitle": "string (max 160 chars, schedule section subtitle)",
-    "event_schedular": [
-      {"title": "string (max 40 chars)", "time": "HH:mm"},
-      {"title": "string (max 40 chars)", "time": "HH:mm"}
-    ]
-  },
-  "stepThree": {
-    "dates": [
-      {
-        "event_date": "YYYY-MM-DD (chronological order, no duplicates; today or future)",
-        "booking_type": "tickets | tables | both — MUST match vendor requirements when stated",
-        "tickets": [
-          {"title": "string (max 25 chars)", "description": "string (max 160 chars)", "total_capacity": "string (numeric string only, e.g. 200)", "price": "string (numeric string only, e.g. 45)"},
-          {"title": "string", "description": "string", "total_capacity": "string", "price": "string"}
-        ],
-        "tables": [
-          {"min_persons": "string", "max_persons": "string", "price": "string", "total_tables": "string"},
-          {"min_persons": "string", "max_persons": "string", "price": "string", "total_tables": "string"}
-        ],
-        "payment_type": "full or deposit",
-        "is_deposit_enabled": false,
-        "deposit_type": "amount or percentage (only when payment_type is deposit)",
-        "deposit_value": "string",
-        "deposit_due_date": "YYYY-MM-DD (before event_date when deposit)"
-      }
-    ]
-  },
-  "stepFour": {
-    "catering_option": 1,
-    "menu_title": "string (max 40 chars)",
-    "menu_description": "string (max 160 chars)",
-    "menus": [
-      {
-        "name": "Starters",
-        "items": [
-          {"title": "Item Title 1", "description": "string (max 160 chars)"},
-          {"title": "Item Title 2", "description": "string (max 160 chars)"},
-          {"title": "Item Title 3", "description": "string (max 160 chars)"}
-        ]
-      },
-      {
-        "name": "Main Courses",
-        "items": [
-          {"title": "Item Title 1", "description": "string (max 160 chars)"},
-          {"title": "Item Title 2", "description": "string (max 160 chars)"},
-          {"title": "Item Title 3", "description": "string (max 160 chars)"}
-        ]
-      },
-      {
-        "name": "Desserts",
-        "items": [
-          {"title": "Item Title 1", "description": "string (max 160 chars)"},
-          {"title": "Item Title 2", "description": "string (max 160 chars)"},
-          {"title": "Item Title 3", "description": "string (max 160 chars)"}
-        ]
-      }
-    ]
-  },
-  "stepFive": {
-    "drink_title": "string (max 40 chars)",
-    "drink_description": "string (max 160 chars)",
-    "packages": [
-      {"title": "string (max 25 chars)", "description": "string (max 160 chars)", "price": number, "available_quantity": number}
-    ]
-  },
-  "stepSix": {
-    "event_address": "${input.venueAddress || input.venueCity || ""}",
-    "price_start_from": "string (realistic starting price as string, e.g. '50')",
-    "price_start_from_button_text": "Book Now"
-  },
-  "stepSeven": {
-    "faqs": [
-      {"question": "string (max 160 chars)", "answer": "string (max 500 chars)"},
-      {"question": "string (max 160 chars)", "answer": "string (max 500 chars)"},
-      {"question": "string (max 160 chars)", "answer": "string (max 500 chars)"},
-      {"question": "string (max 160 chars)", "answer": "string (max 500 chars)"},
-      {"question": "string (max 160 chars)", "answer": "string (max 500 chars)"}
-    ]
-  }
-}
-
-Make times chronologically ascending. Make prices realistic for the event type and consistent with vendor requirements when provided.
-${hasVendorRequirements
-        ? `\nFINAL CHECK: Every ticket/table/menu/drink/FAQ item must be consistent with the vendor requirements quoted above. Do not invent conflicting prices, capacities, or policies.\n`
-        : ""
-      }
-Return ONLY the JSON.`;
+    const systemPrompt = buildAiEventSystemPrompt(STEP_NINE_MAX_FAQS);
+    const userPrompt = buildAiEventUserPrompt({
+      input,
+      hints: vendorHints,
+      hasRoomSystem,
+      roomNames: normalizedRoomNames,
+      jsonSchemaBlock,
+      maxFaqs: STEP_NINE_MAX_FAQS,
+    });
 
     const result: FallbackResult = await tryModelsWithFallback(apiKey, {
       messages: [
@@ -323,8 +204,7 @@ Return ONLY the JSON.`;
         { role: "user", content: userPrompt },
       ],
       temperature: 0.7,
-      // Keep this lower to reduce Groq TPM/TPD failures across models.
-      max_tokens: 2500,
+      max_tokens: 4500,
     });
 
     if (!result.success || !result.data) {
@@ -463,7 +343,38 @@ Return ONLY the JSON.`;
             if (!d.event_date || seen.has(d.event_date)) return false;
             seen.add(d.event_date);
             return true;
+          })
+          .map((d) => normalizeAIDatePaymentFields(d as AIDate) as AIEventDate);
+
+        if (vendorHints.wantsBothTicketsAndTables) {
+          content.stepThree.dates = content.stepThree.dates.map((d) => {
+            if (d.booking_type === "tickets") {
+              return normalizeAIDatePaymentFields({
+                ...(d as AIDate),
+                booking_type: "both",
+                tables:
+                  (d.tables?.length ?? 0) > 0
+                    ? (d.tables as AIDate["tables"])
+                    : [{ min_persons: "2", max_persons: "8", price: "100", total_tables: "20" }],
+              }) as AIEventDate;
+            }
+            return d;
           });
+        }
+
+        if (vendorHints.prefersDepositPayment) {
+          content.stepThree.dates = content.stepThree.dates.map((d) => {
+            if (d.booking_type !== "tables" && d.booking_type !== "both") return d;
+            return normalizeAIDatePaymentFields({
+              ...(d as AIDate),
+              payment_type: "deposit",
+              is_deposit_enabled: true,
+              deposit_type:
+                d.deposit_type === "amount" ? "amount" : ("percentage" as const),
+              deposit_value: d.deposit_value || "25",
+            }) as AIEventDate;
+          });
+        }
       } else {
         const d1 = new Date();
         d1.setMonth(d1.getMonth() + 2);
@@ -485,6 +396,34 @@ Return ONLY the JSON.`;
             },
           ],
         };
+      }
+
+      if (hasRoomSystem && content.stepThree) {
+        const baseDates = (content.stepThree.dates ?? []) as AIDate[];
+        const sanitizeRoomDates = (dates: AIDate[] | undefined): AIDate[] =>
+          (dates ?? []).map((d) => normalizeAIDatePaymentFields(d));
+
+        const filteredRooms = Array.isArray(content.stepThree.rooms)
+          ? content.stepThree.rooms
+              .map((room) => ({
+                room_name: truncate(String(room.room_name ?? "").trim(), 80),
+                dates: sanitizeRoomDates(room.dates as AIDate[]),
+              }))
+              .filter((room) => room.room_name.length > 0)
+          : [];
+
+        content.stepThree.rooms = ensureStepThreeEventRooms(
+          filteredRooms,
+          normalizedRoomNames,
+          baseDates,
+          vendorHints,
+          (dates, _offset) => {
+            const sanitized = sanitizeRoomDates(dates as AIDate[]);
+            return sanitized.length > 0 ? sanitized : baseDates;
+          },
+        );
+      } else if (content.stepThree?.rooms) {
+        content.stepThree.rooms = [];
       }
 
       if (content.stepFour) {
@@ -527,6 +466,21 @@ Return ONLY the JSON.`;
           : [];
       } else {
         content.stepFive = { drink_title: "Drinks & Packages", drink_description: "", packages: [] };
+      }
+
+      if (hasRoomSystem && content.stepFive) {
+        content.stepFive.rooms = ensureStepFiveEventDrinkRooms(
+          content.stepFive.rooms,
+          normalizedRoomNames,
+          {
+            drink_title: content.stepFive.drink_title,
+            drink_description: content.stepFive.drink_description,
+            packages: content.stepFive.packages,
+          },
+          vendorHints,
+        );
+      } else if (content.stepFive?.rooms) {
+        content.stepFive.rooms = [];
       }
 
       if (content.stepSeven?.faqs) {

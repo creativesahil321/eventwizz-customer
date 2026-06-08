@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
-import { useForm, useFieldArray, Resolver } from "react-hook-form";
+import { useForm, useFieldArray, Resolver, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
   eventsService,
@@ -237,10 +237,33 @@ export default function DrinksTab() {
     stepTwoRooms,
   ]);
 
+  const watchedDrinkTitle = useWatch({
+    control: form.control,
+    name: "drink_title",
+  });
+  const watchedDrinkDescription = useWatch({
+    control: form.control,
+    name: "drink_description",
+  });
+  const watchedDrinkPackages = useWatch({
+    control: form.control,
+    name: "packages",
+  });
+
   const canApplyToAllRooms = useMemo(() => {
     if (!isRoomsEnabled || stepTwoRooms.length < 2) return false;
-    return true;
-  }, [isRoomsEnabled, stepTwoRooms.length]);
+    return isVendorRoomDrinksStepComplete({
+      drink_title: watchedDrinkTitle,
+      drink_description: watchedDrinkDescription,
+      packages: watchedDrinkPackages,
+    });
+  }, [
+    isRoomsEnabled,
+    stepTwoRooms.length,
+    watchedDrinkTitle,
+    watchedDrinkDescription,
+    watchedDrinkPackages,
+  ]);
 
   // Sync local form with global form (flat mode only)
   useEffect(() => {
@@ -384,16 +407,10 @@ export default function DrinksTab() {
 
           await advanceStep(6);
         } else {
-          const errorMessage =
-            response?.message ||
-            "Failed to save drink details. Please try again.";
-          toast.error("Error saving drink details", {
-            description: errorMessage,
-          });
+          console.error("Error saving drink details:", response);
         }
       } catch (error) {
         console.error("Error saving drink details:", error);
-        toast.error("Failed to save drink details");
       } finally {
         setIsLoading(false);
       }

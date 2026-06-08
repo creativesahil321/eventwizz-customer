@@ -86,9 +86,11 @@ export interface LatestUpcomingEvent {
  * Location data structure with event information
  */
 export interface LocationData {
+  id?: number;
   is_default?: unknown;
   city: string;
   slug: string;
+  cover_image?: string | null;
   total_events?: number;
   latest_upcoming_event?: LatestUpcomingEvent;
 }
@@ -144,6 +146,13 @@ export interface ThemeSchema {
   banner_sub_heading?: string;
   cover_image?: string;
   cover_video?: string; // Video URL for landing page banner
+
+  /** Multi-location vendor home (before location selection) */
+  main_landing_cover_image?: string;
+  main_landing_banner_heading?: string;
+  main_landing_banner_sub_heading?: string;
+  main_landing_locations_list_title?: string;
+  main_landing_locations_list_subtitle?: string;
 
   // About section fields
   about_title?: string;

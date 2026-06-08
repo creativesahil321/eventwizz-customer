@@ -9,6 +9,7 @@ import { addCacheBusting } from "@/lib/image-utils";
 import { useSession } from "next-auth/react";
 import { logout } from "@/lib/auth/logout";
 import { cn } from "@/lib/utils";
+import { useIsPreviewModeFromProvider } from "@/contexts/preview-context";
 
 interface LocationSelectionHeaderProps {
   logo?: string;
@@ -19,6 +20,7 @@ export default function LocationSelectionHeader({
   logo,
   name,
 }: LocationSelectionHeaderProps) {
+  const isPreviewMode = useIsPreviewModeFromProvider();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const { data: session, status: sessionStatus } = useSession();
   const isAuthenticated = sessionStatus === "authenticated";
@@ -76,36 +78,81 @@ export default function LocationSelectionHeader({
             animate={{ opacity: 1, x: 0 }}
             transition={{ duration: 0.5 }}
           >
-            <Link href="/" className="inline-flex items-center" aria-label="Home">
-              {logo ? (
-                <div className="flex h-10 items-center md:h-14">
-                  <img
-                    src={addCacheBusting(logo)}
-                    width={200}
-                    height={116}
-                    className="max-h-8 w-auto object-contain md:max-h-12"
-                    alt={name || "EventWizz"}
-                  />
-                </div>
-              ) : (
-                <span className="text-lg font-bold md:text-xl">
-                  {name || "EventWizz"}
-                </span>
-              )}
-            </Link>
+            {isPreviewMode ? (
+              <div
+                className="inline-flex cursor-default items-center"
+                aria-label={name || "Site logo"}
+              >
+                {logo ? (
+                  <div className="flex h-10 items-center md:h-14">
+                    <img
+                      src={addCacheBusting(logo)}
+                      width={200}
+                      height={116}
+                      className="max-h-8 w-auto object-contain md:max-h-12"
+                      alt={name || "EventWizz"}
+                    />
+                  </div>
+                ) : (
+                  <span className="text-lg font-bold md:text-xl">
+                    {name || "EventWizz"}
+                  </span>
+                )}
+              </div>
+            ) : (
+              <Link href="/" className="inline-flex items-center" aria-label="Home">
+                {logo ? (
+                  <div className="flex h-10 items-center md:h-14">
+                    <img
+                      src={addCacheBusting(logo)}
+                      width={200}
+                      height={116}
+                      className="max-h-8 w-auto object-contain md:max-h-12"
+                      alt={name || "EventWizz"}
+                    />
+                  </div>
+                ) : (
+                  <span className="text-lg font-bold md:text-xl">
+                    {name || "EventWizz"}
+                  </span>
+                )}
+              </Link>
+            )}
           </motion.div>
 
           <div className="flex items-center gap-3 md:gap-4">
             <div className="hidden md:flex items-center gap-3 lg:gap-4">
               <div className="flex items-center gap-2">
                 <VendorPublicLocationBookNow
+                  disabled={isPreviewMode}
                   pillGlassOnHero={false}
                   onLocationNavigate={() => setMobileMenuOpen(false)}
                 />
               </div>
 
               {sessionStatus !== "loading" &&
-                (isAuthenticated ? (
+                (isPreviewMode ? (
+                  <>
+                    <div
+                      className={cn(
+                        topBarChromeLinkClass,
+                        "cursor-not-allowed opacity-60",
+                      )}
+                      aria-hidden
+                    >
+                      Log In
+                    </div>
+                    <div
+                      className={cn(
+                        topBarChromeLinkClass,
+                        "cursor-not-allowed opacity-60",
+                      )}
+                      aria-hidden
+                    >
+                      Register
+                    </div>
+                  </>
+                ) : isAuthenticated ? (
                   <>
                     <Link href={dashboardHref} className={topBarChromeLinkClass}>
                       Dashboard

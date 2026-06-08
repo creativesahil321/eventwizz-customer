@@ -5,7 +5,10 @@ import {
   processLogoFile,
   processLogoFromUrl,
 } from "@/lib/logo/process-logo-client";
-import { showLogoProcessToasts } from "@/lib/logo/parse-process-logo-response";
+import {
+  showLogoProcessToasts,
+  getFriendlyLogoOptimizeErrorMessage,
+} from "@/lib/logo/logo-process-notices";
 
 type UseLogoUploadProcessorOptions = {
   headerBackgroundColor?: string;
@@ -27,8 +30,8 @@ export function useLogoUploadProcessor(
       } catch (error) {
         console.error("Logo processing failed:", error);
         const { toast } = await import("sonner");
-        toast.message("Using original logo", {
-          description: "Background cleanup was skipped.",
+        toast.message("Logo uploaded", {
+          description: "Background cleanup was skipped. You can still save and use this logo.",
         });
         return file;
       } finally {
@@ -50,9 +53,8 @@ export function useLogoUploadProcessor(
       } catch (error) {
         console.error("Logo re-processing failed:", error);
         const { toast } = await import("sonner");
-        toast.error("Could not optimize logo", {
-          description:
-            error instanceof Error ? error.message : "Please try again.",
+        toast.message("Could not optimize logo", {
+          description: getFriendlyLogoOptimizeErrorMessage(error),
         });
         return null;
       } finally {

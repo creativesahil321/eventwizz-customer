@@ -2,6 +2,7 @@ import { getServerSession } from "next-auth";
 import { redirect } from "next/navigation";
 import { authOptions } from "@/lib/auth/authOptions";
 import "@/assets/scss/app.scss";
+import "./on-boarding/onboarding-shell.css";
 import { tiemposHeadline } from "@/lib/fonts-tiempos";
 import { cn } from "@/lib/utils";
 import { ServerContextProvider } from "@/lib/server-context";
@@ -48,7 +49,7 @@ export default async function OnboardingLayout({
     >
       <section
         className={cn(
-          "flex min-h-screen w-full flex-col",
+          "onboarding-shell flex min-h-screen w-full flex-col",
           tiemposHeadline.variable,
         )}
       >

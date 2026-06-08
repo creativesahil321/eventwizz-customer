@@ -8,7 +8,6 @@ import { Button } from "@/components/ui/button";
 import { Form } from "@/components/ui/form";
 import { StepEightType, stepEightSchema } from "../schema";
 import { useEventFormContext } from "../../events-form-provider";
-import { toast } from "sonner";
 import {
   FormField,
   FormItem,
@@ -16,7 +15,6 @@ import {
   FormControl,
   FormMessage,
 } from "@/components/ui/form";
-import { Input } from "@/components/ui/input";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import {
   Select,
@@ -25,12 +23,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { env } from "@/env";
-import GoogleLocationSearch from "@/app/(on-boarding)/on-boarding/_components/steps/step-11/google-location-search";
-import { fetchLocationDetails } from "@/app/(on-boarding)/on-boarding/_components/steps/step-11/_lib/actions";
 import { useParams, useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
+import { syncVendorLocationsCache } from "@/app/(protected)/vendor/venue-locations/_lib/queries";
+import { useUpdateSessionWithLocation } from "@/services/common/auth/auth-session";
 import { useEventData } from "../../../_lib/hooks/useEventData";
 import { SavingState } from "../_components/saving-state";
+import { DuplicateLocationFields } from "../_components/duplicate-location-fields";
 
 // Days options for reminder emails
 const days = Array.from({ length: 31 }, (_, i) => i + 1);
@@ -45,6 +44,8 @@ const extraOptions = [
 export default function PublishTab() {
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
+  const queryClient = useQueryClient();
+  const updateSessionWithLocation = useUpdateSessionWithLocation();
   const {
     form: globalForm,
     advanceStep,
@@ -72,6 +73,9 @@ export default function PublishTab() {
         globalForm.getValues().stepEight?.reminder_email_before_days || 10,
       submit_type: "draft",
       is_duplicate: false,
+      duplicate_target_type:
+        globalForm.getValues().stepEight?.duplicate_target_type || "existing",
+      vendor_location_id: globalForm.getValues().stepEight?.vendor_location_id,
       city: globalForm.getValues().stepEight?.city || "",
       address: globalForm.getValues().stepEight?.address || "",
       contact_number: globalForm.getValues().stepEight?.contact_number || "",
@@ -102,6 +106,15 @@ export default function PublishTab() {
   // Watch reminder email configuration state
   // const showReminderDays = watch("reminder_email_before_days") !== undefined;
   const isDuplicate = watch("is_duplicate") || false;
+  const eventLocationId = globalForm.watch("stepOne.vendor_location_id");
+
+  useEffect(() => {
+    if (!isDuplicate) {
+      return;
+    }
+
+    void syncVendorLocationsCache(queryClient);
+  }, [isDuplicate, queryClient]);
 
   const params = useParams<{ eventID: string }>();
   const eventId = Array.isArray(params?.eventID)
@@ -146,14 +159,15 @@ export default function PublishTab() {
         }
 
         // Prepare data for submission - exclude location fields if not duplicating
-        const submissionData = {
+        const submissionData: StepEightType = {
           step: data.step,
           event_id: data.event_id,
           reminder_email_before_days: data.reminder_email_before_days,
           submit_type: data.submit_type,
           is_duplicate: data.is_duplicate,
-          // Only include location fields if duplicating
           ...(data.is_duplicate && {
+            duplicate_target_type: data.duplicate_target_type,
+            vendor_location_id: data.vendor_location_id,
             city: data.city,
             address: data.address,
             contact_number: data.contact_number,
@@ -170,26 +184,42 @@ export default function PublishTab() {
         const response = await eventsService.storeStepEightData(submissionData);
 
         if (response && response.status) {
-          // Success message is handled by axios interceptor
           await advanceStep(8);
           await invalidateCache?.();
+          if (data.is_duplicate) {
+            // Fetch fresh locations (backend has now created the new location)
+            const syncedLocations = await syncVendorLocationsCache(queryClient);
+            if (syncedLocations?.data?.length) {
+              // Persist the updated location list in the JWT so it survives hard reloads.
+              // authOptions.ts JWT callback now handles venue_locations + default_venue_location.
+              await updateSessionWithLocation({
+                venue_locations: syncedLocations.data,
+                default_venue_location: syncedLocations.default_venue_location,
+              });
+            }
+            // Mark stale so next mount triggers a background refetch (belt + suspenders)
+            void queryClient.invalidateQueries({ queryKey: ["locations"] });
+          }
           router.push("/vendor/events");
         } else {
-          const errorMessage =
-            response?.message ||
-            "Failed to save publish settings. Please try again.";
-          toast.error("Error saving publish settings", {
-            description: errorMessage,
-          });
+          console.error("Error saving publish settings:", response);
         }
       } catch (error) {
         console.error("Error saving publish settings:", error);
-        toast.error("Failed to save publish settings");
       } finally {
         setIsLoading(false);
       }
     },
-    [form, globalForm, advanceStep, setActiveField, invalidateCache, router],
+    [
+      form,
+      globalForm,
+      advanceStep,
+      setActiveField,
+      invalidateCache,
+      queryClient,
+      updateSessionWithLocation,
+      router,
+    ],
   );
 
   // Check if event is cancelled
@@ -404,75 +434,15 @@ export default function PublishTab() {
                     Location Details
                   </h2>
                   <p className="text-sm text-gray-500">
-                    Provide location information for the duplicated event
+                    Choose an existing location or add a new one for the
+                    duplicated event
                   </p>
-                  <FormField
-                    control={control}
-                    name="address"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel className="text-sm font-medium">
-                          Address <span className="text-red-500">*</span>
-                        </FormLabel>
-                        <FormControl>
-                          <GoogleLocationSearch
-                            apiKey={env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}
-                            value={field.value || ""}
-                            onChange={(value) => field.onChange(value)}
-                            onSelect={(placeId) =>
-                              fetchLocationDetails(form, placeId)
-                            }
-                            placeholder="Search for a location..."
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
+                  <DuplicateLocationFields
+                    form={form}
+                    eventLocationId={eventLocationId}
+                    onFieldFocus={handleFieldFocus}
+                    readOnly={readOnly}
                   />
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <FormField
-                      control={control}
-                      name="city"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel className="text-sm font-medium">
-                            City <span className="text-red-500">*</span>
-                          </FormLabel>
-                          <FormControl>
-                            <Input
-                              {...field}
-                              placeholder="Enter city name"
-                              className="h-11 bg-[#F9FAFB] border-[#E5E7EB]"
-                              onFocus={() => handleFieldFocus("city")}
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-
-                    <FormField
-                      control={control}
-                      name="contact_number"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel className="text-sm font-medium">
-                            Contact Number{" "}
-                            <span className="text-red-500">*</span>
-                          </FormLabel>
-                          <FormControl>
-                            <Input
-                              {...field}
-                              placeholder="Enter contact number"
-                              className="h-11 bg-[#F9FAFB] border-[#E5E7EB]"
-                              onFocus={() => handleFieldFocus("contact_number")}
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
                 </div>
               </div>
             )}

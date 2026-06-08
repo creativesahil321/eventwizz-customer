@@ -328,9 +328,10 @@ export default function DatesSection({
   const canGoLeft = needsPagination && currentPage > 0;
   const canGoRight = needsPagination && currentPage < maxPages;
 
-  // Floating particles animation - only rendered client-side
-  const particles = isClient
-    ? Array.from({ length: 10 }, (_, i) => (
+  // Decorative particles — off in onboarding preview (full-viewport coords + noise).
+  const particles =
+    isClient && !isPreviewMode
+      ? Array.from({ length: 10 }, (_, i) => (
         <motion.div
           key={i}
           className="absolute w-2 h-2 bg-white/20 rounded-full"
@@ -350,7 +351,7 @@ export default function DatesSection({
           }}
         />
       ))
-    : [];
+      : [];
 
   // Simple non-animated fallback for SSR that matches the client layout
   if (!isClient) {

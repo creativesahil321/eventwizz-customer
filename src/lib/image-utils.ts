@@ -4,10 +4,23 @@
 
 import { isNextImageRemoteHostname } from "@/lib/next-image-remote-patterns";
 
+/** Hosts where the browser can load assets but the Next.js image optimizer often cannot. */
+export function isPrivateOrLocalImageHostname(hostname: string): boolean {
+  const h = hostname.toLowerCase();
+  if (h === "localhost" || h === "127.0.0.1" || h === "::1") {
+    return true;
+  }
+  if (/^192\.168\.\d{1,3}\.\d{1,3}$/.test(h)) return true;
+  if (/^10\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(h)) return true;
+  if (/^172\.(1[6-9]|2\d|3[0-1])\.\d{1,3}\.\d{1,3}$/.test(h)) return true;
+  return false;
+}
+
 /**
  * Use Next.js image optimizer for this `src` (`unoptimized={false}`) only when the host is
  * listed in `nextImageRemotePatterns` (same list as `next.config` `images.remotePatterns`).
- * Other remotes stay `unoptimized` so the runtime does not error on disallowed domains.
+ * Private/LAN hosts stay unoptimized so the browser loads them directly (the optimizer runs
+ * on the Next server and often cannot reach 192.168.x.x).
  */
 export function shouldUseNextImageOptimization(src: string): boolean {
   if (!src || src.startsWith("data:") || src.startsWith("blob:")) {
@@ -17,7 +30,11 @@ export function shouldUseNextImageOptimization(src: string): boolean {
     return true;
   }
   try {
-    return isNextImageRemoteHostname(new URL(src).hostname);
+    const hostname = new URL(src).hostname;
+    if (isPrivateOrLocalImageHostname(hostname)) {
+      return false;
+    }
+    return isNextImageRemoteHostname(hostname);
   } catch {
     return false;
   }

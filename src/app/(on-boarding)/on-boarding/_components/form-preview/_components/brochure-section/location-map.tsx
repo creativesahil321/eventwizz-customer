@@ -409,15 +409,15 @@ export default function LocationMap({
       <div className="relative">
         {!mapLoaded ? (
           <div
-            className="w-full h-full rounded-md overflow-hidden bg-[var(--color-surface)] flex items-center justify-center"
+            className="w-full h-full rounded-md overflow-hidden bg-[var(--color-primary)] flex items-center justify-center"
             style={{ minHeight: "200px" }}
           >
             <div className="text-center">
-              <MapPin className="text-[var(--color-text)] mx-auto " size={24} />
-              <h2 className="text-base sm:text-lg font-bold py-2 sm:py-3 uppercase">
+              <MapPin className="text-[var(--color-primary-foreground)] mx-auto " size={24} />
+              <h2 className="text-base sm:text-lg font-bold py-2 sm:py-3 uppercase text-[var(--color-primary-foreground)]">
                 EVENT LOCATION
               </h2>
-              <p className="text-sm pb-2">{address}</p>
+              <p className="text-sm pb-2 text-[var(--color-primary-foreground)]">{address}</p>
 
               <Button
                 variant="event-outline"
@@ -448,11 +448,11 @@ export default function LocationMap({
 
         {/* Error Overlay - Only show when map is loaded */}
         {mapLoaded && error && (
-          <div className="absolute inset-0 bg-[var(--color-surface)] bg-opacity-75 flex items-center justify-center rounded-md">
+          <div className="absolute inset-0 bg-[var(--color-primary)] bg-opacity-75 flex items-center justify-center rounded-md">
             <div className="flex flex-col items-center gap-2 text-center p-4">
-              <MapPin className="h-8 w-8 text-[var(--color-text)]" />
-              <p className="text-[var(--color-text)] text-sm">{error}</p>
-              <p className="text-[var(--color-text-dimmed)] text-xs">
+              <MapPin className="h-8 w-8 text-[var(--color-primary-foreground)]" />
+              <p className="text-[var(--color-primary-foreground)] text-sm">{error}</p>
+              <p className="text-[var(--color-primary-foreground)] text-xs">
                 {address || "No address provided"}
               </p>
             </div>
@@ -522,13 +522,13 @@ export default function LocationMap({
 
         {/* Map Pin Icon Overlay (when no address) */}
         {mapLoaded && !currentLocation && !isLoading && !error && (
-          <div className="absolute inset-0 bg-[var(--color-surface)] flex items-center justify-center rounded-md text-[var(--color-text)]">
+          <div className="absolute inset-0 bg-[var(--color-primary)] flex items-center justify-center rounded-md text-[var(--color-primary-foreground)]">
             <div className="flex flex-col items-center gap-2 ">
               <MapPin className="h-8 w-8" />
-              <p className="text-sm font-medium text-[var(--color-text)]">
+              <p className="text-sm font-medium text-[var(--color-primary-foreground)]">
                 EVENT LOCATION
               </p>
-              <p className="text-xs text-center px-4">
+              <p className="text-xs text-center px-4 text-[var(--color-primary-foreground)]">
                 {address ||
                   "Enter your event address in the form to display here"}
               </p>

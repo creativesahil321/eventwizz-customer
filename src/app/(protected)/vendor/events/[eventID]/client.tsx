@@ -6,10 +6,10 @@ import TabEventForm from "../_components/tab-event-form";
 import { DataTableSkeleton } from "@/components/data-table/data-table-skeleton";
 import { useEventData } from "../_lib/hooks/useEventData";
 import {
+  resolvePersistedEventIsRoomsFromPayload,
   resolveVendorEventIsRoomsForFetch,
   writeVendorEventIsRoomsFlag,
 } from "../_lib/vendor-event-is-rooms";
-import { parseEventIsRoomsFlag } from "@/lib/event-form-limits";
 import { EventApiResponse } from "@/services/vendor/events/type";
 
 interface EventClientWrapperProps {
@@ -24,16 +24,9 @@ export default function EventClientWrapper({
 
   useEffect(() => {
     if (!eventData?.data || !eventId) return;
-    const payload = eventData.data as {
-      is_rooms?: boolean | number | string;
-      stepOne?: { is_rooms?: boolean | number | string };
-      stepTwo?: { is_rooms?: boolean | number | string };
-    };
     writeVendorEventIsRoomsFlag(
       eventId,
-      parseEventIsRoomsFlag(
-        payload.is_rooms ?? payload.stepTwo?.is_rooms ?? payload.stepOne?.is_rooms,
-      ) === 1,
+      resolvePersistedEventIsRoomsFromPayload(eventData.data),
     );
   }, [eventData, eventId]);
 

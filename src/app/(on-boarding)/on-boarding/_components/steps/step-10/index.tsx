@@ -300,15 +300,10 @@ export default function StepTen() {
           );
         }
       } else {
-        console.error("Invalid response structure:", response);
-        toast.error(
-          response.message ||
-            "Failed to initiate Stripe connection. Invalid response from server.",
-        );
+        console.error("Invalid Stripe connect response:", response);
       }
     } catch (error) {
       console.error("Stripe connection error:", error);
-      // Error toast is handled by axios interceptor
     } finally {
       setLoading(false);
     }
@@ -393,15 +388,10 @@ export default function StepTen() {
           );
         }
       } else {
-        console.error("Invalid response structure:", response);
-        toast.error(
-          response.message ||
-            "Failed to initiate PayPal connection. Invalid response from server.",
-        );
+        console.error("Invalid PayPal connect response:", response);
       }
     } catch (error) {
       console.error("PayPal connection error:", error);
-      // Error toast is handled by axios interceptor
     } finally {
       setLoading(false);
     }
@@ -481,7 +471,6 @@ export default function StepTen() {
         globalForm.setValue("stepTen", { ...data, isApproved: true });
         // INSTANT TRANSITION: Set active step FIRST for smooth UX
         setActiveStep(11);
-        toast.success("Payment settings saved successfully!");
 
         // Then handle async operations in background
         Promise.all([

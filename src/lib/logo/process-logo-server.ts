@@ -16,15 +16,18 @@ import {
   LOGO_WHITE_THRESHOLD,
 } from "./constants";
 
+import type { LogoProcessNotice } from "./logo-process-notices";
+import { classifyBackgroundRemovalError } from "./logo-process-notices";
+
 export type ProcessLogoResult = {
   buffer: Buffer;
   contentType: "image/png" | "image/svg+xml";
   method: "sharp" | "remove-bg" | "passthrough";
   invertedForContrast?: boolean;
   headerIsLight?: boolean;
-  /** Set when remove.bg was configured but failed (e.g. no credits). */
+  /** Set when remove.bg was configured but Sharp fallback was used instead. */
   backgroundRemovalFailed?: boolean;
-  backgroundRemovalError?: string;
+  processNotice?: LogoProcessNotice;
 };
 
 function hasSignificantTransparency(
@@ -332,7 +335,7 @@ export async function processLogoBuffer(
     options?.headerBackgroundColor?.trim() || LOGO_DEFAULT_HEADER_BACKGROUND;
   const headerIsLight = isLightHeaderBackground(headerBackgroundColor);
   let backgroundRemovalFailed = false;
-  let backgroundRemovalError: string | undefined;
+  let processNotice: LogoProcessNotice = "none";
 
   if (meta.format === "svg") {
     return {
@@ -359,8 +362,9 @@ export async function processLogoBuffer(
       };
     } catch (error) {
       backgroundRemovalFailed = true;
-      backgroundRemovalError =
+      const rawMessage =
         error instanceof Error ? error.message : "Background removal failed";
+      processNotice = classifyBackgroundRemovalError(rawMessage);
       console.warn("[logo] remove.bg failed, falling back to Sharp:", error);
     }
   }
@@ -378,6 +382,6 @@ export async function processLogoBuffer(
     backgroundRemovalFailed: options?.removeBgApiKey
       ? backgroundRemovalFailed
       : undefined,
-    backgroundRemovalError,
+    processNotice: backgroundRemovalFailed ? processNotice : "none",
   };
 }

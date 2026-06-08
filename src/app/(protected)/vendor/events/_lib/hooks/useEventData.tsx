@@ -12,7 +12,11 @@ import { useSession } from "next-auth/react";
 import { useEffect } from "react";
 import { useIsPreviewModeFromProvider } from "@/contexts/preview-context";
 import { buildVendorEventGetUrl } from "@/services/vendor/events/build-vendor-event-get-url";
-import { parseEventIsRoomsFlag } from "@/lib/event-form-limits";
+import {
+  eventFlatPersistenceLikelyMissedRoomPayload,
+  eventRoomsPersistenceHasRoomData,
+  parseIsRoomsFromEventPersistencePayload,
+} from "../vendor-event-is-rooms";
 import { eventKeys as vendorEventsListKeys } from "../queries";
 
 // Define query key for event data
@@ -22,18 +26,6 @@ export const eventKeys = {
 };
 
 const EVENT_DATA_CHANGED = "event-data-changed";
-
-function parseIsRoomsFromEventApiPayload(data: unknown): 0 | 1 {
-  if (!data || typeof data !== "object") return 0;
-  const root = data as {
-    is_rooms?: boolean | number | string;
-    stepOne?: { is_rooms?: boolean | number | string };
-    stepTwo?: { is_rooms?: boolean | number | string };
-  };
-  return parseEventIsRoomsFlag(
-    root.is_rooms ?? root.stepTwo?.is_rooms ?? root.stepOne?.is_rooms,
-  );
-}
 
 /** One listener for the whole app — avoids N refetches when N components use `useEventData`. */
 let eventDataChangedSubscribers = 0;
@@ -101,9 +93,18 @@ async function fetchEventData(
         ? await fetchByMode(isRooms)
         : await fetchByMode(false).then(async (flatRes) => {
             if (!flatRes?.status) return fetchByMode(true);
-            if (parseIsRoomsFromEventApiPayload(flatRes.data) === 1) {
+            if (parseIsRoomsFromEventPersistencePayload(flatRes.data) === 1) {
               const roomsRes = await fetchByMode(true);
               return roomsRes?.status ? roomsRes : flatRes;
+            }
+            if (eventFlatPersistenceLikelyMissedRoomPayload(flatRes.data)) {
+              const roomsRes = await fetchByMode(true);
+              if (
+                roomsRes?.status &&
+                eventRoomsPersistenceHasRoomData(roomsRes.data)
+              ) {
+                return roomsRes;
+              }
             }
             return flatRes;
           });

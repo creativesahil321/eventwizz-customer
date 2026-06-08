@@ -8,7 +8,6 @@ import type {
   AIOnboardingInput,
 } from "@/app/api/ai/generate-onboarding/route";
 import { useSession } from "next-auth/react";
-import { toast } from "sonner";
 import { useFormContext } from "../form-provider";
 import {
   AI_ONBOARDING_APPLY_STEPS,
@@ -77,9 +76,6 @@ export default function AIAutoApply({
           onApplyStepChange: setApplyStep,
         });
 
-        toast.success(
-          "Your site has been created! We opened the Site step so you can preview branding right away—review the other steps when you are ready, then continue to payments and publishing.",
-        );
         latestRef.current.onComplete();
       } catch (error) {
         console.error("Error applying AI content:", error);

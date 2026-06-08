@@ -35,6 +35,13 @@ import { ensureEventMenuCategoriesForRoom } from "@/lib/event-menu-categories";
 import type { StepFiveSavePayload } from "@/services/vendor/events/events.service";
 import { persistAiEventDraftId } from "./ai-event-draft-storage";
 import type { StepThreeType } from "@/app/(protected)/vendor/events/_components/tab-event-form/schema";
+import {
+  resolveRoomBrochureDescription,
+  resolveRoomMenuFields,
+  resolveRoomPackageFields,
+  type AIEventRoomBrochure,
+} from "./ai-event-vendor-intent";
+import type { AIDate } from "@/app/api/ai/generate-onboarding/route";
 
 export const AI_EVENT_APPLY_STEPS = [
   { label: "Event details & schedule", icon: "📅" },
@@ -123,6 +130,77 @@ function normalizeAiEventRoomNames(roomNames: string[] | undefined): string[] {
   if (unique.length >= AI_EVENT_MIN_ROOMS) return unique;
   if (unique.length === 1) return [unique[0], "Room 2"];
   return ["Room 1", "Room 2"];
+}
+
+function matchAiRoomName<T extends { room_name?: string }>(
+  entries: T[] | undefined,
+  name: string,
+): T | undefined {
+  if (!entries?.length) return undefined;
+  const key = name.trim().toLowerCase();
+  return entries.find(
+    (entry) => String(entry.room_name ?? "").trim().toLowerCase() === key,
+  );
+}
+
+function mapAiDatesToFormDates(
+  rawDates: AIDate[],
+  defaultRoomId?: number,
+) {
+  const sortedUniqueDates = (() => {
+    const sorted = [...rawDates].sort(
+      (a, b) =>
+        new Date(a.event_date + "T00:00:00").getTime() -
+        new Date(b.event_date + "T00:00:00").getTime(),
+    );
+    const seen = new Set<string>();
+    return sorted.filter((d) => {
+      if (!d.event_date || seen.has(d.event_date)) return false;
+      seen.add(d.event_date);
+      return true;
+    });
+  })();
+
+  return sortedUniqueDates.map((d) => {
+    const tickets =
+      d.booking_type !== "tables"
+        ? (d.tickets || []).map((t) => ({
+            title: t.title,
+            description: t.description,
+            total_capacity: parseInt(t.total_capacity) || 100,
+            price: parseInt(t.price) || 50,
+            sold_tickets: 0,
+          }))
+        : [];
+
+    const tables =
+      d.booking_type !== "tickets"
+        ? (d.tables || []).map((t) => ({
+            min_persons: parseInt(t.min_persons) || 2,
+            max_persons: parseInt(t.max_persons) || 6,
+            price: parseInt(t.price) || 100,
+            total_tables: parseInt(t.total_tables) || 10,
+            sold_tables: 0,
+          }))
+        : [];
+
+    return {
+      event_date: d.event_date,
+      booking_type: d.booking_type,
+      ...(defaultRoomId ? { room_id: defaultRoomId } : {}),
+      tickets,
+      tables,
+      total_ticket_types: d.booking_type !== "tables" ? tickets.length : 0,
+      total_table_types: d.booking_type !== "tickets" ? tables.length : 0,
+      payment_type: (d.booking_type !== "tickets" ? d.payment_type || "full" : "full") as
+        | "full"
+        | "deposit",
+      is_deposit_enabled: d.is_deposit_enabled || false,
+      deposit_type: (d.deposit_type || "amount") as "amount" | "percentage",
+      deposit_value: d.deposit_value ? Number(d.deposit_value) : 0,
+      deposit_due_date: d.deposit_due_date || "",
+    };
+  });
 }
 
 export async function applyAIGeneratedEventToBackend(params: {
@@ -270,11 +348,27 @@ export async function applyAIGeneratedEventToBackend(params: {
     active_room_index: useRoomSystem ? 0 : undefined,
     ...stepTwoPackage,
     rooms: useRoomSystem
-      ? createdRooms.map((room) => ({
-          room_id: room.id,
-          name: room.name,
-          ...stepTwoPackage,
-        }))
+      ? createdRooms.map((room) => {
+          const resolved = resolveRoomPackageFields(
+            room.name,
+            {
+              package_title: stepTwoPackage.package_title,
+              package_description: stepTwoPackage.package_description,
+              package_details: stepTwoPackage.package_details,
+              event_schedular: stepTwoPackage.event_schedular,
+            },
+            s.stepTwo.rooms,
+          );
+          return {
+            room_id: room.id,
+            name: room.name,
+            ...stepTwoPackage,
+            package_title: resolved.package_title,
+            package_description: resolved.package_description,
+            package_details: resolved.package_details,
+            event_schedular: resolved.event_schedular,
+          };
+        })
       : undefined,
   };
 
@@ -284,65 +378,12 @@ export async function applyAIGeneratedEventToBackend(params: {
   onProgress?.(2);
   if (!removedSections.has("stepThree")) {
     const rawDates = s.stepThree.dates || [];
-    const sortedUniqueDates = (() => {
-      const sorted = [...rawDates].sort(
-        (a, b) =>
-          new Date(a.event_date + "T00:00:00").getTime() -
-          new Date(b.event_date + "T00:00:00").getTime()
-      );
-      const seen = new Set<string>();
-      return sorted.filter((d) => {
-        if (!d.event_date || seen.has(d.event_date)) return false;
-        seen.add(d.event_date);
-        return true;
-      });
-    })();
+    const perRoomDates = s.stepThree.rooms ?? [];
     const defaultRoomId =
       useRoomSystem && createdRooms[0]?.id ? createdRooms[0].id : undefined;
 
-    const dates = sortedUniqueDates.map((d) => {
-      const tickets =
-        d.booking_type !== "tables"
-          ? (d.tickets || []).map((t) => ({
-            title: t.title,
-            description: t.description,
-            total_capacity: parseInt(t.total_capacity) || 100,
-            price: parseInt(t.price) || 50,
-            sold_tickets: 0,
-          }))
-          : [];
-
-      const tables =
-        d.booking_type !== "tickets"
-          ? (d.tables || []).map((t) => ({
-            min_persons: parseInt(t.min_persons) || 2,
-            max_persons: parseInt(t.max_persons) || 6,
-            price: parseInt(t.price) || 100,
-            total_tables: parseInt(t.total_tables) || 10,
-            sold_tables: 0,
-          }))
-          : [];
-
-      return {
-        event_date: d.event_date,
-        booking_type: d.booking_type,
-        ...(defaultRoomId ? { room_id: defaultRoomId } : {}),
-        tickets,
-        tables,
-        total_ticket_types: d.booking_type !== "tables" ? tickets.length : 0,
-        total_table_types: d.booking_type !== "tickets" ? tables.length : 0,
-        payment_type: (d.booking_type !== "tickets" ? d.payment_type || "full" : "full") as
-          | "full"
-          | "deposit",
-        is_deposit_enabled: d.is_deposit_enabled || false,
-        deposit_type: (d.deposit_type || "amount") as "amount" | "percentage",
-        deposit_value: d.deposit_value ? Number(d.deposit_value) : 0,
-        deposit_due_date: d.deposit_due_date || "",
-      };
-    });
-
     const datesForForm = cleanVendorStepThreeDatesForForm(
-      dates as StepThreeType["dates"],
+      mapAiDatesToFormDates(rawDates as AIDate[], defaultRoomId) as StepThreeType["dates"],
     );
     const datesForApi = datesForForm.map((date) =>
       formatVendorStepThreeDateForApi(date),
@@ -354,10 +395,20 @@ export async function applyAIGeneratedEventToBackend(params: {
         event_id: eventId,
         vendor_location_id: vendorLocationId,
         is_rooms: 1,
-        rooms: createdRooms.map((room) => ({
-          room_id: room.id,
-          dates: datesForApi,
-        })),
+        rooms: createdRooms.map((room) => {
+          const aiRoom = matchAiRoomName(perRoomDates, room.name);
+          const roomRawDates =
+            aiRoom?.dates?.length ? (aiRoom.dates as AIDate[]) : (rawDates as AIDate[]);
+          const roomDatesForForm = cleanVendorStepThreeDatesForForm(
+            mapAiDatesToFormDates(roomRawDates, room.id) as StepThreeType["dates"],
+          );
+          return {
+            room_id: room.id,
+            dates: roomDatesForForm.map((date) =>
+              formatVendorStepThreeDateForApi(date),
+            ),
+          };
+        }),
         dates: datesForForm,
       });
     } else {
@@ -387,10 +438,21 @@ export async function applyAIGeneratedEventToBackend(params: {
   if (hasCatering && eventId) {
     if (useRoomSystem && createdRooms.length > 0) {
       for (const room of createdRooms) {
+        const resolved = resolveRoomMenuFields(
+          room.name,
+          {
+            catering_option: cateringOption,
+            menu_title: s.stepFour.menu_title,
+            menu_description: s.stepFour.menu_description,
+            menus,
+          },
+          s.stepFour.rooms,
+        );
+        const roomMenus = resolved.menus ?? menus;
         const categoryId = await ensureEventMenuCategoriesForRoom(
           eventId,
           room.id,
-          menus,
+          roomMenus,
         );
         if (categoryId != null) {
           menuCategoryIdByRoomId.set(room.id, categoryId);
@@ -418,20 +480,34 @@ export async function applyAIGeneratedEventToBackend(params: {
     (await createPlaceholderPackageImage(s.stepFour.menu_title || "Menu"))
     : null;
 
-  const buildStepFourRoomEntry = (roomId: number): VendorStepFourRoomEntry => ({
-    room_id: roomId,
-    catering_option: cateringOption as 0 | 1,
-    menu_title: hasCatering ? s.stepFour.menu_title : "",
-    menu_description: hasCatering ? s.stepFour.menu_description : "",
-    event_menu_category_id:
-      menuCategoryIdByRoomId.get(roomId) ?? defaultMenuCategoryId,
-    menus,
-    menu_background_image: menuBgFile ?? null,
-  });
+  const buildStepFourRoomEntry = (roomId: number, roomName: string): VendorStepFourRoomEntry => {
+    const resolved = resolveRoomMenuFields(
+      roomName,
+      {
+        catering_option: cateringOption,
+        menu_title: hasCatering ? s.stepFour.menu_title : "",
+        menu_description: hasCatering ? s.stepFour.menu_description : "",
+        menus,
+      },
+      s.stepFour.rooms,
+    );
+    const roomMenus = hasCatering ? (resolved.menus ?? menus) : [];
+    const roomCatering = resolved.catering_option === 1 ? 1 : 0;
+    return {
+      room_id: roomId,
+      catering_option: roomCatering as 0 | 1,
+      menu_title: roomCatering === 1 ? resolved.menu_title : "",
+      menu_description: roomCatering === 1 ? resolved.menu_description : "",
+      event_menu_category_id:
+        menuCategoryIdByRoomId.get(roomId) ?? defaultMenuCategoryId,
+      menus: roomMenus,
+      menu_background_image: menuBgFile ?? null,
+    };
+  };
 
   if (useRoomSystem && createdRooms.length > 0) {
     const roomMenus = createdRooms.map((room) =>
-      buildStepFourRoomEntry(room.id),
+      buildStepFourRoomEntry(room.id, room.name),
     );
     const activeMenu = roomMenus[0];
     await eventsService.storeStepFourData({
@@ -468,6 +544,8 @@ export async function applyAIGeneratedEventToBackend(params: {
 
   const brochureSource = (legacyAiShape ? stepSixAny : stepFiveAny) as {
     event_address?: string;
+    price_start_from?: string;
+    rooms?: AIEventRoomBrochure[];
   };
   const drinksSource = (legacyAiShape ? stepFiveAny : stepSixAny) as {
     drink_title?: string;
@@ -502,6 +580,8 @@ export async function applyAIGeneratedEventToBackend(params: {
         : "-0.1278";
 
     if (useRoomSystem && createdRooms.length > 0) {
+      const defaultBrochureDescription = brochureAddress;
+      const brochureRoomEntries = brochureSource.rooms;
       const roomPayload: StepFiveSavePayload = {
         step: 5,
         event_id: eventId,
@@ -514,6 +594,19 @@ export async function applyAIGeneratedEventToBackend(params: {
           description: brochureAddress,
           icon: "MapPin",
         },
+        more_info:
+          brochureRoomEntries && brochureRoomEntries.length > 0
+            ? createdRooms.map((room) => ({
+                title: room.name.slice(0, 40),
+                description: resolveRoomBrochureDescription(
+                  room.name,
+                  defaultBrochureDescription,
+                  brochureRoomEntries,
+                ).slice(0, 160),
+                button_text: "Details",
+                button_link: "",
+              }))
+            : undefined,
         rooms: createdRooms.map((room) => ({
           room_id: room.id,
           brochure_pdf: null,
@@ -558,24 +651,43 @@ export async function applyAIGeneratedEventToBackend(params: {
     },
   ];
 
+  const perRoomDrinks = s.stepFive.rooms ?? [];
+
   await eventsService.storeStepSixData(
     useRoomSystem && createdRooms.length > 0
       ? {
           step: 6 as const,
           event_id: eventId,
           is_rooms: 1,
-          rooms: createdRooms.map((room) => ({
-            room_id: room.id,
-            drink_title: hasUsableDrinksContent
-              ? String(drinksSource.drink_title).trim()
-              : "Drinks",
-            drink_description: hasUsableDrinksContent
-              ? String(drinksSource.drink_description).trim()
-              : "Drink packages",
-            packages: hasUsableDrinksContent
-              ? mappedDrinkPackages
-              : placeholderDrinkPackages,
-          })),
+          rooms: createdRooms.map((room) => {
+            const aiDrink = matchAiRoomName(perRoomDrinks, room.name);
+            const roomPackages =
+              aiDrink?.packages?.length
+                ? aiDrink.packages.map((p) => ({
+                    title: p.title || "",
+                    description: p.description || "",
+                    price: p.price ?? 0,
+                    available_quantity: p.available_quantity ?? 0,
+                  }))
+                : hasUsableDrinksContent
+                  ? mappedDrinkPackages
+                  : placeholderDrinkPackages;
+            const roomHasDrinks =
+              String(aiDrink?.drink_title ?? drinksSource.drink_title ?? "").trim() !== "" &&
+              roomPackages.length > 0;
+            return {
+              room_id: room.id,
+              drink_title: roomHasDrinks
+                ? String(aiDrink?.drink_title ?? drinksSource.drink_title).trim()
+                : "Drinks",
+              drink_description: roomHasDrinks
+                ? String(
+                    aiDrink?.drink_description ?? drinksSource.drink_description,
+                  ).trim()
+                : "Drink packages",
+              packages: roomHasDrinks ? roomPackages : placeholderDrinkPackages,
+            };
+          }),
           drink_title: hasUsableDrinksContent
             ? String(drinksSource.drink_title).trim()
             : "Drinks",

@@ -3,6 +3,12 @@
 import { useCallback, useEffect, useRef } from "react";
 import { toast } from "sonner";
 import { onboardingService } from "@/services/vendor/onboarding/onboarding.service";
+import {
+  cloneOnboardingBrochureForApplyAll,
+  cloneOnboardingCateringForApplyAll,
+  cloneOnboardingDatesForApplyAll,
+  selectOnboardingRoomsForApi,
+} from "../../_lib/onboarding-room-save";
 import { useFormContext } from "../form-provider";
 import type {
   StepFiveType,
@@ -185,81 +191,109 @@ export function useRoomScopeSync(section: RoomSection): RoomScopeSyncReturn {
       void _eventId;
       void _approved;
 
-      // Ensure the active room contributes its latest in-form values to the aggregate payload
-      // before we send room-scoped step saves.
-      const stagedRooms = allRooms.map((room, index) => {
-        const isActiveRoom = index === currentRoomIndex;
-
-        if (isActiveRoom) {
-          return {
-            ...room,
-            [roomKey]: currentSectionPayload,
-            [approvalKey]: true,
-          } as RoomType;
-        }
-
-        // Per-room save: keep other rooms on their last persisted API snapshot so
-        // unsaved tab edits (e.g. deposit toggled off) are not sent to the backend.
-        if (!applyToAllRooms && section === "dates") {
-          if (
-            room.isApprovedDates &&
-            room.persistedDates?.dates &&
-            room.persistedDates.dates.length > 0
-          ) {
-            return {
-              ...room,
-              dates: cloneRoomDatesSection(room.persistedDates),
-            };
-          }
-
-          // Never-configured rooms can pick up blank default rows from tab switches.
-          // Send persisted snapshot or an empty dates array instead of placeholders.
-          if (!isRoomSectionComplete(room, section)) {
-            return {
-              ...room,
-              dates: cloneRoomDatesSection(
-                room.persistedDates ?? { dates: [] },
-              ),
-            };
-          }
-        }
-
-        if (applyToAllRooms && !isRoomSectionComplete(room, section)) {
-          return {
-            ...room,
-            [roomKey]: currentSectionPayload,
-            [approvalKey]: true,
-          } as RoomType;
-        }
-
-        return room;
-      });
-      const missingRoomId = stagedRooms.some((room) => !room?.id);
-      if (missingRoomId) {
+      const activeRoomBase = allRooms[currentRoomIndex];
+      if (!activeRoomBase?.id) {
         toast.error(
           "Please create rooms in Step 4 before editing room-specific steps.",
         );
         return false;
       }
-      const roomsWithIds = stagedRooms as RoomType[];
+
+      const activeRoomEntry = {
+        ...activeRoomBase,
+        [roomKey]: currentSectionPayload,
+        [approvalKey]: true,
+      } as RoomType;
+
+      // Apply-to-all: mirror active section into target rooms, then send every room.
+      const stagedRoomsForApplyAll = applyToAllRooms
+        ? section === "brochure"
+          ? (() => {
+              const brochureClone = cloneOnboardingBrochureForApplyAll(
+                currentSectionPayload as Record<string, unknown>,
+              );
+              return allRooms.map((room) => ({
+                ...room,
+                brochure: {
+                  ...(room.brochure ?? {}),
+                  ...brochureClone,
+                },
+                isApprovedBrochure: true,
+              })) as RoomType[];
+            })()
+          : section === "catering"
+            ? (() => {
+                const cateringClone = cloneOnboardingCateringForApplyAll(
+                  currentSectionPayload as Record<string, unknown>,
+                );
+                return allRooms.map((room) => ({
+                  ...room,
+                  catering: cateringClone,
+                  isApprovedCatering: true,
+                })) as RoomType[];
+              })()
+            : section === "dates"
+              ? (() => {
+                  const datesClone = cloneOnboardingDatesForApplyAll(
+                    currentSectionPayload as Record<string, unknown>,
+                  );
+                  return allRooms.map((room) => ({
+                    ...room,
+                    dates: datesClone,
+                    isApprovedDates: true,
+                  })) as RoomType[];
+                })()
+              : allRooms.map((room, index) =>
+                  index === currentRoomIndex
+                    ? activeRoomEntry
+                    : ({
+                        ...room,
+                        [roomKey]: currentSectionPayload,
+                        [approvalKey]: true,
+                      } as RoomType),
+                )
+        : null;
+
+      const roomsWithIds = (stagedRoomsForApplyAll ?? allRooms.map((room, index) =>
+        index === currentRoomIndex ? activeRoomEntry : room,
+      )) as RoomType[];
+
+      if (roomsWithIds.some((room) => !room?.id)) {
+        toast.error(
+          "Please create rooms in Step 4 before editing room-specific steps.",
+        );
+        return false;
+      }
+
+      const roomsToSave = selectOnboardingRoomsForApi(
+        roomsWithIds,
+        currentRoomIndex,
+        applyToAllRooms,
+      );
+
+      if (roomsToSave.length === 0) {
+        toast.error("Active room is missing. Please refresh and try again.");
+        return false;
+      }
 
       const currentMultiSpace = globalForm.getValues("multiSpace");
       if (currentMultiSpace) {
+        const nextRooms = [...(currentMultiSpace.rooms ?? [])];
+        if (applyToAllRooms) {
+          roomsWithIds.forEach((room, index) => {
+            if (nextRooms[index]) {
+              nextRooms[index] = room;
+            }
+          });
+        } else if (nextRooms[currentRoomIndex]) {
+          nextRooms[currentRoomIndex] = activeRoomEntry;
+        }
         globalForm.setValue("multiSpace", {
           ...currentMultiSpace,
-          rooms: roomsWithIds,
+          rooms: nextRooms,
         });
       }
 
-      let response;
-      const activeRoomOnly = [roomsWithIds[currentRoomIndex]];
-      const roomsToSave = applyToAllRooms ? roomsWithIds : activeRoomOnly;
-      const allRoomsCompleteForSection = roomsWithIds.every((room) =>
-        isRoomSectionComplete(room, section),
-      );
-
-      // Always mirror the latest active-room payload locally so room switching keeps data stable
-      // even before the aggregate API call runs.
       globalForm.setValue(
         `multiSpace.rooms.${currentRoomIndex}.${roomKey}` as never,
         currentSectionPayload as never,
@@ -269,22 +303,20 @@ export function useRoomScopeSync(section: RoomSection): RoomScopeSyncReturn {
         true as never,
       );
 
+      let response;
+
       switch (section) {
         case "dates": {
-          // Backend replaces the full step-5 rooms[] graph — always send every room.
-          if (applyToAllRooms && !allRoomsCompleteForSection) {
-            onMultiRoomSuccess?.();
-            return true;
-          }
-
           response = await onboardingService.storeStepFiveRoomsData({
             event_id: eventId,
-            rooms: roomsWithIds,
+            rooms: roomsToSave,
             isApproved: true,
           });
 
           if (response?.status) {
-            roomsWithIds.forEach((room, index) => {
+            roomsToSave.forEach((room) => {
+              const index = roomsWithIds.findIndex((r) => r.id === room.id);
+              if (index < 0) return;
               globalForm.setValue(
                 `multiSpace.rooms.${index}.persistedDates` as never,
                 cloneRoomDatesSection(room.dates) as never,

@@ -34,19 +34,73 @@ import { defaultThemeConstants } from "@/services/common/theme/constants/theme";
 import { ensureFilePreview, revokeFilePreview } from "@/lib/file-preview";
 import { Button } from "@/components/ui/button";
 import { optimizeLogoFromSources, isLocalLogoUrl } from "@/lib/logo/optimize-logo-from-sources";
+import { getFriendlyLogoOptimizeErrorMessage } from "@/lib/logo/logo-process-notices";
+import {
+  LOGO_SUPPORTED_ACCEPT,
+  LOGO_SUPPORTED_FORMATS_LABEL,
+  LOGO_UPLOAD_HINT,
+} from "@/lib/logo/supported-formats";
+import { MainLandingPageSection } from "./main-landing-page-section";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Info } from "lucide-react";
+import {
+  useSitePreviewStore,
+  type SitePreviewScope,
+} from "@/store/site-preview.store";
 
 interface BrandingTabProps {
+  /** When false, location page is the public home — hide main home tab & fields */
+  hasMultipleLocations: boolean;
   /** Server values from API – source of truth after location switch so UI updates immediately */
   serverCoverImage?: string;
   serverCoverVideo?: string;
+  serverMainLandingCoverImage?: string;
 }
 
+type BrandingScopeTab = "site-identity" | "main-home" | "location-page";
+
+const BRANDING_SCOPE_TO_PREVIEW: Record<BrandingScopeTab, SitePreviewScope> = {
+  "site-identity": "main",
+  "main-home": "main",
+  "location-page": "location",
+};
+
 export function BrandingTab({
+  hasMultipleLocations,
   serverCoverImage,
   serverCoverVideo,
+  serverMainLandingCoverImage,
 }: BrandingTabProps) {
   const { readOnly } = useSiteEssentialsUpdateGate();
+  const { setPreviewScope } = useSitePreviewStore();
+  const [brandingScope, setBrandingScope] =
+    useState<BrandingScopeTab>("site-identity");
   const form = useFormContext<SiteEssentialsFormValues>();
+
+  const previewScopeForTab = (tab: BrandingScopeTab): SitePreviewScope => {
+    if (!hasMultipleLocations) {
+      return "location";
+    }
+    return BRANDING_SCOPE_TO_PREVIEW[tab];
+  };
+
+  const handleBrandingScopeChange = (value: string) => {
+    const scope = value as BrandingScopeTab;
+    if (!hasMultipleLocations && scope === "main-home") {
+      return;
+    }
+    setBrandingScope(scope);
+    setPreviewScope(previewScopeForTab(scope));
+  };
+
+  useEffect(() => {
+    if (!hasMultipleLocations && brandingScope === "main-home") {
+      setBrandingScope("location-page");
+      setPreviewScope("location");
+      return;
+    }
+    setPreviewScope(previewScopeForTab(brandingScope));
+  }, [brandingScope, hasMultipleLocations, setPreviewScope]);
   const headerBackgroundColor =
     useWatch({ control: form.control, name: "colors.header" }) ??
     defaultThemeConstants.colors.header;
@@ -173,9 +227,8 @@ export function BrandingTab({
     } catch (error) {
       console.error("Logo optimize failed:", error);
       const { toast } = await import("sonner");
-      toast.error("Could not optimize logo", {
-        description:
-          error instanceof Error ? error.message : "Please try again.",
+      toast.message("Could not optimize logo", {
+        description: getFriendlyLogoOptimizeErrorMessage(error),
       });
     }
   };
@@ -298,21 +351,63 @@ export function BrandingTab({
   }, [landingPageVideoFiles]);
 
   return (
-    <div className="space-y-8">
-      {/* ============================================ */}
-      {/* GLOBAL BRANDING SECTION - Applies to ALL Locations */}
-      {/* ============================================ */}
+    <div className="space-y-6">
+      <Alert className="border-slate-200 bg-slate-50 text-slate-800">
+        <Info className="h-4 w-4" />
+        <AlertDescription className="text-sm">
+          {hasMultipleLocations ? (
+            <>
+              Use the tabs below to edit each part of your public site.{" "}
+              <strong>Site identity</strong> applies everywhere;{" "}
+              <strong>Main home page</strong> is shown before guests pick a
+              location; <strong>Location page</strong> is unique to the venue
+              selected in the header.
+            </>
+          ) : (
+            <>
+              You have a single location — your public home page is edited under{" "}
+              <strong>Home page</strong>. <strong>Site identity</strong> (logo,
+              favicon, copyright) applies everywhere.
+            </>
+          )}
+        </AlertDescription>
+      </Alert>
+
+      <Tabs value={brandingScope} onValueChange={handleBrandingScopeChange}>
+        <TabsList
+          className={`grid h-auto w-full gap-1 bg-muted/60 p-1 ${
+            hasMultipleLocations ? "grid-cols-3" : "grid-cols-2"
+          }`}
+        >
+          <TabsTrigger
+            value="site-identity"
+            className="text-xs sm:text-sm data-[state=active]:bg-[var(--color-primary)] data-[state=active]:text-white"
+          >
+            Site identity
+          </TabsTrigger>
+          {hasMultipleLocations ? (
+            <TabsTrigger
+              value="main-home"
+              className="text-xs sm:text-sm data-[state=active]:bg-[var(--color-primary)] data-[state=active]:text-white"
+            >
+              Main home page
+            </TabsTrigger>
+          ) : null}
+          <TabsTrigger
+            value="location-page"
+            className="text-xs sm:text-sm data-[state=active]:bg-[var(--color-primary)] data-[state=active]:text-white"
+          >
+            {hasMultipleLocations ? "Location page" : "Home page"}
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="site-identity" className="mt-6 space-y-6">
       <div className="rounded-lg border-2 border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900 p-6 space-y-6">
         <div className="space-y-2">
           <SectionTitle
-            title="Global Site Branding"
-            description="These settings apply to all locations"
+            title="Logo & site identity"
+            description="Logo, favicon, and copyright — shared across all locations and pages."
           />
-          <div className="inline-flex items-center gap-2 text-xs text-muted-foreground bg-gray-100 dark:bg-gray-800 px-3 py-1.5 rounded-md">
-            <span className="font-medium">🌍 Global</span>
-            <span>·</span>
-            <span>Same across all locations</span>
-          </div>
         </div>
 
         <Separator className="my-4" />
@@ -368,9 +463,10 @@ export function BrandingTab({
               <FormItem>
                 <FormLabel>Logo</FormLabel>
                 <FormDescription>
-                  Upload your site logo (PNG or JPG, max 2MB). We automatically
-                  remove the background and adjust contrast for your header
-                  color. Recommended dimensions: 240×60px.
+                  Upload your site logo ({LOGO_SUPPORTED_FORMATS_LABEL}, max 2MB).
+                  We automatically remove the background and adjust contrast for
+                  your header color. {LOGO_UPLOAD_HINT} Recommended size:
+                  240×60px.
                 </FormDescription>
                 <FormControl>
                   {isProcessingLogo ? (
@@ -459,12 +555,7 @@ export function BrandingTab({
                       maxSize={2 * 1024 * 1024} // 2MB
                       onRemove={handleRemoveLogo}
                       disabled={readOnly || isProcessingLogo}
-                      accept={{
-                        "image/png": [],
-                        "image/jpeg": [],
-                        "image/jpg": [],
-                        "image/webp": [],
-                      }}
+                      accept={LOGO_SUPPORTED_ACCEPT}
                     />
                   )}
                 </FormControl>
@@ -523,10 +614,17 @@ export function BrandingTab({
           />
         </div>
       </div>
+        </TabsContent>
 
-      {/* ============================================ */}
-      {/* LOCATION-SPECIFIC SECTION - Eye-catching so vendors don't miss it */}
-      {/* ============================================ */}
+        {hasMultipleLocations ? (
+          <TabsContent value="main-home" className="mt-6">
+            <MainLandingPageSection
+              serverMainLandingCoverImage={serverMainLandingCoverImage}
+            />
+          </TabsContent>
+        ) : null}
+
+        <TabsContent value="location-page" className="mt-6">
       <div className="relative rounded-xl border-2 border-blue-400 dark:border-blue-600 bg-gradient-to-br from-blue-50 to-slate-50 dark:from-blue-950/50 dark:to-slate-900/50 p-0 overflow-hidden shadow-sm">
         {/* Thick left accent */}
         <div
@@ -542,27 +640,41 @@ export function BrandingTab({
             </div>
             <div>
               <p className="text-xs font-semibold uppercase tracking-wider text-blue-700 dark:text-blue-300">
-                For this location only
+                {hasMultipleLocations
+                  ? "For this location only"
+                  : "Your public home page"}
               </p>
               <p className="text-sm font-bold text-blue-900 dark:text-blue-100">
-                All fields below apply only to this location
+                {hasMultipleLocations
+                  ? "All fields below apply only to this location"
+                  : "Hero, banner, and sections visitors see on your site home"}
               </p>
             </div>
           </div>
-          <div className="flex items-center gap-2 ml-auto rounded-lg bg-white dark:bg-slate-800 px-3 py-2 border border-blue-200 dark:border-blue-700 shadow-sm">
-            <span className="text-xs font-medium text-muted-foreground">
-              Editing:
-            </span>
-            <LocationIndicator variant="light" />
-          </div>
+          {hasMultipleLocations ? (
+            <div className="ml-auto flex items-center gap-2 rounded-lg border border-blue-200 bg-white px-3 py-2 shadow-sm dark:border-blue-700 dark:bg-slate-800">
+              <span className="text-xs font-medium text-muted-foreground">
+                Editing:
+              </span>
+              <LocationIndicator variant="light" />
+            </div>
+          ) : null}
         </div>
 
         <div className="p-6 space-y-6">
           <Separator className="my-0 -mx-6" />
 
           <SectionTitle
-            title="Landing Page Content"
-            description="Heading and subheading copy below. Hero text position (horizontal and vertical) for location pages is set from the Try theme sidebar on the Presets tab preview, or from Try theme on site/event preview — not here."
+            title={
+              hasMultipleLocations
+                ? "Location page hero text"
+                : "Home page hero text"
+            }
+            description={
+              hasMultipleLocations
+                ? "Heading and subheading on this location’s public page. Text position is set from Try theme on the Presets tab or preview — not here."
+                : "Heading and subheading on your site home. Text position is set from Try theme on the Presets tab or preview — not here."
+            }
           />
 
           <div className="grid gap-6 md:grid-cols-2">
@@ -573,7 +685,7 @@ export function BrandingTab({
                 const wc = countWords(field.value || "");
                 return (
                   <FormItem>
-                    <FormLabel>Landing Page Heading</FormLabel>
+                    <FormLabel>Location page heading</FormLabel>
                     <FormControl>
                       <Input
                         placeholder="EventWizz Events"
@@ -609,7 +721,7 @@ export function BrandingTab({
                 const maxLength = BANNER_SUB_HEADING_MAX_CHARS;
                 return (
                   <FormItem>
-                    <FormLabel>Landing Page Subheading</FormLabel>
+                    <FormLabel>Location page subheading</FormLabel>
                     <FormControl>
                       <Input
                         placeholder="Discover amazing events"
@@ -639,8 +751,8 @@ export function BrandingTab({
           <Separator className="my-4" />
 
           <SectionTitle
-            title="Landing Page Banner"
-            description="Choose how you want to display your landing page banner"
+            title="Location page banner"
+            description="Image or video hero for this location’s page only"
           />
 
           <div className="space-y-4">
@@ -661,7 +773,7 @@ export function BrandingTab({
                     <FormItem>
                       <FormLabel>Banner Image</FormLabel>
                       <FormDescription>
-                        Upload a static image for your landing page banner
+                        Upload a static image for this location’s hero banner
                         (recommended size: 1200 x 600px)
                       </FormDescription>
                       <FormControl>
@@ -806,8 +918,8 @@ export function BrandingTab({
           <Separator className="my-4" />
 
           <SectionTitle
-            title="About Section"
-            description="Configure the about section on your homepage"
+            title="About section"
+            description="About block on this location’s page"
           />
 
           <Separator className="my-4" />
@@ -876,8 +988,8 @@ export function BrandingTab({
           <Separator className="my-4" />
 
           <SectionTitle
-            title="Event Sections"
-            description="Configure event section titles (location-specific)"
+            title="Event sections"
+            description="Section titles on this location’s page"
           />
 
           <div className="grid gap-6 md:grid-cols-2">
@@ -953,8 +1065,8 @@ export function BrandingTab({
           <Separator className="my-4" />
 
           <SectionTitle
-            title="Gallery Section"
-            description="Configure the gallery section on your homepage (location-specific)"
+            title="Gallery section"
+            description="Gallery title on this location’s page"
           />
 
           <div className="grid gap-6">
@@ -994,6 +1106,8 @@ export function BrandingTab({
           </div>
         </div>
       </div>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

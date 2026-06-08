@@ -10,22 +10,61 @@ import { SiteEssentialsFormValues } from "@/app/(protected)/_shared/sites-essent
 type SiteEssentialsEndpoints = {
   GET: string;
   UPDATE: string;
+  RESET_THEME_DEFAULT: string;
+};
+
+export type GetSiteEssentialsOptions = {
+  /** Venue location slug — API returns site essentials scoped to that location. */
+  slug?: string;
+};
+
+export type ResetSiteEssentialsThemeOptions = {
+  /** Optional location slug when theme is stored per venue location. */
+  slug?: string;
 };
 
 /**
  * Get site essentials settings
  * @returns Promise with site essentials data
  */
-export const getSiteEssentials = async (): Promise<SiteEssentials> => {
+export const getSiteEssentials = async (
+  options?: GetSiteEssentialsOptions,
+): Promise<SiteEssentials> => {
   try {
     const endpoints =
       getEndpointsByRole<SiteEssentialsEndpoints>("SITES_ESSENTIALS");
     const response = await api.get<SiteEssentialsResponse>(endpoints.GET, {
       returnFullResponse: true,
+      params: options?.slug ? { slug: options.slug } : undefined,
     });
     return response.data;
   } catch (error) {
     console.error("Error fetching site essentials:", error);
+    throw error;
+  }
+};
+
+/**
+ * Reset colors + typography to platform defaults; logo, copy, and media unchanged.
+ * @see docs/SITE_ESSENTIALS_RESET_THEME_DEFAULT_API.md
+ */
+export const resetSiteEssentialsThemeToDefault = async (
+  options?: ResetSiteEssentialsThemeOptions,
+): Promise<SiteEssentials> => {
+  try {
+    const endpoints =
+      getEndpointsByRole<SiteEssentialsEndpoints>("SITES_ESSENTIALS");
+    const response = await api.post<SiteEssentialsResponse>(
+      endpoints.RESET_THEME_DEFAULT,
+      {},
+      {
+        returnFullResponse: true,
+        params: options?.slug ? { slug: options.slug } : undefined,
+      },
+    );
+    return response.data;
+  } catch (error) {
+    console.error("Error resetting site essentials theme:", error);
     throw error;
   }
 };
@@ -96,6 +135,7 @@ export const updateSiteEssentials = async (
 const siteEssentialsService = {
   getSiteEssentials,
   updateSiteEssentials,
+  resetSiteEssentialsThemeToDefault,
 };
 
 export default siteEssentialsService;

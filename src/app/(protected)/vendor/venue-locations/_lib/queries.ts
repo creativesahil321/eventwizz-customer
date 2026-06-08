@@ -1,5 +1,10 @@
 import { useMemo } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import {
+  useQuery,
+  useMutation,
+  useQueryClient,
+  type QueryClient,
+} from "@tanstack/react-query";
 import { SearchParams } from "./types";
 import { LocationFormValues } from "./validations";
 import { VenueLocation as ApiVenueLocation } from "@/types/api.types";
@@ -10,6 +15,7 @@ import {
   LocationUpdatePayload,
 } from "@/services/vendor/locations/type";
 import { useSession } from "next-auth/react";
+import { useLocationStore } from "@/store/location.store";
 
 // Constants
 const LOCATIONS_STALE_TIME = 10 * 60 * 1000; // 10 minutes
@@ -59,6 +65,9 @@ export interface LocationsQueryData {
   meta?: LocationsMeta;
 }
 
+export interface SyncVendorLocationsResult extends LocationsQueryData {
+  default_venue_location?: ApiVenueLocation;
+}
 
 // Type guard to check if response is ApiVenueLocation[]
 function isLocationArray(value: unknown): value is ApiVenueLocation[] {
@@ -105,6 +114,45 @@ const extractLocationsFromResponse = (response: LocationApiResponse): ApiVenueLo
   }
   return [];
 };
+
+/** Fetch latest locations and push into React Query + Zustand (await before navigating). */
+export async function syncVendorLocationsCache(
+  queryClient: QueryClient,
+  params?: SearchParams,
+): Promise<SyncVendorLocationsResult | null> {
+  try {
+    const serviceParams = transformSearchParams(params);
+    const response = (await locationService.getLocations(
+      serviceParams,
+    )) as unknown as LocationApiResponse;
+
+    const locations = extractLocationsFromResponse(response);
+    const normalizedLocations = locations.map((location) =>
+      normalizeLocation(location),
+    );
+    const meta = response?.meta;
+    const default_venue_location = response?.data?.default_venue_location
+      ? normalizeLocation(response.data.default_venue_location)
+      : undefined;
+
+    const queryData: LocationsQueryData = { data: normalizedLocations, meta };
+
+    queryClient.setQueriesData<LocationsQueryData>(
+      { queryKey: ["locations"], exact: false },
+      queryData,
+    );
+
+    if (normalizedLocations.length > 0) {
+      useLocationStore.getState().setLocations(normalizedLocations);
+    }
+
+    return { ...queryData, default_venue_location };
+  } catch (error) {
+    console.error("Failed to sync vendor locations cache:", error);
+    await queryClient.refetchQueries({ queryKey: ["locations"], type: "all" });
+    return null;
+  }
+}
 
 // Function to get all locations with filters (pure React Query, no Zustand store)
 export const useLocations = (
@@ -181,8 +229,7 @@ export const useCreateLocation = () => {
       return locationService.createLocation(payload);
     },
     onSuccess: async () => {
-      // Invalidate all location queries to refetch fresh data
-      queryClient.invalidateQueries({ queryKey: ["locations"] });
+      await syncVendorLocationsCache(queryClient);
     },
   });
 };

@@ -7,7 +7,7 @@ import React, {
   useMemo,
   useRef,
 } from "react";
-import { useForm, useFieldArray, Controller } from "react-hook-form";
+import { useForm, useFieldArray, Controller, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
   eventsService,
@@ -226,10 +226,46 @@ export default function CateringTab() {
     stepTwoRooms,
   ]);
 
+  const watchedCateringOption = useWatch({
+    control: form.control,
+    name: "catering_option",
+  });
+  const watchedMenuTitle = useWatch({
+    control: form.control,
+    name: "menu_title",
+  });
+  const watchedMenuDescription = useWatch({
+    control: form.control,
+    name: "menu_description",
+  });
+  const watchedMenuCategoryId = useWatch({
+    control: form.control,
+    name: "event_menu_category_id",
+  });
+  const watchedMenus = useWatch({
+    control: form.control,
+    name: "menus",
+  });
+
   const canApplyToAllRooms = useMemo(() => {
     if (!isRoomsEnabled || stepTwoRooms.length < 2) return false;
-    return true;
-  }, [isRoomsEnabled, stepTwoRooms.length]);
+
+    return isVendorRoomMenuStepComplete({
+      catering_option: watchedCateringOption,
+      menu_title: watchedMenuTitle,
+      menu_description: watchedMenuDescription,
+      event_menu_category_id: watchedMenuCategoryId,
+      menus: watchedMenus,
+    });
+  }, [
+    isRoomsEnabled,
+    stepTwoRooms.length,
+    watchedCateringOption,
+    watchedMenuTitle,
+    watchedMenuDescription,
+    watchedMenuCategoryId,
+    watchedMenus,
+  ]);
   const [localMenuCategories, setLocalMenuCategories] = useState<
     EventMenuCategory[]
   >([]);

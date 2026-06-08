@@ -14,6 +14,8 @@ import { SiteHeading } from "@/components/public/site-heading";
 import { normalizeHeadingEmphasis } from "@/lib/heading-emphasis";
 import {
   heroBandContentPadClass,
+  heroBandHeightClass,
+  heroBandMediaOverlayClass,
   heroBandVerticalClass,
   heroBannerStackClass,
   vendorHomeSubheroClass,
@@ -21,6 +23,8 @@ import {
 } from "@/lib/banner-heading-align";
 import { cn } from "@/lib/utils";
 import { shouldUseNextImageOptimization } from "@/lib/image-utils";
+import { SingleLocationHome } from "./_components/single-location-home";
+import type { LocationData } from "@/types/theme.types";
 
 export default function VendorSiteHomePage() {
   const router = useRouter();
@@ -34,19 +38,56 @@ export default function VendorSiteHomePage() {
     [settings?.locations],
   );
 
+  const singleLocation: LocationData | null =
+    allLocations.length === 1 ? allLocations[0] : null;
+
   const heroImageSrc = useMemo(() => {
-    const cover = settings?.cover_image;
+    const cover = settings?.main_landing_cover_image ?? settings?.cover_image;
     if (typeof cover === "string" && cover.trim().length > 0) {
       return cover.trim();
     }
     return "/assets/images/Homepage/Homepage-Banner.png";
-  }, [settings?.cover_image]);
+  }, [settings?.main_landing_cover_image, settings?.cover_image]);
 
-  const heroHeading =
-    typeof settings?.banner_heading === "string" &&
-    settings.banner_heading.trim().length > 0
-      ? settings.banner_heading.trim()
-      : "Find Events Near You";
+  const heroHeading = useMemo(() => {
+    const main =
+      typeof settings?.main_landing_banner_heading === "string"
+        ? settings.main_landing_banner_heading.trim()
+        : "";
+    if (main.length > 0) return main;
+    if (
+      typeof settings?.banner_heading === "string" &&
+      settings.banner_heading.trim().length > 0
+    ) {
+      return settings.banner_heading.trim();
+    }
+    return "Find Events Near You";
+  }, [settings?.main_landing_banner_heading, settings?.banner_heading]);
+
+  const heroSubheading = useMemo(() => {
+    const sub =
+      typeof settings?.main_landing_banner_sub_heading === "string"
+        ? settings.main_landing_banner_sub_heading.trim()
+        : "";
+    if (sub.length > 0) return sub;
+    return "Discover verified venues and curated events in your area. Browse by location to find the perfect experience.";
+  }, [settings?.main_landing_banner_sub_heading]);
+
+  const locationsListTitle = useMemo(() => {
+    const t =
+      typeof settings?.main_landing_locations_list_title === "string"
+        ? settings.main_landing_locations_list_title.trim()
+        : "";
+    return t.length > 0 ? t : "Choose Your City";
+  }, [settings?.main_landing_locations_list_title]);
+
+  const locationsListSubtitle = useMemo(() => {
+    const t =
+      typeof settings?.main_landing_locations_list_subtitle === "string"
+        ? settings.main_landing_locations_list_subtitle.trim()
+        : "";
+    return t.length > 0 ? t : "Tap a city to see all upcoming events";
+  }, [settings?.main_landing_locations_list_subtitle]);
 
   const heroAccentHint =
     typeof settings?.banner_heading_accent === "string" &&
@@ -94,6 +135,18 @@ export default function VendorSiteHomePage() {
     "1,200+ Happy Customers",
   ] as const;
 
+  if (!isDomainLoading && singleLocation && settings) {
+    return <SingleLocationHome location={singleLocation} settings={settings} />;
+  }
+
+  if (isDomainLoading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-[var(--color-background)]">
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-[var(--color-primary)] border-t-transparent" />
+      </div>
+    );
+  }
+
   return (
     <div className="relative flex min-h-screen flex-col bg-[var(--color-background)] font-body text-[var(--color-text)]">
       <LocationSelectionHeader
@@ -101,10 +154,11 @@ export default function VendorSiteHomePage() {
         logo={settings?.logo}
       />
 
-      {/* Hero — contained height, tenant cover or default banner */}
+      {/* Hero — same capped height as location page HeroBanner */}
       <section
         className={cn(
-          "relative flex min-h-screen w-full justify-center",
+          "relative mx-auto flex w-full justify-center overflow-hidden",
+          heroBandHeightClass,
           heroBandVerticalClass(heroValign),
         )}
       >
@@ -119,7 +173,7 @@ export default function VendorSiteHomePage() {
             unoptimized={!shouldUseNextImageOptimization(heroImageSrc)}
           />
           <div
-            className="absolute inset-0 bg-gradient-to-b from-black/70 via-black/45 to-black/80"
+            className={cn("absolute inset-0", heroBandMediaOverlayClass)}
             aria-hidden
           />
         </div>
@@ -151,10 +205,7 @@ export default function VendorSiteHomePage() {
               className="mb-6 w-full min-w-0 max-w-full font-bold !text-3xl !leading-[0.98] sm:!text-4xl md:!text-5xl md:max-w-5xl lg:!text-6xl"
             />
 
-            <p className={vendorHomeSubheroClass(heroAlign)}>
-              Discover verified venues and curated events in your area. Browse
-              by location to find the perfect experience.
-            </p>
+            <p className={vendorHomeSubheroClass(heroAlign)}>{heroSubheading}</p>
 
             <div className={vendorHomeTrustRowClass(heroAlign)}>
               {trustItems.map((label) => (
@@ -231,10 +282,10 @@ export default function VendorSiteHomePage() {
                 Explore cities
               </span>
               <h2 className="mb-3 text-3xl font-black tracking-tight text-[var(--color-text)] sm:text-4xl">
-                Choose Your City
+                {locationsListTitle}
               </h2>
               <p className="text-[var(--color-text-dimmed)]">
-                Tap a city to see all upcoming events
+                {locationsListSubtitle}
               </p>
             </div>
           ) : null}

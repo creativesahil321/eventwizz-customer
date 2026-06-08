@@ -69,6 +69,11 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { EventDateInput } from "@/components/event-date-input";
+import {
+  hasEventDateOrderChanged,
+  sortDateFieldArrayWithIds,
+} from "@/lib/event-dates-sort";
 
 // Helper function to get today's date in YYYY-MM-DD format
 const getTodayDateString = () => {
@@ -289,10 +294,15 @@ export default function DatesTab() {
   const { control, watch, setValue, setError, trigger, getValues, reset } =
     form;
 
+  const watchedDates = useWatch({
+    control: form.control,
+    name: "dates",
+  });
+
   const canApplyToAllRooms = useMemo(() => {
     if (!isRoomsEnabled || stepTwoRooms.length < 2) return false;
-    return true;
-  }, [isRoomsEnabled, stepTwoRooms.length]);
+    return hasMeaningfulVendorDates(watchedDates);
+  }, [isRoomsEnabled, stepTwoRooms.length, watchedDates]);
 
   const persistActiveRoomDatesToGlobal = useCallback(
     (roomIndex: number, dates: StepThreeType["dates"]) => {
@@ -380,6 +390,7 @@ export default function DatesTab() {
     fields: dateFields,
     append,
     remove,
+    replace,
   } = useFieldArray({
     control,
     name: "dates",
@@ -538,54 +549,35 @@ export default function DatesTab() {
         return false;
       }
 
-      // Check if dates are in ascending order
-      const sortedDates = [...otherDates, newDate].sort();
-      const currentOrder = [...otherDates, newDate];
-
-      if (JSON.stringify(sortedDates) !== JSON.stringify(currentOrder)) {
-        toast.warning(
-          "Dates should be in ascending order. Please arrange them chronologically.",
-        );
-        return false;
-      }
-
       return true;
     },
     [watch],
   );
 
-  // Sort dates in ascending order whenever dates change
-  const sortDates = useCallback(() => {
-    const currentDates = form.getValues("dates");
-    if (currentDates && currentDates.length > 1) {
-      const sortedDates = [...currentDates].sort((a, b) => {
-        const dateA = new Date(a.event_date);
-        const dateB = new Date(b.event_date);
-        return dateA.getTime() - dateB.getTime();
+  const sortDatesStable = useCallback(() => {
+    const currentDates = getValues("dates");
+    if (!currentDates || currentDates.length <= 1) return;
+
+    const sortedDates = sortDateFieldArrayWithIds(dateFields, currentDates);
+    if (!hasEventDateOrderChanged(currentDates, sortedDates)) return;
+
+    replace(sortedDates as StepThreeType["dates"]);
+  }, [dateFields, getValues, replace]);
+
+  const commitEventDate = useCallback(
+    (dateIndex: number, newDate: string) => {
+      if (newDate && !validateDateUniqueness(dateIndex, newDate)) {
+        return false;
+      }
+      setValue(`dates.${dateIndex}.event_date`, newDate, {
+        shouldValidate: true,
+        shouldDirty: true,
       });
-
-      // Only update if order actually changed
-      const hasChanged = sortedDates.some(
-        (date, index) => date.event_date !== currentDates[index]?.event_date,
-      );
-
-      if (hasChanged) {
-        form.setValue("dates", sortedDates);
-      }
-    }
-  }, [form]);
-
-  // Watch for date changes and sort automatically
-  useEffect(() => {
-    const subscription = form.watch((value, { name }) => {
-      if (name?.startsWith("dates.") && name.includes("event_date")) {
-        // Only sort dates - validation is handled in onChange
-        const timeoutId = setTimeout(sortDates, 300);
-        return () => clearTimeout(timeoutId);
-      }
-    });
-    return () => subscription.unsubscribe();
-  }, [form, sortDates]);
+      sortDatesStable();
+      return true;
+    },
+    [setValue, sortDatesStable, validateDateUniqueness],
+  );
 
   // Create custom field arrays for tickets - now checks individual date's booking type
   const createTicketFields = useCallback(
@@ -1361,22 +1353,16 @@ export default function DatesTab() {
                       </FormLabel>
                       <FormControl>
                         <div className="relative w-full">
-                          <Input
-                            type="date"
+                          <EventDateInput
                             placeholder="Select date"
-                            {...field}
-                            min={getTodayDateString()} // Add min attribute to prevent past dates
+                            name={field.name}
+                            ref={field.ref}
+                            value={field.value ?? ""}
+                            min={getTodayDateString()}
                             className="w-full h-10 sm:h-11 bg-[#F9FAFB] border-[#E5E7EB] focus:ring-2 focus:ring-blue-500 text-sm sm:text-base"
-                            onChange={(e) => {
-                              const newDate = e.target.value;
-                              if (
-                                newDate &&
-                                !validateDateUniqueness(dateIndex, newDate)
-                              ) {
-                                return; // Don't update if validation fails
-                              }
-                              field.onChange(newDate);
-                            }}
+                            onValueCommit={(newDate) =>
+                              commitEventDate(dateIndex, newDate)
+                            }
                           />
                           {!field.value && (
                             <span
@@ -1722,7 +1708,7 @@ export default function DatesTab() {
       createTableFields,
       watch,
       updateDate,
-      validateDateUniqueness,
+      commitEventDate,
       setValue,
       requestCancelDate,
       readOnly,
@@ -1899,18 +1885,12 @@ export default function DatesTab() {
             }
           }
 
-          toast.success(
-            applyToAllRooms
-              ? "Dates applied to all rooms."
-              : "Dates saved for all rooms.",
-          );
           await advanceStep(3);
         } else {
-          toast.error("Could not save dates. Check the form and try again.");
+          console.error("Error saving event dates:", response);
         }
       } catch (error) {
         console.error("Error saving event dates:", error);
-        toast.error("Failed to save dates. Please try again.");
       } finally {
         setIsLoading(false);
       }

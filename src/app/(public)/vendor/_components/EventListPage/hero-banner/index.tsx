@@ -9,6 +9,8 @@ import { SiteHeading } from "@/components/public/site-heading";
 import type { HeadingEmphasis } from "@/lib/heading-emphasis";
 import {
   heroBandContentPadClass,
+  heroBandHeightClass,
+  heroBandMediaOverlayClass,
   heroBandVerticalClass,
   heroBannerStackClass,
   heroBannerSubheadingClass,
@@ -117,8 +119,7 @@ export default function HeroBanner({
       id="hero"
       className={cn(
         "relative mx-auto flex w-full justify-center overflow-hidden",
-        /* Hero band ~60–70% viewport height, capped (not full screen) */
-        "h-[min(68dvh,720px)] min-h-[380px] max-h-[760px]",
+        heroBandHeightClass,
         heroBandVerticalClass(heroValign),
         /*
          * Left + center: stretch cross-axis so the block is full-width (row flex-col hero
@@ -143,7 +144,7 @@ export default function HeroBanner({
             <source src={finalVideoUrl || undefined} type="video/mp4" />
             Your browser does not support the video tag.
           </video>
-          <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-black/30 to-black/85" />
+          <div className={cn("absolute inset-0", heroBandMediaOverlayClass)} />
         </div>
       )}
 
@@ -156,7 +157,7 @@ export default function HeroBanner({
             alt=""
             className="absolute inset-0 h-full w-full scale-105 object-cover"
           />
-          <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-black/30 to-black/85" />
+          <div className={cn("absolute inset-0", heroBandMediaOverlayClass)} />
         </div>
       )}
 

@@ -11,6 +11,7 @@ import FooterSection from "@/app/(public)/vendor/_components/EventListPage/foote
 import { LocationMarketingBody } from "@/components/public/location-marketing-sections";
 import { siteEssentialsToPreviewRootStyle } from "../_lib/preview-root-style";
 import { SiteEssentialsGoogleFontsLoader } from "@/components/shared/site-essentials-google-fonts-loader";
+import { pickPreviewEventsFromSiteEssentials } from "../_lib/site-essentials-preview-events";
 // ServerContext removed - already provided at layout level
 
 interface SitePreviewProps {
@@ -45,6 +46,9 @@ export function SitePreview({ formValues }: Readonly<SitePreviewProps>) {
   const mainBandClass = useGradientBg
     ? "bg-none text-[color:var(--color-text)] font-body"
     : "bg-[color:var(--color-background)] text-[color:var(--color-text)] font-body";
+
+  const { latestEvents, upcomingEvents, galleryImages, locationSlug } =
+    pickPreviewEventsFromSiteEssentials(formValues);
 
   return (
     <div
@@ -83,16 +87,16 @@ export function SitePreview({ formValues }: Readonly<SitePreviewProps>) {
             aboutDescription={formValues.about_description || null}
           />
         }
-        latestEvents={[]}
-        upcomingEvents={[]}
+        latestEvents={latestEvents}
+        upcomingEvents={upcomingEvents}
         popularSectionTitle={formValues.event_title_1 || "Popular Events"}
         upcomingSectionTitle={formValues.event_title_2 || "Upcoming Events"}
         galleryTitle={
           formValues.event_gallery_title || "Recent Events Glimpse"
         }
-        galleryImages={[]}
-        locationSlug=""
-        locationLabel={null}
+        galleryImages={galleryImages}
+        locationSlug={locationSlug}
+        locationLabel={formValues.name?.trim() || null}
       />
       <ContactFormSection />
       <FooterSection

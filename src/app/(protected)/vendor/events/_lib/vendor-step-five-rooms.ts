@@ -140,12 +140,16 @@ export function cloneVendorStepFiveRoomBrochure(
   };
 }
 
-/** Per-room brochure PDF required; address is validated at step level. */
+/** Brochure PDFs are optional; step-level address is the required field. */
 export function isVendorRoomBrochureStepComplete(
-  entry: VendorStepFiveRoomEntry | undefined,
+  _entry: VendorStepFiveRoomEntry | undefined,
 ): boolean {
-  if (!entry) return false;
-  return hasBrochurePdf(entry.brochure_pdf);
+  return true;
+}
+
+/** Required before showing or running "Apply to all rooms" on the brochure tab. */
+export function isVendorBrochureApplyToAllReady(eventAddress: string): boolean {
+  return String(eventAddress ?? "").trim().length > 0;
 }
 
 export function appendVendorStepFiveRoomToFormData(

@@ -35,8 +35,11 @@ import { MultiSpaceHeader } from "../../rooms/multi-space-header";
 import { useRoomScopeSync } from "../../rooms/use-room-scope-sync";
 import {
   isRoomSectionComplete,
+  canShowApplyToAllButton,
   useRoomManager,
 } from "../../rooms/use-room-manager";
+import { isVendorRoomMenuStepComplete } from "@/app/(protected)/vendor/events/_lib/vendor-step-four-rooms";
+import { focusNextIncompleteOnboardingRoom } from "../../../_lib/onboarding-multi-room-progress";
 import { useFieldFocusHandler } from "../../form-preview/field-focus-handler";
 import { useEventId } from "../../../_lib/hooks/useEventId";
 import { WholeStepGuidedShell } from "../../whole-step-guided-shell";
@@ -100,7 +103,8 @@ export default function StepSix() {
   // Multi-room hookup. Keeps `stepSix` in sync with the active room's `catering` slot and
   // dispatches save to the room-scoped endpoint when applicable.
   const roomScope = useRoomScopeSync("catering");
-  const { rooms, currentRoomIndex, setCurrentRoomIndex } = useRoomManager();
+  const { rooms, currentRoomIndex, currentRoom, setCurrentRoomIndex } =
+    useRoomManager();
   const previousRoomIndexRef = useRef(currentRoomIndex);
   const isRoomSwitchHydratingRef = useRef(false);
   const stepSixPersistedApproved = roomScope.isMultiRoom
@@ -191,6 +195,46 @@ export default function StepSix() {
     },
     mode: "onChange",
   });
+
+  const watchedCateringOption = useWatch({
+    control: form.control,
+    name: "catering_option",
+  });
+  const watchedMenuTitle = useWatch({
+    control: form.control,
+    name: "menu_title",
+  });
+  const watchedMenuDescription = useWatch({
+    control: form.control,
+    name: "menu_description",
+  });
+  const watchedMenuCategoryId = useWatch({
+    control: form.control,
+    name: "event_menu_category_id",
+  });
+  const watchedMenus = useWatch({
+    control: form.control,
+    name: "menus",
+  });
+
+  const canApplyToAllRooms = useMemo(() => {
+    if (!roomScope.isMultiRoom || rooms.length < 2) return false;
+    return isVendorRoomMenuStepComplete({
+      catering_option: normalizeCateringOption(watchedCateringOption),
+      menu_title: watchedMenuTitle,
+      menu_description: watchedMenuDescription,
+      event_menu_category_id: watchedMenuCategoryId,
+      menus: watchedMenus,
+    } as Parameters<typeof isVendorRoomMenuStepComplete>[0]);
+  }, [
+    roomScope.isMultiRoom,
+    rooms.length,
+    watchedCateringOption,
+    watchedMenuTitle,
+    watchedMenuDescription,
+    watchedMenuCategoryId,
+    watchedMenus,
+  ]);
 
   const currentEventId = useEventId(globalForm, "stepSix");
 
@@ -655,14 +699,14 @@ export default function StepSix() {
       if (roomScope.isMultiRoom && !applyToAllRooms) {
         const updatedRooms = (globalForm.getValues("multiSpace")?.rooms ??
           []) as typeof rooms;
-        const nextIncompleteRoomIndex = updatedRooms.findIndex(
-          (room) => !isRoomSectionComplete(room, "catering"),
-        );
-        if (nextIncompleteRoomIndex !== -1) {
-          if (nextIncompleteRoomIndex !== currentRoomIndex) {
-            setCurrentRoomIndex(nextIncompleteRoomIndex);
-          }
-          await save();
+        if (
+          focusNextIncompleteOnboardingRoom(
+            updatedRooms,
+            "catering",
+            currentRoomIndex,
+            setCurrentRoomIndex,
+          )
+        ) {
           return;
         }
       }
@@ -727,16 +771,7 @@ export default function StepSix() {
                         void form.handleSubmit((data) => onSubmit(data, false))()
                       }
                       extraActions={
-                        roomScope.isMultiRoom &&
-                        isRoomSectionComplete(
-                          rooms[currentRoomIndex],
-                          "catering",
-                        ) &&
-                        rooms.some(
-                          (room, index) =>
-                            index !== currentRoomIndex &&
-                            !isRoomSectionComplete(room, "catering"),
-                        ) ? (
+                        canShowApplyToAllButton(rooms, canApplyToAllRooms) ? (
                           <Button
                             variant="event-outline"
                             type="button"

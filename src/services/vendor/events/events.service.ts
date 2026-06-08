@@ -1109,6 +1109,14 @@ export const eventsService = {
       formData.append("contact_number", data.contact_number);
     }
 
+    if (
+      data.is_duplicate &&
+      data.vendor_location_id != null &&
+      data.vendor_location_id > 0
+    ) {
+      formData.append("vendor_location_id", data.vendor_location_id.toString());
+    }
+
     if (data.reminder_email_before_days) {
       formData.append(
         "reminder_email_before_days",

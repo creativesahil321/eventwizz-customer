@@ -10,6 +10,7 @@ import {
 } from "../form-provider/schema";
 import { roomService } from "@/services/vendor/onboarding/room.service";
 import { onboardingService } from "@/services/vendor/onboarding/onboarding.service";
+import { writeVendorEventIsRoomsFlag } from "@/app/(protected)/vendor/events/_lib/vendor-event-is-rooms";
 
 const ONBOARDING_IS_ROOMS_STORAGE_KEY = "onboarding_is_rooms";
 
@@ -50,10 +51,23 @@ export const roomApprovalKey = (
   }
 };
 
+/**
+ * Show "Apply to all rooms" when there are 2+ rooms and the active tab's required
+ * fields are satisfied (same rule as vendor event editor tabs).
+ */
+export function canShowApplyToAllButton(
+  rooms: RoomType[],
+  isCurrentRoomReady: boolean,
+): boolean {
+  return rooms.length >= 2 && isCurrentRoomReady;
+}
+
 export const isRoomSectionComplete = (
-  room: RoomType,
+  room: RoomType | undefined | null,
   section: RoomSection,
 ): boolean => {
+  if (!room) return false;
+
   if (section === "package") {
     const pkg = room.package;
     const hasImage = Boolean(
@@ -298,6 +312,22 @@ export function useRoomManager() {
     [form],
   );
 
+  const syncVendorEventRoomsFlag = useCallback(
+    (enabled: boolean) => {
+      const steps = ["stepFour", "stepThree", "stepFive", "stepSix", "stepSeven"];
+      for (const stepKey of steps) {
+        const raw = (form.getValues(stepKey as never) as { event_id?: unknown })
+          ?.event_id;
+        const eventId = Number(raw);
+        if (Number.isFinite(eventId) && eventId > 0) {
+          writeVendorEventIsRoomsFlag(eventId, enabled);
+          return;
+        }
+      }
+    },
+    [form],
+  );
+
   const setEnabled = useCallback(
     (next: boolean) => {
       const current = (form.getValues("multiSpace") ??
@@ -317,9 +347,10 @@ export function useRoomManager() {
           next ? "true" : "false",
         );
       }
+      syncVendorEventRoomsFlag(next);
       void onboardingService.notifyDataChanged();
     },
-    [form, writeMultiSpace],
+    [form, writeMultiSpace, syncVendorEventRoomsFlag],
   );
 
   const setCurrentRoomIndex = useCallback(

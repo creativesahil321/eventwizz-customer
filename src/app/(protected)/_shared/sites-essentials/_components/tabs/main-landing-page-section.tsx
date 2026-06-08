@@ -1,0 +1,299 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { useFormContext } from "react-hook-form";
+import { Home } from "lucide-react";
+import {
+  FormField,
+  FormItem,
+  FormLabel,
+  FormControl,
+  FormMessage,
+  FormDescription,
+} from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import { FileUploader } from "@/components/ui/file-uploader";
+import { SectionTitle } from "../ui/section-title";
+import { Separator } from "@/components/ui/separator";
+import { SiteEssentialsFormValues } from "../../_lib/schema";
+import { BANNER_SUB_HEADING_MAX_CHARS } from "../../_lib/schema";
+import { addCacheBusting } from "@/lib/image-utils";
+import {
+  BANNER_HEADING_MAX_WORDS,
+  countWords,
+  truncateToMaxWordsForInput,
+} from "@/lib/word-count";
+import { useSiteEssentialsUpdateGate } from "../../_lib/site-essentials-update-context";
+
+interface MainLandingPageSectionProps {
+  serverMainLandingCoverImage?: string;
+}
+
+export function MainLandingPageSection({
+  serverMainLandingCoverImage,
+}: MainLandingPageSectionProps) {
+  const { readOnly } = useSiteEssentialsUpdateGate();
+  const form = useFormContext<SiteEssentialsFormValues>();
+
+  const [coverImageFiles, setCoverImageFiles] = useState<File[]>([]);
+  const [coverImageUrl, setCoverImageUrl] = useState<string>("");
+
+  const watchedCover = form.watch("main_landing_cover_image");
+
+  useEffect(() => {
+    const hasServer =
+      Boolean(serverMainLandingCoverImage && serverMainLandingCoverImage.length > 0);
+    if (watchedCover instanceof File) {
+      setCoverImageFiles([watchedCover]);
+      setCoverImageUrl("");
+      return;
+    }
+    setCoverImageFiles([]);
+    if (hasServer) {
+      setCoverImageUrl(serverMainLandingCoverImage!);
+    } else if (typeof watchedCover === "string" && watchedCover) {
+      setCoverImageUrl(watchedCover);
+    } else {
+      setCoverImageUrl("");
+    }
+  }, [serverMainLandingCoverImage, watchedCover]);
+
+  const handleCoverChange = (files: File[]) => {
+    setCoverImageFiles(files);
+    setCoverImageUrl("");
+    form.setValue(
+      "main_landing_cover_image",
+      files.length > 0 ? files[0] : null,
+    );
+  };
+
+  const handleRemoveCover = () => {
+    setCoverImageFiles([]);
+    setCoverImageUrl("");
+    form.setValue("main_landing_cover_image", null);
+  };
+
+  return (
+    <div className="relative overflow-hidden rounded-xl border-2 border-teal-400 bg-gradient-to-br from-teal-50 to-slate-50 p-0 shadow-sm dark:border-teal-600 dark:from-teal-950/50 dark:to-slate-900/50">
+      <div
+        className="absolute bottom-0 left-0 top-0 w-1.5 bg-teal-500 dark:bg-teal-400"
+        aria-hidden
+      />
+
+      <div className="flex flex-wrap items-center gap-3 border-b border-teal-200 bg-teal-100/90 px-6 py-4 dark:border-teal-700 dark:bg-teal-900/60">
+        <div className="flex items-center gap-2.5">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-teal-500 text-white shadow-sm dark:bg-teal-600">
+            <Home className="h-5 w-5" />
+          </div>
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wider text-teal-700 dark:text-teal-300">
+              Main home page
+            </p>
+            <p className="text-sm font-bold text-teal-900 dark:text-teal-100">
+              Shown before guests pick a location — same on every city
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <div className="space-y-6 p-6">
+        <SectionTitle
+          title="Hero & background"
+          description="Headline, subline, and full-width background image on your multi-location home page."
+        />
+
+        <div className="grid gap-6 md:grid-cols-2">
+          <FormField
+            control={form.control}
+            name="main_landing_banner_heading"
+            render={({ field }) => {
+              const wc = countWords(field.value || "");
+              return (
+                <FormItem>
+                  <FormLabel>Main page heading</FormLabel>
+                  <FormControl>
+                    <Input
+                      placeholder="Find Events Near You"
+                      disabled={readOnly}
+                      {...field}
+                      value={field.value || ""}
+                      onChange={(e) =>
+                        field.onChange(
+                          truncateToMaxWordsForInput(
+                            e.target.value,
+                            BANNER_HEADING_MAX_WORDS,
+                          ),
+                        )
+                      }
+                    />
+                  </FormControl>
+                  <div className="mt-1 text-xs text-muted-foreground">
+                    <span>
+                      {wc}/{BANNER_HEADING_MAX_WORDS} words
+                    </span>
+                  </div>
+                  <FormMessage />
+                </FormItem>
+              );
+            }}
+          />
+
+          <FormField
+            control={form.control}
+            name="main_landing_banner_sub_heading"
+            render={({ field }) => {
+              const currentLength = field.value?.length || 0;
+              const maxLength = BANNER_SUB_HEADING_MAX_CHARS;
+              return (
+                <FormItem>
+                  <FormLabel>Main page subheading</FormLabel>
+                  <FormControl>
+                    <Input
+                      placeholder="Discover verified venues and curated events in your area."
+                      disabled={readOnly}
+                      {...field}
+                      value={field.value || ""}
+                      maxLength={maxLength}
+                      onChange={(e) => field.onChange(e.target.value)}
+                    />
+                  </FormControl>
+                  <div className="mt-1 text-xs text-muted-foreground">
+                    <span
+                      className={
+                        currentLength > maxLength ? "text-destructive" : ""
+                      }
+                    >
+                      {currentLength}/{maxLength} characters
+                    </span>
+                  </div>
+                  <FormMessage />
+                </FormItem>
+              );
+            }}
+          />
+        </div>
+
+        <FormField
+          control={form.control}
+          name="main_landing_cover_image"
+          render={() => (
+            <FormItem>
+              <FormLabel>Background image</FormLabel>
+              <FormDescription>
+                Full-width hero background (recommended 1920×1080 or 16:9).
+              </FormDescription>
+              <FormControl>
+                {coverImageUrl ? (
+                  <div className="space-y-2">
+                    <img
+                      src={addCacheBusting(coverImageUrl)}
+                      alt="Main landing background preview"
+                      className="mx-auto max-h-48 w-full rounded-lg object-cover"
+                    />
+                    <button
+                      type="button"
+                      disabled={readOnly}
+                      onClick={handleRemoveCover}
+                      className="text-sm text-red-500 underline disabled:pointer-events-none disabled:opacity-50"
+                    >
+                      Remove image
+                    </button>
+                  </div>
+                ) : (
+                  <FileUploader
+                    value={coverImageFiles}
+                    onValueChange={handleCoverChange}
+                    maxFileCount={1}
+                    maxSize={2 * 1024 * 1024}
+                    onRemove={handleRemoveCover}
+                    disabled={readOnly}
+                    accept={{
+                      "image/png": [],
+                      "image/jpeg": [],
+                      "image/jpg": [],
+                      "image/webp": [],
+                    }}
+                    enableCropping
+                    aspectRatio={16 / 9}
+                    cropConfig={{
+                      maxSizeKB: 500,
+                      quality: 0.9,
+                      maxWidth: 1920,
+                      maxHeight: 1080,
+                    }}
+                  />
+                )}
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        <Separator />
+
+        <SectionTitle
+          title="Locations list"
+          description="Title and subtitle above the city / location grid on the main home page."
+        />
+
+        <div className="grid gap-6 md:grid-cols-2">
+          <FormField
+            control={form.control}
+            name="main_landing_locations_list_title"
+            render={({ field }) => {
+              const currentLength = field.value?.length || 0;
+              const maxLength = 60;
+              return (
+                <FormItem>
+                  <FormLabel>Locations list title</FormLabel>
+                  <FormControl>
+                    <Input
+                      placeholder="Choose Your City"
+                      disabled={readOnly}
+                      {...field}
+                      value={field.value || ""}
+                      maxLength={maxLength}
+                      onChange={(e) => field.onChange(e.target.value)}
+                    />
+                  </FormControl>
+                  <div className="mt-1 text-xs text-muted-foreground">
+                    {currentLength}/{maxLength} characters
+                  </div>
+                  <FormMessage />
+                </FormItem>
+              );
+            }}
+          />
+
+          <FormField
+            control={form.control}
+            name="main_landing_locations_list_subtitle"
+            render={({ field }) => {
+              const currentLength = field.value?.length || 0;
+              const maxLength = 120;
+              return (
+                <FormItem>
+                  <FormLabel>Locations list subtitle</FormLabel>
+                  <FormControl>
+                    <Input
+                      placeholder="Tap a city to see all upcoming events"
+                      disabled={readOnly}
+                      {...field}
+                      value={field.value || ""}
+                      maxLength={maxLength}
+                      onChange={(e) => field.onChange(e.target.value)}
+                    />
+                  </FormControl>
+                  <div className="mt-1 text-xs text-muted-foreground">
+                    {currentLength}/{maxLength} characters
+                  </div>
+                  <FormMessage />
+                </FormItem>
+              );
+            }}
+          />
+        </div>
+      </div>
+    </div>
+  );
+}

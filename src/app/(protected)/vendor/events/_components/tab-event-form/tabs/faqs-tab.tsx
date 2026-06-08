@@ -164,20 +164,12 @@ export default function FaqsTab() {
         const response = await eventsService.storeStepSevenData(data);
 
         if (response && response.status) {
-          // Success message is handled by axios interceptor
-          // Move to the next step
           await advanceStep(7);
         } else {
-          const errorMessage =
-            response?.message ||
-            "Failed to save FAQ details. Please try again.";
-          toast.error("Error saving FAQ details", {
-            description: errorMessage,
-          });
+          console.error("Error saving FAQ details:", response);
         }
       } catch (error) {
         console.error("Error saving FAQ details:", error);
-        toast.error("Failed to save FAQ details");
       } finally {
         setIsLoading(false);
       }

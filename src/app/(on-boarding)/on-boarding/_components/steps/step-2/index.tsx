@@ -43,6 +43,11 @@ import { useLogoUploadProcessor } from "@/hooks/use-logo-upload-processor";
 import { Loader2 } from "lucide-react";
 import { ensureFilePreview, revokeFilePreview } from "@/lib/file-preview";
 import { ONBOARDING_DEFAULT_THEME } from "../../../_lib/onboarding-default-theme";
+import {
+  LOGO_SUPPORTED_ACCEPT,
+  LOGO_SUPPORTED_FORMATS_LABEL,
+  LOGO_UPLOAD_HINT,
+} from "@/lib/logo/supported-formats";
 
 const resolveStepTwoErrorIndex = (keys: string[]) => {
   if (keys.some((k) => k === "__extra_validation__")) return 0;
@@ -425,6 +430,10 @@ export default function StepTwo() {
                         <OnboardingFieldGroupTitle>
                           Upload Your Logo
                         </OnboardingFieldGroupTitle>
+                        <p className="text-xs text-white/60 mb-2">
+                          {LOGO_SUPPORTED_FORMATS_LABEL}, max 1MB.{" "}
+                          {LOGO_UPLOAD_HINT}
+                        </p>
                         <FormControl>
                           <div
                             className="flex flex-col justify-center items-center h-full space-y-2 bg-white/5 p-4 rounded-lg border border-white/10"
@@ -504,6 +513,7 @@ export default function StepTwo() {
                                   handleRemoveLogo(field.onChange)
                                 }
                                 disabled={isProcessingLogo}
+                                accept={LOGO_SUPPORTED_ACCEPT}
                                 className="border-dashed"
                               />
                             )}

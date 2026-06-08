@@ -13,7 +13,8 @@ import { shouldUseNextImageOptimization } from "@/lib/image-utils";
 interface LocationGridProps {
   locations: (VenueLocation | LocationData)[];
   isLoading: boolean;
-  onSelect: (slug: string) => void;
+  /** Return false if navigation did not start (clears "Opening…" state). */
+  onSelect: (slug: string) => void | boolean;
 }
 
 /** Gradient hover tints per card (Tailwind must see full class strings). */
@@ -107,7 +108,10 @@ export default function LocationGrid({
           const handleCardClick = () => {
             if (!locationSlug || pendingSlug) return;
             setPendingSlug(locationSlug);
-            onSelect(locationSlug);
+            const handled = onSelect(locationSlug);
+            if (handled === false) {
+              setPendingSlug(null);
+            }
           };
 
           const isPending = pendingSlug === locationSlug;

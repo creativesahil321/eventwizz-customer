@@ -39,6 +39,10 @@ import {
   EventRoomMultiSelect,
   type VendorRoomOption,
 } from "./event-room-multi-select";
+import {
+  AI_EVENT_ADDITIONAL_DETAILS_HINT,
+  AI_EVENT_ADDITIONAL_DETAILS_PLACEHOLDER,
+} from "../../_lib/ai-event-vendor-intent";
 
 const AI_EVENT_MIN_ROOMS = 2;
 const AI_EVENT_MAX_ROOMS = 3;
@@ -60,7 +64,7 @@ const collectInfoSchema = z
       ),
     eventDescription: z
       .string()
-      .max(800, "Description max 800 characters")
+      .max(2000, "Description max 2000 characters")
       .optional(),
     guestCount: z.string().optional(),
     priceRange: z.string().optional(),
@@ -817,15 +821,18 @@ export default function AIEventCollectInfo({
                     <FormControl>
                       <Textarea
                         {...field}
-                        placeholder="Describe your event — any specific requirements for tickets, tables, pricing, menu, or other packages that the AI should follow…"
-                        maxLength={800}
-                        rows={4}
+                        placeholder={AI_EVENT_ADDITIONAL_DETAILS_PLACEHOLDER}
+                        maxLength={2000}
+                        rows={5}
                         className="bg-white/5 border-white/10 text-white placeholder:text-slate-500 resize-none"
                       />
                     </FormControl>
+                    <p className="text-xs text-slate-500 leading-relaxed">
+                      {AI_EVENT_ADDITIONAL_DETAILS_HINT}
+                    </p>
                     <div className="flex justify-end mt-1">
                       <span className="text-xs text-slate-600">
-                        {field.value?.length || 0}/800
+                        {field.value?.length || 0}/2000
                       </span>
                     </div>
                     <FormMessage />

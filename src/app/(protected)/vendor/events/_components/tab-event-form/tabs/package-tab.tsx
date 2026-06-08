@@ -964,16 +964,10 @@ export default function PackageTab() {
 
           await advanceStep(2);
         } else {
-          const errorMessage =
-            response?.message ||
-            "Failed to save package details. Please try again.";
-          toast.error("Error saving package details", {
-            description: errorMessage,
-          });
+          console.error("Error saving package details:", response);
         }
       } catch (error) {
         console.error("Error saving package details:", error);
-        toast.error("Failed to save package details");
       } finally {
         setIsLoading(false);
       }

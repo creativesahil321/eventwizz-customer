@@ -20,7 +20,7 @@ import {
 import {
   cloneVendorStepFiveRoomBrochure,
   findStepFiveBrochureForRoom,
-  isVendorRoomBrochureStepComplete,
+  isVendorBrochureApplyToAllReady,
   normalizeVendorStepFiveRooms,
   roomEntryToStepFiveBrochureFields,
   stepFiveBrochureFieldsToRoomEntry,
@@ -252,24 +252,8 @@ export default function MoreInfoTab() {
 
   const canApplyToAllRooms = useMemo(() => {
     if (!isRoomsEnabled || stepTwoRooms.length < 2) return false;
-
-    const resolvedBrochure =
-      watchedBrochurePdf ?? brochurePdfUrl ?? null;
-    const hasBrochure = isVendorRoomBrochureStepComplete({
-      room_id: activeRoomId,
-      brochure_pdf: resolvedBrochure,
-    });
-    const hasAddress = String(watchedEventAddress || "").trim().length > 0;
-
-    return hasBrochure && hasAddress;
-  }, [
-    isRoomsEnabled,
-    stepTwoRooms.length,
-    watchedBrochurePdf,
-    brochurePdfUrl,
-    watchedEventAddress,
-    activeRoomId,
-  ]);
+    return isVendorBrochureApplyToAllReady(watchedEventAddress ?? "");
+  }, [isRoomsEnabled, stepTwoRooms.length, watchedEventAddress]);
 
   // Handle field focus for tracking active field
   const handleFieldFocus = useCallback(
@@ -362,8 +346,12 @@ export default function MoreInfoTab() {
         // Manually re-trigger validation on all fields to force error display
         const isValid = await form.trigger();
 
-        // Custom validation for required brochure PDF
-        if (!submission.brochure_pdf && !brochurePdfUrl) {
+        // Custom validation for required brochure PDF (single-room save only)
+        if (
+          !applyToAllRooms &&
+          !submission.brochure_pdf &&
+          !brochurePdfUrl
+        ) {
           toast.error("Event Brochure PDF is required", {
             description: "Please upload a brochure PDF for your event.",
             duration: 5000,
@@ -483,10 +471,10 @@ export default function MoreInfoTab() {
 
           if (
             applyToAllRooms &&
-            !isVendorRoomBrochureStepComplete(activeSnapshot)
+            !isVendorBrochureApplyToAllReady(submission.event_address ?? "")
           ) {
             toast.error(
-              "Upload a brochure PDF for this room before applying to all rooms.",
+              "Enter the event address before applying to all rooms.",
             );
             setIsLoading(false);
             return;
@@ -559,20 +547,11 @@ export default function MoreInfoTab() {
             stepTwoRoomsForSave.length > 0 &&
             !applyToAllRooms
           ) {
-            const nextIncompleteIndex = stepTwoRoomsForSave.findIndex(
-              (room, index) =>
-                index !== resolvedRoomIndex &&
-                !isVendorRoomBrochureStepComplete(
-                  findStepFiveBrochureForRoom(
-                    mergedRoomsGlobal,
-                    Number(room.room_id),
-                  ),
-                ),
-            );
-            if (nextIncompleteIndex !== -1) {
+            const nextRoomIndex = resolvedRoomIndex + 1;
+            if (nextRoomIndex < stepTwoRoomsForSave.length) {
               globalForm.setValue(
                 "stepTwo.active_room_index",
-                nextIncompleteIndex,
+                nextRoomIndex,
                 { shouldDirty: false, shouldTouch: false },
               );
               toast.info("Saved. Continue with the next room.");
@@ -580,22 +559,12 @@ export default function MoreInfoTab() {
             }
           }
 
-          if (applyToAllRooms && roomsEnabled) {
-            toast.success("Brochure applied to all rooms.");
-          }
-
           await advanceStep(5);
         } else {
-          const errorMessage =
-            response?.message ||
-            "Failed to save additional information. Please try again.";
-          toast.error("Error saving additional information", {
-            description: errorMessage,
-          });
+          console.error("Error saving additional information:", response);
         }
       } catch (error) {
         console.error("Error saving additional information:", error);
-        toast.error("Failed to save additional information");
       } finally {
         setIsLoading(false);
       }
@@ -624,8 +593,18 @@ export default function MoreInfoTab() {
         setValue("brochure_pdf_2", merged.brochure_pdf_2 ?? null);
       }
 
+      if (applyToAllRooms) {
+        if (!isVendorBrochureApplyToAllReady(merged.event_address ?? "")) {
+          toast.error("Enter the event address before applying to all rooms.");
+          setActiveField("event_address");
+          return;
+        }
+        void handleSubmit(merged as StepFiveType, { applyToAllRooms: true });
+        return;
+      }
+
       void form.handleSubmit(
-        (data) => handleSubmit(data, { applyToAllRooms }),
+        (data) => handleSubmit(data, { applyToAllRooms: false }),
         () => {
           toast.error(
             "Please complete the required brochure and address fields for this room.",
@@ -633,7 +612,14 @@ export default function MoreInfoTab() {
         },
       )();
     },
-    [form, getValues, setValue, resolveBrochureFieldsForSubmit, handleSubmit],
+    [
+      form,
+      getValues,
+      setValue,
+      resolveBrochureFieldsForSubmit,
+      handleSubmit,
+      setActiveField,
+    ],
   );
 
   return (

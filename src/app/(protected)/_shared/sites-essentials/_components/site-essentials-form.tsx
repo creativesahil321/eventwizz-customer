@@ -1,14 +1,46 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { FormProvider } from "react-hook-form";
-import { Loader2, Save, AlertCircle, Eye, RotateCcw } from "lucide-react";
+import {
+  Loader2,
+  Save,
+  AlertCircle,
+  Eye,
+  RotateCcw,
+  Palette,
+} from "lucide-react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { useToast } from "@/components/ui/use-toast";
 import { useSiteEssentials } from "../_lib/hooks";
+import { useResetSiteEssentialsThemeMutation } from "../_lib/queries";
+import {
+  resolveHasMultipleLocations,
+  useHasMultipleLocations,
+} from "../_lib/use-has-multiple-locations";
+import {
+  mergeSiteEssentialsPreviewWithApi,
+  withPreviewLocationSlug,
+} from "../_lib/merge-preview-with-api";
+import {
+  resolvePreviewLocationCount,
+  resolvePreviewLocationList,
+} from "../_lib/preview-locations";
+import { useVendorLocationsList } from "@/app/(protected)/vendor/venue-locations/_lib/queries";
+import { useSession } from "next-auth/react";
 import { SiteEssentialsFormValues } from "../_lib/schema";
 import { BrandingTab } from "./tabs/branding-tab";
 import { ColorsTab } from "./tabs/colors-tab";
@@ -23,6 +55,11 @@ import {
   SiteEssentialsUpdateProvider,
   useSiteEssentialsUpdateGate,
 } from "../_lib/site-essentials-update-context";
+import {
+  applySiteEssentialsDefaultTheme,
+  SITE_ESSENTIALS_DEFAULT_PRESET_ID,
+} from "../_lib/default-site-theme";
+import { writeLastAppliedSiteThemePresetId } from "../_lib/site-theme-preset-local-cache";
 
 export function SiteEssentialsForm() {
   return (
@@ -36,12 +73,19 @@ function SiteEssentialsFormInner() {
   const { readOnly } = useSiteEssentialsUpdateGate();
   const { form, onSubmit, isLoading, siteEssentials, fetchSiteEssentials } =
     useSiteEssentials();
+  const {
+    mutateAsync: resetThemeToDefault,
+    isPending: isResettingThemeDefault,
+  } = useResetSiteEssentialsThemeMutation();
+  const hasMultipleLocations = useHasMultipleLocations();
   const [submitting, setSubmitting] = useState(false);
   const [previewLoading, setPreviewLoading] = useState(false);
   const router = useRouter();
   const { toast } = useToast();
-  const { setPreviewData, previewData, clearPreviewData } =
+  const { setPreviewData, previewData, clearPreviewData, startPreviewReview } =
     useSitePreviewStore();
+  const { data: session } = useSession();
+  const { locations: venueLocations } = useVendorLocationsList();
 
   // Track validation errors by tab
   const [tabsWithErrors, setTabsWithErrors] = useState<Record<string, boolean>>(
@@ -49,31 +93,57 @@ function SiteEssentialsFormInner() {
   );
   const [showErrorSummary, setShowErrorSummary] = useState(false);
   const [activeTab, setActiveTab] = useState("presets");
+  const [resetDefaultDialogOpen, setResetDefaultDialogOpen] = useState(false);
+  const previewHydratedRef = useRef(false);
 
-  // Load preview data into form if available
-  // BUT never override File objects - form submission should use form's File objects, not preview store data
   useEffect(() => {
-    if (previewData) {
-      try {
-        const currentFormValues = form.getValues();
+    if (!previewData) {
+      previewHydratedRef.current = false;
+    }
+  }, [previewData]);
 
-        // Check if form already has File objects uploaded
-        const hasFileUploads =
-          currentFormValues.logo instanceof File ||
-          currentFormValues.favicon instanceof File ||
-          currentFormValues.cover_image instanceof File ||
-          currentFormValues.cover_video instanceof File;
+  // Load preview snapshot into form once when returning from preview
+  useEffect(() => {
+    if (!previewData || previewHydratedRef.current) return;
 
-        // Only reset with preview data if no files are currently uploaded
-        // This prevents overriding File objects with preview store data (object URLs)
-        if (!hasFileUploads) {
-          form.reset(previewData);
-        }
-      } catch (error) {
-        console.error("Error resetting form with preview data:", error);
+    try {
+      const currentFormValues = form.getValues();
+
+      const hasFileUploads =
+        currentFormValues.logo instanceof File ||
+        currentFormValues.favicon instanceof File ||
+        currentFormValues.cover_image instanceof File ||
+        currentFormValues.cover_video instanceof File ||
+        currentFormValues.main_landing_cover_image instanceof File;
+
+      if (!hasFileUploads) {
+        form.reset(previewData);
       }
+      previewHydratedRef.current = true;
+    } catch (error) {
+      console.error("Error resetting form with preview data:", error);
     }
   }, [form, previewData]);
+
+  // Keep preview store in sync while editing so preview reflects changes immediately
+  useEffect(() => {
+    if (!previewData) return;
+
+    const subscription = form.watch(() => {
+      const values = form.getValues();
+      setPreviewData(
+        withPreviewLocationSlug(
+          mergeSiteEssentialsPreviewWithApi(
+            values,
+            siteEssentials ?? undefined,
+          ),
+          session?.user?.default_venue_location?.slug,
+        ),
+      );
+    });
+
+    return () => subscription.unsubscribe();
+  }, [form, previewData, siteEssentials, session?.user?.default_venue_location?.slug, setPreviewData]);
 
   // Reset form when siteEssentials data changes (e.g., after location switch)
   // This ensures the form always reflects the current location's data
@@ -146,11 +216,47 @@ function SiteEssentialsFormInner() {
     setPreviewLoading(true);
 
     try {
-      // Get complete form values
-      const completeFormValues = form.getValues();
+      const completeFormValues = withPreviewLocationSlug(
+        mergeSiteEssentialsPreviewWithApi(
+          form.getValues(),
+          siteEssentials ?? undefined,
+        ),
+        session?.user?.default_venue_location?.slug,
+      );
+      const effectiveVenueLocations =
+        venueLocations.length > 0
+          ? venueLocations
+          : session?.user?.venue_locations?.length
+            ? session.user.venue_locations
+            : session?.user?.default_venue_location
+              ? [session.user.default_venue_location]
+              : [];
 
-      // Don't use JSON.parse(JSON.stringify()) as it destroys File objects
-      // The preview store will handle File objects appropriately
+      const previewLocationList = resolvePreviewLocationList(
+        siteEssentials?.locations ?? completeFormValues.locations,
+        effectiveVenueLocations,
+        {
+          vendor_location_id: session?.user?.vendor_location_id,
+          slug: session?.user?.default_venue_location?.slug,
+          name:
+            session?.user?.default_venue_location?.city ??
+            session?.user?.default_venue_location?.name ??
+            completeFormValues.name,
+        },
+      );
+      const multi = resolveHasMultipleLocations(
+        resolvePreviewLocationCount(
+          siteEssentials?.locations,
+          previewLocationList.length,
+        ),
+      );
+
+      const vendorKey =
+        siteEssentials?.domain?.trim() ||
+        completeFormValues.domain?.trim() ||
+        completeFormValues.name?.trim() ||
+        null;
+      startPreviewReview(multi, previewLocationList, vendorKey ?? undefined);
       setPreviewData(completeFormValues);
 
       // Add a small delay to show loading state
@@ -237,6 +343,50 @@ function SiteEssentialsFormInner() {
 
   // Count total errors for error summary
   const errorCount = Object.keys(tabsWithErrors).length;
+
+  const presetCacheUserKey =
+    session?.user?.uuid ?? session?.user?.email ?? "anonymous";
+
+  const handleResetAsDefault = async () => {
+    try {
+      const updated = await resetThemeToDefault({});
+      const serverData = JSON.parse(JSON.stringify(updated));
+      form.reset(serverData, {
+        keepErrors: false,
+        keepDirty: false,
+        keepIsSubmitted: false,
+        keepTouched: false,
+        keepIsValid: false,
+        keepSubmitCount: false,
+      });
+      writeLastAppliedSiteThemePresetId(
+        presetCacheUserKey,
+        SITE_ESSENTIALS_DEFAULT_PRESET_ID,
+      );
+      setResetDefaultDialogOpen(false);
+      setShowErrorSummary(false);
+      toast({
+        title: "Theme reset to default",
+        description:
+          "Colors and fonts were restored to EventWizz defaults. Your logo, copy, and images are unchanged.",
+        variant: "default",
+      });
+    } catch {
+      applySiteEssentialsDefaultTheme(form.setValue, form.getValues);
+      writeLastAppliedSiteThemePresetId(
+        presetCacheUserKey,
+        SITE_ESSENTIALS_DEFAULT_PRESET_ID,
+      );
+      setResetDefaultDialogOpen(false);
+      setShowErrorSummary(false);
+      toast({
+        title: "Default theme applied locally",
+        description:
+          "The reset API is not available yet — changes are in the form only. Click Save after the backend ships POST …/reset-theme-default.",
+        variant: "default",
+      });
+    }
+  };
 
   // Handle form reset
   const handleReset = async () => {
@@ -390,6 +540,7 @@ function SiteEssentialsFormInner() {
                 )}
                 <div className="bg-white rounded-lg p-3 sm:p-6">
                   <BrandingTab
+                    hasMultipleLocations={hasMultipleLocations}
                     serverCoverImage={
                       typeof siteEssentials?.cover_image === "string"
                         ? siteEssentials.cover_image
@@ -398,6 +549,12 @@ function SiteEssentialsFormInner() {
                     serverCoverVideo={
                       typeof siteEssentials?.cover_video === "string"
                         ? siteEssentials.cover_video
+                        : undefined
+                    }
+                    serverMainLandingCoverImage={
+                      typeof siteEssentials?.main_landing_cover_image ===
+                      "string"
+                        ? siteEssentials.main_landing_cover_image
                         : undefined
                     }
                   />
@@ -475,6 +632,73 @@ function SiteEssentialsFormInner() {
                 >
                   <RotateCcw className="h-4 w-4" /> Reset
                 </Button>
+                <Button
+                  variant="outline"
+                  type="button"
+                  onClick={() => setResetDefaultDialogOpen(true)}
+                  disabled={
+                    readOnly ||
+                    previewLoading ||
+                    submitting ||
+                    isResettingThemeDefault
+                  }
+                  className="flex items-center justify-center gap-2 border-slate-300 bg-white text-slate-900 hover:bg-slate-50"
+                >
+                  {isResettingThemeDefault ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Palette className="h-4 w-4" />
+                  )}
+                  {isResettingThemeDefault ? "Resetting…" : "Reset as default"}
+                </Button>
+                <AlertDialog
+                  open={resetDefaultDialogOpen}
+                  onOpenChange={setResetDefaultDialogOpen}
+                >
+                  <AlertDialogContent className="text-foreground">
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>
+                        Reset theme to defaults?
+                      </AlertDialogTitle>
+                      <AlertDialogDescription asChild>
+                        <div className="space-y-2 text-sm text-muted-foreground">
+                          <p>
+                            This will replace your current{" "}
+                            <span className="font-medium text-foreground">
+                              colors, fonts, and heading style
+                            </span>{" "}
+                            with the EventWizz default theme (Clean White).
+                          </p>
+                          <p>
+                            Your logo, page copy, images, social links, and SEO
+                            settings will{" "}
+                            <span className="font-medium text-foreground">
+                              not
+                            </span>{" "}
+                            be changed.
+                          </p>
+                          <p className="font-medium text-amber-700">
+                            This saves immediately on the server. Your live site
+                            will use the default theme after the reset
+                            completes.
+                          </p>
+                        </div>
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter className="gap-2 sm:gap-3 sm:space-x-0">
+                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                      <AlertDialogAction
+                        onClick={() => void handleResetAsDefault()}
+                        disabled={isResettingThemeDefault}
+                        className="bg-[var(--color-primary)] text-white hover:bg-[var(--color-primary-hover)]"
+                      >
+                        {isResettingThemeDefault
+                          ? "Resetting…"
+                          : "Yes, reset theme"}
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
                 <Button
                   type="submit"
                   disabled={

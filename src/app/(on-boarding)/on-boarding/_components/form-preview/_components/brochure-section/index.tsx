@@ -123,114 +123,117 @@ export default function BrochureSection({
   );
 
   const pricePanelClass = cn(
-    "flex w-full flex-col items-center justify-center rounded-md bg-[var(--color-surface)] px-2 py-5 text-[var(--color-text)]",
+    "flex w-full flex-col items-center justify-center rounded-md bg-[var(--color-primary)] px-2 py-5 text-[var(--color-primary-foreground)]",
     showDownloads && !omitPricePanel && "sm:col-span-2 md:col-span-1",
   );
 
   return (
     <section className="py-16 px-4 bg-[color:var(--color-background)]">
       <div className="max-w-7xl mx-auto">
-      <div className="text-center mb-8">
-        <h2 className="text-2xl font-black tracking-tight text-[var(--color-text)] md:text-3xl max-w-4xl mx-auto">
-          Check Out The Latest Dates To Be Released — Get In Quick!
-        </h2>
-      </div>
-      <section className={gridClass}>
-        <section className="w-full overflow-hidden rounded-md">
-          <LocationMap
-            address={defaultLocation.description}
-            latitude={location.latitude}
-            longitude={location.longitude}
-            className="h-full w-full"
-            showMapImmediately={showMapImmediately}
-          />
-        </section>
-
-        {showDownloads ? (
-          <section className="flex w-full flex-col items-center justify-center rounded-md bg-[var(--color-surface)] px-2 py-5 text-[var(--color-text)]">
-            {renderIcon("Download", 24)}
-            <h2 className="py-2 text-base font-bold uppercase sm:py-3 sm:text-lg">
-              DOWNLOADS
-            </h2>
-            {validDownloads.map((item, idx) => (
-              <div key={idx} className="mb-1 flex items-center gap-1">
-                {renderIcon("FileText", 16)}
-                <a
-                  href={sanitizeHref(item.download_link[0]) ?? "#"}
-                  className="break-all text-xs text-[var(--color-text)] underline sm:text-sm"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  onClick={(e) => {
-                    // For File objects, we need to handle download differently
-                    if (item.download_link[0].startsWith("blob:")) {
-                      e.preventDefault();
-                      const link = document.createElement("a");
-                      link.href = item.download_link[0];
-                      link.download = item.title + ".pdf";
-                      document.body.appendChild(link);
-                      link.click();
-                      document.body.removeChild(link);
-                    } else if (!sanitizeHref(item.download_link[0])) {
-                      e.preventDefault();
-                    }
-                  }}
-                >
-                  {item.title}
-                </a>
-              </div>
-            ))}
+        <div className="text-center mb-8">
+          <h2 className="text-2xl font-black tracking-tight text-[var(--color-text)] md:text-3xl max-w-4xl mx-auto">
+            Check Out The Latest Dates To Be Released — Get In Quick!
+          </h2>
+        </div>
+        <section className={gridClass}>
+          <section className="w-full overflow-hidden rounded-md">
+            <LocationMap
+              address={defaultLocation.description}
+              latitude={location.latitude}
+              longitude={location.longitude}
+              className="h-full w-full"
+              showMapImmediately={showMapImmediately}
+            />
           </section>
-        ) : null}
 
-        {!omitPricePanel ? (
-          <section className={pricePanelClass}>
-            {renderIcon(defaultPrice.icon, 24)}
-            <h2 className="max-w-full break-words px-2 py-2 text-base font-bold uppercase sm:py-3 sm:text-lg">
-              {defaultPrice.title}
-            </h2>
-            <p
-              className="max-w-full overflow-hidden px-2 text-xs break-words whitespace-normal sm:text-sm"
-              style={{ wordBreak: "break-word", overflowWrap: "break-word" }}
-            >
-              {defaultPrice.description}
-            </p>
-            {defaultPrice.price_title ? (
-              <Button
-                variant="event-outline"
-                type="button"
-                className="mt-3"
-                asChild
-              >
-                {defaultPrice.link?.startsWith("#") ? (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const id = defaultPrice.link!.slice(1);
-                      const el = id ? document.getElementById(id) : null;
-                      el?.scrollIntoView({ behavior: "smooth", block: "start" });
-                    }}
-                  >
-                    {defaultPrice.price_title}
-                  </button>
-                ) : (
+          {showDownloads ? (
+            <section className="flex w-full flex-col items-center justify-center rounded-md bg-[var(--color-primary)] px-2 py-5 text-[var(--color-primary-foreground)]">
+              {renderIcon("Download", 24)}
+              <h2 className="py-2 text-base font-bold uppercase sm:py-3 sm:text-lg text-[var(--color-primary-foreground)]">
+                DOWNLOADS
+              </h2>
+              {validDownloads.map((item, idx) => (
+                <div key={idx} className="mb-1 flex items-center gap-1">
+                  {renderIcon("FileText", 16)}
                   <a
-                    href={sanitizeHref(defaultPrice.link) ?? "#"}
+                    href={sanitizeHref(item.download_link[0]) ?? "#"}
+                    className="break-all text-xs text-[var(--color-primary-foreground)] underline sm:text-sm"
                     target="_blank"
                     rel="noopener noreferrer"
                     onClick={(e) => {
-                      if (!sanitizeHref(defaultPrice.link)) {
+                      // For File objects, we need to handle download differently
+                      if (item.download_link[0].startsWith("blob:")) {
+                        e.preventDefault();
+                        const link = document.createElement("a");
+                        link.href = item.download_link[0];
+                        link.download = item.title + ".pdf";
+                        document.body.appendChild(link);
+                        link.click();
+                        document.body.removeChild(link);
+                      } else if (!sanitizeHref(item.download_link[0])) {
                         e.preventDefault();
                       }
                     }}
                   >
-                    {defaultPrice.price_title}
+                    {item.title}
                   </a>
-                )}
-              </Button>
-            ) : null}
-          </section>
-        ) : null}
-      </section>
+                </div>
+              ))}
+            </section>
+          ) : null}
+
+          {!omitPricePanel ? (
+            <section className={pricePanelClass}>
+              {renderIcon(defaultPrice.icon, 24)}
+              <h2 className="max-w-full break-words px-2 py-2 text-base font-bold uppercase sm:py-3 sm:text-lg">
+                {defaultPrice.title}
+              </h2>
+              <p
+                className="max-w-full overflow-hidden px-2 text-xs break-words whitespace-normal sm:text-sm"
+                style={{ wordBreak: "break-word", overflowWrap: "break-word" }}
+              >
+                {defaultPrice.description}
+              </p>
+              {defaultPrice.price_title ? (
+                <Button
+                  variant="event-outline"
+                  type="button"
+                  className="mt-3"
+                  asChild
+                >
+                  {defaultPrice.link?.startsWith("#") ? (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const id = defaultPrice.link!.slice(1);
+                        const el = id ? document.getElementById(id) : null;
+                        el?.scrollIntoView({
+                          behavior: "smooth",
+                          block: "start",
+                        });
+                      }}
+                    >
+                      {defaultPrice.price_title}
+                    </button>
+                  ) : (
+                    <a
+                      href={sanitizeHref(defaultPrice.link) ?? "#"}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={(e) => {
+                        if (!sanitizeHref(defaultPrice.link)) {
+                          e.preventDefault();
+                        }
+                      }}
+                    >
+                      {defaultPrice.price_title}
+                    </a>
+                  )}
+                </Button>
+              ) : null}
+            </section>
+          ) : null}
+        </section>
       </div>
     </section>
   );

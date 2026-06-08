@@ -1,69 +1,327 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useSession } from "next-auth/react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Loader2 } from "lucide-react";
 import { useSitePreviewStore } from "@/store/site-preview.store";
 import { SitePreview } from "@/app/(protected)/_shared/sites-essentials/_components/site-preview";
+import { MainLandingSitePreview } from "@/app/(protected)/_shared/sites-essentials/_components/main-landing-site-preview";
+import { SitePreviewReviewChrome } from "@/app/(protected)/_shared/sites-essentials/_components/site-preview-review-chrome";
 import { SiteEssentialsFormValues } from "@/app/(protected)/_shared/sites-essentials/_lib/schema";
+import { toSiteEssentialsUpdatePayload } from "@/app/(protected)/_shared/sites-essentials/_lib/payload";
 import {
   siteEssentialsKeys,
+  useSiteEssentialsBySlugQuery,
   useSiteEssentialsMutation,
+  useSiteEssentialsQuery,
 } from "@/app/(protected)/_shared/sites-essentials/_lib/queries";
 import { Skeleton } from "@/components/ui/skeleton";
 import { PreviewProvider } from "@/contexts/preview-context";
 import { PreviewThemeCustomizer } from "@/components/preview/preview-theme-customizer";
 import { themeKeys } from "@/hooks/use-theme-query";
 import { useToast } from "@/components/ui/use-toast";
+import { resolveHasMultipleLocations } from "@/app/(protected)/_shared/sites-essentials/_lib/use-has-multiple-locations";
+import { mergeSiteEssentialsPreviewWithApi } from "@/app/(protected)/_shared/sites-essentials/_lib/merge-preview-with-api";
+import { mergeGlobalWithLocationSiteEssentials } from "@/app/(protected)/_shared/sites-essentials/_lib/merge-location-preview";
+import {
+  allPreviewLocationsApproved,
+  previewLocationSlugsKey,
+  resolvePreviewLocationCount,
+  resolvePreviewLocationList,
+} from "@/app/(protected)/_shared/sites-essentials/_lib/preview-locations";
+import { useSwitchLocation } from "@/app/(protected)/vendor/venue-locations/_lib/hooks";
+import { useVendorLocationsList } from "@/app/(protected)/vendor/venue-locations/_lib/queries";
 
 export default function SitePreviewPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
+  const { data: session } = useSession();
   const { toast } = useToast();
-  const { mutateAsync: saveSiteEssentials, isPending: isSavingTheme } =
+  const { mutate: switchLocation } = useSwitchLocation();
+  const { data: siteEssentialsFromApi } = useSiteEssentialsQuery();
+  const { locations: venueLocations, isLoading: isLoadingVenueLocations } =
+    useVendorLocationsList();
+  const { mutateAsync: saveSiteEssentials, isPending: isSaving } =
     useSiteEssentialsMutation();
-  const { previewData, setPreviewData } = useSitePreviewStore();
+  const {
+    previewData,
+    reviewStep,
+    mainPageApproved,
+    previewLocations,
+    previewVendorKey,
+    currentLocationIndex,
+    approvedLocationSlugs,
+    setPreviewData,
+    setReviewStep,
+    setMainPageApproved,
+    setCurrentLocationIndex,
+    approveLocationSlug,
+  } = useSitePreviewStore();
+
   const [isLoading, setIsLoading] = useState(true);
   const [formData, setFormData] = useState<SiteEssentialsFormValues | null>(
-    null
+    null,
   );
 
+  const resolvedGlobalData = useMemo(() => {
+    if (!formData) return null;
+    return mergeSiteEssentialsPreviewWithApi(
+      formData,
+      siteEssentialsFromApi ?? undefined,
+    );
+  }, [formData, siteEssentialsFromApi]);
+
+  const safePreviewLocations = previewLocations ?? [];
+  const safeApprovedSlugs = approvedLocationSlugs ?? [];
+
+  const effectiveVenueLocations = useMemo(() => {
+    if (venueLocations.length > 0) return venueLocations;
+    if (session?.user?.venue_locations?.length) {
+      return session.user.venue_locations;
+    }
+    if (session?.user?.default_venue_location) {
+      return [session.user.default_venue_location];
+    }
+    return [];
+  }, [
+    venueLocations,
+    session?.user?.venue_locations,
+    session?.user?.default_venue_location,
+  ]);
+
+  const sessionLocationFallback = useMemo(
+    () => ({
+      vendor_location_id: session?.user?.vendor_location_id,
+      slug: session?.user?.default_venue_location?.slug,
+      name:
+        session?.user?.default_venue_location?.city ??
+        session?.user?.default_venue_location?.name ??
+        resolvedGlobalData?.name,
+    }),
+    [
+      session?.user?.vendor_location_id,
+      session?.user?.default_venue_location,
+      resolvedGlobalData?.name,
+    ],
+  );
+
+  const apiSiteEssentialsLocations = siteEssentialsFromApi?.locations;
+
+  /** Fresh API/session list — never trust stale persisted locations from another vendor. */
+  const canonicalLocationList = useMemo(
+    () =>
+      resolvePreviewLocationList(
+        apiSiteEssentialsLocations ?? resolvedGlobalData?.locations,
+        effectiveVenueLocations,
+        sessionLocationFallback,
+      ),
+    [
+      apiSiteEssentialsLocations,
+      resolvedGlobalData?.locations,
+      effectiveVenueLocations,
+      sessionLocationFallback,
+    ],
+  );
+
+  const locationList = useMemo(() => {
+    if (canonicalLocationList.length > 0) return canonicalLocationList;
+    return safePreviewLocations;
+  }, [canonicalLocationList, safePreviewLocations]);
+
+  const hasMultipleLocations = useMemo(() => {
+    const count = resolvePreviewLocationCount(
+      apiSiteEssentialsLocations,
+      locationList.length,
+    );
+    return resolveHasMultipleLocations(count);
+  }, [apiSiteEssentialsLocations, locationList.length]);
+
+  /** Single-location vendors skip main home — don't wait for persisted store sync. */
+  const effectiveReviewStep = hasMultipleLocations
+    ? reviewStep
+    : ("location" as const);
+
+  const safeLocationIndex = Math.min(
+    currentLocationIndex ?? 0,
+    Math.max(0, locationList.length - 1),
+  );
+  const currentLocation = locationList[safeLocationIndex];
+  const currentSlug =
+    effectiveReviewStep === "location" ? currentLocation?.slug : undefined;
+
+  /** Location hero/about/events require `?slug=` even for a single location. */
+  const fetchLocationEssentialsBySlug =
+    effectiveReviewStep === "location" && Boolean(currentSlug?.trim());
+
+  const {
+    data: locationEssentialsFromApi,
+    isLoading: isLoadingLocationEssentials,
+    isFetching: isFetchingLocationEssentials,
+    isError: isLocationEssentialsError,
+    isFetched: isLocationEssentialsFetched,
+  } = useSiteEssentialsBySlugQuery(currentSlug, fetchLocationEssentialsBySlug);
+
+  const locationPreviewData = useMemo(() => {
+    if (!resolvedGlobalData || effectiveReviewStep !== "location") {
+      return null;
+    }
+
+    const locationLabel =
+      currentLocation?.city ??
+      effectiveVenueLocations[0]?.city ??
+      session?.user?.default_venue_location?.city ??
+      resolvedGlobalData.name;
+
+    const locationMergeOptions = {
+      isSingleLocation: !hasMultipleLocations,
+      previewSlug: currentSlug,
+    };
+
+    if (locationEssentialsFromApi) {
+      return mergeGlobalWithLocationSiteEssentials(
+        resolvedGlobalData,
+        locationEssentialsFromApi,
+        locationLabel,
+        locationMergeOptions,
+      );
+    }
+
+    const slugFetchSettled =
+      !fetchLocationEssentialsBySlug ||
+      isLocationEssentialsFetched ||
+      isLocationEssentialsError;
+
+    if (slugFetchSettled) {
+      if (siteEssentialsFromApi) {
+        return mergeGlobalWithLocationSiteEssentials(
+          resolvedGlobalData,
+          siteEssentialsFromApi,
+          locationLabel,
+          locationMergeOptions,
+        );
+      }
+      return resolvedGlobalData;
+    }
+
+    return null;
+  }, [
+    resolvedGlobalData,
+    effectiveReviewStep,
+    locationEssentialsFromApi,
+    currentLocation?.city,
+    venueLocations,
+    siteEssentialsFromApi,
+    fetchLocationEssentialsBySlug,
+    isLocationEssentialsFetched,
+    isLocationEssentialsError,
+    effectiveVenueLocations,
+    session?.user?.default_venue_location?.city,
+    hasMultipleLocations,
+    currentSlug,
+  ]);
+
+  const isLoadingLocationPreview =
+    fetchLocationEssentialsBySlug &&
+    !isLocationEssentialsError &&
+    (isLoadingLocationEssentials || isFetchingLocationEssentials);
+
   useEffect(() => {
-    // Flag to track if component is mounted
     let isMounted = true;
 
-    // Check if we have data in the store
     if (previewData) {
       try {
-        // Deep clone the preview data to avoid read-only property issues
         const clonedData = JSON.parse(JSON.stringify(previewData));
-        // Only update state if component is still mounted
         if (isMounted) {
           setFormData(clonedData);
         }
       } catch (error) {
         console.error("Error cloning preview data:", error);
-        // Fallback to direct assignment if component is still mounted
         if (isMounted) {
           setFormData(previewData);
         }
       }
     }
 
-    // Only update loading state if component is still mounted
     if (isMounted) {
       setIsLoading(false);
     }
 
-    // Cleanup function to prevent state updates after unmounting
     return () => {
       isMounted = false;
     };
   }, [previewData]);
 
-  /** Keep Zustand in sync so “Back to Editor” + Save persists Try theme tweaks. */
+  const currentVendorKey =
+    siteEssentialsFromApi?.domain?.trim() ||
+    resolvedGlobalData?.domain?.trim() ||
+    resolvedGlobalData?.name?.trim() ||
+    null;
+
+  /** Drop stale localStorage when vendor or location list no longer matches API. */
+  useEffect(() => {
+    if (!currentVendorKey) return;
+
+    const vendorMismatch =
+      previewVendorKey != null && previewVendorKey !== currentVendorKey;
+
+    if (vendorMismatch) {
+      useSitePreviewStore.setState({
+        previewVendorKey: currentVendorKey,
+        previewLocations: [],
+        approvedLocationSlugs: [],
+        currentLocationIndex: 0,
+        mainPageApproved: false,
+        reviewStep: hasMultipleLocations ? "main" : "location",
+        previewScope: hasMultipleLocations ? "main" : "location",
+      });
+    } else if (!previewVendorKey) {
+      useSitePreviewStore.setState({ previewVendorKey: currentVendorKey });
+    }
+  }, [currentVendorKey, previewVendorKey, hasMultipleLocations]);
+
+  /** Keep persisted review state in sync with the current vendor's locations. */
+  useEffect(() => {
+    if (canonicalLocationList.length === 0) return;
+
+    const canonicalKey = previewLocationSlugsKey(canonicalLocationList);
+    const storedKey = previewLocationSlugsKey(safePreviewLocations);
+    const multi = resolveHasMultipleLocations(
+      resolvePreviewLocationCount(
+        apiSiteEssentialsLocations,
+        canonicalLocationList.length,
+      ),
+    );
+    const needsListSync = canonicalKey !== storedKey;
+    const needsSingleLocationStep = !multi && reviewStep !== "location";
+
+    if (!needsListSync && !needsSingleLocationStep) return;
+
+    useSitePreviewStore.setState({
+      previewLocations: canonicalLocationList,
+      currentLocationIndex: Math.min(
+        currentLocationIndex ?? 0,
+        canonicalLocationList.length - 1,
+      ),
+      ...(needsListSync ? { approvedLocationSlugs: [] } : {}),
+      ...(multi
+        ? {}
+        : {
+            reviewStep: "location",
+            previewScope: "location",
+            mainPageApproved: true,
+          }),
+    });
+  }, [
+    canonicalLocationList,
+    safePreviewLocations,
+    reviewStep,
+    currentLocationIndex,
+    apiSiteEssentialsLocations,
+  ]);
+
   const handlePreviewValuesChange = useCallback(
     (next: SiteEssentialsFormValues) => {
       setFormData(next);
@@ -76,39 +334,140 @@ export default function SitePreviewPage() {
     router.back();
   };
 
-  /** Same API as Site Essentials → Save: persists Try theme tweaks (colors, fonts, hero layout). */
-  const handleSaveTheme = useCallback(async () => {
-    if (!formData) return;
+  const handleEdit = () => {
+    const loc = locationList[safeLocationIndex];
+    if (reviewStep === "location" && loc?.id) {
+      switchLocation(loc.id);
+    }
+    router.back();
+  };
+
+  const handleApproveMain = () => {
+    setMainPageApproved(true);
+    toast({
+      title: "Main home approved",
+      description:
+        locationList.length > 0
+          ? `Next, review ${locationList.length} location page${locationList.length > 1 ? "s" : ""}.`
+          : "Continue when ready.",
+    });
+  };
+
+  const goToLocationPreview = useCallback(
+    (slug: string, options?: { approveMain?: boolean }) => {
+      const index = locationList.findIndex((loc) => loc.slug === slug);
+      if (index < 0) return false;
+
+      if (options?.approveMain && !mainPageApproved) {
+        setMainPageApproved(true);
+      }
+      setReviewStep("location");
+      setCurrentLocationIndex(index);
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      return true;
+    },
+    [
+      locationList,
+      mainPageApproved,
+      setMainPageApproved,
+      setReviewStep,
+      setCurrentLocationIndex,
+    ],
+  );
+
+  const handleContinueFromMain = () => {
+    if (!mainPageApproved) {
+      setMainPageApproved(true);
+    }
+    if (locationList.length === 0) {
+      toast({
+        title: "No locations to review",
+        description: "Add at least one event location first.",
+        variant: "destructive",
+      });
+      return;
+    }
+    goToLocationPreview(locationList[0].slug);
+  };
+
+  const handlePreviewLocationFromGrid = (slug: string) =>
+    goToLocationPreview(slug, { approveMain: true });
+
+  const handleApproveCurrentLocation = () => {
+    if (!currentSlug) return;
+    approveLocationSlug(currentSlug);
+    toast({
+      title: `${currentLocation?.city ?? "Location"} approved`,
+      description: isLastLocation()
+        ? "You can save your changes when ready."
+        : "Continue to the next location.",
+    });
+  };
+
+  const isLastLocation = () => safeLocationIndex >= locationList.length - 1;
+
+  const handleNextLocation = () => {
+    if (!isLastLocation()) {
+      setCurrentLocationIndex(safeLocationIndex + 1);
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+  };
+
+  const handlePreviousLocation = () => {
+    if (safeLocationIndex > 0) {
+      setCurrentLocationIndex(safeLocationIndex - 1);
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+  };
+
+  const handleSave = useCallback(async () => {
+    const ready = hasMultipleLocations
+      ? mainPageApproved &&
+        allPreviewLocationsApproved(locationList, safeApprovedSlugs)
+      : allPreviewLocationsApproved(locationList, safeApprovedSlugs);
+
+    if (!resolvedGlobalData || !ready) {
+      return;
+    }
+
     try {
       await saveSiteEssentials({
-        ...formData,
+        ...toSiteEssentialsUpdatePayload(resolvedGlobalData),
         _method: "PATCH",
       } as Partial<SiteEssentialsFormValues> & { _method: "PATCH" });
       await queryClient.invalidateQueries({ queryKey: themeKeys.all });
       await queryClient.invalidateQueries({
         queryKey: siteEssentialsKeys.details(),
       });
-      try {
-        setPreviewData(structuredClone(formData));
-      } catch {
-        setPreviewData(JSON.parse(JSON.stringify(formData)));
-      }
-      router.refresh();
-      toast({
-        title: "Theme saved",
-        description:
-          "Site Essentials were updated. Live site and previews will use these colors and fonts.",
+      locationList.forEach((loc) => {
+        queryClient.invalidateQueries({
+          queryKey: siteEssentialsKeys.bySlug(loc.slug),
+        });
       });
+      try {
+        setPreviewData(structuredClone(resolvedGlobalData));
+      } catch {
+        setPreviewData(JSON.parse(JSON.stringify(resolvedGlobalData)));
+      }
+      toast({
+        title: "Saved",
+        description: "Site essentials were updated successfully.",
+      });
+      router.back();
     } catch {
       toast({
-        title: "Could not save theme",
+        title: "Could not save",
         description:
-          "Open Site Essentials and use Save there, or try again in a moment.",
+          "Please try again from Site Essentials or fix any validation errors.",
         variant: "destructive",
       });
     }
   }, [
-    formData,
+    resolvedGlobalData,
+    hasMultipleLocations,
+    mainPageApproved,
+    locationList,
+    safeApprovedSlugs,
     queryClient,
     router,
     saveSiteEssentials,
@@ -116,74 +475,64 @@ export default function SitePreviewPage() {
     toast,
   ]);
 
+  const handleSaveTheme = useCallback(async () => {
+    const dataForSave = locationPreviewData ?? resolvedGlobalData;
+    if (!dataForSave) return;
+    try {
+      await saveSiteEssentials({
+        ...toSiteEssentialsUpdatePayload(dataForSave),
+        _method: "PATCH",
+      } as Partial<SiteEssentialsFormValues> & { _method: "PATCH" });
+      await queryClient.invalidateQueries({ queryKey: themeKeys.all });
+      await queryClient.invalidateQueries({
+        queryKey: siteEssentialsKeys.details(),
+      });
+      router.refresh();
+      toast({
+        title: "Theme saved",
+        description: "Colors and fonts were updated.",
+      });
+    } catch {
+      toast({
+        title: "Could not save theme",
+        variant: "destructive",
+      });
+    }
+  }, [
+    locationPreviewData,
+    resolvedGlobalData,
+    queryClient,
+    router,
+    saveSiteEssentials,
+    toast,
+  ]);
+
+  const previewValuesForCustomizer = locationPreviewData ?? resolvedGlobalData;
+
   if (isLoading) {
     return (
-      <div className="bg-gray-50 min-h-screen text-black">
-        {/* Header Skeleton */}
-        <div className="fixed top-0 left-0 right-0 bg-white border-b z-50 shadow-sm px-4 py-3 flex justify-between items-center text-black">
-          <div className="flex items-center space-x-3">
-            <Button variant="event-primary" onClick={handleGoBack} size="sm">
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Back to Editor
-            </Button>
-            <div className="h-6 w-[1px] bg-gray-200 mx-2"></div>
-            <Skeleton className="h-4 w-40" />
-          </div>
+      <div className="min-h-screen bg-gray-50 text-black">
+        <div className="fixed top-0 left-0 right-0 z-50 flex items-center justify-between border-b bg-white px-4 py-3 shadow-sm">
+          <Button variant="event-primary" onClick={handleGoBack} size="sm">
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            Back to Editor
+          </Button>
+          <Skeleton className="h-4 w-40" />
         </div>
-
-        {/* Content Skeleton */}
-        <div className="pt-16">
-          <div className="w-full">
-            {/* Website Header Skeleton */}
-            <div className="w-full flex justify-between items-center mb-6 p-4 border-b">
-              <Skeleton className="h-10 w-32" /> {/* Logo */}
-              <div className="flex space-x-4">
-                <Skeleton className="h-4 w-16" />
-                <Skeleton className="h-4 w-16" />
-                <Skeleton className="h-4 w-16" />
-                <Skeleton className="h-4 w-16" />
-              </div>
-            </div>
-
-            {/* Hero Section Skeleton */}
-            <div className="w-full aspect-[21/9] relative mb-8">
-              <Skeleton className="h-full w-full absolute" />
-              <div className="absolute inset-0 flex flex-col justify-center items-center p-6">
-                <Skeleton className="h-10 w-3/4 max-w-md mb-4" />
-                <Skeleton className="h-6 w-2/3 max-w-sm" />
-              </div>
-            </div>
-
-            {/* Content Blocks */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8 px-6">
-              {[1, 2, 3].map((i) => (
-                <div key={i} className="flex flex-col">
-                  <Skeleton className="h-40 w-full mb-4" />
-                  <Skeleton className="h-6 w-3/4 mb-2" />
-                  <Skeleton className="h-4 w-full mb-2" />
-                  <Skeleton className="h-4 w-5/6 mb-2" />
-                  <Skeleton className="h-4 w-4/6" />
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        {/* Footer info */}
-        <div className="fixed bottom-0 left-0 right-0 bg-white border-t p-2 flex justify-center">
-          <p className="text-xs text-gray-500">Preview Mode • Desktop View</p>
+        <div className="pt-16 pb-28">
+          <Skeleton className="mx-auto aspect-[21/9] max-w-7xl" />
         </div>
       </div>
     );
   }
 
-  if (!formData) {
+  if (!resolvedGlobalData) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen bg-gray-50 p-4">
-        <h1 className="text-2xl font-bold mb-4">No Preview Data Available</h1>
-        <p className="text-gray-500 mb-6 text-center">
-          Please go back to the Site Essentials page and click the Preview
-          button.
+      <div className="flex min-h-screen flex-col items-center justify-center bg-gray-50 p-4">
+        <h1 className="mb-4 text-2xl font-bold">No Preview Data Available</h1>
+        <p className="mb-6 text-center text-gray-500">
+          Open Site Essentials and click Preview to review your main home and
+          each location page.
         </p>
         <Button variant="event-primary" onClick={handleGoBack}>
           <ArrowLeft className="mr-2 h-4 w-4" />
@@ -195,20 +544,39 @@ export default function SitePreviewPage() {
 
   return (
     <PreviewProvider isPreviewMode={true}>
-      <div className="relative min-h-screen">
-        {/* Site Preview - Full screen without any wrapper controls */}
-        <SitePreview formValues={formData} />
+      <div className="relative min-h-screen pb-[5.5rem] sm:pb-24">
+        {hasMultipleLocations && effectiveReviewStep === "main" ? (
+          <MainLandingSitePreview
+            formValues={resolvedGlobalData}
+            onLocationSelect={handlePreviewLocationFromGrid}
+          />
+        ) : isLoadingLocationPreview ||
+          (effectiveReviewStep === "location" &&
+            locationList.length === 0 &&
+            isLoadingVenueLocations) ? (
+          <div className="flex min-h-[60vh] flex-col items-center justify-center gap-3 bg-[var(--color-background)] text-[var(--color-text)]">
+            <Loader2 className="h-8 w-8 animate-spin text-[var(--color-primary)]" />
+            <p className="text-sm text-[var(--color-text-dimmed)]">
+              Loading {currentLocation?.city ?? "location"} preview…
+            </p>
+          </div>
+        ) : locationPreviewData || effectiveReviewStep === "location" ? (
+          <SitePreview formValues={locationPreviewData ?? resolvedGlobalData} />
+        ) : (
+          <SitePreview formValues={resolvedGlobalData} />
+        )}
 
-        <PreviewThemeCustomizer
-          values={formData}
-          onValuesChange={handlePreviewValuesChange}
-          brandName={formData.name?.trim() || "Site preview"}
-          onSaveTheme={handleSaveTheme}
-          isSavingTheme={isSavingTheme}
-          sheetDescription="Tap a font or color to preview, then Save theme to publish—same as Save on Site Essentials."
-        />
+        {previewValuesForCustomizer ? (
+          <PreviewThemeCustomizer
+            values={previewValuesForCustomizer}
+            onValuesChange={handlePreviewValuesChange}
+            brandName={resolvedGlobalData.name?.trim() || "Site preview"}
+            onSaveTheme={handleSaveTheme}
+            isSavingTheme={isSaving}
+            sheetDescription="Adjust colors or fonts. Approve each location page, then save."
+          />
+        ) : null}
 
-        {/* Preview chrome: Back button in its own layer so it doesn't overlap header */}
         <div className="fixed top-4 left-4 z-[60] isolate">
           <Button
             variant="event-primary"
@@ -216,10 +584,36 @@ export default function SitePreviewPage() {
             size="sm"
             className="shadow-md ring-1 ring-black/10"
           >
-            <ArrowLeft className="h-4 w-4 mr-2" />
+            <ArrowLeft className="mr-2 h-4 w-4" />
             Back to Editor
           </Button>
         </div>
+
+        <SitePreviewReviewChrome
+          hasMultipleLocations={hasMultipleLocations}
+          reviewStep={effectiveReviewStep}
+          mainPageApproved={mainPageApproved}
+          previewLocations={locationList}
+          currentLocationIndex={safeLocationIndex}
+          approvedLocationSlugs={safeApprovedSlugs}
+          isSaving={isSaving}
+          isLoadingLocation={isLoadingLocationPreview}
+          onEdit={handleEdit}
+          onApproveMain={handleApproveMain}
+          onApproveCurrentLocation={handleApproveCurrentLocation}
+          onContinueFromMain={handleContinueFromMain}
+          onNextLocation={handleNextLocation}
+          onPreviousLocation={handlePreviousLocation}
+          onSave={() => void handleSave()}
+          onBackToMain={
+            hasMultipleLocations
+              ? () => {
+                  setReviewStep("main");
+                  window.scrollTo({ top: 0, behavior: "smooth" });
+                }
+              : undefined
+          }
+        />
       </div>
     </PreviewProvider>
   );

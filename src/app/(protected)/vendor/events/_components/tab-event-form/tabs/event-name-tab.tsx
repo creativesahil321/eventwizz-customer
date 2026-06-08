@@ -570,16 +570,10 @@ export default function EventNameTab() {
             }
           }
         } else {
-          // Handle API errors
-          const errorMessage =
-            response?.message || "Failed to create event. Please try again.";
-          toast.error("Error creating event", {
-            description: errorMessage,
-          });
+          console.error("Error saving event details:", response);
         }
       } catch (error) {
         console.error("Error saving event details:", error);
-        toast.error("Failed to save event details");
       } finally {
         setIsLoading(false);
       }

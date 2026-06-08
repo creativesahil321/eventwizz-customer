@@ -55,6 +55,18 @@ export function vendorHomeTrustRowClass(align: BannerHeadingAlign): string {
   );
 }
 
+/* ---- Hero band height (location page + multi-location home) ---- */
+
+/**
+ * Capped hero height — matches `HeroBanner` / location preview (not full viewport).
+ * Use on any full-width marketing hero section.
+ */
+export const heroBandHeightClass =
+  "h-[min(68dvh,720px)] min-h-[380px] max-h-[760px]";
+
+export const heroBandMediaOverlayClass =
+  "bg-gradient-to-b from-black/60 via-black/30 to-black/85";
+
 /* ---- Vertical placement (hero band) ---- */
 
 export const BANNER_HEADING_VALIGN_VALUES = ["top", "center", "bottom"] as const;

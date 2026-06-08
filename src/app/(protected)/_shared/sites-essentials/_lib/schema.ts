@@ -12,6 +12,20 @@ import {
   BANNER_HEADING_VALIGN_VALUES,
 } from "@/lib/banner-heading-align";
 
+const siteEssentialsLocationSchema = z.object({
+  id: z.number().optional(),
+  city: z.string(),
+  slug: z.string(),
+  cover_image: z.string().nullable().optional(),
+  total_events: z.number().optional(),
+  latest_upcoming_event: z
+    .object({
+      name: z.string(),
+      date: z.string(),
+    })
+    .optional(),
+});
+
 export const SiteEssentialsSchema = z.object({
   header_logo: z.string().min(2, { message: "Header logo is required." }),
   phone: z.string().min(2, { message: "Phone is required." }),
@@ -211,6 +225,44 @@ export const siteEssentialsFormSchema = z.object({
     .string()
     .max(40, "Event gallery title must not exceed 40 characters")
     .nullable()
+    .optional(),
+  // Multi-location main home page (vendor root before location pick)
+  main_landing_cover_image: z.any().optional(),
+  main_landing_banner_heading: z
+    .string()
+    .max(500, "Main landing heading is too long")
+    .nullable()
+    .optional()
+    .refine(
+      (s) => !s || countWords(s) <= BANNER_HEADING_MAX_WORDS,
+      `Main landing heading must not exceed ${BANNER_HEADING_MAX_WORDS} words`,
+    ),
+  main_landing_banner_sub_heading: z
+    .string()
+    .max(
+      BANNER_SUB_HEADING_MAX_CHARS,
+      `Main landing sub heading must not exceed ${BANNER_SUB_HEADING_MAX_CHARS} characters`,
+    )
+    .nullable()
+    .optional(),
+  main_landing_locations_list_title: z
+    .string()
+    .max(60, "Locations list title must not exceed 60 characters")
+    .nullable()
+    .optional(),
+  main_landing_locations_list_subtitle: z
+    .string()
+    .max(120, "Locations list subtitle must not exceed 120 characters")
+    .nullable()
+    .optional(),
+  /** From API — used for main landing preview only */
+  locations: z.array(siteEssentialsLocationSchema).optional(),
+  /** Read-only from API when previewing a location (`?slug=`) */
+  slug: z.string().optional(),
+  latest_events: z.array(z.record(z.unknown())).optional(),
+  upcoming_events: z.array(z.record(z.unknown())).optional(),
+  event_gallery: z
+    .array(z.union([z.string(), z.object({ id: z.number().optional(), url: z.string() })]))
     .optional(),
   // Theme animations
   theme_animations: z

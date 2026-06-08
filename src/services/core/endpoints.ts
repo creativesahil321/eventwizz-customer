@@ -118,6 +118,7 @@ export const API_ENDPOINTS = {
     SITES_ESSENTIALS: {
       GET: "/vendor/site-essentials",
       UPDATE: "/vendor/site-essentials/update",
+      RESET_THEME_DEFAULT: "/vendor/site-essentials/reset-theme-default",
     },
     LOCATION: {
       SWITCH_LOCATION: "/vendor/locations/switch",
@@ -270,6 +271,7 @@ export const API_ENDPOINTS = {
     SITES_ESSENTIALS: {
       GET: "/admin/site-essentials",
       UPDATE: "/admin/site-essentials/update",
+      RESET_THEME_DEFAULT: "/admin/site-essentials/reset-theme-default",
     },
     /** Default platform commission; per-venue overrides live on venue detail (PUT /admin/venues/{id}). */
     PAYMENT_SETTINGS: {
