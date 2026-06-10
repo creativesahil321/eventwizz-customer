@@ -281,9 +281,13 @@ export default function VendorSiteHomePage() {
               <span className="mb-2 block text-xs font-bold uppercase tracking-widest text-[color:var(--color-primary)]">
                 Explore cities
               </span>
-              <h2 className="mb-3 text-3xl font-black tracking-tight text-[var(--color-text)] sm:text-4xl">
-                {locationsListTitle}
-              </h2>
+              <SiteHeading
+                level={2}
+                align="center"
+                title={locationsListTitle}
+                variant="onSurface"
+                className="mb-3 !text-3xl !font-black tracking-tight sm:!text-4xl"
+              />
               <p className="text-[var(--color-text-dimmed)]">
                 {locationsListSubtitle}
               </p>

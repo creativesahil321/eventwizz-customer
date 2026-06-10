@@ -1,6 +1,5 @@
 import { DefaultSession } from "next-auth";
 import { UserType } from "./auth.types";
-import { VenueLocation } from "./api.types";
 
 declare module "next-auth" {
   interface Session {
@@ -18,8 +17,6 @@ declare module "next-auth" {
       event_id?: number | string;
       on_boarding_step?: number;
       last_completed_step?: number;
-      default_venue_location?: VenueLocation;
-      venue_locations?: VenueLocation[];
     } & DefaultSession["user"];
   }
 
@@ -31,8 +28,6 @@ declare module "next-auth" {
     event_id?: number | string;
     on_boarding_step?: number;
     last_completed_step?: number;
-    default_venue_location?: VenueLocation;
-    venue_locations?: VenueLocation[];
   }
 
   interface JWT {
@@ -43,7 +38,5 @@ declare module "next-auth" {
     event_id?: number | string;
     on_boarding_step?: number;
     last_completed_step?: number;
-    default_venue_location?: VenueLocation;
-    venue_locations?: VenueLocation[];
   }
 }

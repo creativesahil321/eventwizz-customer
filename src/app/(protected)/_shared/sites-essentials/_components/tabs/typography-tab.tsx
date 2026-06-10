@@ -1,6 +1,8 @@
 "use client";
 
+import type { CSSProperties } from "react";
 import { useFormContext } from "react-hook-form";
+import { SiteHeading } from "@/components/public/site-heading";
 import { SiteEssentialsFormValues } from "../../_lib/hooks";
 import {
   FormField,
@@ -402,7 +404,15 @@ export function TypographyTab() {
 
       <div>
         <h3 className="text-sm font-medium mb-3">Font Preview</h3>
-        <div className="space-y-4 rounded-md border-2 border-[var(--color-primary)]/25 bg-muted/30 p-4">
+        <div
+          className="space-y-4 rounded-md border-2 border-[var(--color-primary)]/25 bg-muted/30 p-4"
+          style={
+            {
+              "--font-heading": headingFont,
+              "--font-body": bodyFont,
+            } as CSSProperties
+          }
+        >
           <div
             className={cn(
               "rounded-md border-l-4 border-[var(--color-primary)] bg-background/80 p-3 pl-4",
@@ -411,24 +421,24 @@ export function TypographyTab() {
             <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
               Heading (live)
             </p>
-            <h1
-              className="text-2xl font-semibold"
-              style={{ fontFamily: headingFont }}
-            >
-              Heading Font Sample (h1)
-            </h1>
-            <h2
-              className="mt-2 text-xl font-semibold"
-              style={{ fontFamily: headingFont }}
-            >
-              Heading Font Sample (h2)
-            </h2>
-            <h3
-              className="mt-2 text-lg font-semibold"
-              style={{ fontFamily: headingFont }}
-            >
-              Heading Font Sample (h3)
-            </h3>
+            <SiteHeading
+              level={1}
+              title="Heading Font Sample (h1)"
+              variant="onSurface"
+              className="!text-2xl !font-semibold"
+            />
+            <SiteHeading
+              level={2}
+              title="Heading Font Sample (h2)"
+              variant="onSurface"
+              className="mt-2 !text-xl !font-semibold"
+            />
+            <SiteHeading
+              level={3}
+              title="Heading Font Sample (h3)"
+              variant="onSurface"
+              className="mt-2 !text-lg !font-semibold"
+            />
           </div>
 
           <div
@@ -439,7 +449,7 @@ export function TypographyTab() {
             <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
               Body (live)
             </p>
-            <div style={{ fontFamily: bodyFont }}>
+            <div className="font-body">
               <p>
                 Body font sample. This is how your main content will appear on
                 your website. The quick brown fox jumps over the lazy dog. Lorem

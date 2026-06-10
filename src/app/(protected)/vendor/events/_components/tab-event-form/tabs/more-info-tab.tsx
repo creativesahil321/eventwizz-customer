@@ -346,30 +346,6 @@ export default function MoreInfoTab() {
         // Manually re-trigger validation on all fields to force error display
         const isValid = await form.trigger();
 
-        // Custom validation for required brochure PDF (single-room save only)
-        if (
-          !applyToAllRooms &&
-          !submission.brochure_pdf &&
-          !brochurePdfUrl
-        ) {
-          toast.error("Event Brochure PDF is required", {
-            description: "Please upload a brochure PDF for your event.",
-            duration: 5000,
-          });
-          setActiveField("brochure_pdf");
-          const brochureElement = document.querySelector(
-            '[name="brochure_pdf"]',
-          );
-          if (brochureElement) {
-            brochureElement.scrollIntoView({
-              behavior: "smooth",
-              block: "center",
-            });
-          }
-          setIsLoading(false);
-          return;
-        }
-
         // Custom validation for required event address
         if (
           !submission.event_address ||
@@ -408,8 +384,7 @@ export default function MoreInfoTab() {
           const errors = form.formState.errors;
           const errorFields = Object.keys(errors);
 
-          // Prioritize event_address and brochure_pdf errors
-          const priorityFields = ["event_address", "brochure_pdf"];
+          const priorityFields = ["event_address"];
           const firstPriorityField = priorityFields.find((field) =>
             errorFields.includes(field),
           );
@@ -607,7 +582,7 @@ export default function MoreInfoTab() {
         (data) => handleSubmit(data, { applyToAllRooms: false }),
         () => {
           toast.error(
-            "Please complete the required brochure and address fields for this room.",
+            "Please complete the required address field for this room.",
           );
         },
       )();
@@ -647,8 +622,7 @@ export default function MoreInfoTab() {
                 render={() => (
                   <FormItem>
                     <FormLabel className="text-sm font-medium">
-                      Event Brochure (PDF only){" "}
-                      <span className="text-red-500">*</span>
+                      Event Brochure (PDF only) (Optional)
                     </FormLabel>
                     <FormControl>
                       {brochurePdfUrl ? (

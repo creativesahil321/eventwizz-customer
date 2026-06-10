@@ -29,9 +29,11 @@ import {
 import {
   eventCarouselNavButtonClass,
   eventListingManyScrollItemClass,
-  mobileEventRowPeekScrollItemClass,
 } from "../event-carousel-classes";
 import { EventListingHorizontalScroll } from "../event-listing-horizontal-scroll";
+import { SingleEventShowcase } from "../single-event-showcase";
+import { DualEventShowcase } from "../dual-event-showcase";
+import { SiteHeading } from "@/components/public/site-heading";
 
 export default function UpcomingEvents({
   events: apiEvents,
@@ -77,7 +79,7 @@ export default function UpcomingEvents({
       return (
         <SitePreviewDummyEventSection
           sectionTitle={sectionTitleText}
-          band="background"
+          sectionLabel="Upcoming Events"
         />
       );
     }
@@ -89,18 +91,24 @@ export default function UpcomingEvents({
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[color:var(--color-primary)]">
               Upcoming Events
             </p>
-            <h2 className="text-3xl font-black tracking-tight text-[var(--color-text)] md:text-4xl">
-              {sectionTitleText}
-            </h2>
+            <SiteHeading
+              level={2}
+              title={sectionTitleText}
+              variant="onSurface"
+              className="!text-3xl !font-black tracking-tight md:!text-4xl"
+            />
           </div>
 
           {/* Professional Coming Soon UI */}
           <div className="text-center py-20">
             {/* Main Message */}
             <div className="mb-12 max-w-3xl mx-auto">
-              <h3 className="text-2xl md:text-3xl font-semibold text-[var(--color-text)] mb-6">
-                Exciting Events Coming Soon
-              </h3>
+              <SiteHeading
+                level={3}
+                title="Exciting Events Coming Soon"
+                variant="onSurface"
+                className="!text-2xl md:!text-3xl !font-semibold mb-6"
+              />
               <p className="text-lg text-[var(--color-text-dimmed)] leading-relaxed">
                 We&apos;re preparing something amazing for you. Stay tuned for
                 exclusive events, special performances, and unforgettable
@@ -167,36 +175,36 @@ export default function UpcomingEvents({
   if (events.length === 1) {
     const event = events[0];
     return (
-      <section
-        id="upcoming-events"
-        className="w-full bg-transparent py-20 md:py-28 text-[var(--color-text)]"
-      >
-        <div className="container mx-auto max-w-7xl px-4">
-          <div className="mb-8 w-full text-left space-y-3">
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[color:var(--color-primary)]">
-              Upcoming Events
-            </p>
-            <h2 className="text-3xl font-black tracking-tight text-[var(--color-text)] md:text-4xl">
-              {sectionTitleText}
-            </h2>
-          </div>
-          <div className="mx-auto max-w-[16rem] sm:max-w-[18rem]">
-            <LocationEventCard
-              event={event}
-              locationSlug={locationSlug || ""}
-              locationLabel={locationLabel}
-              isPending={pendingEventSlug === event.slug}
-              onNavigateStart={() => setPendingEventSlug(event.slug)}
-              imageFallback={eventImages[0]}
-            />
-          </div>
-        </div>
-      </section>
+      <SingleEventShowcase
+        sectionId="upcoming-events"
+        sectionLabel="Upcoming Events"
+        sectionTitle={sectionTitleText}
+        event={event}
+        locationSlug={locationSlug || ""}
+        isPending={pendingEventSlug === event.slug}
+        onNavigateStart={() => setPendingEventSlug(event.slug)}
+        imageFallback={eventImages[0]}
+      />
     );
   }
 
-  // 2–4 events: horizontal carousel on small screens; grid from md breakpoint up
-  if (events.length > 1 && events.length <= 4) {
+  if (events.length === 2) {
+    return (
+      <DualEventShowcase
+        sectionId="upcoming-events"
+        sectionLabel="Upcoming Events"
+        sectionTitle={sectionTitleText}
+        events={[events[0], events[1]]}
+        locationSlug={locationSlug || ""}
+        pendingEventSlug={pendingEventSlug}
+        onNavigateStart={setPendingEventSlug}
+        imageFallbacks={[eventImages[0], eventImages[1]]}
+      />
+    );
+  }
+
+  // 3–4 events: static grid — no slider chrome
+  if (events.length > 2 && events.length <= 4) {
     return (
       <section
         id="upcoming-events"
@@ -207,47 +215,19 @@ export default function UpcomingEvents({
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[color:var(--color-primary)]">
               Upcoming Events
             </p>
-            <h2 className="text-3xl font-black tracking-tight text-[var(--color-text)] md:text-4xl">
-              {sectionTitleText}
-            </h2>
-          </div>
-
-          <div className="relative w-full md:hidden">
-            <EventListingHorizontalScroll
-              watchKey={scrollWatchKey}
-              leftButtonClassName={eventCarouselNavButtonClass(
-                "absolute left-0 top-1/2 -translate-y-1/2 sm:left-0",
-              )}
-              rightButtonClassName={eventCarouselNavButtonClass(
-                "absolute right-0 top-1/2 -translate-y-1/2 sm:right-0",
-              )}
-            >
-              {events.map((event, index) => (
-                <div
-                  key={event.slug || index}
-                  className={mobileEventRowPeekScrollItemClass}
-                >
-                  <div className="h-full w-full pb-1 pt-0.5">
-                    <LocationEventCard
-                      event={event}
-                      locationSlug={locationSlug || ""}
-                      locationLabel={locationLabel}
-                      isPending={pendingEventSlug === event.slug}
-                      onNavigateStart={() => setPendingEventSlug(event.slug)}
-                      imageFallback={eventImages[index % eventImages.length]}
-                    />
-                  </div>
-                </div>
-              ))}
-            </EventListingHorizontalScroll>
+            <SiteHeading
+              level={2}
+              title={sectionTitleText}
+              variant="onSurface"
+              className="!text-3xl !font-black tracking-tight md:!text-4xl"
+            />
           </div>
 
           <div
             className={cn(
-              "hidden gap-5 md:grid",
-              events.length === 2 && "md:grid-cols-2",
-              events.length === 3 && "md:grid-cols-2 lg:grid-cols-3",
-              events.length === 4 && "md:grid-cols-2 lg:grid-cols-4",
+              "grid grid-cols-1 gap-5 sm:grid-cols-2",
+              events.length === 3 && "lg:grid-cols-3",
+              events.length === 4 && "lg:grid-cols-4",
             )}
           >
             {events.map((event, index) => (
@@ -267,6 +247,7 @@ export default function UpcomingEvents({
     );
   }
 
+  // 5+ events: horizontal slider — arrows only when content overflows
   return (
     <section
       id="upcoming-events"
@@ -277,9 +258,12 @@ export default function UpcomingEvents({
           <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[color:var(--color-primary)]">
             Upcoming Events
           </p>
-          <h2 className="text-3xl font-black tracking-tight text-[var(--color-text)] md:text-4xl">
-            {sectionTitleText}
-          </h2>
+          <SiteHeading
+            level={2}
+            title={sectionTitleText}
+            variant="onSurface"
+            className="!text-3xl !font-black tracking-tight md:!text-4xl"
+          />
         </div>
         <div className="relative w-full">
           <EventListingHorizontalScroll

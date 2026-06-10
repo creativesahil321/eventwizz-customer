@@ -34,6 +34,7 @@ import {
 } from "@/app/(protected)/_shared/sites-essentials/_lib/preview-locations";
 import { useSwitchLocation } from "@/app/(protected)/vendor/venue-locations/_lib/hooks";
 import { useVendorLocationsList } from "@/app/(protected)/vendor/venue-locations/_lib/queries";
+import { resolveDefaultVenueLocation } from "@/lib/auth/session-location";
 
 export default function SitePreviewPage() {
   const router = useRouter();
@@ -77,33 +78,30 @@ export default function SitePreviewPage() {
   const safePreviewLocations = previewLocations ?? [];
   const safeApprovedSlugs = approvedLocationSlugs ?? [];
 
-  const effectiveVenueLocations = useMemo(() => {
-    if (venueLocations.length > 0) return venueLocations;
-    if (session?.user?.venue_locations?.length) {
-      return session.user.venue_locations;
-    }
-    if (session?.user?.default_venue_location) {
-      return [session.user.default_venue_location];
-    }
-    return [];
-  }, [
-    venueLocations,
-    session?.user?.venue_locations,
-    session?.user?.default_venue_location,
-  ]);
+  const defaultVenueLocation = useMemo(
+    () =>
+      resolveDefaultVenueLocation(
+        venueLocations,
+        venueLocations.find(
+          (loc) =>
+            String(loc.id) === String(session?.user?.vendor_location_id ?? ""),
+        ),
+      ),
+    [venueLocations, session?.user?.vendor_location_id],
+  );
 
   const sessionLocationFallback = useMemo(
     () => ({
       vendor_location_id: session?.user?.vendor_location_id,
-      slug: session?.user?.default_venue_location?.slug,
+      slug: defaultVenueLocation?.slug,
       name:
-        session?.user?.default_venue_location?.city ??
-        session?.user?.default_venue_location?.name ??
+        defaultVenueLocation?.city ??
+        defaultVenueLocation?.name ??
         resolvedGlobalData?.name,
     }),
     [
       session?.user?.vendor_location_id,
-      session?.user?.default_venue_location,
+      defaultVenueLocation,
       resolvedGlobalData?.name,
     ],
   );
@@ -115,13 +113,13 @@ export default function SitePreviewPage() {
     () =>
       resolvePreviewLocationList(
         apiSiteEssentialsLocations ?? resolvedGlobalData?.locations,
-        effectiveVenueLocations,
+        venueLocations,
         sessionLocationFallback,
       ),
     [
       apiSiteEssentialsLocations,
       resolvedGlobalData?.locations,
-      effectiveVenueLocations,
+      venueLocations,
       sessionLocationFallback,
     ],
   );
@@ -171,8 +169,8 @@ export default function SitePreviewPage() {
 
     const locationLabel =
       currentLocation?.city ??
-      effectiveVenueLocations[0]?.city ??
-      session?.user?.default_venue_location?.city ??
+      venueLocations[0]?.city ??
+      defaultVenueLocation?.city ??
       resolvedGlobalData.name;
 
     const locationMergeOptions = {
@@ -217,8 +215,7 @@ export default function SitePreviewPage() {
     fetchLocationEssentialsBySlug,
     isLocationEssentialsFetched,
     isLocationEssentialsError,
-    effectiveVenueLocations,
-    session?.user?.default_venue_location?.city,
+    defaultVenueLocation?.city,
     hasMultipleLocations,
     currentSlug,
   ]);

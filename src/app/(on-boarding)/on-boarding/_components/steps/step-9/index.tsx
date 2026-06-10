@@ -77,6 +77,18 @@ export default function StepNine() {
     name: "faqs",
   });
 
+  // Keep global form (live preview) in sync with this step's nested form.
+  useEffect(() => {
+    const subscription = form.watch((values) => {
+      if (!values.faqs) return;
+      globalForm.setValue("stepNine.faqs", values.faqs, {
+        shouldDirty: true,
+        shouldTouch: false,
+      });
+    });
+    return () => subscription.unsubscribe();
+  }, [form, globalForm]);
+
   // Add state to track deleted FAQ IDs
   const [deletedFaqIds, setDeletedFaqIds] = useState<number[]>([]);
 
@@ -131,12 +143,11 @@ export default function StepNine() {
       setDeletedFaqIds((prev: number[]) => [...prev, faqToRemove.id as number]);
     }
 
-    // Remove the FAQ from the field array
     remove(index);
 
-    // Update global form state immediately to update preview
-    const currentFaqs = form.getValues("faqs").filter((_, i) => i !== index);
-    globalForm.setValue("stepNine.faqs", currentFaqs);
+    // `remove` already updates the field array — do not filter by index again.
+    const currentFaqs = form.getValues("faqs");
+    globalForm.setValue("stepNine.faqs", currentFaqs, { shouldDirty: true });
   };
 
   // Update onSubmit to send deleted FAQ IDs

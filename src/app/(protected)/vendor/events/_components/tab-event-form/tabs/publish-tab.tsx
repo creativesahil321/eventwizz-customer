@@ -189,12 +189,9 @@ export default function PublishTab() {
           if (data.is_duplicate) {
             // Fetch fresh locations (backend has now created the new location)
             const syncedLocations = await syncVendorLocationsCache(queryClient);
-            if (syncedLocations?.data?.length) {
-              // Persist the updated location list in the JWT so it survives hard reloads.
-              // authOptions.ts JWT callback now handles venue_locations + default_venue_location.
+            if (syncedLocations?.default_venue_location?.id) {
               await updateSessionWithLocation({
-                venue_locations: syncedLocations.data,
-                default_venue_location: syncedLocations.default_venue_location,
+                vendor_location_id: syncedLocations.default_venue_location.id,
               });
             }
             // Mark stale so next mount triggers a background refetch (belt + suspenders)

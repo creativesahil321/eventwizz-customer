@@ -38,7 +38,7 @@ import {
   canShowApplyToAllButton,
   useRoomManager,
 } from "../../rooms/use-room-manager";
-import { isVendorRoomMenuStepComplete } from "@/app/(protected)/vendor/events/_lib/vendor-step-four-rooms";
+import { isOnboardingCateringRoomReady } from "../../../_lib/onboarding-catering-ready";
 import { focusNextIncompleteOnboardingRoom } from "../../../_lib/onboarding-multi-room-progress";
 import { useFieldFocusHandler } from "../../form-preview/field-focus-handler";
 import { useEventId } from "../../../_lib/hooks/useEventId";
@@ -219,13 +219,13 @@ export default function StepSix() {
 
   const canApplyToAllRooms = useMemo(() => {
     if (!roomScope.isMultiRoom || rooms.length < 2) return false;
-    return isVendorRoomMenuStepComplete({
+    return isOnboardingCateringRoomReady({
       catering_option: normalizeCateringOption(watchedCateringOption),
       menu_title: watchedMenuTitle,
       menu_description: watchedMenuDescription,
       event_menu_category_id: watchedMenuCategoryId,
       menus: watchedMenus,
-    } as Parameters<typeof isVendorRoomMenuStepComplete>[0]);
+    });
   }, [
     roomScope.isMultiRoom,
     rooms.length,

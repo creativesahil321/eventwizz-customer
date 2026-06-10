@@ -9,6 +9,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useState } from "react";
 import Image from "next/image";
 import { shouldUseNextImageOptimization } from "@/lib/image-utils";
+import { SiteHeading } from "@/components/public/site-heading";
 
 interface LocationGridProps {
   locations: (VenueLocation | LocationData)[];
@@ -57,9 +58,12 @@ export default function LocationGrid({
             className="mx-auto mb-4 opacity-40 text-[color:var(--color-primary)]"
             aria-hidden
           />
-          <h3 className="mb-2 text-2xl font-semibold tracking-tight">
-            No locations yet
-          </h3>
+          <SiteHeading
+            level={3}
+            title="No locations yet"
+            variant="onSurface"
+            className="mb-2 !text-2xl !font-semibold tracking-tight"
+          />
           <p className="text-[var(--color-text-dimmed)]">
             There are no event locations available at the moment. Check back
             soon!
@@ -171,9 +175,12 @@ export default function LocationGrid({
                   <Badge className="mb-3 border-0 bg-[var(--color-primary)]/80 text-[var(--color-primary-foreground)] backdrop-blur-sm">
                     {totalEvents} event{totalEvents !== 1 ? "s" : ""}
                   </Badge>
-                  <h3 className="mb-2 text-3xl font-black tracking-tight text-white sm:text-4xl">
-                    {locationName}
-                  </h3>
+                  <SiteHeading
+                    level={3}
+                    title={locationName}
+                    variant="onDark"
+                    className="mb-2 !text-3xl !font-black tracking-tight !text-white sm:!text-4xl"
+                  />
 
                   {upcomingEvent ? (
                     <div

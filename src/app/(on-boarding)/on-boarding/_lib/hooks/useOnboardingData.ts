@@ -204,7 +204,7 @@ export function useOnboardingData() {
 
         // Redirect to welcome page after session update
         setTimeout(() => {
-          window.location.href = "/welcome/select-location?onboarded=true";
+          window.location.href = "/preview/onboarding";
         }, 500);
         return;
       }

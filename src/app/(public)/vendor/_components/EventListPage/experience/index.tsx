@@ -36,6 +36,7 @@ export default function ExperienceSection({
           <div className="w-full">
             <h2
               className="mt-2 text-3xl font-black leading-tight tracking-tight md:text-5xl"
+              style={{ fontFamily: "var(--font-heading)" }}
               dangerouslySetInnerHTML={{ __html: experienceData.title }}
             />
           </div>

@@ -1,0 +1,9 @@
+/**
+ * Onboarding preview — only rules that can't be expressed cleanly in Tailwind
+ * (child selector + !important to beat theme animation layers).
+ */
+.onboarding-preview-shell .theme-animations-container {
+  display: none !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+}

@@ -14,6 +14,9 @@ import {
 import { siteEssentialsFormSchema, SiteEssentialsFormValues } from "./schema";
 import { mergeGlobalWithLocationSiteEssentials } from "./merge-location-preview";
 import { resolvePreviewLocationList } from "./preview-locations";
+import { toMutableSiteEssentialsFormValues } from "./to-mutable-form-values";
+import { useVendorLocationsList } from "@/app/(protected)/vendor/venue-locations/_lib/queries";
+import { resolveDefaultVenueLocation } from "@/lib/auth/session-location";
 
 export type { SiteEssentialsFormValues };
 
@@ -26,23 +29,35 @@ export const useSiteEssentials = () => {
     isLoading: isGlobalLoading,
     refetch: refetchGlobal,
   } = useSiteEssentialsQuery();
+  const { locations: venueLocations } = useVendorLocationsList();
+
+  const defaultVenueLocation = useMemo(
+    () =>
+      resolveDefaultVenueLocation(
+        venueLocations,
+        venueLocations.find(
+          (loc) =>
+            String(loc.id) === String(session?.user?.vendor_location_id ?? ""),
+        ),
+      ),
+    [venueLocations, session?.user?.vendor_location_id],
+  );
 
   const singleLocationSlug = useMemo(() => {
     const fromApi = resolvePreviewLocationList(
       globalSiteEssentials?.locations,
-      [],
+      venueLocations,
       {
-        slug: session?.user?.default_venue_location?.slug,
-        name:
-          session?.user?.default_venue_location?.city ??
-          session?.user?.default_venue_location?.name,
+        slug: defaultVenueLocation?.slug,
+        name: defaultVenueLocation?.city ?? defaultVenueLocation?.name,
         vendor_location_id: session?.user?.vendor_location_id,
       },
     );
     return fromApi.length === 1 ? fromApi[0].slug : undefined;
   }, [
     globalSiteEssentials?.locations,
-    session?.user?.default_venue_location,
+    venueLocations,
+    defaultVenueLocation,
     session?.user?.vendor_location_id,
   ]);
 
@@ -92,6 +107,14 @@ export const useSiteEssentials = () => {
 
   // Determine overall loading state
   const isLoading = isQueryLoading || isMutationLoading;
+
+  const mutableFormValues = useMemo(
+    () =>
+      siteEssentials
+        ? toMutableSiteEssentialsFormValues(siteEssentials)
+        : undefined,
+    [siteEssentials],
+  );
 
   // Set up form with react-hook-form
   const form = useForm<SiteEssentialsFormValues>({
@@ -156,28 +179,7 @@ export const useSiteEssentials = () => {
       main_landing_locations_list_title: "",
       main_landing_locations_list_subtitle: "",
     },
-    values: siteEssentials
-      ? ({
-          ...siteEssentials,
-          typography: {
-            ...siteEssentials.typography,
-            fontFamily: {
-              heading: siteEssentials.typography.fontFamily?.heading ?? "",
-              body: siteEssentials.typography.fontFamily?.body ?? "",
-            },
-            customFontStylesheetUrls:
-              siteEssentials.typography.customFontStylesheetUrls ?? [],
-            headingEmphasis:
-              siteEssentials.typography?.headingEmphasis ?? "uniform",
-          },
-          banner_heading_accent:
-            siteEssentials.banner_heading_accent ?? "",
-          banner_heading_align:
-            siteEssentials.banner_heading_align ?? "center",
-          banner_heading_valign:
-            siteEssentials.banner_heading_valign ?? "center",
-        } as SiteEssentialsFormValues)
-      : undefined,
+    values: mutableFormValues,
   });
 
   // Handle form submission

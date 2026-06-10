@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { FormProvider } from "react-hook-form";
 import {
@@ -31,16 +31,14 @@ import {
   resolveHasMultipleLocations,
   useHasMultipleLocations,
 } from "../_lib/use-has-multiple-locations";
-import {
-  mergeSiteEssentialsPreviewWithApi,
-  withPreviewLocationSlug,
-} from "../_lib/merge-preview-with-api";
+import { mergeSiteEssentialsPreviewWithApi } from "../_lib/merge-preview-with-api";
 import {
   resolvePreviewLocationCount,
   resolvePreviewLocationList,
 } from "../_lib/preview-locations";
 import { useVendorLocationsList } from "@/app/(protected)/vendor/venue-locations/_lib/queries";
 import { useSession } from "next-auth/react";
+import { resolveDefaultVenueLocation } from "@/lib/auth/session-location";
 import { SiteEssentialsFormValues } from "../_lib/schema";
 import { BrandingTab } from "./tabs/branding-tab";
 import { ColorsTab } from "./tabs/colors-tab";
@@ -60,6 +58,7 @@ import {
   SITE_ESSENTIALS_DEFAULT_PRESET_ID,
 } from "../_lib/default-site-theme";
 import { writeLastAppliedSiteThemePresetId } from "../_lib/site-theme-preset-local-cache";
+import { toMutableSiteEssentialsFormValues } from "../_lib/to-mutable-form-values";
 
 export function SiteEssentialsForm() {
   return (
@@ -86,6 +85,12 @@ function SiteEssentialsFormInner() {
     useSitePreviewStore();
   const { data: session } = useSession();
   const { locations: venueLocations } = useVendorLocationsList();
+  const defaultVenueLocation = resolveDefaultVenueLocation(
+    venueLocations,
+    venueLocations.find(
+      (loc) => String(loc.id) === String(session?.user?.vendor_location_id ?? ""),
+    ),
+  );
 
   // Track validation errors by tab
   const [tabsWithErrors, setTabsWithErrors] = useState<Record<string, boolean>>(
@@ -94,67 +99,40 @@ function SiteEssentialsFormInner() {
   const [showErrorSummary, setShowErrorSummary] = useState(false);
   const [activeTab, setActiveTab] = useState("presets");
   const [resetDefaultDialogOpen, setResetDefaultDialogOpen] = useState(false);
-  const previewHydratedRef = useRef(false);
 
+  // Load preview data into form if available
+  // BUT never override File objects - form submission should use form's File objects, not preview store data
   useEffect(() => {
-    if (!previewData) {
-      previewHydratedRef.current = false;
-    }
-  }, [previewData]);
+    if (previewData) {
+      try {
+        const currentFormValues = form.getValues();
 
-  // Load preview snapshot into form once when returning from preview
-  useEffect(() => {
-    if (!previewData || previewHydratedRef.current) return;
+        // Check if form already has File objects uploaded
+        const hasFileUploads =
+          currentFormValues.logo instanceof File ||
+          currentFormValues.favicon instanceof File ||
+          currentFormValues.cover_image instanceof File ||
+          currentFormValues.cover_video instanceof File ||
+          currentFormValues.main_landing_cover_image instanceof File;
 
-    try {
-      const currentFormValues = form.getValues();
-
-      const hasFileUploads =
-        currentFormValues.logo instanceof File ||
-        currentFormValues.favicon instanceof File ||
-        currentFormValues.cover_image instanceof File ||
-        currentFormValues.cover_video instanceof File ||
-        currentFormValues.main_landing_cover_image instanceof File;
-
-      if (!hasFileUploads) {
-        form.reset(previewData);
+        // Only reset with preview data if no files are currently uploaded
+        // This prevents overriding File objects with preview store data (object URLs)
+        if (!hasFileUploads) {
+          form.reset(toMutableSiteEssentialsFormValues(previewData));
+        }
+      } catch (error) {
+        console.error("Error resetting form with preview data:", error);
       }
-      previewHydratedRef.current = true;
-    } catch (error) {
-      console.error("Error resetting form with preview data:", error);
     }
   }, [form, previewData]);
-
-  // Keep preview store in sync while editing so preview reflects changes immediately
-  useEffect(() => {
-    if (!previewData) return;
-
-    const subscription = form.watch(() => {
-      const values = form.getValues();
-      setPreviewData(
-        withPreviewLocationSlug(
-          mergeSiteEssentialsPreviewWithApi(
-            values,
-            siteEssentials ?? undefined,
-          ),
-          session?.user?.default_venue_location?.slug,
-        ),
-      );
-    });
-
-    return () => subscription.unsubscribe();
-  }, [form, previewData, siteEssentials, session?.user?.default_venue_location?.slug, setPreviewData]);
 
   // Reset form when siteEssentials data changes (e.g., after location switch)
   // This ensures the form always reflects the current location's data
   useEffect(() => {
     if (siteEssentials && !previewData) {
       try {
-        // Create a deep copy to avoid read-only issues
-        const serverData = JSON.parse(JSON.stringify(siteEssentials));
-
-        // Reset form with fresh server data
-        form.reset(serverData, {
+        // Reset form with fresh server data (mutable clone — query cache is frozen)
+        form.reset(toMutableSiteEssentialsFormValues(siteEssentials), {
           keepErrors: false,
           keepDirty: false,
           keepIsSubmitted: false,
@@ -216,31 +194,19 @@ function SiteEssentialsFormInner() {
     setPreviewLoading(true);
 
     try {
-      const completeFormValues = withPreviewLocationSlug(
-        mergeSiteEssentialsPreviewWithApi(
-          form.getValues(),
-          siteEssentials ?? undefined,
-        ),
-        session?.user?.default_venue_location?.slug,
+      const completeFormValues = mergeSiteEssentialsPreviewWithApi(
+        form.getValues(),
+        siteEssentials ?? undefined,
       );
-      const effectiveVenueLocations =
-        venueLocations.length > 0
-          ? venueLocations
-          : session?.user?.venue_locations?.length
-            ? session.user.venue_locations
-            : session?.user?.default_venue_location
-              ? [session.user.default_venue_location]
-              : [];
-
       const previewLocationList = resolvePreviewLocationList(
         siteEssentials?.locations ?? completeFormValues.locations,
-        effectiveVenueLocations,
+        venueLocations,
         {
           vendor_location_id: session?.user?.vendor_location_id,
-          slug: session?.user?.default_venue_location?.slug,
+          slug: defaultVenueLocation?.slug,
           name:
-            session?.user?.default_venue_location?.city ??
-            session?.user?.default_venue_location?.name ??
+            defaultVenueLocation?.city ??
+            defaultVenueLocation?.name ??
             completeFormValues.name,
         },
       );
@@ -349,9 +315,8 @@ function SiteEssentialsFormInner() {
 
   const handleResetAsDefault = async () => {
     try {
-      const updated = await resetThemeToDefault({});
-      const serverData = JSON.parse(JSON.stringify(updated));
-      form.reset(serverData, {
+      const updated = await resetThemeToDefault();
+      form.reset(toMutableSiteEssentialsFormValues(updated), {
         keepErrors: false,
         keepDirty: false,
         keepIsSubmitted: false,
@@ -397,11 +362,8 @@ function SiteEssentialsFormInner() {
       await fetchSiteEssentials();
 
       if (siteEssentials) {
-        // Create a deep clone to avoid issues with read-only properties
-        const serverData = JSON.parse(JSON.stringify(siteEssentials));
-
         // Reset form to the server data and clear all form state
-        form.reset(serverData, {
+        form.reset(toMutableSiteEssentialsFormValues(siteEssentials), {
           keepErrors: false,
           keepDirty: false,
           keepIsSubmitted: false,

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { SiteHeading } from "@/components/public/site-heading";
 
 export default function SubscribeSection() {
   const [formData, setFormData] = useState({
@@ -41,9 +42,12 @@ export default function SubscribeSection() {
         <p className="mb-3 text-xs font-semibold uppercase tracking-[0.28em] text-[color:var(--color-primary)]">
           Stay updated
         </p>
-        <h2 className="mb-4 text-3xl font-semibold tracking-tight text-[var(--color-on-surface)] md:text-4xl">
-          Never miss what&apos;s on
-        </h2>
+        <SiteHeading
+          level={2}
+          title="Never miss what's on"
+          variant="onSurface"
+          className="mb-4 !text-3xl !font-semibold tracking-tight !text-[var(--color-on-surface)] md:!text-4xl"
+        />
         <p className="mx-auto mb-10 max-w-xl text-base text-[var(--color-text-dimmed)] md:text-lg">
           Get drops for new dates and venues — one short form, no spam.
         </p>

@@ -10,6 +10,7 @@ function coalesceMedia(
   apiVal: string | null | undefined,
 ): string | File | null | undefined {
   if (formVal instanceof File) return formVal;
+  if (formVal === null) return null;
   if (typeof formVal === "string" && formVal.trim().length > 0) {
     return formVal;
   }
@@ -42,10 +43,15 @@ export function withPreviewLocationSlug(
   return { ...formData, slug: resolved };
 }
 
+/** API or merged editor snapshot — coalesce source only, not a PATCH payload. */
+export type SiteEssentialsPreviewApiSource =
+  | SiteEssentials
+  | SiteEssentialsFormValues;
+
 /** Ensures preview has API-backed media when form/store is missing fields. */
 export function mergeSiteEssentialsPreviewWithApi(
   formData: SiteEssentialsFormValues,
-  api: SiteEssentials | undefined,
+  api: SiteEssentialsPreviewApiSource | undefined,
 ): SiteEssentialsFormValues {
   if (!api) return formData;
 
@@ -116,14 +122,16 @@ export function mergeSiteEssentialsPreviewWithApi(
       api.cover_video,
     ) as SiteEssentialsFormValues["cover_video"],
     slug: formData.slug?.trim() || api.slug?.trim() || undefined,
-    latest_events:
+    latest_events: (
       normalizeSiteEssentialsEvents(formData.latest_events).length > 0
         ? normalizeSiteEssentialsEvents(formData.latest_events)
-        : normalizeSiteEssentialsEvents(api.latest_events),
-    upcoming_events:
+        : normalizeSiteEssentialsEvents(api.latest_events)
+    ) as unknown as SiteEssentialsFormValues["latest_events"],
+    upcoming_events: (
       normalizeSiteEssentialsEvents(formData.upcoming_events).length > 0
         ? normalizeSiteEssentialsEvents(formData.upcoming_events)
-        : normalizeSiteEssentialsEvents(api.upcoming_events),
+        : normalizeSiteEssentialsEvents(api.upcoming_events)
+    ) as unknown as SiteEssentialsFormValues["upcoming_events"],
     event_gallery:
       normalizeSiteEssentialsGallery(formData.event_gallery).length > 0
         ? normalizeSiteEssentialsGallery(formData.event_gallery)

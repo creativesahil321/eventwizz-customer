@@ -14,6 +14,7 @@ import { ServerContext } from "@/lib/server-context";
 import { ThemeSchema } from "@/types/theme.types";
 import { GalleryComponentProps } from "../event-types";
 import { addCacheBusting } from "@/lib/image-utils";
+import { SiteHeading } from "@/components/public/site-heading";
 
 // Default fallback images
 const defaultEventImages = [
@@ -81,9 +82,12 @@ export default function RecentEventsGlimpse({
         <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[color:var(--color-primary)]">
           Latest Memories
         </p>
-        <h2 className="text-3xl font-black tracking-tight text-[var(--color-text)] md:text-4xl">
-          {galleryTitle}
-        </h2>
+        <SiteHeading
+          level={2}
+          title={galleryTitle}
+          variant="onSurface"
+          className="!text-3xl !font-black tracking-tight md:!text-4xl"
+        />
       </div>
 
       {images.length === 0 ? (
@@ -91,9 +95,12 @@ export default function RecentEventsGlimpse({
         <div className="w-full py-16 text-center">
           {/* Main Message */}
           <div className="mb-12 max-w-3xl mx-auto">
-            <h3 className="text-2xl md:text-3xl font-semibold text-gray-800 mb-6">
-              Gallery Content Coming Soon
-            </h3>
+            <SiteHeading
+              level={3}
+              title="Gallery Content Coming Soon"
+              variant="onSurface"
+              className="!text-2xl md:!text-3xl !font-semibold !text-gray-800 mb-6"
+            />
             <p className="text-lg text-gray-600 leading-relaxed">
               We&apos;re curating an amazing collection of event photos and
               memories. Get ready to relive the magic through our exclusive

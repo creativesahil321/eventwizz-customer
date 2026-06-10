@@ -18,11 +18,6 @@ export type GetSiteEssentialsOptions = {
   slug?: string;
 };
 
-export type ResetSiteEssentialsThemeOptions = {
-  /** Optional location slug when theme is stored per venue location. */
-  slug?: string;
-};
-
 /**
  * Get site essentials settings
  * @returns Promise with site essentials data
@@ -48,9 +43,7 @@ export const getSiteEssentials = async (
  * Reset colors + typography to platform defaults; logo, copy, and media unchanged.
  * @see docs/SITE_ESSENTIALS_RESET_THEME_DEFAULT_API.md
  */
-export const resetSiteEssentialsThemeToDefault = async (
-  options?: ResetSiteEssentialsThemeOptions,
-): Promise<SiteEssentials> => {
+export const resetSiteEssentialsThemeToDefault = async (): Promise<SiteEssentials> => {
   try {
     const endpoints =
       getEndpointsByRole<SiteEssentialsEndpoints>("SITES_ESSENTIALS");
@@ -59,7 +52,6 @@ export const resetSiteEssentialsThemeToDefault = async (
       {},
       {
         returnFullResponse: true,
-        params: options?.slug ? { slug: options.slug } : undefined,
       },
     );
     return response.data;

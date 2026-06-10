@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { useContext } from "react";
 import { ServerContext } from "@/lib/server-context";
 import { ThemeSchema } from "@/types/theme.types";
+import { SiteHeading } from "@/components/public/site-heading";
 
 export default function ContactFormSection() {
   const { theme } = useContext(ServerContext);
@@ -40,9 +41,12 @@ export default function ContactFormSection() {
             <p className="mb-2 text-[11px] font-bold uppercase tracking-[0.28em] text-[color:var(--color-primary)]">
               Booking and Event Assistance
             </p>
-            <h2 className="mb-3 text-3xl font-black tracking-tight text-[var(--color-text)] md:text-4xl">
-              Need Help?
-            </h2>
+            <SiteHeading
+              level={2}
+              title="Need Help?"
+              variant="onSurface"
+              className="mb-3 !text-3xl !font-black tracking-tight md:!text-4xl"
+            />
             <p className="mb-8 max-w-md text-base leading-relaxed text-[var(--color-text-dimmed)]">
               Get in touch with our team for any questions about booking events,
               assistance with your account, or general inquiries.

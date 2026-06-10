@@ -628,6 +628,14 @@ export default function FormPreview() {
     [activePreviewDates],
   );
 
+  const hasPreviewFaqs = useMemo(() => {
+    const faqs = formState.stepNine?.faqs ?? [];
+    return faqs.some(
+      (faq) => faq.question?.trim() || faq.answer?.trim(),
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [formState.stepNine?.faqs, formTick]);
+
   // Render homepage preview (step 2) — same structure as `/[locationSlug]` + Site Essentials preview
   const renderStepTwoPreview = () => {
     const tv = tryThemePreviewValues;
@@ -1027,7 +1035,7 @@ export default function FormPreview() {
             "faqs",
           )}`}
         >
-          {(formState.stepNine?.faqs?.length ?? 0) > 0 && (
+          {hasPreviewFaqs && (
             <Suspense fallback={<SectionLoader />}>
               <FaqSection
                 faqs={formState.stepNine?.faqs || []}

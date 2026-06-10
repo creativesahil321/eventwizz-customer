@@ -55,12 +55,30 @@ function normalizeApiBoolean(value: unknown): boolean | undefined {
   return undefined;
 }
 
+function parseOptionalFiniteNumber(value: unknown): number | undefined {
+  if (value === "" || value === null || value === undefined) return undefined;
+  if (typeof value === "number") {
+    return Number.isFinite(value) ? value : undefined;
+  }
+  const parsed = Number(String(value).trim());
+  return Number.isFinite(parsed) ? parsed : undefined;
+}
+
 function normalizeTicketOrTableRow<T extends Record<string, unknown>>(
   raw: T,
 ): T {
   const status = normalizeApiBoolean(raw.status);
+  const id = parseOptionalFiniteNumber(raw.id);
+  const eventDateId = parseOptionalFiniteNumber(raw.event_date_id);
+  const soldTickets = parseOptionalFiniteNumber(raw.sold_tickets);
+  const soldTables = parseOptionalFiniteNumber(raw.sold_tables);
+
   return {
     ...raw,
+    ...(id !== undefined ? { id } : {}),
+    ...(eventDateId !== undefined ? { event_date_id: eventDateId } : {}),
+    ...(soldTickets !== undefined ? { sold_tickets: soldTickets } : {}),
+    ...(soldTables !== undefined ? { sold_tables: soldTables } : {}),
     ...(status !== undefined ? { status } : {}),
   };
 }
@@ -73,8 +91,10 @@ export function normalizeVendorStepThreeDateRow(
       ? ""
       : String(raw.deposit_due_date);
 
+  const dateId = parseOptionalFiniteNumber(raw.id);
+
   return {
-    ...(typeof raw.id === "number" && Number.isFinite(raw.id) ? { id: raw.id } : {}),
+    ...(dateId !== undefined && dateId > 0 ? { id: dateId } : {}),
     event_date: String(raw.event_date ?? "").trim(),
     booking_type: (raw.booking_type as DateRow["booking_type"]) ?? "tickets",
     payment_type: raw.payment_type as DateRow["payment_type"] | undefined,
@@ -247,7 +267,7 @@ export function cleanVendorStepThreeDatesForForm(
       return {
         event_date: date.event_date,
         booking_type: date.booking_type,
-        total_ticket_types: date.total_ticket_types ?? 0,
+        total_ticket_types: Number(date.total_ticket_types) || 0,
         tickets: date.tickets ?? [],
         total_table_types: 0,
         tables: [],

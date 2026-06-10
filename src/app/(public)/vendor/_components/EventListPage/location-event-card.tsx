@@ -95,6 +95,7 @@ export function LocationEventCard({
             "line-clamp-2 text-left text-sm font-bold leading-snug text-white transition-colors duration-300",
             "group-hover:text-[color:var(--color-primary)]",
           )}
+          style={{ fontFamily: "var(--font-heading)" }}
         >
           {event.title}
         </h3>

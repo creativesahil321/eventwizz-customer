@@ -28,3 +28,11 @@ export const mobileEventRowPeekScrollItemClass =
 
 export const eventListingManyScrollItemClass =
   "shrink-0 w-[min(88vw,19.5rem)] sm:w-[min(46vw,20rem)] md:w-[min(32vw,18rem)] lg:w-[min(24vw,16rem)] xl:w-[280px]";
+
+/** Centered carousel-slide width for single-event hero sections (~65–70% of container). */
+export const singleEventShowcaseSlideClass =
+  "mx-auto w-full max-w-[min(92vw,42rem)] md:max-w-[min(70vw,52rem)]";
+
+/** Centered frame for two standard cards side-by-side (same carousel family as single). */
+export const dualEventShowcaseFrameClass =
+  "mx-auto w-full max-w-[min(96vw,36rem)] sm:max-w-[min(94vw,44rem)] md:max-w-[min(88vw,56rem)]";

@@ -14,13 +14,6 @@ import {
   buildOAuthErrorRedirectUrl,
   extractErrorMessage,
 } from "./oauth-utils";
-import { VenueLocation } from "@/types/api.types";
-import {
-  resolveDefaultVenueLocation,
-  SessionVenueLocation,
-  slimVenueLocationForSession,
-  slimVenueLocationsForSession,
-} from "./session-location";
 
 // Extend global to include our OAuth tenant info
 declare global {
@@ -130,8 +123,6 @@ declare module "next-auth" {
   interface Session {
     user: {
       last_completed_step: any;
-      venue_locations?: SessionVenueLocation[];
-      default_venue_location?: SessionVenueLocation;
       name: string | null;
       email: string | null;
       account_type: string;
@@ -427,22 +418,11 @@ export const authOptions: NextAuthOptions = {
         if (session?.has_payment_provider !== undefined) {
           token.has_payment_provider = session.has_payment_provider;
         }
-
-        // Persist slim vendor locations so the cookie stays under 4096 bytes
-        if (session?.venue_locations !== undefined) {
-          token.venue_locations = slimVenueLocationsForSession(
-            session.venue_locations,
-          );
-          token.default_venue_location = resolveDefaultVenueLocation(
-            token.venue_locations as SessionVenueLocation[] | undefined,
-            slimVenueLocationForSession(session.default_venue_location),
-          );
-        } else if (session?.default_venue_location !== undefined) {
-          token.default_venue_location = slimVenueLocationForSession(
-            session.default_venue_location,
-          );
-        }
       }
+
+      // Locations are fetched via React Query — never store in JWT (cookie size limit).
+      delete token.venue_locations;
+      delete token.default_venue_location;
 
       return token;
     },
@@ -490,11 +470,6 @@ export const authOptions: NextAuthOptions = {
           status: token.status,
           permissions: token.permissions || [],
           has_payment_provider: Boolean(token.has_payment_provider),
-          venue_locations: token.venue_locations as SessionVenueLocation[] | undefined,
-          default_venue_location: resolveDefaultVenueLocation(
-            token.venue_locations as SessionVenueLocation[] | undefined,
-            token.default_venue_location as SessionVenueLocation | undefined,
-          ),
         },
       };
     },

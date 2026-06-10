@@ -2,7 +2,6 @@
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import siteEssentialsService from "@/services/common/site-essentials/site-essentials.service";
-import type { ResetSiteEssentialsThemeOptions } from "@/services/common/site-essentials/site-essentials.service";
 import { themeKeys } from "@/hooks/use-theme-query";
 import { SiteEssentialsFormValues } from "./schema";
 import { toSiteEssentialsUpdatePayload } from "./payload";
@@ -49,8 +48,7 @@ export const useResetSiteEssentialsThemeMutation = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (options?: ResetSiteEssentialsThemeOptions) =>
-      siteEssentialsService.resetSiteEssentialsThemeToDefault(options),
+    mutationFn: () => siteEssentialsService.resetSiteEssentialsThemeToDefault(),
     onSuccess: (data) => {
       queryClient.setQueryData(siteEssentialsKeys.details(), data);
       void queryClient.invalidateQueries({ queryKey: themeKeys.all });

@@ -40,23 +40,47 @@ export function MainLandingPageSection({
 
   const watchedCover = form.watch("main_landing_cover_image");
 
+  // Server refetch only — do not restore when the user cleared the field (form value is null).
   useEffect(() => {
-    const hasServer =
-      Boolean(serverMainLandingCoverImage && serverMainLandingCoverImage.length > 0);
+    const formCover = form.getValues("main_landing_cover_image");
+    if (formCover instanceof File || formCover === null) return;
+
+    const hasServer = Boolean(serverMainLandingCoverImage?.length);
+    setCoverImageFiles([]);
+    if (hasServer) {
+      setCoverImageUrl(serverMainLandingCoverImage!);
+    } else if (typeof formCover === "string" && formCover) {
+      setCoverImageUrl(formCover);
+    } else {
+      setCoverImageUrl("");
+    }
+  }, [serverMainLandingCoverImage, form]);
+
+  useEffect(() => {
     if (watchedCover instanceof File) {
       setCoverImageFiles([watchedCover]);
       setCoverImageUrl("");
       return;
     }
+
     setCoverImageFiles([]);
-    if (hasServer) {
-      setCoverImageUrl(serverMainLandingCoverImage!);
-    } else if (typeof watchedCover === "string" && watchedCover) {
+
+    if (watchedCover === null) {
+      setCoverImageUrl("");
+      return;
+    }
+
+    if (typeof watchedCover === "string" && watchedCover.trim()) {
       setCoverImageUrl(watchedCover);
+      return;
+    }
+
+    if (serverMainLandingCoverImage?.trim()) {
+      setCoverImageUrl(serverMainLandingCoverImage);
     } else {
       setCoverImageUrl("");
     }
-  }, [serverMainLandingCoverImage, watchedCover]);
+  }, [watchedCover, serverMainLandingCoverImage]);
 
   const handleCoverChange = (files: File[]) => {
     setCoverImageFiles(files);
@@ -64,13 +88,17 @@ export function MainLandingPageSection({
     form.setValue(
       "main_landing_cover_image",
       files.length > 0 ? files[0] : null,
+      { shouldDirty: true, shouldTouch: true },
     );
   };
 
   const handleRemoveCover = () => {
     setCoverImageFiles([]);
     setCoverImageUrl("");
-    form.setValue("main_landing_cover_image", null);
+    form.setValue("main_landing_cover_image", null, {
+      shouldDirty: true,
+      shouldTouch: true,
+    });
   };
 
   return (

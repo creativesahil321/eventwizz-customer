@@ -340,6 +340,27 @@ const normalizeBoolean = (value: unknown) => {
   return undefined;
 };
 
+/** Laravel / RHF often provide numeric IDs and counts as strings. */
+const coerceFiniteNumber = (value: unknown): number | undefined => {
+  if (value === "" || value === null || value === undefined) return undefined;
+  if (typeof value === "number") {
+    return Number.isFinite(value) ? value : undefined;
+  }
+  const parsed = Number(String(value).trim());
+  return Number.isFinite(parsed) ? parsed : undefined;
+};
+
+const optionalCoercedFiniteNumber = z.preprocess(
+  coerceFiniteNumber,
+  z.number().optional(),
+);
+
+const requiredCoercedFiniteNumber = (message: string) =>
+  z.preprocess(
+    (value) => coerceFiniteNumber(value) ?? NaN,
+    z.number().min(1, message),
+  );
+
 /** Laravel often returns 0/1 for boolean columns on persisted rows. */
 const optionalBooleanFromApi = z.preprocess(
   normalizeBoolean,
@@ -360,7 +381,7 @@ const normalizeDepositType = (value: unknown) => {
 
 const baseDateSchema = z.object({
   /** Existing `event_dates.id` — send on update */
-  id: z.number().optional(),
+  id: optionalCoercedFiniteNumber,
   event_date: z.string().min(1, "Date is required"),
   booking_type: z.enum(["tickets", "tables", "both"]),
   has_bookings: optionalBooleanFromApi,
@@ -393,8 +414,8 @@ const dateSchema = baseDateSchema
       .array(
         z
           .object({
-            id: z.number().optional(), // From API when editing
-            event_date_id: z.number().optional(), // From API when editing
+            id: optionalCoercedFiniteNumber, // From API when editing
+            event_date_id: optionalCoercedFiniteNumber, // From API when editing
             title: z
               .string()
               .min(1, "Title is required")
@@ -411,7 +432,7 @@ const dateSchema = baseDateSchema
               const num = typeof val === "string" ? parseInt(val, 10) : val;
               return !isNaN(num) && num >= 1 && num <= 9999;
             }, "Price must be between 1 and 9,999 (4 digits max)"),
-            sold_tickets: z.number().optional(), // Read-only from API
+            sold_tickets: optionalCoercedFiniteNumber, // Read-only from API
             status: optionalBooleanFromApi, // API may send 0/1
           })
           .superRefine((ticket, ctx) => {
@@ -439,13 +460,13 @@ const dateSchema = baseDateSchema
           })
       )
       .optional(),
-    total_ticket_types: z.number().optional(),
+    total_ticket_types: optionalCoercedFiniteNumber,
     tables: z
       .array(
         z
           .object({
-            id: z.number().optional(), // From API when editing
-            event_date_id: z.number().optional(), // From API when editing
+            id: optionalCoercedFiniteNumber, // From API when editing
+            event_date_id: optionalCoercedFiniteNumber, // From API when editing
             min_persons: z.union([z.string(), z.number()]).refine((val) => {
               const num = typeof val === "string" ? parseInt(val, 10) : val;
               return !isNaN(num) && num >= 1;
@@ -462,7 +483,7 @@ const dateSchema = baseDateSchema
               const num = typeof val === "string" ? parseInt(val, 10) : val;
               return !isNaN(num) && num >= 1 && num <= 5000;
             }, "Total tables must be between 1 and 5,000"),
-            sold_tables: z.number().optional(), // Read-only from API
+            sold_tables: optionalCoercedFiniteNumber, // Read-only from API
             status: optionalBooleanFromApi, // API may send 0/1
           })
           .superRefine((table, ctx) => {
@@ -484,7 +505,7 @@ const dateSchema = baseDateSchema
           })
       )
       .optional(),
-    total_table_types: z.number().optional(),
+    total_table_types: optionalCoercedFiniteNumber,
   })
   .refine(validateDepositDueDate, depositDueDateMessage)
   .superRefine((data, ctx) => {
@@ -637,16 +658,19 @@ const dateSchema = baseDateSchema
 
 /** Persisted per-room snapshots — validated via top-level `dates` while editing. */
 const stepThreeRoomEntrySchema = z.object({
-  room_id: z.number().min(1),
+  room_id: requiredCoercedFiniteNumber("Room ID is required"),
   dates: z.array(z.record(z.string(), z.unknown())),
 });
 
 export const stepThreeSchema = z
   .object({
     step: z.literal(3),
-    event_id: z.number().min(1, "Event ID is required"),
+    event_id: requiredCoercedFiniteNumber("Event ID is required"),
     /** Sent on save; may be filled from step 1 if omitted */
-    vendor_location_id: z.number().min(1).optional(),
+    vendor_location_id: z.preprocess(
+      coerceFiniteNumber,
+      z.number().min(1).optional(),
+    ),
     is_rooms: z.union([z.literal(0), z.literal(1)]).optional(),
     /** Active room (room mode) or single-venue dates */
     dates: z.array(dateSchema).default([]),
@@ -952,19 +976,7 @@ export const stepFiveSchema = z
         })
       )
       .optional(),
-  })
-  .superRefine((data, ctx) => {
-    // Main brochure PDF is required
-    if (!data.brochure_pdf && !data.remove_brochure_pdf) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: "Event Brochure PDF is required",
-        path: ["brochure_pdf"],
-      });
-    }
   });
-
-
 
 export type StepFiveType = z.infer<typeof stepFiveSchema>;
 

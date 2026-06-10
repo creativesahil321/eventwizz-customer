@@ -1337,7 +1337,15 @@ export function applySiteThemePreset(
   setValue(
     "typography",
     {
-      ...prevTypography,
+      ...(prevTypography
+        ? (() => {
+            try {
+              return structuredClone(prevTypography);
+            } catch {
+              return JSON.parse(JSON.stringify(prevTypography));
+            }
+          })()
+        : {}),
       fontFamily: { ...preset.typography.fontFamily },
       customFontStylesheetUrls: [
         ...(preset.typography.customFontStylesheetUrls ?? []) as string[],

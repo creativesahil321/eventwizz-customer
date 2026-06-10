@@ -289,10 +289,9 @@ export default function StepEleven() {
 
       if (values.submit_type === "duplicate") {
         const syncedLocations = await syncVendorLocationsCache(queryClient);
-        if (syncedLocations?.data?.length) {
+        if (syncedLocations?.default_venue_location?.id) {
           await updateSessionWithLocation({
-            venue_locations: syncedLocations.data,
-            default_venue_location: syncedLocations.default_venue_location,
+            vendor_location_id: syncedLocations.default_venue_location.id,
           });
         }
         void queryClient.invalidateQueries({ queryKey: ["locations"] });
@@ -314,7 +313,7 @@ export default function StepEleven() {
       setPublishDone(true);
 
       setTimeout(() => {
-        router.push("/welcome/select-location?onboarded=true");
+        router.push("/preview/onboarding");
       }, 3500);
     } catch (error) {
       console.error("Error during publishing:", error);

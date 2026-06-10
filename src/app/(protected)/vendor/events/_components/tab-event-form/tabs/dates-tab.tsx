@@ -286,8 +286,9 @@ export default function DatesTab() {
 
   const watchedStepOneLocation = globalForm.watch("stepOne.vendor_location_id");
   useEffect(() => {
-    if (watchedStepOneLocation && watchedStepOneLocation >= 1) {
-      form.setValue("vendor_location_id", watchedStepOneLocation);
+    const locationId = Number(watchedStepOneLocation);
+    if (Number.isFinite(locationId) && locationId >= 1) {
+      form.setValue("vendor_location_id", locationId);
     }
   }, [watchedStepOneLocation, form]);
 
@@ -1921,6 +1922,9 @@ export default function DatesTab() {
       }
     };
     walk(errors.dates, "dates");
+    if (messages.length === 0) {
+      walk(errors, "");
+    }
     if (messages.length > 0) {
       toast.error(messages.slice(0, 3).join("; "));
     } else {
@@ -1929,7 +1933,7 @@ export default function DatesTab() {
 
     const firstPath = (() => {
       const stack: Array<{ node: unknown; path: string }> = [
-        { node: errors.dates, path: "dates" },
+        { node: errors.dates ?? errors, path: errors.dates ? "dates" : "" },
       ];
       while (stack.length > 0) {
         const { node, path } = stack.shift()!;

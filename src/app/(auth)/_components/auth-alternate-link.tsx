@@ -25,7 +25,7 @@ export function AuthAlternateLink({ variant }: AuthAlternateLinkProps) {
   const { website_role } = useDomain();
 
   const linkClassName =
-    "font-medium text-[var(--color-primary)] hover:text-[var(--color-primary-hover)] hover:underline";
+    "font-medium text-black hover:text-black hover:underline";
 
   if (variant === "register") {
     return (

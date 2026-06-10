@@ -20,6 +20,17 @@ function locationLabel(location: LocationData) {
   return location.city?.trim() || "Unknown Location";
 }
 
+function getSelectableLocations(locations: LocationData[]): LocationData[] {
+  return locations.filter(
+    (loc) => typeof loc.slug === "string" && loc.slug.trim().length > 0,
+  );
+}
+
+/** Location switcher is only useful when guests can pick between 2+ venues. */
+function shouldShowLocationSwitcher(locations: LocationData[]): boolean {
+  return getSelectableLocations(locations).length > 1;
+}
+
 export interface VendorPublicLocationMobileMenuEntriesProps {
   disabled?: boolean;
   onNavigate: () => void;
@@ -38,6 +49,11 @@ export function VendorPublicLocationMobileMenuEntries({
 }: VendorPublicLocationMobileMenuEntriesProps) {
   const { settings, isLoading } = useDomain();
   const allLocations = settings?.locations ?? [];
+  const selectableLocations = getSelectableLocations(allLocations);
+
+  if (!isLoading && !shouldShowLocationSwitcher(allLocations)) {
+    return null;
+  }
 
   if (disabled) {
     return (
@@ -79,7 +95,7 @@ export function VendorPublicLocationMobileMenuEntries({
 
   return (
     <>
-      {allLocations.map((location, index) => {
+      {selectableLocations.map((location, index) => {
         const slug = location.slug?.trim() ?? "";
         const label = locationLabel(location);
         if (!slug) {
@@ -136,6 +152,11 @@ export function VendorPublicLocationBookNow({
 }: VendorPublicLocationBookNowProps) {
   const { settings, isLoading } = useDomain();
   const allLocations = settings?.locations ?? [];
+  const selectableLocations = getSelectableLocations(allLocations);
+
+  if (!isLoading && !shouldShowLocationSwitcher(allLocations)) {
+    return null;
+  }
 
   const bookNowPillClass = cn(
     "!rounded-full h-9 gap-1 border-0 px-4 font-semibold backdrop-blur-sm",
@@ -153,8 +174,8 @@ export function VendorPublicLocationBookNow({
         <div className="py-2 px-2 text-sm text-[var(--color-on-header)]/70">
           Loading locations...
         </div>
-      ) : allLocations.length > 0 ? (
-        allLocations.map((location, index) => {
+      ) : selectableLocations.length > 0 ? (
+        selectableLocations.map((location, index) => {
           const slug = location.slug?.trim() ?? "";
           const label = locationLabel(location);
           if (!slug) return null;
