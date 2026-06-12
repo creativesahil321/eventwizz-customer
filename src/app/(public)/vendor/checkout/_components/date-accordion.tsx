@@ -19,7 +19,6 @@ import {
   Ticket,
   MessageSquare,
   Trash2,
-  Sparkles,
 } from "lucide-react";
 import { format } from "date-fns";
 import { toast } from "sonner";
@@ -28,20 +27,19 @@ import { useIsPreviewMode } from "@/contexts/preview-context";
 import QuantityControls from "./quantity-controls";
 import TableRecommendations from "./table-recommendations";
 import { useCartEditStore, EditableItem } from "@/store/cart-edit.store";
-import {
-  useStoreEventBooking,
-  useGetCartData,
-} from "@/services/customer/cart/query";
+import { useStoreEventBooking } from "@/services/customer/cart/query";
 import {
   validateCartPrices,
   sanitizeCartPrices,
   logSecurityIncident,
 } from "@/lib/security/price-validation";
 import {
-  extractEventsFromApiResponse,
-  findEventBySlug,
+  buildDateSelectionSummary,
+  calculateEditableDateTotal,
 } from "../_lib/cart-calculations";
 import { useCurrencyFormat } from "@/hooks/use-currency-format";
+import { getCheckoutRoomTone } from "../_lib/checkout-room-tones";
+import { cn } from "@/lib/utils";
 
 interface DateAccordionProps {
   eventSlug: string;
@@ -54,6 +52,16 @@ interface DateAccordionProps {
   isExpanded: boolean;
   onToggle: () => void;
   onRemoveDate?: (date: string) => void;
+  /** Room ID for multi-room events (display/context only — store uses composite key). */
+  roomId?: number;
+  /** Nested inside the room checkout card (no outer card chrome). */
+  embedded?: boolean;
+  /** Accent index for room-colored calendar icon. */
+  roomAccentIndex?: number;
+  /** Event-level drink section label from cart API. */
+  drinkTitle?: string;
+  /** Server cart event payload for price validation on save. */
+  serverEventData?: Record<string, unknown> | null;
 }
 
 export default function DateAccordion({
@@ -63,6 +71,11 @@ export default function DateAccordion({
   isExpanded,
   onToggle,
   onRemoveDate,
+  roomId,
+  embedded = false,
+  roomAccentIndex = 0,
+  drinkTitle = "Drinks",
+  serverEventData = null,
 }: DateAccordionProps) {
   const { format: formatMoney, formatCompact: formatMoneyUnit } =
     useCurrencyFormat();
@@ -73,7 +86,6 @@ export default function DateAccordion({
   const isSavingRef = useRef(false);
   const isPreviewMode = useIsPreviewMode();
   const { mutateAsync: storeEventBooking } = useStoreEventBooking();
-  const { data: apiCartData } = useGetCartData(!isPreviewMode);
 
   const {
     updateQuantity,
@@ -90,15 +102,10 @@ export default function DateAccordion({
   const currentDateData = getDateData(eventSlug, date);
   const specialRequest = currentDateData?.specialRequest || "";
 
-  // Extract dynamic drink_title from API data
-  const drinkTitle = (() => {
-    if (!apiCartData) return "Drinks";
-    const eventsArray = extractEventsFromApiResponse(apiCartData);
-    const apiEventData = findEventBySlug(eventsArray, eventSlug);
-    return apiEventData?.drink_title || "Drinks";
-  })();
-
   const hasChanges = hasUnsavedChanges(eventSlug, date);
+  const pendingTableConfirm = useCartEditStore((state) =>
+    state.hasPendingTableConfirmation(eventSlug, date),
+  );
 
   // Check validation status
   const validation = validateDateRequirements(eventSlug, date);
@@ -112,7 +119,9 @@ export default function DateAccordion({
     }
 
     if (
+      isExpanded &&
       hasChanges &&
+      !pendingTableConfirm &&
       !isSaving &&
       !isAutoSaving &&
       !isSavingRef.current &&
@@ -137,30 +146,16 @@ export default function DateAccordion({
         autoSaveTimerRef.current = null;
       }
     };
-  }, [hasChanges, isSaving, isAutoSaving, isPreviewMode]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [
+    isExpanded,
+    hasChanges,
+    pendingTableConfirm,
+    isSaving,
+    isAutoSaving,
+    isPreviewMode,
+  ]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Calculate total amount for this date
-  const totalAmount = [
-    ...dateData.tables,
-    ...dateData.tickets,
-    ...dateData.drinks,
-  ].reduce((sum, item) => {
-    if (item.type === "table") {
-      const pricePerPerson = item.pricePerPerson || item.price;
-      if (item.allocation && item.allocation.length > 0) {
-        const totalGuests = item.allocation.reduce(
-          (sum, guests) => sum + guests,
-          0,
-        );
-        return sum + pricePerPerson * totalGuests;
-      } else {
-        const minGuests = (item.minPersons || 1) * item.quantity;
-        return sum + pricePerPerson * minGuests;
-      }
-    } else {
-      return sum + item.price * item.quantity;
-    }
-  }, 0);
+  const totalAmount = calculateEditableDateTotal(dateData);
 
   const handleSaveDate = async () => {
     if (isSavingRef.current || isSaving) return;
@@ -179,7 +174,7 @@ export default function DateAccordion({
     }, 30000);
 
     try {
-      const cartData = getItemsForAPI(eventSlug, date);
+      const cartData = getItemsForAPI(eventSlug, date, roomId);
       const hasItems =
         cartData.tables.length > 0 ||
         cartData.tickets.length > 0 ||
@@ -195,69 +190,55 @@ export default function DateAccordion({
           return;
         }
 
-        const allocationValidation = validateGuestAllocation(eventSlug, date);
-        if (!allocationValidation.isValid) {
-          toast.error(
-            allocationValidation.errors[0] ||
-              "Please complete guest allocation for your tables",
-          );
-          return;
+        const stillPendingTables = useCartEditStore
+          .getState()
+          .hasPendingTableConfirmation(eventSlug, date);
+
+        if (!stillPendingTables) {
+          const allocationValidation = validateGuestAllocation(eventSlug, date);
+          if (!allocationValidation.isValid) {
+            toast.error(
+              allocationValidation.errors[0] ||
+                "Please complete guest allocation for your tables",
+            );
+            return;
+          }
         }
       }
 
       if (!hasItems) {
-        toast.info(
-          `Removing all items for ${format(new Date(date), "MMM dd, yyyy")}`,
-        );
+        toast.info(`Removing all items for ${formatDateMobile(date)}`);
       }
 
       if (process.env.NODE_ENV === "development") {
-        console.log(
-          `🔍 Saving ${format(new Date(date), "MMM dd, yyyy")}:`,
-          cartData,
-        );
+        console.log(`🔍 Saving ${formatDateMobile(date)}:`, cartData);
       }
 
       // Security: Validate prices against server data
-      if (apiCartData) {
-        const eventsArray = extractEventsFromApiResponse(apiCartData);
-        const serverEventData = findEventBySlug(eventsArray, eventSlug);
+      if (serverEventData) {
+        const priceValidation = await validateCartPrices(
+          cartData,
+          serverEventData as Parameters<typeof validateCartPrices>[1],
+        );
 
-        if (serverEventData) {
-          const priceValidation = await validateCartPrices(
-            cartData,
-            serverEventData,
+        if (!priceValidation.isValid) {
+          logSecurityIncident(priceValidation);
+          toast.error(
+            "Price data appears to be outdated. Please refresh the page and try again.",
           );
+          return;
+        }
 
-          if (!priceValidation.isValid) {
-            logSecurityIncident(priceValidation);
-            toast.error(
-              "Price data appears to be outdated. Please refresh the page and try again.",
-            );
-            setIsSaving(false);
-            return;
-          }
-
-          const sanitizedCartData = sanitizeCartPrices(
-            cartData,
-            serverEventData,
-          );
-
-          const response = await storeEventBooking(sanitizedCartData);
-          if (response?.status === true) {
-            markDateAsSaved(eventSlug, date);
-            await new Promise((resolve) => setTimeout(resolve, 150));
-          } else {
-            console.error("API Error Response:", response);
-          }
+        const sanitizedCartData = sanitizeCartPrices(
+          cartData,
+          serverEventData as Parameters<typeof sanitizeCartPrices>[1],
+        );
+        const response = await storeEventBooking(sanitizedCartData);
+        if (response?.status === true) {
+          markDateAsSaved(eventSlug, date);
+          await new Promise((resolve) => setTimeout(resolve, 150));
         } else {
-          const response = await storeEventBooking(cartData);
-          if (response?.status === true) {
-            markDateAsSaved(eventSlug, date);
-            await new Promise((resolve) => setTimeout(resolve, 150));
-          } else {
-            console.error("API Error Response:", response);
-          }
+          console.error("API Error Response:", response);
         }
       } else {
         const response = await storeEventBooking(cartData);
@@ -323,72 +304,95 @@ export default function DateAccordion({
     updateQuantity(eventSlug, date, itemType, itemId, newQuantity);
   };
 
+  const extractActualDate = (key: string) => {
+    const colon = key.indexOf(":");
+    return colon > 0 && colon <= 6 ? key.slice(colon + 1) : key;
+  };
+
   const formatDate = (dateString: string) => {
     try {
-      return format(new Date(dateString), "EEEE, MMMM dd, yyyy");
+      return format(new Date(extractActualDate(dateString)), "EEEE, MMMM dd, yyyy");
     } catch {
       return dateString;
     }
   };
 
-  // Short mobile format — just "Jan 20, 2026"
   const formatDateMobile = (dateString: string) => {
     try {
-      return format(new Date(dateString), "MMM dd, yyyy");
+      return format(new Date(extractActualDate(dateString)), "MMM dd, yyyy");
     } catch {
       return dateString;
     }
   };
 
-  // Count active items
-  const activeTablesCount = dateData.tables.filter(
-    (t) => t.quantity > 0,
-  ).length;
-  const activeTicketsCount = dateData.tickets.filter(
-    (t) => t.quantity > 0,
-  ).length;
-  const activeDrinksCount = dateData.drinks.filter(
-    (d) => d.quantity > 0,
-  ).length;
-  const totalActiveItems = activeTablesCount + activeTicketsCount + activeDrinksCount;
+  const selectionSummary = buildDateSelectionSummary(dateData);
+  const roomTone = getCheckoutRoomTone(roomAccentIndex);
+  const metaParts: string[] = [];
+  const ticketQty = dateData.tickets
+    .filter((t) => t.quantity > 0)
+    .reduce((s, t) => s + t.quantity, 0);
+  const drinkQty = dateData.drinks
+    .filter((d) => d.quantity > 0)
+    .reduce((s, d) => s + d.quantity, 0);
+  const tableQty = dateData.tables
+    .filter((t) => t.quantity > 0)
+    .reduce((s, t) => s + t.quantity, 0);
+  const guestQty =
+    currentDateData?.peopleCount ??
+    dateData.tables
+      .filter((t) => t.quantity > 0)
+      .reduce((sum, table) => {
+        if (table.allocation?.length) {
+          return sum + table.allocation.reduce((s, g) => s + g, 0);
+        }
+        return sum + (table.minPersons || 1) * table.quantity;
+      }, 0);
+  if (ticketQty > 0) metaParts.push(`${ticketQty} ticket${ticketQty !== 1 ? "s" : ""}`);
+  if (drinkQty > 0) metaParts.push(`${drinkQty} drink${drinkQty !== 1 ? "s" : ""}`);
+  if (tableQty > 0) metaParts.push(`${tableQty} table${tableQty !== 1 ? "s" : ""}`);
+  if (guestQty > 0) metaParts.push(`${guestQty} guest${guestQty !== 1 ? "s" : ""}`);
+  const metaLine = metaParts.join(" · ");
+
+  const hasTicketsSection = dateData.tickets.length > 0;
+  const hasTablesSection = dateData.tables.length > 0;
+  const hasDrinksSection = dateData.drinks.length > 0;
 
   return (
-    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-      {/* Date Header — cleaner, more scannable */}
-      <div
-        className="flex items-center justify-between px-4 sm:px-5 py-3 cursor-pointer hover:bg-gray-50/50 transition-colors"
+    <div
+      className={cn(
+        "bg-white",
+        isExpanded ? "overflow-visible" : "overflow-hidden",
+        embedded ? "" : "rounded-2xl border border-[color:var(--checkout-border)] shadow-sm",
+      )}
+    >
+      <button
+        type="button"
+        className={cn(
+          "flex w-full cursor-pointer items-center justify-between gap-2 px-3 py-3 text-left transition-colors sm:gap-3 sm:px-5",
+          isExpanded
+            ? "bg-white"
+            : "hover:bg-[color:var(--checkout-muted)]/50",
+        )}
         onClick={onToggle}
       >
-        <div className="flex items-center gap-2.5 sm:gap-3 min-w-0 flex-1">
-          {/* Date icon with accent */}
-          <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center flex-shrink-0 shadow-sm">
-            <Calendar className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-white" />
+        <div className="flex min-w-0 flex-1 items-center gap-3">
+          <div
+            className={cn(
+              "flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg",
+              embedded ? roomTone.calendarIcon : "bg-emerald-50 text-emerald-700",
+            )}
+          >
+            <Calendar className="h-4 w-4" strokeWidth={2.25} />
           </div>
-          <div className="min-w-0 flex-1">
-            {/* Date + price on same row */}
-            <div className="flex items-center justify-between gap-2">
-              <h3 className="text-sm sm:text-base font-semibold text-gray-900 leading-snug whitespace-nowrap">
-                <span className="hidden sm:inline">{formatDate(date)}</span>
-                <span className="sm:hidden">{formatDateMobile(date)}</span>
-              </h3>
-              {/* Price — visible on mobile next to date */}
-              {totalAmount > 0 && (
-                <span className="text-sm sm:text-base font-bold text-gray-900 tabular-nums flex-shrink-0 sm:hidden">
-                  {formatMoney(totalAmount)}
-                </span>
-              )}
-            </div>
-            {/* Subtitle row */}
-            <div className="flex items-center gap-1.5 mt-0.5">
-              {totalActiveItems > 0 ? (
-                <span className="text-xs text-gray-500">
-                  {totalActiveItems} item{totalActiveItems !== 1 ? "s" : ""} selected
-                </span>
-              ) : (
-                <span className="text-xs text-gray-400">
-                  No items selected yet
-                </span>
-              )}
+          <div className="min-w-0 flex-1 text-left">
+            <h3 className="text-[15px] font-bold leading-snug text-[color:var(--checkout-brand-primary)] sm:text-base">
+              <span className="hidden sm:inline">{formatDate(date)}</span>
+              <span className="sm:hidden">{formatDateMobile(date)}</span>
+            </h3>
+            <div className="mt-0.5 flex min-w-0 items-center gap-1.5">
+              <span className="truncate text-[11px] font-medium text-[color:var(--checkout-muted-foreground)] sm:text-xs">
+                {metaLine || selectionSummary || "No items selected yet"}
+              </span>
               {/* Action needed — small inline badge on mobile */}
               {hasValidationError && (
                 <span className="text-[10px] sm:text-xs font-medium text-amber-600 bg-amber-50 px-1.5 sm:px-2.5 py-0.5 sm:py-1 rounded-full border border-amber-100 sm:hidden">
@@ -407,9 +411,8 @@ export default function DateAccordion({
             </span>
           )}
 
-          {/* Date total — desktop only (shown next to date on mobile) */}
           {totalAmount > 0 && (
-            <span className="hidden sm:inline text-base font-bold text-gray-900 tabular-nums">
+            <span className="text-sm font-bold tabular-nums text-[color:var(--checkout-brand-primary)] sm:text-lg">
               {formatMoney(totalAmount)}
             </span>
           )}
@@ -437,59 +440,57 @@ export default function DateAccordion({
             )}
           </div>
         </div>
-      </div>
+      </button>
 
-      {/* Expanded Content — sections with distinct visual identity */}
       {isExpanded && (
-        <div className="border-t border-gray-100">
-
-          {/* ═══ TICKETS SECTION ═══ — Primary action, shown first */}
-          {dateData.tickets.length > 0 && (
-            <div className="px-4 sm:px-5 py-4">
-              {/* Section header with accent */}
-              <div className="flex items-center gap-2.5 mb-3">
-                <div className="w-7 h-7 rounded-lg bg-blue-50 flex items-center justify-center">
-                  <Ticket className="h-3.5 w-3.5 text-blue-600" />
-                </div>
+        <div className="divide-y divide-[color:var(--checkout-border)] border-t border-[color:var(--checkout-border)] bg-white px-3 py-4 sm:px-5 sm:py-5">
+          {/* ═══ TICKETS ═══ */}
+          {hasTicketsSection && (
+            <section className="space-y-2.5 pb-5">
+              <div className="flex items-center justify-between gap-2">
                 <div className="flex items-center gap-2">
-                  <h4 className="text-sm font-semibold text-gray-900">
+                  <Ticket className="h-4 w-4 text-[color:var(--checkout-ticket)]" strokeWidth={2.25} />
+                  <h4 className="text-xs font-bold uppercase tracking-widest text-[color:var(--checkout-ticket)]">
                     Tickets
                   </h4>
-                  <span className="text-xs text-gray-400 font-medium">
-                    {dateData.tickets.length} type{dateData.tickets.length > 1 ? "s" : ""}
-                  </span>
                 </div>
+                <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-[color:var(--checkout-muted)] px-1.5 text-[10px] font-bold text-[color:var(--checkout-muted-foreground)]">
+                  {dateData.tickets
+                    .filter((t) => t.quantity > 0)
+                    .reduce((sum, t) => sum + t.quantity, 0) || dateData.tickets.length}
+                </span>
               </div>
 
               <div className="space-y-2">
                 {dateData.tickets.map((ticket) => (
                   <div
                     key={ticket.id}
-                    className={`flex items-start justify-between gap-3 p-3 sm:p-3.5 rounded-xl border-l-[3px] transition-all duration-200 ${
+                    className={cn(
+                      "flex flex-col gap-3 rounded-lg border px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between",
                       ticket.quantity > 0
-                        ? "border-l-blue-500 bg-blue-50/50 shadow-sm border-t border-r border-b border-blue-100"
-                        : "border-l-transparent bg-gray-50/50 hover:bg-gray-50 border-t border-r border-b border-gray-100"
-                    }`}
+                        ? "border-[color:var(--checkout-border)] bg-[color:var(--checkout-muted)]/30"
+                        : "border-[color:var(--checkout-border)] bg-white",
+                    )}
                   >
-                    <div className="flex-1 min-w-0">
-                      <h5 className="text-sm font-medium text-gray-900 leading-snug">
+                    <div className="min-w-0 flex-1">
+                      <h5 className="text-sm font-semibold leading-snug text-[color:var(--checkout-foreground)]">
                         {ticket.title}
                       </h5>
-                      <span className="text-sm font-semibold text-blue-600 mt-0.5 block">
-                        {formatMoneyUnit(Number(ticket.price))}
-                      </span>
-                      {ticket.description && (
-                        <p className="text-xs text-gray-500 mt-1 leading-relaxed">
+                      {ticket.description ? (
+                        <p className="mt-0.5 text-xs leading-relaxed text-[color:var(--checkout-muted-foreground)]">
                           {ticket.description}
                         </p>
-                      )}
+                      ) : null}
+                      <p className="mt-1.5 text-sm font-bold tabular-nums text-[color:var(--checkout-ticket)]">
+                        {formatMoney(Number(ticket.price))}
+                      </p>
                       {ticket.maxQuantity && ticket.maxQuantity <= 10 && (
-                        <p className="text-xs text-amber-600 mt-1 font-medium">
+                        <p className="mt-1 text-xs font-medium text-amber-600">
                           Only {ticket.maxQuantity} left
                         </p>
                       )}
                     </div>
-                    <div className="flex-shrink-0 mt-0.5">
+                    <div className="shrink-0 self-end sm:self-auto">
                       <QuantityControls
                         quantity={ticket.quantity}
                         maxQuantity={ticket.maxQuantity}
@@ -509,36 +510,32 @@ export default function DateAccordion({
                           )
                         }
                         size="sm"
-                        priceLabel={formatMoneyUnit(Number(ticket.price))}
+                        priceLabel={formatMoney(Number(ticket.price))}
                       />
                     </div>
                   </div>
                 ))}
               </div>
-            </div>
+            </section>
           )}
 
-          {/* Divider between sections */}
-          {dateData.tickets.length > 0 && dateData.tables.length > 0 && (
-            <div className="mx-4 sm:mx-5 border-t border-gray-100" />
-          )}
-
-          {/* ═══ TABLES SECTION ═══ — with amber accent */}
-          {dateData.tables.length > 0 && (
-            <div className="px-4 sm:px-5 py-4">
-              <div className="flex items-center gap-2.5 mb-3">
-                <div className="w-7 h-7 rounded-lg bg-amber-50 flex items-center justify-center">
-                  <UtensilsCrossed className="h-3.5 w-3.5 text-amber-600" />
-                </div>
+          {/* ═══ TABLES ═══ */}
+          {hasTablesSection && (
+            <section className="space-y-2.5 py-5">
+              <div className="flex items-center justify-between gap-2">
                 <div className="flex items-center gap-2">
-                  <h4 className="text-sm font-semibold text-gray-900">
-                    Tables
+                  <UtensilsCrossed className="h-4 w-4 text-[color:var(--checkout-table)]" strokeWidth={2.25} />
+                  <h4 className="text-xs font-bold uppercase tracking-widest text-[color:var(--checkout-table)]">
+                    Table Seating
                   </h4>
-                  <span className="text-xs text-gray-400 font-medium">
-                    {dateData.tables.length} available
-                  </span>
                 </div>
+                <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-[color:var(--checkout-muted)] px-1.5 text-[10px] font-bold text-[color:var(--checkout-muted-foreground)]">
+                  {dateData.tables
+                    .filter((t) => t.quantity > 0)
+                    .reduce((sum, t) => sum + t.quantity, 0) || dateData.tables.length}
+                </span>
               </div>
+
               <TableRecommendations
                 eventSlug={eventSlug}
                 date={date}
@@ -552,55 +549,51 @@ export default function DateAccordion({
                 getTotalQuantity={(tableId) =>
                   getTotalQuantity(eventSlug, date, "table", tableId)
                 }
+                onTableSeatingConfirmed={handleSaveDate}
               />
-            </div>
+            </section>
           )}
 
-          {/* Divider between sections */}
-          {(dateData.tickets.length > 0 || dateData.tables.length > 0) && dateData.drinks.length > 0 && (
-            <div className="mx-4 sm:mx-5 border-t border-gray-100" />
-          )}
-
-          {/* ═══ DRINKS SECTION ═══ — optional add-on with purple accent */}
-          {dateData.drinks.length > 0 && (
-            <div className="px-4 sm:px-5 py-4">
-              <div className="flex items-center gap-2.5 mb-3">
-                <div className="w-7 h-7 rounded-lg bg-purple-50 flex items-center justify-center">
-                  <Wine className="h-3.5 w-3.5 text-purple-600" />
-                </div>
-                <div className="flex items-center gap-2 flex-1">
-                  <h4 className="text-sm font-semibold text-gray-900">
-                    {drinkTitle}
+          {/* ═══ DRINKS ═══ */}
+          {hasDrinksSection && (
+            <section className="space-y-2.5 pt-5">
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <Wine className="h-4 w-4 text-[color:var(--checkout-package)]" strokeWidth={2.25} />
+                  <h4 className="text-xs font-bold uppercase tracking-widest text-[color:var(--checkout-package)]">
+                    Drink Packages
                   </h4>
-                  <span className="text-xs text-purple-600 bg-purple-50 px-2 py-0.5 rounded-full font-medium border border-purple-100">
-                    Optional
-                  </span>
                 </div>
+                <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-[color:var(--checkout-muted)] px-1.5 text-[10px] font-bold text-[color:var(--checkout-muted-foreground)]">
+                  {dateData.drinks
+                    .filter((d) => d.quantity > 0)
+                    .reduce((sum, d) => sum + d.quantity, 0) || dateData.drinks.length}
+                </span>
               </div>
+
               <div className="space-y-2">
                 {dateData.drinks.map((drink, index) => (
                   <div
-                    key={index}
-                    className={`flex items-start justify-between gap-3 p-3 sm:p-3.5 rounded-xl border-l-[3px] transition-all duration-200 ${
+                    key={drink.id ?? index}
+                    className={cn(
+                      "flex flex-col gap-3 rounded-lg border px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between",
                       drink.quantity > 0
-                        ? "border-l-purple-500 bg-purple-50/40 shadow-sm border-t border-r border-b border-purple-100"
-                        : "border-l-transparent bg-gray-50/50 hover:bg-gray-50 border-t border-r border-b border-gray-100"
-                    }`}
+                        ? "border-[color:var(--checkout-border)] bg-[color:var(--checkout-muted)]/30"
+                        : "border-[color:var(--checkout-border)] bg-white",
+                    )}
                   >
-                    <div className="flex-1 min-w-0">
-                      <h5 className="text-sm font-medium text-gray-900 leading-snug">
+                    <div className="min-w-0 flex-1">
+                      <h5 className="text-sm font-semibold leading-snug text-[color:var(--checkout-foreground)]">
                         {drink.title}
                       </h5>
-                      <span className="text-sm font-semibold text-purple-600 mt-0.5 block">
-                        {formatMoneyUnit(Number(drink.price))}
-                      </span>
-                      {drink.description && (
-                        <p className="text-xs text-gray-500 mt-1 leading-relaxed">
-                          {drink.description}
-                        </p>
-                      )}
+                      <p className="mt-0.5 text-xs leading-relaxed text-[color:var(--checkout-muted-foreground)]">
+                        {drink.description?.trim() || "Optional add-on"}
+                      </p>
+                      <p className="mt-1.5 text-sm font-bold tabular-nums text-[color:var(--checkout-package)]">
+                        {formatMoney(Number(drink.price) || 0)}
+                      </p>
                     </div>
-                    <div className="flex-shrink-0 mt-0.5">
+                    <div className="shrink-0 self-end sm:self-auto">
                       <QuantityControls
                         quantity={drink.quantity}
                         onIncrease={() =>
@@ -619,17 +612,18 @@ export default function DateAccordion({
                           )
                         }
                         size="sm"
-                        priceLabel={formatMoneyUnit(Number(drink.price))}
+                        priceLabel={formatMoney(Number(drink.price) || 0)}
                       />
                     </div>
                   </div>
                 ))}
               </div>
-            </div>
+            </section>
           )}
 
           {/* ═══ SPECIAL REQUESTS ═══ */}
-          <div className="px-4 sm:px-5 pb-4">
+          <div className="pt-5">
+          <div className="rounded-lg border border-[color:var(--checkout-border)] bg-white px-3 py-2.5">
             <button
               onClick={() => setShowSpecialRequest(!showSpecialRequest)}
               className="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-700 transition-colors py-1.5 w-full"
@@ -673,6 +667,7 @@ export default function DateAccordion({
                 </div>
               </div>
             )}
+          </div>
           </div>
         </div>
       )}

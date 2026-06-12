@@ -38,6 +38,7 @@ import {
   resolveVendorPreviewActiveSlices,
 } from "../_lib/resolve-vendor-preview-room-slices";
 import { VendorPreviewRoomSelector } from "./vendor-preview-room-selector";
+import { useIsPreviewModeFromProvider } from "@/contexts/preview-context";
 
 import "@/app/(public)/[locationSlug]/events/[eventSlug]/event-detail.css";
 
@@ -97,6 +98,7 @@ export function EventPreview({
   const [roomSelectorScrollVisible, setRoomSelectorScrollVisible] =
     useState(false);
 
+  const isPostOnboardingPreview = useIsPreviewModeFromProvider();
   const roomPreviewMode = isVendorEventRoomPreviewMode(data);
 
   useEffect(() => {
@@ -110,8 +112,10 @@ export function EventPreview({
 
   const showRoomSelector = roomPreviewMode && slices.rooms.length >= 2;
 
-  /** Fade in after ~2–3 scrolls (onboarding preview parity). */
-  const roomSelectorVisible = showRoomSelector && roomSelectorScrollVisible;
+  /** Post-onboarding review shows rooms immediately; in-form preview fades in after scroll. */
+  const roomSelectorVisible =
+    showRoomSelector &&
+    (isPostOnboardingPreview || roomSelectorScrollVisible);
 
   useEffect(() => {
     if (!showRoomSelector) {
@@ -405,7 +409,7 @@ export function EventPreview({
             rooms={slices.rooms}
             currentRoomIndex={currentRoomIndex}
             onRoomChange={setCurrentRoomIndex}
-            visible={roomSelectorScrollVisible}
+            visible={roomSelectorVisible}
             layout="sticky"
           />
         ) : null}

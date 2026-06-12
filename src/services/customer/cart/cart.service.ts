@@ -1,6 +1,11 @@
 import { api } from "../../core/api-client";
 import { API_ENDPOINTS } from "../../core/endpoints";
-import { CartRequest, CartResponse, GetCartResponse } from "./type";
+import {
+  CartRequest,
+  CartResponse,
+  DeleteCartDateRequest,
+  GetCartResponse,
+} from "./type";
 
 export const cartService = {
   /**
@@ -24,9 +29,27 @@ export const cartService = {
       API_ENDPOINTS.CUSTOMER.BOOK_EVENT.GET_CART_DATA
     );
   },
-  deleteCartData: async (date: string): Promise<void> => {
-    return api.delete<void>(
-      API_ENDPOINTS.CUSTOMER.BOOK_EVENT.DELETE_CART_DATA.replace("{date}", date)
-    );
+  deleteCartData: async (
+    params: DeleteCartDateRequest | "all",
+  ): Promise<void> => {
+    if (params === "all") {
+      return api.delete<void>(
+        API_ENDPOINTS.CUSTOMER.BOOK_EVENT.DELETE_CART_DATA.replace("{date}", ""),
+      );
+    }
+
+    const { eventDate, roomId } = params;
+    const url =
+      roomId != null && roomId > 0
+        ? API_ENDPOINTS.CUSTOMER.BOOK_EVENT.DELETE_CART_DATA_ROOM.replace(
+            "{room_id}",
+            String(roomId),
+          ).replace("{date}", eventDate)
+        : API_ENDPOINTS.CUSTOMER.BOOK_EVENT.DELETE_CART_DATA.replace(
+            "{date}",
+            eventDate,
+          );
+
+    return api.delete<void>(url);
   },
 };

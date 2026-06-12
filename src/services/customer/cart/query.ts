@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { cartService } from "./cart.service";
-import { CartRequest } from "./type";
+import { CartRequest, DeleteCartDateRequest } from "./type";
 import { useDrinkSelectionStore } from "@/store/drink-selection.store";
 import { useCartEditStore } from "@/store/cart-edit.store";
 
@@ -42,24 +42,23 @@ export const useStoreEventBooking = () => {
 
   return useMutation({
     mutationFn: (data: CartRequest) => cartService.storeEventBooking(data),
-    onSuccess: (response) => {
+    onSuccess: (response, variables) => {
       // Only invalidate cache, no toasts (handled by components)
       if (response.status) {
         console.log("🧹 Store Event Booking - Synchronizing cache:");
 
-        // Clear drink selection storage after successful submission
+        // Clear only the active event/room drink scope after successful submission
         console.log(
           "🧹 Clearing drink-selection-storage after successful cart submission"
         );
-        clearDrinks();
-
-        // 🔄 Invalidate and refetch WITHOUT removing cache - keeps current UI visible
-        // (removeQueries would clear cache → full skeleton flash; invalidate keeps data during refetch)
-        queryClient.invalidateQueries({ queryKey: ["cart-data"] });
-        queryClient.refetchQueries({
-          queryKey: ["cart-data"],
-          type: "active",
+        clearDrinks({
+          eventSlug: variables.slug,
+          roomId: variables.room_id,
         });
+
+        // Single refetch: invalidateQueries already refetches active observers (v5 default).
+        // Do not also call refetchQueries — that caused duplicate GET /customer/event.
+        void queryClient.invalidateQueries({ queryKey: ["cart-data"] });
 
         console.log("✅ Cache synchronized with backend");
       }
@@ -80,10 +79,13 @@ export const useDeleteCartDate = () => {
   const { removeDate, getCurrentEventSlug } = useCartEditStore();
 
   return useMutation({
-    mutationFn: (date: string) => cartService.deleteCartData(date),
-    onSuccess: (_, date) => {
-      console.log(`🧹 Delete Cart Date (${date}) - Synchronizing all sources:`);
-      
+    mutationFn: (params: DeleteCartDateRequest) =>
+      cartService.deleteCartData(params),
+    onSuccess: (_, params) => {
+      console.log(
+        `🧹 Delete Cart Date (${params.storeDateKey}) - Synchronizing all sources:`,
+      );
+
       // 1️⃣ Delete from database (already done by mutation)
       console.log("✅ Database cleared");
 
@@ -95,7 +97,7 @@ export const useDeleteCartDate = () => {
       // 3️⃣ Remove from Zustand store
       const currentEventSlug = getCurrentEventSlug();
       if (currentEventSlug) {
-        removeDate(currentEventSlug, date);
+        removeDate(currentEventSlug, params.storeDateKey);
         console.log("✅ Zustand localStorage cleared");
       }
 
@@ -116,7 +118,7 @@ export const useClearAllCart = () => {
   const { clearAllCarts } = useCartEditStore();
 
   return useMutation({
-    mutationFn: () => cartService.deleteCartData(""), // Empty string deletes all
+    mutationFn: () => cartService.deleteCartData("all"),
     onSuccess: () => {
       console.log("🧹 Clear All Cart - Synchronizing all sources:");
       

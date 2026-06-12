@@ -73,8 +73,9 @@ export function BrandingTab({
 }: BrandingTabProps) {
   const { readOnly } = useSiteEssentialsUpdateGate();
   const { setPreviewScope } = useSitePreviewStore();
-  const [brandingScope, setBrandingScope] =
-    useState<BrandingScopeTab>("site-identity");
+  const [brandingScope, setBrandingScope] = useState<BrandingScopeTab>(() =>
+    hasMultipleLocations ? "main-home" : "site-identity",
+  );
   const form = useFormContext<SiteEssentialsFormValues>();
 
   const previewScopeForTab = (tab: BrandingScopeTab): SitePreviewScope => {

@@ -13,7 +13,18 @@
 
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import { CART_METADATA_KEYS_SET } from "@/lib/constants/cart-meta-keys";
+import {
+  resolveBestTableSelection,
+  type ResolvedTableSelection,
+} from "@/app/(public)/vendor/checkout/_lib/table-recommendations";
+import {
+  buildRoomDateKey,
+  getApiCartDateKeys,
+  isRoomBasedApiRecord,
+  parseRoomDateKey,
+} from "@/app/(public)/vendor/checkout/_lib/cart-calculations";
+import { formatTableCapacityTitle } from "@/app/(public)/vendor/checkout/_lib/table-labels";
+import type { ApiEventCartData } from "@/lib/types/cart.types";
 
 // Payment calculation utility
 function calculatePaymentAmounts(
@@ -129,6 +140,274 @@ function calculatePaymentAmounts(
   return { todayAmount, laterAmount };
 }
 
+function mapApiTablesToEditable(
+  tables: Array<Record<string, unknown>> | undefined,
+  depositAmount: number,
+): EditableItem[] {
+  return (
+    tables?.map((table) => ({
+      id: Number(table.id),
+      title: formatTableCapacityTitle(
+        Number(table.min_persons),
+        Number(table.max_persons),
+      ),
+      description: `Seating for ${table.min_persons} to ${table.max_persons} people`,
+      price: Number(table.price),
+      quantity: Number(table.no_tables || 0),
+      maxQuantity: Number(table.total_tables),
+      type: "table" as const,
+      depositAmount,
+      allocation: (table.allocation as number[]) || [],
+      minPersons: Number(table.min_persons),
+      maxPersons: Number(table.max_persons),
+      tableSize: Number(table.max_persons),
+      pricePerPerson: Number(table.price),
+    })) || []
+  );
+}
+
+function mapApiTicketsToEditable(
+  tickets: Array<Record<string, unknown>> | undefined,
+  depositAmount: number,
+): EditableItem[] {
+  return (
+    tickets?.map((ticket) => ({
+      id: Number(ticket.id),
+      title: String(ticket.title),
+      description: String(ticket.description),
+      price: Number(ticket.price),
+      quantity: Number(ticket.quantity || 0),
+      maxQuantity: Number(ticket.total_capacity),
+      type: "ticket" as const,
+      depositAmount,
+    })) || []
+  );
+}
+
+function hasActiveDrinkSelection(drinks: EditableItem[]): boolean {
+  return drinks.some((drink) => drink.quantity > 0);
+}
+
+function mapApiDrinksToEditable(
+  drinkCatalog: Array<Record<string, unknown>>,
+  selectedDrinks: Array<Record<string, unknown>> | undefined,
+  depositAmount: number,
+): EditableItem[] {
+  const selectedById = new Map<number, number>();
+  const selectedByTitle = new Map<string, number>();
+  (selectedDrinks ?? []).forEach((drink) => {
+    const quantity = parseInt(String(drink.quantity)) || 0;
+    const id = Number(drink.id);
+    if (Number.isFinite(id) && id > 0) {
+      selectedById.set(id, quantity);
+    }
+    if (drink.title) {
+      selectedByTitle.set(String(drink.title), quantity);
+    }
+  });
+
+  return drinkCatalog.map((drink) => {
+    const id = Number(drink.id);
+    const title = String(drink.title);
+    const description =
+      drink.description != null && String(drink.description).trim() !== ""
+        ? String(drink.description)
+        : undefined;
+    return {
+      id,
+      title,
+      description,
+      price: parseFloat(String(drink.price)) || 0,
+      quantity:
+        selectedById.get(id) ?? selectedByTitle.get(title) ?? 0,
+      type: "drink" as const,
+      depositAmount,
+    };
+  });
+}
+
+function derivePeopleCountFromApiDate(
+  dateData: Record<string, unknown>,
+  tables: EditableItem[],
+): number {
+  const fromApi = Number(dateData.people_quantity);
+  if (Number.isFinite(fromApi) && fromApi >= 1) {
+    return Math.min(500, Math.floor(fromApi));
+  }
+
+  let total = 0;
+  for (const table of tables) {
+    if (table.quantity <= 0) continue;
+    if (table.allocation?.length) {
+      total += table.allocation.reduce((sum, guests) => sum + guests, 0);
+    } else {
+      total += (table.minPersons || 1) * table.quantity;
+    }
+  }
+
+  return total > 0 ? Math.min(500, total) : 20;
+}
+
+/** Map one API date bucket (flat or per-room) into Zustand editable state. */
+function mapApiDateBucketToEditableDate(
+  dateData: Record<string, unknown>,
+  drinkCatalog: Array<Record<string, unknown>>,
+): EditableDateData {
+  const paymentConfig = (dateData.payment as Record<string, unknown>) || {};
+  const paymentType =
+    paymentConfig.type === "deposit" ? ("deposit" as const) : ("full" as const);
+  const depositAmount = Number(paymentConfig.deposit_amount || 0);
+  const balanceDueDate = paymentConfig.balance_due_date
+    ? String(paymentConfig.balance_due_date)
+    : null;
+  const isDepositEnabled = Boolean(paymentConfig.is_deposit_enabled ?? false);
+  const depositType =
+    (paymentConfig.deposit_type as "amount" | "percentage") || "amount";
+  const depositValue = Number(paymentConfig.deposit_value || 0);
+
+  const tables = mapApiTablesToEditable(
+    dateData.tables as Array<Record<string, unknown>> | undefined,
+    depositAmount,
+  );
+  const tickets = mapApiTicketsToEditable(
+    dateData.tickets as Array<Record<string, unknown>> | undefined,
+    depositAmount,
+  );
+  const drinks = mapApiDrinksToEditable(
+    drinkCatalog,
+    dateData.selected_drinks as Array<Record<string, unknown>> | undefined,
+    depositAmount,
+  );
+
+  return {
+    tables,
+    tickets,
+    drinks,
+    hasChanges: false,
+    peopleCount: derivePeopleCountFromApiDate(dateData, tables),
+    specialRequest: String(dateData.special_request ?? "").trim(),
+    confirmedTableIds: tables
+      .filter(
+        (table) => table.quantity > 0 && (table.allocation?.length ?? 0) > 0,
+      )
+      .map((table) => table.id),
+    paymentType,
+    depositAmount,
+    balanceDueDate,
+    isDepositEnabled,
+    depositType,
+    depositValue,
+  };
+}
+
+function itemsSnapshotEqual(a: EditableItem[], b: EditableItem[]): boolean {
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) {
+    if (a[i].id !== b[i].id || a[i].quantity !== b[i].quantity) return false;
+    const allocA = a[i].allocation ?? [];
+    const allocB = b[i].allocation ?? [];
+    if (allocA.length !== allocB.length) return false;
+    for (let j = 0; j < allocA.length; j++) {
+      if (allocA[j] !== allocB[j]) return false;
+    }
+  }
+  return true;
+}
+
+function editableDatesEqual(
+  a: EditableDateData,
+  b: EditableDateData,
+): boolean {
+  return (
+    a.peopleCount === b.peopleCount &&
+    a.specialRequest === b.specialRequest &&
+    a.paymentType === b.paymentType &&
+    a.depositAmount === b.depositAmount &&
+    a.balanceDueDate === b.balanceDueDate &&
+    a.isDepositEnabled === b.isDepositEnabled &&
+    a.depositType === b.depositType &&
+    a.depositValue === b.depositValue &&
+    itemsSnapshotEqual(a.tables, b.tables) &&
+    itemsSnapshotEqual(a.tickets, b.tickets) &&
+    itemsSnapshotEqual(a.drinks, b.drinks)
+  );
+}
+
+function allocationsEqual(a?: number[], b?: number[]): boolean {
+  const left = a ?? [];
+  const right = b ?? [];
+  if (left.length !== right.length) return false;
+  return left.every((value, index) => value === right[index]);
+}
+
+function tablesAlreadyMatchSelection(
+  tables: EditableItem[],
+  selection: ResolvedTableSelection | null,
+): boolean {
+  if (!selection) {
+    return tables.every(
+      (table) =>
+        table.quantity === 0 && allocationsEqual(table.allocation, []),
+    );
+  }
+
+  const selectionById = new Map(
+    selection.items.map((item) => [item.tableId, item]),
+  );
+
+  return tables.every((table) => {
+    const item = selectionById.get(table.id);
+    if (item) {
+      return (
+        table.quantity === item.quantity &&
+        allocationsEqual(table.allocation, item.allocation)
+      );
+    }
+    return (
+      table.quantity === 0 && allocationsEqual(table.allocation, [])
+    );
+  });
+}
+
+function forEachApiDateBucket(
+  apiData: Record<string, unknown>,
+  visit: (params: {
+    storeKey: string;
+    dateData: Record<string, unknown>;
+    drinkCatalog: Array<Record<string, unknown>>;
+  }) => void,
+): void {
+  if (isRoomBasedApiRecord(apiData)) {
+    const rooms = apiData.rooms as Array<Record<string, unknown>>;
+    for (const room of rooms) {
+      const roomId = Number(room.room_id);
+      const roomDrinks =
+        (room.drinks as Array<Record<string, unknown>>) || [];
+      const dates =
+        (room.dates as Record<string, Record<string, unknown>>) || {};
+
+      for (const [dateKey, dateData] of Object.entries(dates)) {
+        if (!dateData) continue;
+        visit({
+          storeKey: buildRoomDateKey(roomId, dateKey),
+          dateData,
+          drinkCatalog: roomDrinks,
+        });
+      }
+    }
+    return;
+  }
+
+  const globalDrinks =
+    (apiData.drinks as Array<Record<string, unknown>>) || [];
+
+  for (const dateKey of getApiCartDateKeys(apiData as ApiEventCartData)) {
+    const dateData = apiData[dateKey] as Record<string, unknown> | undefined;
+    if (!dateData) continue;
+    visit({ storeKey: dateKey, dateData, drinkCatalog: globalDrinks });
+  }
+}
+
 // Types for editing state
 export interface EditableItem {
   id: number;
@@ -155,6 +434,8 @@ export interface EditableDateData {
   hasChanges: boolean; // Track if this date has unsaved changes
   peopleCount?: number; // Number of people for table recommendations
   specialRequest?: string; // Special requests for support team
+  /** Table type IDs with seating confirmed via "Confirm Seating". */
+  confirmedTableIds?: number[];
 
   // NEW: Payment selection per date
   paymentType: "full" | "deposit";
@@ -176,6 +457,10 @@ export interface CartEditState {
     apiData: Record<string, unknown>
   ) => void;
   syncNewDatesFromAPI: (
+    eventSlug: string,
+    apiData: Record<string, unknown>
+  ) => void;
+  reconcileSavedDatesFromAPI: (
     eventSlug: string,
     apiData: Record<string, unknown>
   ) => void;
@@ -252,10 +537,12 @@ export interface CartEditState {
   ) => number;
   getItemsForAPI: (
     eventSlug: string,
-    date: string
+    date: string,
+    roomId?: number,
   ) => {
     slug: string;
     event_date: string;
+    room_id?: number;
     tables: Array<{
       id: number;
       table_size: number;
@@ -280,6 +567,9 @@ export interface CartEditState {
     special_request?: string;
   };
 
+  /** Auto-select best table match and distribute guests (no manual picker). */
+  applyBestTableMatch: (eventSlug: string, date: string) => void;
+
   // NEW: Guest allocation methods
   updateTableAllocation: (
     eventSlug: string,
@@ -287,6 +577,13 @@ export interface CartEditState {
     tableId: number,
     allocation: number[]
   ) => void;
+  confirmTableSeating: (
+    eventSlug: string,
+    date: string,
+    tableId: number,
+    allocation: number[],
+  ) => void;
+  hasPendingTableConfirmation: (eventSlug: string, date: string) => boolean;
   validateGuestAllocation: (
     eventSlug: string,
     date: string
@@ -344,115 +641,23 @@ export const useCartEditStore = create<CartEditState>()(
             newEditingData[eventSlug] = {};
           }
 
-          // Process each date from API data
-          Object.keys(apiData).forEach((dateKey) => {
-            if (!CART_METADATA_KEYS_SET.has(dateKey)) {
-              const dateData = apiData[dateKey] as Record<string, unknown>;
+          forEachApiDateBucket(apiData, ({ storeKey, dateData, drinkCatalog }) => {
+            const existing = newEditingData[eventSlug][storeKey];
+            const mapped = mapApiDateBucketToEditableDate(dateData, drinkCatalog);
 
-              // Extract payment configuration for this date
-              const paymentConfig =
-                (dateData.payment as Record<string, unknown>) || {};
-              // Always default to "full" payment type when initializing from API
-              // Users can manually change to "deposit" if they prefer
-              const paymentType = "full" as "full" | "deposit";
-              const depositAmount = Number(paymentConfig.deposit_amount || 0);
-              const balanceDueDate = paymentConfig.balance_due_date
-                ? String(paymentConfig.balance_due_date)
-                : null;
-              // NEW: Extract dynamic deposit configuration
-              const isDepositEnabled = Boolean(
-                paymentConfig.is_deposit_enabled ?? false
-              );
-              const depositType =
-                (paymentConfig.deposit_type as "amount" | "percentage") ||
-                "amount";
-              const depositValue = Number(paymentConfig.deposit_value || 0);
+            if (!existing) {
+              newEditingData[eventSlug][storeKey] = mapped;
+              return;
+            }
 
-              newEditingData[eventSlug][dateKey] = {
-                tables:
-                  (dateData.tables as Array<Record<string, unknown>>)?.map(
-                    (table) => ({
-                      id: Number(table.id),
-                      title: `Table (${table.min_persons}-${table.max_persons} persons)`,
-                      description: `Seating for ${table.min_persons} to ${table.max_persons} people`,
-                      price: Number(table.price), // ⚠️ SECURITY: Prices stored in localStorage - validate on server
-                      quantity: Number(table.no_tables || 0), // Use saved quantity from API
-                      maxQuantity: Number(table.total_tables),
-                      type: "table" as const,
-                      depositAmount: depositAmount, // Per person deposit
-                      // NEW: Guest allocation fields
-                      allocation: (table.allocation as number[]) || [], // Use saved allocation from API
-                      minPersons: Number(table.min_persons),
-                      maxPersons: Number(table.max_persons),
-                      tableSize: Number(table.max_persons), // For API
-                      pricePerPerson: Number(table.price), // API already provides price per person
-                    })
-                  ) || [],
-
-                tickets:
-                  (dateData.tickets as Array<Record<string, unknown>>)?.map(
-                    (ticket) => ({
-                      id: Number(ticket.id),
-                      title: String(ticket.title),
-                      description: String(ticket.description),
-                      price: Number(ticket.price), // ⚠️ SECURITY: Prices stored in localStorage - validate on server
-                      quantity: Number(ticket.quantity || 0), // Use saved quantity from API
-                      maxQuantity: Number(ticket.total_capacity),
-                      type: "ticket" as const,
-                      depositAmount: depositAmount, // Per person deposit
-                    })
-                  ) || [],
-
-                drinks: (() => {
-                  // Get global drinks list from API root (all available drinks for this event)
-                  const globalDrinks =
-                    (apiData.drinks as Array<Record<string, unknown>>) || [];
-
-                  // Get selected drinks for this specific date (pre-selected quantities)
-                  const selectedDrinks =
-                    (dateData.selected_drinks as Array<
-                      Record<string, unknown>
-                    >) || [];
-
-                  // Create a map of selected drinks for quick quantity lookup
-                  const selectedQuantityMap = new Map();
-                  selectedDrinks.forEach((drink) => {
-                    const title = String(drink.title);
-                    const quantity = parseInt(String(drink.quantity)) || 0;
-                    selectedQuantityMap.set(title, quantity);
-                  });
-
-                  // Always show ALL global drinks for every date
-                  // Apply quantities from selected_drinks if available, otherwise 0
-                  const processedDrinks = globalDrinks.map((drink) => {
-                    const title = String(drink.title);
-                    const selectedQuantity =
-                      selectedQuantityMap.get(title) || 0;
-
-                    return {
-                      id: Number(drink.id),
-                      title: title,
-                      price: parseFloat(String(drink.price)),
-                      quantity: selectedQuantity, // Pre-fill from selected_drinks or default to 0
-                      type: "drink" as const,
-                      depositAmount: depositAmount, // Per item deposit
-                    };
-                  });
-
-                  return processedDrinks;
-                })(),
-
-                hasChanges: false,
-                peopleCount: 20, // Default people count
-                specialRequest: "", // Default empty special request
-                // NEW: Payment configuration
-                paymentType: paymentType,
-                depositAmount: depositAmount,
-                balanceDueDate: balanceDueDate,
-                // NEW: Dynamic deposit configuration
-                isDepositEnabled: isDepositEnabled,
-                depositType: depositType,
-                depositValue: depositValue,
+            if (
+              !hasActiveDrinkSelection(existing.drinks) &&
+              (mapped.drinks.length > existing.drinks.length ||
+                hasActiveDrinkSelection(mapped.drinks))
+            ) {
+              newEditingData[eventSlug][storeKey] = {
+                ...existing,
+                drinks: mapped.drinks,
               };
             }
           });
@@ -476,130 +681,68 @@ export const useCartEditStore = create<CartEditState>()(
           // Get existing dates in the store
           const existingDates = Object.keys(newEditingData[eventSlug]);
 
-          // Get all dates from API data
-          const apiDates = Object.keys(apiData).filter(
-            (key) => !CART_METADATA_KEYS_SET.has(key)
-          );
-
-          // Find new dates that don't exist in the store
+          const apiDates = getApiCartDateKeys(apiData as ApiEventCartData);
           const newDates = apiDates.filter(
-            (date) => !existingDates.includes(date)
+            (date) => !existingDates.includes(date),
           );
 
           if (newDates.length === 0) {
-            // No new dates to sync
             return { editingData: newEditingData };
           }
 
-          // Process each new date from API data
-          newDates.forEach((dateKey) => {
-            const dateData = apiData[dateKey] as Record<string, unknown>;
+          const newDateSet = new Set(newDates);
 
-            // Extract payment configuration for this date
-            const paymentConfig =
-              (dateData.payment as Record<string, unknown>) || {};
-            // Always default to "full" payment type when syncing new dates from API
-            // Users can manually change to "deposit" if they prefer
-            const paymentType = "full" as "full" | "deposit";
-            const depositAmount = Number(paymentConfig.deposit_amount || 0);
-            const balanceDueDate = paymentConfig.balance_due_date
-              ? String(paymentConfig.balance_due_date)
-              : null;
-            // NEW: Extract dynamic deposit configuration
-            const isDepositEnabled = Boolean(
-              paymentConfig.is_deposit_enabled ?? false
-            );
-            const depositType =
-              (paymentConfig.deposit_type as "amount" | "percentage") ||
-              "amount";
-            const depositValue = Number(paymentConfig.deposit_value || 0);
-
-            newEditingData[eventSlug][dateKey] = {
-              tables:
-                (dateData.tables as Array<Record<string, unknown>>)?.map(
-                  (table) => ({
-                    id: Number(table.id),
-                    title: `Table (${table.min_persons}-${table.max_persons} persons)`,
-                    description: `Seating for ${table.min_persons} to ${table.max_persons} people`,
-                    price: Number(table.price),
-                    quantity: Number(table.no_tables || 0), // Use saved quantity from API
-                    maxQuantity: Number(table.total_tables),
-                    type: "table" as const,
-                    depositAmount: depositAmount, // Per person deposit
-                    // NEW: Guest allocation fields
-                    allocation: (table.allocation as number[]) || [], // Use saved allocation from API
-                    minPersons: Number(table.min_persons),
-                    maxPersons: Number(table.max_persons),
-                    tableSize: Number(table.max_persons), // For API
-                    pricePerPerson: Number(table.price), // API already provides price per person
-                  })
-                ) || [],
-
-              tickets:
-                (dateData.tickets as Array<Record<string, unknown>>)?.map(
-                  (ticket) => ({
-                    id: Number(ticket.id),
-                    title: String(ticket.title),
-                    description: String(ticket.description),
-                    price: Number(ticket.price),
-                    quantity: Number(ticket.quantity || 0), // Use saved quantity from API
-                    maxQuantity: Number(ticket.total_capacity),
-                    type: "ticket" as const,
-                    depositAmount: depositAmount, // Per person deposit
-                  })
-                ) || [],
-
-              drinks: (() => {
-                // Get global drinks list from API root (all available drinks for this event)
-                const globalDrinks =
-                  (apiData.drinks as Array<Record<string, unknown>>) || [];
-
-                // Get selected drinks for this specific date (pre-selected quantities)
-                const selectedDrinks =
-                  (dateData.selected_drinks as Array<
-                    Record<string, unknown>
-                  >) || [];
-
-                // Create a map of selected drinks for quick quantity lookup
-                const selectedQuantityMap = new Map();
-                selectedDrinks.forEach((drink) => {
-                  const title = String(drink.title);
-                  const quantity = parseInt(String(drink.quantity)) || 0;
-                  selectedQuantityMap.set(title, quantity);
-                });
-
-                // Always show ALL global drinks for every date
-                // Apply quantities from selected_drinks if available, otherwise 0
-                const processedDrinks = globalDrinks.map((drink) => {
-                  const title = String(drink.title);
-                  const selectedQuantity = selectedQuantityMap.get(title) || 0;
-
-                  return {
-                    id: Number(drink.id),
-                    title: title,
-                    price: parseFloat(String(drink.price)),
-                    quantity: selectedQuantity, // Pre-fill from selected_drinks or default to 0
-                    type: "drink" as const,
-                    depositAmount: depositAmount, // Per item deposit
-                  };
-                });
-
-                return processedDrinks;
-              })(),
-
-              hasChanges: false,
-              peopleCount: 20, // Default people count
-              specialRequest: "", // Default empty special request
-              // NEW: Payment configuration
-              paymentType: paymentType,
-              depositAmount: depositAmount,
-              balanceDueDate: balanceDueDate,
-              // NEW: Dynamic deposit configuration
-              isDepositEnabled: isDepositEnabled,
-              depositType: depositType,
-              depositValue: depositValue,
-            };
+          forEachApiDateBucket(apiData, ({ storeKey, dateData, drinkCatalog }) => {
+            if (!newDateSet.has(storeKey)) return;
+            newEditingData[eventSlug][storeKey] =
+              mapApiDateBucketToEditableDate(dateData, drinkCatalog);
           });
+
+          return { editingData: newEditingData };
+        });
+      },
+
+      reconcileSavedDatesFromAPI: (
+        eventSlug: string,
+        apiData: Record<string, unknown>,
+      ) => {
+        set((state) => {
+          const eventDates = state.editingData[eventSlug];
+          if (!eventDates) return state;
+
+          const newEditingData = { ...state.editingData };
+          let didUpdate = false;
+
+          forEachApiDateBucket(apiData, ({ storeKey, dateData, drinkCatalog }) => {
+            const existing = newEditingData[eventSlug][storeKey];
+            if (!existing) return;
+
+            const mapped = mapApiDateBucketToEditableDate(
+              dateData,
+              drinkCatalog,
+            );
+
+            if (existing.hasChanges) {
+              if (
+                !hasActiveDrinkSelection(existing.drinks) &&
+                hasActiveDrinkSelection(mapped.drinks)
+              ) {
+                newEditingData[eventSlug][storeKey] = {
+                  ...existing,
+                  drinks: mapped.drinks,
+                };
+                didUpdate = true;
+              }
+              return;
+            }
+
+            if (!editableDatesEqual(existing, mapped)) {
+              newEditingData[eventSlug][storeKey] = mapped;
+              didUpdate = true;
+            }
+          });
+
+          if (!didUpdate) return state;
 
           return { editingData: newEditingData };
         });
@@ -715,7 +858,11 @@ export const useCartEditStore = create<CartEditState>()(
                 dateData.paymentType = "full";
               }
 
-              dateData.hasChanges = true;
+              if (itemType === "table") {
+                dateData.confirmedTableIds = [];
+              } else {
+                dateData.hasChanges = true;
+              }
               newEditingData[eventSlug][date] = dateData;
             }
           }
@@ -833,60 +980,19 @@ export const useCartEditStore = create<CartEditState>()(
               return state;
             }
 
-            // Update people count and handle allocation
-            const shouldUpdateAllocation =
-              currentPeopleCount !== validatedPeopleCount;
-
-            // Calculate total tables selected
-            const totalTablesSelected = currentDateData.tables.reduce(
-              (sum, table) => sum + table.quantity,
-              0
-            );
-
-            let updatedTables = currentDateData.tables;
-
-            if (
-              shouldUpdateAllocation &&
-              totalTablesSelected === 1 &&
-              validatedPeopleCount > 0
-            ) {
-              // Auto-allocate people to single table
-              console.log(
-                `🔄 Auto-allocating ${validatedPeopleCount} people to single table (people count updated)`
-              );
-              updatedTables = currentDateData.tables.map((table) => {
-                if (table.quantity > 0) {
-                  return {
-                    ...table,
-                    allocation: [validatedPeopleCount], // Auto-allocate all people to the single table
-                  };
-                }
-                return table;
-              });
-            } else if (
-              shouldUpdateAllocation &&
-              (totalTablesSelected === 0 || totalTablesSelected > 1)
-            ) {
-              // Clear allocation for no tables or multiple tables
-              console.log(
-                `🔄 Clearing allocation - ${totalTablesSelected} tables selected`
-              );
-              updatedTables = currentDateData.tables.map((table) => ({
-                ...table,
-                allocation: [],
-              }));
-            }
-
             newEditingData[eventSlug][date] = {
               ...currentDateData,
               peopleCount: validatedPeopleCount,
+              confirmedTableIds: [],
               hasChanges: true,
-              tables: updatedTables,
             };
           }
 
           return { editingData: newEditingData };
         });
+
+        // Re-pick best table match whenever group size changes
+        get().applyBestTableMatch(eventSlug, date);
       },
 
       updateSpecialRequest: (
@@ -1094,10 +1200,7 @@ export const useCartEditStore = create<CartEditState>()(
         const state = get();
         const existingDates = Object.keys(state.editingData[eventSlug] || {});
 
-        const apiDates = Object.keys(apiData).filter(
-          (key) => !CART_METADATA_KEYS_SET.has(key)
-        );
-
+        const apiDates = getApiCartDateKeys(apiData as ApiEventCartData);
         return apiDates.filter((date) => !existingDates.includes(date));
       },
 
@@ -1121,12 +1224,23 @@ export const useCartEditStore = create<CartEditState>()(
         return item?.quantity || 0;
       },
 
-      getItemsForAPI: (eventSlug: string, date: string) => {
+      getItemsForAPI: (eventSlug: string, date: string, explicitRoomId?: number) => {
         const dateData = get().getDateData(eventSlug, date);
+
+        const parsed = parseRoomDateKey(date);
+        const actualDate = parsed.date;
+        const resolvedRoomId =
+          parsed.roomId != null && parsed.roomId > 0
+            ? parsed.roomId
+            : explicitRoomId != null && explicitRoomId > 0
+              ? explicitRoomId
+              : undefined;
+
         if (!dateData)
           return {
             slug: eventSlug,
-            event_date: date,
+            event_date: actualDate,
+            ...(resolvedRoomId != null ? { room_id: resolvedRoomId } : {}),
             tables: [],
             tickets: [],
             drink_package: [],
@@ -1136,7 +1250,8 @@ export const useCartEditStore = create<CartEditState>()(
 
         return {
           slug: eventSlug,
-          event_date: date,
+          event_date: actualDate,
+          ...(resolvedRoomId != null ? { room_id: resolvedRoomId } : {}),
           tables: dateData.tables
             .filter((table) => table.quantity > 0)
             .map((table) => ({
@@ -1263,6 +1378,77 @@ export const useCartEditStore = create<CartEditState>()(
         return { totalToday, totalLater, depositDates, fullPaymentDates };
       },
 
+      applyBestTableMatch: (eventSlug: string, date: string) => {
+        set((state) => {
+          const dateData = state.editingData[eventSlug]?.[date];
+          if (!dateData?.tables?.length) return state;
+
+          const peopleCount = dateData.peopleCount || 20;
+          const selection = resolveBestTableSelection(
+            dateData.tables,
+            peopleCount,
+          );
+
+          if (tablesAlreadyMatchSelection(dateData.tables, selection)) {
+            return state;
+          }
+
+          if (!selection) {
+            const clearedTables = dateData.tables.map((table) => ({
+              ...table,
+              quantity: 0,
+              allocation: [],
+            }));
+
+            return {
+              editingData: {
+                ...state.editingData,
+                [eventSlug]: {
+                  ...state.editingData[eventSlug],
+                  [date]: {
+                    ...dateData,
+                    tables: clearedTables,
+                    confirmedTableIds: [],
+                    hasChanges: false,
+                  },
+                },
+              },
+            };
+          }
+
+          const selectionById = new Map(
+            selection.items.map((item) => [item.tableId, item]),
+          );
+
+          const updatedTables = dateData.tables.map((table) => {
+            const item = selectionById.get(table.id);
+            if (item) {
+              return {
+                ...table,
+                quantity: item.quantity,
+                allocation: item.allocation,
+              };
+            }
+            return { ...table, quantity: 0, allocation: [] };
+          });
+
+          return {
+            editingData: {
+              ...state.editingData,
+              [eventSlug]: {
+                ...state.editingData[eventSlug],
+                [date]: {
+                  ...dateData,
+                  tables: updatedTables,
+                  confirmedTableIds: [],
+                  hasChanges: false,
+                },
+              },
+            },
+          };
+        });
+      },
+
       // NEW: Guest allocation methods
       updateTableAllocation: (
         eventSlug: string,
@@ -1301,13 +1487,65 @@ export const useCartEditStore = create<CartEditState>()(
               };
 
               dateData.tables = tables;
-              dateData.hasChanges = true;
               newEditingData[eventSlug][date] = dateData;
             }
           }
 
           return { editingData: newEditingData };
         });
+      },
+
+      confirmTableSeating: (
+        eventSlug: string,
+        date: string,
+        tableId: number,
+        allocation: number[],
+      ) => {
+        set((state) => {
+          const newEditingData = { ...state.editingData };
+
+          if (!newEditingData[eventSlug]?.[date]) {
+            return state;
+          }
+
+          const dateData = { ...newEditingData[eventSlug][date] };
+          const tables = [...dateData.tables];
+          const tableIndex = tables.findIndex((table) => table.id === tableId);
+
+          if (tableIndex < 0) return state;
+
+          const validatedAllocation = allocation.map((count) =>
+            Math.min(Math.max(0, Math.floor(count)), 500),
+          );
+
+          tables[tableIndex] = {
+            ...tables[tableIndex],
+            allocation: validatedAllocation,
+          };
+
+          const confirmed = new Set(dateData.confirmedTableIds ?? []);
+          confirmed.add(tableId);
+
+          newEditingData[eventSlug][date] = {
+            ...dateData,
+            tables,
+            confirmedTableIds: Array.from(confirmed),
+            hasChanges: true,
+          };
+
+          return { editingData: newEditingData };
+        });
+      },
+
+      hasPendingTableConfirmation: (eventSlug: string, date: string) => {
+        const dateData = get().getDateData(eventSlug, date);
+        if (!dateData) return false;
+
+        const activeTables = dateData.tables.filter((table) => table.quantity > 0);
+        if (activeTables.length === 0) return false;
+
+        const confirmed = new Set(dateData.confirmedTableIds ?? []);
+        return activeTables.some((table) => !confirmed.has(table.id));
       },
 
       validateGuestAllocation: (eventSlug: string, date: string) => {

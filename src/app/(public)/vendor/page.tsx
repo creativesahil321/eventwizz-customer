@@ -205,7 +205,9 @@ export default function VendorSiteHomePage() {
               className="mb-6 w-full min-w-0 max-w-full font-bold !text-3xl !leading-[0.98] sm:!text-4xl md:!text-5xl md:max-w-5xl lg:!text-6xl"
             />
 
-            <p className={vendorHomeSubheroClass(heroAlign)}>{heroSubheading}</p>
+            <p className={vendorHomeSubheroClass(heroAlign)}>
+              {heroSubheading}
+            </p>
 
             <div className={vendorHomeTrustRowClass(heroAlign)}>
               {trustItems.map((label) => (

@@ -12,6 +12,8 @@ import {
 import { useDomain } from "@/providers/domain-provider/domain-provider";
 import type { LocationData } from "@/types/theme.types";
 import { cn } from "@/lib/utils";
+import { usePreviewLocationNavigation } from "@/contexts/preview-context";
+import { Check } from "lucide-react";
 
 const dropdownContentClass =
   "bg-[var(--color-header)] border border-[var(--color-primary)] text-[var(--color-on-header)] p-2 rounded-lg shadow-lg w-48 max-w-[min(100vw-2rem,20rem)]";
@@ -48,14 +50,34 @@ export function VendorPublicLocationMobileMenuEntries({
   hoverColorClass,
 }: VendorPublicLocationMobileMenuEntriesProps) {
   const { settings, isLoading } = useDomain();
-  const allLocations = settings?.locations ?? [];
+  const {
+    previewLocations,
+    activePreviewLocationSlug,
+    onPreviewLocationSelect,
+  } = usePreviewLocationNavigation();
+
+  const previewLocationData: LocationData[] = (previewLocations ?? []).map(
+    (loc) => ({
+      id: loc.id,
+      slug: loc.slug,
+      city: loc.city,
+    }),
+  );
+
+  const allLocations =
+    previewLocationData.length > 0
+      ? previewLocationData
+      : (settings?.locations ?? []);
   const selectableLocations = getSelectableLocations(allLocations);
+  const isPreviewLocationNav =
+    Boolean(onPreviewLocationSelect) && selectableLocations.length > 1;
+  const effectivelyDisabled = disabled && !isPreviewLocationNav;
 
   if (!isLoading && !shouldShowLocationSwitcher(allLocations)) {
     return null;
   }
 
-  if (disabled) {
+  if (effectivelyDisabled) {
     return (
       <div
         className={cn(
@@ -101,6 +123,35 @@ export function VendorPublicLocationMobileMenuEntries({
         if (!slug) {
           return null;
         }
+        const isActive = activePreviewLocationSlug === slug;
+
+        if (isPreviewLocationNav && onPreviewLocationSelect) {
+          return (
+            <button
+              key={slug || String(index)}
+              type="button"
+              className={cn(
+                mobileNavRowClass,
+                hoverColorClass,
+                "w-full transition-colors text-left",
+                isActive && "font-semibold",
+              )}
+              onClick={() => {
+                onPreviewLocationSelect(slug);
+                onNavigate();
+              }}
+            >
+              <span className={mobileNavIconWrap} aria-hidden>
+                <MapPin />
+              </span>
+              <span className="flex-1">{label}</span>
+              {isActive ? (
+                <Check className="h-4 w-4 shrink-0 text-[color:var(--color-primary)]" />
+              ) : null}
+            </button>
+          );
+        }
+
         return (
           <Link
             key={slug || String(index)}
@@ -151,8 +202,28 @@ export function VendorPublicLocationBookNow({
   menuContentClassName,
 }: VendorPublicLocationBookNowProps) {
   const { settings, isLoading } = useDomain();
-  const allLocations = settings?.locations ?? [];
+  const {
+    previewLocations,
+    activePreviewLocationSlug,
+    onPreviewLocationSelect,
+  } = usePreviewLocationNavigation();
+
+  const previewLocationData: LocationData[] = (previewLocations ?? []).map(
+    (loc) => ({
+      id: loc.id,
+      slug: loc.slug,
+      city: loc.city,
+    }),
+  );
+
+  const allLocations =
+    previewLocationData.length > 0
+      ? previewLocationData
+      : (settings?.locations ?? []);
   const selectableLocations = getSelectableLocations(allLocations);
+  const isPreviewLocationNav =
+    Boolean(onPreviewLocationSelect) && selectableLocations.length > 1;
+  const effectivelyDisabled = disabled && !isPreviewLocationNav;
 
   if (!isLoading && !shouldShowLocationSwitcher(allLocations)) {
     return null;
@@ -179,6 +250,35 @@ export function VendorPublicLocationBookNow({
           const slug = location.slug?.trim() ?? "";
           const label = locationLabel(location);
           if (!slug) return null;
+          const isActive = activePreviewLocationSlug === slug;
+
+          if (isPreviewLocationNav && onPreviewLocationSelect) {
+            return (
+              <DropdownMenuItem
+                key={slug || String(index)}
+                className={cn(
+                  "flex cursor-pointer items-center gap-2 rounded-md px-2 py-2 text-sm transition-colors",
+                  isActive
+                    ? "bg-[var(--color-primary)]/15 font-semibold"
+                    : "hover:bg-[var(--color-primary)]/10",
+                )}
+                onClick={() => {
+                  onPreviewLocationSelect(slug);
+                  onLocationNavigate?.();
+                }}
+              >
+                <MapPin
+                  size={14}
+                  className="text-[var(--color-on-header)]/70"
+                />
+                <span className="flex-1">{label}</span>
+                {isActive ? (
+                  <Check className="h-3.5 w-3.5 shrink-0 text-[color:var(--color-primary)]" />
+                ) : null}
+              </DropdownMenuItem>
+            );
+          }
+
           return (
             <DropdownMenuItem key={slug || String(index)} asChild>
               <Link
@@ -203,7 +303,7 @@ export function VendorPublicLocationBookNow({
     </>
   );
 
-  if (disabled) {
+  if (effectivelyDisabled) {
     if (variant === "icon") {
       return (
         <div

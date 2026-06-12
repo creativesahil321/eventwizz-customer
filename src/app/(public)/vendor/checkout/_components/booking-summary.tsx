@@ -5,30 +5,30 @@ import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
 import BookingSummarySkeleton from "./booking-summary-skeleton-loader";
 import {
-  Calendar,
   CreditCard,
   Shield,
   Clock,
-  UtensilsCrossed,
-  Ticket,
-  Wine,
   ChevronUp,
   ChevronDown,
   Check,
   Lock,
   Zap,
-  BadgeCheck,
+  HelpCircle,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 import { useGetCartData } from "@/services/customer/cart/query";
 import { useIsPreviewMode } from "@/contexts/preview-context";
 import { useStoreEventBooking } from "@/services/customer/cart/query";
-import { ANIMATION_VARIANTS } from "../_lib/constants";
 import {
   getAvailableDates,
   calculatePaymentAmounts,
   extractCurrentEventData,
+  isRoomBasedCart,
+  getCartRooms,
+  getAllRoomDateKeys,
+  getApiCartDateKeys,
+  parseRoomDateKey,
 } from "../_lib/cart-calculations";
 import {
   transformCartToCheckout,
@@ -42,6 +42,16 @@ import { usePaymentGatewaySelection } from "@/store/payment-gateway-selection.st
 import PaymentGatewaySelector from "./payment-gateway-selector";
 import { addCacheBusting } from "@/lib/image-utils";
 import { useCurrencyFormat } from "@/hooks/use-currency-format";
+import OrderViewBreakdown from "./order-view-breakdown";
+import { cn } from "@/lib/utils";
+
+const checkoutPayButtonClass = (disabled: boolean) =>
+  cn(
+    "rounded-xl font-bold shadow-lg transition-all duration-200",
+    disabled
+      ? "cursor-not-allowed border border-[color:var(--checkout-border)] bg-[color:var(--checkout-muted)] text-[color:var(--checkout-muted-foreground)] hover:bg-[color:var(--checkout-muted)] hover:text-[color:var(--checkout-muted-foreground)]"
+      : "bg-[color:var(--checkout-brand-primary)] text-white shadow-[color:var(--checkout-brand-primary)]/20 hover:!bg-[color:var(--checkout-brand-primary)] hover:!text-white hover:brightness-110 active:scale-[0.98]",
+  );
 
 type BookingSummaryProps = Record<string, never>;
 
@@ -50,7 +60,7 @@ export default function BookingSummary({}: BookingSummaryProps) {
   const isPreviewMode = useIsPreviewMode();
   const { isPending } = useStoreEventBooking();
   const [isProcessing, setIsProcessing] = useState(false);
-  const [showDateBreakdown, setShowDateBreakdown] = useState(false);
+  const [showViewBreakdown, setShowViewBreakdown] = useState(false);
   const [showMobileDrawer, setShowMobileDrawer] = useState(false);
   const isCheckoutInProgressRef = useRef(false);
 
@@ -76,8 +86,7 @@ export default function BookingSummary({}: BookingSummaryProps) {
     return { currentEventSlug, currentEventApiData };
   }, [apiCartData]);
 
-  const { getTotalPaymentBreakdown, updatePaymentType, getPaymentAmounts } =
-    useCartEditStore();
+  const { getTotalPaymentBreakdown, getPaymentAmounts } = useCartEditStore();
 
   const { totalItems, totalToday, totalLater } = useMemo(() => {
     if (
@@ -88,11 +97,10 @@ export default function BookingSummary({}: BookingSummaryProps) {
       return { totalItems: 0, totalToday: 0, totalLater: 0 };
     }
 
-    const availableDates = getAvailableDates(currentEventApiData);
     const paymentBreakdown = getTotalPaymentBreakdown(currentEventSlug);
 
     return {
-      totalItems: availableDates.length,
+      totalItems: getApiCartDateKeys(currentEventApiData).length,
       totalToday: paymentBreakdown.totalToday,
       totalLater: paymentBreakdown.totalLater,
     };
@@ -103,10 +111,20 @@ export default function BookingSummary({}: BookingSummaryProps) {
     getTotalPaymentBreakdown,
   ]);
 
+  const roomMode = useMemo(
+    () => isRoomBasedCart(currentEventApiData),
+    [currentEventApiData],
+  );
+  const rooms = useMemo(
+    () => getCartRooms(currentEventApiData),
+    [currentEventApiData],
+  );
+
   const availableDates = useMemo(() => {
     if (!currentEventApiData) return [];
+    if (roomMode) return getAllRoomDateKeys(currentEventApiData);
     return getAvailableDates(currentEventApiData);
-  }, [currentEventApiData]);
+  }, [currentEventApiData, roomMode]);
 
   const { isPaymentBlocked, hasValidationErrors, validationErrorMessage } =
     useMemo(() => {
@@ -236,9 +254,8 @@ export default function BookingSummary({}: BookingSummaryProps) {
 
   const initializedPaymentTypes = useMemo(() => {
     if (!currentEventApiData) return {};
-    const availableDates = getAvailableDates(currentEventApiData);
     const newPaymentTypes: Record<string, "full" | "deposit"> = {};
-    availableDates.forEach((date) => {
+    getApiCartDateKeys(currentEventApiData).forEach((date) => {
       newPaymentTypes[date] = "full";
     });
     return newPaymentTypes;
@@ -258,19 +275,79 @@ export default function BookingSummary({}: BookingSummaryProps) {
     getDateData,
   ]);
 
-  // Count total items for mobile bar — MUST be before early returns (Rules of Hooks)
-  const totalItemCount = useMemo(() => {
-    let count = 0;
-    availableDates.forEach((date) => {
-      const dateData = currentEventSlug ? getDateData(currentEventSlug, date) : null;
-      if (dateData) {
-        count += dateData.tables.filter(t => t.quantity > 0).reduce((s, t) => s + t.quantity, 0);
-        count += dateData.tickets.filter(t => t.quantity > 0).reduce((s, t) => s + t.quantity, 0);
-        count += dateData.drinks.filter(d => d.quantity > 0).reduce((s, d) => s + d.quantity, 0);
-      }
-    });
-    return count;
+  const totalGuests = useMemo(() => {
+    if (!currentEventSlug) return 0;
+    return availableDates.reduce((sum, dateKey) => {
+      const dateData = getDateData(currentEventSlug, dateKey);
+      if (!dateData) return sum;
+      const fromPeople = dateData.peopleCount ?? 0;
+      if (fromPeople > 0) return sum + fromPeople;
+      return (
+        sum +
+        dateData.tables
+          .filter((t) => t.quantity > 0)
+          .reduce((tableSum, table) => {
+            if (table.allocation?.length) {
+              return (
+                tableSum +
+                table.allocation.reduce((guestSum, g) => guestSum + g, 0)
+              );
+            }
+            return tableSum + (table.minPersons || 1) * table.quantity;
+          }, 0)
+      );
+    }, 0);
   }, [availableDates, currentEventSlug, editingData, getDateData]);
+
+  const summaryMetaLine = useMemo(() => {
+    if (roomMode && rooms.length > 0) {
+      return `${rooms.length} room${rooms.length > 1 ? "s" : ""} · ${totalItems} date${totalItems !== 1 ? "s" : ""} · ${totalGuests} guest${totalGuests !== 1 ? "s" : ""}`;
+    }
+    return `${totalItems} date${totalItems !== 1 ? "s" : ""}${totalGuests > 0 ? ` · ${totalGuests} guest${totalGuests !== 1 ? "s" : ""}` : ""}`;
+  }, [roomMode, rooms.length, totalItems, totalGuests]);
+
+  const itineraryDates = useMemo(() => {
+    if (!currentEventSlug) return [];
+    return availableDates
+      .map((dateKey) => {
+        const dateData = getDateData(currentEventSlug, dateKey);
+        if (!dateData) return null;
+
+        const paymentAmounts = getPaymentAmounts(currentEventSlug, dateKey);
+        const fullAmount =
+          dateData.tables
+            .filter((t) => t.quantity > 0)
+            .reduce((sum, t) => {
+              const pricePerPerson = t.pricePerPerson || t.price;
+              if (t.allocation?.length) {
+                const guests = t.allocation.reduce((s, g) => s + g, 0);
+                return guests > 0 ? sum + pricePerPerson * guests : sum;
+              }
+              return sum;
+            }, 0) +
+          dateData.tickets
+            .filter((t) => t.quantity > 0)
+            .reduce((sum, t) => sum + t.price * t.quantity, 0) +
+          dateData.drinks
+            .filter((d) => d.quantity > 0)
+            .reduce((sum, d) => sum + d.price * d.quantity, 0);
+
+        return {
+          key: dateKey,
+          dateData,
+          todayAmount: paymentAmounts.todayAmount,
+          laterAmount: paymentAmounts.laterAmount,
+          fullAmount,
+        };
+      })
+      .filter((entry): entry is NonNullable<typeof entry> => entry != null);
+  }, [
+    availableDates,
+    currentEventSlug,
+    editingData,
+    getDateData,
+    getPaymentAmounts,
+  ]);
 
   // Show skeleton only on initial load
   const isInitialLoad = isLoadingCartData && !apiCartData;
@@ -300,9 +377,11 @@ export default function BookingSummary({}: BookingSummaryProps) {
   const hasPayableTotal = bookingGrandTotal > 0;
 
   // Platform fee
-  const platformFeeMeta = (currentEventApiData as unknown as {
-    vendor_platform_fee?: { mode: "flat" | "percentage"; value: number };
-  })?.vendor_platform_fee;
+  const platformFeeMeta = (
+    currentEventApiData as unknown as {
+      vendor_platform_fee?: { mode: "flat" | "percentage"; value: number };
+    }
+  )?.vendor_platform_fee;
   const platformFeeRaw =
     hasPayableTotal && platformFeeMeta
       ? platformFeeMeta.mode === "flat"
@@ -321,10 +400,11 @@ export default function BookingSummary({}: BookingSummaryProps) {
     return null;
   }
 
-  // Helper: Format date
+  // Helper: Format date (handles composite "roomId:date" keys)
   const fmtDate = (dateString: string) => {
     try {
-      return new Date(dateString).toLocaleDateString("en-US", {
+      const { date: actualDate } = parseRoomDateKey(dateString);
+      return new Date(actualDate).toLocaleDateString("en-US", {
         weekday: "short",
         month: "short",
         day: "numeric",
@@ -334,13 +414,22 @@ export default function BookingSummary({}: BookingSummaryProps) {
     }
   };
 
+  // Helper: Get room name for a composite key
+  const getRoomNameForKey = (key: string): string | null => {
+    const { roomId } = parseRoomDateKey(key);
+    if (roomId == null) return null;
+    return rooms.find((r) => r.room_id === roomId)?.room_name ?? null;
+  };
+
   // CTA button state — NEVER show "Saving Changes..."
   // Auto-save runs silently; we queue checkout if save is in progress
   const isCtaLoading =
     isProcessing || isPending || processCheckoutMutation.isPending;
   const isCtaDisabled =
-    isCtaLoading || (hasValidationErrors && isPaymentBlocked) || !selectedGateway;
-  
+    isCtaLoading ||
+    (hasValidationErrors && isPaymentBlocked) ||
+    !selectedGateway;
+
   // Dynamic CTA label with exact amount
   const ctaLabel = isCtaLoading
     ? "Processing..."
@@ -352,196 +441,28 @@ export default function BookingSummary({}: BookingSummaryProps) {
           ? `Pay ${formatMoney(finalTotalWithFee)} Now`
           : "Continue to Payment";
 
-  // totalItemCount is computed above (before early returns) to comply with Rules of Hooks
-
   // ──────────────────────────────────────────────
   // RENDER: ORDER SUMMARY CARD
   // ──────────────────────────────────────────────
   const OrderSummaryContent = () => (
     <div className="space-y-4">
-      {/* ── Per-Date Breakdown ── */}
-      {availableDates.length > 0 && (
-        <div>
-          {/* Collapsible date details */}
-          {availableDates.length > 1 && (
-            <button
-              onClick={() => setShowDateBreakdown(!showDateBreakdown)}
-              className="flex items-center justify-between w-full text-left mb-2 py-1"
-            >
-              <span className="text-xs font-medium text-gray-500 uppercase tracking-wider">
-                {totalItems} date{totalItems !== 1 ? "s" : ""} selected
-              </span>
-              {showDateBreakdown ? (
-                <ChevronUp className="h-3.5 w-3.5 text-gray-400" />
-              ) : (
-                <ChevronDown className="h-3.5 w-3.5 text-gray-400" />
-              )}
-            </button>
-          )}
-
-          <AnimatePresence>
-            {(availableDates.length === 1 || showDateBreakdown) && (
-              <motion.div
-                initial={availableDates.length > 1 ? { opacity: 0, height: 0 } : false}
-                animate={{ opacity: 1, height: "auto" }}
-                exit={{ opacity: 0, height: 0 }}
-                className="space-y-2"
-              >
-                {availableDates.map((date) => {
-                  const dateData = currentEventSlug
-                    ? getDateData(currentEventSlug, date)
-                    : null;
-                  if (!dateData) return null;
-
-                  const paymentAmounts = currentEventSlug
-                    ? getPaymentAmounts(currentEventSlug, date)
-                    : { todayAmount: 0, laterAmount: 0 };
-
-                  const fullDateAmount =
-                    dateData.tables
-                      .filter((t) => t.quantity > 0)
-                      .reduce((sum, t) => {
-                        const pricePerPerson = t.pricePerPerson || t.price;
-                        if (t.allocation && t.allocation.length > 0) {
-                          const totalGuests = t.allocation.reduce(
-                            (sum, guests) => sum + guests,
-                            0,
-                          );
-                          if (totalGuests > 0) {
-                            return sum + pricePerPerson * totalGuests;
-                          }
-                          return sum;
-                        }
-                        return sum;
-                      }, 0) +
-                    dateData.tickets
-                      .filter((t) => t.quantity > 0)
-                      .reduce((sum, t) => sum + t.price * t.quantity, 0) +
-                    dateData.drinks
-                      .filter((d) => d.quantity > 0)
-                      .reduce((sum, d) => sum + d.price * d.quantity, 0);
-
-                  if (fullDateAmount === 0) return null;
-
-                  const totalTables = dateData.tables
-                    .filter((t) => t.quantity > 0)
-                    .reduce((sum, t) => sum + t.quantity, 0);
-                  const totalTickets = dateData.tickets
-                    .filter((t) => t.quantity > 0)
-                    .reduce((sum, t) => sum + t.quantity, 0);
-                  const totalDrinks = dateData.drinks
-                    .filter((d) => d.quantity > 0)
-                    .reduce((sum, d) => sum + d.quantity, 0);
-
-                  return (
-                    <div
-                      key={date}
-                      className="rounded-xl bg-gray-50 border border-gray-100 p-3"
-                    >
-                      <div className="flex items-center justify-between mb-1.5">
-                        <div className="flex items-center gap-1.5">
-                          <Calendar className="h-3 w-3 text-gray-400" />
-                          <span className="text-xs font-medium text-gray-700">
-                            {fmtDate(date)}
-                          </span>
-                        </div>
-                        <span className="text-sm font-semibold text-gray-900 tabular-nums">
-                          {formatMoney(fullDateAmount)}
-                        </span>
-                      </div>
-
-                      {/* Item summary pills */}
-                      <div className="flex flex-wrap gap-1.5">
-                        {totalTables > 0 && (
-                          <span className="inline-flex items-center gap-1 text-xs text-amber-700 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-100">
-                            <UtensilsCrossed className="h-2.5 w-2.5" />
-                            {totalTables} table{totalTables > 1 ? "s" : ""}
-                          </span>
-                        )}
-                        {totalTickets > 0 && (
-                          <span className="inline-flex items-center gap-1 text-xs text-blue-700 bg-blue-50 px-2 py-0.5 rounded-md border border-blue-100">
-                            <Ticket className="h-2.5 w-2.5" />
-                            {totalTickets} ticket{totalTickets > 1 ? "s" : ""}
-                          </span>
-                        )}
-                        {totalDrinks > 0 && (
-                          <span className="inline-flex items-center gap-1 text-xs text-purple-700 bg-purple-50 px-2 py-0.5 rounded-md border border-purple-100">
-                            <Wine className="h-2.5 w-2.5" />
-                            {totalDrinks} drink{totalDrinks > 1 ? "s" : ""}
-                          </span>
-                        )}
-                      </div>
-
-                      {/* Payment type toggle for this date */}
-                      {dateData.tables.some((t) => t.quantity > 0) &&
-                        dateData.isDepositEnabled && (
-                          <div className="mt-2.5 pt-2.5 border-t border-gray-100">
-                            <div className="flex rounded-lg bg-white border border-gray-200 p-0.5">
-                              <button
-                                onClick={() =>
-                                  updatePaymentType(
-                                    currentEventSlug!,
-                                    date,
-                                    "full",
-                                  )
-                                }
-                                className={`flex-1 text-center py-1.5 px-2 rounded-md text-xs font-medium transition-all duration-200 ${
-                                  (dateData.paymentType || "full") === "full"
-                                    ? "bg-emerald-500 text-white shadow-sm"
-                                    : "text-gray-500 hover:text-gray-700"
-                                }`}
-                              >
-                                Pay in Full
-                              </button>
-                              <button
-                                onClick={() =>
-                                  updatePaymentType(
-                                    currentEventSlug!,
-                                    date,
-                                    "deposit",
-                                  )
-                                }
-                                className={`flex-1 text-center py-1.5 px-2 rounded-md text-xs font-medium transition-all duration-200 ${
-                                  (dateData.paymentType || "full") === "deposit"
-                                    ? "bg-blue-500 text-white shadow-sm"
-                                    : "text-gray-500 hover:text-gray-700"
-                                }`}
-                              >
-                                Pay Deposit
-                              </button>
-                            </div>
-
-                            {dateData.paymentType === "deposit" && (
-                              <div className="mt-2 space-y-1">
-                                <div className="flex justify-between text-xs">
-                                  <span className="text-blue-600">Due today</span>
-                                  <span className="font-medium text-blue-600">
-                                    {formatMoney(paymentAmounts.todayAmount)}
-                                  </span>
-                                </div>
-                                <div className="flex justify-between text-xs">
-                                  <span className="text-gray-400">Due later</span>
-                                  <span className="font-medium text-gray-400">
-                                    {formatMoney(paymentAmounts.laterAmount)}
-                                  </span>
-                                </div>
-                                <p className="text-xs text-gray-400">
-                                  Deposit:{" "}
-                                  {dateData.depositType === "percentage"
-                                    ? `${dateData.depositValue}%`
-                                    : `${formatMoney(Number(dateData.depositValue))} per person`}
-                                </p>
-                              </div>
-                            )}
-                          </div>
-                        )}
-                    </div>
-                  );
-                })}
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </div>
+      {availableDates.length > 0 && hasPayableTotal && (
+        <OrderViewBreakdown
+          isOpen={showViewBreakdown}
+          onToggle={() => setShowViewBreakdown((open) => !open)}
+          formatMoney={formatMoney}
+          formatDate={fmtDate}
+          getRoomName={roomMode ? getRoomNameForKey : undefined}
+          rooms={roomMode ? rooms : undefined}
+          dates={itineraryDates}
+          totals={{
+            subtotal: bookingGrandTotal,
+            platformFee,
+            dueToday: finalTotalWithFee,
+            dueLater: totalLater,
+            grandTotal: bookingGrandTotalWithFee,
+          }}
+        />
       )}
 
       <Separator className="bg-gray-100" />
@@ -571,9 +492,22 @@ export default function BookingSummary({}: BookingSummaryProps) {
         )}
 
         {hasPayableTotal && totalLater > 0 && (
-          <div className="flex justify-between text-xs text-gray-500">
-            <span>Due later</span>
-            <span className="tabular-nums">−{formatMoney(totalLater)}</span>
+          <div className="rounded-xl border border-blue-100 bg-blue-50/50 p-3 space-y-2">
+            <p className="text-xs font-semibold uppercase tracking-wide text-blue-800">
+              Deposit payment
+            </p>
+            <div className="flex justify-between text-sm text-gray-700">
+              <span>Due today</span>
+              <span className="font-semibold tabular-nums text-gray-900">
+                {formatMoney(finalTotalWithFee)}
+              </span>
+            </div>
+            <div className="flex justify-between text-sm text-blue-700">
+              <span>Due later</span>
+              <span className="font-semibold tabular-nums">
+                {formatMoney(totalLater)}
+              </span>
+            </div>
           </div>
         )}
 
@@ -595,8 +529,9 @@ export default function BookingSummary({}: BookingSummaryProps) {
         </div>
 
         {hasPayableTotal && totalLater > 0 && (
-          <p className="text-xs text-gray-400">
-            + {formatMoney(totalLater)} due before event
+          <p className="text-xs text-gray-500">
+            Full booking value {formatMoney(bookingGrandTotalWithFee)} — balance
+            of {formatMoney(totalLater)} due before your event
           </p>
         )}
       </div>
@@ -618,9 +553,7 @@ export default function BookingSummary({}: BookingSummaryProps) {
               selectedGateway={selectedGateway}
               onGatewaySelect={setSelectedGateway}
               disabled={false}
-              showError={
-                !selectedGateway && !isPaymentBlocked && !isProcessing
-              }
+              showError={!selectedGateway && !isPaymentBlocked && !isProcessing}
             />
             <Separator className="bg-gray-100" />
           </>
@@ -651,11 +584,10 @@ export default function BookingSummary({}: BookingSummaryProps) {
               handleProceedToPayment();
             }}
             disabled={isCtaDisabled}
-            className={`w-full rounded-xl h-12 text-sm font-semibold shadow-sm transition-all duration-200 ${
-              isCtaDisabled
-                ? "bg-gray-100 text-gray-400 border border-gray-200 cursor-not-allowed"
-                : "bg-gradient-to-r from-blue-600 to-blue-700 text-white hover:from-blue-700 hover:to-blue-800 hover:shadow-lg active:scale-[0.98] shadow-blue-200"
-            }`}
+            className={cn(
+              "h-12 w-full text-sm",
+              checkoutPayButtonClass(isCtaDisabled),
+            )}
           >
             {isCtaLoading ? (
               <div className="flex items-center gap-2">
@@ -672,21 +604,10 @@ export default function BookingSummary({}: BookingSummaryProps) {
 
           {/* Trust signals — enhanced with more recognizable badges */}
           {hasPayableTotal && !hasValidationErrors && (
-            <div className="space-y-2">
-              <div className="flex items-center justify-center gap-4 text-xs text-gray-400">
-                <div className="flex items-center gap-1">
-                  <Shield className="h-3 w-3" />
-                  <span>SSL Encrypted</span>
-                </div>
-                <div className="flex items-center gap-1">
-                  <Lock className="h-3 w-3" />
-                  <span>Secure Payment</span>
-                </div>
-                <div className="flex items-center gap-1">
-                  <Zap className="h-3 w-3" />
-                  <span>Instant Confirmation</span>
-                </div>
-              </div>
+            <div className="grid grid-cols-3 gap-1.5">
+              <span className="checkout-trust-badge">SSL Encrypted</span>
+              <span className="checkout-trust-badge">Secure Payment</span>
+              <span className="checkout-trust-badge">Instant Confirm</span>
             </div>
           )}
 
@@ -712,27 +633,52 @@ export default function BookingSummary({}: BookingSummaryProps) {
 
   return (
     <>
-      {/* ── DESKTOP: Sticky Sidebar ── */}
-      <motion.div
-        className="hidden lg:block"
-        {...ANIMATION_VARIANTS.FADE_IN_UP}
-      >
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm sticky top-16 p-5">
-          <h2 className="text-base font-semibold text-gray-900 mb-4 flex items-center gap-2">
-            <BadgeCheck className="h-4 w-4 text-blue-600" />
-            Order Summary
-          </h2>
-          <OrderSummaryContent />
+      {/* ── DESKTOP: Sticky floating sidebar (Lovable) ── */}
+      <div className="hidden lg:block">
+        <div className="sticky top-[var(--checkout-header-offset)] z-30 w-full space-y-4 self-start">
+          <div className="overflow-hidden rounded-2xl border border-[color:var(--checkout-border)] bg-white shadow-sm">
+            <div className="border-b border-[color:var(--checkout-border)] px-6 py-5">
+              <h2 className="text-sm font-bold tracking-tight text-[color:var(--checkout-brand-primary)]">
+                Order Summary
+              </h2>
+              <div className="mt-3">
+                <p className="text-xs font-semibold uppercase tracking-wide text-[color:var(--checkout-muted-foreground)]">
+                  Total
+                </p>
+                <p className="mt-1 text-3xl font-extrabold tracking-tight tabular-nums text-[color:var(--checkout-brand-primary)]">
+                  {hasPayableTotal ? formatMoney(finalTotalWithFee) : "—"}
+                </p>
+                <p className="mt-1 text-xs text-[color:var(--checkout-muted-foreground)]">
+                  {summaryMetaLine}
+                </p>
+              </div>
+            </div>
+            <div className="px-5 py-4">
+              <OrderSummaryContent />
+            </div>
+          </div>
+
+          <div className="rounded-xl border border-[color:var(--checkout-border)] bg-white p-4">
+            <div className="flex items-start gap-2">
+              <HelpCircle className="mt-0.5 h-4 w-4 shrink-0 text-[color:var(--checkout-brand-accent)]" />
+              <div>
+                <p className="text-xs font-semibold text-[color:var(--checkout-foreground)]">
+                  Need assistance?
+                </p>
+                <p className="mt-1 text-xs text-[color:var(--checkout-muted-foreground)]">
+                  Our concierge team is available 24/7. Contact your venue for
+                  booking support.
+                </p>
+              </div>
+            </div>
+          </div>
         </div>
-      </motion.div>
+      </div>
 
       {/* ── MOBILE: Fixed Bottom Bar + Expandable Drawer ── */}
       <div className="lg:hidden">
-        {/* Spacer to prevent content from hiding behind fixed bar */}
-        <div className="h-20" />
-
         {/* Fixed Bottom Bar */}
-        <div className="fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-gray-200 shadow-[0_-4px_20px_rgba(0,0,0,0.08)]">
+        <div className="fixed inset-x-0 bottom-0 z-50 border-t border-[color:var(--checkout-border)] bg-white shadow-[0_-4px_20px_rgba(0,0,0,0.08)]">
           {/* Expandable Drawer */}
           <AnimatePresence>
             {showMobileDrawer && (
@@ -743,8 +689,8 @@ export default function BookingSummary({}: BookingSummaryProps) {
                 transition={{ duration: 0.3, ease: "easeInOut" }}
                 className="overflow-hidden border-b border-gray-100"
               >
-                <div className="max-h-[60vh] overflow-y-auto p-4">
-                  <h2 className="text-base font-semibold text-gray-900 mb-4">
+                <div className="max-h-[min(65vh,560px)] overflow-y-auto overscroll-contain p-4 pb-2 [-webkit-overflow-scrolling:touch]">
+                  <h2 className="mb-4 text-base font-semibold text-[color:var(--checkout-brand-primary)]">
                     Order Summary
                   </h2>
                   <OrderSummaryContent />
@@ -753,29 +699,32 @@ export default function BookingSummary({}: BookingSummaryProps) {
             )}
           </AnimatePresence>
 
-          {/* Bottom Bar — shows item count + total + CTA */}
-          <div className="flex items-center justify-between px-4 py-3 safe-area-padding">
+          {/* Bottom Bar — total + expandable summary + CTA */}
+          <div className="flex items-center gap-2 px-3 pt-2.5 pb-[max(0.75rem,var(--checkout-mobile-safe-bottom))] sm:gap-3 sm:px-4 sm:pt-3">
             <button
+              type="button"
               onClick={() => setShowMobileDrawer(!showMobileDrawer)}
-              className="flex items-center gap-2"
+              className="flex min-w-0 flex-1 items-center gap-2 text-left"
+              aria-expanded={showMobileDrawer}
+              aria-label="Toggle order summary"
             >
-              <div>
-                <div className="flex items-center gap-1.5">
-                  <p className="text-xs text-gray-500">
-                    {totalItemCount > 0 ? (
-                      <span>{totalItemCount} item{totalItemCount !== 1 ? "s" : ""} · </span>
-                    ) : null}
-                    {totalLater > 0 ? "Due Today" : "Total"}
-                  </p>
-                </div>
-                <p className="text-lg font-bold text-gray-900 tabular-nums">
+              <div className="min-w-0 flex-1">
+                <p className="text-[11px] font-medium text-[color:var(--checkout-muted-foreground)]">
+                  {totalLater > 0 ? "Due Today" : "Total"}
+                </p>
+                <p className="truncate text-base font-bold tabular-nums text-[color:var(--checkout-brand-primary)] sm:text-lg">
                   {hasPayableTotal ? formatMoney(finalTotalWithFee) : "—"}
                 </p>
+                {summaryMetaLine ? (
+                  <p className="truncate text-[10px] text-[color:var(--checkout-muted-foreground)]">
+                    {summaryMetaLine}
+                  </p>
+                ) : null}
               </div>
               {showMobileDrawer ? (
-                <ChevronDown className="h-4 w-4 text-gray-400" />
+                <ChevronDown className="h-4 w-4 shrink-0 text-[color:var(--checkout-muted-foreground)]" />
               ) : (
-                <ChevronUp className="h-4 w-4 text-gray-400" />
+                <ChevronUp className="h-4 w-4 shrink-0 text-[color:var(--checkout-muted-foreground)]" />
               )}
             </button>
 
@@ -796,26 +745,38 @@ export default function BookingSummary({}: BookingSummaryProps) {
                 handleProceedToPayment();
               }}
               disabled={isCtaDisabled}
-              className={`rounded-xl h-11 px-6 text-sm font-semibold transition-all duration-200 ${
-                isCtaDisabled
-                  ? "bg-gray-100 text-gray-400"
-                  : "bg-gradient-to-r from-blue-600 to-blue-700 text-white hover:from-blue-700 hover:to-blue-800 active:scale-[0.98] shadow-sm shadow-blue-200"
-              }`}
+              className={cn(
+                "h-11 max-w-[48%] shrink-0 px-3 text-xs font-semibold min-[400px]:max-w-none min-[400px]:px-4 min-[400px]:text-sm sm:px-6",
+                checkoutPayButtonClass(isCtaDisabled),
+              )}
             >
               {isCtaLoading ? (
-                <div className="flex items-center gap-2">
-                  <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                  <span>Processing...</span>
+                <div className="flex items-center gap-1.5">
+                  <div className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+                  <span className="hidden min-[360px]:inline">
+                    Processing...
+                  </span>
                 </div>
               ) : (
-                <div className="flex items-center gap-2">
-                  {!isCtaDisabled && <Lock className="h-3.5 w-3.5" />}
-                  <span>
-                    {isCtaDisabled
-                      ? (hasValidationErrors ? "Complete Selections" : "Select items")
-                      : hasPayableTotal
-                        ? `Pay ${formatMoney(finalTotalWithFee)}`
-                        : "Checkout"}
+                <div className="flex items-center gap-1.5">
+                  {!isCtaDisabled && <Lock className="h-3.5 w-3.5 shrink-0" />}
+                  <span className="truncate">
+                    {isCtaDisabled ? (
+                      hasValidationErrors ? (
+                        "Complete"
+                      ) : (
+                        "Select"
+                      )
+                    ) : hasPayableTotal ? (
+                      <>
+                        <span className="min-[400px]:hidden">Pay now</span>
+                        <span className="hidden min-[400px]:inline">
+                          {`Pay ${formatMoney(finalTotalWithFee)}`}
+                        </span>
+                      </>
+                    ) : (
+                      "Checkout"
+                    )}
                   </span>
                 </div>
               )}

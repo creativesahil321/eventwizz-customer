@@ -58,6 +58,23 @@ export type VendorPlatformFee = {
   value: number;
 };
 
+/** Per-room cart data returned when `is_rooms` is true on the cart API. */
+export interface ApiRoomCartData {
+  room_id: number;
+  room_name: string;
+  /** Room-specific package section label (e.g. "The Boys Package"). */
+  drink_title?: string;
+  drinks: SelectedDrink[];
+  dates: Record<string, ApiEventCartDateBucket>;
+  room_subtotal: number;
+}
+
+/** All bookable rooms on the event (cart API `event_rooms` catalog). */
+export interface ApiEventRoomCatalogItem {
+  room_id: number;
+  room_name: string;
+}
+
 /**
  * Checkout GET cart shape for one event. Not `extends EventCartData` — that type’s
  * index signature is incompatible with `drinks`, totals, and per-date buckets.
@@ -73,13 +90,20 @@ export interface ApiEventCartData {
   cart_sub_total?: number;
   cart_customer_total?: number;
   vendor_platform_fee?: VendorPlatformFee;
+  is_rooms?: boolean;
+  rooms?: ApiRoomCartData[];
+  /** Full room catalog for the event (may include rooms not yet in cart). */
+  event_rooms?: ApiEventRoomCatalogItem[];
   [key: string]:
     | string
     | number
+    | boolean
     | undefined
     | PaymentGatewayData[]
     | SelectedDrink[]
     | VendorPlatformFee
+    | ApiRoomCartData[]
+    | ApiEventRoomCatalogItem[]
     | ApiEventCartDateBucket;
 }
 

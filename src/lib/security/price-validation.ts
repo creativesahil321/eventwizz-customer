@@ -38,11 +38,23 @@ interface ServerDateData {
   }>;
 }
 
+interface ServerRoomCartData {
+  room_id: number;
+  drinks?: Array<{
+    id: number;
+    title: string;
+    price: number | string;
+  }>;
+  dates?: Record<string, ServerDateData>;
+}
+
 // Server event data interface
 interface ServerEventData {
   event_name: string;
   event_slug: string;
   event_image: string;
+  is_rooms?: boolean | number | string;
+  rooms?: ServerRoomCartData[];
   drinks?: Array<{
     id: number;
     title: string;
@@ -56,7 +68,42 @@ interface ServerEventData {
         title: string;
         price: number | string;
       }>
+    | ServerRoomCartData[]
     | undefined;
+}
+
+function resolveServerDateDataForCart(
+  serverEventData: ServerEventData,
+  cartData: CartRequest,
+): ServerDateData | null {
+  const eventDate = cartData.event_date;
+
+  if (cartData.room_id != null && cartData.room_id > 0) {
+    const room = serverEventData.rooms?.find(
+      (entry) => Number(entry.room_id) === Number(cartData.room_id),
+    );
+    const bucket = room?.dates?.[eventDate];
+    return bucket ?? null;
+  }
+
+  const flat = serverEventData[eventDate];
+  if (!flat || typeof flat === "string" || Array.isArray(flat)) {
+    return null;
+  }
+  return flat;
+}
+
+function resolveServerDrinksForCart(
+  serverEventData: ServerEventData,
+  cartData: CartRequest,
+): Array<{ id: number; title: string; price: number | string }> {
+  if (cartData.room_id != null && cartData.room_id > 0) {
+    const room = serverEventData.rooms?.find(
+      (entry) => Number(entry.room_id) === Number(cartData.room_id),
+    );
+    return room?.drinks ?? serverEventData.drinks ?? [];
+  }
+  return serverEventData.drinks ?? [];
 }
 
 /**
@@ -71,20 +118,18 @@ export async function validateCartPrices(
   let totalDifference = 0;
 
   try {
-    // Get server date data for the event date
-    const serverDateData = serverEventData[
-      cartData.event_date
-    ] as ServerDateData;
-    if (
-      !serverDateData ||
-      typeof serverDateData === "string" ||
-      Array.isArray(serverDateData)
-    ) {
+    const serverDateData = resolveServerDateDataForCart(
+      serverEventData,
+      cartData,
+    );
+    if (!serverDateData) {
       return {
         isValid: false,
         manipulatedItems: [],
         totalDifference: 0,
-        errorMessage: "Invalid event date",
+        errorMessage: cartData.room_id
+          ? "Invalid room or event date"
+          : "Invalid event date",
       };
     }
 
@@ -104,7 +149,7 @@ export async function validateCartPrices(
             manipulatedItems.push({
               type: "table",
               id: clientTable.id,
-              title: `Table (${serverTable.min_persons}-${serverTable.max_persons} persons)`,
+              title: `Table Capacity – Minimum ${serverTable.min_persons}, Maximum ${serverTable.max_persons}`,
               clientPrice,
               serverPrice,
               difference,
@@ -147,7 +192,7 @@ export async function validateCartPrices(
 
     // Validate drink prices
     if (cartData.drink_package && cartData.drink_package.length > 0) {
-      const serverDrinks = serverEventData.drinks || [];
+      const serverDrinks = resolveServerDrinksForCart(serverEventData, cartData);
 
       for (const clientDrink of cartData.drink_package) {
         const serverDrink = serverDrinks.find(
@@ -203,19 +248,15 @@ export function sanitizeCartPrices(
   const sanitized = { ...cartData };
 
   try {
-    const serverDateData = serverEventData[
-      cartData.event_date
-    ] as ServerDateData;
-    if (
-      !serverDateData ||
-      typeof serverDateData === "string" ||
-      Array.isArray(serverDateData)
-    )
-      return sanitized;
+    const serverDateData = resolveServerDateDataForCart(
+      serverEventData,
+      cartData,
+    );
+    if (!serverDateData) return sanitized;
 
     // Sanitize drink package prices (only place where we send prices to API)
     if (sanitized.drink_package && sanitized.drink_package.length > 0) {
-      const serverDrinks = serverEventData.drinks || [];
+      const serverDrinks = resolveServerDrinksForCart(serverEventData, cartData);
 
       sanitized.drink_package = sanitized.drink_package.map((clientDrink) => {
         // Try to match by id first, then fall back to title for backward compatibility

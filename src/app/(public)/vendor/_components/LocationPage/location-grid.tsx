@@ -10,6 +10,7 @@ import { useState } from "react";
 import Image from "next/image";
 import { shouldUseNextImageOptimization } from "@/lib/image-utils";
 import { SiteHeading } from "@/components/public/site-heading";
+import { cn } from "@/lib/utils";
 
 interface LocationGridProps {
   locations: (VenueLocation | LocationData)[];
@@ -51,8 +52,8 @@ export default function LocationGrid({
 
   if (!locations || locations.length === 0) {
     return (
-      <div className="py-16 text-center">
-        <div className="mx-auto max-w-md rounded-2xl border border-[color:color-mix(in_srgb,var(--color-text)_10%,transparent)] bg-[var(--color-surface)] p-12 text-[var(--color-on-surface)] shadow-sm">
+      <div className="flex w-full justify-center py-16">
+        <div className="w-full max-w-md rounded-2xl border border-[color:color-mix(in_srgb,var(--color-text)_10%,transparent)] bg-[var(--color-surface)] p-12 text-center text-[var(--color-on-surface)] shadow-sm">
           <MapPin
             size={48}
             className="mx-auto mb-4 opacity-40 text-[color:var(--color-primary)]"
@@ -74,7 +75,16 @@ export default function LocationGrid({
   }
 
   return (
-    <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
+    <div
+      className={cn(
+        "grid gap-6",
+        locations.length === 1 &&
+          "mx-auto max-w-sm grid-cols-1 justify-items-center",
+        locations.length === 2 &&
+          "mx-auto max-w-3xl grid-cols-1 md:grid-cols-2",
+        locations.length >= 3 && "grid-cols-1 md:grid-cols-3",
+      )}
+    >
       <AnimatePresence>
         {locations.map((location, idx) => {
           const locationName =

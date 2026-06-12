@@ -4,7 +4,10 @@ import Link from "next/link";
 import { Calendar, Loader2 } from "lucide-react";
 import { addCacheBusting } from "@/lib/image-utils";
 import { cn } from "@/lib/utils";
-import { useIsPreviewMode } from "@/contexts/preview-context";
+import {
+  useIsPreviewMode,
+  usePreviewEventSelect,
+} from "@/contexts/preview-context";
 
 export type LocationEventCardModel = {
   title: string;
@@ -37,18 +40,20 @@ export function LocationEventCard({
   imageFallback,
 }: LocationEventCardProps) {
   const isPreview = useIsPreviewMode();
+  const onPreviewEventSelect = usePreviewEventSelect();
+  const isInteractivePreview = isPreview && Boolean(onPreviewEventSelect);
   const href = `/${locationSlug}/events/${event.slug}`;
 
   const cardClassName = cn(
     "group relative block h-full w-full overflow-hidden rounded-xl border border-white/10 bg-zinc-950 outline-none",
     "shadow-sm transition-all duration-300 ease-out",
-    !isPreview &&
+    (!isPreview || isInteractivePreview) &&
       "hover:-translate-y-1 hover:border-[color:var(--color-primary)] hover:shadow-lg hover:shadow-black/50",
-    !isPreview &&
+    (!isPreview || isInteractivePreview) &&
       "hover:ring-2 hover:ring-[color:var(--color-primary)] hover:ring-offset-0",
-    !isPreview &&
+    (!isPreview || isInteractivePreview) &&
       "focus-visible:ring-2 focus-visible:ring-[color:var(--color-primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--color-background)]",
-    (isPending || isPreview) && "pointer-events-none",
+    (isPending || (isPreview && !isInteractivePreview)) && "pointer-events-none",
   );
 
   const cardBody = (
@@ -105,7 +110,16 @@ export function LocationEventCard({
 
   return (
     <div className="relative h-full w-full">
-      {isPreview ? (
+      {isInteractivePreview ? (
+        <button
+          type="button"
+          onClick={() => onPreviewEventSelect?.(event.slug)}
+          aria-label={`${event.title} — preview event`}
+          className={cn(cardClassName, "cursor-pointer text-left")}
+        >
+          {cardBody}
+        </button>
+      ) : isPreview ? (
         <article
           aria-label={`${event.title} — preview`}
           className={cardClassName}

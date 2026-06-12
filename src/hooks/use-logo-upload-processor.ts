@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useState } from "react";
+import { toast } from "sonner";
 import {
   processLogoFile,
   processLogoFromUrl,
@@ -29,9 +30,11 @@ export function useLogoUploadProcessor(
         return result.file;
       } catch (error) {
         console.error("Logo processing failed:", error);
-        const { toast } = await import("sonner");
-        toast.message("Logo uploaded", {
-          description: "Background cleanup was skipped. You can still save and use this logo.",
+        toast.warning("Logo uploaded", {
+          description:
+            "Background cleanup was skipped. You can still save and use this logo.",
+          position: "top-center",
+          duration: 7000,
         });
         return file;
       } finally {
@@ -52,9 +55,10 @@ export function useLogoUploadProcessor(
         return result.file;
       } catch (error) {
         console.error("Logo re-processing failed:", error);
-        const { toast } = await import("sonner");
-        toast.message("Could not optimize logo", {
+        toast.error("Could not optimize logo", {
           description: getFriendlyLogoOptimizeErrorMessage(error),
+          position: "top-center",
+          duration: 7000,
         });
         return null;
       } finally {

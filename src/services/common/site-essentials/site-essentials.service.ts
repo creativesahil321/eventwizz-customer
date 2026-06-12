@@ -16,6 +16,10 @@ type SiteEssentialsEndpoints = {
 export type GetSiteEssentialsOptions = {
   /** Venue location slug — API returns site essentials scoped to that location. */
   slug?: string;
+  /** When true, returns onboarding-enriched data (theme, locations, events). */
+  is_onboarding?: boolean;
+  /** Event slug — returns event detail within site essentials response. */
+  event_slug?: string;
 };
 
 /**
@@ -28,9 +32,14 @@ export const getSiteEssentials = async (
   try {
     const endpoints =
       getEndpointsByRole<SiteEssentialsEndpoints>("SITES_ESSENTIALS");
+    const params: Record<string, string> = {};
+    if (options?.slug) params.slug = options.slug;
+    if (options?.is_onboarding) params.is_onboarding = "true";
+    if (options?.event_slug) params.event_slug = options.event_slug;
+
     const response = await api.get<SiteEssentialsResponse>(endpoints.GET, {
       returnFullResponse: true,
-      params: options?.slug ? { slug: options.slug } : undefined,
+      params: Object.keys(params).length > 0 ? params : undefined,
     });
     return response.data;
   } catch (error) {

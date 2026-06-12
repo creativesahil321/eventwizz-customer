@@ -44,6 +44,7 @@ export default function SubscribeSection() {
         </p>
         <SiteHeading
           level={2}
+          align="center"
           title="Never miss what's on"
           variant="onSurface"
           className="mb-4 !text-3xl !font-semibold tracking-tight !text-[var(--color-on-surface)] md:!text-4xl"

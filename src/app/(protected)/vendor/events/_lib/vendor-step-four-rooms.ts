@@ -30,6 +30,31 @@ export function normalizeCateringOptionFlag(value: unknown): 0 | 1 {
   return 0;
 }
 
+/** Resolve catering flag from API/onboarding payloads (boolean strings, missing flag + menu data). */
+export function resolveCateringOptionFlag(payload: {
+  catering_option?: unknown;
+  menu_title?: unknown;
+  menu_description?: unknown;
+  menus?: unknown;
+  event_menu_category_id?: unknown;
+}): 0 | 1 {
+  const raw = payload.catering_option;
+  const hasExplicitFlag =
+    raw !== undefined && raw !== null && String(raw).trim() !== "";
+
+  if (hasExplicitFlag) {
+    return normalizeCateringOptionFlag(raw);
+  }
+
+  const hasMenuContent =
+    hasNonEmpty(payload.menu_title) ||
+    hasNonEmpty(payload.menu_description) ||
+    normalizeMenus(payload.menus).length > 0 ||
+    Number(payload.event_menu_category_id) > 0;
+
+  return hasMenuContent ? 1 : 0;
+}
+
 function normalizeMenus(raw: unknown): VendorStepFourMenuCategory[] {
   if (!Array.isArray(raw)) return [];
   return raw
@@ -59,7 +84,7 @@ function mapPayloadToRoomEntry(
   const bg = payload.menu_background_image;
   return {
     room_id: roomId,
-    catering_option: normalizeCateringOptionFlag(payload.catering_option),
+    catering_option: resolveCateringOptionFlag(payload),
     menu_title: String(payload.menu_title ?? "").trim(),
     menu_description: String(payload.menu_description ?? "").trim(),
     event_menu_category_id: Number(payload.event_menu_category_id) || 0,
@@ -168,7 +193,7 @@ export function stepFourFieldsToRoomEntry(
 ): VendorStepFourRoomEntry {
   return {
     room_id: roomId,
-    catering_option: (data.catering_option === 1 ? 1 : 0) as 0 | 1,
+    catering_option: normalizeCateringOptionFlag(data.catering_option),
     menu_title: String(data.menu_title ?? "").trim(),
     menu_description: String(data.menu_description ?? "").trim(),
     event_menu_category_id: Number(data.event_menu_category_id) || 0,

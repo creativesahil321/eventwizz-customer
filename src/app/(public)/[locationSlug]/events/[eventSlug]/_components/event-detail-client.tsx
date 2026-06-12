@@ -311,6 +311,7 @@ export default function EventDetailClient({
               description={slices.drink_description}
               packages={drinkPackages}
               eventSlug={eventSlug}
+              roomId={activeRoomId}
             />
           </div>
         )}

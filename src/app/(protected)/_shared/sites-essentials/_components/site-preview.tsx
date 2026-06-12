@@ -53,7 +53,7 @@ export function SitePreview({ formValues }: Readonly<SitePreviewProps>) {
   return (
     <div
       style={previewStyles}
-      className="text-[color:var(--color-text)] font-body"
+      className="w-full min-w-0 text-[color:var(--color-text)] font-body"
     >
       <SiteEssentialsGoogleFontsLoader
         linkId="site-essentials-google-fonts-site-preview"

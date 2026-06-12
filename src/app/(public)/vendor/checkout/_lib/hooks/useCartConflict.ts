@@ -16,6 +16,7 @@ import {
   useClearAllCart,
   useGetCartData,
 } from "@/services/customer/cart/query";
+import { countEventCartDates } from "@/app/(public)/vendor/checkout/_lib/cart-calculations";
 import { useIsPreviewMode } from "@/contexts/preview-context";
 
 export interface EventInfo {
@@ -86,17 +87,7 @@ export function useCartConflict(): UseCartConflictReturn {
         }
 
         // Conflict detected - different event already in cart
-        const dateCount = Object.keys(currentEvent).filter(
-          (key) =>
-            ![
-              "event_name",
-              "event_slug",
-              "event_image",
-              "drinks",
-              "vendor_event_id",
-              "payment_gateways",
-            ].includes(key)
-        ).length;
+        const dateCount = countEventCartDates(currentEvent);
 
         // Create conflict info for the modal
         const conflict: CartConflictInfo = {

@@ -40,6 +40,16 @@ export interface CartRequest {
   }>;
 }
 
+/** DELETE cart row — flat date or room + date (store key may be composite). */
+export interface DeleteCartDateRequest {
+  /** ISO date sent to the API */
+  eventDate: string;
+  /** Set for multi-room events */
+  roomId?: number;
+  /** Zustand key (`roomId:date` or plain date) */
+  storeDateKey: string;
+}
+
 /**
  * Request payload for fetching event checkout data
  */

@@ -3,8 +3,19 @@
 import React, { createContext, useContext, ReactNode } from "react";
 import { usePathname } from "next/navigation";
 
+export type PreviewLocationOption = {
+  id?: number;
+  slug: string;
+  city: string;
+};
+
 interface PreviewContextType {
   isPreviewMode: boolean;
+  onEventSelect?: (eventSlug: string) => void;
+  /** Multi-location site preview: drives header location switcher. */
+  previewLocations?: PreviewLocationOption[];
+  activePreviewLocationSlug?: string;
+  onPreviewLocationSelect?: (slug: string) => void;
 }
 
 const PreviewContext = createContext<PreviewContextType | undefined>(undefined);
@@ -12,17 +23,57 @@ const PreviewContext = createContext<PreviewContextType | undefined>(undefined);
 interface PreviewProviderProps {
   children: ReactNode;
   isPreviewMode?: boolean;
+  onEventSelect?: (eventSlug: string) => void;
+  previewLocations?: PreviewLocationOption[];
+  activePreviewLocationSlug?: string;
+  onPreviewLocationSelect?: (slug: string) => void;
 }
 
 export function PreviewProvider({
   children,
   isPreviewMode = false,
+  onEventSelect,
+  previewLocations,
+  activePreviewLocationSlug,
+  onPreviewLocationSelect,
 }: PreviewProviderProps) {
   return (
-    <PreviewContext.Provider value={{ isPreviewMode }}>
+    <PreviewContext.Provider
+      value={{
+        isPreviewMode,
+        onEventSelect,
+        previewLocations,
+        activePreviewLocationSlug,
+        onPreviewLocationSelect,
+      }}
+    >
       {children}
     </PreviewContext.Provider>
   );
+}
+
+export function usePreviewEventSelect():
+  | ((eventSlug: string) => void)
+  | undefined {
+  const context = useContext(PreviewContext);
+  return context?.onEventSelect;
+}
+
+/** Location switcher data for site / onboarding preview chrome. */
+export function usePreviewLocationNavigation() {
+  const context = useContext(PreviewContext);
+  if (!context) {
+    return {
+      previewLocations: undefined,
+      activePreviewLocationSlug: undefined,
+      onPreviewLocationSelect: undefined,
+    };
+  }
+  return {
+    previewLocations: context.previewLocations,
+    activePreviewLocationSlug: context.activePreviewLocationSlug,
+    onPreviewLocationSelect: context.onPreviewLocationSelect,
+  };
 }
 
 export function usePreview() {

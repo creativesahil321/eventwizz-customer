@@ -478,23 +478,24 @@ export default function CommonHeader({
           >
             {/* Cart (signed-in) or public location switcher (guest) */}
             {useNonInteractiveChrome ? (
-              isAuthenticated ? (
-                <div
-                  className={cn(
-                    "flex items-center gap-1",
-                    topBarPillDisabledClass,
-                    styles.textColor,
-                  )}
-                >
-                  <ShoppingCart size={16} />
-                  <span>Cart</span>
-                </div>
-              ) : (
+              <>
                 <VendorPublicLocationBookNow
                   disabled
                   pillGlassOnHero={pillGlassOnHero}
                 />
-              )
+                {isAuthenticated ? (
+                  <div
+                    className={cn(
+                      "flex items-center gap-1",
+                      topBarPillDisabledClass,
+                      styles.textColor,
+                    )}
+                  >
+                    <ShoppingCart size={16} />
+                    <span>Cart</span>
+                  </div>
+                ) : null}
+              </>
             ) : commerceSlotLoading ? (
               <div
                 className={cn(
@@ -814,20 +815,21 @@ export default function CommonHeader({
           <div className="flex items-center gap-2">
             {/* Mobile: cart when signed-in, location switcher when guest */}
             {useNonInteractiveChrome ? (
-              isAuthenticated ? (
-                <div
-                  className={`p-2 ${styles.textColor} opacity-60 transition-colors cursor-not-allowed`}
-                >
-                  <ShoppingCart className="h-5 w-5" />
-                </div>
-              ) : (
+              <>
                 <VendorPublicLocationBookNow
                   disabled
                   variant="icon"
                   pillGlassOnHero={pillGlassOnHero}
                   iconTriggerClassName={cn("p-2 rounded-md", styles.textColor)}
                 />
-              )
+                {isAuthenticated ? (
+                  <div
+                    className={`p-2 ${styles.textColor} opacity-60 transition-colors cursor-not-allowed`}
+                  >
+                    <ShoppingCart className="h-5 w-5" />
+                  </div>
+                ) : null}
+              </>
             ) : commerceSlotLoading ? (
               <div
                 className={cn(
@@ -1063,19 +1065,7 @@ export default function CommonHeader({
                 ))}
 
               {useNonInteractiveChrome ? (
-                isAuthenticated ? (
-                  <div
-                    className={cn(
-                      mobileNavRowClass,
-                      "cursor-not-allowed opacity-60",
-                    )}
-                  >
-                    <span className={mobileNavIconWrap} aria-hidden>
-                      <ShoppingCart />
-                    </span>
-                    Cart
-                  </div>
-                ) : (
+                <>
                   <VendorPublicLocationMobileMenuEntries
                     disabled
                     onNavigate={toggleMobileMenu}
@@ -1083,7 +1073,20 @@ export default function CommonHeader({
                     mobileNavIconWrap={mobileNavIconWrap}
                     hoverColorClass={styles.hoverColor}
                   />
-                )
+                  {isAuthenticated ? (
+                    <div
+                      className={cn(
+                        mobileNavRowClass,
+                        "cursor-not-allowed opacity-60",
+                      )}
+                    >
+                      <span className={mobileNavIconWrap} aria-hidden>
+                        <ShoppingCart />
+                      </span>
+                      Cart
+                    </div>
+                  ) : null}
+                </>
               ) : commerceSlotLoading ? (
                 <div
                   className={cn(mobileNavRowClass, "opacity-70")}

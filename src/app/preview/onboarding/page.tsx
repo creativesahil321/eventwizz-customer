@@ -1,45 +1,28 @@
 "use client";
 
-import {
-  Suspense,
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { useSession } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 import { ArrowRight, Calendar, Globe, Loader2, MapPin } from "lucide-react";
 import { PreviewProvider } from "@/contexts/preview-context";
 import { SitePreview } from "@/app/(protected)/_shared/sites-essentials/_components/site-preview";
 import { MainLandingSitePreview } from "@/app/(protected)/_shared/sites-essentials/_components/main-landing-site-preview";
-import {
-  useSiteEssentialsQuery,
-  useSiteEssentialsBySlugQuery,
-} from "@/app/(protected)/_shared/sites-essentials/_lib/queries";
 import { SiteEssentialsFormValues } from "@/app/(protected)/_shared/sites-essentials/_lib/schema";
-import type { SiteEssentials } from "@/services/common/site-essentials/type";
 import { EventPreview } from "@/app/(protected)/vendor/events/_components/event-preview";
 import { EventDetailData } from "@/services/vendor/events/type";
-import { useEventData } from "@/app/(protected)/vendor/events/_lib/hooks/useEventData";
-import {
-  resolvePreviewRoomsForFetch,
-} from "@/app/(protected)/vendor/events/_lib/open-event-preview-tab";
-import { mergeGlobalWithLocationSiteEssentials } from "@/app/(protected)/_shared/sites-essentials/_lib/merge-location-preview";
-import { useSwitchLocation } from "@/app/(protected)/vendor/venue-locations/_lib/hooks";
-import { useOnboardingPersistence } from "./_lib/use-onboarding-persistence";
-import { normalizeStepOneFromApi } from "@/app/(on-boarding)/on-boarding/_components/form-provider/schema";
-import { getHasMultipleLocationsChoiceFromPersistence } from "@/app/(on-boarding)/on-boarding/_components/form-provider/hydrate-onboarding-from-api";
-import { useVendorLocationsList } from "@/app/(protected)/vendor/venue-locations/_lib/queries";
 import { useToast } from "@/components/ui/use-toast";
+import {
+  useOnboardingPreviewMainQuery,
+  useOnboardingPreviewLocationQuery,
+  useOnboardingPreviewEventQuery,
+} from "./_lib/use-onboarding-preview-queries";
+import { mapOnboardingEventToDetailData } from "./_lib/map-onboarding-event-to-detail";
 import {
   OnboardingPreviewReviewChrome,
   type OnboardingPreviewTab,
 } from "./_components/onboarding-preview-review-chrome";
 
-/* ──────────────────────────── types ──────────────────────────── */
+/* ──────────────────────────── types & constants ──────────────────────────── */
 type PreviewTab = OnboardingPreviewTab;
 
 const REVIEW_STEPS = {
@@ -53,7 +36,7 @@ const EMPTY_APPROVAL_STATE: Record<PreviewTab, boolean> = {
   event: false,
 };
 
-/* ──────────────────────────── loading shell ──────────────────── */
+/* ──────────────────────────── loading shell ──────────────────────────── */
 function OnboardingPreviewLoadingShell() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-white">
@@ -99,309 +82,81 @@ export default function OnboardingPreviewPage() {
 /* ──────────────────────────── main content ───────────────────── */
 function OnboardingPreviewContent() {
   const router = useRouter();
-  const { data: session } = useSession();
   const { toast } = useToast();
-  const { mutate: switchLocation } = useSwitchLocation();
-  const { locations: venueLocations, isLoading: isLoadingVenueLocations } =
-    useVendorLocationsList();
 
-  /* ── persistence data (onboarding API) ── */
-  const { persistenceData, isLoading: isLoadingPersistence } =
-    useOnboardingPersistence();
+  /* ── API: Main Landing (also provides locations list, multi-location flag) ── */
+  const { data: mainData, isLoading: isLoadingMain } =
+    useOnboardingPreviewMainQuery();
 
-  /* ── site essentials (global) ── */
-  const { data: siteEssentialsFromApi, isLoading: isLoadingSiteEssentials } =
-    useSiteEssentialsQuery();
-
-  /* ── resolve flags from persistence ── */
+  /* ── Derive multi-location + default location slug from API response ── */
   const hasMultipleLocations = useMemo(() => {
-    const choice = getHasMultipleLocationsChoiceFromPersistence(persistenceData);
-    if (choice === false) return false;
-    if (choice === true) return true;
-
-    if (venueLocations.length > 1) return true;
-
-    if (persistenceData) {
-      const locations = (persistenceData as Record<string, unknown>)
-        .venue_locations;
-      if (Array.isArray(locations) && locations.length > 1) return true;
-    }
-
-    return false;
-  }, [persistenceData, venueLocations.length]);
-
-  const eventId = useMemo(() => {
-    if (!persistenceData) return undefined;
-    const raw = persistenceData as Record<string, unknown>;
-    const stepThree = raw.stepThree as Record<string, unknown> | undefined;
-    const id =
-      stepThree?.event_id ??
-      (raw.stepFour as Record<string, unknown> | undefined)?.event_id ??
-      (raw.stepFive as Record<string, unknown> | undefined)?.event_id;
-    return id ? String(id) : undefined;
-  }, [persistenceData]);
+    if (!mainData?.locations) return false;
+    return mainData.locations.length > 1;
+  }, [mainData?.locations]);
 
   const defaultLocationSlug = useMemo(() => {
-    if (!persistenceData) return undefined;
-    const raw = persistenceData as Record<string, unknown>;
-    const defaultLoc = raw.default_venue_location as
-      | Record<string, unknown>
-      | undefined;
-    return defaultLoc?.slug as string | undefined;
-  }, [persistenceData]);
+    if (!mainData?.locations?.length) return undefined;
+    return mainData.locations[0]?.slug;
+  }, [mainData?.locations]);
 
   const [selectedLocationSlug, setSelectedLocationSlug] = useState<
     string | undefined
   >();
-
   const activeLocationSlug = selectedLocationSlug ?? defaultLocationSlug;
 
-  const isRooms = useMemo(() => {
-    if (!persistenceData) return undefined;
-    const raw = persistenceData as Record<string, unknown>;
-    if (raw.is_rooms === true || raw.is_rooms === 1 || raw.is_rooms === "true")
-      return true;
-    if (
-      raw.is_rooms === false ||
-      raw.is_rooms === 0 ||
-      raw.is_rooms === "false"
-    )
-      return false;
-    return undefined;
-  }, [persistenceData]);
+  /* ── Derive event slug from location API response ── */
+  const [activeEventSlug, setActiveEventSlug] = useState<string | undefined>();
 
-  /* ── event data ── */
-  const isRoomsForFetch = useMemo(() => {
-    if (!eventId) return undefined;
-    return resolvePreviewRoomsForFetch(eventId, isRooms ? "true" : "false");
-  }, [eventId, isRooms]);
+  /* ── API: Location Page — only fetch when user reaches location tab ── */
+  const [hasVisitedLocationTab, setHasVisitedLocationTab] = useState(false);
+  const { data: locationData, isLoading: isLoadingLocation } =
+    useOnboardingPreviewLocationQuery(
+      activeLocationSlug,
+      hasVisitedLocationTab && Boolean(activeLocationSlug?.trim()),
+    );
 
-  const { eventData, isLoading: isLoadingEvent } = useEventData(
-    eventId,
-    isRoomsForFetch,
-    { allowFetchInPreview: true, alwaysFresh: true },
-  );
+  const eventSlugFromLocation = useMemo(() => {
+    if (activeEventSlug) return activeEventSlug;
+    const firstEvent =
+      locationData?.latest_events?.[0] ?? locationData?.upcoming_events?.[0];
+    return firstEvent?.slug;
+  }, [locationData, activeEventSlug]);
 
-  /* ── location-specific site essentials ── */
-  const { data: locationEssentialsFromApi } = useSiteEssentialsBySlugQuery(
-    activeLocationSlug,
-    Boolean(activeLocationSlug?.trim()),
-  );
+  /* ── API: Event Page — only fetch when user navigates to event tab ── */
+  const [hasVisitedEventTab, setHasVisitedEventTab] = useState(false);
+  const { data: eventApiData, isLoading: isLoadingEvent } =
+    useOnboardingPreviewEventQuery(
+      eventSlugFromLocation,
+      hasVisitedEventTab && Boolean(eventSlugFromLocation?.trim()),
+    );
 
-  /* ── resolved preview data ── */
-  const globalPreviewData = useMemo<SiteEssentialsFormValues | null>(() => {
-    // Start with API data, or initialize with defaults if not present
-    let baseData: SiteEssentialsFormValues;
-    if (siteEssentialsFromApi) {
-      baseData = JSON.parse(JSON.stringify(siteEssentialsFromApi)) as SiteEssentialsFormValues;
-    } else if (persistenceData) {
-      baseData = {
-        colors: {
-          primary: "#4747d1",
-          secondary: "#f4f4f5",
-          header: "#ffffff",
-          footer: "#f4f4f5",
-          background: "#ffffff",
-          surface: "#ffffff",
-          text: "#17171c",
-          textDimmed: "#71717a",
-          socialLogin: { google: "#4285F4", microsoft: "#1877f2" },
-        },
-        typography: {
-          fontFamily: {
-            heading: "Space Grotesk, sans-serif",
-            body: "Inter, sans-serif",
-          },
-          customFontStylesheetUrls: [],
-          headingEmphasis: "uniform",
-        },
-        socialLinks: {
-          facebook: "",
-          twitter: "",
-          instagram: "",
-          linkedin: "",
-          youtube: "",
-        },
-        seo: {
-          title: "",
-          description: "",
-          keywords: "",
-        },
-        name: "",
-        copyright: `© ${new Date().getFullYear()} EventWizz. All rights reserved.`,
-        logo: "",
-        favicon: "",
-        locations: [],
-      };
-    } else {
-      return null;
-    }
+  /* ── Transform event API data into EventDetailData ── */
+  const eventDetailData = useMemo<EventDetailData | null>(() => {
+    if (!eventApiData) return null;
+    return mapOnboardingEventToDetailData(eventApiData);
+  }, [eventApiData]);
 
-    if (!persistenceData) return baseData;
+  /* ── Site essentials as form values (for MainLanding & SitePreview) ── */
+  const mainPreviewData = mainData as SiteEssentialsFormValues | undefined;
+  const locationPreviewData = locationData as
+    | SiteEssentialsFormValues
+    | undefined;
 
-    const raw = persistenceData as Record<string, any>;
+  /* ── Location label ── */
+  const locationLabel = useMemo(() => {
+    if (!activeLocationSlug || !mainData?.locations) return "Location";
+    const loc = mainData.locations.find(
+      (l) => l.slug === activeLocationSlug,
+    );
+    return loc?.city?.trim() || "Location";
+  }, [activeLocationSlug, mainData?.locations]);
 
-    // 1. Merge name
-    const stepOne = raw.stepOne ? normalizeStepOneFromApi(raw.stepOne) : {};
-    const name = (raw.name || stepOne.name || baseData.name || "").trim();
-    if (name) baseData.name = name;
+  /* ── Event label ── */
+  const eventLabel = useMemo(() => {
+    return eventApiData?.event?.event_name?.trim() || "Event";
+  }, [eventApiData?.event?.event_name]);
 
-    // 2. Merge theme colors
-    const theme = raw.default_theme || {};
-    if (theme.colors) {
-      baseData.colors = {
-        ...baseData.colors,
-        ...theme.colors,
-        socialLogin: {
-          ...(baseData.colors?.socialLogin || {}),
-          ...(theme.colors.socialLogin || {}),
-        },
-      };
-    }
-
-    // 3. Merge theme typography
-    if (theme.typography) {
-      baseData.typography = {
-        ...baseData.typography,
-        ...theme.typography,
-        fontFamily: {
-          ...(baseData.typography?.fontFamily || {}),
-          ...(theme.typography.fontFamily || {}),
-        },
-      };
-    }
-
-    // 4. Merge social links
-    const socialLinks = raw.social_links || raw.socialLinks || {};
-    baseData.socialLinks = {
-      facebook: socialLinks.facebook || baseData.socialLinks?.facebook || "",
-      twitter: socialLinks.twitter || baseData.socialLinks?.twitter || "",
-      instagram: socialLinks.instagram || baseData.socialLinks?.instagram || "",
-      linkedin: socialLinks.linkedin || baseData.socialLinks?.linkedin || "",
-      youtube: socialLinks.youtube || baseData.socialLinks?.youtube || "",
-    };
-
-    // 5. Merge locations from venue_locations
-    const venueLocations = raw.venue_locations;
-    if (Array.isArray(venueLocations) && venueLocations.length > 0) {
-      baseData.locations = venueLocations.map((loc: any) => ({
-        id: loc.id,
-        city: (loc.city?.trim() || loc.name?.trim() || loc.slug || "").trim(),
-        slug: loc.slug?.trim() || "",
-        cover_image: loc.cover_image || null,
-        total_events: typeof loc.total_events === "number" ? loc.total_events : 0,
-        latest_upcoming_event: loc.latest_upcoming_event ? {
-          name: loc.latest_upcoming_event.name,
-          date: loc.latest_upcoming_event.date,
-        } : undefined,
-      }));
-    }
-
-    // 6. Merge content fields from stepTwo if empty
-    const stepTwo = raw.stepTwo || {};
-    if (stepTwo.logo && !baseData.logo) {
-      baseData.logo = stepTwo.logo;
-    }
-    if (stepTwo.cover_image && !baseData.cover_image) {
-      baseData.cover_image = stepTwo.cover_image;
-    }
-    if (stepTwo.banner_heading && !baseData.banner_heading) {
-      baseData.banner_heading = stepTwo.banner_heading;
-    }
-    if (stepTwo.banner_sub_heading && !baseData.banner_sub_heading) {
-      baseData.banner_sub_heading = stepTwo.banner_sub_heading;
-    }
-    if (stepTwo.about_title && !baseData.about_title) {
-      baseData.about_title = stepTwo.about_title;
-    }
-    if (stepTwo.about_description && !baseData.about_description) {
-      baseData.about_description = stepTwo.about_description;
-    }
-
-    // Copy to main landing page fields for multi-location fallback
-    if (baseData.banner_heading && !baseData.main_landing_banner_heading) {
-      baseData.main_landing_banner_heading = baseData.banner_heading;
-    }
-    if (baseData.banner_sub_heading && !baseData.main_landing_banner_sub_heading) {
-      baseData.main_landing_banner_sub_heading = baseData.banner_sub_heading;
-    }
-    if (baseData.cover_image && !baseData.main_landing_cover_image) {
-      baseData.main_landing_cover_image = baseData.cover_image;
-    }
-
-    return baseData;
-  }, [siteEssentialsFromApi, persistenceData]);
-
-  const resolveLocationMeta = useCallback(
-    (slug: string | undefined) => {
-      if (!slug?.trim()) {
-        return { label: "Location", id: undefined as number | undefined };
-      }
-
-      const fromGlobal = globalPreviewData?.locations?.find(
-        (loc) => loc.slug === slug,
-      );
-      const fromVenue = venueLocations.find((loc) => loc.slug === slug);
-      const fromPersistence = (
-        (persistenceData as Record<string, unknown> | null)?.venue_locations as
-          | Array<Record<string, unknown>>
-          | undefined
-      )?.find((loc) => loc.slug === slug);
-
-      const label =
-        fromGlobal?.city?.trim() ||
-        fromVenue?.city?.trim() ||
-        fromVenue?.name?.trim() ||
-        (fromPersistence?.city as string | undefined)?.trim() ||
-        (fromPersistence?.name as string | undefined)?.trim() ||
-        slug;
-
-      const id =
-        fromVenue?.id ??
-        (typeof fromPersistence?.id === "number"
-          ? fromPersistence.id
-          : Number(fromPersistence?.id));
-
-      return {
-        label,
-        id: Number.isFinite(id) && id > 0 ? id : undefined,
-      };
-    },
-    [globalPreviewData?.locations, venueLocations, persistenceData],
-  );
-
-  const activeLocationMeta = useMemo(
-    () => resolveLocationMeta(activeLocationSlug),
-    [resolveLocationMeta, activeLocationSlug],
-  );
-
-  const locationPreviewData = useMemo<SiteEssentialsFormValues | null>(() => {
-    if (!globalPreviewData) return null;
-
-    const apiForLocation = locationEssentialsFromApi ?? siteEssentialsFromApi;
-    if (apiForLocation) {
-      return mergeGlobalWithLocationSiteEssentials(
-        globalPreviewData,
-        apiForLocation as SiteEssentials,
-        activeLocationMeta.label,
-        {
-          isSingleLocation: !hasMultipleLocations,
-          previewSlug: activeLocationSlug,
-        },
-      );
-    }
-
-    return globalPreviewData;
-  }, [
-    globalPreviewData,
-    locationEssentialsFromApi,
-    siteEssentialsFromApi,
-    hasMultipleLocations,
-    activeLocationSlug,
-    activeLocationMeta.label,
-  ]);
-
-  /* ── tab state ── */
+  /* ── Tab state ── */
   const availableTabs = useMemo<PreviewTab[]>(() => {
     const tabs: PreviewTab[] = [];
     if (hasMultipleLocations) tabs.push("main-landing");
@@ -413,74 +168,26 @@ function OnboardingPreviewContent() {
   const [activeTab, setActiveTab] = useState<PreviewTab>("main-landing");
   const [approved, setApproved] =
     useState<Record<PreviewTab, boolean>>(EMPTY_APPROVAL_STATE);
-  const hasInitializedReviewRef = useRef(false);
-  const prevHasMultipleLocationsRef = useRef<boolean | null>(null);
+  const hasInitializedRef = useRef(false);
 
   const reviewSteps = hasMultipleLocations
     ? REVIEW_STEPS.multi
     : REVIEW_STEPS.single;
 
-  const locationLabel = activeLocationMeta.label;
-
+  /* ── Initialize tab once data arrives ── */
   useEffect(() => {
-    if (defaultLocationSlug && !selectedLocationSlug) {
-      setSelectedLocationSlug(defaultLocationSlug);
-    }
-  }, [defaultLocationSlug, selectedLocationSlug]);
+    if (isLoadingMain || hasInitializedRef.current) return;
+    hasInitializedRef.current = true;
 
-  const eventLabel = useMemo(() => {
-    const detail = eventData?.data as EventDetailData | undefined;
-    const fromEvent = detail?.stepOne?.event_name?.trim();
-    if (fromEvent) return fromEvent;
-
-    const stepOne = (persistenceData as Record<string, unknown> | null)
-      ?.stepOne as { event_name?: string } | undefined;
-    return stepOne?.event_name?.trim() || "Event";
-  }, [eventData?.data, persistenceData]);
-
-  const isLocationScopeReady = useMemo(() => {
-    if (isLoadingPersistence) return false;
-
-    const choice = getHasMultipleLocationsChoiceFromPersistence(persistenceData);
-    if (choice !== null) return true;
-
-    const persistedVenueLocations = (
-      persistenceData as Record<string, unknown> | null
-    )?.venue_locations;
-    if (
-      Array.isArray(persistedVenueLocations) &&
-      persistedVenueLocations.length > 0
-    ) {
-      return true;
-    }
-
-    return !isLoadingVenueLocations;
-  }, [isLoadingPersistence, persistenceData, isLoadingVenueLocations]);
-
-  useEffect(() => {
-    if (!isLocationScopeReady) return;
-
-    const prevMulti = prevHasMultipleLocationsRef.current;
-    prevHasMultipleLocationsRef.current = hasMultipleLocations;
-
-    if (!hasInitializedReviewRef.current) {
-      hasInitializedReviewRef.current = true;
-      if (hasMultipleLocations) {
-        setActiveTab("main-landing");
-        setApproved(EMPTY_APPROVAL_STATE);
-      } else {
-        setActiveTab("location");
-        setApproved({ ...EMPTY_APPROVAL_STATE, "main-landing": true });
-      }
-      return;
-    }
-
-    // Venue list can load after persistence — undo mistaken single-location init.
-    if (prevMulti === false && hasMultipleLocations) {
+    if (hasMultipleLocations) {
       setActiveTab("main-landing");
       setApproved(EMPTY_APPROVAL_STATE);
+    } else {
+      setActiveTab("location");
+      setHasVisitedLocationTab(true);
+      setApproved({ ...EMPTY_APPROVAL_STATE, "main-landing": true });
     }
-  }, [isLocationScopeReady, hasMultipleLocations]);
+  }, [isLoadingMain, hasMultipleLocations]);
 
   useEffect(() => {
     if (!availableTabs.includes(activeTab)) {
@@ -488,58 +195,39 @@ function OnboardingPreviewContent() {
     }
   }, [availableTabs, activeTab]);
 
-  /* ── navigation handlers ── */
+  /* ── Navigation handlers ── */
   const handleContinue = useCallback(() => {
     router.push("/welcome/select-location?onboarded=true");
   }, [router]);
 
   const handleTabChange = useCallback((tab: PreviewTab) => {
+    if (tab === "location") setHasVisitedLocationTab(true);
+    if (tab === "event") setHasVisitedEventTab(true);
     setActiveTab(tab);
     window.scrollTo({ top: 0, behavior: "smooth" });
   }, []);
 
   const handlePreviewLocationFromGrid = useCallback(
     (slug: string) => {
-      const normalized = slug.trim();
-      if (!normalized) return false;
-
-      const existsInPreview =
-        globalPreviewData?.locations?.some((loc) => loc.slug === normalized) ||
-        venueLocations.some((loc) => loc.slug === normalized);
-
-      if (!existsInPreview) return false;
-
-      setSelectedLocationSlug(normalized);
+      if (!slug.trim()) return false;
+      setSelectedLocationSlug(slug);
+      setHasVisitedLocationTab(true);
       setApproved((prev) => ({ ...prev, "main-landing": true }));
       setActiveTab("location");
-
-      const { id } = resolveLocationMeta(normalized);
-      if (id) {
-        switchLocation(id);
-      }
-
       window.scrollTo({ top: 0, behavior: "smooth" });
       return true;
     },
-    [
-      globalPreviewData?.locations,
-      venueLocations,
-      resolveLocationMeta,
-      switchLocation,
-    ],
+    [],
   );
 
-  const ensureLocationSlugForReview = useCallback(() => {
-    if (activeLocationSlug?.trim()) return activeLocationSlug;
-    const firstSlug =
-      globalPreviewData?.locations?.find((loc) => loc.slug?.trim())?.slug ||
-      venueLocations.find((loc) => loc.slug?.trim())?.slug;
-    if (firstSlug) {
-      setSelectedLocationSlug(firstSlug);
-      return firstSlug;
-    }
-    return undefined;
-  }, [activeLocationSlug, globalPreviewData?.locations, venueLocations]);
+  const handlePreviewEventFromCard = useCallback((eventSlug: string) => {
+    if (!eventSlug.trim()) return;
+    setActiveEventSlug(eventSlug);
+    setHasVisitedEventTab(true);
+    setApproved((prev) => ({ ...prev, location: true }));
+    setActiveTab("event");
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }, []);
 
   const handlePrimaryAction = useCallback(() => {
     const stepIndex = reviewSteps.indexOf(activeTab);
@@ -575,16 +263,14 @@ function OnboardingPreviewContent() {
 
     const nextTab = reviewSteps[stepIndex + 1];
     if (nextTab) {
-      if (nextTab === "location") {
-        ensureLocationSlugForReview();
-      }
+      if (nextTab === "location") setHasVisitedLocationTab(true);
+      if (nextTab === "event") setHasVisitedEventTab(true);
       setActiveTab(nextTab);
       window.scrollTo({ top: 0, behavior: "smooth" });
     }
   }, [
     activeTab,
     approved,
-    ensureLocationSlugForReview,
     eventLabel,
     handleContinue,
     locationLabel,
@@ -596,31 +282,29 @@ function OnboardingPreviewContent() {
     if (activeTab === "main-landing") {
       router.push("/vendor/sites-essentials");
     } else if (activeTab === "location") {
-      if (activeLocationMeta.id) {
-        switchLocation(activeLocationMeta.id);
-      }
       router.push("/vendor/sites-essentials");
     } else if (activeTab === "event") {
-      if (eventId) {
-        router.push(`/vendor/events/${eventId}`);
-      } else {
-        router.push("/vendor/events");
-      }
+      router.push("/vendor/events");
     }
-  }, [activeTab, router, eventId, activeLocationMeta.id, switchLocation]);
+  }, [activeTab, router]);
 
-  /* ── loading state ── */
-  const isInitialLoading =
-    isLoadingPersistence ||
-    isLoadingSiteEssentials ||
-    !isLocationScopeReady;
+  const previewLocationOptions = useMemo(() => {
+    if (!hasMultipleLocations || !mainData?.locations?.length) return undefined;
+    return mainData.locations
+      .filter((loc) => typeof loc.slug === "string" && loc.slug.trim().length > 0)
+      .map((loc) => ({
+        id: loc.id,
+        slug: loc.slug.trim(),
+        city: loc.city?.trim() || loc.slug,
+      }));
+  }, [hasMultipleLocations, mainData?.locations]);
 
-  if (isInitialLoading) {
+  /* ── Loading state ── */
+  if (isLoadingMain) {
     return <OnboardingPreviewLoadingShell />;
   }
 
-  /* ── no data fallback ── */
-  if (!globalPreviewData && !eventData?.data) {
+  if (!mainPreviewData) {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center bg-white p-4">
         <div className="text-center max-w-md">
@@ -646,13 +330,23 @@ function OnboardingPreviewContent() {
   }
 
   return (
-    <PreviewProvider isPreviewMode={true}>
+    <PreviewProvider
+      isPreviewMode={true}
+      onEventSelect={handlePreviewEventFromCard}
+      previewLocations={previewLocationOptions}
+      activePreviewLocationSlug={
+        activeTab === "location" ? activeLocationSlug : undefined
+      }
+      onPreviewLocationSelect={
+        hasMultipleLocations ? handlePreviewLocationFromGrid : undefined
+      }
+    >
       <div className="min-h-screen bg-white pb-28 sm:pb-32">
         <div className="min-h-screen">
           {/* Main Landing Page */}
-          {activeTab === "main-landing" && globalPreviewData && (
+          {activeTab === "main-landing" && mainPreviewData && (
             <MainLandingSitePreview
-              formValues={globalPreviewData}
+              formValues={mainPreviewData}
               onLocationSelect={handlePreviewLocationFromGrid}
             />
           )}
@@ -660,30 +354,32 @@ function OnboardingPreviewContent() {
           {/* Location Page */}
           {activeTab === "location" && (
             <>
-              {locationPreviewData ? (
-                <SitePreview formValues={locationPreviewData} />
-              ) : globalPreviewData ? (
-                <SitePreview formValues={globalPreviewData} />
-              ) : (
+              {isLoadingLocation && !locationPreviewData ? (
                 <div className="flex items-center justify-center min-h-[60vh]">
                   <Loader2 className="h-8 w-8 text-gray-300 animate-spin" />
                 </div>
-              )}
+              ) : locationPreviewData ? (
+                <SitePreview formValues={locationPreviewData} />
+              ) : mainPreviewData ? (
+                <SitePreview formValues={mainPreviewData} />
+              ) : null}
             </>
           )}
 
           {/* Event Page */}
           {activeTab === "event" && (
             <>
-              {isLoadingEvent ? (
+              {isLoadingEvent && !eventDetailData ? (
                 <div className="flex items-center justify-center min-h-[60vh]">
                   <Loader2 className="h-8 w-8 text-gray-300 animate-spin" />
                 </div>
-              ) : eventData?.data ? (
+              ) : eventDetailData ? (
                 <EventPreview
-                  data={eventData.data as EventDetailData}
+                  data={eventDetailData}
                   siteEssentials={
-                    (siteEssentialsFromApi as unknown as SiteEssentialsFormValues) ?? null
+                    (locationPreviewData ?? mainPreviewData) as
+                      | SiteEssentialsFormValues
+                      | undefined
                   }
                 />
               ) : (

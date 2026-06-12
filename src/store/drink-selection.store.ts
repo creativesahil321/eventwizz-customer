@@ -1,6 +1,7 @@
 /**
  * Drink Selection Store
- * Manages drink selections before adding to cart
+ * Manages drink selections before adding to cart.
+ * Room events scope drinks per event + room so packages never mix across rooms.
  */
 
 import { create } from "zustand";
@@ -15,154 +16,245 @@ export interface SelectedDrink {
   quantity: number;
 }
 
-interface DrinkSelectionState {
-  // Selected drinks for current event (before adding to cart)
-  selectedDrinks: SelectedDrink[];
-  // Track current event slug to auto-clear when switching events
-  currentEventSlug: string | null;
+export function buildDrinkScopeKey(
+  eventSlug: string,
+  roomId?: number | null,
+  roomIndex?: number | null,
+): string {
+  const normalized = normalizeSlug(eventSlug);
+  if (roomId != null && roomId > 0) {
+    return `${normalized}:${roomId}`;
+  }
+  if (roomIndex != null && roomIndex >= 0) {
+    return `${normalized}:room-${roomIndex}`;
+  }
+  return normalized;
+}
 
-  // Actions
+interface DrinkSelectionState {
+  /** Drinks keyed by scope (`eventSlug` or `eventSlug:roomId`). */
+  drinksByScope: Record<string, SelectedDrink[]>;
+  currentScopeKey: string | null;
+
   addDrink: (drink: SelectedDrink) => void;
   updateDrinkQuantity: (title: string, quantity: number) => void;
   updateDrinkQuantityById: (id: number, quantity: number) => void;
   removeDrink: (title: string) => void;
-  clearDrinks: () => void;
-  clearDrinksForNewEvent: (eventSlug: string) => void;
-  setCurrentEvent: (eventSlug: string) => void;
+  clearDrinks: (options?: {
+    eventSlug?: string;
+    roomId?: number | null;
+    roomIndex?: number | null;
+  }) => void;
+  clearDrinksForNewEvent: () => void;
+  setCurrentEvent: (
+    eventSlug: string,
+    roomId?: number | null,
+    roomIndex?: number | null,
+  ) => void;
 
-  // Getters
   getDrinkQuantity: (title: string) => number;
   getTotalDrinks: () => number;
   getTotalDrinkAmount: () => number;
   hasDrinks: () => boolean;
+  getSelectedDrinks: () => SelectedDrink[];
+}
+
+function getScopedDrinks(state: DrinkSelectionState): SelectedDrink[] {
+  const key = state.currentScopeKey;
+  if (!key) return [];
+  return state.drinksByScope[key] ?? [];
+}
+
+function withScopedDrinks(
+  state: DrinkSelectionState,
+  drinks: SelectedDrink[],
+): Pick<DrinkSelectionState, "drinksByScope"> {
+  const key = state.currentScopeKey;
+  if (!key) return { drinksByScope: state.drinksByScope };
+  return {
+    drinksByScope: {
+      ...state.drinksByScope,
+      [key]: drinks,
+    },
+  };
 }
 
 export const useDrinkSelectionStore = create<DrinkSelectionState>()(
   persist(
     (set, get) => ({
-      selectedDrinks: [],
-      currentEventSlug: null,
+      drinksByScope: {},
+      currentScopeKey: null,
 
       addDrink: (drink) => {
         set((state) => {
-          const existingDrinkIndex = state.selectedDrinks.findIndex(
-            (d) => d.id === drink.id || d.title === drink.title
+          const scoped = getScopedDrinks(state);
+          const existingDrinkIndex = scoped.findIndex(
+            (d) => d.id === drink.id || d.title === drink.title,
           );
 
           if (existingDrinkIndex >= 0) {
-            // Update quantity if drink already exists
-            const updatedDrinks = [...state.selectedDrinks];
-            updatedDrinks[existingDrinkIndex].quantity += drink.quantity;
-            return { selectedDrinks: updatedDrinks };
-          } else {
-            // Add new drink
-            return { selectedDrinks: [...state.selectedDrinks, drink] };
+            const updatedDrinks = [...scoped];
+            updatedDrinks[existingDrinkIndex] = {
+              ...updatedDrinks[existingDrinkIndex],
+              quantity: updatedDrinks[existingDrinkIndex].quantity + drink.quantity,
+            };
+            return withScopedDrinks(state, updatedDrinks);
           }
+
+          return withScopedDrinks(state, [...scoped, drink]);
         });
       },
 
       updateDrinkQuantity: (title, quantity) => {
         set((state) => {
+          const scoped = getScopedDrinks(state);
           if (quantity <= 0) {
-            return {
-              selectedDrinks: state.selectedDrinks.filter(
-                (d) => d.title !== title
-              ),
-            };
+            return withScopedDrinks(
+              state,
+              scoped.filter((d) => d.title !== title),
+            );
           }
 
-          const updatedDrinks = state.selectedDrinks.map((drink) =>
-            drink.title === title ? { ...drink, quantity } : drink
+          return withScopedDrinks(
+            state,
+            scoped.map((drink) =>
+              drink.title === title ? { ...drink, quantity } : drink,
+            ),
           );
-
-          return { selectedDrinks: updatedDrinks };
         });
       },
 
       updateDrinkQuantityById: (id, quantity) => {
         set((state) => {
+          const scoped = getScopedDrinks(state);
           if (quantity <= 0) {
-            return {
-              selectedDrinks: state.selectedDrinks.filter(
-                (d) => d.id !== id
-              ),
-            };
+            return withScopedDrinks(
+              state,
+              scoped.filter((d) => d.id !== id),
+            );
           }
 
-          const updatedDrinks = state.selectedDrinks.map((drink) =>
-            drink.id === id ? { ...drink, quantity } : drink
+          return withScopedDrinks(
+            state,
+            scoped.map((drink) =>
+              drink.id === id ? { ...drink, quantity } : drink,
+            ),
           );
-
-          return { selectedDrinks: updatedDrinks };
         });
       },
 
       removeDrink: (title) => {
-        set((state) => ({
-          selectedDrinks: state.selectedDrinks.filter((d) => d.title !== title),
-        }));
+        set((state) =>
+          withScopedDrinks(
+            state,
+            getScopedDrinks(state).filter((d) => d.title !== title),
+          ),
+        );
       },
 
-      clearDrinks: () => {
-        set({ selectedDrinks: [] });
+      clearDrinks: (options) => {
+        set((state) => {
+          const key = options?.eventSlug
+            ? buildDrinkScopeKey(
+                options.eventSlug,
+                options.roomId,
+                options.roomIndex,
+              )
+            : state.currentScopeKey;
+          if (!key) return state;
+
+          return {
+            drinksByScope: {
+              ...state.drinksByScope,
+              [key]: [],
+            },
+          };
+        });
       },
 
       clearDrinksForNewEvent: () => {
-        // Clear drinks when switching to a new event
-        set({ selectedDrinks: [] });
+        set({ drinksByScope: {}, currentScopeKey: null });
       },
 
-      setCurrentEvent: (eventSlug: string) => {
-        const currentSlug = get().currentEventSlug;
+      setCurrentEvent: (
+        eventSlug: string,
+        roomId?: number | null,
+        roomIndex?: number | null,
+      ) => {
+        const newScopeKey = buildDrinkScopeKey(eventSlug, roomId, roomIndex);
+        const currentScopeKey = get().currentScopeKey;
 
-        // Use existing utility to normalize slug (handles URL decoding)
-        const normalizedEventSlug = normalizeSlug(eventSlug);
-
-        // If switching to a different event, clear drinks automatically
-        if (currentSlug && currentSlug !== normalizedEventSlug) {
-          console.log(
-            `🍷 Clearing drinks: switching from ${currentSlug} to ${normalizedEventSlug}`
-          );
-          set({
-            selectedDrinks: [],
-            currentEventSlug: normalizedEventSlug,
-          });
-        } else {
-          // First time or same event, just update slug
-          set({ currentEventSlug: normalizedEventSlug });
-        }
+        if (currentScopeKey === newScopeKey) return;
+        set({ currentScopeKey: newScopeKey });
       },
+
+      getSelectedDrinks: () => getScopedDrinks(get()),
 
       getDrinkQuantity: (title) => {
-        const drink = get().selectedDrinks.find((d) => d.title === title);
+        const drink = getScopedDrinks(get()).find((d) => d.title === title);
         return drink ? drink.quantity : 0;
       },
 
       getTotalDrinks: () => {
-        return get().selectedDrinks.reduce(
+        return getScopedDrinks(get()).reduce(
           (total, drink) => total + drink.quantity,
-          0
+          0,
         );
       },
 
       getTotalDrinkAmount: () => {
-        return get().selectedDrinks.reduce(
+        return getScopedDrinks(get()).reduce(
           (total, drink) => total + drink.price * drink.quantity,
-          0
+          0,
         );
       },
 
-      hasDrinks: () => {
-        return get().selectedDrinks.length > 0;
-      },
+      hasDrinks: () => getScopedDrinks(get()).length > 0,
     }),
     {
       name: "drink-selection-storage",
-      // Persist selected drinks and current event slug for cross-event cleanup
+      version: 2,
+      migrate: (persistedState) => {
+        const legacy = persistedState as {
+          selectedDrinks?: SelectedDrink[];
+          currentEventSlug?: string | null;
+          drinksByScope?: Record<string, SelectedDrink[]>;
+          currentScopeKey?: string | null;
+        };
+
+        if (legacy.drinksByScope) {
+          return {
+            drinksByScope: legacy.drinksByScope,
+            currentScopeKey: legacy.currentScopeKey ?? null,
+          };
+        }
+
+        const scopeKey = legacy.currentEventSlug
+          ? normalizeSlug(legacy.currentEventSlug)
+          : null;
+
+        return {
+          drinksByScope:
+            scopeKey && legacy.selectedDrinks?.length
+              ? { [scopeKey]: legacy.selectedDrinks }
+              : {},
+          currentScopeKey: scopeKey,
+        };
+      },
       partialize: (state) => ({
-        selectedDrinks: state.selectedDrinks,
-        currentEventSlug: state.currentEventSlug,
+        drinksByScope: state.drinksByScope,
+        currentScopeKey: state.currentScopeKey,
       }),
-    }
-  )
+    },
+  ),
 );
+
+/** Stable empty reference — avoids Zustand re-render loops in selectors. */
+const EMPTY_SCOPED_DRINKS: SelectedDrink[] = [];
+
+/** Reactive selector — drinks for the active event/room scope only. */
+export function selectScopedDrinks(state: DrinkSelectionState): SelectedDrink[] {
+  const key = state.currentScopeKey;
+  if (!key) return EMPTY_SCOPED_DRINKS;
+  return state.drinksByScope[key] ?? EMPTY_SCOPED_DRINKS;
+}

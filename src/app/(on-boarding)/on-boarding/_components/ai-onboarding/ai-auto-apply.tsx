@@ -14,6 +14,7 @@ import {
   applyAIGeneratedOnboardingContent,
 } from "../../_lib/apply-ai-onboarding-content";
 import { clearAIBulkApplyStarted } from "../../_lib/ai-bulk-apply-session-flag";
+import { toast } from "sonner";
 
 const themeAccent = {
   text: { color: `var(--color-primary, #3b82f6)` } as React.CSSProperties,
@@ -27,7 +28,7 @@ interface AIAutoApplyProps {
   content: AIGeneratedContent;
   venueInput: AIOnboardingInput;
   onComplete: () => void;
-  onApplyFailed: () => void;
+  onApplyFailed: (message: string) => void;
 }
 
 export default function AIAutoApply({
@@ -79,7 +80,16 @@ export default function AIAutoApply({
         latestRef.current.onComplete();
       } catch (error) {
         console.error("Error applying AI content:", error);
-        latestRef.current.onApplyFailed();
+        const message =
+          error instanceof Error
+            ? error.message
+            : "Failed to apply AI-generated content";
+        toast.error("Could not finish AI setup", {
+          description: message,
+          position: "top-center",
+          duration: 8000,
+        });
+        latestRef.current.onApplyFailed(message);
       } finally {
         setApplyStep(-1);
         clearAIBulkApplyStarted();

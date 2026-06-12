@@ -289,7 +289,9 @@ export function useOnboardingData() {
     const handleDataChanged = () => {
       syncIsRoomsFlagFromStorage();
       void queryClient.invalidateQueries({ queryKey: onboardingKeys.all });
-      void refetch();
+      if (isValidLocationId) {
+        void refetch();
+      }
     };
 
     window.addEventListener("onboarding-data-changed", handleDataChanged);
@@ -299,7 +301,7 @@ export function useOnboardingData() {
       window.removeEventListener("onboarding-data-changed", handleDataChanged);
       window.removeEventListener("storage", syncIsRoomsFlagFromStorage);
     };
-  }, [queryClient, refetch, syncIsRoomsFlagFromStorage]);
+  }, [queryClient, refetch, syncIsRoomsFlagFromStorage, isValidLocationId]);
 
   return {
     onboardingData,

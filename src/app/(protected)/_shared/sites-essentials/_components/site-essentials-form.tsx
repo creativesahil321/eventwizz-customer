@@ -81,8 +81,13 @@ function SiteEssentialsFormInner() {
   const [previewLoading, setPreviewLoading] = useState(false);
   const router = useRouter();
   const { toast } = useToast();
-  const { setPreviewData, previewData, clearPreviewData, startPreviewReview } =
-    useSitePreviewStore();
+  const {
+    setPreviewData,
+    previewData,
+    clearPreviewData,
+    startPreviewReview,
+    previewScope,
+  } = useSitePreviewStore();
   const { data: session } = useSession();
   const { locations: venueLocations } = useVendorLocationsList();
   const defaultVenueLocation = resolveDefaultVenueLocation(
@@ -194,8 +199,18 @@ function SiteEssentialsFormInner() {
     setPreviewLoading(true);
 
     try {
+      const rawFormValues = form.getValues();
+      const openOnLocation = previewScope === "location";
+      const activeLocationSlug =
+        defaultVenueLocation?.slug?.trim() || rawFormValues.slug?.trim();
+      const previewSnapshot: SiteEssentialsFormValues = openOnLocation
+        ? {
+            ...rawFormValues,
+            slug: activeLocationSlug || rawFormValues.slug,
+          }
+        : rawFormValues;
       const completeFormValues = mergeSiteEssentialsPreviewWithApi(
-        form.getValues(),
+        previewSnapshot,
         siteEssentials ?? undefined,
       );
       const previewLocationList = resolvePreviewLocationList(
@@ -222,7 +237,15 @@ function SiteEssentialsFormInner() {
         completeFormValues.domain?.trim() ||
         completeFormValues.name?.trim() ||
         null;
-      startPreviewReview(multi, previewLocationList, vendorKey ?? undefined);
+      const initialLocationIndex = activeLocationSlug
+        ? previewLocationList.findIndex((loc) => loc.slug === activeLocationSlug)
+        : 0;
+
+      startPreviewReview(multi, previewLocationList, vendorKey ?? undefined, {
+        openOnLocation,
+        initialLocationIndex:
+          initialLocationIndex >= 0 ? initialLocationIndex : 0,
+      });
       setPreviewData(completeFormValues);
 
       // Add a small delay to show loading state

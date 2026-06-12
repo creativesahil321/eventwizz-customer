@@ -23,6 +23,7 @@ import {
   isVendorRoomMenuStepComplete,
   normalizeCateringOptionFlag,
   normalizeVendorStepFourRooms,
+  resolveCateringOptionFlag,
   roomEntryToStepFourFields,
   stepFourFieldsToRoomEntry,
   syncStepFourRoomsFromStepTwo,
@@ -114,7 +115,13 @@ export default function CateringTab() {
       );
     }
     return {
-      catering_option: stepFourDefaults?.catering_option || 0,
+      catering_option: resolveCateringOptionFlag({
+        catering_option: stepFourDefaults?.catering_option,
+        menu_title: stepFourDefaults?.menu_title,
+        menu_description: stepFourDefaults?.menu_description,
+        menus: stepFourDefaults?.menus,
+        event_menu_category_id: stepFourDefaults?.event_menu_category_id,
+      }),
       menu_title: stepFourDefaults?.menu_title || "",
       menu_description: stepFourDefaults?.menu_description || "",
       event_menu_category_id: stepFourDefaults?.event_menu_category_id || 0,
@@ -295,6 +302,20 @@ export default function CateringTab() {
   // Keep menu details visibility in sync with catering_option (room switches, API hydrate).
   const cateringOption = watch("catering_option");
   const showMenuSection = normalizeCateringOptionFlag(cateringOption) === 1;
+
+  // Coerce API booleans/strings ("true", true) → 0|1 so radios and visibility stay aligned.
+  useEffect(() => {
+    const resolved = resolveCateringOptionFlag({
+      catering_option: getValues("catering_option"),
+      menu_title: getValues("menu_title"),
+      menu_description: getValues("menu_description"),
+      menus: getValues("menus"),
+      event_menu_category_id: getValues("event_menu_category_id"),
+    });
+    if (getValues("catering_option") !== resolved) {
+      setValue("catering_option", resolved, { shouldValidate: false });
+    }
+  }, [eventId, getValues, setValue, resolvedRoomIndex]);
 
   // Clamp menu copy loaded from API (controlled inputs can show values longer than maxLength until edited).
   useEffect(() => {
@@ -720,7 +741,9 @@ export default function CateringTab() {
                           globalForm.setValue("stepFour.menus", []);
                         }
                       }}
-                      value={String(field.value ?? 0)}
+                      value={String(
+                        normalizeCateringOptionFlag(field.value),
+                      )}
                       className="flex mt-4 space-x-6"
                     >
                       <FormItem className="flex items-center space-x-3 space-y-0">

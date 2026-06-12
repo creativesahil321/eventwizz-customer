@@ -1,7 +1,6 @@
 "use client";
 
 import { useMemo, useState, useEffect, useRef } from "react";
-import { motion } from "framer-motion";
 import {
   ShoppingCart,
   CalendarPlus,
@@ -20,24 +19,34 @@ import {
 } from "@/services/customer/cart/query";
 import { useIsPreviewMode } from "@/contexts/preview-context";
 import { useSession } from "next-auth/react";
-import { ANIMATION_VARIANTS } from "../_lib/constants";
 import {
   getAvailableDates,
-  calculatePaymentAmounts,
   extractCurrentEventData,
   extractEventsFromApiResponse,
+  isRoomBasedCart,
+  getCartRooms,
+  getRoomDates,
+  buildRoomDateKey,
+  parseRoomDateKey,
+  getAllRoomDateKeys,
+  getApiCartDateKeys,
+  getEventRoomCatalog,
+  getTotalEventRoomCount,
+  hasRoomsAvailableToAdd,
+  getRoomDrinkTitle,
+  calculateRoomSubtotal,
 } from "../_lib/cart-calculations";
-import { CART_METADATA_KEYS_SET } from "@/lib/constants/cart-meta-keys";
-
+import { useCurrencyFormat } from "@/hooks/use-currency-format";
+import { cn } from "@/lib/utils";
 import DateAccordion from "./date-accordion";
+import RoomTabSelector from "./room-tab-selector";
 import CartSkeletonLoader from "./cart-skeleton-loader";
 import { useCartEditStore } from "@/store/cart-edit.store";
 import { useDrinkSelectionStore } from "@/store/drink-selection.store";
 import { useCartSync } from "../_lib/hooks/useCartSync";
 import { useLocationSlug } from "../_lib/hooks/useLocationSlug";
 import { generateEventBookingUrl } from "../_lib/utils/event-url";
-import { addCacheBusting } from "@/lib/image-utils";
-import { format } from "date-fns";
+import type { ApiRoomCartData } from "@/lib/types/cart.types";
 
 type CartManagerProps = Record<string, never>;
 
@@ -46,6 +55,7 @@ export default function CartManager({}: CartManagerProps) {
   const [expandedDates, setExpandedDates] = useState<Set<string>>(new Set());
   const [showClearConfirm, setShowClearConfirm] = useState(false);
   const [showActions, setShowActions] = useState(false);
+  const [activeRoomId, setActiveRoomId] = useState<number | null>(null);
   const hasInitializedExpanded = useRef(false);
   const isPreviewMode = useIsPreviewMode();
   const { data: session } = useSession();
@@ -62,9 +72,9 @@ export default function CartManager({}: CartManagerProps) {
   const {
     initializeFromAPI,
     syncNewDatesFromAPI,
+    reconcileSavedDatesFromAPI,
     getNewDatesFromAPI,
     getDateData,
-    hasUnsavedChanges,
     editingData,
     removeDate,
     removeAllDates,
@@ -75,6 +85,7 @@ export default function CartManager({}: CartManagerProps) {
   const { syncCart } = useCartSync(apiCartData);
   const deleteCartDateMutation = useDeleteCartDate();
   const clearAllCartMutation = useClearAllCart();
+  const { format: formatMoney } = useCurrencyFormat();
 
   const { currentEventSlug, currentEventApiData, firstDate } = useMemo(() => {
     return extractCurrentEventData(apiCartData);
@@ -82,31 +93,77 @@ export default function CartManager({}: CartManagerProps) {
 
   const locationSlug = useLocationSlug();
 
+  const roomMode = useMemo(
+    () => isRoomBasedCart(currentEventApiData),
+    [currentEventApiData],
+  );
+  const rooms: ApiRoomCartData[] = useMemo(
+    () => getCartRooms(currentEventApiData),
+    [currentEventApiData],
+  );
+
+  // Full room list from GET /customer/event → event_rooms (no /domain/.../events call).
+  const eventRoomCatalog = useMemo(
+    () => getEventRoomCatalog(currentEventApiData),
+    [currentEventApiData],
+  );
+
+  const showAddRoom = useMemo(
+    () => hasRoomsAvailableToAdd(rooms, eventRoomCatalog),
+    [rooms, eventRoomCatalog],
+  );
+
+  const totalEventRooms = useMemo(
+    () => getTotalEventRoomCount(currentEventApiData),
+    [currentEventApiData],
+  );
+
+  const drinkTitle = useMemo(
+    () => getRoomDrinkTitle(currentEventApiData, activeRoomId),
+    [currentEventApiData, activeRoomId],
+  );
+
   const eventDetailsUrl = useMemo(
     () => generateEventBookingUrl(locationSlug, currentEventSlug),
     [locationSlug, currentEventSlug],
   );
 
+  // Initialize active room to first room
+  useEffect(() => {
+    if (roomMode && rooms.length > 0 && activeRoomId === null) {
+      setActiveRoomId(rooms[0].room_id);
+    }
+    if (!roomMode) {
+      setActiveRoomId(null);
+    }
+  }, [roomMode, rooms, activeRoomId]);
+
   useEffect(() => {
     if (currentEventSlug) {
-      setCurrentEvent(currentEventSlug);
+      setCurrentEvent(
+        currentEventSlug,
+        roomMode && activeRoomId != null ? activeRoomId : undefined,
+      );
     }
-  }, [currentEventSlug, setCurrentEvent]);
+  }, [currentEventSlug, roomMode, activeRoomId, setCurrentEvent]);
 
-  // Initialize all dates as expanded (no accordion collapse by default)
+  // Room mode: dates collapsed by default. Flat mode: all expanded.
   useEffect(() => {
     if (firstDate && !hasInitializedExpanded.current) {
-      // Expand ALL dates by default for the new design
-      const allDates = currentEventApiData
-        ? getAvailableDates(currentEventApiData)
-        : [firstDate];
-      setExpandedDates(new Set(allDates));
+      if (roomMode) {
+        setExpandedDates(new Set());
+      } else {
+        const allDates = currentEventApiData
+          ? getAvailableDates(currentEventApiData)
+          : [firstDate];
+        setExpandedDates(new Set(allDates));
+      }
       hasInitializedExpanded.current = true;
     }
-    if (!firstDate) {
+    if (!firstDate && !(roomMode && rooms.length > 0)) {
       hasInitializedExpanded.current = false;
     }
-  }, [firstDate, currentEventApiData]);
+  }, [firstDate, currentEventApiData, roomMode, rooms]);
 
   // Cart synchronization check
   useEffect(() => {
@@ -144,9 +201,9 @@ export default function CartManager({}: CartManagerProps) {
         syncNewDatesFromAPI(currentEventSlug, currentEventApiData);
       }
 
-      const apiDates = Object.keys(currentEventApiData).filter(
-        (key) => !CART_METADATA_KEYS_SET.has(key),
-      );
+      reconcileSavedDatesFromAPI(currentEventSlug, currentEventApiData);
+
+      const apiDates = getApiCartDateKeys(currentEventApiData);
       const zustandDates = Object.keys(currentEditingData[currentEventSlug]);
       const removedDates = zustandDates.filter(
         (date) => !apiDates.includes(date),
@@ -178,6 +235,7 @@ export default function CartManager({}: CartManagerProps) {
     apiCartData,
     initializeFromAPI,
     syncNewDatesFromAPI,
+    reconcileSavedDatesFromAPI,
     getNewDatesFromAPI,
     removeAllDates,
     removeDate,
@@ -185,41 +243,31 @@ export default function CartManager({}: CartManagerProps) {
   ]);
 
   const availableDates = useMemo(() => {
+    if (roomMode && activeRoomId != null) {
+      return getRoomDates(currentEventApiData, activeRoomId).map((d) =>
+        buildRoomDateKey(activeRoomId, d),
+      );
+    }
     return getAvailableDates(currentEventApiData);
-  }, [currentEventApiData]);
-
-  const initializedPaymentTypes = useMemo(() => {
-    if (!currentEventApiData) return {};
-    const newPaymentTypes: Record<string, "full" | "deposit"> = {};
-    availableDates.forEach((date) => {
-      newPaymentTypes[date] = "full";
-    });
-    return newPaymentTypes;
-  }, [currentEventApiData, availableDates]);
+  }, [currentEventApiData, roomMode, activeRoomId]);
 
   const { totalCartItems } = useMemo(() => {
     if (!currentEventSlug) {
       return { totalCartItems: 0 };
     }
+    if (roomMode) {
+      return {
+        totalCartItems: getAllRoomDateKeys(currentEventApiData).length,
+      };
+    }
     return { totalCartItems: availableDates.length };
-  }, [availableDates, currentEventSlug]);
-
-  useMemo(() => {
-    return calculatePaymentAmounts(
-      currentEventApiData,
-      initializedPaymentTypes,
-      currentEventSlug ?? undefined,
-      getDateData,
-    );
-  }, [
-    currentEventApiData,
-    initializedPaymentTypes,
-    currentEventSlug,
-    getDateData,
-  ]);
+  }, [availableDates, currentEventSlug, roomMode, currentEventApiData]);
 
   const toggleDateExpansion = (date: string) => {
     setExpandedDates((prev) => {
+      if (roomMode) {
+        return prev.has(date) ? new Set<string>() : new Set([date]);
+      }
       const newSet = new Set(prev);
       if (newSet.has(date)) {
         newSet.delete(date);
@@ -230,16 +278,78 @@ export default function CartManager({}: CartManagerProps) {
     });
   };
 
-  const handleRemoveDate = async (date: string) => {
+  const handleRoomChange = (roomId: number) => {
+    setActiveRoomId(roomId);
+    if (!currentEventApiData) return;
+    const roomDates = getRoomDates(currentEventApiData, roomId).map((d) =>
+      buildRoomDateKey(roomId, d),
+    );
+    setExpandedDates(roomDates.length > 0 ? new Set([roomDates[0]]) : new Set());
+  };
+
+  const roomSubtotals = useMemo(() => {
+    if (!roomMode || !currentEventApiData) return {};
+    const subtotals: Record<number, number> = {};
+    for (const room of rooms) {
+      subtotals[room.room_id] = calculateRoomSubtotal(
+        currentEventApiData,
+        room.room_id,
+        currentEventSlug
+          ? { eventSlug: currentEventSlug, getDateData }
+          : undefined,
+      );
+    }
+    return subtotals;
+  }, [
+    roomMode,
+    currentEventApiData,
+    rooms,
+    currentEventSlug,
+    getDateData,
+    editingData,
+  ]);
+
+  const totalGuestsAcrossCart = useMemo(() => {
+    if (!currentEventSlug || !currentEventApiData) return 0;
+    const dateKeys = roomMode
+      ? getAllRoomDateKeys(currentEventApiData)
+      : getAvailableDates(currentEventApiData);
+    return dateKeys.reduce((sum, dateKey) => {
+      const dateData = getDateData(currentEventSlug, dateKey);
+      if (!dateData) return sum;
+      const fromPeople = dateData.peopleCount ?? 0;
+      if (fromPeople > 0) return sum + fromPeople;
+      return (
+        sum +
+        dateData.tables
+          .filter((t) => t.quantity > 0)
+          .reduce((tableSum, table) => {
+            if (table.allocation?.length) {
+              return (
+                tableSum + table.allocation.reduce((guestSum, g) => guestSum + g, 0)
+              );
+            }
+            return tableSum + (table.minPersons || 1) * table.quantity;
+          }, 0)
+      );
+    }, 0);
+  }, [currentEventSlug, currentEventApiData, roomMode, getDateData]);
+
+  const handleRemoveDate = async (dateKey: string) => {
     try {
       setIsProcessing(true);
-      await deleteCartDateMutation.mutateAsync(date);
+      const { roomId, date: eventDate } = parseRoomDateKey(dateKey);
+      await deleteCartDateMutation.mutateAsync({
+        eventDate,
+        roomId: roomId ?? undefined,
+        storeDateKey: dateKey,
+      });
       if (currentEventSlug) {
-        removeDate(currentEventSlug, date);
+        removeDate(currentEventSlug, dateKey);
       }
       setExpandedDates((prev) => {
         const newSet = new Set(prev);
-        newSet.delete(date);
+        newSet.delete(dateKey);
         return newSet;
       });
     } catch (error) {
@@ -314,159 +424,145 @@ export default function CartManager({}: CartManagerProps) {
     );
   }
 
-  // Format date range for header
-  const formatDateRange = () => {
-    if (availableDates.length === 0) return "";
-    try {
-      if (availableDates.length === 1) {
-        return format(new Date(availableDates[0]), "EEE, MMM d, yyyy");
-      }
-      const first = format(new Date(availableDates[0]), "MMM d");
-      const last = format(
-        new Date(availableDates[availableDates.length - 1]),
-        "MMM d, yyyy",
-      );
-      return `${first} — ${last}`;
-    } catch {
-      return "";
-    }
-  };
+  const totalDatesAcrossRooms = roomMode
+    ? getAllRoomDateKeys(currentEventApiData).length
+    : totalCartItems;
+  const activeRoom = rooms.find((r) => r.room_id === activeRoomId);
+  const activeRoomIndex = Math.max(
+    0,
+    rooms.findIndex((r) => r.room_id === activeRoomId),
+  );
+  const bookingMetaLine = roomMode && rooms.length > 0
+    ? `${totalEventRooms} ${totalEventRooms === 1 ? "room" : "rooms"} · ${totalDatesAcrossRooms} ${totalDatesAcrossRooms === 1 ? "date" : "dates"} · ${totalGuestsAcrossCart} total guests`
+    : `${totalCartItems} ${totalCartItems === 1 ? "date" : "dates"}${totalGuestsAcrossCart > 0 ? ` · ${totalGuestsAcrossCart} guests` : ""}`;
+
+  const bookingHeader = (
+    <div className="mb-3 flex flex-col gap-3 sm:mb-4 sm:flex-row sm:items-start sm:justify-between">
+      <div className="min-w-0 flex-1">
+        <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-[color:var(--checkout-brand-accent)]">
+          Your Booking
+        </p>
+        <h1 className="mt-1 text-lg font-extrabold tracking-tight text-[color:var(--checkout-brand-primary)] sm:text-2xl">
+          {currentEventApiData?.event_name || "Your Booking"}
+        </h1>
+        <p className="mt-1.5 text-[11px] font-medium leading-relaxed text-[color:var(--checkout-muted-foreground)] sm:text-xs">
+          {bookingMetaLine}
+        </p>
+      </div>
+
+      <div className="flex w-full shrink-0 items-center gap-2 sm:w-auto">
+        {eventDetailsUrl && currentEventSlug && (
+          <Link
+            href={eventDetailsUrl}
+            className="inline-flex min-h-10 flex-1 items-center justify-center gap-1.5 rounded-lg border border-[color:var(--checkout-border)] bg-white px-3 py-2 text-sm font-semibold text-[color:var(--checkout-foreground)] transition-colors hover:bg-[color:var(--checkout-muted)] sm:flex-none sm:px-4"
+          >
+            <CalendarPlus className="h-4 w-4 shrink-0" />
+            <span className="truncate">Add Dates</span>
+          </Link>
+        )}
+
+        {showClearConfirm ? (
+          <div className="flex items-center gap-1.5">
+            <button
+              type="button"
+              onClick={handleClearAllCart}
+              disabled={isProcessing || clearAllCartMutation.isPending}
+              className="rounded-lg border border-red-200 px-3 py-2 text-xs font-semibold text-red-600 hover:bg-red-50"
+            >
+              {clearAllCartMutation.isPending ? "Clearing..." : "Confirm"}
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowClearConfirm(false)}
+              className="rounded-lg px-3 py-2 text-xs text-[color:var(--checkout-muted-foreground)]"
+            >
+              Cancel
+            </button>
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setShowClearConfirm(true)}
+            className="rounded-lg border border-[color:var(--checkout-border)] bg-white p-2 text-[color:var(--checkout-muted-foreground)] transition-colors hover:bg-red-50 hover:text-red-500"
+            title="Clear cart"
+          >
+            <Trash2 className="h-4 w-4" />
+          </button>
+        )}
+      </div>
+    </div>
+  );
+
+  const dateSections =
+    availableDates.length === 0 ? (
+      <div className="px-4 py-10 text-center sm:px-5">
+        <ShoppingCart className="mx-auto mb-4 h-12 w-12 text-gray-200" />
+        <h3 className="mb-1 text-base font-semibold text-gray-700">
+          No event data available
+        </h3>
+        <p className="text-sm text-gray-500">
+          Select a date from the event page to add items to your cart
+        </p>
+      </div>
+    ) : (
+      availableDates.map((date, index) => {
+        const isExpanded = expandedDates.has(date);
+        const dateData = currentEventSlug
+          ? getDateData(currentEventSlug, date)
+          : null;
+
+        if (!dateData || !currentEventSlug) return null;
+
+        return (
+          <div key={date}>
+            <DateAccordion
+              eventSlug={currentEventSlug}
+              date={date}
+              dateData={dateData}
+              isExpanded={isExpanded}
+              onToggle={() => toggleDateExpansion(date)}
+              onRemoveDate={handleRemoveDate}
+              roomId={roomMode ? (activeRoomId ?? undefined) : undefined}
+              embedded={roomMode}
+              roomAccentIndex={activeRoomIndex}
+              drinkTitle={drinkTitle}
+              serverEventData={currentEventApiData}
+            />
+          </div>
+        );
+      })
+    );
+
+  if (roomMode && rooms.length > 0 && activeRoomId != null && activeRoom) {
+    return (
+      <div className="space-y-4">
+        {bookingHeader}
+
+        <RoomTabSelector
+          rooms={rooms}
+          activeRoomId={activeRoomId}
+          onRoomChange={handleRoomChange}
+          roomSubtotals={roomSubtotals}
+          showAddRoom={showAddRoom}
+          addRoomUrl={eventDetailsUrl ?? undefined}
+        />
+
+        <div className="overflow-hidden rounded-2xl border border-[color:var(--checkout-border)] bg-white shadow-sm">
+          <div className="divide-y divide-[color:var(--checkout-border)]">
+            {dateSections}
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4">
-      {/* Compact Event Context Bar — not a hero card */}
-      <motion.div
-        className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden"
-        {...ANIMATION_VARIANTS.FADE_IN_UP}
-      >
-        <div className="flex items-center gap-3 px-4 py-3">
-          {/* Compact Event Image */}
-          {currentEventApiData?.event_image && (
-            <div className="relative w-10 h-10 rounded-lg overflow-hidden bg-gray-100 flex-shrink-0">
-              <img
-                src={addCacheBusting(currentEventApiData.event_image)}
-                alt={currentEventApiData?.event_name || "Event"}
-                className="absolute inset-0 w-full h-full object-cover"
-              />
-            </div>
-          )}
-
-          {/* Event Info — condensed */}
-          <div className="flex-1 min-w-0">
-            <h1 className="text-sm sm:text-base font-semibold text-gray-900 truncate leading-tight">
-              {currentEventApiData?.event_name || "Your Booking"}
-            </h1>
-            <div className="flex items-center gap-2 mt-0.5">
-              {formatDateRange() && (
-                <span className="text-xs text-gray-500 truncate">
-                  {formatDateRange()}
-                </span>
-              )}
-              {totalCartItems > 1 && (
-                <>
-                  <span className="text-gray-300">·</span>
-                  <span className="text-xs font-medium text-blue-600">
-                    {totalCartItems} dates
-                  </span>
-                </>
-              )}
-            </div>
-          </div>
-
-          {/* Actions — compact */}
-          <div className="flex items-center gap-1.5 flex-shrink-0">
-            {eventDetailsUrl && currentEventSlug && (
-              <Link href={eventDetailsUrl}>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="hidden sm:flex items-center gap-1.5 text-blue-600 border-blue-200 hover:bg-blue-50 hover:text-blue-700 rounded-lg h-8 text-xs font-medium"
-                >
-                  <CalendarPlus className="h-3.5 w-3.5" />
-                  Add Dates
-                </Button>
-              </Link>
-            )}
-
-            {/* Clear all — overflow menu style */}
-            <div className="relative">
-              {showClearConfirm ? (
-                <div className="flex items-center gap-1.5">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={handleClearAllCart}
-                    disabled={isProcessing || clearAllCartMutation.isPending}
-                    className="text-red-600 border-red-200 hover:bg-red-50 rounded-lg h-8 text-xs"
-                  >
-                    {clearAllCartMutation.isPending ? "Clearing..." : "Confirm"}
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setShowClearConfirm(false)}
-                    className="rounded-lg h-8 text-xs text-gray-500"
-                  >
-                    Cancel
-                  </Button>
-                </div>
-              ) : (
-                <button
-                  onClick={() => setShowClearConfirm(true)}
-                  className="p-1.5 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors"
-                  title="Clear cart"
-                >
-                  <Trash2 className="h-4 w-4" />
-                </button>
-              )}
-            </div>
-          </div>
+      {bookingHeader}
+      <div className="overflow-hidden rounded-2xl border border-[color:var(--checkout-border)] bg-white shadow-sm">
+        <div className="divide-y divide-[color:var(--checkout-border)]">
+          {dateSections}
         </div>
-      </motion.div>
-
-      {/* Date Sections — always expanded, no accordion collapse */}
-      <div className="space-y-4">
-        {availableDates.length === 0 ? (
-          <motion.div
-            className="bg-white rounded-2xl border border-gray-100 shadow-sm p-10 text-center"
-            {...ANIMATION_VARIANTS.FADE_IN_UP}
-          >
-            <ShoppingCart className="h-12 w-12 text-gray-200 mx-auto mb-4" />
-            <h3 className="text-base font-semibold text-gray-700 mb-1">
-              No event data available
-            </h3>
-            <p className="text-sm text-gray-500">
-              Select a date from the event page to add items to your cart
-            </p>
-          </motion.div>
-        ) : (
-          availableDates.map((date, index) => {
-            const isExpanded = expandedDates.has(date);
-            const dateData = currentEventSlug
-              ? getDateData(currentEventSlug, date)
-              : null;
-
-            if (!dateData || !currentEventSlug) return null;
-
-            return (
-              <motion.div
-                key={date}
-                initial={{ opacity: 0, y: 12 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.3, delay: index * 0.05 }}
-              >
-                <DateAccordion
-                  eventSlug={currentEventSlug}
-                  date={date}
-                  dateData={dateData}
-                  isExpanded={isExpanded}
-                  onToggle={() => toggleDateExpansion(date)}
-                  onRemoveDate={handleRemoveDate}
-                />
-              </motion.div>
-            );
-          })
-        )}
       </div>
     </div>
   );

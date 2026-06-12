@@ -24,14 +24,19 @@ import { PreviewThemeCustomizer } from "@/components/preview/preview-theme-custo
 import { themeKeys } from "@/hooks/use-theme-query";
 import { useToast } from "@/components/ui/use-toast";
 import { resolveHasMultipleLocations } from "@/app/(protected)/_shared/sites-essentials/_lib/use-has-multiple-locations";
-import { mergeSiteEssentialsPreviewWithApi } from "@/app/(protected)/_shared/sites-essentials/_lib/merge-preview-with-api";
+import {
+  mergeSiteEssentialsPreviewWithApi,
+  withPreviewLocationSlug,
+} from "@/app/(protected)/_shared/sites-essentials/_lib/merge-preview-with-api";
 import { mergeGlobalWithLocationSiteEssentials } from "@/app/(protected)/_shared/sites-essentials/_lib/merge-location-preview";
 import {
   allPreviewLocationsApproved,
   previewLocationSlugsKey,
+  resolveMainLandingPreviewLocations,
   resolvePreviewLocationCount,
   resolvePreviewLocationList,
 } from "@/app/(protected)/_shared/sites-essentials/_lib/preview-locations";
+import type { LocationData } from "@/types/theme.types";
 import { useSwitchLocation } from "@/app/(protected)/vendor/venue-locations/_lib/hooks";
 import { useVendorLocationsList } from "@/app/(protected)/vendor/venue-locations/_lib/queries";
 import { resolveDefaultVenueLocation } from "@/lib/auth/session-location";
@@ -129,6 +134,20 @@ export default function SitePreviewPage() {
     return safePreviewLocations;
   }, [canonicalLocationList, safePreviewLocations]);
 
+  const mainLandingPreviewData = useMemo(() => {
+    if (!resolvedGlobalData) return null;
+    const formLocations = resolvedGlobalData.locations as
+      | LocationData[]
+      | undefined;
+    if (formLocations?.length || locationList.length === 0) {
+      return resolvedGlobalData;
+    }
+    return {
+      ...resolvedGlobalData,
+      locations: resolveMainLandingPreviewLocations(formLocations, locationList),
+    };
+  }, [resolvedGlobalData, locationList]);
+
   const hasMultipleLocations = useMemo(() => {
     const count = resolvePreviewLocationCount(
       apiSiteEssentialsLocations,
@@ -178,6 +197,14 @@ export default function SitePreviewPage() {
       previewSlug: currentSlug,
     };
 
+    const editorSnapshot = (): SiteEssentialsFormValues => {
+      const base = withPreviewLocationSlug(resolvedGlobalData, currentSlug);
+      return {
+        ...base,
+        name: locationLabel?.trim() || base.name,
+      };
+    };
+
     if (locationEssentialsFromApi) {
       return mergeGlobalWithLocationSiteEssentials(
         resolvedGlobalData,
@@ -187,41 +214,35 @@ export default function SitePreviewPage() {
       );
     }
 
-    const slugFetchSettled =
-      !fetchLocationEssentialsBySlug ||
-      isLocationEssentialsFetched ||
-      isLocationEssentialsError;
-
-    if (slugFetchSettled) {
-      if (siteEssentialsFromApi) {
-        return mergeGlobalWithLocationSiteEssentials(
-          resolvedGlobalData,
-          siteEssentialsFromApi,
-          locationLabel,
-          locationMergeOptions,
-        );
-      }
-      return resolvedGlobalData;
-    }
-
-    return null;
+    // Show unsaved editor values immediately — never fall back to global site-essentials.
+    return editorSnapshot();
   }, [
     resolvedGlobalData,
     effectiveReviewStep,
     locationEssentialsFromApi,
     currentLocation?.city,
     venueLocations,
-    siteEssentialsFromApi,
-    fetchLocationEssentialsBySlug,
-    isLocationEssentialsFetched,
-    isLocationEssentialsError,
     defaultVenueLocation?.city,
     hasMultipleLocations,
     currentSlug,
   ]);
 
+  const locationPreviewFormValues = useMemo(() => {
+    const data = locationPreviewData ?? resolvedGlobalData;
+    if (!data) return null;
+    const formLocations = data.locations as LocationData[] | undefined;
+    if (formLocations?.length || locationList.length === 0) {
+      return data;
+    }
+    return {
+      ...data,
+      locations: resolveMainLandingPreviewLocations(formLocations, locationList),
+    };
+  }, [locationPreviewData, resolvedGlobalData, locationList]);
+
   const isLoadingLocationPreview =
     fetchLocationEssentialsBySlug &&
+    !locationPreviewData &&
     !isLocationEssentialsError &&
     (isLoadingLocationEssentials || isFetchingLocationEssentials);
 
@@ -540,11 +561,26 @@ export default function SitePreviewPage() {
   }
 
   return (
-    <PreviewProvider isPreviewMode={true}>
-      <div className="relative min-h-screen pb-[5.5rem] sm:pb-24">
+    <PreviewProvider
+      isPreviewMode={true}
+      previewLocations={
+        hasMultipleLocations && locationList.length > 0 ? locationList : undefined
+      }
+      activePreviewLocationSlug={
+        effectiveReviewStep === "location" ? currentSlug : undefined
+      }
+      onPreviewLocationSelect={
+        hasMultipleLocations
+          ? (slug) => {
+              goToLocationPreview(slug);
+            }
+          : undefined
+      }
+    >
+      <div className="relative min-h-screen w-full min-w-0 pb-[5.5rem] sm:pb-24">
         {hasMultipleLocations && effectiveReviewStep === "main" ? (
           <MainLandingSitePreview
-            formValues={resolvedGlobalData}
+            formValues={mainLandingPreviewData ?? resolvedGlobalData}
             onLocationSelect={handlePreviewLocationFromGrid}
           />
         ) : isLoadingLocationPreview ||
@@ -557,8 +593,10 @@ export default function SitePreviewPage() {
               Loading {currentLocation?.city ?? "location"} preview…
             </p>
           </div>
-        ) : locationPreviewData || effectiveReviewStep === "location" ? (
-          <SitePreview formValues={locationPreviewData ?? resolvedGlobalData} />
+        ) : locationPreviewFormValues || effectiveReviewStep === "location" ? (
+          <SitePreview
+            formValues={locationPreviewFormValues ?? resolvedGlobalData}
+          />
         ) : (
           <SitePreview formValues={resolvedGlobalData} />
         )}

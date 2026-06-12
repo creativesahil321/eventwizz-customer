@@ -7,6 +7,13 @@ import type { PreviewLocationItem } from "@/app/(protected)/_shared/sites-essent
 export type SitePreviewScope = "main" | "location";
 export type SitePreviewReviewStep = SitePreviewScope;
 
+export type StartPreviewReviewOptions = {
+  /** Multi-location: skip main home and open the location review step first. */
+  openOnLocation?: boolean;
+  /** Which location to show when `openOnLocation` is true. */
+  initialLocationIndex?: number;
+};
+
 interface SitePreviewState {
   previewData: SiteEssentialsFormValues | null;
   previewScope: SitePreviewScope;
@@ -28,6 +35,7 @@ interface SitePreviewState {
     hasMultipleLocations: boolean,
     locations: PreviewLocationItem[],
     vendorKey?: string,
+    options?: StartPreviewReviewOptions,
   ) => void;
   clearPreviewData: () => void;
 }
@@ -97,19 +105,35 @@ export const useSitePreviewStore = create<SitePreviewState>()(
           if (state.approvedLocationSlugs.includes(slug)) return;
           state.approvedLocationSlugs.push(slug);
         }),
-      startPreviewReview: (hasMultipleLocations, locations, vendorKey) =>
+      startPreviewReview: (hasMultipleLocations, locations, vendorKey, options) =>
         set((state) => {
           state.previewLocations = locations ?? [];
-          state.currentLocationIndex = 0;
           state.approvedLocationSlugs = [];
           state.previewVendorKey = vendorKey?.trim() || null;
-          if (hasMultipleLocations) {
+
+          const openOnLocation =
+            options?.openOnLocation ??
+            state.previewScope === "location";
+          const maxIndex = Math.max(0, (locations ?? []).length - 1);
+          const initialIndex = Math.min(
+            Math.max(0, options?.initialLocationIndex ?? 0),
+            maxIndex,
+          );
+
+          if (hasMultipleLocations && openOnLocation) {
+            state.reviewStep = "location";
+            state.previewScope = "location";
+            state.currentLocationIndex = initialIndex;
+            state.mainPageApproved = false;
+          } else if (hasMultipleLocations) {
             state.reviewStep = "main";
             state.previewScope = "main";
+            state.currentLocationIndex = 0;
             state.mainPageApproved = false;
           } else {
             state.reviewStep = "location";
             state.previewScope = "location";
+            state.currentLocationIndex = initialIndex;
             state.mainPageApproved = true;
           }
         }),

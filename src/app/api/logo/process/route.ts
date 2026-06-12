@@ -16,10 +16,14 @@ function normalizeRemoveBgApiKey(value: string | undefined): string | undefined 
   return trimmed.replace(/^["']|["']$/g, "");
 }
 
+const LOGO_PROCESS_EXPOSE_HEADERS =
+  "X-Logo-Process-Method, X-Logo-Inverted-For-Contrast, X-Logo-Header-Is-Light, X-Logo-Background-Removal-Failed, X-Logo-Process-Notice";
+
 function processLogoResponseHeaders(result: Awaited<ReturnType<typeof processLogoBuffer>>) {
   return {
     "Content-Type": result.contentType,
     "Content-Disposition": 'inline; filename="logo.png"',
+    "Access-Control-Expose-Headers": LOGO_PROCESS_EXPOSE_HEADERS,
     "X-Logo-Process-Method": result.method,
     "X-Logo-Inverted-For-Contrast": result.invertedForContrast ? "true" : "false",
     "X-Logo-Header-Is-Light": result.headerIsLight ? "true" : "false",

@@ -71,7 +71,7 @@ export default function LocationSelectionHeader({
       )}
     >
       <div className="py-3">
-        <div className="container mx-auto flex items-center justify-between px-4">
+        <div className="mx-auto flex w-full min-w-0 max-w-7xl items-center justify-between px-4">
           <motion.div
             className="flex items-center"
             initial={{ opacity: 0, x: -20 }}

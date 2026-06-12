@@ -26,8 +26,16 @@ export default function AIOnboardingFlow({
   persistedHasRoomSystem,
   persistedRoomNames,
 }: AIOnboardingFlowProps) {
-  const { step, content, error, isGenerating, generateContent, setStep, reset } =
-    useAIOnboarding();
+  const {
+    step,
+    content,
+    error,
+    isGenerating,
+    generateContent,
+    setStep,
+    setError,
+    reset,
+  } = useAIOnboarding();
   const [venueInput, setVenueInput] = useState<AIOnboardingInput | null>(null);
 
   const handleCollectComplete = async (input: AIOnboardingInput) => {
@@ -45,9 +53,13 @@ export default function AIOnboardingFlow({
     onComplete();
   };
 
-  const handleApplyFailed = useCallback(() => {
-    setStep("error");
-  }, [setStep]);
+  const handleApplyFailed = useCallback(
+    (message: string) => {
+      setError(message);
+      setStep("error");
+    },
+    [setError, setStep],
+  );
 
   return (
     <div className="relative min-h-screen w-full overflow-hidden bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950">
@@ -129,7 +141,7 @@ export default function AIOnboardingFlow({
                 <span className="text-2xl">!</span>
               </div>
               <h2 className="text-2xl font-bold text-white mb-3">
-                Generation Failed
+                {step === "error" && content ? "Setup Failed" : "Generation Failed"}
               </h2>
               <p className="text-slate-400 mb-6 text-sm">{error}</p>
               <div className="flex items-center justify-center gap-3">

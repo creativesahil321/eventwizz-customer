@@ -22,6 +22,7 @@ import {
 import {
   findStepFourMenuForRoom,
   normalizeVendorStepFourRooms,
+  resolveCateringOptionFlag,
   roomEntryToStepFourFields,
   syncStepFourRoomsFromStepTwo,
 } from "@/app/(protected)/vendor/events/_lib/vendor-step-four-rooms";
@@ -256,9 +257,11 @@ export function patchEventPayloadFromApi(
       );
 
       if (stepFourIsRooms !== 1) {
+        const raw = rawStepFour as Record<string, unknown>;
         return {
           ...initialData.stepFour,
           ...rawStepFour,
+          catering_option: resolveCateringOptionFlag(raw),
           is_rooms: 0 as const,
         } as StepFourType;
       }

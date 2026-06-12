@@ -3,7 +3,10 @@
 import { ShoppingCart } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { useGetCartData } from "@/services/customer/cart/query";
-import { extractEventsFromApiResponse } from "@/app/(public)/vendor/checkout/_lib/cart-calculations";
+import {
+  countEventCartDates,
+  extractEventsFromApiResponse,
+} from "@/app/(public)/vendor/checkout/_lib/cart-calculations";
 import { useMemo, useEffect } from "react";
 import Link from "next/link";
 import { ApiEventCartData } from "@/lib/types/cart.types";
@@ -17,7 +20,6 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { detectAndFixStaleZustand } from "@/lib/utils/cart-sync-helper";
-import { CART_METADATA_KEYS_SET } from "@/lib/constants/cart-meta-keys";
 
 interface CartButtonProps {
   className?: string;
@@ -69,14 +71,9 @@ export default function CartButton({
     let totalEventsFromAPI = 0;
 
     eventsArray.forEach((event: ApiEventCartData) => {
-      // Get date keys only (exclude all metadata: event_slug, drink_title, drinks, etc.)
-      const dateKeys = Object.keys(event).filter(
-        (key) => !CART_METADATA_KEYS_SET.has(key),
-      );
-
-      // Simply count all date keys (no heavy calculations)
-      if (dateKeys.length > 0) {
-        totalDatesFromAPI += dateKeys.length;
+      const dateCount = countEventCartDates(event);
+      if (dateCount > 0) {
+        totalDatesFromAPI += dateCount;
         totalEventsFromAPI++;
       }
     });
@@ -150,18 +147,20 @@ export default function CartButton({
               className={`flex items-center gap-1 transition-colors ${className}`}
               style={{ cursor: isLoading ? "not-allowed" : "pointer" }}
             >
-              <ShoppingCart className="h-4 w-4" />
+              <span className="relative inline-flex shrink-0">
+                <ShoppingCart className="h-4 w-4" />
+                {cartSummary.hasItems && showBadge && (
+                  <Badge
+                    variant="destructive"
+                    className="absolute -top-2 -right-2 z-10 flex h-5 min-w-5 items-center justify-center rounded-full p-0 px-1 text-[10px] font-bold leading-none"
+                  >
+                    {cartSummary.totalDates > 99
+                      ? "99+"
+                      : cartSummary.totalDates}
+                  </Badge>
+                )}
+              </span>
               {size !== "icon" && <span className="inline">Cart</span>}
-
-              {/* Cart date count badge */}
-              {cartSummary.hasItems && showBadge && (
-                <Badge
-                  variant="destructive"
-                  className="absolute -top-2 -right-2 h-5 w-5 flex items-center justify-center p-0 text-xs font-bold"
-                >
-                  {cartSummary.totalDates > 99 ? "99+" : cartSummary.totalDates}
-                </Badge>
-              )}
             </div>
           </Link>
         </TooltipTrigger>

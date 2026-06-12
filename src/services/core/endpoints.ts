@@ -253,7 +253,9 @@ export const API_ENDPOINTS = {
     BOOK_EVENT: {
       STORE_CART_DATA: "/customer/event/store", // This is for to store the cart data and event booking data in database
       GET_CART_DATA: "/customer/event", // This is for to get the cart data from database and show in the cart page
-      DELETE_CART_DATA: "/customer/event/delete/{date}", // This is for to delete the cart data from database and zustand store if date not send delete all the cart data from database also from zustand store
+      DELETE_CART_DATA: "/customer/event/delete/{date}", // Non-room events: delete one date from cart
+      DELETE_CART_DATA_ROOM:
+        "/customer/event/delete/{room_id}/{date}", // Room events: delete one date for a specific room
       CHECKOUT: "/customer/event/checkout", // This is for to checkout the cart data and event booking data in database
     },
 

@@ -17,13 +17,14 @@ export type AIOnboardingStep =
   | "applying"
   | "error";
 
-interface UseAIOnboardingReturn {
+export interface UseAIOnboardingReturn {
   step: AIOnboardingStep;
   content: AIGeneratedContent | null;
   error: string | null;
   isGenerating: boolean;
   generateContent: (input: AIOnboardingInput) => Promise<AIGeneratedContent | null>;
   setStep: (step: AIOnboardingStep) => void;
+  setError: (message: string | null) => void;
   reset: () => void;
 }
 
@@ -92,6 +93,7 @@ export function useAIOnboarding(): UseAIOnboardingReturn {
     isGenerating,
     generateContent,
     setStep,
+    setError,
     reset,
   };
 }

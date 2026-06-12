@@ -2,7 +2,7 @@
 
 import { Button } from "@/components/ui/button";
 import { CircleChevronLeft, CircleChevronRight } from "lucide-react";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
@@ -12,10 +12,18 @@ import { useStoreEventBooking } from "@/services/customer/cart/query";
 import { CartRequest } from "@/services/customer/cart/type";
 import { toast } from "sonner";
 import { normalizeSlug } from "@/lib/utils";
-import { useDrinkSelectionStore } from "@/store/drink-selection.store";
+import {
+  selectScopedDrinks,
+  useDrinkSelectionStore,
+} from "@/store/drink-selection.store";
 import { useCartEditStore } from "@/store/cart-edit.store";
 import { useCartConflictCheck } from "@/app/(public)/vendor/checkout/_components/cart-conflict-provider";
 import { useGetCartData } from "@/services/customer/cart/query";
+import {
+  buildCartDateLookupKey,
+  findApiCartEventBySlug,
+  isDateInApiCart,
+} from "@/app/(public)/vendor/checkout/_lib/cart-calculations";
 import { useOnboarding } from "@/hooks/use-onboarding";
 import { useIsPreviewMode } from "@/contexts/preview-context";
 import { addCacheBusting } from "@/lib/image-utils";
@@ -43,6 +51,8 @@ type DatesSectionProps = {
   eventImage?: string;
   /** Multi-room events: scope booking to the selected room. */
   roomId?: number;
+  /** Fallback scope when room id is not assigned yet (onboarding preview). */
+  roomIndex?: number;
 };
 
 export default function DatesSection({
@@ -51,6 +61,7 @@ export default function DatesSection({
   eventName,
   eventImage,
   roomId,
+  roomIndex,
 }: DatesSectionProps) {
   const currencySymbol = useCurrencySymbol();
   const router = useRouter();
@@ -59,7 +70,7 @@ export default function DatesSection({
   const isPreviewMode = useIsPreviewMode();
   // Professional API-only approach - no local cart state needed
   const { mutateAsync: storeEventBooking, isPending } = useStoreEventBooking();
-  const { selectedDrinks } = useDrinkSelectionStore();
+  const selectedDrinks = useDrinkSelectionStore(selectScopedDrinks);
 
   // Use Zustand store instead of direct localStorage access
   const { getDateData } = useCartEditStore();
@@ -83,12 +94,14 @@ export default function DatesSection({
   }
 
   const sessionUser = session?.user as SessionUser | undefined;
-  useGetCartData(
+  const { data: apiCartData } = useGetCartData(
     sessionUser?.account_type === "customer" && !isOnboarding && !isPreviewMode,
   );
 
-  // Get cart data to check if dates are already in cart (for future use)
-  // const { data: apiCartData } = useGetCartData();
+  const cartEventData = useMemo(() => {
+    if (!eventSlug || !apiCartData) return null;
+    return findApiCartEventBySlug(apiCartData, eventSlug);
+  }, [apiCartData, eventSlug]);
   const sectionLabel = "Book Your Places Now";
   const heading = "Select a Date";
   const text = "Already Booked? Log In Here";
@@ -125,6 +138,13 @@ export default function DatesSection({
     }
   }, []);
 
+  useEffect(() => {
+    if (!eventSlug) return;
+    useDrinkSelectionStore
+      .getState()
+      .setCurrentEvent(eventSlug, roomId, roomIndex);
+  }, [eventSlug, roomId, roomIndex]);
+
   // Animation visibility trigger - reduced delay for smoother transition
   useEffect(() => {
     if (!isClient) return;
@@ -132,7 +152,7 @@ export default function DatesSection({
     return () => clearTimeout(timer);
   }, [isClient]);
 
-  // Helper function to check if a date is already in cart
+  // Helper function to check if a date is already in cart (room-aware)
   const isDateInCart = useCallback(
     (dateToCheck: string): boolean => {
       if (!eventSlug) {
@@ -140,22 +160,20 @@ export default function DatesSection({
       }
 
       try {
-        // Decode URL-encoded eventSlug to match storage format
         const decodedEventSlug = decodeURIComponent(eventSlug);
+        const storeKey = buildCartDateLookupKey(dateToCheck, roomId);
 
-        // Use Zustand store instead of direct localStorage access
-        const dateData = getDateData(decodedEventSlug, dateToCheck);
+        if (isDateInApiCart(cartEventData, dateToCheck, roomId)) {
+          return true;
+        }
 
-        // Simply check if the date exists in cart storage
-        const isInCart = !!dateData;
-
-        return isInCart;
+        return Boolean(getDateData(decodedEventSlug, storeKey));
       } catch (error) {
         console.error("Error checking cart data:", error);
         return false;
       }
     },
-    [eventSlug, getDateData],
+    [eventSlug, roomId, cartEventData, getDateData],
   );
 
   // Handle date card click - add to cart and redirect to checkout

@@ -1,3 +1,4 @@
+import { toast } from "sonner";
 import type { ProcessLogoFileResult } from "./process-logo-client";
 import { LOGO_SUPPORTED_FORMATS_LABEL, LOGO_UPLOAD_HINT } from "./supported-formats";
 
@@ -12,7 +13,10 @@ export function classifyBackgroundRemovalError(
 ): LogoProcessNotice {
   const lower = message.toLowerCase();
 
-  if (lower.includes("insufficient credit")) {
+  if (
+    lower.includes("insufficient credit") ||
+    lower.includes("insufficient credits")
+  ) {
     return "credits_unavailable";
   }
 
@@ -28,7 +32,7 @@ export function classifyBackgroundRemovalError(
 }
 
 type LogoProcessToast = {
-  variant: "success" | "message";
+  variant: "success" | "warning" | "message";
   title: string;
   description?: string;
 };
@@ -38,7 +42,7 @@ function noticeDescription(notice: LogoProcessNotice): string | undefined {
     case "foreground_unrecognized":
       return `${LOGO_UPLOAD_HINT} Supported formats: ${LOGO_SUPPORTED_FORMATS_LABEL}.`;
     case "credits_unavailable":
-      return "We applied basic cleanup for your header. Plain white or black backgrounds were removed where possible.";
+      return "Automatic background removal is temporarily unavailable. We applied basic cleanup for your header instead.";
     case "basic_cleanup":
       return "We applied basic cleanup for your header color.";
     default:
@@ -68,10 +72,14 @@ export function getLogoProcessToast(
   }
 
   if (result.backgroundRemovalFailed) {
+    const description = noticeDescription(notice ?? "basic_cleanup");
     return {
-      variant: "success",
-      title: "Logo ready for your site header",
-      description: noticeDescription(notice),
+      variant: notice === "credits_unavailable" ? "warning" : "message",
+      title:
+        notice === "credits_unavailable"
+          ? "Background removal unavailable"
+          : "Logo ready with basic cleanup",
+      description,
     };
   }
 
@@ -101,14 +109,20 @@ export function getFriendlyLogoOptimizeErrorMessage(error: unknown): string {
 }
 
 export function showLogoProcessToasts(result: ProcessLogoFileResult): void {
-  void import("sonner").then(({ toast }) => {
-    const { variant, title, description } = getLogoProcessToast(result);
+  const { variant, title, description } = getLogoProcessToast(result);
+  const options = description
+    ? { description, duration: 7000, position: "top-center" as const }
+    : { duration: 7000, position: "top-center" as const };
 
-    if (variant === "success") {
-      toast.success(title, description ? { description, duration: 6000 } : undefined);
-      return;
-    }
+  if (variant === "success") {
+    toast.success(title, options);
+    return;
+  }
 
-    toast.message(title, description ? { description, duration: 6000 } : undefined);
-  });
+  if (variant === "warning") {
+    toast.warning(title, options);
+    return;
+  }
+
+  toast.message(title, options);
 }

@@ -74,7 +74,7 @@ export function MainLandingSitePreview({
   return (
     <div
       style={previewStyles}
-      className="text-[color:var(--color-text)] font-body"
+      className="w-full min-w-0 text-[color:var(--color-text)] font-body"
     >
       <SiteEssentialsGoogleFontsLoader
         linkId="site-essentials-google-fonts-main-landing-preview"
@@ -89,7 +89,7 @@ export function MainLandingSitePreview({
 
       <section
         className={cn(
-          "relative mx-auto flex w-full justify-center overflow-hidden",
+          "relative flex w-full min-w-0 justify-center overflow-hidden",
           heroBandHeightClass,
           heroBandVerticalClass("center"),
         )}
@@ -153,8 +153,8 @@ export function MainLandingSitePreview({
         </div>
       </section>
 
-      <section className="bg-[var(--color-background)] pb-16 pt-10">
-        <div className="container mx-auto max-w-7xl px-4 sm:px-6">
+      <section className="w-full bg-[var(--color-background)] pb-16 pt-10">
+        <div className="mx-auto w-full min-w-0 max-w-7xl px-4 sm:px-6">
           <div className="mb-10 text-center">
             <span className="mb-2 block text-xs font-bold uppercase tracking-widest text-[color:var(--color-primary)]">
               Explore cities

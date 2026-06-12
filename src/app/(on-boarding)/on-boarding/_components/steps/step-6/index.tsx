@@ -71,7 +71,9 @@ type MenuType = {
 const emptyMenus: MenuType[] = [];
 
 const normalizeCateringOption = (value: unknown): 0 | 1 => {
-  if (value === 1 || value === "1" || value === true) return 1;
+  if (value === 1 || value === "1" || value === true || value === "true") {
+    return 1;
+  }
   return 0;
 };
 
@@ -362,7 +364,7 @@ export default function StepSix() {
 
   // Set showMenuSection based on catering_option value
   const cateringOption = form.watch("catering_option");
-  const showMenuSection = cateringOption === 1;
+  const showMenuSection = normalizeCateringOption(cateringOption) === 1;
 
   // Setup field array for menus
   const {
@@ -828,7 +830,9 @@ export default function StepSix() {
                                       clearCateringMenuDetails();
                                     }
                                   }}
-                                  value={String(field.value ?? 0)}
+                                  value={String(
+                                    normalizeCateringOption(field.value),
+                                  )}
                                   className="flex mt-4 space-x-6"
                                   onFocus={() =>
                                     handleFieldFocus("catering_option")

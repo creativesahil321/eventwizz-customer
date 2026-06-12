@@ -3,11 +3,11 @@
 import { useDomain } from "@/providers/domain-provider/domain-provider";
 import CheckoutHeader from "./_components/checkout-header";
 import CartManager from "./_components/cart-manager";
-import { motion } from "framer-motion";
 import { CheckoutPageProps } from "./_lib/types";
 import { useCheckoutAuth } from "./_lib/hooks";
-import { ANIMATION_VARIANTS, LOADING_MESSAGES } from "./_lib/constants";
+import { LOADING_MESSAGES } from "./_lib/constants";
 import BookingSummary from "./_components/booking-summary";
+import "./checkout-theme.css";
 
 export default function CheckoutPage({}: CheckoutPageProps) {
   const { settings, isLoading: isDomainLoading } = useDomain();
@@ -62,27 +62,20 @@ export default function CheckoutPage({}: CheckoutPageProps) {
   }
 
   return (
-    <motion.div
-      className="min-h-screen bg-[#FAFBFC]"
-      {...ANIMATION_VARIANTS.FADE_IN_UP}
-    >
-      {/* Header */}
+    <div className="checkout-page min-h-screen">
       <CheckoutHeader settings={settings || undefined} />
 
-      {/* Main Content - 2-column layout */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8">
-          {/* Main content area — tickets/tables/drinks */}
-          <div className="lg:col-span-7 xl:col-span-8">
+      <div className="mx-auto max-w-7xl px-3 py-4 sm:px-6 sm:py-8">
+        <div className="grid grid-cols-1 items-start gap-6 sm:gap-8 lg:grid-cols-12">
+          <div className="min-w-0 pb-[var(--checkout-mobile-bar-offset)] lg:col-span-8 lg:pb-0">
             <CartManager />
           </div>
 
-          {/* Order summary sidebar */}
-          <div className="lg:col-span-5 xl:col-span-4">
+          <aside className="min-w-0 lg:col-span-4">
             <BookingSummary />
-          </div>
+          </aside>
         </div>
       </div>
-    </motion.div>
+    </div>
   );
 }

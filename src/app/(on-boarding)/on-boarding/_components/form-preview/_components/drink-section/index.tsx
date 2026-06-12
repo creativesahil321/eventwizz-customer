@@ -19,6 +19,10 @@ type DrinkSectionProps = {
   description: string;
   packages: DrinkPackage[];
   eventSlug?: string; // Optional for backward compatibility
+  /** Multi-room events: isolate drink selections per room. */
+  roomId?: number;
+  /** Fallback scope when room id is not assigned yet (onboarding preview). */
+  roomIndex?: number;
   /** Show package list without an extra click (default: open on public + preview). */
   defaultExpanded?: boolean;
 };
@@ -28,26 +32,23 @@ export default function DrinkSection({
   description,
   packages,
   eventSlug,
+  roomId,
+  roomIndex,
   defaultExpanded = true,
 }: DrinkSectionProps) {
   const { format: formatMoney } = useCurrencyFormat();
   const [showMore] = useState(defaultExpanded);
   const isHydrated = useHydration(); // Professional hydration handling
-  const {
-    addDrink,
-    updateDrinkQuantity,
-    getDrinkQuantity,
-    getTotalDrinks,
-    setCurrentEvent,
-  } = useDrinkSelectionStore();
+  const { addDrink, updateDrinkQuantity, getDrinkQuantity, getTotalDrinks } =
+    useDrinkSelectionStore();
 
-  // 🍷 DRINK CLEANUP: Initialize event slug when component mounts
   useEffect(() => {
     if (eventSlug && isHydrated) {
-      console.log(`🍷 Initializing drink store for event: ${eventSlug}`);
-      setCurrentEvent(eventSlug);
+      useDrinkSelectionStore
+        .getState()
+        .setCurrentEvent(eventSlug, roomId, roomIndex);
     }
-  }, [eventSlug, isHydrated, setCurrentEvent]);
+  }, [eventSlug, roomId, roomIndex, isHydrated]);
 
   const safePackages = Array.isArray(packages) ? packages : [];
 

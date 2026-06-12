@@ -1,6 +1,10 @@
 import type { SiteEssentials } from "@/services/common/site-essentials/type";
 import type { SiteEssentialsFormValues } from "./schema";
 import { mergeSiteEssentialsPreviewWithApi } from "./merge-preview-with-api";
+import {
+  normalizeSiteEssentialsEvents,
+  normalizeSiteEssentialsGallery,
+} from "./site-essentials-preview-events";
 
 /** Location-scoped fields returned when fetching site essentials with a slug. */
 const LOCATION_SCOPED_KEYS = [
@@ -129,6 +133,26 @@ export function mergeGlobalWithLocationSiteEssentials(
   );
 
   let result = preserveMainLandingFields(merged, global);
+
+  const formSlug = global.slug?.trim() ?? "";
+  const usePerLocationReadonlyFields =
+    Boolean(previewSlug) &&
+    !options?.isSingleLocation &&
+    formSlug !== previewSlug;
+
+  if (usePerLocationReadonlyFields) {
+    result = {
+      ...result,
+      slug: previewSlug,
+      latest_events: normalizeSiteEssentialsEvents(
+        perLocation.latest_events,
+      ) as unknown as SiteEssentialsFormValues["latest_events"],
+      upcoming_events: normalizeSiteEssentialsEvents(
+        perLocation.upcoming_events,
+      ) as unknown as SiteEssentialsFormValues["upcoming_events"],
+      event_gallery: normalizeSiteEssentialsGallery(perLocation.event_gallery),
+    };
+  }
 
   if (locationLabel?.trim()) {
     result = { ...result, name: locationLabel.trim() };

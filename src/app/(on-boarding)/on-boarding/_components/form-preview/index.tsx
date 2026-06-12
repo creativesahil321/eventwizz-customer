@@ -32,6 +32,7 @@ import { EventHeroBand } from "@/components/public/event-hero-band";
 import { LocationMarketingBody } from "@/components/public/location-marketing-sections";
 import { Image as ImageIcon } from "lucide-react";
 import { useCurrencySymbol } from "@/hooks/use-currency-format";
+import { normalizeSlug } from "@/lib/utils";
 
 // Lazy load components - only import what's actually used
 const BrochureSection = lazy(() => import("./_components/brochure-section"));
@@ -403,6 +404,24 @@ export default function FormPreview() {
     return rooms[idx]?.drinks ?? formState.stepEight;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [formState.multiSpace, formState.stepEight, formTick]);
+
+  const previewEventSlug = useMemo(() => {
+    const name = formState.stepThree?.event_name?.trim();
+    return name ? normalizeSlug(name) : "onboarding-preview";
+  }, [formState.stepThree?.event_name]);
+
+  const activePreviewRoomScope = useMemo(() => {
+    const ms = formState.multiSpace;
+    if (!ms?.enabled || !ms.rooms?.length) {
+      return { roomId: undefined, roomIndex: undefined };
+    }
+    const idx = Math.min(
+      ms.currentRoomIndex ?? 0,
+      Math.max(ms.rooms.length - 1, 0),
+    );
+    return { roomId: ms.rooms[idx]?.id, roomIndex: idx };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [formState.multiSpace, formTick]);
 
   // Stable gallery for preview: reuse File.preview when set (avoids new blob URLs on reorder so preview updates instantly)
   const galleryPreviewItems = useMemo(() => {
@@ -949,8 +968,11 @@ export default function FormPreview() {
           <Suspense fallback={<SectionLoader />}>
             <DatesSection
               dates={datesPreviewItems}
+              eventSlug={previewEventSlug}
               eventName={formState.stepThree?.event_name || undefined}
               eventImage={datesEventImage}
+              roomId={activePreviewRoomScope.roomId}
+              roomIndex={activePreviewRoomScope.roomIndex}
             />
           </Suspense>
         </div>
@@ -1021,6 +1043,9 @@ export default function FormPreview() {
                     price: Number(pkg.price),
                   })) || []
                 }
+                eventSlug={previewEventSlug}
+                roomId={activePreviewRoomScope.roomId}
+                roomIndex={activePreviewRoomScope.roomIndex}
                 defaultExpanded
               />
             </Suspense>

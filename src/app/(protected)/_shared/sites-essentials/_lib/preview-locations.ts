@@ -7,6 +7,25 @@ export type PreviewLocationItem = {
   city: string;
 };
 
+export function previewLocationItemsToLocationData(
+  locations: PreviewLocationItem[],
+): LocationData[] {
+  return locations.map((loc) => ({
+    id: loc.id,
+    slug: loc.slug,
+    city: loc.city,
+  }));
+}
+
+/** Main landing grid: form/API locations first, then venue/session fallbacks. */
+export function resolveMainLandingPreviewLocations(
+  formLocations: LocationData[] | undefined,
+  fallback: PreviewLocationItem[],
+): LocationData[] {
+  if (formLocations?.length) return formLocations;
+  return previewLocationItemsToLocationData(fallback);
+}
+
 export function toPreviewLocationList(
   locations: LocationData[] | undefined,
 ): PreviewLocationItem[] {
