@@ -3,11 +3,10 @@
 import { useMemo } from "react";
 import { Calendar, ChevronDown, ChevronUp } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
-import { Separator } from "@/components/ui/separator";
 import { EditableDateData } from "@/store/cart-edit.store";
 import type { ApiRoomCartData } from "@/lib/types/cart.types";
-import { parseRoomDateKey } from "../_lib/cart-calculations";
-import { getCheckoutRoomTone } from "../_lib/checkout-room-tones";
+import { parseRoomDateKey, getBillableTables } from "../_lib/cart-calculations";
+import { getRoomFloatingAccent } from "@/lib/room-accent-palette";
 import { cn } from "@/lib/utils";
 
 interface OrderViewBreakdownProps {
@@ -24,13 +23,6 @@ interface OrderViewBreakdownProps {
     laterAmount: number;
     fullAmount: number;
   }>;
-  totals: {
-    subtotal: number;
-    platformFee: number;
-    dueToday: number;
-    dueLater: number;
-    grandTotal: number;
-  };
 }
 
 function getGuestCount(dateData: EditableDateData): number {
@@ -116,7 +108,7 @@ function DateBreakdownCard({
   formatDate: (dateKey: string) => string;
 }) {
   const { dateData, key, fullAmount } = entry;
-  const activeTables = dateData.tables.filter((t) => t.quantity > 0);
+  const activeTables = getBillableTables(dateData);
   const activeTickets = dateData.tickets.filter((t) => t.quantity > 0);
   const activeDrinks = dateData.drinks.filter((d) => d.quantity > 0);
   const guestCount = getGuestCount(dateData);
@@ -211,7 +203,6 @@ export default function OrderViewBreakdown({
   formatDate,
   rooms = [],
   dates,
-  totals,
 }: OrderViewBreakdownProps) {
   const activeDates = dates.filter((d) => d.fullAmount > 0);
   const roomMode = rooms.length > 0;
@@ -264,13 +255,13 @@ export default function OrderViewBreakdown({
                 </p>
               ) : roomMode && roomGroups ? (
                 roomGroups.map(({ room, index, roomDates, roomTotal }) => {
-                  const tone = getCheckoutRoomTone(index);
+                  const accent = getRoomFloatingAccent(index);
                   return (
                     <div key={room.room_id} className="space-y-2.5">
                       <div className="flex items-center justify-between gap-3">
                         <div className="flex min-w-0 items-center gap-2">
                           <span
-                            className={cn("h-2 w-2 shrink-0 rounded-full", tone.dot)}
+                            className={cn("h-2 w-2 shrink-0 rounded-full", accent.dot)}
                             aria-hidden
                           />
                           <div className="min-w-0 leading-tight">
@@ -309,42 +300,6 @@ export default function OrderViewBreakdown({
                     formatDate={formatDate}
                   />
                 ))
-              )}
-
-              {activeDates.length > 0 && (
-                <>
-                  <Separator className="bg-[color:var(--checkout-border)]" />
-                  <div className="space-y-1.5 text-sm">
-                    <div className="flex justify-between text-[color:var(--checkout-muted-foreground)]">
-                      <span>Booking subtotal</span>
-                      <span className="tabular-nums">
-                        {formatMoney(totals.subtotal)}
-                      </span>
-                    </div>
-                    {totals.platformFee > 0 && (
-                      <div className="flex justify-between text-xs text-[color:var(--checkout-muted-foreground)]">
-                        <span>Service fee</span>
-                        <span className="tabular-nums">
-                          {formatMoney(totals.platformFee)}
-                        </span>
-                      </div>
-                    )}
-                    <div className="flex justify-between rounded-lg bg-[color:var(--checkout-muted)]/60 px-2.5 py-2 font-bold text-[color:var(--checkout-foreground)]">
-                      <span>{totals.dueLater > 0 ? "Due today" : "Total"}</span>
-                      <span className="tabular-nums">
-                        {formatMoney(totals.dueToday)}
-                      </span>
-                    </div>
-                    {totals.dueLater > 0 && (
-                      <div className="flex justify-between font-medium text-[color:var(--checkout-brand-accent)]">
-                        <span>Due later</span>
-                        <span className="tabular-nums">
-                          {formatMoney(totals.dueLater)}
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                </>
               )}
             </div>
           </motion.div>

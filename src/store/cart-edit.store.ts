@@ -20,6 +20,8 @@ import {
 import {
   buildRoomDateKey,
   getApiCartDateKeys,
+  getBillableTables,
+  hasUnconfirmedTableSeating,
   isRoomBasedApiRecord,
   parseRoomDateKey,
 } from "@/app/(public)/vendor/checkout/_lib/cart-calculations";
@@ -35,9 +37,9 @@ function calculatePaymentAmounts(
   let laterAmount = 0;
 
   if (paymentType === "full") {
-    // Pay full amount today - only include items with quantity > 0
+    const billableTables = getBillableTables(dateData);
     const activeItems = [
-      ...dateData.tables.filter((table) => table.quantity > 0),
+      ...billableTables,
       ...dateData.tickets.filter((ticket) => ticket.quantity > 0),
       ...dateData.drinks.filter((drink) => drink.quantity > 0),
     ];
@@ -67,9 +69,9 @@ function calculatePaymentAmounts(
 
     laterAmount = 0;
   } else {
-    // Pay deposit today, rest later - only include items with quantity > 0
+    const billableTables = getBillableTables(dateData);
     const activeItems = [
-      ...dateData.tables.filter((table) => table.quantity > 0),
+      ...billableTables,
       ...dateData.tickets.filter((ticket) => ticket.quantity > 0),
       ...dateData.drinks.filter((drink) => drink.quantity > 0),
     ];
@@ -254,8 +256,6 @@ function mapApiDateBucketToEditableDate(
   drinkCatalog: Array<Record<string, unknown>>,
 ): EditableDateData {
   const paymentConfig = (dateData.payment as Record<string, unknown>) || {};
-  const paymentType =
-    paymentConfig.type === "deposit" ? ("deposit" as const) : ("full" as const);
   const depositAmount = Number(paymentConfig.deposit_amount || 0);
   const balanceDueDate = paymentConfig.balance_due_date
     ? String(paymentConfig.balance_due_date)
@@ -291,7 +291,9 @@ function mapApiDateBucketToEditableDate(
         (table) => table.quantity > 0 && (table.allocation?.length ?? 0) > 0,
       )
       .map((table) => table.id),
-    paymentType,
+    tableSeatingSkipped:
+      !tables.some((table) => table.quantity > 0) && tickets.length > 0,
+    paymentType: "full",
     depositAmount,
     balanceDueDate,
     isDepositEnabled,
@@ -314,6 +316,35 @@ function itemsSnapshotEqual(a: EditableItem[], b: EditableItem[]): boolean {
   return true;
 }
 
+/**
+ * Merge API catalog fields (price, capacity) while keeping user selections
+ * (quantity, allocation) from the local edit session.
+ */
+function mergeEditableItemsFromApi(
+  existing: EditableItem[],
+  mapped: EditableItem[],
+): EditableItem[] {
+  const existingById = new Map(existing.map((item) => [item.id, item]));
+
+  const merged = mapped.map((item) => {
+    const prev = existingById.get(item.id);
+    if (!prev) return item;
+    return {
+      ...item,
+      quantity: prev.quantity,
+      allocation: prev.allocation ?? item.allocation,
+    };
+  });
+
+  for (const item of existing) {
+    if (!mapped.some((mappedItem) => mappedItem.id === item.id)) {
+      merged.push(item);
+    }
+  }
+
+  return merged;
+}
+
 function editableDatesEqual(
   a: EditableDateData,
   b: EditableDateData,
@@ -327,10 +358,34 @@ function editableDatesEqual(
     a.isDepositEnabled === b.isDepositEnabled &&
     a.depositType === b.depositType &&
     a.depositValue === b.depositValue &&
+    a.tableSeatingSkipped === b.tableSeatingSkipped &&
     itemsSnapshotEqual(a.tables, b.tables) &&
     itemsSnapshotEqual(a.tickets, b.tickets) &&
     itemsSnapshotEqual(a.drinks, b.drinks)
   );
+}
+
+/** Merge API snapshot into saved local state — quantities stay client-authoritative. */
+function mergeReconciledSavedDate(
+  existing: EditableDateData,
+  mapped: EditableDateData,
+): EditableDateData {
+  return {
+    ...mapped,
+    tables: mergeEditableItemsFromApi(existing.tables, mapped.tables),
+    tickets: mergeEditableItemsFromApi(existing.tickets, mapped.tickets),
+    drinks: mergeEditableItemsFromApi(existing.drinks, mapped.drinks),
+    peopleCount: existing.peopleCount,
+    specialRequest: existing.specialRequest,
+    paymentType: existing.paymentType,
+    confirmedTableIds:
+      (existing.confirmedTableIds?.length ?? 0) > 0
+        ? existing.confirmedTableIds
+        : mapped.confirmedTableIds,
+    tableSeatingSkipped:
+      existing.tableSeatingSkipped ?? mapped.tableSeatingSkipped,
+    hasChanges: false,
+  };
 }
 
 function allocationsEqual(a?: number[], b?: number[]): boolean {
@@ -436,6 +491,8 @@ export interface EditableDateData {
   specialRequest?: string; // Special requests for support team
   /** Table type IDs with seating confirmed via "Confirm Seating". */
   confirmedTableIds?: number[];
+  /** Customer opted out of table seating (tickets-only booking). */
+  tableSeatingSkipped?: boolean;
 
   // NEW: Payment selection per date
   paymentType: "full" | "deposit";
@@ -584,6 +641,8 @@ export interface CartEditState {
     allocation: number[],
   ) => void;
   hasPendingTableConfirmation: (eventSlug: string, date: string) => boolean;
+  skipTableSeating: (eventSlug: string, date: string) => void;
+  resumeTableSeating: (eventSlug: string, date: string) => void;
   validateGuestAllocation: (
     eventSlug: string,
     date: string
@@ -650,16 +709,12 @@ export const useCartEditStore = create<CartEditState>()(
               return;
             }
 
-            if (
-              !hasActiveDrinkSelection(existing.drinks) &&
-              (mapped.drinks.length > existing.drinks.length ||
-                hasActiveDrinkSelection(mapped.drinks))
-            ) {
-              newEditingData[eventSlug][storeKey] = {
-                ...existing,
-                drinks: mapped.drinks,
-              };
-            }
+            if (existing.hasChanges) return;
+
+            newEditingData[eventSlug][storeKey] = mergeReconciledSavedDate(
+              existing,
+              mapped,
+            );
           });
 
           return { editingData: newEditingData };
@@ -722,22 +777,16 @@ export const useCartEditStore = create<CartEditState>()(
               drinkCatalog,
             );
 
+            // Unsaved local edits are authoritative — never merge API data mid-edit.
             if (existing.hasChanges) {
-              if (
-                !hasActiveDrinkSelection(existing.drinks) &&
-                hasActiveDrinkSelection(mapped.drinks)
-              ) {
-                newEditingData[eventSlug][storeKey] = {
-                  ...existing,
-                  drinks: mapped.drinks,
-                };
-                didUpdate = true;
-              }
               return;
             }
 
             if (!editableDatesEqual(existing, mapped)) {
-              newEditingData[eventSlug][storeKey] = mapped;
+              newEditingData[eventSlug][storeKey] = mergeReconciledSavedDate(
+                existing,
+                mapped,
+              );
               didUpdate = true;
             }
           });
@@ -860,9 +909,11 @@ export const useCartEditStore = create<CartEditState>()(
 
               if (itemType === "table") {
                 dateData.confirmedTableIds = [];
-              } else {
-                dateData.hasChanges = true;
+                if (quantity > 0) {
+                  dateData.tableSeatingSkipped = false;
+                }
               }
+              dateData.hasChanges = true;
               newEditingData[eventSlug][date] = dateData;
             }
           }
@@ -991,8 +1042,9 @@ export const useCartEditStore = create<CartEditState>()(
           return { editingData: newEditingData };
         });
 
-        // Re-pick best table match whenever group size changes
-        get().applyBestTableMatch(eventSlug, date);
+        if (!get().getDateData(eventSlug, date)?.tableSeatingSkipped) {
+          get().applyBestTableMatch(eventSlug, date);
+        }
       },
 
       updateSpecialRequest: (
@@ -1028,7 +1080,7 @@ export const useCartEditStore = create<CartEditState>()(
 
         // Check if user has any items at all for this date
         const hasAnyItems =
-          dateData.tables.some((t) => t.quantity > 0) ||
+          getBillableTables(dateData).length > 0 ||
           dateData.tickets.some((t) => t.quantity > 0) ||
           dateData.drinks.some((d) => d.quantity > 0);
 
@@ -1041,7 +1093,7 @@ export const useCartEditStore = create<CartEditState>()(
         }
 
         // If user has items, they must have at least one table OR ticket
-        const hasTable = dateData.tables.some((t) => t.quantity > 0);
+        const hasTable = getBillableTables(dateData).length > 0;
         const hasTicket = dateData.tickets.some((t) => t.quantity > 0);
         const hasTableOrTicket = hasTable || hasTicket;
 
@@ -1054,9 +1106,13 @@ export const useCartEditStore = create<CartEditState>()(
           };
         }
 
-        // Validate table capacity if tables are selected
+        // Validate table capacity if tables are selected and not skipped
         const selectedTables = dateData.tables.filter((t) => t.quantity > 0);
-        if (selectedTables.length > 0 && dateData.peopleCount) {
+        if (
+          !dateData.tableSeatingSkipped &&
+          selectedTables.length > 0 &&
+          dateData.peopleCount
+        ) {
           let totalMinCapacity = 0;
           let totalMaxCapacity = 0;
 
@@ -1084,6 +1140,15 @@ export const useCartEditStore = create<CartEditState>()(
               errorMessage: `Selected tables require at least ${totalMinCapacity} guests, but you have ${dateData.peopleCount} guests. Please select smaller tables or reduce table quantity.`,
             };
           }
+        }
+
+        if (hasUnconfirmedTableSeating(dateData)) {
+          return {
+            isValid: false,
+            hasTableOrTicket: true,
+            errorMessage:
+              "Please confirm table seating, or remove it to continue with tickets only",
+          };
         }
 
         return {
@@ -1252,8 +1317,7 @@ export const useCartEditStore = create<CartEditState>()(
           slug: eventSlug,
           event_date: actualDate,
           ...(resolvedRoomId != null ? { room_id: resolvedRoomId } : {}),
-          tables: dateData.tables
-            .filter((table) => table.quantity > 0)
+          tables: getBillableTables(dateData)
             .map((table) => ({
               id: table.id,
               table_size: table.tableSize || table.maxPersons || 20,
@@ -1333,7 +1397,7 @@ export const useCartEditStore = create<CartEditState>()(
             newEditingData[eventSlug][date] = {
               ...dateData,
               paymentType: finalPaymentType,
-              hasChanges: true,
+              // Checkout preference only — not sent on cart POST; avoid autosave.
             };
           }
 
@@ -1381,7 +1445,9 @@ export const useCartEditStore = create<CartEditState>()(
       applyBestTableMatch: (eventSlug: string, date: string) => {
         set((state) => {
           const dateData = state.editingData[eventSlug]?.[date];
-          if (!dateData?.tables?.length) return state;
+          if (!dateData?.tables?.length || dateData.tableSeatingSkipped) {
+            return state;
+          }
 
           const peopleCount = dateData.peopleCount || 20;
           const selection = resolveBestTableSelection(
@@ -1409,7 +1475,9 @@ export const useCartEditStore = create<CartEditState>()(
                     ...dateData,
                     tables: clearedTables,
                     confirmedTableIds: [],
-                    hasChanges: false,
+                    // Keep seating active so UI can show "no tables for group size"
+                    tableSeatingSkipped: false,
+                    hasChanges: true,
                   },
                 },
               },
@@ -1441,7 +1509,8 @@ export const useCartEditStore = create<CartEditState>()(
                   ...dateData,
                   tables: updatedTables,
                   confirmedTableIds: [],
-                  hasChanges: false,
+                  tableSeatingSkipped: false,
+                  hasChanges: true,
                 },
               },
             },
@@ -1487,6 +1556,7 @@ export const useCartEditStore = create<CartEditState>()(
               };
 
               dateData.tables = tables;
+              dateData.hasChanges = true;
               newEditingData[eventSlug][date] = dateData;
             }
           }
@@ -1530,6 +1600,7 @@ export const useCartEditStore = create<CartEditState>()(
             ...dateData,
             tables,
             confirmedTableIds: Array.from(confirmed),
+            tableSeatingSkipped: false,
             hasChanges: true,
           };
 
@@ -1539,13 +1610,57 @@ export const useCartEditStore = create<CartEditState>()(
 
       hasPendingTableConfirmation: (eventSlug: string, date: string) => {
         const dateData = get().getDateData(eventSlug, date);
-        if (!dateData) return false;
+        if (dateData?.tableSeatingSkipped) return false;
+        return hasUnconfirmedTableSeating(dateData);
+      },
 
-        const activeTables = dateData.tables.filter((table) => table.quantity > 0);
-        if (activeTables.length === 0) return false;
+      skipTableSeating: (eventSlug: string, date: string) => {
+        set((state) => {
+          const dateData = state.editingData[eventSlug]?.[date];
+          if (!dateData) return state;
 
-        const confirmed = new Set(dateData.confirmedTableIds ?? []);
-        return activeTables.some((table) => !confirmed.has(table.id));
+          const clearedTables = dateData.tables.map((table) => ({
+            ...table,
+            quantity: 0,
+            allocation: [],
+          }));
+
+          return {
+            editingData: {
+              ...state.editingData,
+              [eventSlug]: {
+                ...state.editingData[eventSlug],
+                [date]: {
+                  ...dateData,
+                  tables: clearedTables,
+                  confirmedTableIds: [],
+                  tableSeatingSkipped: true,
+                  hasChanges: true,
+                },
+              },
+            },
+          };
+        });
+      },
+
+      resumeTableSeating: (eventSlug: string, date: string) => {
+        set((state) => {
+          const dateData = state.editingData[eventSlug]?.[date];
+          if (!dateData) return state;
+
+          return {
+            editingData: {
+              ...state.editingData,
+              [eventSlug]: {
+                ...state.editingData[eventSlug],
+                [date]: {
+                  ...dateData,
+                  tableSeatingSkipped: false,
+                },
+              },
+            },
+          };
+        });
       },
 
       validateGuestAllocation: (eventSlug: string, date: string) => {

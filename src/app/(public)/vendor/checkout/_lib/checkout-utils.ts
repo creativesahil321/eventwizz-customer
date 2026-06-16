@@ -13,6 +13,8 @@ import { EditableDateData } from "@/store/cart-edit.store";
 import {
   extractEventsFromApiResponse,
   findEventBySlug,
+  getBillableTables,
+  hasUnconfirmedTableSeating,
 } from "./cart-calculations";
 import { formatMoney, resolveCurrencySymbol } from "@/lib/currency-format";
 import { useDomainStore } from "@/store/domain.store";
@@ -99,26 +101,24 @@ export function transformCartToCheckout(
 
   Object.entries(eventData).forEach(([date, dateData]) => {
     // Only include dates with items
+    const billableTables = getBillableTables(dateData);
     const hasItems =
-      dateData.tables.some((t) => t.quantity > 0) ||
+      billableTables.length > 0 ||
       dateData.tickets.some((t) => t.quantity > 0) ||
       dateData.drinks.some((d) => d.quantity > 0);
 
     if (!hasItems) return;
 
-    // Transform tables
-    const tables = dateData.tables
-      .filter((table) => table.quantity > 0)
-      .map((table) => ({
-        id: table.id,
-        table_size: table.tableSize || table.maxPersons || 20,
-        price_per_person: table.pricePerPerson || table.price,
-        no_tables: table.quantity,
-        allocation:
-          table.allocation && table.allocation.length > 0
-            ? table.allocation
-            : Array(table.quantity).fill(table.minPersons || 1),
-      }));
+    const tables = billableTables.map((table) => ({
+      id: table.id,
+      table_size: table.tableSize || table.maxPersons || 20,
+      price_per_person: table.pricePerPerson || table.price,
+      no_tables: table.quantity,
+      allocation:
+        table.allocation && table.allocation.length > 0
+          ? table.allocation
+          : Array(table.quantity).fill(table.minPersons || 1),
+    }));
 
     // Transform tickets
     const tickets = dateData.tickets
@@ -171,14 +171,14 @@ export function transformCartToCheckout(
     // Extract payment configuration from API data for this date
     const apiDateData = apiEventData?.[date] as
       | {
-          payment?: {
-            type?: string;
-            is_deposit_enabled?: boolean;
-            deposit_type?: "amount" | "percentage";
-            deposit_value?: number;
-            balance_due_date?: string | null;
-          };
-        }
+        payment?: {
+          type?: string;
+          is_deposit_enabled?: boolean;
+          deposit_type?: "amount" | "percentage";
+          deposit_value?: number;
+          balance_due_date?: string | null;
+        };
+      }
       | undefined;
 
     const paymentConfig = apiDateData?.payment;
@@ -331,8 +331,9 @@ export function validateCheckoutRequirements(
   let hasValidDates = 0;
 
   Object.entries(eventData).forEach(([date, dateData]) => {
+    const billableTables = getBillableTables(dateData);
     const hasItems =
-      dateData.tables.some((t) => t.quantity > 0) ||
+      billableTables.length > 0 ||
       dateData.tickets.some((t) => t.quantity > 0) ||
       dateData.drinks.some((d) => d.quantity > 0);
 
@@ -340,9 +341,14 @@ export function validateCheckoutRequirements(
       hasAnyItems = true;
       hasValidDates++;
 
-      // Validate that each date has at least one table or ticket (not just drinks)
+      if (hasUnconfirmedTableSeating(dateData)) {
+        errors.push(
+          `${date}: Please confirm table seating, or remove it to continue with tickets only`,
+        );
+      }
+
       const hasTableOrTicket =
-        dateData.tables.some((t) => t.quantity > 0) ||
+        billableTables.length > 0 ||
         dateData.tickets.some((t) => t.quantity > 0);
 
       if (!hasTableOrTicket) {
@@ -351,8 +357,7 @@ export function validateCheckoutRequirements(
         );
       }
 
-      // Validate table capacity and guest allocation
-      const selectedTables = dateData.tables.filter((t) => t.quantity > 0);
+      const selectedTables = billableTables;
       const totalTablesSelected = selectedTables.reduce(
         (sum, table) => sum + table.quantity,
         0
@@ -397,15 +402,13 @@ export function validateCheckoutRequirements(
             table.allocation.forEach((guestCount, index) => {
               if (guestCount < (table.minPersons || 1)) {
                 errors.push(
-                  `${date}: ${table.title} Table ${index + 1} needs at least ${
-                    table.minPersons
+                  `${date}: ${table.title} Table ${index + 1} needs at least ${table.minPersons
                   } guests`
                 );
               }
               if (guestCount > (table.maxPersons || 999)) {
                 errors.push(
-                  `${date}: ${table.title} Table ${index + 1} exceeds maximum ${
-                    table.maxPersons
+                  `${date}: ${table.title} Table ${index + 1} exceeds maximum ${table.maxPersons
                   } guests`
                 );
               }
@@ -515,8 +518,9 @@ export function calculateCheckoutSummary(
   let itemCount = 0;
 
   Object.entries(eventData).forEach(([date, dateData]) => {
+    const billableTables = getBillableTables(dateData);
     const hasItems =
-      dateData.tables.some((t) => t.quantity > 0) ||
+      billableTables.length > 0 ||
       dateData.tickets.some((t) => t.quantity > 0) ||
       dateData.drinks.some((d) => d.quantity > 0);
 
@@ -524,30 +528,26 @@ export function calculateCheckoutSummary(
 
     dateCount++;
 
-    // Calculate date totals
     let dateTotal = 0;
 
-    // Table costs
-    dateData.tables
-      .filter((t) => t.quantity > 0)
-      .forEach((table) => {
-        itemCount += table.quantity;
-        const pricePerPerson = table.pricePerPerson || table.price;
+    billableTables.forEach((table) => {
+      itemCount += table.quantity;
+      const pricePerPerson = table.pricePerPerson || table.price;
 
-        if (table.allocation && table.allocation.length > 0) {
-          const totalGuests = table.allocation.reduce(
-            (sum, guests) => sum + guests,
-            0
-          );
-          // Only charge if guests are actually allocated
-          if (totalGuests > 0) {
-            dateTotal += pricePerPerson * totalGuests;
-          }
-        } else {
-          // No allocation = no cost (0 guests)
-          dateTotal += 0;
+      if (table.allocation && table.allocation.length > 0) {
+        const totalGuests = table.allocation.reduce(
+          (sum, guests) => sum + guests,
+          0
+        );
+        // Only charge if guests are actually allocated
+        if (totalGuests > 0) {
+          dateTotal += pricePerPerson * totalGuests;
         }
-      });
+      } else {
+        // No allocation = no cost (0 guests)
+        dateTotal += 0;
+      }
+    });
 
     // Ticket costs
     dateData.tickets
@@ -570,14 +570,14 @@ export function calculateCheckoutSummary(
     // Extract payment configuration from API data for this date
     const apiDateData = apiEventData?.[date] as
       | {
-          payment?: {
-            type?: string;
-            is_deposit_enabled?: boolean;
-            deposit_type?: "amount" | "percentage";
-            deposit_value?: number;
-            balance_due_date?: string | null;
-          };
-        }
+        payment?: {
+          type?: string;
+          is_deposit_enabled?: boolean;
+          deposit_type?: "amount" | "percentage";
+          deposit_value?: number;
+          balance_due_date?: string | null;
+        };
+      }
       | undefined;
 
     const paymentConfig = apiDateData?.payment;

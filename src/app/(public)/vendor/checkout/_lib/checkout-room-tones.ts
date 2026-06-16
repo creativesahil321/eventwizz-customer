@@ -1,8 +1,10 @@
+import { getRoomFloatingAccent } from "@/lib/room-accent-palette";
+
 /** Lovable-style room tone palette (emerald / violet alternating). */
 export const CHECKOUT_LOVABLE_ROOM_TONES = [
   {
     id: "emerald" as const,
-    dot: "bg-emerald-500",
+    dot: getRoomFloatingAccent(0).dot,
     iconInactive: "bg-emerald-50 text-emerald-600",
     calendarIcon: "bg-emerald-50 text-emerald-700",
     tabInactive:
@@ -11,7 +13,7 @@ export const CHECKOUT_LOVABLE_ROOM_TONES = [
   },
   {
     id: "violet" as const,
-    dot: "bg-violet-500",
+    dot: getRoomFloatingAccent(2).dot,
     iconInactive: "bg-violet-50 text-violet-600",
     calendarIcon: "bg-violet-50 text-violet-700",
     tabInactive:

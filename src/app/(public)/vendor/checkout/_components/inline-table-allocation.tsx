@@ -25,6 +25,8 @@ interface InlineTableAllocationProps {
   table: EditableItem;
   peopleCount: number;
   isMixedPlan?: boolean;
+  nested?: boolean;
+  showConfirmHint?: boolean;
   onTableSeatingConfirmed?: () => void | Promise<void>;
 }
 
@@ -43,6 +45,8 @@ export default function InlineTableAllocation({
   table,
   peopleCount,
   isMixedPlan = false,
+  nested = false,
+  showConfirmHint = false,
   onTableSeatingConfirmed,
 }: InlineTableAllocationProps) {
   const { format: formatMoney } = useCurrencyFormat();
@@ -175,6 +179,13 @@ export default function InlineTableAllocation({
     updateDraft(Array(table.quantity).fill(minPersons));
   };
 
+  const dateData = getDateData(eventSlug, date);
+  const isStoreConfirmed =
+    dateData?.confirmedTableIds?.includes(table.id) ?? false;
+
+  const showConfirmButton =
+    validation.isValid && !isStoreConfirmed && !isSavingSeating;
+
   const handleConfirmSeating = async () => {
     if (!validation.isValid) {
       toast.error("Please assign all guests correctly before confirming seating.");
@@ -202,7 +213,13 @@ export default function InlineTableAllocation({
   };
 
   return (
-    <div className="overflow-hidden rounded-xl border border-[color:var(--checkout-border)] bg-white">
+    <div
+      className={cn(
+        nested
+          ? "border-t border-[color:var(--checkout-border)]"
+          : "overflow-hidden rounded-xl border border-[color:var(--checkout-border)] bg-white",
+      )}
+    >
       <div className="p-3.5 sm:p-4">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
           <div className="min-w-0">
@@ -215,11 +232,11 @@ export default function InlineTableAllocation({
             </p>
           </div>
           <div className="shrink-0 text-left sm:text-right">
-            <p className="text-[11px] text-[color:var(--checkout-muted-foreground)]">
-              {validation.totalAllocated} / {seatingTarget} guests assigned
-            </p>
-            <p className="mt-0.5 text-sm font-bold tabular-nums text-[color:var(--checkout-foreground)]">
+            <p className="text-sm font-bold tabular-nums text-[color:var(--checkout-foreground)]">
               {formatMoney(pricePerPerson * draftGuestTotal)}
+            </p>
+            <p className="text-[10px] tabular-nums text-[color:var(--checkout-muted-foreground)]">
+              {formatMoney(pricePerPerson)}/person
             </p>
           </div>
         </div>
@@ -238,11 +255,11 @@ export default function InlineTableAllocation({
           />
         </div>
 
-        <div className="mt-3 flex flex-wrap gap-2">
+        <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
           <button
             type="button"
             onClick={handleAutoDistribute}
-            className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-[color:var(--checkout-brand-accent)] px-3 text-xs font-semibold text-white transition-colors hover:opacity-90"
+            className="inline-flex h-10 w-full items-center justify-center gap-1.5 rounded-lg bg-[color:var(--checkout-brand-accent)] px-3 text-xs font-semibold text-white transition-colors hover:opacity-90 sm:h-8 sm:w-auto"
           >
             <Wand2 className="h-3 w-3" />
             Auto Distribute
@@ -250,29 +267,44 @@ export default function InlineTableAllocation({
           <button
             type="button"
             onClick={handleReset}
-            className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-[color:var(--checkout-border)] bg-white px-3 text-xs font-semibold text-[color:var(--checkout-muted-foreground)] transition-colors hover:bg-[color:var(--checkout-muted)]/50"
+            className="inline-flex h-10 w-full items-center justify-center gap-1.5 rounded-lg border border-[color:var(--checkout-border)] bg-white px-3 text-xs font-semibold text-[color:var(--checkout-muted-foreground)] transition-colors hover:bg-[color:var(--checkout-muted)]/50 sm:h-8 sm:w-auto"
           >
             <RotateCcw className="h-3 w-3" />
             Reset
           </button>
-          {!isConfirmed && validation.isValid && isDirty && (
+        </div>
+
+        {showConfirmButton && (
+          <>
+            {showConfirmHint ? (
+              <p className="mt-3 text-[11px] leading-snug text-[color:var(--checkout-muted-foreground)]">
+                Tap{" "}
+                <span className="font-semibold text-[color:var(--checkout-foreground)]">
+                  Confirm seating
+                </span>{" "}
+                to add tables to your order.
+              </p>
+            ) : null}
             <button
               type="button"
               onClick={handleConfirmSeating}
               disabled={isSavingSeating}
-              className="inline-flex h-8 items-center rounded-lg border border-emerald-200 bg-emerald-50 px-3 text-xs font-semibold text-emerald-700 transition-colors hover:bg-emerald-100 disabled:opacity-50"
+              className={cn(
+                "flex h-10 w-full items-center justify-center rounded-lg bg-emerald-600 px-4 text-sm font-semibold text-white transition-colors hover:bg-emerald-700 disabled:opacity-50",
+                showConfirmHint ? "mt-2" : "mt-3",
+              )}
             >
               {isSavingSeating ? "Saving…" : "Confirm seating"}
             </button>
-          )}
-        </div>
+          </>
+        )}
       </div>
 
       <div
         className={cn(
-          "flex flex-wrap gap-2 border-t border-[color:var(--checkout-border)] px-3 py-3",
-          table.quantity > 8 &&
-            "max-h-[min(45vh,360px)] overflow-y-auto overscroll-contain",
+          "grid grid-cols-2 gap-2 border-t border-[color:var(--checkout-border)] px-3 py-3 min-[420px]:grid-cols-3 sm:grid-cols-4 lg:grid-cols-5",
+          table.quantity > 6 &&
+            "max-h-[min(50vh,420px)] overflow-y-auto overscroll-contain [-webkit-overflow-scrolling:touch]",
         )}
       >
         {Array.from({ length: table.quantity }, (_, index) => {
@@ -285,7 +317,7 @@ export default function InlineTableAllocation({
             <div
               key={index}
               className={cn(
-                "w-[6.5rem] shrink-0 rounded-lg border bg-white px-1.5 py-2 sm:w-[7.25rem] sm:px-2",
+                "min-w-0 rounded-lg border bg-white px-1.5 py-2 sm:px-2",
                 isOverflow
                   ? "border-red-200"
                   : isUnder
@@ -320,6 +352,9 @@ export default function InlineTableAllocation({
                   </p>
                   <p className="mt-0.5 text-[8px] text-[color:var(--checkout-muted-foreground)]">
                     Max {maxPersons}
+                  </p>
+                  <p className="mt-1 text-[8px] font-semibold tabular-nums text-[color:var(--checkout-foreground)]">
+                    {formatMoney(pricePerPerson * currentValue)}
                   </p>
                 </div>
 

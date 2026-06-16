@@ -1,6 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { cartService } from "./cart.service";
-import { CartRequest, DeleteCartDateRequest } from "./type";
+import {
+  CartRequest,
+  DeleteCartDateRequest,
+  StoreEventBookingInput,
+} from "./type";
 import { useDrinkSelectionStore } from "@/store/drink-selection.store";
 import { useCartEditStore } from "@/store/cart-edit.store";
 
@@ -32,39 +36,38 @@ export const useGetCartData = (enabled: boolean = true) => {
 };
 
 /**
- * Hook for storing event booking data
- * Implements the flow: POST → Invalidate Cache → Clear Drink Storage → GET
- * 🔄 SYNC FIX: Ensures cache is properly refreshed after adding/updating cart
+ * Hook for storing event booking data.
+ *
+ * Sync strategy:
+ * - Checkout edits: POST only (skipInvalidation) — Zustand stays authoritative.
+ * - Event preview / add-to-cart: POST + GET refetch to hydrate checkout.
  */
 export const useStoreEventBooking = () => {
   const queryClient = useQueryClient();
   const { clearDrinks } = useDrinkSelectionStore();
 
   return useMutation({
-    mutationFn: (data: CartRequest) => cartService.storeEventBooking(data),
-    onSuccess: (response, variables) => {
-      // Only invalidate cache, no toasts (handled by components)
-      if (response.status) {
-        console.log("🧹 Store Event Booking - Synchronizing cache:");
+    mutationFn: (input: StoreEventBookingInput | CartRequest) => {
+      const payload = "data" in input ? input.data : input;
+      return cartService.storeEventBooking(payload);
+    },
+    onSuccess: (response, input) => {
+      if (!response.status) return;
 
-        // Clear only the active event/room drink scope after successful submission
-        console.log(
-          "🧹 Clearing drink-selection-storage after successful cart submission"
-        );
-        clearDrinks({
-          eventSlug: variables.slug,
-          roomId: variables.room_id,
-        });
+      const skipInvalidation =
+        "data" in input ? Boolean(input.skipInvalidation) : false;
+      const variables: CartRequest = "data" in input ? input.data : input;
 
-        // Single refetch: invalidateQueries already refetches active observers (v5 default).
-        // Do not also call refetchQueries — that caused duplicate GET /customer/event.
+      clearDrinks({
+        eventSlug: variables.slug,
+        roomId: variables.room_id,
+      });
+
+      if (!skipInvalidation) {
         void queryClient.invalidateQueries({ queryKey: ["cart-data"] });
-
-        console.log("✅ Cache synchronized with backend");
       }
     },
     onError: (error: unknown) => {
-      // Only log error, no toasts (handled by components)
       console.error("Error storing cart data:", error);
     },
   });
@@ -121,7 +124,7 @@ export const useClearAllCart = () => {
     mutationFn: () => cartService.deleteCartData("all"),
     onSuccess: () => {
       console.log("🧹 Clear All Cart - Synchronizing all sources:");
-      
+
       // 1️⃣ Clear database (already done by mutation)
       console.log("✅ Database cleared");
 

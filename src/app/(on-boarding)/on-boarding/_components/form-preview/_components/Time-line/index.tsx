@@ -879,33 +879,6 @@ const timelineStyles = `
   }
 }
 
-.tl-card__now-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.3rem;
-  padding: 0.2rem 0.5rem;
-  border-radius: 100px;
-  background: linear-gradient(
-    135deg,
-    var(--tl-primary),
-    color-mix(in srgb, var(--tl-primary) 80%, #000)
-  );
-  color: var(--tl-primary-fg);
-  font-size: 0.625rem;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  box-shadow: 0 2px 8px color-mix(in srgb, var(--tl-primary) 30%, transparent);
-}
-
-.tl-card__now-pulse {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--tl-primary-fg);
-  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-}
-
 /* ── Card title ── */
 .tl-card__title {
   position: relative;
@@ -1233,15 +1206,6 @@ export default function Timeline({
                           >
                             {formatTime(item.time)}
                           </time>
-                          {isCurrent ? (
-                            <span className="tl-card__now-badge">
-                              <span
-                                className="tl-card__now-pulse"
-                                aria-hidden
-                              />
-                              Now
-                            </span>
-                          ) : null}
                         </div>
 
                         <h3

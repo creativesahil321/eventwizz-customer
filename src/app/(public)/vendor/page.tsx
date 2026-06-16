@@ -9,7 +9,7 @@ import GoogleLocationMap from "./_components/LocationPage/location-map-google";
 import Image from "next/image";
 import { motion } from "framer-motion";
 import SubscribeSection from "./_components/EventListPage/subscribe";
-import { CheckCircle2, Map, LayoutGrid } from "lucide-react";
+import { Map, LayoutGrid } from "lucide-react";
 import { SiteHeading } from "@/components/public/site-heading";
 import { normalizeHeadingEmphasis } from "@/lib/heading-emphasis";
 import {
@@ -19,7 +19,6 @@ import {
   heroBandVerticalClass,
   heroBannerStackClass,
   vendorHomeSubheroClass,
-  vendorHomeTrustRowClass,
 } from "@/lib/banner-heading-align";
 import { cn } from "@/lib/utils";
 import { shouldUseNextImageOptimization } from "@/lib/image-utils";
@@ -129,12 +128,6 @@ export default function VendorSiteHomePage() {
     router.push(`/${slug}`);
   };
 
-  const trustItems = [
-    "Verified Venues",
-    "Secure Bookings",
-    "1,200+ Happy Customers",
-  ] as const;
-
   if (!isDomainLoading && singleLocation && settings) {
     return <SingleLocationHome location={singleLocation} settings={settings} />;
   }
@@ -208,21 +201,6 @@ export default function VendorSiteHomePage() {
             <p className={vendorHomeSubheroClass(heroAlign)}>
               {heroSubheading}
             </p>
-
-            <div className={vendorHomeTrustRowClass(heroAlign)}>
-              {trustItems.map((label) => (
-                <div
-                  key={label}
-                  className="inline-flex w-full items-center justify-center gap-2 rounded-full border border-white/10 bg-white/[0.07] px-4 py-2.5 text-sm text-white/90 shadow-lg shadow-black/20 backdrop-blur-md sm:inline-flex sm:w-auto sm:justify-start md:px-5"
-                >
-                  <CheckCircle2
-                    className="h-4 w-4 shrink-0 text-[color:var(--color-primary)] md:h-[18px] md:w-[18px]"
-                    aria-hidden
-                  />
-                  <span className="font-medium tracking-tight">{label}</span>
-                </div>
-              ))}
-            </div>
           </motion.div>
         </div>
       </section>

@@ -103,9 +103,6 @@ export default function DateAccordion({
   const specialRequest = currentDateData?.specialRequest || "";
 
   const hasChanges = hasUnsavedChanges(eventSlug, date);
-  const pendingTableConfirm = useCartEditStore((state) =>
-    state.hasPendingTableConfirmation(eventSlug, date),
-  );
 
   // Check validation status
   const validation = validateDateRequirements(eventSlug, date);
@@ -121,7 +118,6 @@ export default function DateAccordion({
     if (
       isExpanded &&
       hasChanges &&
-      !pendingTableConfirm &&
       !isSaving &&
       !isAutoSaving &&
       !isSavingRef.current &&
@@ -146,14 +142,7 @@ export default function DateAccordion({
         autoSaveTimerRef.current = null;
       }
     };
-  }, [
-    isExpanded,
-    hasChanges,
-    pendingTableConfirm,
-    isSaving,
-    isAutoSaving,
-    isPreviewMode,
-  ]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [isExpanded, hasChanges, isSaving, isAutoSaving, isPreviewMode]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const totalAmount = calculateEditableDateTotal(dateData);
 
@@ -233,7 +222,10 @@ export default function DateAccordion({
           cartData,
           serverEventData as Parameters<typeof sanitizeCartPrices>[1],
         );
-        const response = await storeEventBooking(sanitizedCartData);
+        const response = await storeEventBooking({
+          data: sanitizedCartData,
+          skipInvalidation: true,
+        });
         if (response?.status === true) {
           markDateAsSaved(eventSlug, date);
           await new Promise((resolve) => setTimeout(resolve, 150));
@@ -241,7 +233,10 @@ export default function DateAccordion({
           console.error("API Error Response:", response);
         }
       } else {
-        const response = await storeEventBooking(cartData);
+        const response = await storeEventBooking({
+          data: cartData,
+          skipInvalidation: true,
+        });
         if (response?.status === true) {
           markDateAsSaved(eventSlug, date);
           await new Promise((resolve) => setTimeout(resolve, 150));
@@ -311,7 +306,10 @@ export default function DateAccordion({
 
   const formatDate = (dateString: string) => {
     try {
-      return format(new Date(extractActualDate(dateString)), "EEEE, MMMM dd, yyyy");
+      return format(
+        new Date(extractActualDate(dateString)),
+        "EEEE, MMMM dd, yyyy",
+      );
     } catch {
       return dateString;
     }
@@ -347,39 +345,65 @@ export default function DateAccordion({
         }
         return sum + (table.minPersons || 1) * table.quantity;
       }, 0);
-  if (ticketQty > 0) metaParts.push(`${ticketQty} ticket${ticketQty !== 1 ? "s" : ""}`);
-  if (drinkQty > 0) metaParts.push(`${drinkQty} drink${drinkQty !== 1 ? "s" : ""}`);
-  if (tableQty > 0) metaParts.push(`${tableQty} table${tableQty !== 1 ? "s" : ""}`);
-  if (guestQty > 0) metaParts.push(`${guestQty} guest${guestQty !== 1 ? "s" : ""}`);
+  if (ticketQty > 0)
+    metaParts.push(`${ticketQty} ticket${ticketQty !== 1 ? "s" : ""}`);
+  if (drinkQty > 0)
+    metaParts.push(`${drinkQty} drink${drinkQty !== 1 ? "s" : ""}`);
+  if (tableQty > 0)
+    metaParts.push(`${tableQty} table${tableQty !== 1 ? "s" : ""}`);
+  if (guestQty > 0 && !currentDateData?.tableSeatingSkipped)
+    metaParts.push(`${guestQty} guest${guestQty !== 1 ? "s" : ""}`);
   const metaLine = metaParts.join(" · ");
 
   const hasTicketsSection = dateData.tickets.length > 0;
   const hasTablesSection = dateData.tables.length > 0;
   const hasDrinksSection = dateData.drinks.length > 0;
 
+  const ticketCartQty = dateData.tickets
+    .filter((t) => t.quantity > 0)
+    .reduce((sum, t) => sum + t.quantity, 0);
+  const drinkCartQty = dateData.drinks
+    .filter((d) => d.quantity > 0)
+    .reduce((sum, d) => sum + d.quantity, 0);
+  const tableCartQty = dateData.tables
+    .filter((t) => t.quantity > 0)
+    .reduce((sum, t) => sum + t.quantity, 0);
+
+  const sectionCountBadge = (count: number) =>
+    count > 0 ? (
+      <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-[color:var(--checkout-muted)] px-1.5 text-[10px] font-bold tabular-nums text-[color:var(--checkout-muted-foreground)]">
+        {count}
+      </span>
+    ) : null;
+
   return (
     <div
       className={cn(
         "bg-white",
         isExpanded ? "overflow-visible" : "overflow-hidden",
-        embedded ? "" : "rounded-2xl border border-[color:var(--checkout-border)] shadow-sm",
+        embedded
+          ? ""
+          : "rounded-2xl border border-[color:var(--checkout-border)] shadow-sm",
       )}
     >
-      <button
-        type="button"
+      <div
         className={cn(
-          "flex w-full cursor-pointer items-center justify-between gap-2 px-3 py-3 text-left transition-colors sm:gap-3 sm:px-5",
-          isExpanded
-            ? "bg-white"
-            : "hover:bg-[color:var(--checkout-muted)]/50",
+          "flex w-full items-start justify-between gap-3 px-3 py-3.5 transition-colors sm:items-center sm:gap-3 sm:px-5 sm:py-3",
+          isExpanded ? "bg-white" : "hover:bg-[color:var(--checkout-muted)]/50",
         )}
-        onClick={onToggle}
       >
-        <div className="flex min-w-0 flex-1 items-center gap-3">
+        <button
+          type="button"
+          className="flex min-w-0 flex-1 items-start gap-2.5 text-left sm:items-center sm:gap-3"
+          onClick={onToggle}
+          aria-expanded={isExpanded}
+        >
           <div
             className={cn(
-              "flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg",
-              embedded ? roomTone.calendarIcon : "bg-emerald-50 text-emerald-700",
+              "mt-0.5 flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg sm:mt-0",
+              embedded
+                ? roomTone.calendarIcon
+                : "bg-emerald-50 text-emerald-700",
             )}
           >
             <Calendar className="h-4 w-4" strokeWidth={2.25} />
@@ -389,24 +413,20 @@ export default function DateAccordion({
               <span className="hidden sm:inline">{formatDate(date)}</span>
               <span className="sm:hidden">{formatDateMobile(date)}</span>
             </h3>
-            <div className="mt-0.5 flex min-w-0 items-center gap-1.5">
-              <span className="truncate text-[11px] font-medium text-[color:var(--checkout-muted-foreground)] sm:text-xs">
-                {metaLine || selectionSummary || "No items selected yet"}
+            <p className="mt-0.5 truncate text-[11px] font-medium leading-relaxed text-[color:var(--checkout-muted-foreground)] sm:text-xs">
+              {metaLine || selectionSummary || "No items selected yet"}
+            </p>
+            {hasValidationError && (
+              <span className="mt-1.5 inline-flex w-fit items-center rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-[10px] font-semibold leading-none text-amber-700 sm:hidden">
+                Action needed
               </span>
-              {/* Action needed — small inline badge on mobile */}
-              {hasValidationError && (
-                <span className="text-[10px] sm:text-xs font-medium text-amber-600 bg-amber-50 px-1.5 sm:px-2.5 py-0.5 sm:py-1 rounded-full border border-amber-100 sm:hidden">
-                  Action needed
-                </span>
-              )}
-            </div>
+            )}
           </div>
-        </div>
+        </button>
 
-        <div className="flex items-center gap-1.5 sm:gap-2.5 flex-shrink-0">
-          {/* Validation error indicator — desktop only (shown inline on mobile) */}
+        <div className="flex shrink-0 items-center gap-2 pt-0.5 sm:gap-2.5 sm:pt-0">
           {hasValidationError && (
-            <span className="hidden sm:inline-flex text-xs font-medium text-amber-600 bg-amber-50 px-2.5 py-1 rounded-full border border-amber-100">
+            <span className="hidden rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700 sm:inline-flex">
               Action needed
             </span>
           )}
@@ -417,30 +437,32 @@ export default function DateAccordion({
             </span>
           )}
 
-          {/* Remove date */}
           {onRemoveDate && (
             <button
-              onClick={(e) => {
-                e.stopPropagation();
-                onRemoveDate(date);
-              }}
-              className="p-1.5 rounded-lg text-gray-300 hover:text-red-500 hover:bg-red-50 transition-colors"
+              type="button"
+              onClick={() => onRemoveDate(date)}
+              className="rounded-lg p-1.5 text-gray-300 transition-colors hover:bg-red-50 hover:text-red-500"
               title="Remove this date"
+              aria-label="Remove this date"
             >
               <Trash2 className="h-3.5 w-3.5" />
             </button>
           )}
 
-          {/* Expand/collapse chevron */}
-          <div className="text-gray-400">
+          <button
+            type="button"
+            onClick={onToggle}
+            className="rounded-lg p-1 text-gray-400 transition-colors hover:bg-[color:var(--checkout-muted)]/50"
+            aria-label={isExpanded ? "Collapse date" : "Expand date"}
+          >
             {isExpanded ? (
               <ChevronUp className="h-4 w-4" />
             ) : (
               <ChevronDown className="h-4 w-4" />
             )}
-          </div>
+          </button>
         </div>
-      </button>
+      </div>
 
       {isExpanded && (
         <div className="divide-y divide-[color:var(--checkout-border)] border-t border-[color:var(--checkout-border)] bg-white px-3 py-4 sm:px-5 sm:py-5">
@@ -449,16 +471,15 @@ export default function DateAccordion({
             <section className="space-y-2.5 pb-5">
               <div className="flex items-center justify-between gap-2">
                 <div className="flex items-center gap-2">
-                  <Ticket className="h-4 w-4 text-[color:var(--checkout-ticket)]" strokeWidth={2.25} />
+                  <Ticket
+                    className="h-4 w-4 text-[color:var(--checkout-ticket)]"
+                    strokeWidth={2.25}
+                  />
                   <h4 className="text-xs font-bold uppercase tracking-widest text-[color:var(--checkout-ticket)]">
                     Tickets
                   </h4>
                 </div>
-                <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-[color:var(--checkout-muted)] px-1.5 text-[10px] font-bold text-[color:var(--checkout-muted-foreground)]">
-                  {dateData.tickets
-                    .filter((t) => t.quantity > 0)
-                    .reduce((sum, t) => sum + t.quantity, 0) || dateData.tickets.length}
-                </span>
+                {sectionCountBadge(ticketCartQty)}
               </div>
 
               <div className="space-y-2">
@@ -524,22 +545,39 @@ export default function DateAccordion({
             <section className="space-y-2.5 py-5">
               <div className="flex items-center justify-between gap-2">
                 <div className="flex items-center gap-2">
-                  <UtensilsCrossed className="h-4 w-4 text-[color:var(--checkout-table)]" strokeWidth={2.25} />
+                  <UtensilsCrossed
+                    className="h-4 w-4 text-[color:var(--checkout-table)]"
+                    strokeWidth={2.25}
+                  />
                   <h4 className="text-xs font-bold uppercase tracking-widest text-[color:var(--checkout-table)]">
                     Table Seating
                   </h4>
                 </div>
-                <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-[color:var(--checkout-muted)] px-1.5 text-[10px] font-bold text-[color:var(--checkout-muted-foreground)]">
-                  {dateData.tables
-                    .filter((t) => t.quantity > 0)
-                    .reduce((sum, t) => sum + t.quantity, 0) || dateData.tables.length}
-                </span>
+                <div className="flex shrink-0 items-center gap-1.5">
+                  {sectionCountBadge(tableCartQty)}
+                  {hasTicketsSection && !currentDateData?.tableSeatingSkipped ? (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        useCartEditStore
+                          .getState()
+                          .skipTableSeating(eventSlug, date)
+                      }
+                      className="rounded-lg p-1.5 text-gray-300 transition-colors hover:bg-red-50 hover:text-red-500"
+                      title="Remove table seating"
+                      aria-label="Remove table seating"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  ) : null}
+                </div>
               </div>
 
               <TableRecommendations
                 eventSlug={eventSlug}
                 date={date}
                 tables={dateData.tables}
+                ticketsAvailable={hasTicketsSection}
                 onQuantityChange={(tableId, change) =>
                   handleQuantityChange("table", tableId, change)
                 }
@@ -559,16 +597,15 @@ export default function DateAccordion({
             <section className="space-y-2.5 pt-5">
               <div className="flex items-center justify-between gap-2">
                 <div className="flex items-center gap-2">
-                  <Wine className="h-4 w-4 text-[color:var(--checkout-package)]" strokeWidth={2.25} />
+                  <Wine
+                    className="h-4 w-4 text-[color:var(--checkout-package)]"
+                    strokeWidth={2.25}
+                  />
                   <h4 className="text-xs font-bold uppercase tracking-widest text-[color:var(--checkout-package)]">
                     Drink Packages
                   </h4>
                 </div>
-                <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-[color:var(--checkout-muted)] px-1.5 text-[10px] font-bold text-[color:var(--checkout-muted-foreground)]">
-                  {dateData.drinks
-                    .filter((d) => d.quantity > 0)
-                    .reduce((sum, d) => sum + d.quantity, 0) || dateData.drinks.length}
-                </span>
+                {sectionCountBadge(drinkCartQty)}
               </div>
 
               <div className="space-y-2">
@@ -587,7 +624,7 @@ export default function DateAccordion({
                         {drink.title}
                       </h5>
                       <p className="mt-0.5 text-xs leading-relaxed text-[color:var(--checkout-muted-foreground)]">
-                        {drink.description?.trim() || "Optional add-on"}
+                        {drink.description?.trim() || "Add to your order"}
                       </p>
                       <p className="mt-1.5 text-sm font-bold tabular-nums text-[color:var(--checkout-package)]">
                         {formatMoney(Number(drink.price) || 0)}
@@ -603,13 +640,7 @@ export default function DateAccordion({
                           handleQuantityChange("drink", drink.id, -1)
                         }
                         onRemove={() =>
-                          updateQuantity(
-                            eventSlug,
-                            date,
-                            "drink",
-                            drink.id,
-                            0,
-                          )
+                          updateQuantity(eventSlug, date, "drink", drink.id, 0)
                         }
                         size="sm"
                         priceLabel={formatMoney(Number(drink.price) || 0)}
@@ -623,51 +654,51 @@ export default function DateAccordion({
 
           {/* ═══ SPECIAL REQUESTS ═══ */}
           <div className="pt-5">
-          <div className="rounded-lg border border-[color:var(--checkout-border)] bg-white px-3 py-2.5">
-            <button
-              onClick={() => setShowSpecialRequest(!showSpecialRequest)}
-              className="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-700 transition-colors py-1.5 w-full"
-            >
-              <MessageSquare className="h-3.5 w-3.5" />
-              <span className="font-medium">
-                {specialRequest
-                  ? "Edit special requests"
-                  : "Add special requests"}
-              </span>
-              {specialRequest && (
-                <span className="text-xs bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded-full font-medium">
-                  Added
+            <div className="rounded-lg border border-[color:var(--checkout-border)] bg-white px-3 py-2.5">
+              <button
+                onClick={() => setShowSpecialRequest(!showSpecialRequest)}
+                className="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-700 transition-colors py-1.5 w-full"
+              >
+                <MessageSquare className="h-3.5 w-3.5" />
+                <span className="font-medium">
+                  {specialRequest
+                    ? "Edit special requests"
+                    : "Add special requests"}
                 </span>
-              )}
-              {showSpecialRequest ? (
-                <ChevronUp className="h-3 w-3 ml-auto" />
-              ) : (
-                <ChevronDown className="h-3 w-3 ml-auto" />
-              )}
-            </button>
-
-            {showSpecialRequest && (
-              <div className="mt-2 p-3.5 bg-gray-50 rounded-xl border border-gray-100">
-                <Textarea
-                  value={specialRequest}
-                  onChange={(e) =>
-                    updateSpecialRequest(eventSlug, date, e.target.value)
-                  }
-                  placeholder="Tell us about any special requirements... (e.g., dietary needs, accessibility, seating preferences)"
-                  className="min-h-[80px] text-sm bg-white text-gray-900 caret-gray-900 placeholder:text-gray-500 border-gray-200 rounded-lg resize-none focus:ring-blue-500 focus:border-blue-500"
-                  maxLength={500}
-                />
-                <div className="flex justify-between items-center mt-2">
-                  <p className="text-xs text-gray-400">
-                    This will be sent to the support team
-                  </p>
-                  <span className="text-xs text-gray-400">
-                    {specialRequest.length}/500
+                {specialRequest && (
+                  <span className="text-xs bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded-full font-medium">
+                    Added
                   </span>
+                )}
+                {showSpecialRequest ? (
+                  <ChevronUp className="h-3 w-3 ml-auto" />
+                ) : (
+                  <ChevronDown className="h-3 w-3 ml-auto" />
+                )}
+              </button>
+
+              {showSpecialRequest && (
+                <div className="mt-2 p-3.5 bg-gray-50 rounded-xl border border-gray-100">
+                  <Textarea
+                    value={specialRequest}
+                    onChange={(e) =>
+                      updateSpecialRequest(eventSlug, date, e.target.value)
+                    }
+                    placeholder="Tell us about any special requirements... (e.g., dietary needs, accessibility, seating preferences)"
+                    className="min-h-[80px] text-sm bg-white text-gray-900 caret-gray-900 placeholder:text-gray-500 border-gray-200 rounded-lg resize-none focus:ring-blue-500 focus:border-blue-500"
+                    maxLength={500}
+                  />
+                  <div className="flex justify-between items-center mt-2">
+                    <p className="text-xs text-gray-400">
+                      This will be sent to the support team
+                    </p>
+                    <span className="text-xs text-gray-400">
+                      {specialRequest.length}/500
+                    </span>
+                  </div>
                 </div>
-              </div>
-            )}
-          </div>
+              )}
+            </div>
           </div>
         </div>
       )}

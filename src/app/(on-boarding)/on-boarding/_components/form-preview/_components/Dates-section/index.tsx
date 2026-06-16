@@ -255,7 +255,7 @@ export default function DatesSection({
 
         // Make POST API call to store initial cart data and wait for response
         try {
-          const response = await storeEventBooking(cartData);
+          const response = await storeEventBooking({ data: cartData });
 
           if (response?.status === true) {
             // API call succeeded - API interceptor already shows success toast

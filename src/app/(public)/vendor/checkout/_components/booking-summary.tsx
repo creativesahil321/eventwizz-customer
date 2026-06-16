@@ -10,10 +10,10 @@ import {
   Clock,
   ChevronUp,
   ChevronDown,
-  Check,
   Lock,
   Zap,
   HelpCircle,
+  AlertCircle,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
@@ -22,13 +22,16 @@ import { useIsPreviewMode } from "@/contexts/preview-context";
 import { useStoreEventBooking } from "@/services/customer/cart/query";
 import {
   getAvailableDates,
-  calculatePaymentAmounts,
   extractCurrentEventData,
   isRoomBasedCart,
   getCartRooms,
   getAllRoomDateKeys,
   getApiCartDateKeys,
+  getApiDateData,
   parseRoomDateKey,
+  calculateEditableDateTotal,
+  isDepositChoiceAvailable,
+  hasUnconfirmedTableSeating,
 } from "../_lib/cart-calculations";
 import {
   transformCartToCheckout,
@@ -43,6 +46,7 @@ import PaymentGatewaySelector from "./payment-gateway-selector";
 import { addCacheBusting } from "@/lib/image-utils";
 import { useCurrencyFormat } from "@/hooks/use-currency-format";
 import OrderViewBreakdown from "./order-view-breakdown";
+import PerDatePaymentSelection from "./per-date-payment-selection";
 import { cn } from "@/lib/utils";
 
 const checkoutPayButtonClass = (disabled: boolean) =>
@@ -78,6 +82,7 @@ export default function BookingSummary({}: BookingSummaryProps) {
     editingData,
     hasUnsavedChanges,
     validateDateRequirements,
+    updatePaymentType,
   } = useCartEditStore();
 
   const { currentEventSlug, currentEventApiData } = useMemo(() => {
@@ -86,7 +91,8 @@ export default function BookingSummary({}: BookingSummaryProps) {
     return { currentEventSlug, currentEventApiData };
   }, [apiCartData]);
 
-  const { getTotalPaymentBreakdown, getPaymentAmounts } = useCartEditStore();
+  const { getTotalPaymentBreakdown, getPaymentAmounts } =
+    useCartEditStore();
 
   const { totalItems, totalToday, totalLater } = useMemo(() => {
     if (
@@ -252,34 +258,62 @@ export default function BookingSummary({}: BookingSummaryProps) {
     }
   };
 
-  const initializedPaymentTypes = useMemo(() => {
-    if (!currentEventApiData) return {};
-    const newPaymentTypes: Record<string, "full" | "deposit"> = {};
-    getApiCartDateKeys(currentEventApiData).forEach((date) => {
-      newPaymentTypes[date] = "full";
+  const selectedPaymentTypes = useMemo(() => {
+    if (!currentEventSlug || !editingData[currentEventSlug]) return {};
+    const types: Record<string, "full" | "deposit"> = {};
+    availableDates.forEach((dateKey) => {
+      types[dateKey] = getDateData(currentEventSlug, dateKey)?.paymentType ?? "full";
     });
-    return newPaymentTypes;
-  }, [currentEventApiData]);
+    return types;
+  }, [availableDates, currentEventSlug, editingData, getDateData]);
 
-  useMemo(() => {
-    return calculatePaymentAmounts(
-      currentEventApiData,
-      initializedPaymentTypes,
-      currentEventSlug ?? undefined,
-      getDateData,
-    );
+  const hasDepositPaymentChoices = useMemo(() => {
+    if (!currentEventApiData || !currentEventSlug) return false;
+    return availableDates.some((dateKey) => {
+      const apiDate = getApiDateData(currentEventApiData, dateKey);
+      return isDepositChoiceAvailable(
+        apiDate?.payment,
+        getDateData(currentEventSlug, dateKey),
+        apiDate,
+      );
+    });
   }, [
+    availableDates,
     currentEventApiData,
-    initializedPaymentTypes,
     currentEventSlug,
+    editingData,
     getDateData,
   ]);
+
+  const hasUnconfirmedSeating = useMemo(() => {
+    if (!currentEventSlug) return false;
+    return availableDates.some((dateKey) =>
+      hasUnconfirmedTableSeating(getDateData(currentEventSlug, dateKey)),
+    );
+  }, [availableDates, currentEventSlug, editingData, getDateData]);
 
   const totalGuests = useMemo(() => {
     if (!currentEventSlug) return 0;
     return availableDates.reduce((sum, dateKey) => {
       const dateData = getDateData(currentEventSlug, dateKey);
       if (!dateData) return sum;
+
+      if (dateData.tableSeatingSkipped) {
+        return (
+          sum +
+          dateData.tables
+            .filter((t) => t.quantity > 0)
+            .reduce((tableSum, table) => {
+              if (table.allocation?.length) {
+                return (
+                  tableSum + table.allocation.reduce((guestSum, g) => guestSum + g, 0)
+                );
+              }
+              return tableSum + (table.minPersons || 1) * table.quantity;
+            }, 0)
+        );
+      }
+
       const fromPeople = dateData.peopleCount ?? 0;
       if (fromPeople > 0) return sum + fromPeople;
       return (
@@ -289,8 +323,7 @@ export default function BookingSummary({}: BookingSummaryProps) {
           .reduce((tableSum, table) => {
             if (table.allocation?.length) {
               return (
-                tableSum +
-                table.allocation.reduce((guestSum, g) => guestSum + g, 0)
+                tableSum + table.allocation.reduce((guestSum, g) => guestSum + g, 0)
               );
             }
             return tableSum + (table.minPersons || 1) * table.quantity;
@@ -314,23 +347,7 @@ export default function BookingSummary({}: BookingSummaryProps) {
         if (!dateData) return null;
 
         const paymentAmounts = getPaymentAmounts(currentEventSlug, dateKey);
-        const fullAmount =
-          dateData.tables
-            .filter((t) => t.quantity > 0)
-            .reduce((sum, t) => {
-              const pricePerPerson = t.pricePerPerson || t.price;
-              if (t.allocation?.length) {
-                const guests = t.allocation.reduce((s, g) => s + g, 0);
-                return guests > 0 ? sum + pricePerPerson * guests : sum;
-              }
-              return sum;
-            }, 0) +
-          dateData.tickets
-            .filter((t) => t.quantity > 0)
-            .reduce((sum, t) => sum + t.price * t.quantity, 0) +
-          dateData.drinks
-            .filter((d) => d.quantity > 0)
-            .reduce((sum, d) => sum + d.price * d.quantity, 0);
+        const fullAmount = calculateEditableDateTotal(dateData);
 
         return {
           key: dateKey,
@@ -377,11 +394,9 @@ export default function BookingSummary({}: BookingSummaryProps) {
   const hasPayableTotal = bookingGrandTotal > 0;
 
   // Platform fee
-  const platformFeeMeta = (
-    currentEventApiData as unknown as {
-      vendor_platform_fee?: { mode: "flat" | "percentage"; value: number };
-    }
-  )?.vendor_platform_fee;
+  const platformFeeMeta = (currentEventApiData as unknown as {
+    vendor_platform_fee?: { mode: "flat" | "percentage"; value: number };
+  })?.vendor_platform_fee;
   const platformFeeRaw =
     hasPayableTotal && platformFeeMeta
       ? platformFeeMeta.mode === "flat"
@@ -427,19 +442,20 @@ export default function BookingSummary({}: BookingSummaryProps) {
     isProcessing || isPending || processCheckoutMutation.isPending;
   const isCtaDisabled =
     isCtaLoading ||
+    !hasPayableTotal ||
     (hasValidationErrors && isPaymentBlocked) ||
     !selectedGateway;
-
+  
   // Dynamic CTA label with exact amount
   const ctaLabel = isCtaLoading
     ? "Processing..."
-    : hasValidationErrors
-      ? "Complete Selections"
-      : !selectedGateway
-        ? "Select Payment Method"
-        : hasPayableTotal
-          ? `Pay ${formatMoney(finalTotalWithFee)} Now`
-          : "Continue to Payment";
+    : !hasPayableTotal
+      ? "Add items to continue"
+      : hasValidationErrors
+        ? "Complete selections"
+        : !selectedGateway
+          ? "Select payment method"
+          : `Pay ${formatMoney(finalTotalWithFee)} now`;
 
   // ──────────────────────────────────────────────
   // RENDER: ORDER SUMMARY CARD
@@ -455,24 +471,34 @@ export default function BookingSummary({}: BookingSummaryProps) {
           getRoomName={roomMode ? getRoomNameForKey : undefined}
           rooms={roomMode ? rooms : undefined}
           dates={itineraryDates}
-          totals={{
-            subtotal: bookingGrandTotal,
-            platformFee,
-            dueToday: finalTotalWithFee,
-            dueLater: totalLater,
-            grandTotal: bookingGrandTotalWithFee,
-          }}
         />
       )}
 
-      <Separator className="bg-gray-100" />
+      {hasPayableTotal && hasDepositPaymentChoices && (
+        <PerDatePaymentSelection
+          eventData={currentEventApiData}
+          selectedPaymentTypes={selectedPaymentTypes}
+          onPaymentTypeChange={(dateKey, type) => {
+            if (!currentEventSlug) return;
+            updatePaymentType(currentEventSlug, dateKey, type);
+          }}
+          disabled={isProcessing || isPending}
+          getDateData={getDateData}
+          eventSlug={currentEventSlug ?? undefined}
+          getRoomName={roomMode ? getRoomNameForKey : undefined}
+        />
+      )}
+
+      {hasPayableTotal ? <Separator className="bg-gray-100" /> : null}
 
       {/* ── Pricing Summary ── */}
-      <div className="space-y-2">
-        <div className="flex justify-between items-center">
-          <span className="text-sm text-gray-600">Subtotal</span>
+      <div className="space-y-2.5">
+        <div className="flex items-center justify-between">
+          <span className="text-sm text-[color:var(--checkout-muted-foreground)]">
+            Subtotal
+          </span>
           {hasPayableTotal ? (
-            <span className="text-sm font-medium text-gray-900 tabular-nums">
+            <span className="text-sm font-medium tabular-nums text-[color:var(--checkout-foreground)]">
               {formatMoney(bookingGrandTotal)}
             </span>
           ) : (
@@ -481,7 +507,7 @@ export default function BookingSummary({}: BookingSummaryProps) {
         </div>
 
         {hasPayableTotal && platformFee > 0 && (
-          <div className="flex justify-between text-xs text-gray-500">
+          <div className="flex justify-between text-xs text-[color:var(--checkout-muted-foreground)]">
             <span>
               {platformFeeMeta?.mode === "percentage"
                 ? `Service fee (${platformFeeMeta.value}%)`
@@ -492,33 +518,22 @@ export default function BookingSummary({}: BookingSummaryProps) {
         )}
 
         {hasPayableTotal && totalLater > 0 && (
-          <div className="rounded-xl border border-blue-100 bg-blue-50/50 p-3 space-y-2">
-            <p className="text-xs font-semibold uppercase tracking-wide text-blue-800">
-              Deposit payment
-            </p>
-            <div className="flex justify-between text-sm text-gray-700">
-              <span>Due today</span>
-              <span className="font-semibold tabular-nums text-gray-900">
-                {formatMoney(finalTotalWithFee)}
-              </span>
-            </div>
-            <div className="flex justify-between text-sm text-blue-700">
-              <span>Due later</span>
-              <span className="font-semibold tabular-nums">
-                {formatMoney(totalLater)}
-              </span>
-            </div>
+          <div className="flex items-center justify-between">
+            <span className="text-sm text-[color:var(--checkout-muted-foreground)]">
+              Due later
+            </span>
+            <span className="text-sm font-medium tabular-nums text-[color:var(--checkout-foreground)]">
+              {formatMoney(totalLater)}
+            </span>
           </div>
         )}
 
-        <Separator className="bg-gray-100" />
-
-        <div className="flex justify-between items-center pt-1">
-          <span className="text-sm font-semibold text-gray-900">
+        <div className="flex items-center justify-between pt-1">
+          <span className="text-[11px] font-bold uppercase tracking-wider text-[color:var(--checkout-foreground)]">
             {totalLater > 0 ? "Due Today" : "Total"}
           </span>
           {hasPayableTotal ? (
-            <span className="text-xl font-bold text-gray-900 tabular-nums">
+            <span className="text-2xl font-bold tabular-nums text-[color:var(--checkout-foreground)]">
               {formatMoney(finalTotalWithFee)}
             </span>
           ) : (
@@ -527,13 +542,6 @@ export default function BookingSummary({}: BookingSummaryProps) {
             </span>
           )}
         </div>
-
-        {hasPayableTotal && totalLater > 0 && (
-          <p className="text-xs text-gray-500">
-            Full booking value {formatMoney(bookingGrandTotalWithFee)} — balance
-            of {formatMoney(totalLater)} due before your event
-          </p>
-        )}
       </div>
 
       <Separator className="bg-gray-100" />
@@ -553,7 +561,9 @@ export default function BookingSummary({}: BookingSummaryProps) {
               selectedGateway={selectedGateway}
               onGatewaySelect={setSelectedGateway}
               disabled={false}
-              showError={!selectedGateway && !isPaymentBlocked && !isProcessing}
+              showError={
+                !selectedGateway && !isPaymentBlocked && !isProcessing
+              }
             />
             <Separator className="bg-gray-100" />
           </>
@@ -562,6 +572,15 @@ export default function BookingSummary({}: BookingSummaryProps) {
       {/* ── CTA Button ── Dynamic label with exact amount */}
       {availableDates.length > 0 && (
         <div className="space-y-3">
+          {hasUnconfirmedSeating ? (
+            <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5">
+              <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
+              <p className="text-xs leading-snug text-amber-800">
+                Confirm table seating below, or remove it using the trash icon
+                next to Table Seating.
+              </p>
+            </div>
+          ) : null}
           <Button
             size="lg"
             onClick={(e) => {
@@ -584,10 +603,7 @@ export default function BookingSummary({}: BookingSummaryProps) {
               handleProceedToPayment();
             }}
             disabled={isCtaDisabled}
-            className={cn(
-              "h-12 w-full text-sm",
-              checkoutPayButtonClass(isCtaDisabled),
-            )}
+            className={cn("h-12 w-full text-sm", checkoutPayButtonClass(isCtaDisabled))}
           >
             {isCtaLoading ? (
               <div className="flex items-center gap-2">
@@ -602,30 +618,7 @@ export default function BookingSummary({}: BookingSummaryProps) {
             )}
           </Button>
 
-          {/* Trust signals — enhanced with more recognizable badges */}
-          {hasPayableTotal && !hasValidationErrors && (
-            <div className="grid grid-cols-3 gap-1.5">
-              <span className="checkout-trust-badge">SSL Encrypted</span>
-              <span className="checkout-trust-badge">Secure Payment</span>
-              <span className="checkout-trust-badge">Instant Confirm</span>
-            </div>
-          )}
-
-          {/* Status messages */}
-          {!hasValidationErrors && !isProcessing && !isPending && (
-            <div className="text-center">
-              {hasPayableTotal ? (
-                <p className="text-xs text-emerald-600 flex items-center justify-center gap-1">
-                  <Check className="h-3 w-3" />
-                  Ready for payment
-                </p>
-              ) : (
-                <p className="text-xs text-gray-400">
-                  Add items to your cart to continue
-                </p>
-              )}
-            </div>
-          )}
+          {/* Trust signals — hidden on summary to match reference layout */}
         </div>
       )}
     </div>
@@ -638,19 +631,25 @@ export default function BookingSummary({}: BookingSummaryProps) {
         <div className="sticky top-[var(--checkout-header-offset)] z-30 w-full space-y-4 self-start">
           <div className="overflow-hidden rounded-2xl border border-[color:var(--checkout-border)] bg-white shadow-sm">
             <div className="border-b border-[color:var(--checkout-border)] px-6 py-5">
-              <h2 className="text-sm font-bold tracking-tight text-[color:var(--checkout-brand-primary)]">
-                Order Summary
-              </h2>
-              <div className="mt-3">
-                <p className="text-xs font-semibold uppercase tracking-wide text-[color:var(--checkout-muted-foreground)]">
-                  Total
-                </p>
-                <p className="mt-1 text-3xl font-extrabold tracking-tight tabular-nums text-[color:var(--checkout-brand-primary)]">
-                  {hasPayableTotal ? formatMoney(finalTotalWithFee) : "—"}
-                </p>
-                <p className="mt-1 text-xs text-[color:var(--checkout-muted-foreground)]">
-                  {summaryMetaLine}
-                </p>
+              <div className="flex items-start justify-between gap-4">
+                <div className="min-w-0">
+                  <h2 className="text-base font-bold tracking-tight text-[color:var(--checkout-foreground)]">
+                    Order Summary
+                  </h2>
+                  <p className="mt-1 text-xs text-[color:var(--checkout-muted-foreground)]">
+                    {summaryMetaLine}
+                  </p>
+                </div>
+                <div className="shrink-0 text-right">
+                  {availableDates.length > 1 && hasPayableTotal ? (
+                    <p className="mb-0.5 text-[10px] font-semibold uppercase tracking-wider text-[color:var(--checkout-muted-foreground)]">
+                      Booking total
+                    </p>
+                  ) : null}
+                  <p className="text-2xl font-bold tabular-nums tracking-tight text-[color:var(--checkout-foreground)]">
+                    {hasPayableTotal ? formatMoney(bookingGrandTotalWithFee) : "—"}
+                  </p>
+                </div>
               </div>
             </div>
             <div className="px-5 py-4">
@@ -753,30 +752,26 @@ export default function BookingSummary({}: BookingSummaryProps) {
               {isCtaLoading ? (
                 <div className="flex items-center gap-1.5">
                   <div className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white/30 border-t-white" />
-                  <span className="hidden min-[360px]:inline">
-                    Processing...
-                  </span>
+                  <span className="hidden min-[360px]:inline">Processing...</span>
                 </div>
               ) : (
                 <div className="flex items-center gap-1.5">
                   {!isCtaDisabled && <Lock className="h-3.5 w-3.5 shrink-0" />}
                   <span className="truncate">
-                    {isCtaDisabled ? (
-                      hasValidationErrors ? (
-                        "Complete"
+                    {isCtaDisabled
+                      ? hasValidationErrors
+                        ? "Complete"
+                        : "Select"
+                      : hasPayableTotal ? (
+                        <>
+                          <span className="min-[400px]:hidden">Pay now</span>
+                          <span className="hidden min-[400px]:inline">
+                            {`Pay ${formatMoney(finalTotalWithFee)}`}
+                          </span>
+                        </>
                       ) : (
-                        "Select"
-                      )
-                    ) : hasPayableTotal ? (
-                      <>
-                        <span className="min-[400px]:hidden">Pay now</span>
-                        <span className="hidden min-[400px]:inline">
-                          {`Pay ${formatMoney(finalTotalWithFee)}`}
-                        </span>
-                      </>
-                    ) : (
-                      "Checkout"
-                    )}
+                        "Checkout"
+                      )}
                   </span>
                 </div>
               )}

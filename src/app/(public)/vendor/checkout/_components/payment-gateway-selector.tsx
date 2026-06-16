@@ -121,26 +121,28 @@ export default function PaymentGatewaySelector({
     return null;
   }
 
-  // If only one gateway, show it as auto-selected without the full selector 
+  // Single gateway — clean selected card (matches order summary design)
   if (filteredGateways.length === 1 && selectedGateway) {
     const gateway = filteredGateways[0];
     const IconComponent = gateway.icon;
     return (
       <div className="space-y-2">
-        <h4 className="text-xs font-medium text-gray-500 uppercase tracking-wider">
+        <p className="text-[11px] font-semibold uppercase tracking-wider text-[color:var(--checkout-muted-foreground)]">
           Payment Method
-        </h4>
-        <div className={`flex items-center gap-3 p-3 rounded-xl border ${gateway.bgSelected}`}>
-          <div className={`p-2 rounded-lg ${gateway.iconBg}`}>
-            <IconComponent className={`h-4 w-4 ${gateway.textColor}`} />
+        </p>
+        <div className="flex items-center gap-3 rounded-xl border border-[color:var(--checkout-brand-accent)]/30 bg-[color:var(--checkout-muted)]/30 p-3">
+          <div className="rounded-lg bg-white p-2 shadow-sm">
+            <IconComponent className="h-4 w-4 text-[color:var(--checkout-brand-primary)]" />
           </div>
-          <div className="flex-1 min-w-0">
-            <span className="font-semibold text-sm text-gray-900">
+          <div className="min-w-0 flex-1">
+            <span className="text-sm font-semibold text-[color:var(--checkout-foreground)]">
               {gateway.name}
             </span>
-            <div className="text-xs text-gray-500">{gateway.description}</div>
+            <div className="text-xs text-[color:var(--checkout-muted-foreground)]">
+              {gateway.description}
+            </div>
           </div>
-          <CheckCircle className={`h-4 w-4 ${gateway.textColor}`} />
+          <CheckCircle className="h-4 w-4 shrink-0 text-[color:var(--checkout-brand-accent)]" />
         </div>
       </div>
     );

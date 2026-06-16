@@ -485,30 +485,102 @@ export function calculateDateTotal(
   return sumApiDateBucketAmount(getApiDateData(eventData, dateKey));
 }
 
-/** Sum tickets, tables, and drinks for one editable date bucket (live cart state). */
+export function hasUnconfirmedTableSeating(
+  dateData:
+    | Pick<EditableDateData, "tables" | "confirmedTableIds" | "tableSeatingSkipped">
+    | null
+    | undefined,
+): boolean {
+  if (!dateData || dateData.tableSeatingSkipped) return false;
+  const activeTables = dateData.tables.filter((table) => table.quantity > 0);
+  if (activeTables.length === 0) return false;
+  const confirmed = new Set(dateData.confirmedTableIds ?? []);
+  return activeTables.some((table) => !confirmed.has(table.id));
+}
+
+/** Tables count toward totals and API only after the customer confirms seating. */
+export function isTableSeatingConfirmed(
+  dateData: Pick<EditableDateData, "confirmedTableIds">,
+  table: { id: number; quantity: number },
+): boolean {
+  if (table.quantity <= 0) return false;
+  return (dateData.confirmedTableIds ?? []).includes(table.id);
+}
+
+export function getBillableTables(
+  dateData: Pick<EditableDateData, "tables" | "confirmedTableIds">,
+): EditableDateData["tables"] {
+  return dateData.tables.filter((table) =>
+    isTableSeatingConfirmed(dateData, table),
+  );
+}
+
+/** Saved cart tables from GET — billable when quantity and allocation exist. */
+export function hasApiBillableTables(apiDate: ApiDateData | null): boolean {
+  if (!apiDate?.tables?.length) return false;
+  return apiDate.tables.some((table) => {
+    const bucket = table as CartApiTableBucket;
+    const qty = Number(bucket.no_tables ?? 0);
+    const allocation = bucket.allocation ?? [];
+    return qty > 0 && allocation.length > 0;
+  });
+}
+
+/** Deposit/full payment options when deposit is enabled and tables are billable. */
+export function isDepositChoiceAvailable(
+  paymentInfo: ApiDateData["payment"] | null | undefined,
+  editStoreData: Pick<EditableDateData, "tables" | "confirmedTableIds"> | null,
+  apiDate: ApiDateData | null,
+): boolean {
+  if (!paymentInfo) return false;
+  const depositEnabled =
+    paymentInfo.is_deposit_enabled || paymentInfo.type === "deposit";
+  if (!depositEnabled) return false;
+
+  const storeBillable =
+    getBillableTables(
+      editStoreData ?? { tables: [], confirmedTableIds: [] },
+    ).length > 0;
+  return storeBillable || hasApiBillableTables(apiDate);
+}
+
+function tableLineTotal(table: EditableDateData["tables"][number]): number {
+  const pricePerPerson = table.pricePerPerson || table.price;
+  if (table.allocation?.length) {
+    const guests = table.allocation.reduce((sum, g) => sum + g, 0);
+    return pricePerPerson * guests;
+  }
+  return pricePerPerson * (table.minPersons || 1) * table.quantity;
+}
+
+/** Sum tickets, confirmed tables, and drinks for one editable date bucket. */
 export function calculateEditableDateTotal(
   dateData:
-    | Pick<EditableDateData, "tables" | "tickets" | "drinks">
+    | Pick<EditableDateData, "tables" | "tickets" | "drinks" | "confirmedTableIds">
     | null
     | undefined,
 ): number {
   if (!dateData) return 0;
 
-  return [...dateData.tables, ...dateData.tickets, ...dateData.drinks].reduce(
-    (sum, item) => {
-      if (item.type === "table") {
-        const pricePerPerson = item.pricePerPerson || item.price;
-        if (item.allocation?.length) {
-          const totalGuests = item.allocation.reduce((guestSum, g) => guestSum + g, 0);
-          return sum + pricePerPerson * totalGuests;
-        }
-        const minGuests = (item.minPersons || 1) * item.quantity;
-        return sum + pricePerPerson * minGuests;
-      }
-      return sum + item.price * item.quantity;
-    },
-    0,
-  );
+  let total = 0;
+
+  for (const table of getBillableTables(dateData)) {
+    total += tableLineTotal(table);
+  }
+
+  for (const ticket of dateData.tickets) {
+    if (ticket.quantity > 0) {
+      total += ticket.price * ticket.quantity;
+    }
+  }
+
+  for (const drink of dateData.drinks) {
+    if (drink.quantity > 0) {
+      total += drink.price * drink.quantity;
+    }
+  }
+
+  return total;
 }
 
 /** Per-room subtotal — prefers live Zustand edits, falls back to API date buckets. */

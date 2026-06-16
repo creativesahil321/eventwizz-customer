@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useEffect, useRef } from "react";
+import { useMemo, useState, useEffect, useLayoutEffect, useRef } from "react";
 import {
   ShoppingCart,
   CalendarPlus,
@@ -179,8 +179,9 @@ export default function CartManager({}: CartManagerProps) {
     });
   }, [currentEventSlug, currentEventApiData, syncCart, initializeFromAPI]);
 
-  // Sync Zustand with API
-  useEffect(() => {
+  // Hydrate Zustand from GET cart-data before paint to avoid delayed summary UI.
+  // Checkout saves use POST without invalidation — local edits stay authoritative.
+  useLayoutEffect(() => {
     if (!currentEventSlug) return;
     const currentEditingData = useCartEditStore.getState().editingData;
 
@@ -559,11 +560,7 @@ export default function CartManager({}: CartManagerProps) {
   return (
     <div className="space-y-4">
       {bookingHeader}
-      <div className="overflow-hidden rounded-2xl border border-[color:var(--checkout-border)] bg-white shadow-sm">
-        <div className="divide-y divide-[color:var(--checkout-border)]">
-          {dateSections}
-        </div>
-      </div>
+      <div className="space-y-3">{dateSections}</div>
     </div>
   );
 }

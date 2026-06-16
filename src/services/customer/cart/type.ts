@@ -11,6 +11,13 @@ import { ApiResponse as BaseApiResponse } from "@/services/core/api-client";
  * Request payload for storing event booking data
  * Updated to match the new API payload format
  */
+/** Wrapper for cart POST — checkout skips GET refetch to avoid stale API overwrites. */
+export interface StoreEventBookingInput {
+  data: CartRequest;
+  /** When true, POST succeeds without invalidating cart-data (checkout auto-save). */
+  skipInvalidation?: boolean;
+}
+
 export interface CartRequest {
   slug: string;
   event_date: string;
