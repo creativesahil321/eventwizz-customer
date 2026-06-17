@@ -15,6 +15,10 @@ import {
 import { toast } from "sonner";
 import { api } from "@/services/core/api-client";
 import { API_ENDPOINTS } from "@/services/core/endpoints";
+import {
+  confirmStripePaymentSuccess,
+  mapStripePaymentSuccessData,
+} from "@/services/customer/checkout/checkout-payment";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -43,6 +47,59 @@ function PaymentSuccessContent() {
     null
   );
   const [isLoading, setIsLoading] = useState(true);
+  const [verificationError, setVerificationError] = useState<string | null>(
+    null,
+  );
+
+  /** Verify via Payment Intents API (legacy) */
+  const verifyPaymentIntentFlow = useCallback(
+    async (params: {
+      bookingId: number;
+      paymentIntentId: string;
+      redirectStatus?: string | null;
+    }) => {
+      if (params.redirectStatus === "failed") {
+        throw new Error("Payment was not completed. Please try again.");
+      }
+
+      const response = await confirmStripePaymentSuccess({
+        booking_id: params.bookingId,
+        payment_intent_id: params.paymentIntentId,
+      });
+
+      if (!response.data?.is_paid) {
+        throw new Error("Payment has not been confirmed yet.");
+      }
+
+      setPaymentData(mapStripePaymentSuccessData(response.data, params.paymentIntentId));
+    },
+    [],
+  );
+
+  /** Verify via Checkout Sessions API (new) */
+  const verifyCheckoutSessionFlow = useCallback(
+    async (params: {
+      bookingId: number;
+      checkoutSessionId: string;
+      redirectStatus?: string | null;
+    }) => {
+      if (params.redirectStatus === "failed") {
+        throw new Error("Payment was not completed. Please try again.");
+      }
+
+      const response = await confirmStripePaymentSuccess({
+        booking_id: params.bookingId,
+        checkout_session_id: params.checkoutSessionId,
+      });
+
+      if (!response.data?.is_paid) {
+        throw new Error("Payment has not been confirmed yet.");
+      }
+
+      setPaymentData(mapStripePaymentSuccessData(response.data, params.checkoutSessionId));
+    },
+    [],
+  );
 
   const handleStripeSession = useCallback(
     async (sessionId: string) => {
@@ -93,54 +150,111 @@ function PaymentSuccessContent() {
     const amount = searchParams.get("amount");
     const gateway = searchParams.get("gateway");
     const bookingNumber = searchParams.get("booking_number");
+    const paymentIntentId =
+      searchParams.get("payment_intent_id") ??
+      searchParams.get("payment_intent");
+    const checkoutSessionId = searchParams.get("checkout_session_id");
+    const redirectStatus = searchParams.get("redirect_status");
+    const verified = searchParams.get("verified") === "1";
+    const parsedBookingId = bookingId ? parseInt(bookingId, 10) : NaN;
 
-    // If we have a Stripe session_id, we need to process it
-    if (sessionId && bookingId) {
-      // Direct Stripe session with booking ID
-      setPaymentData({
-        booking_id: parseInt(bookingId),
-        booking_number: bookingNumber || undefined,
-        amount: amount || "0",
-        gateway: "Stripe",
-        transaction_id: sessionId,
-      });
-      setIsLoading(false);
-      return;
-    }
+    const run = async () => {
+      setIsLoading(true);
+      setVerificationError(null);
 
-    if (sessionId && !bookingId) {
-      handleStripeSession(sessionId);
-      return;
-    }
+      try {
+        // Legacy: Stripe Checkout hosted session (not our flow)
+        if (sessionId) {
+          await handleStripeSession(sessionId);
+          return;
+        }
 
-    // If we have direct parameters, use them (for other payment methods)
-    if (bookingId && amount && gateway) {
-      const transactionId = searchParams.get("transaction_id");
-      const eventName = searchParams.get("event_name");
-      const eventDate = searchParams.get("event_date");
-      const eventLocation = searchParams.get("event_location");
-      const guestCount = searchParams.get("guest_count");
+        // Checkout Sessions API — verify with checkout_session_id
+        if (
+          bookingNumber &&
+          amount &&
+          gateway &&
+          checkoutSessionId &&
+          Number.isFinite(parsedBookingId)
+        ) {
+          if (verified) {
+            setPaymentData({
+              booking_id: parsedBookingId,
+              booking_number: bookingNumber,
+              amount,
+              gateway,
+              transaction_id: checkoutSessionId,
+            });
+            return;
+          }
 
-      setPaymentData({
-        booking_id: parseInt(bookingId),
-        booking_number: bookingNumber || undefined,
-        amount,
-        gateway,
-        transaction_id: transactionId || undefined,
-        event_name: eventName || undefined,
-        event_date: eventDate || undefined,
-        event_location: eventLocation || undefined,
-        guest_count: guestCount ? parseInt(guestCount) : undefined,
-      });
+          await verifyCheckoutSessionFlow({
+            bookingId: parsedBookingId,
+            checkoutSessionId,
+            redirectStatus,
+          });
+          return;
+        }
 
-      setIsLoading(false);
-    } else {
-      toast.error("Invalid payment confirmation. Please contact support.");
-      setTimeout(() => {
-        router.push("/customer/bookings");
-      }, 2000);
-    }
-  }, [searchParams, router, handleStripeSession]);
+        // Payment Intents API (legacy) — verify with payment_intent_id
+        if (
+          bookingNumber &&
+          amount &&
+          gateway &&
+          paymentIntentId &&
+          Number.isFinite(parsedBookingId)
+        ) {
+          if (verified) {
+            setPaymentData({
+              booking_id: parsedBookingId,
+              booking_number: bookingNumber,
+              amount,
+              gateway,
+              transaction_id: paymentIntentId,
+            });
+            return;
+          }
+
+          await verifyPaymentIntentFlow({
+            bookingId: parsedBookingId,
+            paymentIntentId,
+            redirectStatus,
+          });
+          return;
+        }
+
+        if (bookingId && amount && gateway) {
+          setPaymentData({
+            booking_id: parseInt(bookingId, 10),
+            booking_number: bookingNumber || undefined,
+            amount,
+            gateway,
+            transaction_id: searchParams.get("transaction_id") || undefined,
+            event_name: searchParams.get("event_name") || undefined,
+            event_date: searchParams.get("event_date") || undefined,
+            event_location: searchParams.get("event_location") || undefined,
+            guest_count: searchParams.get("guest_count")
+              ? parseInt(searchParams.get("guest_count")!, 10)
+              : undefined,
+          });
+          return;
+        }
+
+        throw new Error("Invalid payment confirmation.");
+      } catch (error) {
+        const message =
+          error instanceof Error
+            ? error.message
+            : "Payment could not be verified.";
+        setVerificationError(message);
+        toast.error("Payment not confirmed", { description: message });
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    void run();
+  }, [searchParams, handleStripeSession, verifyPaymentIntentFlow, verifyCheckoutSessionFlow]);
 
   const handleViewBookings = () => {
     router.push("/customer/bookings");
@@ -160,6 +274,33 @@ function PaymentSuccessContent() {
           </p>
           <p className="text-sm text-gray-500 mt-2">Please wait</p>
         </motion.div>
+      </div>
+    );
+  }
+
+  if (verificationError) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-amber-50 via-white to-gray-50 flex items-center justify-center px-4">
+        <div className="max-w-md text-center space-y-4">
+          <h1 className="text-2xl font-bold text-gray-900">
+            Payment not confirmed
+          </h1>
+          <p className="text-sm text-gray-600 leading-relaxed">
+            {verificationError}
+          </p>
+          <p className="text-xs text-gray-500">
+            If money was taken from your account, contact support with your
+            booking reference. Do not pay again until this is resolved.
+          </p>
+          <div className="flex flex-col gap-2 sm:flex-row sm:justify-center">
+            <Button onClick={() => router.push("/vendor/checkout")}>
+              Return to checkout
+            </Button>
+            <Button variant="outline" onClick={() => router.push("/customer/bookings")}>
+              View bookings
+            </Button>
+          </div>
+        </div>
       </div>
     );
   }

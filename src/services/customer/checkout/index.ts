@@ -8,3 +8,4 @@
 export * from "./type";
 export * from "./checkout.service";
 export * from "./query";
+export * from "./checkout-payment";

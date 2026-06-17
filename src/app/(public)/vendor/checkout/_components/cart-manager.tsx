@@ -41,6 +41,7 @@ import { cn } from "@/lib/utils";
 import DateAccordion from "./date-accordion";
 import RoomTabSelector from "./room-tab-selector";
 import CartSkeletonLoader from "./cart-skeleton-loader";
+import { useCheckoutPaymentUiStore } from "@/store/checkout-payment-ui.store";
 import { useCartEditStore } from "@/store/cart-edit.store";
 import { useDrinkSelectionStore } from "@/store/drink-selection.store";
 import { useCartSync } from "../_lib/hooks/useCartSync";
@@ -186,8 +187,10 @@ export default function CartManager({}: CartManagerProps) {
     const currentEditingData = useCartEditStore.getState().editingData;
 
     if (!currentEventApiData || Object.keys(currentEventApiData).length === 0) {
+      const awaitingPayment =
+        useCheckoutPaymentUiStore.getState().isAwaitingStripePayment;
       const hasStaleZustandData = Object.keys(currentEditingData).length > 0;
-      if (hasStaleZustandData) {
+      if (hasStaleZustandData && !awaitingPayment) {
         clearAllCarts();
         return;
       }

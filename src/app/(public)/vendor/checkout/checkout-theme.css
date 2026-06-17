@@ -38,3 +38,44 @@
   color: var(--checkout-muted-foreground);
   text-align: center;
 }
+
+/* Stripe payment modal — portaled outside .checkout-page, needs same tokens */
+.checkout-stripe-modal {
+  --checkout-radius: 0.75rem;
+  --checkout-background: oklch(0.984 0.003 247.858);
+  --checkout-foreground: oklch(0.208 0.042 265.755);
+  --checkout-card: oklch(1 0 0);
+  --checkout-muted: oklch(0.968 0.007 247.896);
+  --checkout-muted-foreground: oklch(0.554 0.046 257.417);
+  --checkout-border: oklch(0.929 0.013 255.508);
+  --checkout-brand-primary: oklch(0.208 0.042 265.755);
+  --checkout-brand-accent: oklch(0.546 0.215 262.881);
+
+  background-color: var(--checkout-card);
+  color: var(--checkout-foreground);
+}
+
+.checkout-stripe-modal .checkout-stripe-pay-btn {
+  background-color: var(--checkout-brand-primary) !important;
+  color: #ffffff !important;
+}
+
+.checkout-stripe-modal .checkout-stripe-pay-btn:hover:not(:disabled) {
+  filter: brightness(1.1);
+}
+
+.checkout-stripe-modal .checkout-stripe-pay-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+/* Stripe payment modal — full-width element alignment */
+.checkout-stripe-modal .checkout-stripe-express,
+.checkout-stripe-modal .checkout-stripe-payment {
+  width: 100%;
+}
+
+.checkout-stripe-modal .checkout-stripe-express iframe,
+.checkout-stripe-modal .checkout-stripe-payment iframe {
+  max-width: 100%;
+}

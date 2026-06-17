@@ -120,6 +120,30 @@ export interface PaymentGatewayData {
 }
 
 /**
+ * Pending Stripe payment attached to the cart when a customer has an unpaid
+ * booking for this event (e.g. they closed the payment modal, switched device).
+ * Backend returns this so the frontend can restore the session without the
+ * customer having to create a duplicate booking.
+ */
+export interface CartPendingPayment {
+  booking_number: string;
+  booking_id: number;
+  amount: number;
+  due_later?: number | null;
+  payment: {
+    gateway: string;
+    stripe?: {
+      client_secret: string;
+      publishable_key: string;
+      /** Payment Intents API (legacy) */
+      payment_intent_id?: string;
+      /** Checkout Sessions API */
+      checkout_session_id?: string;
+    };
+  };
+}
+
+/**
  * Event cart data structure from API response
  * Contains event info and dynamic date keys
  */
@@ -129,19 +153,23 @@ export interface EventCartData {
   event_image: string;
   vendor_event_id: number;
   payment_gateways?: PaymentGatewayData[];
-  drink_title?: string; // Dynamic drink title from API
+  drink_title?: string;
   drinks?: Array<{
     id: number;
     title: string;
     price: string;
-  }>; // Global drinks list for the event
+  }>;
+  /** Present when the customer has an unpaid booking for this event. */
+  pending_payment?: CartPendingPayment | null;
   [date: string]:
     | DateData
     | string
     | number
     | PaymentGatewayData[]
     | Array<{ id: number; title: string; price: string }>
-    | undefined; // Dynamic date keys + static properties
+    | CartPendingPayment
+    | null
+    | undefined;
 }
 
 /**

@@ -79,6 +79,24 @@ export interface ApiEventRoomCatalogItem {
  * Checkout GET cart shape for one event. Not `extends EventCartData` — that type’s
  * index signature is incompatible with `drinks`, totals, and per-date buckets.
  */
+/** Pending Stripe payment returned by the cart API when the customer has an
+ *  unpaid booking — used to restore the payment session cross-device. */
+export interface ApiPendingPayment {
+  booking_number: string;
+  booking_id: number;
+  amount: number;
+  due_later?: number | null;
+  payment: {
+    gateway: string;
+    stripe?: {
+      client_secret: string;
+      publishable_key: string;
+      payment_intent_id?: string;
+      checkout_session_id?: string;
+    };
+  };
+}
+
 export interface ApiEventCartData {
   event_name: string;
   event_slug: string;
@@ -94,17 +112,21 @@ export interface ApiEventCartData {
   rooms?: ApiRoomCartData[];
   /** Full room catalog for the event (may include rooms not yet in cart). */
   event_rooms?: ApiEventRoomCatalogItem[];
+  /** Present when the customer has an unpaid booking — enables cross-device session restore. */
+  pending_payment?: ApiPendingPayment | null;
   [key: string]:
     | string
     | number
     | boolean
     | undefined
+    | null
     | PaymentGatewayData[]
     | SelectedDrink[]
     | VendorPlatformFee
     | ApiRoomCartData[]
     | ApiEventRoomCatalogItem[]
-    | ApiEventCartDateBucket;
+    | ApiEventCartDateBucket
+    | ApiPendingPayment;
 }
 
 // Professional UI Types (replacing cart store types)

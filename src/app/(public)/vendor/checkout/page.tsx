@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import { useDomain } from "@/providers/domain-provider/domain-provider";
 import CheckoutHeader from "./_components/checkout-header";
 import CartManager from "./_components/cart-manager";
@@ -7,11 +8,17 @@ import { CheckoutPageProps } from "./_lib/types";
 import { useCheckoutAuth } from "./_lib/hooks";
 import { LOADING_MESSAGES } from "./_lib/constants";
 import BookingSummary from "./_components/booking-summary";
+import { preconnectStripeJs, preloadStripeModule } from "@/lib/stripe/stripe-loader";
 import "./checkout-theme.css";
 
 export default function CheckoutPage({}: CheckoutPageProps) {
   const { settings, isLoading: isDomainLoading } = useDomain();
   const { isClient, status, isAuthenticated, isCustomer } = useCheckoutAuth();
+
+  useEffect(() => {
+    preconnectStripeJs();
+    preloadStripeModule();
+  }, []);
 
   // Centralized loading component
   const LoadingScreen = ({

@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo, useState, useRef } from "react";
+import { useMemo, useState, useRef, useCallback, useEffect } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
 import BookingSummarySkeleton from "./booking-summary-skeleton-loader";
@@ -38,11 +39,16 @@ import {
   validateCheckoutRequirements,
   calculateCheckoutSummary,
 } from "../_lib/checkout-utils";
-import { useProcessCheckout } from "@/services/customer/checkout";
+import { useProcessCheckout, useResumeCheckout, resolveCheckoutPaymentAction } from "@/services/customer/checkout";
+import type { CheckoutStripePaymentSession } from "@/services/customer/checkout";
+import { buildCheckoutStripeSession } from "@/services/customer/checkout/checkout-payment";
+import { getStripePromise } from "@/lib/stripe/stripe-loader";
 import { handleCheckoutError } from "@/services/customer/checkout/utils";
+import { useCheckoutPaymentUiStore } from "@/store/checkout-payment-ui.store";
 import { useCartEditStore } from "@/store/cart-edit.store";
 import { usePaymentGatewaySelection } from "@/store/payment-gateway-selection.store";
 import PaymentGatewaySelector from "./payment-gateway-selector";
+import CheckoutStripePaymentModal from "./checkout-stripe-payment-modal";
 import { addCacheBusting } from "@/lib/image-utils";
 import { useCurrencyFormat } from "@/hooks/use-currency-format";
 import OrderViewBreakdown from "./order-view-breakdown";
@@ -66,10 +72,32 @@ export default function BookingSummary({}: BookingSummaryProps) {
   const [isProcessing, setIsProcessing] = useState(false);
   const [showViewBreakdown, setShowViewBreakdown] = useState(false);
   const [showMobileDrawer, setShowMobileDrawer] = useState(false);
+  const [isStripePaymentOpen, setIsStripePaymentOpen] = useState(false);
   const isCheckoutInProgressRef = useRef(false);
+  const stripePaymentCompletedRef = useRef(false);
+
+  // Session persisted in sessionStorage — survives page refresh
+  const {
+    stripePaymentSession,
+    setStripePaymentSession,
+    clearPaymentSession,
+    completePaymentSession,
+  } = useCheckoutPaymentUiStore();
+
+  // On mount — warm up Stripe.js if we already have a session (page refresh restore
+  // via Zustand sessionStorage persist). This avoids an extra round-trip when the
+  // payment modal is opened.
+  useEffect(() => {
+    if (stripePaymentSession?.publishableKey) {
+      void getStripePromise(stripePaymentSession.publishableKey);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const { selectedGateway, setSelectedGateway } = usePaymentGatewaySelection();
   const processCheckoutMutation = useProcessCheckout();
+  const resumeCheckoutMutation = useResumeCheckout();
+  const queryClient = useQueryClient();
 
   const {
     data: apiCartData,
@@ -83,6 +111,7 @@ export default function BookingSummary({}: BookingSummaryProps) {
     hasUnsavedChanges,
     validateDateRequirements,
     updatePaymentType,
+    clearAllCarts,
   } = useCartEditStore();
 
   const { currentEventSlug, currentEventApiData } = useMemo(() => {
@@ -90,6 +119,46 @@ export default function BookingSummary({}: BookingSummaryProps) {
       extractCurrentEventData(apiCartData);
     return { currentEventSlug, currentEventApiData };
   }, [apiCartData]);
+
+  // Cross-device restore — when the cart API returns a `pending_payment` field
+  // (backend includes it when the customer has an unpaid booking for this event),
+  // restore the stripe session so the user sees the "Complete payment" banner
+  // regardless of device/browser. Zustand sessionStorage handles same-device refresh.
+  //
+  // IMPORTANT: read stripePaymentSession and isBookingCompleted via getState() so
+  // they are NOT reactive dependencies. The effect must only re-run when the cart
+  // data changes — NOT when the session is set — otherwise it loops infinitely.
+  useEffect(() => {
+    if (!currentEventApiData || stripePaymentCompletedRef.current) return;
+
+    // Imperative read — avoids adding stripePaymentSession to deps (infinite loop)
+    const store = useCheckoutPaymentUiStore.getState();
+    if (store.stripePaymentSession) return;
+
+    const pending = currentEventApiData.pending_payment as import("@/lib/types/cart.types").ApiPendingPayment | null | undefined;
+    if (!pending?.payment?.stripe) return;
+
+    // Skip restore if we already paid this booking in the current session —
+    // prevents re-hydration while the backend webhook is still processing.
+    if (store.isBookingCompleted(pending.booking_number)) return;
+
+    const checkoutResponseShape = {
+      booking_number: pending.booking_number,
+      booking_id: pending.booking_id,
+      amount: pending.amount,
+      due_later: pending.due_later ?? null,
+      payment: pending.payment,
+    };
+
+    const session = buildCheckoutStripeSession(checkoutResponseShape);
+    if (!session) return;
+
+    store.setStripePaymentSession(session);
+    store.setAwaitingStripePayment(true);
+    void getStripePromise(session.publishableKey);
+  // Only re-run when cart data changes — session state read imperatively above
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentEventApiData]);
 
   const { getTotalPaymentBreakdown, getPaymentAmounts } =
     useCartEditStore();
@@ -116,6 +185,24 @@ export default function BookingSummary({}: BookingSummaryProps) {
     editingData,
     getTotalPaymentBreakdown,
   ]);
+
+  // Bug 1 fix — discard pending session when the amount the user owes today changes
+  // (e.g. switching deposit ↔ pay-in-full, adding/removing items).
+  // The backend keeps the old booking alive; calling /resume with a new bookingNumber
+  // would open the wrong intent, so we drop the session and let the user re-checkout.
+  useEffect(() => {
+    if (!stripePaymentSession || stripePaymentCompletedRef.current) return;
+    // totalToday is 0 while cart data is loading — ignore transient zeros
+    if (totalToday === 0) return;
+
+    if (totalToday !== stripePaymentSession.amount) {
+      clearPaymentSession();
+      toast.info("Payment option changed", {
+        description:
+          "Your previous booking is still reserved. A new payment will be created for the updated amount.",
+      });
+    }
+  }, [totalToday, stripePaymentSession, clearPaymentSession]);
 
   const roomMode = useMemo(
     () => isRoomBasedCart(currentEventApiData),
@@ -186,6 +273,20 @@ export default function BookingSummary({}: BookingSummaryProps) {
       return;
     }
 
+    if (stripePaymentSession) {
+      // If the user changed payment type (deposit ↔ full) while a session is
+      // pending, the stored amount no longer matches the current cart total.
+      // Clear the stale session and fall through to create a fresh checkout.
+      if (stripePaymentSession.amount !== totalToday) {
+        clearPaymentSession();
+        useCheckoutPaymentUiStore.getState().setAwaitingStripePayment(false);
+        // fall through to fresh checkout below
+      } else {
+        void resumeStripePayment();
+        return;
+      }
+    }
+
     isCheckoutInProgressRef.current = true;
     setIsProcessing(true);
 
@@ -212,6 +313,7 @@ export default function BookingSummary({}: BookingSummaryProps) {
       const validation = validateCheckoutRequirements(
         currentEventSlug,
         editingData,
+        apiCartData,
       );
       if (!validation.isValid) {
         throw new Error(`Validation failed: ${validation.errors.join(", ")}`);
@@ -243,7 +345,30 @@ export default function BookingSummary({}: BookingSummaryProps) {
       });
 
       toast.info("Processing checkout...", { id: "checkout-progress" });
-      await processCheckoutMutation.mutateAsync(checkoutData);
+      const response = await processCheckoutMutation.mutateAsync(checkoutData);
+      toast.dismiss("checkout-progress");
+
+      if (!response.status || !response.data) {
+        throw new Error(response.message || "Checkout failed");
+      }
+
+      const paymentAction = resolveCheckoutPaymentAction(response.data);
+      if (!paymentAction) {
+        throw new Error(
+          "Payment could not be started. Please try again or contact support.",
+        );
+      }
+
+      if (paymentAction.type === "stripe") {
+        stripePaymentCompletedRef.current = false;
+        useCheckoutPaymentUiStore.getState().setAwaitingStripePayment(true);
+        void getStripePromise(paymentAction.session.publishableKey);
+        setStripePaymentSession(paymentAction.session);
+        setIsStripePaymentOpen(true);
+        return;
+      }
+
+      window.location.href = paymentAction.url;
     } catch (error) {
       if (error instanceof Error) {
         handleCheckoutError(error);
@@ -366,26 +491,111 @@ export default function BookingSummary({}: BookingSummaryProps) {
     getPaymentAmounts,
   ]);
 
+  const hasPendingStripePayment = Boolean(stripePaymentSession);
+
+  const refreshCartAfterCheckout = useCallback(() => {
+    queryClient.invalidateQueries({ queryKey: ["cart-data"] });
+  }, [queryClient]);
+
+  const resumeStripePayment = useCallback(async () => {
+    if (!stripePaymentSession?.bookingNumber) return;
+
+    try {
+      setIsProcessing(true);
+      toast.info("Loading payment...", { id: "resume-payment" });
+      const response = await resumeCheckoutMutation.mutateAsync(
+        stripePaymentSession.bookingNumber,
+      );
+      toast.dismiss("resume-payment");
+
+      if (!response.status || !response.data) {
+        throw new Error(response.message || "Could not resume payment");
+      }
+
+      const paymentAction = resolveCheckoutPaymentAction(response.data);
+      if (paymentAction?.type !== "stripe") {
+        throw new Error("Stripe payment could not be resumed.");
+      }
+
+      useCheckoutPaymentUiStore.getState().setAwaitingStripePayment(true);
+      stripePaymentCompletedRef.current = false;
+      void getStripePromise(paymentAction.session.publishableKey);
+      setStripePaymentSession(paymentAction.session);
+      setIsStripePaymentOpen(true);
+    } catch (error) {
+      toast.dismiss("resume-payment");
+      if (error instanceof Error) {
+        handleCheckoutError(error);
+      } else {
+        toast.error("Could not resume payment", {
+          description: "Please try again or contact support.",
+        });
+      }
+    } finally {
+      setIsProcessing(false);
+    }
+  }, [resumeCheckoutMutation, stripePaymentSession?.bookingNumber]);
+
+  const stripePaymentModal = (
+    <CheckoutStripePaymentModal
+      open={isStripePaymentOpen}
+      onOpenChange={(open) => {
+        setIsStripePaymentOpen(open);
+        if (
+          !open &&
+          stripePaymentSession &&
+          !stripePaymentCompletedRef.current
+        ) {
+          toast.message("Payment not completed", {
+            description: `Booking ${stripePaymentSession.bookingNumber} is reserved. Tap "Complete payment" to continue.`,
+          });
+        }
+      }}
+      session={stripePaymentSession}
+      onPaymentComplete={() => {
+        stripePaymentCompletedRef.current = true;
+        // completePaymentSession: clears session + removes sessionStorage key +
+        // flags booking number so cross-device restore effect never re-hydrates it.
+        completePaymentSession(stripePaymentSession?.bookingNumber ?? "");
+        clearAllCarts();
+        refreshCartAfterCheckout();
+        setIsStripePaymentOpen(false);
+      }}
+    />
+  );
+
   // Show skeleton only on initial load
   const isInitialLoad = isLoadingCartData && !apiCartData;
-  if (isInitialLoad) {
-    return <BookingSummarySkeleton />;
+  if (isInitialLoad && !hasPendingStripePayment) {
+    return (
+      <>
+        <BookingSummarySkeleton />
+        {stripePaymentModal}
+      </>
+    );
   }
 
-  // Empty cart state
-  if (!isFetchingCartData && (!currentEventApiData || totalItems === 0)) {
+  // Empty cart — but keep modal open if customer still needs to pay
+  if (
+    !hasPendingStripePayment &&
+    !isFetchingCartData &&
+    (!currentEventApiData || totalItems === 0)
+  ) {
     return (
-      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 text-center">
-        <div className="w-12 h-12 mx-auto bg-gray-50 rounded-xl flex items-center justify-center mb-3">
-          <CreditCard className="w-5 h-5 text-gray-300" />
+      <>
+        <div className="rounded-2xl border border-gray-100 bg-white p-6 text-center shadow-sm">
+          <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-xl bg-gray-50">
+            <CreditCard className="h-5 w-5 text-gray-300" />
+          </div>
+          <h3 className="mb-1 text-sm font-medium text-gray-700">
+            Order Summary
+          </h3>
+          <p className="text-xs text-gray-400">
+            Add items to see your order total
+          </p>
         </div>
-        <h3 className="font-medium text-sm text-gray-700 mb-1">
-          Order Summary
-        </h3>
-        <p className="text-xs text-gray-400">
-          Add items to see your order total
-        </p>
-      </div>
+        {stripePaymentModal}
+      </>
     );
   }
 
@@ -411,8 +621,41 @@ export default function BookingSummary({}: BookingSummaryProps) {
   const bookingGrandTotalWithFee = bookingGrandTotal + platformFee;
   const finalTotalWithFee = finalTotal + platformFee;
 
-  if (!currentEventApiData) {
-    return null;
+  if (hasPendingStripePayment && !currentEventApiData) {
+    return (
+      <>
+        <div className="rounded-2xl border border-amber-200/80 bg-amber-50/60 p-6 shadow-sm">
+          <h3 className="text-base font-bold text-[color:var(--checkout-foreground)]">
+            Payment required
+          </h3>
+          <p className="mt-2 text-sm text-[color:var(--checkout-muted-foreground)]">
+            Booking{" "}
+            <span className="font-semibold text-[color:var(--checkout-foreground)]">
+              {stripePaymentSession?.bookingNumber}
+            </span>{" "}
+            is reserved. Complete payment to confirm your booking.
+          </p>
+          <Button
+            type="button"
+            onClick={resumeStripePayment}
+            className={cn(
+              "mt-4 h-11 w-full rounded-xl text-sm font-bold",
+              checkoutPayButtonClass(false),
+            )}
+          >
+            <span className="inline-flex items-center gap-2">
+              <Lock className="h-4 w-4" />
+              Complete payment · {formatMoney(stripePaymentSession?.amount ?? 0)}
+            </span>
+          </Button>
+        </div>
+        {stripePaymentModal}
+      </>
+    );
+  }
+
+  if (!currentEventApiData && !hasPendingStripePayment) {
+    return stripePaymentModal;
   }
 
   // Helper: Format date (handles composite "roomId:date" keys)
@@ -439,29 +682,46 @@ export default function BookingSummary({}: BookingSummaryProps) {
   // CTA button state — NEVER show "Saving Changes..."
   // Auto-save runs silently; we queue checkout if save is in progress
   const isCtaLoading =
-    isProcessing || isPending || processCheckoutMutation.isPending;
+    isProcessing ||
+    isPending ||
+    processCheckoutMutation.isPending ||
+    resumeCheckoutMutation.isPending;
   const isCtaDisabled =
     isCtaLoading ||
-    !hasPayableTotal ||
-    (hasValidationErrors && isPaymentBlocked) ||
-    !selectedGateway;
-  
-  // Dynamic CTA label with exact amount
-  const ctaLabel = isCtaLoading
-    ? "Processing..."
-    : !hasPayableTotal
-      ? "Add items to continue"
-      : hasValidationErrors
-        ? "Complete selections"
-        : !selectedGateway
-          ? "Select payment method"
-          : `Pay ${formatMoney(finalTotalWithFee)} now`;
+    (!hasPendingStripePayment &&
+      (!hasPayableTotal ||
+        (hasValidationErrors && isPaymentBlocked) ||
+        !selectedGateway));
+
+  const ctaLabel = hasPendingStripePayment
+    ? `Complete payment · ${formatMoney(stripePaymentSession?.amount ?? 0)}`
+    : isCtaLoading
+      ? "Processing..."
+      : !hasPayableTotal
+        ? "Add items to continue"
+        : hasValidationErrors
+          ? "Complete selections"
+          : !selectedGateway
+            ? "Select payment method"
+            : `Pay ${formatMoney(finalTotalWithFee)} now`;
 
   // ──────────────────────────────────────────────
   // RENDER: ORDER SUMMARY CARD
   // ──────────────────────────────────────────────
   const OrderSummaryContent = () => (
     <div className="space-y-4">
+      {hasPendingStripePayment ? (
+        <div className="rounded-xl border border-amber-200/80 bg-amber-50/50 px-4 py-3">
+          <p className="text-xs font-semibold text-amber-900">
+            Payment pending · {stripePaymentSession?.bookingNumber}
+          </p>
+          <p className="mt-1 text-xs leading-relaxed text-amber-800/90">
+            Your booking is reserved. Complete payment to confirm — closing the
+            window does not cancel your booking.
+          </p>
+        </div>
+      ) : null}
+
       {availableDates.length > 0 && hasPayableTotal && (
         <OrderViewBreakdown
           isOpen={showViewBreakdown}
@@ -779,6 +1039,8 @@ export default function BookingSummary({}: BookingSummaryProps) {
           </div>
         </div>
       </div>
+
+      {stripePaymentModal}
     </>
   );
 }

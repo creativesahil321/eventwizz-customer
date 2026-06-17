@@ -210,30 +210,30 @@ export default function TableRecommendations({
 
   const prevPeopleCountRef = useRef(peopleCount);
 
+  // Auto-apply the best table match on mount and whenever people count changes,
+  // so tables are shown immediately without requiring a button click.
   useEffect(() => {
     if (tables.length === 0 || tableSeatingSkipped) return;
 
+    const hasDraftSelection = tables.some((table) => table.quantity > 0);
     const peopleCountChanged = prevPeopleCountRef.current !== peopleCount;
     prevPeopleCountRef.current = peopleCount;
 
-    const hasDraftSelection = tables.some((table) => table.quantity > 0);
-    if (!peopleCountChanged || !hasDraftSelection) return;
-
-    applyBestTableMatch(eventSlug, date);
+    // Auto-suggest on first load (no selection yet) or when group size changes
+    if (!hasDraftSelection || peopleCountChanged) {
+      resumeTableSeating(eventSlug, date);
+      applyBestTableMatch(eventSlug, date);
+    }
   }, [
     peopleCount,
     eventSlug,
     date,
     tables.length,
     applyBestTableMatch,
+    resumeTableSeating,
     tables,
     tableSeatingSkipped,
   ]);
-
-  const handleFindSeating = () => {
-    resumeTableSeating(eventSlug, date);
-    applyBestTableMatch(eventSlug, date);
-  };
 
   const handleStartTableSeating = () => {
     resumeTableSeating(eventSlug, date);
@@ -317,26 +317,8 @@ export default function TableRecommendations({
           />
         ))
       ) : hasBestMatch ? (
-        <div className="px-4 py-4">
-          <p className="text-xs leading-relaxed text-[color:var(--checkout-muted-foreground)]">
-            Suggest a layout for {peopleCount} guests. Nothing is charged until
-            you confirm seating.
-            {tablePriceHint ? (
-              <>
-                {" "}
-                <span className="font-medium text-[color:var(--checkout-foreground)]">
-                  {tablePriceHint}
-                </span>
-              </>
-            ) : null}
-          </p>
-          <button
-            type="button"
-            onClick={handleFindSeating}
-            className="mt-3 inline-flex h-9 w-full items-center justify-center rounded-lg bg-[color:var(--checkout-brand-primary)] px-4 text-xs font-semibold text-white transition-opacity hover:opacity-90 sm:w-auto"
-          >
-            Suggest seating for {peopleCount} guests
-          </button>
+        <div className="flex items-center justify-center px-4 py-6">
+          <div className="h-4 w-4 animate-spin rounded-full border-2 border-[color:var(--checkout-border)] border-t-[color:var(--checkout-brand-primary)]" />
         </div>
       ) : belowMinimum ? (
         <div className={cn("px-4 py-4")}>

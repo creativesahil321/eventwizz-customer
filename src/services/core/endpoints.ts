@@ -256,7 +256,9 @@ export const API_ENDPOINTS = {
       DELETE_CART_DATA: "/customer/event/delete/{date}", // Non-room events: delete one date from cart
       DELETE_CART_DATA_ROOM:
         "/customer/event/delete/{room_id}/{date}", // Room events: delete one date for a specific room
-      CHECKOUT: "/customer/event/checkout", // This is for to checkout the cart data and event booking data in database
+      CHECKOUT: "/customer/event/checkout", // Create booking + payment credentials
+      CHECKOUT_RESUME: "/customer/event/checkout/resume", // Resume unpaid Stripe payment
+      CHECKOUT_BOOKING: "/customer/event/checkout/{bookingId}",
     },
 
     TRANSACTIONS: {

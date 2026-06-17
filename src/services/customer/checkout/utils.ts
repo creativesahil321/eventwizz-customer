@@ -32,15 +32,15 @@ export const handleCheckoutError = (error: Error): void => {
  * Log checkout success with consistent format
  */
 export const logCheckoutSuccess = (data: {
-  bookingId: number;
-  total: number;
-  paymentStatus: string;
+  bookingNumber: string;
+  amount: number;
+  gateway?: string;
   eventSlug: string;
 }): void => {
-  console.log("✅ Checkout successful:", {
-    bookingId: data.bookingId,
-    total: data.total,
-    paymentStatus: data.paymentStatus,
+  console.log("✅ Checkout ready:", {
+    bookingNumber: data.bookingNumber,
+    amount: data.amount,
+    gateway: data.gateway,
     eventSlug: data.eventSlug,
     timestamp: new Date().toISOString(),
   });
