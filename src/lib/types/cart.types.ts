@@ -93,6 +93,8 @@ export interface ApiPendingPayment {
       publishable_key: string;
       payment_intent_id?: string;
       checkout_session_id?: string;
+      /** Seconds remaining, or absolute Unix timestamp — same as checkout API */
+      expires_at?: number;
     };
   };
 }

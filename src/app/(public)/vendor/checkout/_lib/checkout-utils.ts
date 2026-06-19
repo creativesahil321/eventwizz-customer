@@ -260,10 +260,11 @@ function collectCheckoutDates(
   subTotal: number;
   payToday: number;
   payLater: number;
+  depositToday: number;
 } {
   const eventData = editingData[eventSlug];
   if (!eventData) {
-    return { dates: [], subTotal: 0, payToday: 0, payLater: 0 };
+    return { dates: [], subTotal: 0, payToday: 0, payLater: 0, depositToday: 0 };
   }
 
   const dateKeys = isRoomBasedCart(apiEventData)
@@ -273,6 +274,7 @@ function collectCheckoutDates(
   let subTotal = 0;
   let payToday = 0;
   let payLater = 0;
+  let depositToday = 0;
   const dates: CheckoutDateData[] = [];
 
   for (const dateKey of dateKeys) {
@@ -286,9 +288,12 @@ function collectCheckoutDates(
     subTotal += built.totals.dateTotal;
     payToday += built.totals.payToday;
     payLater += built.totals.payLater;
+    if (built.totals.isDeposit) {
+      depositToday += built.totals.calculatedDepositAmount;
+    }
   }
 
-  return { dates, subTotal, payToday, payLater };
+  return { dates, subTotal, payToday, payLater, depositToday };
 }
 
 function collectCheckoutRooms(
@@ -300,16 +305,18 @@ function collectCheckoutRooms(
   subTotal: number;
   payToday: number;
   payLater: number;
+  depositToday: number;
 } {
   const eventData = editingData[eventSlug];
   const cartRooms = getCartRooms(apiEventData);
   if (!eventData || cartRooms.length === 0) {
-    return { rooms: [], subTotal: 0, payToday: 0, payLater: 0 };
+    return { rooms: [], subTotal: 0, payToday: 0, payLater: 0, depositToday: 0 };
   }
 
   let subTotal = 0;
   let payToday = 0;
   let payLater = 0;
+  let depositToday = 0;
   const rooms: CheckoutRoomData[] = [];
 
   for (const room of cartRooms) {
@@ -330,6 +337,9 @@ function collectCheckoutRooms(
       subTotal += built.totals.dateTotal;
       payToday += built.totals.payToday;
       payLater += built.totals.payLater;
+      if (built.totals.isDeposit) {
+        depositToday += built.totals.calculatedDepositAmount;
+      }
     }
 
     if (roomDates.length > 0) {
@@ -341,7 +351,7 @@ function collectCheckoutRooms(
     }
   }
 
-  return { rooms, subTotal, payToday, payLater };
+  return { rooms, subTotal, payToday, payLater, depositToday };
 }
 
 /**
@@ -378,6 +388,7 @@ export function transformCartToCheckout(
   let subTotal = 0;
   let payToday = 0;
   let payLater = 0;
+  let depositToday = 0;
   let checkoutDates: CheckoutDateData[] | undefined;
   let checkoutRooms: CheckoutRoomData[] | undefined;
 
@@ -386,12 +397,14 @@ export function transformCartToCheckout(
     subTotal = collected.subTotal;
     payToday = collected.payToday;
     payLater = collected.payLater;
+    depositToday = collected.depositToday;
     checkoutRooms = collected.rooms;
   } else {
     const collected = collectCheckoutDates(eventSlug, editingData, apiEventData);
     subTotal = collected.subTotal;
     payToday = collected.payToday;
     payLater = collected.payLater;
+    depositToday = collected.depositToday;
     checkoutDates = collected.dates;
   }
 
@@ -410,7 +423,8 @@ export function transformCartToCheckout(
     is_rooms: roomMode,
     payment_gateway: gatewayId,
     sub_total: subTotal,
-    partial_payment: payLater > 0 ? payLater : null,
+    // Sum of table deposit amounts charged today (e.g. $25, or $25+$20 across dates)
+    partial_payment: depositToday > 0 ? depositToday : null,
     total: payToday,
   };
 
@@ -427,6 +441,7 @@ export function transformCartToCheckout(
     sub_total: checkoutPayload.sub_total,
     partial_payment: checkoutPayload.partial_payment,
     total: checkoutPayload.total,
+    balance_due_later: payLater > 0 ? payLater : null,
     payment_gateway: checkoutPayload.payment_gateway,
     dates_count: roomMode
       ? checkoutPayload.rooms?.reduce(

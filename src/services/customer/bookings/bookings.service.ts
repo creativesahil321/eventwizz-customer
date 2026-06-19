@@ -181,7 +181,7 @@ export const bookingsService = {
   /**
    * Get reschedule data (current date, payment gateways, and available dates)
    * @param bookingId - The booking ID
-   * @param bookingDateId - The booking date ID (from event_dates array)
+   * @param bookingDateId - The booking date ID (from dates array)
    */
   getRescheduleData: async (
     bookingId: number,

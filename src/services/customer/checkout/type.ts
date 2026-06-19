@@ -56,8 +56,8 @@ export interface CheckoutRoomData {
  *
  * Amount semantics:
  * - `sub_total` — full booking value across all dates
- * - `partial_payment` — balance due later (null when paying in full today)
- * - `total` — amount charged at checkout now
+ * - `partial_payment` — sum of table deposit amounts charged today (null when paying in full)
+ * - `total` — full amount charged at checkout now (deposits + tickets/drinks)
  */
 export interface CheckoutRequest {
   vendor_event_id: number;
@@ -93,6 +93,9 @@ export interface CheckoutStripeDetails {
   payment_intent_id?: string;
   /** Checkout Sessions API (ui_mode: "elements") — preferred */
   checkout_session_id?: string;
+  /** Unix timestamp (seconds) when this payment session expires. Used to drive
+   *  the countdown timer in the pending-payment banner. */
+  expires_at?: number;
 }
 
 export interface CheckoutResumeRequest {
@@ -152,6 +155,10 @@ export interface CheckoutStripePaymentSession {
   paymentIntentId?: string;
   /** Set when backend uses Checkout Sessions API (ui_mode: "elements") */
   checkoutSessionId?: string;
+  /** Unix timestamp (seconds) when this session expires — drives the
+   *  countdown timer in the pending-payment banner.
+   *  Backend returns this as `stripe.expires_at` in the checkout response. */
+  expiresAt?: number;
 }
 
 export interface CheckoutResponseData {

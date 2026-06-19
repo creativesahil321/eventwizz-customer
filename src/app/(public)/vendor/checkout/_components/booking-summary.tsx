@@ -8,7 +8,6 @@ import BookingSummarySkeleton from "./booking-summary-skeleton-loader";
 import {
   CreditCard,
   Shield,
-  Clock,
   ChevronUp,
   ChevronDown,
   Lock,
@@ -39,9 +38,13 @@ import {
   validateCheckoutRequirements,
   calculateCheckoutSummary,
 } from "../_lib/checkout-utils";
-import { useProcessCheckout, useResumeCheckout, resolveCheckoutPaymentAction } from "@/services/customer/checkout";
+import {
+  useProcessCheckout,
+  useResumeCheckout,
+  resolveCheckoutPaymentAction,
+} from "@/services/customer/checkout";
 import type { CheckoutStripePaymentSession } from "@/services/customer/checkout";
-import { buildCheckoutStripeSession } from "@/services/customer/checkout/checkout-payment";
+import { buildCheckoutStripeSession, mergeStripePaymentSession } from "@/services/customer/checkout/checkout-payment";
 import { getStripePromise } from "@/lib/stripe/stripe-loader";
 import { handleCheckoutError } from "@/services/customer/checkout/utils";
 import { useCheckoutPaymentUiStore } from "@/store/checkout-payment-ui.store";
@@ -49,11 +52,14 @@ import { useCartEditStore } from "@/store/cart-edit.store";
 import { usePaymentGatewaySelection } from "@/store/payment-gateway-selection.store";
 import PaymentGatewaySelector from "./payment-gateway-selector";
 import CheckoutStripePaymentModal from "./checkout-stripe-payment-modal";
+import { PaymentSessionCountdownPill } from "./payment-session-countdown-pill";
+import { usePaymentSessionCountdown } from "../_lib/use-payment-session-countdown";
 import { addCacheBusting } from "@/lib/image-utils";
 import { useCurrencyFormat } from "@/hooks/use-currency-format";
 import OrderViewBreakdown from "./order-view-breakdown";
 import PerDatePaymentSelection from "./per-date-payment-selection";
 import { cn } from "@/lib/utils";
+import { useDrinkSelectionStore } from "@/store/drink-selection.store";
 
 const checkoutPayButtonClass = (disabled: boolean) =>
   cn(
@@ -91,7 +97,7 @@ export default function BookingSummary({}: BookingSummaryProps) {
     if (stripePaymentSession?.publishableKey) {
       void getStripePromise(stripePaymentSession.publishableKey);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const { selectedGateway, setSelectedGateway } = usePaymentGatewaySelection();
@@ -114,6 +120,21 @@ export default function BookingSummary({}: BookingSummaryProps) {
     clearAllCarts,
   } = useCartEditStore();
 
+  const { clearDrinksForNewEvent } = useDrinkSelectionStore();
+
+  const expireSession = useCallback(() => {
+    clearPaymentSession();
+    clearAllCarts();
+    clearDrinksForNewEvent();
+    toast.info("Payment session expired. Please restart your checkout.");
+    window.location.reload();
+  }, [clearPaymentSession, clearAllCarts, clearDrinksForNewEvent]);
+
+  const sessionSecondsLeft = usePaymentSessionCountdown(
+    stripePaymentSession?.expiresAt,
+    expireSession,
+  );
+
   const { currentEventSlug, currentEventApiData } = useMemo(() => {
     const { currentEventSlug, currentEventApiData } =
       extractCurrentEventData(apiCartData);
@@ -135,7 +156,10 @@ export default function BookingSummary({}: BookingSummaryProps) {
     const store = useCheckoutPaymentUiStore.getState();
     if (store.stripePaymentSession) return;
 
-    const pending = currentEventApiData.pending_payment as import("@/lib/types/cart.types").ApiPendingPayment | null | undefined;
+    const pending = currentEventApiData.pending_payment as
+      | import("@/lib/types/cart.types").ApiPendingPayment
+      | null
+      | undefined;
     if (!pending?.payment?.stripe) return;
 
     // Skip restore if we already paid this booking in the current session —
@@ -153,15 +177,16 @@ export default function BookingSummary({}: BookingSummaryProps) {
     const session = buildCheckoutStripeSession(checkoutResponseShape);
     if (!session) return;
 
-    store.setStripePaymentSession(session);
+    store.setStripePaymentSession(
+      mergeStripePaymentSession(store.stripePaymentSession, session),
+    );
     store.setAwaitingStripePayment(true);
     void getStripePromise(session.publishableKey);
-  // Only re-run when cart data changes — session state read imperatively above
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // Only re-run when cart data changes — session state read imperatively above
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentEventApiData]);
 
-  const { getTotalPaymentBreakdown, getPaymentAmounts } =
-    useCartEditStore();
+  const { getTotalPaymentBreakdown, getPaymentAmounts } = useCartEditStore();
 
   const { totalItems, totalToday, totalLater } = useMemo(() => {
     if (
@@ -363,7 +388,12 @@ export default function BookingSummary({}: BookingSummaryProps) {
         stripePaymentCompletedRef.current = false;
         useCheckoutPaymentUiStore.getState().setAwaitingStripePayment(true);
         void getStripePromise(paymentAction.session.publishableKey);
-        setStripePaymentSession(paymentAction.session);
+        setStripePaymentSession(
+          mergeStripePaymentSession(
+            useCheckoutPaymentUiStore.getState().stripePaymentSession,
+            paymentAction.session,
+          ),
+        );
         setIsStripePaymentOpen(true);
         return;
       }
@@ -387,7 +417,8 @@ export default function BookingSummary({}: BookingSummaryProps) {
     if (!currentEventSlug || !editingData[currentEventSlug]) return {};
     const types: Record<string, "full" | "deposit"> = {};
     availableDates.forEach((dateKey) => {
-      types[dateKey] = getDateData(currentEventSlug, dateKey)?.paymentType ?? "full";
+      types[dateKey] =
+        getDateData(currentEventSlug, dateKey)?.paymentType ?? "full";
     });
     return types;
   }, [availableDates, currentEventSlug, editingData, getDateData]);
@@ -431,7 +462,8 @@ export default function BookingSummary({}: BookingSummaryProps) {
             .reduce((tableSum, table) => {
               if (table.allocation?.length) {
                 return (
-                  tableSum + table.allocation.reduce((guestSum, g) => guestSum + g, 0)
+                  tableSum +
+                  table.allocation.reduce((guestSum, g) => guestSum + g, 0)
                 );
               }
               return tableSum + (table.minPersons || 1) * table.quantity;
@@ -448,7 +480,8 @@ export default function BookingSummary({}: BookingSummaryProps) {
           .reduce((tableSum, table) => {
             if (table.allocation?.length) {
               return (
-                tableSum + table.allocation.reduce((guestSum, g) => guestSum + g, 0)
+                tableSum +
+                table.allocation.reduce((guestSum, g) => guestSum + g, 0)
               );
             }
             return tableSum + (table.minPersons || 1) * table.quantity;
@@ -520,7 +553,9 @@ export default function BookingSummary({}: BookingSummaryProps) {
       useCheckoutPaymentUiStore.getState().setAwaitingStripePayment(true);
       stripePaymentCompletedRef.current = false;
       void getStripePromise(paymentAction.session.publishableKey);
-      setStripePaymentSession(paymentAction.session);
+      setStripePaymentSession(
+        mergeStripePaymentSession(stripePaymentSession, paymentAction.session),
+      );
       setIsStripePaymentOpen(true);
     } catch (error) {
       toast.dismiss("resume-payment");
@@ -534,7 +569,7 @@ export default function BookingSummary({}: BookingSummaryProps) {
     } finally {
       setIsProcessing(false);
     }
-  }, [resumeCheckoutMutation, stripePaymentSession?.bookingNumber]);
+  }, [resumeCheckoutMutation, stripePaymentSession]);
 
   const stripePaymentModal = (
     <CheckoutStripePaymentModal
@@ -552,17 +587,118 @@ export default function BookingSummary({}: BookingSummaryProps) {
         }
       }}
       session={stripePaymentSession}
+      sessionSecondsLeft={sessionSecondsLeft}
       onPaymentComplete={() => {
         stripePaymentCompletedRef.current = true;
         // completePaymentSession: clears session + removes sessionStorage key +
         // flags booking number so cross-device restore effect never re-hydrates it.
         completePaymentSession(stripePaymentSession?.bookingNumber ?? "");
         clearAllCarts();
+        clearDrinksForNewEvent();
         refreshCartAfterCheckout();
         setIsStripePaymentOpen(false);
       }}
     />
   );
+
+  // Taller mobile bottom bar when pending-payment strip is shown
+  useEffect(() => {
+    const root = document.querySelector(".checkout-page");
+    if (!root) return;
+    if (hasPendingStripePayment) {
+      root.setAttribute("data-pending-payment", "true");
+    } else {
+      root.removeAttribute("data-pending-payment");
+    }
+    return () => root.removeAttribute("data-pending-payment");
+  }, [hasPendingStripePayment]);
+
+  const renderPendingPaymentBanner = (
+    variant: "card" | "mobile-sticky" = "card",
+  ) => {
+    if (!hasPendingStripePayment) return null;
+
+    const isUrgent =
+      sessionSecondsLeft !== null && sessionSecondsLeft <= 60;
+
+    const timerPill =
+      sessionSecondsLeft !== null ? (
+        <PaymentSessionCountdownPill
+          secondsLeft={sessionSecondsLeft}
+          size={variant === "mobile-sticky" ? "md" : "sm"}
+        />
+      ) : null;
+
+    if (variant === "mobile-sticky") {
+      return (
+        <div
+          className={cn(
+            "border-b px-3 py-2.5 sm:px-4",
+            isUrgent
+              ? "border-red-200/80 bg-red-50/90"
+              : "border-amber-200/80 bg-amber-50/90",
+          )}
+        >
+          <div className="flex items-center justify-between gap-3">
+            <div className="min-w-0 flex-1">
+              <p
+                className={cn(
+                  "text-xs font-semibold",
+                  isUrgent ? "text-red-900" : "text-amber-900",
+                )}
+              >
+                Payment pending · {stripePaymentSession?.bookingNumber}
+              </p>
+              <p
+                className={cn(
+                  "mt-0.5 text-[11px] leading-snug",
+                  isUrgent ? "text-red-800/90" : "text-amber-800/90",
+                )}
+              >
+                {isUrgent
+                  ? "Hurry! Your reserved session expires soon."
+                  : "Complete payment to keep your booking reserved."}
+              </p>
+            </div>
+            {timerPill}
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div
+        className={cn(
+          "rounded-xl border px-4 py-3 transition-colors",
+          isUrgent
+            ? "border-red-200/80 bg-red-50/50"
+            : "border-amber-200/80 bg-amber-50/50",
+        )}
+      >
+        <div className="flex items-center justify-between gap-2">
+          <p
+            className={cn(
+              "text-xs font-semibold",
+              isUrgent ? "text-red-900" : "text-amber-900",
+            )}
+          >
+            Payment pending · {stripePaymentSession?.bookingNumber}
+          </p>
+          {timerPill}
+        </div>
+        <p
+          className={cn(
+            "mt-1 text-xs leading-relaxed",
+            isUrgent ? "text-red-800/90" : "text-amber-800/90",
+          )}
+        >
+          {isUrgent
+            ? "Hurry! Your reserved session expires soon."
+            : "Your booking is reserved. Complete payment to confirm — closing the window does not cancel your booking."}
+        </p>
+      </div>
+    );
+  };
 
   // Show skeleton only on initial load
   const isInitialLoad = isLoadingCartData && !apiCartData;
@@ -604,9 +740,11 @@ export default function BookingSummary({}: BookingSummaryProps) {
   const hasPayableTotal = bookingGrandTotal > 0;
 
   // Platform fee
-  const platformFeeMeta = (currentEventApiData as unknown as {
-    vendor_platform_fee?: { mode: "flat" | "percentage"; value: number };
-  })?.vendor_platform_fee;
+  const platformFeeMeta = (
+    currentEventApiData as unknown as {
+      vendor_platform_fee?: { mode: "flat" | "percentage"; value: number };
+    }
+  )?.vendor_platform_fee;
   const platformFeeRaw =
     hasPayableTotal && platformFeeMeta
       ? platformFeeMeta.mode === "flat"
@@ -645,7 +783,8 @@ export default function BookingSummary({}: BookingSummaryProps) {
           >
             <span className="inline-flex items-center gap-2">
               <Lock className="h-4 w-4" />
-              Complete payment · {formatMoney(stripePaymentSession?.amount ?? 0)}
+              Complete payment ·{" "}
+              {formatMoney(stripePaymentSession?.amount ?? 0)}
             </span>
           </Button>
         </div>
@@ -710,17 +849,7 @@ export default function BookingSummary({}: BookingSummaryProps) {
   // ──────────────────────────────────────────────
   const OrderSummaryContent = () => (
     <div className="space-y-4">
-      {hasPendingStripePayment ? (
-        <div className="rounded-xl border border-amber-200/80 bg-amber-50/50 px-4 py-3">
-          <p className="text-xs font-semibold text-amber-900">
-            Payment pending · {stripePaymentSession?.bookingNumber}
-          </p>
-          <p className="mt-1 text-xs leading-relaxed text-amber-800/90">
-            Your booking is reserved. Complete payment to confirm — closing the
-            window does not cancel your booking.
-          </p>
-        </div>
-      ) : null}
+      {renderPendingPaymentBanner("card")}
 
       {availableDates.length > 0 && hasPayableTotal && (
         <OrderViewBreakdown
@@ -821,9 +950,7 @@ export default function BookingSummary({}: BookingSummaryProps) {
               selectedGateway={selectedGateway}
               onGatewaySelect={setSelectedGateway}
               disabled={false}
-              showError={
-                !selectedGateway && !isPaymentBlocked && !isProcessing
-              }
+              showError={!selectedGateway && !isPaymentBlocked && !isProcessing}
             />
             <Separator className="bg-gray-100" />
           </>
@@ -863,7 +990,10 @@ export default function BookingSummary({}: BookingSummaryProps) {
               handleProceedToPayment();
             }}
             disabled={isCtaDisabled}
-            className={cn("h-12 w-full text-sm", checkoutPayButtonClass(isCtaDisabled))}
+            className={cn(
+              "h-12 w-full text-sm",
+              checkoutPayButtonClass(isCtaDisabled),
+            )}
           >
             {isCtaLoading ? (
               <div className="flex items-center gap-2">
@@ -907,7 +1037,9 @@ export default function BookingSummary({}: BookingSummaryProps) {
                     </p>
                   ) : null}
                   <p className="text-2xl font-bold tabular-nums tracking-tight text-[color:var(--checkout-foreground)]">
-                    {hasPayableTotal ? formatMoney(bookingGrandTotalWithFee) : "—"}
+                    {hasPayableTotal
+                      ? formatMoney(bookingGrandTotalWithFee)
+                      : "—"}
                   </p>
                 </div>
               </div>
@@ -938,6 +1070,8 @@ export default function BookingSummary({}: BookingSummaryProps) {
       <div className="lg:hidden">
         {/* Fixed Bottom Bar */}
         <div className="fixed inset-x-0 bottom-0 z-50 border-t border-[color:var(--checkout-border)] bg-white shadow-[0_-4px_20px_rgba(0,0,0,0.08)]">
+          {/* Always-visible pending payment + countdown (not hidden in drawer) */}
+          {renderPendingPaymentBanner("mobile-sticky")}
           {/* Expandable Drawer */}
           <AnimatePresence>
             {showMobileDrawer && (
@@ -1012,27 +1146,14 @@ export default function BookingSummary({}: BookingSummaryProps) {
               {isCtaLoading ? (
                 <div className="flex items-center gap-1.5">
                   <div className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white/30 border-t-white" />
-                  <span className="hidden min-[360px]:inline">Processing...</span>
+                  <span className="hidden min-[360px]:inline">
+                    Processing...
+                  </span>
                 </div>
               ) : (
                 <div className="flex items-center gap-1.5">
                   {!isCtaDisabled && <Lock className="h-3.5 w-3.5 shrink-0" />}
-                  <span className="truncate">
-                    {isCtaDisabled
-                      ? hasValidationErrors
-                        ? "Complete"
-                        : "Select"
-                      : hasPayableTotal ? (
-                        <>
-                          <span className="min-[400px]:hidden">Pay now</span>
-                          <span className="hidden min-[400px]:inline">
-                            {`Pay ${formatMoney(finalTotalWithFee)}`}
-                          </span>
-                        </>
-                      ) : (
-                        "Checkout"
-                      )}
-                  </span>
+                  <span className="truncate">{ctaLabel}</span>
                 </div>
               )}
             </Button>

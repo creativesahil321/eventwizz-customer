@@ -3,9 +3,12 @@
   --checkout-radius: 0.75rem;
   --checkout-header-offset: 4.75rem;
   --checkout-mobile-bar-height: 5.25rem;
+  --checkout-mobile-pending-extra: 0px;
   --checkout-mobile-safe-bottom: env(safe-area-inset-bottom, 0px);
   --checkout-mobile-bar-offset: calc(
-    var(--checkout-mobile-bar-height) + max(0.75rem, var(--checkout-mobile-safe-bottom))
+    var(--checkout-mobile-bar-height) +
+      max(0.75rem, var(--checkout-mobile-safe-bottom)) +
+      var(--checkout-mobile-pending-extra)
   );
   overflow-x: hidden;
   --checkout-background: oklch(0.984 0.003 247.858);
@@ -25,6 +28,11 @@
   background-color: var(--checkout-background);
   color: var(--checkout-foreground);
   font-family: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+}
+
+/* Extra bottom inset when the mobile pending-payment countdown strip is visible */
+.checkout-page[data-pending-payment="true"] {
+  --checkout-mobile-pending-extra: 3.25rem;
 }
 
 .checkout-page .checkout-trust-badge {

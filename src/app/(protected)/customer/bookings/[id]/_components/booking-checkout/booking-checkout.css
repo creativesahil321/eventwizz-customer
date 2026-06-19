@@ -1,0 +1,558 @@
+.booking-checkout-page {
+  --booking-mobile-bar-height: 8.5rem;
+  --booking-mobile-safe-bottom: env(safe-area-inset-bottom, 0px);
+  --booking-mobile-bar-offset: calc(
+    var(--booking-mobile-bar-height) +
+      max(0.75rem, var(--booking-mobile-safe-bottom))
+  );
+  --booking-radius: 0.75rem;
+  --booking-radius-sm: 0.5rem;
+  --booking-section-track: 0.18em;
+  /* Category tints — derived from theme tokens (Lovable-style chips) */
+  --booking-kind-table: var(--color-info);
+  --booking-kind-ticket: var(--chart-3);
+  --booking-kind-package: var(--color-success);
+  --booking-kind-addon: var(--color-warning);
+  padding-bottom: var(--booking-mobile-bar-offset);
+}
+
+@media (min-width: 1024px) {
+  .booking-checkout-page {
+    padding-bottom: 0;
+  }
+}
+
+.booking-checkout-page .booking-section-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: var(--booking-section-track);
+  line-height: 1;
+  text-transform: uppercase;
+  color: var(--muted-foreground);
+}
+
+.booking-checkout-page .booking-card {
+  overflow: hidden;
+  border-radius: var(--booking-radius);
+  border: 1px solid var(--border);
+  background: var(--card);
+  box-shadow: 0 1px 2px color-mix(in srgb, var(--foreground) 4%, transparent);
+}
+
+@media (min-width: 1024px) {
+  .booking-checkout-page .booking-card {
+    border-bottom-left-radius: 0;
+    border-bottom-right-radius: 0;
+    border-bottom: none;
+  }
+}
+
+.booking-checkout-page .booking-date-card--active {
+  border-color: var(--color-primary);
+  background-color: color-mix(in srgb, var(--color-primary) 8%, var(--card));
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-primary) 22%, transparent);
+}
+
+.booking-checkout-page .booking-date-card--active .booking-date-card__date {
+  color: var(--color-primary);
+}
+
+.booking-checkout-page .booking-date-card {
+  padding: 0.5rem 0.625rem;
+}
+
+@media (min-width: 640px) {
+  .booking-checkout-page .booking-date-card {
+    padding: 0.625rem 0.75rem;
+  }
+}
+
+/* Lovable: single bordered box for line items + add-extras */
+.booking-checkout-page .booking-date-group {
+  overflow: hidden;
+  border-radius: var(--booking-radius);
+  border: 1px solid var(--border);
+  background: var(--card);
+}
+
+.booking-checkout-page .booking-line-list {
+  padding-inline: 1.25rem;
+}
+
+@media (min-width: 640px) {
+  .booking-checkout-page .booking-line-list {
+    padding-inline: 1.5rem;
+  }
+}
+
+@media (min-width: 1024px) {
+  .booking-checkout-page .booking-line-list {
+    padding-inline: 2rem;
+  }
+}
+
+.booking-checkout-page .booking-line-item {
+  padding-block: 0.875rem;
+}
+
+@media (min-width: 640px) {
+  .booking-checkout-page .booking-line-item {
+    padding-block: 1rem;
+  }
+}
+
+/* Lovable neutral icon chips — fork/knife, ticket, sparkle, wine glass */
+.booking-checkout-page .booking-kind-chip {
+  background-color: color-mix(in srgb, var(--muted) 58%, var(--card));
+  color: color-mix(in srgb, var(--foreground) 68%, var(--muted-foreground));
+}
+
+.booking-checkout-page .booking-kind-badge {
+  background-color: color-mix(in srgb, var(--muted) 72%, var(--card));
+  color: var(--muted-foreground);
+}
+
+.booking-checkout-page .booking-panel-padding {
+  padding: 1rem;
+}
+
+@media (min-width: 640px) {
+  .booking-checkout-page .booking-panel-padding {
+    padding: 1.5rem;
+  }
+}
+
+@media (min-width: 1024px) {
+  .booking-checkout-page .booking-panel-padding {
+    padding: 2rem;
+  }
+}
+
+/* Payment summary — white header + dark footer (Lovable) */
+.booking-checkout-page .booking-payment-summary {
+  border-top: 1px solid var(--border);
+  background: var(--card);
+}
+
+@media (min-width: 1024px) {
+  .booking-checkout-page .booking-payment-summary {
+    overflow: hidden;
+    border: 1px solid var(--border);
+    border-top: 1px solid var(--border);
+    border-radius: 0 0 var(--booking-radius) var(--booking-radius);
+    box-shadow: 0 1px 2px color-mix(in srgb, var(--foreground) 4%, transparent);
+  }
+}
+
+@media (max-width: 1023px) {
+  .booking-checkout-page .booking-payment-summary {
+    position: fixed;
+    inset-inline: 0;
+    bottom: 0;
+    z-index: 40;
+    border-top: 1px solid var(--border);
+    border-radius: var(--booking-radius) var(--booking-radius) 0 0;
+    box-shadow:
+      0 -8px 24px color-mix(in srgb, var(--foreground) 10%, transparent),
+      0 -1px 0 var(--border);
+  }
+}
+
+.booking-checkout-page .booking-payment-summary__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  border-bottom: 1px solid var(--border);
+  background: var(--card);
+}
+
+.booking-checkout-page .booking-payment-summary__title {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: var(--booking-section-track);
+  line-height: 1;
+  text-transform: uppercase;
+  color: var(--foreground);
+}
+
+.booking-checkout-page .booking-payment-summary__toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1;
+  color: var(--color-primary);
+  transition: opacity 0.15s ease;
+}
+
+.booking-checkout-page .booking-payment-summary__toggle:hover {
+  opacity: 0.85;
+}
+
+.booking-checkout-page .booking-payment-summary__breakdown {
+  border-bottom: 1px solid var(--border);
+  background: var(--card);
+}
+
+@media (max-width: 1023px) {
+  .booking-checkout-page .booking-payment-summary__breakdown {
+    max-height: min(42vh, 20rem);
+    overflow-y: auto;
+  }
+}
+
+.booking-checkout-page .booking-payment-summary__footer {
+  background: var(--foreground);
+  color: var(--card);
+}
+
+@media (min-width: 1024px) {
+  .booking-checkout-page .booking-payment-summary__footer {
+    border-radius: 0 0 var(--booking-radius) var(--booking-radius);
+  }
+}
+
+.booking-checkout-page .booking-payment-summary__total-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: var(--booking-section-track);
+  line-height: 1;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--card) 62%, transparent);
+}
+
+.booking-checkout-page .booking-payment-summary__pay-btn {
+  border-radius: var(--booking-radius-sm);
+  background-color: var(--color-primary);
+  color: var(--color-primary-foreground, var(--primary-foreground));
+  font-weight: 700;
+}
+
+.booking-checkout-page .booking-payment-summary__pay-btn:hover {
+  opacity: 0.92;
+}
+
+.booking-checkout-page .booking-payment-summary__paid-badge {
+  border-color: color-mix(in srgb, var(--card) 25%, transparent);
+  background-color: color-mix(in srgb, var(--card) 12%, transparent);
+  color: var(--card);
+  font-size: 12px;
+  font-weight: 600;
+  padding-inline: 1rem;
+  padding-block: 0.5rem;
+}
+
+/* Add-extras panel (Lovable category blocks) */
+.booking-checkout-page .booking-extras-panel {
+  border-top: 1px solid var(--border);
+  background: color-mix(in srgb, var(--muted) 22%, var(--card));
+}
+
+.booking-checkout-page .booking-extras-panel__inner {
+  padding: 0.75rem 1rem 1rem;
+}
+
+@media (min-width: 640px) {
+  .booking-checkout-page .booking-extras-panel__inner {
+    padding-inline: 1.25rem;
+  }
+}
+
+.booking-checkout-page .booking-extras-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.booking-checkout-page .booking-extras-section + .booking-extras-section {
+  margin-top: 1rem;
+}
+
+.booking-checkout-page .booking-extras-section-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.125rem;
+}
+
+.booking-checkout-page .booking-catalog-grid {
+  display: grid;
+  gap: 0.5rem;
+  /* Fixed tile width — cards never stretch with container (Lovable) */
+  grid-template-columns: repeat(auto-fill, minmax(8.25rem, 10.25rem));
+  justify-content: start;
+  align-items: stretch;
+}
+
+@media (min-width: 640px) {
+  .booking-checkout-page .booking-catalog-grid {
+    grid-template-columns: repeat(auto-fill, minmax(8.5rem, 10.5rem));
+  }
+}
+
+.booking-checkout-page .booking-kind-section-title {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: var(--booking-section-track);
+  line-height: 1;
+  text-transform: uppercase;
+  color: var(--kind-accent, var(--muted-foreground));
+}
+
+.booking-checkout-page .booking-catalog-card {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: 10.5rem;
+  min-height: 0;
+  border-radius: 0.5rem;
+  border: 1px solid var(--border);
+  background: var(--card);
+  padding: 0.625rem 0.75rem;
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease,
+    background-color 0.15s ease;
+}
+
+.booking-checkout-page .booking-catalog-card__title {
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.35;
+  color: var(--foreground);
+}
+
+.booking-checkout-page .booking-catalog-card__desc {
+  margin-top: 0.125rem;
+  font-size: 10px;
+  line-height: 1.4;
+  color: var(--muted-foreground);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.booking-checkout-page .booking-catalog-card--selected {
+  border-color: var(--kind-accent, var(--color-primary));
+  background-color: color-mix(
+    in srgb,
+    var(--kind-accent, var(--color-primary)) 4%,
+    var(--card)
+  );
+  box-shadow: 0 0 0 1px
+    color-mix(in srgb, var(--kind-accent, var(--color-primary)) 16%, transparent);
+}
+
+.booking-checkout-page .booking-catalog-price {
+  margin-top: 0.375rem;
+  font-size: 13px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  color: var(--kind-accent, var(--foreground));
+}
+
+.booking-checkout-page .booking-catalog-card__actions {
+  margin-top: 0.5rem;
+}
+
+.booking-checkout-page .booking-catalog-add-btn {
+  display: inline-flex;
+  height: 1.875rem;
+  width: 100%;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25rem;
+  border-radius: 0.375rem;
+  border: 1px solid
+    color-mix(in srgb, var(--kind-accent, var(--color-primary)) 32%, var(--border));
+  background: var(--card);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1;
+  color: var(--kind-accent, var(--color-primary));
+  transition: background-color 0.15s ease;
+}
+
+.booking-checkout-page .booking-catalog-add-btn:hover {
+  background-color: color-mix(
+    in srgb,
+    var(--kind-accent, var(--color-primary)) 5%,
+    var(--card)
+  );
+}
+
+.booking-checkout-page .booking-catalog-stepper-value {
+  min-width: 1.25rem;
+  text-align: center;
+  font-size: 12px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--kind-accent, var(--color-primary));
+}
+
+.booking-checkout-page .booking-table-panel {
+  border-radius: 0.5rem;
+  border: 1px solid var(--border);
+  background: var(--card);
+  padding: 0.75rem;
+}
+
+.booking-checkout-page .booking-table-panel--compact {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.booking-checkout-page .booking-table-progress {
+  height: 2px;
+  border-radius: 9999px;
+  background-color: color-mix(
+    in srgb,
+    var(--kind-accent, var(--color-primary)) 35%,
+    transparent
+  );
+}
+
+.booking-checkout-page .booking-table-auto-btn {
+  display: inline-flex;
+  height: 2rem;
+  width: 100%;
+  align-items: center;
+  justify-content: center;
+  gap: 0.375rem;
+  border-radius: 0.5rem;
+  border: none;
+  background-color: var(--color-primary);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1;
+  color: var(--color-primary-foreground, #fff);
+  transition: opacity 0.15s ease;
+}
+
+.booking-checkout-page .booking-table-auto-btn:hover {
+  opacity: 0.9;
+}
+
+.booking-checkout-page .booking-table-reset-btn {
+  display: inline-flex;
+  height: 2rem;
+  width: 100%;
+  align-items: center;
+  justify-content: center;
+  gap: 0.375rem;
+  border-radius: 0.5rem;
+  border: 1px solid var(--border);
+  background-color: var(--card);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1;
+  color: var(--muted-foreground);
+  transition: background-color 0.15s ease;
+}
+
+.booking-checkout-page .booking-table-reset-btn:hover {
+  background-color: color-mix(in srgb, var(--muted) 40%, var(--card));
+}
+
+@media (min-width: 640px) {
+  .booking-checkout-page .booking-table-auto-btn,
+  .booking-checkout-page .booking-table-reset-btn {
+    width: auto;
+    padding-inline: 0.75rem;
+  }
+}
+
+.booking-checkout-page .booking-table-confirm-btn {
+  height: 2rem;
+  width: 100%;
+  border-radius: 0.375rem;
+  background-color: var(--color-success);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--color-primary-foreground, #fff);
+}
+
+.booking-checkout-page .booking-table-confirm-btn:hover {
+  opacity: 0.92;
+}
+
+.booking-checkout-page .booking-table-allocation {
+  border-radius: 0.375rem;
+  border: 1px solid var(--border);
+  background: color-mix(in srgb, var(--muted) 25%, var(--card));
+  padding: 0.5rem 0.625rem;
+}
+
+.booking-checkout-page .booking-extras-save-bar {
+  border-top: 1px solid var(--border);
+  background: var(--card);
+  padding: 0.625rem 1rem;
+}
+
+@media (min-width: 640px) {
+  .booking-checkout-page .booking-extras-save-bar {
+    padding-inline: 1.25rem;
+  }
+}
+
+.booking-checkout-page .booking-line-amount {
+  flex-shrink: 0;
+  align-self: flex-start;
+  font-size: 0.875rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--foreground);
+}
+
+.booking-checkout-page .booking-line-delete {
+  display: inline-flex;
+  height: 1.75rem;
+  width: 1.75rem;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.375rem;
+  color: var(--destructive, #dc2626);
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.booking-checkout-page .booking-line-delete:hover:not(:disabled) {
+  background-color: color-mix(in srgb, var(--destructive, #dc2626) 10%, transparent);
+}
+
+.booking-checkout-page .booking-line-delete:disabled {
+  opacity: 0.5;
+}
+
+.booking-checkout-page .booking-catalog-remove-btn {
+  display: inline-flex;
+  height: 1.5rem;
+  width: 1.5rem;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.375rem;
+  color: var(--destructive, #dc2626);
+  transition: background-color 0.15s ease;
+}
+
+.booking-checkout-page .booking-catalog-remove-btn:hover {
+  background-color: color-mix(in srgb, var(--destructive, #dc2626) 10%, transparent);
+}
+
+.booking-checkout-page .booking-menu-link {
+  margin-top: 0.375rem;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-primary);
+}
+
+.booking-checkout-page .booking-menu-link:hover {
+  text-decoration: underline;
+}

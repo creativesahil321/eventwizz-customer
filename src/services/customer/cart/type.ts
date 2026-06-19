@@ -139,6 +139,8 @@ export interface CartPendingPayment {
       payment_intent_id?: string;
       /** Checkout Sessions API */
       checkout_session_id?: string;
+      /** Seconds remaining, or absolute Unix timestamp — same as checkout API */
+      expires_at?: number;
     };
   };
 }

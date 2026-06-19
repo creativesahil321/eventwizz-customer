@@ -13,6 +13,8 @@
 
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
+
+const CART_EDIT_STORAGE_KEY = "cart-edit-storage";
 import {
   resolveBestTableSelection,
   type ResolvedTableSelection,
@@ -1059,7 +1061,8 @@ export const useCartEditStore = create<CartEditState>()(
             newEditingData[eventSlug][date] = {
               ...newEditingData[eventSlug][date],
               specialRequest,
-              hasChanges: true,
+              // Do not set hasChanges — special requests are sent only on Pay now
+              // via the checkout payload, not via cart auto-save while typing.
             };
           }
 
@@ -1220,6 +1223,15 @@ export const useCartEditStore = create<CartEditState>()(
 
       clearAllCarts: () => {
         set({ editingData: {} });
+        // Explicitly remove the persisted key so a page reload (e.g. after
+        // payment) never rehydrates stale cart data ahead of the Zustand write.
+        if (typeof window !== "undefined") {
+          try {
+            localStorage.removeItem(CART_EDIT_STORAGE_KEY);
+          } catch {
+            // private browsing / storage quota — safe to ignore
+          }
+        }
       },
 
       debugUnsavedState: (eventSlug: string) => {
@@ -1777,7 +1789,7 @@ export const useCartEditStore = create<CartEditState>()(
       },
     }),
     {
-      name: "cart-edit-storage",
+      name: CART_EDIT_STORAGE_KEY,
       partialize: (state) => ({ editingData: state.editingData }),
     }
   )

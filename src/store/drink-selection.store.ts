@@ -8,6 +8,8 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { normalizeSlug } from "@/lib/utils";
 
+const DRINK_SELECTION_STORAGE_KEY = "drink-selection-storage";
+
 export interface SelectedDrink {
   id: number;
   title: string;
@@ -174,6 +176,15 @@ export const useDrinkSelectionStore = create<DrinkSelectionState>()(
 
       clearDrinksForNewEvent: () => {
         set({ drinksByScope: {}, currentScopeKey: null });
+        // Explicitly remove the persisted key so a page reload never rehydrates
+        // stale drink selections (e.g. after payment or session expiry).
+        if (typeof window !== "undefined") {
+          try {
+            localStorage.removeItem(DRINK_SELECTION_STORAGE_KEY);
+          } catch {
+            // private browsing / storage quota — safe to ignore
+          }
+        }
       },
 
       setCurrentEvent: (
@@ -212,7 +223,7 @@ export const useDrinkSelectionStore = create<DrinkSelectionState>()(
       hasDrinks: () => getScopedDrinks(get()).length > 0,
     }),
     {
-      name: "drink-selection-storage",
+      name: DRINK_SELECTION_STORAGE_KEY,
       version: 2,
       migrate: (persistedState) => {
         const legacy = persistedState as {

@@ -121,118 +121,161 @@ export interface TableAllocation {
   deposit_per_person?: number | string | null;
 }
 
-/**
- * Ticket details in booking
- */
-export interface BookingTicketDetails {
-  title: string;
-  description: string;
-  price_per_ticket: number;
+/** Table seat allocation on a booking date line item */
+export interface BookingTableAllocation {
+  id: number;
+  table_number: string | number;
+  label: string;
+  people: number;
+}
+
+/** Booked table line item */
+export interface BookingDetailsTable {
+  id: number;
+  name: string;
+  description?: string | null;
+  unit_price: number;
   quantity: number;
+  total_amount: number;
+  table_size: number;
+  table_count: number;
+  allocations?: BookingTableAllocation[];
 }
 
-/**
- * Drink details in booking
- */
-export interface BookingDrinkDetails {
-  title: string;
-  price: number;
+/** Booked ticket line item */
+export interface BookingDetailsTicket {
+  id: number;
+  name: string;
+  description?: string | null;
+  unit_price: number;
   quantity: number;
+  total_amount: number;
 }
 
-/**
- * Add-on ticket details
- */
-export interface AddOnTicketDetails {
-  title: string;
-  description: string;
-  price_per_ticket: string;
-  quantity: string;
+/** Booked package line item (drinks / brunch / etc.) */
+export interface BookingDetailsPackage {
+  id: number;
+  name: string;
+  description?: string | null;
+  unit_price: number;
+  quantity: number;
+  total_amount: number;
 }
 
-/**
- * Add-on drink details
- */
-export interface AddOnDrinkDetails {
-  title: string;
-  price: string;
-  quantity: string;
-}
-
-/**
- * Add-ons data for a booking date
- */
-export interface BookingAddOnsData {
-  tickets?: AddOnTicketDetails[];
-  drinks?: AddOnDrinkDetails[];
+/** Saved add-on ticket on a booking date */
+export interface BookingDetailsAddonTicket {
+  id?: number;
+  booking_date_ticket_id?: number;
+  name: string;
+  description?: string | null;
+  unit_price: number;
+  quantity: number;
   total_amount?: number;
 }
 
-/**
- * Event date details for booking details page
- */
-export interface BookingEventDate {
-  has_unbooked_event_dates: boolean;
+/** Saved add-on package on a booking date */
+export interface BookingDetailsAddonPackage {
+  id?: number;
+  booking_date_package_id?: number;
+  name: string;
+  description?: string | null;
+  unit_price: number;
+  quantity: number;
+  total_amount?: number;
+}
+
+/** Saved add-on table on a booking date */
+export interface BookingDetailsAddonTable {
+  id?: number;
+  booking_date_table_id?: number;
+  name?: string;
+  unit_price: number;
+  quantity: number;
+  total_amount: number;
+  table_size: number;
+  table_count?: number;
+  allocations?: BookingTableAllocation[];
+}
+
+/** Add-ons bucket for a booking date */
+export interface BookingDetailsAddons {
+  tickets?: BookingDetailsAddonTicket[];
+  packages?: BookingDetailsAddonPackage[];
+  tables?: BookingDetailsAddonTable[];
+  total_amount?: number;
+}
+
+export interface BookingRescheduleRequest {
+  id: number;
+  booking_id: number;
+  bookings_date_id: number;
+  event_date_id: number;
+  event_date: string;
+  payment_method: string;
+  unpaid_amount: number;
+  table_details: Array<{
+    event_date_table_id: number;
+    allocated_seat: number[];
+    table_size: number;
+    price_per_person: number;
+    total: number;
+  }>;
+  drink_details: unknown[];
+  created_at: string;
+  updated_at: string;
+}
+
+/** Single date entry in booking details */
+export interface BookingDetailsDate {
   booking_date_id: number;
+  event_date_id: number;
+  room_id?: number;
+  room_name?: string;
   date_key: string;
-  date: string;
-  parent_booking_date?: string | null; // Original date before reschedule
-  payment_status: string;
+  date_label: string;
+  item_summary?: string;
+  payment_status_code?: number;
+  payment_status_label: string;
   total_amount: number;
   paid_amount: number | null;
-  pending_payment: number | null;
   can_pay_now?: boolean;
-  tables: TableAllocation[];
-  tickets: BookingTicketDetails[];
-  drinks: BookingDrinkDetails[];
-  addons?: BookingAddOnsData;
-  reschedule_requests?: Array<{
-    id: number;
-    booking_id: number;
-    bookings_date_id: number;
-    event_date_id: number;
-    event_date: string;
-    payment_method: string;
-    unpaid_amount: number;
-    table_details: Array<{
-      event_date_table_id: number;
-      allocated_seat: number[];
-      table_size: number;
-      price_per_person: number;
-      total: number;
-    }>;
-    drink_details: unknown[];
-    created_at: string;
-    updated_at: string;
-  }>;
+  tickets: BookingDetailsTicket[];
+  packages: BookingDetailsPackage[];
+  tables: BookingDetailsTable[];
+  addons?: BookingDetailsAddons;
+  reschedule_requests?: BookingRescheduleRequest[];
+}
+
+/** Top-level payment summary on booking details */
+export interface BookingPaymentSummary {
+  sub_total_amount: number;
+  paid_amount: number | null;
+  pending_amount: number | null;
+  deposit_amount: number | null;
+  addons_amount: number | null;
+  total_amount: number;
+  can_pay_now?: boolean;
 }
 
 /**
- * Booking details data structure
+ * Booking details data structure (customer booking detail / checkout page)
  */
 export interface BookingDetailsData {
-  is_menu_choice: boolean;
   booking_id: number;
   booking_number?: string;
   event_name: string;
-  slug: string;
+  event_slug: string;
   location: string;
-  drink_title?: string;
-  payment_status: string;
+  is_room_system?: boolean;
+  payment_status_code?: number;
+  payment_status_label: string;
+  is_menu_choice?: boolean;
   payment_gateways?: Array<{
     id: number;
     slug: string;
   }>;
-  sub_total: string | number;
-  partial_payment?: string | number;
-  deposit_paid?: number | null;
-  paid_amount: number | null;
-  pending_payment: number;
-  addons_amount: number;
-  total: number;
-  reschedule_status?: boolean;
-  can_pay_now?: boolean;
-  event_dates: BookingEventDate[];
+  dates: BookingDetailsDate[];
+  payment_summary: BookingPaymentSummary;
 }
 
 /**

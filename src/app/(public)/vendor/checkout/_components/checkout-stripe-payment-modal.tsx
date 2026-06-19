@@ -38,6 +38,7 @@ import {
 } from "@/services/customer/checkout/checkout-payment";
 import { getStripePromise } from "@/lib/stripe/stripe-loader";
 import { cn } from "@/lib/utils";
+import { PaymentSessionCountdownPill } from "./payment-session-countdown-pill";
 
 // ---------------------------------------------------------------------------
 // Shared appearance / UI helpers
@@ -96,6 +97,7 @@ function buildStripeAppearance() {
 interface FormBodyProps {
   session: CheckoutStripePaymentSession;
   merchantName: string;
+  sessionSecondsLeft: number | null;
   isReady: boolean;
   isSubmitting: boolean;
   errorMessage: string | null;
@@ -108,6 +110,7 @@ interface FormBodyProps {
 function StripeFormBody({
   session,
   merchantName,
+  sessionSecondsLeft,
   isReady,
   isSubmitting,
   errorMessage,
@@ -120,6 +123,32 @@ function StripeFormBody({
 
   return (
     <div className="space-y-5">
+      {sessionSecondsLeft !== null ? (
+        <div
+          className={cn(
+            "flex items-center justify-between gap-3 rounded-xl border px-3.5 py-2.5",
+            sessionSecondsLeft <= 60
+              ? "border-red-200/80 bg-red-50/80"
+              : "border-amber-200/80 bg-amber-50/80",
+          )}
+        >
+          <p
+            className={cn(
+              "text-xs font-medium leading-snug",
+              sessionSecondsLeft <= 60 ? "text-red-900" : "text-amber-900",
+            )}
+          >
+            {sessionSecondsLeft <= 60
+              ? "Hurry! Session expires soon."
+              : "Complete payment before your reservation expires."}
+          </p>
+          <PaymentSessionCountdownPill
+            secondsLeft={sessionSecondsLeft}
+            size="md"
+          />
+        </div>
+      ) : null}
+
       <div className="rounded-xl border border-[color:var(--checkout-border)] bg-[color:var(--checkout-muted)]/30 px-4 py-3.5">
         <div className="grid grid-cols-[1fr_auto] items-end gap-x-6 gap-y-1">
           <div className="min-w-0">
@@ -169,7 +198,7 @@ function StripeFormBody({
               onHasExpressCheckout(
                 Boolean(
                   availablePaymentMethods &&
-                    Object.keys(availablePaymentMethods).length > 0,
+                  Object.keys(availablePaymentMethods).length > 0,
                 ),
               );
             }}
@@ -262,6 +291,7 @@ function StripeFormBody({
 interface FormProps {
   session: CheckoutStripePaymentSession;
   merchantName: string;
+  sessionSecondsLeft: number | null;
   onPaymentComplete?: () => void;
   onClose: () => void;
 }
@@ -269,6 +299,7 @@ interface FormProps {
 function PaymentIntentForm({
   session,
   merchantName,
+  sessionSecondsLeft,
   onPaymentComplete,
   onClose: _onClose,
 }: FormProps) {
@@ -363,7 +394,9 @@ function PaymentIntentForm({
       await runConfirm();
     } catch (error) {
       const message =
-        error instanceof Error ? error.message : "An unexpected error occurred.";
+        error instanceof Error
+          ? error.message
+          : "An unexpected error occurred.";
       setErrorMessage(message);
       toast.error("Payment failed", { description: message });
     } finally {
@@ -380,7 +413,9 @@ function PaymentIntentForm({
       await runConfirm(event);
     } catch (error) {
       const message =
-        error instanceof Error ? error.message : "An unexpected error occurred.";
+        error instanceof Error
+          ? error.message
+          : "An unexpected error occurred.";
       setErrorMessage(message);
       toast.error("Payment failed", { description: message });
     } finally {
@@ -392,6 +427,7 @@ function PaymentIntentForm({
     <StripeFormBody
       session={session}
       merchantName={merchantName}
+      sessionSecondsLeft={sessionSecondsLeft}
       isReady={Boolean(stripe && elements)}
       isSubmitting={isSubmitting}
       errorMessage={errorMessage}
@@ -410,6 +446,7 @@ function PaymentIntentForm({
 function CheckoutSessionForm({
   session,
   merchantName,
+  sessionSecondsLeft,
   onPaymentComplete,
   onClose: _onClose,
 }: FormProps) {
@@ -494,7 +531,9 @@ function CheckoutSessionForm({
       await runConfirm();
     } catch (error) {
       const message =
-        error instanceof Error ? error.message : "An unexpected error occurred.";
+        error instanceof Error
+          ? error.message
+          : "An unexpected error occurred.";
       setErrorMessage(message);
       toast.error("Payment failed", { description: message });
     } finally {
@@ -511,7 +550,9 @@ function CheckoutSessionForm({
       await runConfirm(event);
     } catch (error) {
       const message =
-        error instanceof Error ? error.message : "An unexpected error occurred.";
+        error instanceof Error
+          ? error.message
+          : "An unexpected error occurred.";
       setErrorMessage(message);
       toast.error("Payment failed", { description: message });
     } finally {
@@ -534,6 +575,7 @@ function CheckoutSessionForm({
     <StripeFormBody
       session={session}
       merchantName={merchantName}
+      sessionSecondsLeft={sessionSecondsLeft}
       isReady={isReady}
       isSubmitting={isSubmitting}
       errorMessage={errorMessage}
@@ -553,6 +595,8 @@ interface CheckoutStripePaymentModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   session: CheckoutStripePaymentSession | null;
+  /** Shared countdown from BookingSummary — avoids duplicate timers. */
+  sessionSecondsLeft?: number | null;
   onPaymentComplete?: () => void;
 }
 
@@ -560,6 +604,7 @@ export default function CheckoutStripePaymentModal({
   open,
   onOpenChange,
   session,
+  sessionSecondsLeft = null,
   onPaymentComplete,
 }: CheckoutStripePaymentModalProps) {
   const { settings } = useDomain();
@@ -583,13 +628,14 @@ export default function CheckoutStripePaymentModal({
   }, [session?.clientSecret, isCheckoutSession]);
 
   // Options for Checkout Sessions
-  const csElementsOptions = useMemo<StripeCheckoutElementsOptions | null>(() => {
-    if (!session?.clientSecret || !isCheckoutSession) return null;
-    return {
-      appearance: buildStripeAppearance(),
-      loader: "auto",
-    };
-  }, [session?.clientSecret, isCheckoutSession]);
+  const csElementsOptions =
+    useMemo<StripeCheckoutElementsOptions | null>(() => {
+      if (!session?.clientSecret || !isCheckoutSession) return null;
+      return {
+        appearance: buildStripeAppearance(),
+        loader: "auto",
+      };
+    }, [session?.clientSecret, isCheckoutSession]);
 
   const canRender = Boolean(session && stripePromise);
 
@@ -599,6 +645,7 @@ export default function CheckoutStripePaymentModal({
   const formProps: FormProps = {
     session,
     merchantName,
+    sessionSecondsLeft,
     onPaymentComplete,
     onClose: () => onOpenChange(false),
   };

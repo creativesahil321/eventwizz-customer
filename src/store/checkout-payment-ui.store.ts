@@ -4,6 +4,17 @@ import type { CheckoutStripePaymentSession } from "@/services/customer/checkout/
 
 const STORAGE_KEY = "eventwizz-checkout-payment";
 
+/** Remove the persisted key from sessionStorage so Zustand can never
+ *  rehydrate a stale/completed/expired session on the next page load. */
+function purgePersistedSession(): void {
+  if (typeof window === "undefined") return;
+  try {
+    sessionStorage.removeItem(STORAGE_KEY);
+  } catch {
+    // private browsing / storage quota — safe to ignore
+  }
+}
+
 interface CheckoutPaymentUiState {
   /** True while a Stripe payment modal is open / awaiting payment. */
   isAwaitingStripePayment: boolean;
@@ -52,19 +63,13 @@ export const useCheckoutPaymentUiStore = create<CheckoutPaymentUiState>()(
             ...state.completedBookingNumbers,
           ].slice(0, 10),
         }));
-        // Belt-and-suspenders: fully remove the key so Zustand rehydration
-        // cannot restore a completed session even if persist write races.
-        if (typeof window !== "undefined") {
-          try {
-            sessionStorage.removeItem(STORAGE_KEY);
-          } catch {
-            // private browsing / storage quota — safe to ignore
-          }
-        }
+        purgePersistedSession();
       },
 
-      clearPaymentSession: () =>
-        set({ stripePaymentSession: null, isAwaitingStripePayment: false }),
+      clearPaymentSession: () => {
+        set({ stripePaymentSession: null, isAwaitingStripePayment: false });
+        purgePersistedSession();
+      },
 
       isBookingCompleted: (bookingNumber) =>
         get().completedBookingNumbers.includes(bookingNumber),

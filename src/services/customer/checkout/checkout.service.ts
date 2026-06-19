@@ -94,11 +94,23 @@ export const checkoutService = {
 
     if (
       data.partial_payment != null &&
-      Math.abs(data.sub_total - (data.total + data.partial_payment)) > 0.02
+      data.total < data.partial_payment - 0.02
     ) {
       errors.push(
-        "partial_payment must equal sub_total minus total (balance due later)",
+        "total must be greater than or equal to partial_payment (deposit portion)",
       );
+    }
+
+    if (data.partial_payment != null) {
+      const { calculatedPartial } = checkoutService.calculateTotals(data);
+      if (
+        calculatedPartial != null &&
+        Math.abs(calculatedPartial - data.partial_payment) > 0.02
+      ) {
+        errors.push(
+          "partial_payment must equal the sum of table deposit amounts across deposit dates",
+        );
+      }
     }
 
     iterateCheckoutDates(data, (dateData, index) => {
@@ -190,14 +202,9 @@ export const checkoutService = {
             0,
           ) ?? 0);
 
-        const tableTotal =
-          dateData.tables?.reduce((sum, table) => {
-            const guests = table.allocation?.reduce((guestSum, g) => guestSum + g, 0) ?? 0;
-            return sum + table.price_per_person * guests;
-          }, 0) ?? 0;
-
         calculatedTotal += dateData.deposit_amount + ticketsAndDrinks;
-        calculatedPartial = (calculatedPartial ?? 0) + Math.max(0, tableTotal - dateData.deposit_amount);
+        calculatedPartial =
+          (calculatedPartial ?? 0) + dateData.deposit_amount;
       } else {
         calculatedTotal += dateData.amount_per_date;
       }

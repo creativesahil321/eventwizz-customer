@@ -12,6 +12,20 @@ export type CheckoutPaymentAction =
   | { type: "stripe"; session: CheckoutStripePaymentSession }
   | { type: "redirect"; url: string };
 
+/**
+ * Converts the backend `expires_at` field to an absolute Unix timestamp (seconds).
+ *
+ * Backend sends a duration in seconds (e.g. 1740 = 29 minutes).
+ * If it's already an absolute Unix timestamp (> 1 billion) we use it directly.
+ */
+function normalizeExpiresAt(raw: number | undefined | null): number | undefined {
+  if (!raw || raw <= 0) return undefined;
+  // Already an absolute Unix timestamp
+  if (raw > 1_000_000_000) return raw;
+  // Duration in seconds → convert to absolute timestamp
+  return Math.floor(Date.now() / 1000) + raw;
+}
+
 export function buildCheckoutStripeSession(
   data: CheckoutResponseData,
 ): CheckoutStripePaymentSession | null {
@@ -43,6 +57,23 @@ export function buildCheckoutStripeSession(
     // Prefer Checkout Sessions when both are present (shouldn't happen in practice)
     checkoutSessionId: stripe.checkout_session_id ?? undefined,
     paymentIntentId: stripe.payment_intent_id ?? undefined,
+    // Normalise expires_at: backend SHOULD send a Unix timestamp (e.g. 1750170000)
+    // but may send a duration in minutes (e.g. 29).
+    // Heuristic: real Unix timestamps are always > 1 billion; anything smaller is
+    // treated as minutes-from-now and converted to an absolute timestamp.
+    expiresAt: normalizeExpiresAt(stripe.expires_at),
+  };
+}
+
+/** Merge a refreshed checkout/resume session with any stored session.
+ *  Keeps the stored absolute `expiresAt` when the API omits it (common on /resume). */
+export function mergeStripePaymentSession(
+  previous: CheckoutStripePaymentSession | null | undefined,
+  next: CheckoutStripePaymentSession,
+): CheckoutStripePaymentSession {
+  return {
+    ...next,
+    expiresAt: next.expiresAt ?? previous?.expiresAt,
   };
 }
 

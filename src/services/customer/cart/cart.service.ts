@@ -42,13 +42,13 @@ export const cartService = {
     const url =
       roomId != null && roomId > 0
         ? API_ENDPOINTS.CUSTOMER.BOOK_EVENT.DELETE_CART_DATA_ROOM.replace(
-            "{room_id}",
-            String(roomId),
-          ).replace("{date}", eventDate)
+          "{room_id}",
+          String(roomId),
+        ).replace("{date}", eventDate)
         : API_ENDPOINTS.CUSTOMER.BOOK_EVENT.DELETE_CART_DATA.replace(
-            "{date}",
-            eventDate,
-          );
+          "{date}",
+          eventDate,
+        );
 
     return api.delete<void>(url);
   },

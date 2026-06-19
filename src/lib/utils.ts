@@ -306,6 +306,7 @@ export async function resetAllStores(): Promise<void> {
         // Cart persisted keys (customer checkout)
         "cart-edit-storage",
         "cart-storage",
+        "drink-selection-storage",
       ];
 
       storageKeys.forEach((key) => {

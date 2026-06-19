@@ -172,6 +172,8 @@ export interface RequestOptions extends AxiosRequestConfig {
   returnFullResponse?: boolean;
   /** Skip global error toasts — caller shows inline validation instead. */
   suppressErrorToast?: boolean;
+  /** Skip global success toasts — used for silent checkout cart saves on Pay. */
+  suppressSuccessToast?: boolean;
 }
 
 // Create axios instance with default config
