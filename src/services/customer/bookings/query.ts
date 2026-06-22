@@ -6,6 +6,7 @@
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { bookingsService } from "./bookings.service";
+import { resolveBookingPaymentAction } from "./booking-payment";
 import {
   BookingsQueryParams,
   BookingsResponse,
@@ -272,16 +273,17 @@ export const useBookingPayment = () => {
   >({
     mutationFn: (payload) => bookingsService.processBookingPayment(payload),
     onSuccess: (response, variables) => {
-      if (response.status && response.data?.redirect_url) {
-        console.log("🔄 Redirecting to payment gateway:", {
-          gateway: response.data.gateway,
-          bookingId: response.data.booking_id,
-          paymentId: response.data.payment_id,
-          redirectUrl: response.data.redirect_url,
-        });
-        // Redirect to payment gateway
-        window.location.href = response.data.redirect_url;
-        return; // Prevent further execution if redirecting
+      if (!response.status || !response.data) return;
+
+      const action = resolveBookingPaymentAction(response.data);
+      if (action?.type === "redirect") {
+        window.location.href = action.url;
+        return;
+      }
+
+      // Stripe modal is opened by the caller when action.type === "stripe"
+      if (action?.type === "stripe") {
+        return;
       }
 
       // Invalidate booking details to refetch updated data

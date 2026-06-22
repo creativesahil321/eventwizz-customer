@@ -39,6 +39,7 @@ import {
 import { getStripePromise } from "@/lib/stripe/stripe-loader";
 import { cn } from "@/lib/utils";
 import { PaymentSessionCountdownPill } from "./payment-session-countdown-pill";
+import "../checkout-theme.css";
 
 // ---------------------------------------------------------------------------
 // Shared appearance / UI helpers
@@ -248,6 +249,8 @@ function StripeFormBody({
           className={cn(
             "checkout-stripe-pay-btn h-12 w-full rounded-xl border-0 text-sm font-bold shadow-md",
             "shadow-[oklch(0.208_0.042_265.755/0.2)]",
+            "!bg-[var(--checkout-brand-primary,oklch(0.208_0.042_265.755))] !text-white",
+            "hover:!brightness-110 disabled:!opacity-55",
           )}
         >
           {isSubmitting ? (
@@ -292,6 +295,7 @@ interface FormProps {
   session: CheckoutStripePaymentSession;
   merchantName: string;
   sessionSecondsLeft: number | null;
+  successReturnPath?: string;
   onPaymentComplete?: () => void;
   onClose: () => void;
 }
@@ -300,6 +304,7 @@ function PaymentIntentForm({
   session,
   merchantName,
   sessionSecondsLeft,
+  successReturnPath,
   onPaymentComplete,
   onClose: _onClose,
 }: FormProps) {
@@ -329,9 +334,11 @@ function PaymentIntentForm({
     }
 
     onPaymentComplete?.();
-    const returnUrl = buildStripeReturnUrl(session);
-    router.push(returnUrl + "&verified=1");
-  }, [onPaymentComplete, router, session]);
+    const returnUrl = buildStripeReturnUrl(session, {
+      path: successReturnPath,
+    });
+    router.push(`${returnUrl}&verified=1`);
+  }, [onPaymentComplete, router, session, successReturnPath]);
 
   const runConfirm = useCallback(
     async (
@@ -339,7 +346,9 @@ function PaymentIntentForm({
     ): Promise<boolean> => {
       if (!stripe || !elements) return false;
 
-      const returnUrl = buildStripeReturnUrl(session);
+      const returnUrl = buildStripeReturnUrl(session, {
+        path: successReturnPath,
+      });
 
       if (!expressEvent) {
         const { error: submitError } = await elements.submit();
@@ -383,7 +392,7 @@ function PaymentIntentForm({
 
       return false;
     },
-    [elements, finalizeSuccess, session, stripe],
+    [elements, finalizeSuccess, session, stripe, successReturnPath],
   );
 
   const handleSubmit = async () => {
@@ -447,6 +456,7 @@ function CheckoutSessionForm({
   session,
   merchantName,
   sessionSecondsLeft,
+  successReturnPath,
   onPaymentComplete,
   onClose: _onClose,
 }: FormProps) {
@@ -478,9 +488,11 @@ function CheckoutSessionForm({
     }
 
     onPaymentComplete?.();
-    const returnUrl = buildStripeReturnUrl(session);
-    router.push(returnUrl + "&verified=1");
-  }, [onPaymentComplete, router, session]);
+    const returnUrl = buildStripeReturnUrl(session, {
+      path: successReturnPath,
+    });
+    router.push(`${returnUrl}&verified=1`);
+  }, [onPaymentComplete, router, session, successReturnPath]);
 
   const runConfirm = useCallback(
     async (
@@ -488,7 +500,9 @@ function CheckoutSessionForm({
     ): Promise<boolean> => {
       if (!checkout) return false;
 
-      const returnUrl = buildStripeReturnUrl(session);
+      const returnUrl = buildStripeReturnUrl(session, {
+        path: successReturnPath,
+      });
 
       const confirmResult = await checkout.confirm({
         returnUrl,
@@ -520,7 +534,7 @@ function CheckoutSessionForm({
 
       return false;
     },
-    [checkout, finalizeSuccess, session],
+    [checkout, finalizeSuccess, session, successReturnPath],
   );
 
   const handleSubmit = async () => {
@@ -597,6 +611,8 @@ interface CheckoutStripePaymentModalProps {
   session: CheckoutStripePaymentSession | null;
   /** Shared countdown from BookingSummary — avoids duplicate timers. */
   sessionSecondsLeft?: number | null;
+  /** Override post-payment redirect path (default: /vendor/payment/success) */
+  successReturnPath?: string;
   onPaymentComplete?: () => void;
 }
 
@@ -605,6 +621,7 @@ export default function CheckoutStripePaymentModal({
   onOpenChange,
   session,
   sessionSecondsLeft = null,
+  successReturnPath,
   onPaymentComplete,
 }: CheckoutStripePaymentModalProps) {
   const { settings } = useDomain();
@@ -646,6 +663,7 @@ export default function CheckoutStripePaymentModal({
     session,
     merchantName,
     sessionSecondsLeft,
+    successReturnPath,
     onPaymentComplete,
     onClose: () => onOpenChange(false),
   };

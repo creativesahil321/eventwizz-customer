@@ -99,6 +99,7 @@ export interface DrinkData {
   title: string;
   price: string; // API returns as string
   quantity?: string | number; // API returns as string or number
+  available_quantity?: number;
 }
 
 /**
@@ -160,6 +161,7 @@ export interface EventCartData {
     id: number;
     title: string;
     price: string;
+    available_quantity?: number;
   }>;
   /** Present when the customer has an unpaid booking for this event. */
   pending_payment?: CartPendingPayment | null;

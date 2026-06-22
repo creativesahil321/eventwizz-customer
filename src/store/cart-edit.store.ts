@@ -144,6 +144,14 @@ function calculatePaymentAmounts(
   return { todayAmount, laterAmount };
 }
 
+function clampItemQuantity(quantity: number, maxQuantity?: number): number {
+  const safe = Math.max(0, quantity);
+  if (maxQuantity == null || !Number.isFinite(maxQuantity) || maxQuantity < 0) {
+    return safe;
+  }
+  return Math.min(safe, maxQuantity);
+}
+
 function mapApiTablesToEditable(
   tables: Array<Record<string, unknown>> | undefined,
   depositAmount: number,
@@ -175,16 +183,22 @@ function mapApiTicketsToEditable(
   depositAmount: number,
 ): EditableItem[] {
   return (
-    tickets?.map((ticket) => ({
-      id: Number(ticket.id),
-      title: String(ticket.title),
-      description: String(ticket.description),
-      price: Number(ticket.price),
-      quantity: Number(ticket.quantity || 0),
-      maxQuantity: Number(ticket.total_capacity),
-      type: "ticket" as const,
-      depositAmount,
-    })) || []
+    tickets?.map((ticket) => {
+      const capacity = Number(ticket.total_capacity);
+      const maxQuantity =
+        Number.isFinite(capacity) && capacity >= 0 ? capacity : undefined;
+
+      return {
+        id: Number(ticket.id),
+        title: String(ticket.title),
+        description: String(ticket.description),
+        price: Number(ticket.price),
+        quantity: Number(ticket.quantity || 0),
+        maxQuantity,
+        type: "ticket" as const,
+        depositAmount,
+      };
+    }) || []
   );
 }
 
@@ -217,6 +231,12 @@ function mapApiDrinksToEditable(
       drink.description != null && String(drink.description).trim() !== ""
         ? String(drink.description)
         : undefined;
+    const availableRaw =
+      drink.available_quantity ?? drink.available_drinks ?? drink.quantity;
+    const maxQuantity = Number(availableRaw);
+    const parsedMax =
+      Number.isFinite(maxQuantity) && maxQuantity >= 0 ? maxQuantity : undefined;
+
     return {
       id,
       title,
@@ -224,6 +244,7 @@ function mapApiDrinksToEditable(
       price: parseFloat(String(drink.price)) || 0,
       quantity:
         selectedById.get(id) ?? selectedByTitle.get(title) ?? 0,
+      maxQuantity: parsedMax,
       type: "drink" as const,
       depositAmount,
     };
@@ -333,7 +354,7 @@ function mergeEditableItemsFromApi(
     if (!prev) return item;
     return {
       ...item,
-      quantity: prev.quantity,
+      quantity: clampItemQuantity(prev.quantity, item.maxQuantity),
       allocation: prev.allocation ?? item.allocation,
     };
   });
@@ -823,9 +844,14 @@ export const useCartEditStore = create<CartEditState>()(
               (item: EditableItem) => item.id === itemId
             );
             if (itemIndex >= 0) {
+              const item = items[itemIndex];
+              const cappedQuantity = clampItemQuantity(
+                quantity,
+                item.maxQuantity,
+              );
               const updatedItem = {
                 ...items[itemIndex],
-                quantity: Math.max(0, quantity),
+                quantity: cappedQuantity,
               };
 
               // Auto-handle guest allocation for tables

@@ -5,7 +5,8 @@
  */
 
 export { bookingsService } from "./bookings.service";
-export { useBookings, useBooking, bookingsKeys } from "./query";
+export { resolveBookingPaymentAction } from "./booking-payment";
+export { useBookings, useBooking, bookingsKeys, useBookingPayment } from "./query";
 export type {
   BookingsQueryParams,
   BookingsResponse,

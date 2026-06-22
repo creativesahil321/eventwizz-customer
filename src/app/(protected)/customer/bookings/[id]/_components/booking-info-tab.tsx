@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useCallback } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
@@ -36,11 +37,16 @@ import { useDeleteAddOns } from "@/services/customer/bookings/hooks/useDeleteAdd
 import {
   useRescheduleBooking,
   useBookingPayment,
+  bookingsKeys,
 } from "@/services/customer/bookings/query";
+import { resolveBookingPaymentAction } from "@/services/customer/bookings/booking-payment";
 import type {
   RescheduleBookingPayload,
   BookingPaymentPayload,
+  BookingPaymentResponse,
 } from "@/services/customer/bookings/type";
+import type { CheckoutStripePaymentSession } from "@/services/customer/checkout";
+import CheckoutStripePaymentModal from "@/app/(public)/vendor/checkout/_components/checkout-stripe-payment-modal";
 import { useCurrencyFormat } from "@/hooks/use-currency-format";
 import { parseFormattedMoney } from "@/lib/currency-format";
 
@@ -195,6 +201,10 @@ export default function BookingInfoTab({ bookingData }: BookingInfoTabProps) {
   const deleteAddOnsMutation = useDeleteAddOns();
   const rescheduleMutation = useRescheduleBooking();
   const paymentMutation = useBookingPayment();
+  const queryClient = useQueryClient();
+  const [stripePaymentSession, setStripePaymentSession] =
+    useState<CheckoutStripePaymentSession | null>(null);
+  const [isStripePaymentOpen, setIsStripePaymentOpen] = useState(false);
   const [expandedAllocations, setExpandedAllocations] = useState<
     Record<string, boolean>
   >({});
@@ -416,26 +426,47 @@ export default function BookingInfoTab({ bookingData }: BookingInfoTabProps) {
 
     // Call payment API
     paymentMutation.mutate(paymentPayload, {
-      onSuccess: (response) => {
-        if (response.status) {
-          // If redirect URL is present, the mutation will handle redirect
-          // Otherwise, close modal and show success
-          if (!response.data?.redirect_url) {
-            toast.success(
-              response.message || "Payment processed successfully!",
-            );
-            setSingleDatePaymentModalOpen(false);
-            setSelectedDateForPayment(null);
-          }
-          // If redirect_url exists, window.location.href is called in the mutation
+      onSuccess: (response: BookingPaymentResponse) => {
+        if (!response.status || !response.data) return;
+
+        const action = resolveBookingPaymentAction(response.data);
+        if (action?.type === "stripe") {
+          setSingleDatePaymentModalOpen(false);
+          setStripePaymentSession(action.session);
+          setIsStripePaymentOpen(true);
+          return;
         }
+
+        if (action?.type === "redirect") {
+          return;
+        }
+
+        toast.success(response.message || "Payment processed successfully!");
+        setSingleDatePaymentModalOpen(false);
+        setSelectedDateForPayment(null);
+        setSelectedRescheduleRequest(null);
       },
       onError: (error) => {
         console.error("Error processing payment:", error);
-        // Error toasts are handled by API interceptor
       },
     });
   };
+
+  const handleStripePaymentComplete = useCallback(() => {
+    const parsedBookingId = parseInt(bookingData.booking_id, 10);
+    if (!Number.isNaN(parsedBookingId)) {
+      queryClient.invalidateQueries({
+        queryKey: bookingsKeys.bookingDetail(parsedBookingId),
+      });
+      queryClient.invalidateQueries({
+        queryKey: bookingsKeys.lists(),
+      });
+    }
+    setStripePaymentSession(null);
+    setIsStripePaymentOpen(false);
+    setSelectedDateForPayment(null);
+    setSelectedRescheduleRequest(null);
+  }, [bookingData.booking_id, queryClient]);
 
   const getPaymentStatusBadge = (status: string) => (
     <StatusBadge
@@ -1942,6 +1973,24 @@ export default function BookingInfoTab({ bookingData }: BookingInfoTabProps) {
           onConfirm={handleSingleDatePaymentConfirm}
         />
       )}
+
+      <CheckoutStripePaymentModal
+        open={isStripePaymentOpen}
+        onOpenChange={(open) => {
+          setIsStripePaymentOpen(open);
+          if (!open && stripePaymentSession) {
+            toast.message("Payment not completed", {
+              description: `Booking ${stripePaymentSession.bookingNumber} — tap Pay when you're ready to continue.`,
+            });
+          }
+          if (!open) {
+            setStripePaymentSession(null);
+          }
+        }}
+        session={stripePaymentSession}
+        successReturnPath="/payment/success"
+        onPaymentComplete={handleStripePaymentComplete}
+      />
     </div>
   );
 }

@@ -231,6 +231,7 @@ export interface BookingDetailsDate {
   event_date_id: number;
   room_id?: number;
   room_name?: string;
+  package_title?: string;
   date_key: string;
   date_label: string;
   item_summary?: string;
@@ -238,6 +239,7 @@ export interface BookingDetailsDate {
   payment_status_label: string;
   total_amount: number;
   paid_amount: number | null;
+  pending_amount?: number | null;
   can_pay_now?: boolean;
   tickets: BookingDetailsTicket[];
   packages: BookingDetailsPackage[];
@@ -249,12 +251,18 @@ export interface BookingDetailsDate {
 /** Top-level payment summary on booking details */
 export interface BookingPaymentSummary {
   sub_total_amount: number;
-  paid_amount: number | null;
-  pending_amount: number | null;
-  deposit_amount: number | null;
-  addons_amount: number | null;
+  total_paid_amount?: number | null;
+  total_pending_amount?: number | null;
+  total_addons_amount?: number | null;
   total_amount: number;
   can_pay_now?: boolean;
+  /** @deprecated use total_paid_amount */
+  paid_amount?: number | null;
+  /** @deprecated use total_pending_amount */
+  pending_amount?: number | null;
+  /** @deprecated use total_addons_amount */
+  addons_amount?: number | null;
+  deposit_amount?: number | null;
 }
 
 /**
@@ -664,19 +672,68 @@ export interface BookingPaymentDetails {
 }
 
 /**
+ * Stripe credentials returned when booking payment uses Stripe Elements.
+ */
+export interface BookingPaymentStripeDetails {
+  client_secret: string;
+  publishable_key: string;
+  payment_intent_id?: string;
+  checkout_session_id?: string;
+  expires_at?: number;
+}
+
+export interface BookingPaymentGatewayInfo {
+  gateway: string;
+  payment_id: number;
+  stripe?: BookingPaymentStripeDetails;
+  redirect_url?: string;
+}
+
+export interface BookingPaymentSettlementLine {
+  booking_date_id: number;
+  base_due: number;
+  addons_due: number;
+  reschedule_due: number;
+  total: number;
+  addon_item_ids?: {
+    ticket_ids?: number[];
+    table_ids?: number[];
+    drink_ids?: number[];
+  };
+}
+
+export interface BookingPaymentSettlement {
+  pay_all_at_once: boolean;
+  booking_date_ids: number[];
+  date_wise_pending: Record<string, number>;
+  lines?: Record<string, BookingPaymentSettlementLine>;
+  summary?: {
+    pending_amount: number;
+    add_ons_amount: number;
+    reschedule_unpaid_amount: number;
+  };
+}
+
+/**
  * Response data from booking payment API
  */
 export interface BookingPaymentResponseData {
-  payment_id: number;
   booking_id: number;
-  total_amount: number;
-  pending_amount: number;
-  add_ons_amount: number;
-  booking_date_ids: number[];
-  date_wise_pending: Record<string, number>;
-  gateway: string;
-  redirect_url: string;
-  payment_details: BookingPaymentDetails;
+  booking_number: string;
+  amount: number;
+  payment?: BookingPaymentGatewayInfo;
+  settlement?: BookingPaymentSettlement;
+  /** Legacy redirect-based gateways (PayPal, TrueLayer, etc.) */
+  redirect_url?: string;
+  /** Legacy flat fields — kept for backward compatibility */
+  payment_id?: number;
+  total_amount?: number;
+  pending_amount?: number;
+  add_ons_amount?: number;
+  booking_date_ids?: number[];
+  date_wise_pending?: Record<string, number>;
+  gateway?: string;
+  payment_details?: BookingPaymentDetails;
 }
 
 /**

@@ -22,9 +22,15 @@ export const DateCardRow = ({
   isFirstRow = false,
 }: DateCardRowProps) => {
   const rowDates = dates.slice(startIndex, startIndex + itemsPerRow);
+  const rowJustifyClass =
+    rowDates.length < itemsPerRow
+      ? "justify-center"
+      : "justify-start sm:justify-center";
 
   return (
-    <div className="flex justify-start sm:justify-center items-center gap-3 sm:gap-5 overflow-x-auto sm:overflow-hidden pb-2 mb-4 sm:mb-5">
+    <div
+      className={`flex ${rowJustifyClass} items-center gap-3 sm:gap-5 overflow-x-auto sm:overflow-hidden pb-2 mb-4 sm:mb-5`}
+    >
       {rowDates.map((dateItem, i) => {
         const index = startIndex + i;
         if (index >= dates.length) return null;

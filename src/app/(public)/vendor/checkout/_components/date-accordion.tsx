@@ -40,6 +40,7 @@ import {
 import { useCurrencyFormat } from "@/hooks/use-currency-format";
 import { getCheckoutRoomTone } from "../_lib/checkout-room-tones";
 import { cn } from "@/lib/utils";
+import { formatCheckoutAvailabilityLabel } from "../_lib/checkout-availability";
 
 interface DateAccordionProps {
   eventSlug: string;
@@ -62,6 +63,32 @@ interface DateAccordionProps {
   drinkTitle?: string;
   /** Server cart event payload for price validation on save. */
   serverEventData?: Record<string, unknown> | null;
+}
+
+function CheckoutAvailabilityHint({
+  maxQuantity,
+  quantity = 0,
+}: {
+  maxQuantity?: number;
+  quantity?: number;
+}) {
+  const label = formatCheckoutAvailabilityLabel(maxQuantity, quantity);
+  if (!label) return null;
+
+  return (
+    <p
+      className={cn(
+        "mt-1 text-xs font-medium",
+        label.tone === "sold-out" &&
+          "text-[color:var(--checkout-muted-foreground)]",
+        label.tone === "low" && "text-amber-600",
+        label.tone === "default" &&
+          "text-[color:var(--checkout-muted-foreground)]",
+      )}
+    >
+      {label.text}
+    </p>
+  );
 }
 
 export default function DateAccordion({
@@ -505,11 +532,10 @@ export default function DateAccordion({
                       <p className="mt-1.5 text-sm font-bold tabular-nums text-[color:var(--checkout-ticket)]">
                         {formatMoney(Number(ticket.price))}
                       </p>
-                      {ticket.maxQuantity && ticket.maxQuantity <= 10 && (
-                        <p className="mt-1 text-xs font-medium text-amber-600">
-                          Only {ticket.maxQuantity} left
-                        </p>
-                      )}
+                      <CheckoutAvailabilityHint
+                        maxQuantity={ticket.maxQuantity}
+                        quantity={ticket.quantity}
+                      />
                     </div>
                     <div className="shrink-0 self-end sm:self-auto">
                       <QuantityControls
@@ -630,10 +656,15 @@ export default function DateAccordion({
                       <p className="mt-1.5 text-sm font-bold tabular-nums text-[color:var(--checkout-package)]">
                         {formatMoney(Number(drink.price) || 0)}
                       </p>
+                      <CheckoutAvailabilityHint
+                        maxQuantity={drink.maxQuantity}
+                        quantity={drink.quantity}
+                      />
                     </div>
                     <div className="shrink-0 self-end sm:self-auto">
                       <QuantityControls
                         quantity={drink.quantity}
+                        maxQuantity={drink.maxQuantity}
                         onIncrease={() =>
                           handleQuantityChange("drink", drink.id, 1)
                         }

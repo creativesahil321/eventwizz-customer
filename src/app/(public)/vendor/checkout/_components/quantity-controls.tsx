@@ -34,7 +34,10 @@ export default function QuantityControls({
   const buttonSize = size === "sm" ? "w-8 h-8" : "w-9 h-9";
   const iconSize = size === "sm" ? "w-3.5 h-3.5" : "w-3.5 h-3.5";
 
-  const canIncrease = !disabled && (!maxQuantity || quantity < maxQuantity);
+  const hasCapacityLimit =
+    maxQuantity != null && Number.isFinite(maxQuantity) && maxQuantity >= 0;
+  const canIncrease =
+    !disabled && (!hasCapacityLimit || quantity < maxQuantity);
   const canDecrease = !disabled && quantity > 0;
 
   return (

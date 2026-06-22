@@ -117,6 +117,11 @@ export default function DatesSection({
   const itemsPerRow = 5; // Number of items to display per row
   const datesPerPage = itemsPerRow * 2; // Total dates visible per page (2 rows)
 
+  const getDateRowJustifyClass = (itemCount: number) =>
+    itemCount < itemsPerRow
+      ? "justify-center"
+      : "justify-start sm:justify-center";
+
   // Setup client-side detection and window measurements
   useEffect(() => {
     setIsClient(true);
@@ -340,6 +345,12 @@ export default function DatesSection({
           sold_out: false,
         }));
 
+  const firstRowCount = Math.min(itemsPerRow, displayDates.length);
+  const secondRowCount = Math.min(
+    itemsPerRow,
+    Math.max(0, displayDates.length - itemsPerRow),
+  );
+
   // Check if pagination is needed
   const needsPagination = displayDates.length > datesPerPage;
   const maxPages = Math.ceil(displayDates.length / datesPerPage) - 1;
@@ -416,9 +427,11 @@ export default function DatesSection({
           <div className="overflow-hidden">
             <div className="flex flex-col gap-4 sm:gap-5">
               {/* First row of date cards */}
-              <div className="flex justify-start sm:justify-center items-center gap-3 sm:gap-5 overflow-x-auto sm:overflow-hidden pb-2 mb-4 sm:mb-5">
+              <div
+                className={`flex ${getDateRowJustifyClass(firstRowCount)} items-center gap-3 sm:gap-5 overflow-x-auto sm:overflow-hidden pb-2 mb-4 sm:mb-5`}
+              >
                 {Array.from({
-                  length: Math.min(itemsPerRow, displayDates.length),
+                  length: firstRowCount,
                 }).map((_, i) => {
                   const index = i;
                   if (index >= displayDates.length) return null;
@@ -479,12 +492,11 @@ export default function DatesSection({
               </div>
 
               {/* Second row of date cards */}
-              <div className="flex justify-start sm:justify-center items-center gap-3 sm:gap-5 overflow-x-auto sm:overflow-hidden pb-2">
+              <div
+                className={`flex ${getDateRowJustifyClass(secondRowCount)} items-center gap-3 sm:gap-5 overflow-x-auto sm:overflow-hidden pb-2`}
+              >
                 {Array.from({
-                  length: Math.min(
-                    itemsPerRow,
-                    displayDates.length - itemsPerRow,
-                  ),
+                  length: secondRowCount,
                 }).map((_, i) => {
                   const index = itemsPerRow + i;
                   if (index >= displayDates.length) return null;
@@ -642,9 +654,11 @@ export default function DatesSection({
         <div className="overflow-hidden">
           {/* First row of date cards */}
           <div className="flex flex-col gap-4 sm:gap-5">
-            <div className="flex justify-start sm:justify-center items-center gap-3 sm:gap-5 overflow-x-auto sm:overflow-hidden pb-2 mb-4 sm:mb-5">
+            <div
+              className={`flex ${getDateRowJustifyClass(firstRowCount)} items-center gap-3 sm:gap-5 overflow-x-auto sm:overflow-hidden pb-2 mb-4 sm:mb-5`}
+            >
               {Array.from({
-                length: Math.min(itemsPerRow, displayDates.length),
+                length: firstRowCount,
               }).map((_, i) => {
                 const index = currentPage * itemsPerRow + i;
                 if (index >= displayDates.length) return null;
@@ -722,12 +736,11 @@ export default function DatesSection({
             </div>
 
             {/* Second row of date cards */}
-            <div className="flex justify-start sm:justify-center items-center gap-3 sm:gap-5 overflow-x-auto sm:overflow-hidden pb-2">
+            <div
+              className={`flex ${getDateRowJustifyClass(secondRowCount)} items-center gap-3 sm:gap-5 overflow-x-auto sm:overflow-hidden pb-2`}
+            >
               {Array.from({
-                length: Math.min(
-                  itemsPerRow,
-                  displayDates.length - itemsPerRow,
-                ),
+                length: secondRowCount,
               }).map((_, i) => {
                 const index = currentPage * itemsPerRow + itemsPerRow + i;
                 if (index >= displayDates.length) return null;

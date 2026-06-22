@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { ChevronDown, Plus, Trash2 } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useAddOnsDetails } from "@/services/customer/bookings/hooks/useAddOnsDetails";
 import { useSaveAddOns } from "@/services/customer/bookings/hooks/useSaveAddOns";
@@ -18,11 +17,13 @@ import {
 import { KindIconChip } from "./kind-icon-chip";
 import { QuantityStepper } from "./quantity-stepper";
 import { Skeleton } from "@/components/ui/skeleton";
+import { toast } from "sonner";
 import {
   TableSeatingPanel,
   type TableSeatingConfig,
   type TableSeatingSnapshot,
 } from "./table-seating-panel";
+import type { BookingDateSource } from "./build-line-items";
 
 interface CatalogItem {
   id: number;
@@ -33,14 +34,131 @@ interface CatalogItem {
   maxQuantity: number;
 }
 
+/** Already-booked quantities on this date (base booking + saved add-ons). */
+export interface BookedCatalogQuantities {
+  tickets: Record<number, number>;
+  packages: Record<number, number>;
+}
+
 interface AddExtrasPanelProps {
   bookingId: string;
   dateId: string;
   paymentStatus?: BookingDatePaymentStatus;
+  dateSource?: BookingDateSource;
   formatCurrency: (amount: number) => string;
   formatUnit: (amount: number) => string;
   onPendingTotalChange?: (total: number, itemCount: number) => void;
   onSaveSuccess?: () => void;
+}
+
+function normalizeCatalogLabel(value: string): string {
+  return value.trim().toLowerCase().replace(/\s+/g, " ");
+}
+
+function resolveCatalogTicketId(
+  catalogTickets: Array<{ id: number; title: string }>,
+  item: { id?: number; name: string },
+): number | undefined {
+  if (
+    item.id != null &&
+    catalogTickets.some((ticket) => ticket.id === item.id)
+  ) {
+    return item.id;
+  }
+
+  const label = normalizeCatalogLabel(item.name);
+  return catalogTickets.find(
+    (ticket) => normalizeCatalogLabel(ticket.title) === label,
+  )?.id;
+}
+
+function resolveCatalogPackageId(
+  catalogPackages: Array<{ id: number; title: string }>,
+  item: { id?: number; name: string },
+): number | undefined {
+  if (item.id != null && catalogPackages.some((pkg) => pkg.id === item.id)) {
+    return item.id;
+  }
+
+  const label = normalizeCatalogLabel(item.name);
+  return catalogPackages.find(
+    (pkg) => normalizeCatalogLabel(pkg.title) === label,
+  )?.id;
+}
+
+function resolveBookedCatalogQuantities(
+  date: BookingDateSource | undefined,
+  catalogTickets: Array<{ id: number; title: string }>,
+  catalogPackages: Array<{ id: number; title: string }>,
+): BookedCatalogQuantities {
+  const tickets: Record<number, number> = {};
+  const packages: Record<number, number> = {};
+
+  if (!date) {
+    return { tickets, packages };
+  }
+
+  const addTicketQty = (catalogId: number, qty: number) => {
+    if (qty <= 0) return;
+    tickets[catalogId] = (tickets[catalogId] ?? 0) + qty;
+  };
+
+  const addPackageQty = (catalogId: number, qty: number) => {
+    if (qty <= 0) return;
+    packages[catalogId] = (packages[catalogId] ?? 0) + qty;
+  };
+
+  date.tickets?.forEach((ticket) => {
+    const catalogId = resolveCatalogTicketId(catalogTickets, {
+      id: ticket.id,
+      name: ticket.name,
+    });
+    if (catalogId != null) addTicketQty(catalogId, ticket.quantity);
+  });
+
+  date.addons?.tickets?.forEach((ticket) => {
+    const catalogId = resolveCatalogTicketId(catalogTickets, {
+      id: ticket.id,
+      name: ticket.name,
+    });
+    if (catalogId != null) addTicketQty(catalogId, ticket.quantity ?? 1);
+  });
+
+  date.packages?.forEach((pkg) => {
+    const catalogId = resolveCatalogPackageId(catalogPackages, {
+      id: pkg.id,
+      name: pkg.name,
+    });
+    if (catalogId != null) addPackageQty(catalogId, pkg.quantity);
+  });
+
+  const addonPackages = [
+    ...(date.addons?.packages ?? []),
+    ...((
+      date.addons as
+        | { drinks?: Array<{ id?: number; name: string; quantity?: number }> }
+        | undefined
+    )?.drinks ?? []),
+  ];
+
+  addonPackages.forEach((pkg) => {
+    const catalogId = resolveCatalogPackageId(catalogPackages, {
+      id: pkg.id,
+      name: pkg.name,
+    });
+    if (catalogId != null) addPackageQty(catalogId, pkg.quantity ?? 1);
+  });
+
+  return { tickets, packages };
+}
+
+function getAdditionalMax(
+  availableFromApi: number,
+  catalogId: number,
+  bookedMap: Record<number, number>,
+): number {
+  const alreadyBooked = bookedMap[catalogId] ?? 0;
+  return Math.max(0, availableFromApi - alreadyBooked);
 }
 
 function ExtrasSectionHeader({
@@ -51,14 +169,20 @@ function ExtrasSectionHeader({
   title?: string;
 }) {
   const styles = getKindStyles(kind);
+  const customTitle = title?.trim();
   return (
     <div
       className="booking-extras-section-header"
       style={kindAccentStyle(kind)}
     >
-      <KindIconChip kind={kind} size="sm" />
-      <h4 className={styles.sectionClassName}>
-        {title ?? styles.sectionTitle}
+      <KindIconChip kind={kind} size="md" variant="section" />
+      <h4
+        className={cn(
+          styles.sectionClassName,
+          customTitle && "booking-kind-section-title--named",
+        )}
+      >
+        {customTitle ?? styles.sectionTitle}
       </h4>
     </div>
   );
@@ -86,12 +210,14 @@ function CatalogCard({
   onQuantityChange,
 }: CatalogCardProps) {
   const selected = quantity > 0;
+  const soldOut = maxQuantity <= 0;
 
   return (
     <div
       className={cn(
         "booking-catalog-card",
         selected && "booking-catalog-card--selected",
+        soldOut && "booking-catalog-card--sold-out",
       )}
       style={kindAccentStyle(kind)}
     >
@@ -100,6 +226,11 @@ function CatalogCard({
         <p className="booking-catalog-card__desc">{description}</p>
       )}
       <p className="booking-catalog-price">{priceLabel}</p>
+      {maxQuantity > 0 && maxQuantity <= 99 && (
+        <p className="booking-catalog-availability">
+          {maxQuantity === 1 ? "1 available" : `${maxQuantity} available`}
+        </p>
+      )}
       <div className="booking-catalog-card__actions">
         {selected ? (
           <div className="flex w-full items-center justify-between gap-1.5">
@@ -121,12 +252,62 @@ function CatalogCard({
             </button>
           </div>
         ) : (
-          <button type="button" className="booking-catalog-add-btn" onClick={onAdd}>
+          <button
+            type="button"
+            className="booking-catalog-add-btn"
+            onClick={onAdd}
+            disabled={soldOut}
+          >
             <Plus className="h-3 w-3" strokeWidth={2} />
-            Add {priceLabel}
+            {soldOut ? "Sold out" : `Add ${priceLabel}`}
           </button>
         )}
       </div>
+    </div>
+  );
+}
+
+function PendingExtrasSaveBar({
+  pendingCount,
+  pendingTotalFormatted,
+  isSaving,
+  onSave,
+  position = "top",
+}: {
+  pendingCount: number;
+  pendingTotalFormatted: string;
+  isSaving: boolean;
+  onSave: () => void;
+  position?: "top" | "bottom";
+}) {
+  if (pendingCount <= 0) return null;
+
+  return (
+    <div
+      className={cn(
+        "z-10 flex flex-col gap-2 border-amber-200/80 bg-amber-50/95 px-4 py-3 backdrop-blur-sm sm:flex-row sm:items-center sm:justify-between sm:px-5",
+        position === "top"
+          ? "sticky top-0 border-b"
+          : "border-t border-amber-200",
+      )}
+    >
+      <div className="min-w-0">
+        <p className="text-xs font-semibold text-amber-950">
+          Ready to add to your booking
+        </p>
+        <p className="mt-0.5 text-[11px] text-amber-900/80">
+          {pendingCount} item{pendingCount === 1 ? "" : "s"} ·{" "}
+          {pendingTotalFormatted} · not saved until you tap below
+        </p>
+      </div>
+      <button
+        type="button"
+        className="booking-table-auto-btn h-9 shrink-0 px-4 sm:w-auto"
+        onClick={onSave}
+        disabled={isSaving}
+      >
+        {isSaving ? "Adding…" : "Add to booking"}
+      </button>
     </div>
   );
 }
@@ -135,6 +316,7 @@ export function AddExtrasPanel({
   bookingId,
   dateId,
   paymentStatus,
+  dateSource,
   formatCurrency,
   formatUnit,
   onPendingTotalChange,
@@ -145,7 +327,7 @@ export function AddExtrasPanel({
     bookingId,
     eligible ? dateId : "",
   );
-  const saveMutation = useSaveAddOns();
+  const { mutate: saveAddOns, isPending: isSavingAddOns } = useSaveAddOns();
 
   const [tickets, setTickets] = useState<CatalogItem[]>([]);
   const [drinks, setDrinks] = useState<CatalogItem[]>([]);
@@ -159,41 +341,85 @@ export function AddExtrasPanel({
     tableTotal: 0,
     tableItemCount: 0,
   });
+  const [tablePanelResetKey, setTablePanelResetKey] = useState(0);
 
   useEffect(() => {
     if (!addOnsData?.data) return;
 
-    setTickets(
-      addOnsData.data.tickets.map((t) => ({
-        id: t.id,
-        title: t.title,
-        description: t.description,
-        price: Math.max(0, t.price),
-        quantity: 0,
-        maxQuantity: Math.max(0, t.available_tickets),
-      })),
+    const catalogTickets = addOnsData.data.tickets.map((ticket) => ({
+      id: ticket.id,
+      title: ticket.title,
+    }));
+    const catalogPackages = addOnsData.data.drinks
+      .filter((drink) => drink.status === 1)
+      .map((drink) => ({
+        id: drink.id,
+        title: drink.title,
+      }));
+    const booked = resolveBookedCatalogQuantities(
+      dateSource,
+      catalogTickets,
+      catalogPackages,
     );
 
-    setDrinks(
+    setTickets((prev) =>
+      addOnsData.data.tickets.map((t) => {
+        const maxQuantity = getAdditionalMax(
+          t.available_tickets,
+          t.id,
+          booked.tickets,
+        );
+        const previous = prev.find((item) => item.id === t.id);
+        const quantity = Math.max(
+          0,
+          Math.min(previous?.quantity ?? 0, maxQuantity),
+        );
+
+        return {
+          id: t.id,
+          title: t.title,
+          description: t.description,
+          price: Math.max(0, t.price),
+          quantity,
+          maxQuantity,
+        };
+      }),
+    );
+
+    setDrinks((prev) =>
       addOnsData.data.drinks
         .filter((d) => d.status === 1)
-        .map((d) => ({
-          id: d.id,
-          title: d.title,
-          description: d.description,
-          price: parseFloat(d.price) || 0,
-          quantity: 0,
-          maxQuantity: Math.max(0, d.available_drinks),
-        })),
+        .map((d) => {
+          const maxQuantity = getAdditionalMax(
+            d.available_drinks,
+            d.id,
+            booked.packages,
+          );
+          const previous = prev.find((item) => item.id === d.id);
+          const quantity = Math.max(
+            0,
+            Math.min(previous?.quantity ?? 0, maxQuantity),
+          );
+
+          return {
+            id: d.id,
+            title: d.title,
+            description: d.description,
+            price: parseFloat(d.price) || 0,
+            quantity,
+            maxQuantity,
+          };
+        }),
     );
 
     const firstTable = addOnsData.data.tables[0];
-    if (firstTable) {
+    if (firstTable && firstTable.available_tables > 0) {
       setTableConfig({
         id: firstTable.id,
         min: Math.max(1, firstTable.min_persons),
         max: Math.max(firstTable.min_persons, firstTable.max_persons),
         price: Math.max(0, firstTable.price),
+        maxTables: Math.max(0, firstTable.available_tables),
       });
     } else {
       setTableConfig(null);
@@ -206,10 +432,33 @@ export function AddExtrasPanel({
       tableTotal: 0,
       tableItemCount: 0,
     });
-  }, [addOnsData, dateId]);
+    setTablePanelResetKey((key) => key + 1);
+  }, [addOnsData, dateId, dateSource]);
 
-  const handleTableSeatingChange = useCallback((snapshot: TableSeatingSnapshot) => {
-    setTableSeating(snapshot);
+  const clampCatalogQuantity = useCallback(
+    (qty: number, maxQuantity: number) =>
+      Math.max(0, Math.min(qty, maxQuantity)),
+    [],
+  );
+
+  const handleTableSeatingChange = useCallback(
+    (snapshot: TableSeatingSnapshot) => {
+      setTableSeating(snapshot);
+    },
+    [],
+  );
+
+  const resetExtrasCatalog = useCallback(() => {
+    setTableSeating({
+      groupSize: 0,
+      allocation: [],
+      seatingConfirmed: false,
+      tableTotal: 0,
+      tableItemCount: 0,
+    });
+    setTablePanelResetKey((key) => key + 1);
+    setTickets((prev) => prev.map((ticket) => ({ ...ticket, quantity: 0 })));
+    setDrinks((prev) => prev.map((drink) => ({ ...drink, quantity: 0 })));
   }, []);
 
   const ticketTotal = tickets.reduce((s, t) => s + t.price * t.quantity, 0);
@@ -224,11 +473,24 @@ export function AddExtrasPanel({
     onPendingTotalChange?.(pendingTotal, pendingCount);
   }, [pendingTotal, pendingCount, onPendingTotalChange]);
 
-  const hasCatalog =
-    tickets.length > 0 || drinks.length > 0 || tableConfig !== null;
+  const handleSave = useCallback(() => {
+    if (!eligible || pendingCount === 0 || isSavingAddOns) return;
 
-  const handleSave = () => {
-    if (!eligible || pendingCount === 0) return;
+    const overTicket = tickets.find((t) => t.quantity > t.maxQuantity);
+    if (overTicket) {
+      toast.error(
+        `Only ${overTicket.maxQuantity} ticket(s) available for '${overTicket.title}'. You requested ${overTicket.quantity}.`,
+      );
+      return;
+    }
+
+    const overDrink = drinks.find((d) => d.quantity > d.maxQuantity);
+    if (overDrink) {
+      toast.error(
+        `Only ${overDrink.maxQuantity} package(s) available for '${overDrink.title}'. You requested ${overDrink.quantity}.`,
+      );
+      return;
+    }
 
     const formData = new FormData();
     formData.append("booking_id", bookingId);
@@ -240,7 +502,10 @@ export function AddExtrasPanel({
       .forEach((drink, index) => {
         formData.append(`drink_package[${index}][id]`, drink.id.toString());
         formData.append(`drink_package[${index}][title]`, drink.title);
-        formData.append(`drink_package[${index}][price]`, drink.price.toString());
+        formData.append(
+          `drink_package[${index}][price]`,
+          drink.price.toString(),
+        );
         formData.append(
           `drink_package[${index}][quantity]`,
           drink.quantity.toString(),
@@ -294,12 +559,29 @@ export function AddExtrasPanel({
       });
     }
 
-    saveMutation.mutate(formData, {
+    saveAddOns(formData, {
       onSuccess: () => {
+        resetExtrasCatalog();
         onSaveSuccess?.();
       },
     });
-  };
+  }, [
+    bookingId,
+    dateId,
+    drinks,
+    eligible,
+    isSavingAddOns,
+    onSaveSuccess,
+    pendingCount,
+    resetExtrasCatalog,
+    saveAddOns,
+    tableConfig,
+    tableSeating,
+    tickets,
+  ]);
+
+  const hasCatalog =
+    tickets.length > 0 || drinks.length > 0 || tableConfig !== null;
 
   if (!eligible) {
     return (
@@ -327,9 +609,18 @@ export function AddExtrasPanel({
   }
 
   const tableAccent = kindAccentStyle("table");
+  const pendingTotalFormatted = formatCurrency(pendingTotal);
 
   return (
     <div className="booking-extras-panel">
+      <PendingExtrasSaveBar
+        pendingCount={pendingCount}
+        pendingTotalFormatted={pendingTotalFormatted}
+        isSaving={isSavingAddOns}
+        onSave={handleSave}
+        position="top"
+      />
+
       <div className="booking-extras-panel__inner">
         {tickets.length > 0 && (
           <section className="booking-extras-section">
@@ -354,7 +645,15 @@ export function AddExtrasPanel({
                   onQuantityChange={(qty) =>
                     setTickets((prev) =>
                       prev.map((t) =>
-                        t.id === ticket.id ? { ...t, quantity: qty } : t,
+                        t.id === ticket.id
+                          ? {
+                              ...t,
+                              quantity: clampCatalogQuantity(
+                                qty,
+                                t.maxQuantity,
+                              ),
+                            }
+                          : t,
                       ),
                     )
                   }
@@ -368,7 +667,7 @@ export function AddExtrasPanel({
           <section className="booking-extras-section" style={tableAccent}>
             <ExtrasSectionHeader kind="table" />
             <TableSeatingPanel
-              key={`${dateId}-${tableConfig.id}`}
+              key={`${dateId}-${tableConfig.id}-${tablePanelResetKey}`}
               tableConfig={tableConfig}
               formatCurrency={formatCurrency}
               formatUnit={formatUnit}
@@ -379,7 +678,10 @@ export function AddExtrasPanel({
 
         {drinks.length > 0 && (
           <section className="booking-extras-section">
-            <ExtrasSectionHeader kind="package" />
+            <ExtrasSectionHeader
+              kind="package"
+              title={dateSource?.package_title}
+            />
             <div className="booking-catalog-grid">
               {drinks.map((drink) => (
                 <CatalogCard
@@ -400,7 +702,15 @@ export function AddExtrasPanel({
                   onQuantityChange={(qty) =>
                     setDrinks((prev) =>
                       prev.map((d) =>
-                        d.id === drink.id ? { ...d, quantity: qty } : d,
+                        d.id === drink.id
+                          ? {
+                              ...d,
+                              quantity: clampCatalogQuantity(
+                                qty,
+                                d.maxQuantity,
+                              ),
+                            }
+                          : d,
                       ),
                     )
                   }
@@ -411,26 +721,13 @@ export function AddExtrasPanel({
         )}
       </div>
 
-      {pendingCount > 0 && (
-        <div className="booking-extras-save-bar flex items-center justify-between gap-2">
-          <p className="text-[11px] text-muted-foreground">
-            {pendingCount} item{pendingCount === 1 ? "" : "s"} ·{" "}
-            {formatCurrency(pendingTotal)}
-          </p>
-          <Button
-            type="button"
-            onClick={handleSave}
-            disabled={saveMutation.isPending}
-            className="h-7 rounded-md px-3 text-[11px] font-semibold shadow-none"
-            style={{
-              backgroundColor: "var(--color-primary)",
-              color: "var(--color-primary-foreground, var(--primary-foreground))",
-            }}
-          >
-            {saveMutation.isPending ? "Saving…" : "Save extras"}
-          </Button>
-        </div>
-      )}
+      <PendingExtrasSaveBar
+        pendingCount={pendingCount}
+        pendingTotalFormatted={pendingTotalFormatted}
+        isSaving={isSavingAddOns}
+        onSave={handleSave}
+        position="bottom"
+      />
     </div>
   );
 }
@@ -470,7 +767,7 @@ export function AddExtrasToggle({
             color: "var(--color-primary)",
           }}
         >
-          {pendingCount} added · {pendingTotalFormatted}
+          {pendingCount} pending · {pendingTotalFormatted}
         </span>
       )}
       <ChevronDown

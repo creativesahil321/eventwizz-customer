@@ -1,12 +1,31 @@
 import type {
   BookingDetailsAddons,
+  BookingDetailsAddonPackage,
   BookingDetailsPackage,
   BookingDetailsTable,
   BookingDetailsTicket,
   BookingTableAllocation,
 } from "@/services/customer/bookings/type";
-import type { CheckoutLineItem, PaymentBreakdownGroup } from "./types";
+import type { CheckoutLineItem, DateLineItemsSplit, PaymentBreakdownGroup } from "./types";
 import { formatDate } from "@/lib/utils";
+
+/** Month/day chip for single-date event strip, e.g. JUN / 26 */
+export function getDateCalendarParts(dateKey: string): {
+  month: string;
+  day: number;
+} {
+  const parsed = new Date(`${dateKey}T12:00:00`);
+  if (Number.isNaN(parsed.getTime())) {
+    return { month: "---", day: 0 };
+  }
+
+  return {
+    month: parsed
+      .toLocaleString("en-US", { month: "short" })
+      .toUpperCase(),
+    day: parsed.getDate(),
+  };
+}
 
 /** Compact label for date strip cards: "Mon, Aug 10, 2026" */
 export function formatDateStripLabel(
@@ -38,6 +57,7 @@ export interface BookingDateSource {
   id: string;
   date: string;
   room_name?: string;
+  package_title?: string;
   item_summary?: string;
   tickets?: BookingDetailsTicket[];
   packages?: BookingDetailsPackage[];
@@ -50,9 +70,35 @@ function formatAllocations(
 ): { label: string; value: string }[] {
   if (!allocations?.length) return [];
   return allocations.map((row) => ({
+    id: row.id,
     label: row.label,
     value: `${row.people} ${row.people === 1 ? "Person" : "People"}`,
   }));
+}
+
+function parseUnitPrice(value: unknown): number {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "string" && value.trim() !== "") {
+    const parsed = parseFloat(value);
+    return Number.isFinite(parsed) ? parsed : 0;
+  }
+  return 0;
+}
+
+function normalizeGroupLabel(value: string): string {
+  return value.trim().toLowerCase().replace(/\s+/g, " ");
+}
+
+function addonPackageGroupKey(name: string, unitPrice: number, type: string): string {
+  return `${type}|${normalizeGroupLabel(name)}|${parseUnitPrice(unitPrice).toFixed(2)}`;
+}
+
+function getAddonPackages(date: BookingDateSource): BookingDetailsAddonPackage[] {
+  const packages = date.addons?.packages ?? [];
+  const legacyDrinks =
+    (date.addons as { drinks?: BookingDetailsAddonPackage[] } | undefined)
+      ?.drinks ?? [];
+  return [...packages, ...legacyDrinks];
 }
 
 export function buildLineItemsForDate(
@@ -98,13 +144,17 @@ export function buildLineItemsForDate(
   });
 
   date.addons?.tables?.forEach((table, idx) => {
+    const unitPrice = parseUnitPrice(table.unit_price);
     items.push({
       id: `addon-table-${date.id}-${idx}`,
-      kind: "addon",
+      kind: "table",
       name: table.name || `Table of ${table.table_size}`,
-      meta: `${formatUnit(table.unit_price)} × ${table.quantity}`,
+      meta: `${formatUnit(unitPrice)} × ${table.quantity}`,
       amount: table.total_amount,
+      unitPrice,
+      quantity: table.table_count && table.table_count > 1 ? table.table_count : undefined,
       allocation: formatAllocations(table.allocations),
+      isSavedAddon: true,
       deletable: true,
       deletePayload: {
         type: "table",
@@ -114,13 +164,18 @@ export function buildLineItemsForDate(
   });
 
   date.addons?.tickets?.forEach((ticket, idx) => {
+    const unitPrice = parseUnitPrice(ticket.unit_price);
+    const quantity = ticket.quantity ?? 1;
     items.push({
       id: `addon-ticket-${date.id}-${idx}`,
-      kind: "addon",
+      kind: "ticket",
       name: ticket.name,
       description: ticket.description ?? undefined,
-      meta: `${formatUnit(ticket.unit_price)} × ${ticket.quantity}`,
-      amount: ticket.total_amount ?? ticket.unit_price * ticket.quantity,
+      meta: `${formatUnit(unitPrice)} × ${quantity}`,
+      amount: ticket.total_amount ?? unitPrice * quantity,
+      unitPrice,
+      quantity,
+      isSavedAddon: true,
       deletable: true,
       deletePayload: {
         type: "ticket",
@@ -129,14 +184,19 @@ export function buildLineItemsForDate(
     });
   });
 
-  date.addons?.packages?.forEach((pkg, idx) => {
+  getAddonPackages(date).forEach((pkg, idx) => {
+    const unitPrice = parseUnitPrice(pkg.unit_price);
+    const quantity = pkg.quantity ?? 1;
     items.push({
-      id: `addon-package-${date.id}-${idx}`,
-      kind: "addon",
+      id: `addon-package-${date.id}-${pkg.id ?? idx}-${idx}`,
+      kind: "package",
       name: pkg.name,
       description: pkg.description ?? undefined,
-      meta: `${formatUnit(pkg.unit_price)} × ${pkg.quantity}`,
-      amount: pkg.total_amount ?? pkg.unit_price * pkg.quantity,
+      meta: `${formatUnit(unitPrice)} × ${quantity}`,
+      amount: pkg.total_amount ?? unitPrice * quantity,
+      unitPrice,
+      quantity,
+      isSavedAddon: true,
       deletable: true,
       deletePayload: {
         type: "package",
@@ -148,57 +208,110 @@ export function buildLineItemsForDate(
   return items;
 }
 
+function groupAddonLineItems(
+  items: CheckoutLineItem[],
+  formatUnit: (amount: number) => string,
+): CheckoutLineItem[] {
+  const tables: CheckoutLineItem[] = [];
+  const groups = new Map<string, CheckoutLineItem>();
+
+  items.forEach((item) => {
+    if (item.deletePayload?.type === "table") {
+      tables.push(item);
+      return;
+    }
+
+    const type = item.deletePayload?.type ?? "other";
+    const unitPrice = parseUnitPrice(item.unitPrice);
+    const key = addonPackageGroupKey(item.name, unitPrice, type);
+    const lineQty = item.quantity ?? 1;
+    const existing = groups.get(key);
+
+    if (!existing) {
+      groups.set(key, {
+        ...item,
+        unitPrice,
+        quantity: lineQty,
+        groupMembers: [{ ...item, unitPrice, quantity: lineQty }],
+      });
+      return;
+    }
+
+    const nextQty = (existing.quantity ?? 1) + lineQty;
+    existing.quantity = nextQty;
+    existing.amount += item.amount;
+    existing.meta = `${formatUnit(unitPrice)} × ${nextQty}`;
+    existing.groupMembers = [
+      ...(existing.groupMembers ?? []),
+      { ...item, unitPrice, quantity: lineQty },
+    ];
+  });
+
+  return [...tables, ...Array.from(groups.values())];
+}
+
+export function splitLineItemsForDate(
+  date: BookingDateSource,
+  formatUnit: (amount: number) => string,
+): DateLineItemsSplit {
+  const all = buildLineItemsForDate(date, formatUnit);
+  const bookingItems = all.filter((item) => !item.isSavedAddon);
+  const rawAddons = all.filter((item) => item.isSavedAddon);
+  const addonItems = groupAddonLineItems(rawAddons, formatUnit);
+
+  return {
+    bookingItems,
+    addonItems,
+    addonTotal: rawAddons.reduce((sum, item) => sum + item.amount, 0),
+    addonLineCount: addonItems.reduce(
+      (sum, item) => sum + (item.quantity ?? 1),
+      0,
+    ),
+  };
+}
+
 export function buildPaymentBreakdown(
   dates: BookingDateSource[],
   formatUnit: (amount: number) => string,
-  addOnsTotal: number,
 ): PaymentBreakdownGroup[] {
-  const groups: PaymentBreakdownGroup[] = dates.map((date) => {
-    const lines = buildLineItemsForDate(date, formatUnit)
-      .filter((item) => item.kind !== "addon")
-      .map((item) => ({
+  return dates
+    .map((date) => {
+      const split = splitLineItemsForDate(date, formatUnit);
+
+      const lines = split.bookingItems.map((item) => ({
         id: item.id,
         label: item.name,
-        meta: `${date.date} · ${item.meta}`,
+        meta: item.meta,
         amount: item.amount,
+        kind: item.kind,
       }));
 
-    const subtotal = lines.reduce((sum, line) => sum + line.amount, 0);
+      const addonLines = split.addonItems.map((item) => ({
+        id: item.id,
+        label: item.name,
+        meta: item.meta,
+        amount: item.amount,
+        isAddon: true as const,
+        kind: item.kind,
+      }));
 
-    return {
-      id: date.id,
-      title: date.date,
-      subtotal,
-      lines,
-    };
-  });
+      const bookingSubtotal = lines.reduce((sum, line) => sum + line.amount, 0);
+      const addonSubtotal = split.addonTotal;
 
-  const addonLines: PaymentBreakdownGroup["lines"] = [];
-  dates.forEach((date) => {
-    buildLineItemsForDate(date, formatUnit)
-      .filter((item) => item.kind === "addon")
-      .forEach((item) => {
-        addonLines.push({
-          id: item.id,
-          label: item.name,
-          meta: `${date.date} · ${item.meta}`,
-          amount: item.amount,
-          isAddon: true,
-        });
-      });
-  });
-
-  if (addonLines.length > 0 || addOnsTotal > 0) {
-    groups.push({
-      id: "extras",
-      title: "Extras & add-ons",
-      subtotal: addonLines.reduce((s, l) => s + l.amount, 0) || addOnsTotal,
-      lines: addonLines,
-      isExtras: true,
-    });
-  }
-
-  return groups;
+      return {
+        id: date.id,
+        title: date.date,
+        packageTitle: date.package_title,
+        subtotal: bookingSubtotal + addonSubtotal,
+        lines,
+        addonLines: addonLines.length > 0 ? addonLines : undefined,
+        addonSubtotal: addonLines.length > 0 ? addonSubtotal : undefined,
+      };
+    })
+    .filter(
+      (group) =>
+        group.lines.length > 0 || (group.addonLines?.length ?? 0) > 0,
+    );
 }
 
 /** Fallback subtitle when room name is not shown on date cards */

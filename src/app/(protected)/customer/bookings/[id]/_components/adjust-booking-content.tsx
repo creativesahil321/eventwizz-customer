@@ -71,53 +71,84 @@ export default function AdjustBookingContent({
         const apiSummary = bookingData.payment_summary;
         const subTotalAmount =
           parseAmount(apiSummary?.sub_total_amount) || datesSubTotal;
-        const addOnsAmount = parseAmount(apiSummary?.addons_amount);
+        const addOnsAmount = parseAmount(
+          apiSummary?.total_addons_amount ?? apiSummary?.addons_amount,
+        );
         const totalAmount =
           parseAmount(apiSummary?.total_amount) || datesSubTotal;
         const paidAmount =
-          parseAmount(apiSummary?.paid_amount) || datesPaidTotal;
+          parseAmount(
+            apiSummary?.total_paid_amount ?? apiSummary?.paid_amount,
+          ) || datesPaidTotal;
         const depositSelectedAmount = parseAmount(apiSummary?.deposit_amount);
 
-        const pendingRaw = apiSummary?.pending_amount;
+        const pendingFromSummary =
+          apiSummary?.total_pending_amount ?? apiSummary?.pending_amount;
         const outstandingAmount =
-          pendingRaw != null && pendingRaw !== ""
-            ? parseAmount(pendingRaw)
+          pendingFromSummary != null
+            ? parseAmount(pendingFromSummary)
             : Math.max(totalAmount - paidAmount, 0);
 
         const paymentStatusLabel =
           bookingData.payment_status_label?.trim() || "Pending";
 
+        const bookingCanPay = apiSummary?.can_pay_now !== false;
+
         const dates: (BookingDateSource & {
           booking_date_id: number;
           total: string;
+          totalAmount: number;
+          paidAmount: number;
+          pendingAmount: number | null;
           paymentStatus: ReturnType<typeof normalizePaymentStatus>;
           addOnsPaymentStatus: BookingDatePaymentStatus;
           canPayNow: boolean;
           partialPayment?: string;
           reschedule_requests?: BookingRescheduleRequest[];
-        })[] = bookingData.dates.map((dateEntry) => ({
-          id: dateEntry.date_key,
-          booking_date_id: dateEntry.booking_date_id,
-          date: dateEntry.date_label,
-          room_name: dateEntry.room_name,
-          item_summary: dateEntry.item_summary,
-          paymentStatus: normalizePaymentStatus(dateEntry.payment_status_label),
-          addOnsPaymentStatus: normalizePaymentStatusForAddOnsDate(
+        })[] = bookingData.dates.map((dateEntry) => {
+          const pendingAmount =
+            dateEntry.pending_amount != null
+              ? parseAmount(dateEntry.pending_amount)
+              : null;
+          const paidAmountForDate = parseAmount(dateEntry.paid_amount);
+          const totalAmountForDate = parseAmount(dateEntry.total_amount);
+          const paymentStatus = normalizePaymentStatus(
             dateEntry.payment_status_label,
-          ),
-          canPayNow:
-            apiSummary?.can_pay_now !== false &&
-            dateEntry.can_pay_now !== false,
-          total: formatCurrency(dateEntry.total_amount),
-          partialPayment: dateEntry.paid_amount
-            ? formatCurrency(dateEntry.paid_amount)
-            : undefined,
-          tickets: dateEntry.tickets,
-          packages: dateEntry.packages,
-          tables: dateEntry.tables,
-          addons: dateEntry.addons,
-          reschedule_requests: dateEntry.reschedule_requests ?? [],
-        }));
+          );
+          const dateCanPay =
+            bookingCanPay &&
+            dateEntry.can_pay_now !== false &&
+            (pendingAmount != null && pendingAmount > 0
+              ? true
+              : paymentStatus !== "paid");
+
+          return {
+            id: dateEntry.date_key,
+            booking_date_id: dateEntry.booking_date_id,
+            date: dateEntry.date_label,
+            room_name: dateEntry.room_name,
+            package_title: dateEntry.package_title,
+            item_summary: dateEntry.item_summary,
+            paymentStatus,
+            paymentStatusLabel: dateEntry.payment_status_label?.trim() || undefined,
+            addOnsPaymentStatus: normalizePaymentStatusForAddOnsDate(
+              dateEntry.payment_status_label,
+            ),
+            canPayNow: dateCanPay,
+            total: formatCurrency(dateEntry.total_amount),
+            totalAmount: totalAmountForDate,
+            paidAmount: paidAmountForDate,
+            pendingAmount,
+            partialPayment: dateEntry.paid_amount
+              ? formatCurrency(dateEntry.paid_amount)
+              : undefined,
+            tickets: dateEntry.tickets,
+            packages: dateEntry.packages,
+            tables: dateEntry.tables,
+            addons: dateEntry.addons,
+            reschedule_requests: dateEntry.reschedule_requests ?? [],
+          };
+        });
 
         return {
           id: bookingId,
@@ -127,7 +158,7 @@ export default function AdjustBookingContent({
             bookingData.booking_number || bookingData.booking_id.toString(),
           location: bookingData.location,
           payment_status: paymentStatusLabel,
-          canPayNow: apiSummary?.can_pay_now !== false,
+          canPayNow: bookingCanPay && outstandingAmount > 0,
           isRoomSystem: bookingData.is_room_system === true,
           is_menu_choice: bookingData.is_menu_choice || false,
           payment_gateways: bookingData.payment_gateways,

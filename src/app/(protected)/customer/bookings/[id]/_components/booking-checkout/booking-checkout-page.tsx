@@ -2,43 +2,55 @@
 
 import { useCallback, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   ArrowLeft,
+  CheckCircle2,
   ChevronDown,
   ChevronUp,
   Download,
   MapPin,
-  Trash2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { cn } from "@/lib/utils";
 import { useCurrencyFormat } from "@/hooks/use-currency-format";
-import { parseFormattedMoney } from "@/lib/currency-format";
-import { useBookingPayment } from "@/services/customer/bookings/query";
+import { useBookingPayment, bookingsKeys } from "@/services/customer/bookings/query";
+import { resolveBookingPaymentAction } from "@/services/customer/bookings/booking-payment";
+import type { BookingPaymentResponse } from "@/services/customer/bookings/type";
+import type { CheckoutStripePaymentSession } from "@/services/customer/checkout";
+import CheckoutStripePaymentModal from "@/app/(public)/vendor/checkout/_components/checkout-stripe-payment-modal";
 import { useDeleteAddOns } from "@/services/customer/bookings/hooks/useDeleteAddOns";
 import type {
   BookingDetailsAddonTable,
   BookingDetailsAddonTicket,
   BookingPaymentPayload,
+  PaymentDate,
 } from "@/services/customer/bookings/type";
 import { toast } from "sonner";
-import { AddExtrasPanel, AddExtrasToggle } from "./add-extras-panel";
+import {
+  AddExtrasPanel,
+  AddExtrasToggle,
+} from "./add-extras-panel";
 import {
   buildDateSubtitle,
-  buildLineItemsForDate,
   buildPaymentBreakdown,
   formatDateStripLabel,
+  splitLineItemsForDate,
   type BookingDateSource,
 } from "./build-line-items";
-import { getKindStyles, getKindAllocationPillStyle } from "./item-kinds";
-import { KindIconChip } from "./kind-icon-chip";
+import { BookingLineItemsList } from "./booking-line-items-list";
 import {
   isBookingDateEligibleForAddOns,
   type BookingDatePaymentStatus,
 } from "@/lib/booking-addons-eligibility";
-import type { CheckoutDateCard } from "./types";
+import type { CheckoutDateCard, PaymentBreakdownLine } from "./types";
+import {
+  getAddonCategoryLabel,
+  splitAddonsByCategory,
+} from "./types";
 import { SingleDatePaymentModal } from "../single-date-payment-modal";
+import { SingleDateEventStrip } from "./single-date-event-strip";
 import "./booking-checkout.css";
 
 interface RescheduleRequest {
@@ -50,11 +62,117 @@ interface RescheduleRequest {
 interface CheckoutDate extends BookingDateSource {
   booking_date_id: number;
   total: string;
+  totalAmount: number;
+  paidAmount: number;
+  pendingAmount: number | null;
   paymentStatus?: "paid" | "pending" | "partial" | "refunded" | "cancelled";
+  paymentStatusLabel?: string;
   addOnsPaymentStatus?: BookingDatePaymentStatus;
   canPayNow?: boolean;
   partialPayment?: string;
   reschedule_requests?: RescheduleRequest[];
+}
+
+function getSingleDateStatusLabel(
+  status: CheckoutDateCard["paymentStatus"],
+  apiLabel?: string,
+): string {
+  if (apiLabel?.trim()) {
+    const normalized = apiLabel.trim().toUpperCase();
+    if (normalized === "PENDING" || normalized === "PENDING PAYMENT") {
+      return "UNPAID";
+    }
+    return normalized;
+  }
+
+  switch (status) {
+    case "paid":
+      return "PAID";
+    case "partial":
+      return "PARTIAL PAYMENT";
+    case "pending":
+      return "UNPAID";
+    case "refunded":
+      return "REFUNDED";
+    case "cancelled":
+      return "CANCELLED";
+    default:
+      return "UNPAID";
+  }
+}
+
+function getDateCardStatusLabel(
+  status: CheckoutDateCard["paymentStatus"],
+): string {
+  switch (status) {
+    case "paid":
+      return "Paid";
+    case "partial":
+      return "Partial";
+    case "pending":
+      return "Pending";
+    case "refunded":
+      return "Refunded";
+    case "cancelled":
+      return "Cancelled";
+    default:
+      return "Pending";
+  }
+}
+
+function getDatePendingAmount(date: CheckoutDate): number {
+  if (date.pendingAmount != null) {
+    return Math.max(0, date.pendingAmount);
+  }
+
+  const total = date.totalAmount ?? 0;
+  const paid = date.paidAmount ?? 0;
+  return Math.max(0, total - paid);
+}
+
+function isDateFullyPaid(pendingDue: number): boolean {
+  return pendingDue <= 0;
+}
+
+function getDateDisplayStatusLabel(
+  paymentStatus: CheckoutDateCard["paymentStatus"],
+  apiLabel?: string,
+): string {
+  if (apiLabel?.trim()) {
+    return getSingleDateStatusLabel(paymentStatus, apiLabel);
+  }
+
+  return getDateCardStatusLabel(paymentStatus).toUpperCase();
+}
+
+function isDatePayable(date: CheckoutDate): boolean {
+  if (date.canPayNow === false) return false;
+  return getDatePendingAmount(date) > 0;
+}
+
+function buildPaymentDateEntry(date: CheckoutDate): PaymentDate {
+  return {
+    booking_date_id: date.booking_date_id,
+    add_ons: {
+      tables:
+        date.addons?.tables
+          ?.map((table: BookingDetailsAddonTable) => ({
+            booking_date_table_id: table.booking_date_table_id ?? 0,
+            event_date_table_id: table.id ?? 0,
+          }))
+          .filter(
+            (table) =>
+              table.booking_date_table_id > 0 && table.event_date_table_id > 0,
+          ) ?? [],
+      tickets:
+        date.addons?.tickets
+          ?.map((ticket: BookingDetailsAddonTicket) => ({
+            booking_date_ticket_id:
+              ticket.booking_date_ticket_id || ticket.id || 0,
+          }))
+          .filter((ticket) => ticket.booking_date_ticket_id > 0) ?? [],
+    },
+  };
 }
 
 interface BookingCheckoutPageProps {
@@ -80,6 +198,106 @@ interface BookingCheckoutPageProps {
   isDownloadingInvoice?: boolean;
 }
 
+function PaymentBreakdownLineSections({
+  lines,
+  formatCurrency,
+  variant = "default",
+  packageSectionTitle,
+}: {
+  lines: PaymentBreakdownLine[];
+  formatCurrency: (amount: number) => string;
+  variant?: "default" | "addon";
+  packageSectionTitle?: string;
+}) {
+  const { seating, packages } = splitAddonsByCategory(lines);
+  const sections = [
+    { category: "seating" as const, items: seating },
+    { category: "package" as const, items: packages },
+  ].filter((section) => section.items.length > 0);
+
+  if (sections.length <= 1) {
+    return (
+      <div className="divide-y divide-border/60">
+        {lines.map((line) => (
+          <PaymentBreakdownLineRow
+            key={line.id}
+            line={line}
+            formatCurrency={formatCurrency}
+            variant={variant}
+          />
+        ))}
+      </div>
+    );
+  }
+
+  return (
+    <>
+      {sections.map((section, sectionIndex) => (
+        <div
+          key={section.category}
+          className={cn(
+            "booking-breakdown-subsection",
+            variant === "addon" && "booking-breakdown-subsection--addon",
+            sectionIndex > 0 && "booking-breakdown-subsection--separated",
+          )}
+        >
+          <p
+            className={cn(
+              "booking-breakdown-subsection__label",
+              variant === "addon" && "booking-breakdown-subsection__label--addon",
+            )}
+          >
+            {getAddonCategoryLabel(
+              section.category,
+              section.items,
+              packageSectionTitle,
+            )}
+          </p>
+          <div className="divide-y divide-border/60">
+            {section.items.map((line) => (
+              <PaymentBreakdownLineRow
+                key={line.id}
+                line={line}
+                formatCurrency={formatCurrency}
+                variant={variant}
+              />
+            ))}
+          </div>
+        </div>
+      ))}
+    </>
+  );
+}
+
+function PaymentBreakdownLineRow({
+  line,
+  formatCurrency,
+  variant = "default",
+}: {
+  line: PaymentBreakdownLine;
+  formatCurrency: (amount: number) => string;
+  variant?: "default" | "addon";
+}) {
+  return (
+    <div
+      className={cn(
+        "flex items-start justify-between gap-3 px-4 py-2.5",
+        variant === "addon" && "booking-payment-breakdown-addons__line",
+      )}
+    >
+      <div className="min-w-0">
+        <p className="text-sm font-medium text-foreground">{line.label}</p>
+        <p className="text-[11px] font-normal text-muted-foreground">
+          {line.meta}
+        </p>
+      </div>
+      <span className="shrink-0 text-sm font-semibold tabular-nums text-foreground">
+        {formatCurrency(line.amount)}
+      </span>
+    </div>
+  );
+}
+
 export default function BookingCheckoutPage({
   bookingId,
   bookingNumber,
@@ -96,10 +314,10 @@ export default function BookingCheckoutPage({
   isDownloadingInvoice,
 }: BookingCheckoutPageProps) {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const {
     format: formatCurrency,
     formatCompact: formatUnit,
-    symbol,
   } = useCurrencyFormat();
   const paymentMutation = useBookingPayment();
   const deleteAddOnsMutation = useDeleteAddOns();
@@ -115,8 +333,12 @@ export default function BookingCheckoutPage({
   const [paymentDateId, setPaymentDateId] = useState<string | null>(null);
   const [rescheduleRequest, setRescheduleRequest] =
     useState<RescheduleRequest | null>(null);
+  const [stripePaymentSession, setStripePaymentSession] =
+    useState<CheckoutStripePaymentSession | null>(null);
+  const [isStripePaymentOpen, setIsStripePaymentOpen] = useState(false);
 
   const selectedDate = dates.find((d) => d.id === selectedDateId) ?? dates[0];
+  const hasMultipleDates = dates.length > 1;
   const pendingExtras = pendingExtrasByDate[selectedDateId] ?? {
     total: 0,
     count: 0,
@@ -128,25 +350,34 @@ export default function BookingCheckoutPage({
         id: d.id,
         booking_date_id: d.booking_date_id,
         date: formatDateStripLabel(d.id, d.date),
-        subtitle: isRoomSystem
-          ? d.room_name
-          : buildDateSubtitle(d),
-        amount: 0,
+        subtitle: isRoomSystem ? d.room_name : buildDateSubtitle(d),
+        amount: d.totalAmount ?? 0,
         amountFormatted: d.total,
+        paidAmount: d.paidAmount ?? 0,
+        paidAmountFormatted: formatCurrency(d.paidAmount ?? 0),
         paymentStatus: d.paymentStatus ?? "pending",
+        paymentStatusLabel: d.paymentStatusLabel,
         canPayNow: d.canPayNow,
       })),
-    [dates, isRoomSystem],
+    [dates, isRoomSystem, formatCurrency],
   );
 
-  const lineItems = useMemo(
-    () => (selectedDate ? buildLineItemsForDate(selectedDate, formatUnit) : []),
+  const lineItemSections = useMemo(
+    () =>
+      selectedDate
+        ? splitLineItemsForDate(selectedDate, formatUnit)
+        : {
+            bookingItems: [],
+            addonItems: [],
+            addonTotal: 0,
+            addonLineCount: 0,
+          },
     [selectedDate, formatUnit],
   );
 
   const breakdownGroups = useMemo(
-    () => buildPaymentBreakdown(dates, formatUnit, summary.addOns),
-    [dates, formatUnit, summary.addOns],
+    () => buildPaymentBreakdown(dates, formatUnit),
+    [dates, formatUnit],
   );
 
   const pendingExtrasTotal = Object.values(pendingExtrasByDate).reduce(
@@ -154,14 +385,27 @@ export default function BookingCheckoutPage({
     0,
   );
 
-  const displayTotal = summary.outstanding + pendingExtrasTotal;
-  const isFullyPaid = displayTotal <= 0;
-  const footerLabel = isFullyPaid ? "Total Paid" : "Total Due";
+  const payableDates = useMemo(
+    () => dates.filter((date) => isDatePayable(date as CheckoutDate)),
+    [dates],
+  );
+
+  const bookingOutstanding = summary.outstanding;
+  const isFullyPaid = bookingOutstanding <= 0 && pendingExtrasTotal <= 0;
+  const footerLabel = isFullyPaid
+    ? "Total Paid"
+    : hasMultipleDates
+      ? "Total Due (all dates)"
+      : "Total Due";
   const footerAmount = isFullyPaid
     ? summary.paid > 0
       ? summary.paid
       : summary.total
-    : displayTotal;
+    : bookingOutstanding;
+  const showFooterPayAll =
+    canPayNow && bookingOutstanding > 0 && payableDates.length > 0 && hasMultipleDates;
+  const showPayAll =
+    canPayNow && bookingOutstanding > 0 && payableDates.length > 0;
 
   const handlePendingExtrasChange = useCallback(
     (total: number, count: number) => {
@@ -205,70 +449,87 @@ export default function BookingCheckoutPage({
 
   const paymentDate = dates.find((d) => d.id === paymentDateId);
 
-  const handlePayNow = () => {
-    const target =
-      dates.find(
-        (d) =>
-          d.canPayNow !== false &&
-          (d.paymentStatus === "pending" || d.paymentStatus === "partial"),
-      ) ?? selectedDate;
-
-    if (!target) {
-      toast.info("Nothing to pay right now");
-      return;
-    }
-    setPaymentDateId(target.id);
+  const handlePayForDate = (dateId: string) => {
+    setPaymentDateId(dateId);
     setRescheduleRequest(null);
     setPaymentModalOpen(true);
   };
 
-  const handlePaymentConfirm = () => {
-    if (!paymentDate) return;
-    const paymentGatewayId = paymentGateways?.[0]?.id ?? 1;
-    const dateWithMeta = paymentDate as CheckoutDate;
+  const handlePaymentApiSuccess = useCallback(
+    (response: BookingPaymentResponse) => {
+      if (!response.status || !response.data) return;
+
+      const action = resolveBookingPaymentAction(response.data);
+      if (action?.type === "stripe") {
+        setPaymentModalOpen(false);
+        setStripePaymentSession(action.session);
+        setIsStripePaymentOpen(true);
+        return;
+      }
+
+      if (action?.type === "redirect") {
+        return;
+      }
+
+      toast.success(response.message || "Payment processed successfully!");
+      setPaymentModalOpen(false);
+      setPaymentDateId(null);
+      setRescheduleRequest(null);
+    },
+    [],
+  );
+
+  const handleStripePaymentComplete = useCallback(() => {
+    const parsedBookingId = parseInt(bookingId, 10);
+    if (!Number.isNaN(parsedBookingId)) {
+      queryClient.invalidateQueries({
+        queryKey: bookingsKeys.bookingDetail(parsedBookingId),
+      });
+      queryClient.invalidateQueries({
+        queryKey: bookingsKeys.lists(),
+      });
+    }
+    setStripePaymentSession(null);
+    setIsStripePaymentOpen(false);
+    setPaymentDateId(null);
+    setRescheduleRequest(null);
+  }, [bookingId, queryClient]);
+
+  const submitPayment = (targetDates: CheckoutDate[]) => {
+    if (targetDates.length === 0) return;
 
     const payload: BookingPaymentPayload = {
       booking_id: parseInt(bookingId, 10),
-      payment_gateway: paymentGatewayId,
-      dates: [
-        {
-          booking_date_id: dateWithMeta.booking_date_id,
-          add_ons: {
-            tables:
-              dateWithMeta.addons?.tables
-                ?.map((table: BookingDetailsAddonTable) => ({
-                  booking_date_table_id: table.booking_date_table_id ?? 0,
-                  event_date_table_id: table.id ?? 0,
-                }))
-                .filter(
-                  (t: { booking_date_table_id: number; event_date_table_id: number }) =>
-                    t.booking_date_table_id > 0 && t.event_date_table_id > 0,
-                ) ?? [],
-            tickets:
-              dateWithMeta.addons?.tickets
-                ?.map((ticket: BookingDetailsAddonTicket) => ({
-                  booking_date_ticket_id:
-                    ticket.booking_date_ticket_id || ticket.id || 0,
-                }))
-                .filter((t: { booking_date_ticket_id: number }) => t.booking_date_ticket_id > 0) ?? [],
-          },
-        },
-      ],
+      payment_gateway: paymentGateways?.[0]?.id ?? 1,
+      dates: targetDates.map(buildPaymentDateEntry),
     };
 
     paymentMutation.mutate(payload, {
-      onSuccess: (response) => {
-        if (response.status && !response.data?.redirect_url) {
-          toast.success(response.message || "Payment processed successfully!");
-          setPaymentModalOpen(false);
-          setPaymentDateId(null);
-        }
-      },
+      onSuccess: handlePaymentApiSuccess,
     });
   };
 
+  const handlePayAll = () => {
+    if (payableDates.length === 0) {
+      toast.info("Nothing to pay right now");
+      return;
+    }
+
+    submitPayment(payableDates as CheckoutDate[]);
+  };
+
+  const handlePaymentConfirm = () => {
+    if (!paymentDate) return;
+    submitPayment([paymentDate as CheckoutDate]);
+  };
+
   return (
-    <div className="booking-checkout-page w-full">
+    <div
+      className={cn(
+        "booking-checkout-page w-full",
+        !hasMultipleDates && "booking-checkout-page--single-date",
+      )}
+    >
       <div className="booking-card">
         {/* Header card */}
         <header className="border-b border-border booking-panel-padding">
@@ -337,45 +598,166 @@ export default function BookingCheckoutPage({
 
         {/* Dates selector */}
         <section className="border-b border-border booking-panel-padding">
-          <p className="booking-section-label mb-3">Dates</p>
-          <div className="-mx-1 overflow-x-auto pb-1">
-            <div className="grid min-w-[260px] grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
-              {dateCards.map((card) => {
+          <p className="booking-section-label mb-3">
+            {hasMultipleDates ? "Dates" : "Event date"}
+          </p>
+          <div className={cn(!hasMultipleDates && "-mx-0", "-mx-1 overflow-x-auto pb-1")}>
+            <div
+              className={cn(
+                hasMultipleDates
+                  ? "grid min-w-[280px] grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5"
+                  : "grid grid-cols-1",
+              )}
+            >
+              {hasMultipleDates
+                ? dateCards.map((card) => {
                 const active = card.id === selectedDateId;
+                const dateMeta = dates.find((d) => d.id === card.id) as
+                  | CheckoutDate
+                  | undefined;
+                const pendingDue = dateMeta ? getDatePendingAmount(dateMeta) : 0;
+                const showDatePay =
+                  dateMeta != null && isDatePayable(dateMeta) && pendingDue > 0;
+                const isFullyPaid = isDateFullyPaid(pendingDue);
+                const statusLabel = getDateDisplayStatusLabel(
+                  card.paymentStatus,
+                  card.paymentStatusLabel,
+                );
+
                 return (
-                  <button
+                  <div
                     key={card.id}
-                    type="button"
-                    onClick={() => {
-                      setSelectedDateId(card.id);
-                      setExtrasOpen(false);
-                    }}
                     className={cn(
-                      "booking-date-card rounded-lg border bg-card text-left transition-all",
+                      "booking-date-card rounded-xl border bg-card transition-all",
                       active
                         ? "booking-date-card--active"
-                        : "border-border hover:border-muted-foreground/30",
+                        : "border-border",
+                      isFullyPaid && "booking-date-card--paid",
+                      showDatePay && "booking-date-card--payable",
                     )}
                   >
-                    <p
-                      className={cn(
-                        "booking-date-card__date text-[13px] font-bold leading-snug sm:text-sm",
-                        !active && "text-foreground",
-                      )}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedDateId(card.id);
+                        setExtrasOpen(false);
+                      }}
+                      className="booking-date-card__select w-full text-left"
                     >
-                      {card.date}
-                    </p>
-                    {card.subtitle && (
-                      <p className="mt-0.5 truncate text-[11px] font-normal text-muted-foreground">
-                        {card.subtitle}
-                      </p>
-                    )}
-                    <p className="mt-1 text-[11px] font-medium text-muted-foreground">
-                      {card.amountFormatted}
-                    </p>
-                  </button>
+                      <div className="booking-date-card__header flex items-start justify-between gap-2">
+                        <p
+                          className={cn(
+                            "booking-date-card__date min-w-0 text-sm font-bold leading-snug",
+                            !active && "text-foreground",
+                          )}
+                        >
+                          {card.date}
+                        </p>
+                        <span
+                          className={cn(
+                            "booking-date-card__status-badge shrink-0",
+                            `booking-date-card__status-badge--${card.paymentStatus}`,
+                          )}
+                        >
+                          {statusLabel}
+                        </span>
+                      </div>
+                      {card.subtitle && (
+                        <p className="booking-date-card__subtitle mt-0.5 truncate text-xs text-muted-foreground">
+                          {card.subtitle}
+                        </p>
+                      )}
+                      <div className="booking-date-card__amounts mt-3 flex items-end justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="booking-date-card__amount-label text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                            Total
+                          </p>
+                          <p className="booking-date-card__amount-value mt-0.5 text-lg font-bold leading-none text-foreground">
+                            {card.amountFormatted}
+                          </p>
+                        </div>
+                        <div className="shrink-0 text-right">
+                          {isFullyPaid ? (
+                            <>
+                              <p className="booking-date-card__amount-label booking-date-card__amount-label--paid text-[10px] font-semibold uppercase tracking-wide">
+                                Paid
+                              </p>
+                              <p className="booking-date-card__amount-value booking-date-card__amount-value--paid mt-0.5 text-base font-bold leading-none">
+                                {card.paidAmountFormatted}
+                              </p>
+                            </>
+                          ) : pendingDue > 0 ? (
+                            <>
+                              <p className="booking-date-card__amount-label booking-date-card__amount-label--due text-[10px] font-semibold uppercase tracking-wide">
+                                Due
+                              </p>
+                              <p className="booking-date-card__amount-value booking-date-card__amount-value--due mt-0.5 text-base font-bold leading-none">
+                                {formatCurrency(pendingDue)}
+                              </p>
+                            </>
+                          ) : (
+                            <>
+                              <p className="booking-date-card__amount-label text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                                Paid
+                              </p>
+                              <p className="booking-date-card__amount-value mt-0.5 text-base font-bold leading-none text-muted-foreground">
+                                {card.paidAmountFormatted}
+                              </p>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    </button>
+                    {isFullyPaid ? (
+                      <div className="booking-date-card__footer booking-date-card__footer--paid">
+                        <CheckCircle2
+                          className="h-3.5 w-3.5 shrink-0"
+                          strokeWidth={2.5}
+                        />
+                        <span>Fully Paid</span>
+                      </div>
+                    ) : showDatePay ? (
+                      <Button
+                        type="button"
+                        size="sm"
+                        className="booking-date-card__pay-btn booking-date-card__footer-pay"
+                        onClick={() => handlePayForDate(card.id)}
+                        disabled={paymentMutation.isPending}
+                      >
+                        Pay {formatCurrency(pendingDue)} Now
+                      </Button>
+                    ) : null}
+                  </div>
                 );
-              })}
+              })
+                : dateCards.map((card) => {
+                    const dateMeta = dates.find((d) => d.id === card.id) as
+                      | CheckoutDate
+                      | undefined;
+                    const pendingDue = dateMeta
+                      ? getDatePendingAmount(dateMeta)
+                      : 0;
+                    const showDatePay =
+                      dateMeta != null &&
+                      isDatePayable(dateMeta) &&
+                      pendingDue > 0;
+
+                    return (
+                      <SingleDateEventStrip
+                        key={card.id}
+                        card={card}
+                        pendingDue={pendingDue}
+                        showPay={showDatePay}
+                        statusLabel={getDateDisplayStatusLabel(
+                          card.paymentStatus,
+                          card.paymentStatusLabel,
+                        )}
+                        formatCurrency={formatCurrency}
+                        isProcessing={paymentMutation.isPending}
+                        onPay={() => handlePayForDate(card.id)}
+                      />
+                    );
+                  })}
             </div>
           </div>
         </section>
@@ -423,101 +805,22 @@ export default function BookingCheckoutPage({
               )}
             <div className="booking-panel-padding pb-4 pt-3">
               <div className="booking-date-group">
-                <div className="booking-line-list divide-y divide-border/70">
-                  {lineItems.map((item) => {
-                const kind = getKindStyles(item.kind);
-                return (
-                  <div
-                    key={item.id}
-                    className="booking-line-item flex gap-3 sm:items-start sm:gap-4"
-                  >
-                    <KindIconChip kind={item.kind} />
-                    <div className="min-w-0 flex-1">
-                      <div className="flex flex-wrap items-center gap-1.5">
-                        <p className="text-sm font-semibold leading-snug text-foreground">
-                          {item.name}
-                        </p>
-                        <span className={kind.badgeClassName}>
-                          {kind.label}
-                        </span>
-                        {item.quantity && item.quantity > 1 && (
-                          <span
-                            className="rounded px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide"
-                            style={{
-                              backgroundColor:
-                                "color-mix(in srgb, var(--color-primary) 12%, transparent)",
-                              color: "var(--color-primary)",
-                            }}
-                          >
-                            ×{item.quantity}
-                          </span>
-                        )}
-                      </div>
-                      {item.description && (
-                        <p className="mt-0.5 text-xs font-normal leading-relaxed text-muted-foreground">
-                          {item.description}
-                        </p>
-                      )}
-                      {item.allocation && item.allocation.length > 0 && (
-                        <div className="mt-2 flex flex-wrap gap-1.5">
-                          {item.allocation.map((pill) => (
-                            <span
-                              key={pill.label}
-                              className="rounded-md border px-2 py-0.5 text-[10px] font-semibold"
-                              style={getKindAllocationPillStyle()}
-                            >
-                              {pill.label}: {pill.value}
-                            </span>
-                          ))}
-                        </div>
-                      )}
-                      <p className="mt-1 text-[11px] font-medium text-muted-foreground">
-                        {item.meta}
-                      </p>
-                      {item.showMenuChoices && isMenuChoice && (
-                        <button
-                          type="button"
-                          className="booking-menu-link"
-                          onClick={handleMenuChoices}
-                        >
-                          Menu choices →
-                        </button>
-                      )}
-                    </div>
-                    <div className="flex shrink-0 items-start gap-1.5">
-                      <p className="booking-line-amount">
-                        {formatCurrency(item.amount)}
-                      </p>
-                      {item.deletable &&
-                        item.deletePayload &&
-                        canModifyAddOns && (
-                          <button
-                            type="button"
-                            onClick={() =>
-                              handleDeleteAddon(
-                                item.deletePayload!.type,
-                                selectedDateId,
-                                item.deletePayload!.keyword,
-                              )
-                            }
-                            disabled={deleteAddOnsMutation.isPending}
-                            className="booking-line-delete"
-                            title={`Remove ${item.name}`}
-                            aria-label={`Remove ${item.name}`}
-                          >
-                            <Trash2 className="h-3.5 w-3.5" strokeWidth={2} />
-                          </button>
-                        )}
-                    </div>
-                  </div>
-                );
-              })}
-
-              {lineItems.length === 0 && (
-                <p className="booking-line-item py-10 text-center text-sm font-normal text-muted-foreground">
-                  No items for this date yet.
-                </p>
-              )}
+                <div className="booking-line-list">
+                  <BookingLineItemsList
+                    bookingItems={lineItemSections.bookingItems}
+                    addonItems={lineItemSections.addonItems}
+                    addonTotal={lineItemSections.addonTotal}
+                    addonLineCount={lineItemSections.addonLineCount}
+                    packageSectionTitle={selectedDate.package_title}
+                    formatCurrency={formatCurrency}
+                    canModifyAddOns={canModifyAddOns}
+                    isMenuChoice={isMenuChoice}
+                    onMenuChoices={handleMenuChoices}
+                    onDeleteAddon={(type, keyword) =>
+                      handleDeleteAddon(type, selectedDateId, keyword)
+                    }
+                    isDeleting={deleteAddOnsMutation.isPending}
+                  />
                 </div>
 
                 <AddExtrasToggle
@@ -531,6 +834,7 @@ export default function BookingCheckoutPage({
                     bookingId={bookingId}
                     dateId={selectedDateId}
                     paymentStatus={selectedDate.addOnsPaymentStatus}
+                    dateSource={selectedDate}
                     formatCurrency={formatCurrency}
                     formatUnit={formatUnit}
                     onPendingTotalChange={handlePendingExtrasChange}
@@ -543,7 +847,12 @@ export default function BookingCheckoutPage({
       </div>
 
       {/* Payment summary + pay bar (Lovable unified block) */}
-      <section className="booking-payment-summary">
+      <section
+        className={cn(
+          "booking-payment-summary",
+          !hasMultipleDates && "booking-payment-summary--single-date",
+        )}
+      >
           <div className="booking-payment-summary__header booking-panel-padding py-3 sm:py-3.5">
             <p className="booking-payment-summary__title">Payment Summary</p>
             <button
@@ -570,17 +879,10 @@ export default function BookingCheckoutPage({
                   >
                     <div
                       className="flex items-center justify-between px-4 py-2.5"
-                      style={
-                        group.isExtras
-                          ? {
-                              backgroundColor:
-                                "color-mix(in srgb, var(--color-primary) 10%, var(--color-card))",
-                            }
-                          : {
-                              backgroundColor:
-                                "color-mix(in srgb, var(--color-muted) 55%, var(--color-card))",
-                            }
-                      }
+                      style={{
+                        backgroundColor:
+                          "color-mix(in srgb, var(--color-muted) 55%, var(--color-card))",
+                      }}
                     >
                       <span className="text-sm font-semibold text-foreground">
                         {group.title}
@@ -589,29 +891,33 @@ export default function BookingCheckoutPage({
                         {formatCurrency(group.subtotal)}
                       </span>
                     </div>
-                    <div className="divide-y divide-border">
-                      {group.lines.map((line, idx) => (
-                        <div
-                          key={line.id}
-                          className={cn(
-                            "flex items-start justify-between gap-3 px-4 py-2.5",
-                            idx % 2 === 1 && "bg-muted/40",
-                          )}
-                        >
-                          <div className="min-w-0">
-                            <p className="text-sm font-medium text-foreground">
-                              {line.label}
-                            </p>
-                            <p className="text-[11px] font-normal text-muted-foreground">
-                              {line.meta}
-                            </p>
-                          </div>
-                          <span className="shrink-0 text-sm font-semibold tabular-nums text-foreground">
-                            {formatCurrency(line.amount)}
+
+                    {group.lines.length > 0 && (
+                      <PaymentBreakdownLineSections
+                        lines={group.lines}
+                        formatCurrency={formatCurrency}
+                        packageSectionTitle={group.packageTitle}
+                      />
+                    )}
+
+                    {group.addonLines && group.addonLines.length > 0 && (
+                      <div className="booking-payment-breakdown-addons">
+                        <div className="booking-payment-breakdown-addons__header">
+                          <span className="booking-payment-breakdown-addons__title">
+                            Extra add-ons
+                          </span>
+                          <span className="text-xs font-semibold tabular-nums">
+                            {formatCurrency(group.addonSubtotal ?? 0)}
                           </span>
                         </div>
-                      ))}
-                    </div>
+                        <PaymentBreakdownLineSections
+                          lines={group.addonLines}
+                          formatCurrency={formatCurrency}
+                          variant="addon"
+                          packageSectionTitle={group.packageTitle}
+                        />
+                      </div>
+                    )}
                   </div>
                 ))}
 
@@ -645,6 +951,7 @@ export default function BookingCheckoutPage({
             </div>
           )}
 
+          {!hasMultipleDates ? null : (
           <div className="booking-payment-summary__footer booking-panel-padding py-4">
             <div className="flex items-center justify-between gap-4">
               <div>
@@ -652,16 +959,21 @@ export default function BookingCheckoutPage({
                 <p className="mt-1 text-2xl font-extrabold tabular-nums tracking-tight text-card sm:text-[1.75rem]">
                   {formatCurrency(footerAmount)}
                 </p>
+                {showPayAll && payableDates.length > 1 && (
+                  <p className="mt-1 text-[11px] text-card/70">
+                    {payableDates.length} dates with outstanding balance
+                  </p>
+                )}
               </div>
-              {canPayNow && summary.outstanding > 0 ? (
+              {showFooterPayAll ? (
                 <Button
                   type="button"
                   size="lg"
                   className="booking-payment-summary__pay-btn h-11 shrink-0 px-7 text-sm shadow-none"
-                  onClick={handlePayNow}
+                  onClick={handlePayAll}
                   disabled={paymentMutation.isPending}
                 >
-                  {paymentMutation.isPending ? "Processing…" : "Pay Now"}
+                  {paymentMutation.isPending ? "Processing…" : "Pay All"}
                 </Button>
               ) : (
                 <StatusBadge
@@ -676,6 +988,7 @@ export default function BookingCheckoutPage({
               )}
             </div>
           </div>
+          )}
         </section>
 
       {paymentDate && (
@@ -689,15 +1002,9 @@ export default function BookingCheckoutPage({
           dateInfo={{
             date: paymentDate.date,
             dateKey: paymentDate.id,
-            totalAmount: parseFormattedMoney(paymentDate.total, symbol),
-            paidAmount: paymentDate.partialPayment
-              ? parseFormattedMoney(paymentDate.partialPayment, symbol)
-              : 0,
-            pendingPayment:
-              parseFormattedMoney(paymentDate.total, symbol) -
-              (paymentDate.partialPayment
-                ? parseFormattedMoney(paymentDate.partialPayment, symbol)
-                : 0),
+            totalAmount: (paymentDate as CheckoutDate).totalAmount,
+            paidAmount: (paymentDate as CheckoutDate).paidAmount,
+            pendingPayment: getDatePendingAmount(paymentDate as CheckoutDate),
             partialPaymentOption:
               summary.depositSelected > 0 ? summary.depositSelected : undefined,
           }}
@@ -706,6 +1013,24 @@ export default function BookingCheckoutPage({
           onConfirm={handlePaymentConfirm}
         />
       )}
+
+      <CheckoutStripePaymentModal
+        open={isStripePaymentOpen}
+        onOpenChange={(open) => {
+          setIsStripePaymentOpen(open);
+          if (!open && stripePaymentSession) {
+            toast.message("Payment not completed", {
+              description: `Booking ${stripePaymentSession.bookingNumber} — tap Pay Now when you're ready to continue.`,
+            });
+          }
+          if (!open) {
+            setStripePaymentSession(null);
+          }
+        }}
+        session={stripePaymentSession}
+        successReturnPath="/payment/success"
+        onPaymentComplete={handleStripePaymentComplete}
+      />
     </div>
   );
 }

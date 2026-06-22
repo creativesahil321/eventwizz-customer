@@ -94,8 +94,10 @@ export function resolveCheckoutPaymentAction(
 
 export function buildStripeReturnUrl(
   session: CheckoutStripePaymentSession,
+  options?: { path?: string },
 ): string {
-  const url = new URL("/vendor/payment/success", window.location.origin);
+  const path = options?.path ?? "/vendor/payment/success";
+  const url = new URL(path, window.location.origin);
   url.searchParams.set("booking_number", session.bookingNumber);
   url.searchParams.set("booking_id", String(session.bookingId));
   url.searchParams.set("amount", String(session.amount));
