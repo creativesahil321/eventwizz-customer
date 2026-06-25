@@ -14,21 +14,25 @@ import { AddOnsResponse } from "../type";
  *
  * @param bookingId - The booking ID (must be a valid numeric string)
  * @param date - The event date in YYYY-MM-DD format
+ * @param roomId - Room scope for multi-room events only (omit for flat events)
  * @returns React Query result with add-ons data
  *
  * @example
- * const { data, isLoading, error } = useAddOnsDetails("123", "2025-09-20");
+ * const { data, isLoading, error } = useAddOnsDetails("123", "2025-09-20", 114);
  */
-export const useAddOnsDetails = (bookingId: string, date: string) => {
-  // Parse and validate bookingId
+export const useAddOnsDetails = (
+  bookingId: string,
+  date: string,
+  roomId?: number | null,
+) => {
   const parsedId = parseInt(bookingId, 10);
   const isValidId = !isNaN(parsedId) && parsedId > 0;
-
-  // Validate date format (basic validation)
   const isValidDate = !!date && /^\d{4}-\d{2}-\d{2}$/.test(date);
+  const resolvedRoomId =
+    roomId != null && Number(roomId) > 0 ? Number(roomId) : undefined;
 
   return useQuery<AddOnsResponse>({
-    queryKey: ["add-ons-details", bookingId, date],
+    queryKey: ["add-ons-details", bookingId, resolvedRoomId ?? "flat", date],
     queryFn: async () => {
       if (!isValidId) {
         throw new Error("Invalid booking ID");
@@ -36,12 +40,12 @@ export const useAddOnsDetails = (bookingId: string, date: string) => {
       if (!isValidDate) {
         throw new Error("Invalid date format");
       }
-      return bookingsService.getAddOnsDetails(parsedId, date);
+      return bookingsService.getAddOnsDetails(parsedId, date, resolvedRoomId);
     },
     enabled: isValidId && isValidDate,
-    staleTime: 5 * 60 * 1000, // 5 minutes
-    gcTime: 10 * 60 * 1000, // 10 minutes (formerly cacheTime)
-    retry: 2, // Retry failed requests twice
-    refetchOnWindowFocus: false, // Don't refetch on window focus
+    staleTime: 5 * 60 * 1000,
+    gcTime: 10 * 60 * 1000,
+    retry: 2,
+    refetchOnWindowFocus: false,
   });
 };

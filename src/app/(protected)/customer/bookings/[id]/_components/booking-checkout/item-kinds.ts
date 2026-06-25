@@ -50,6 +50,26 @@ export function kindTint(cssVar: string, strength: number, base = "var(--card)")
   return `color-mix(in srgb, ${cssVar} ${strength}%, ${base})`;
 }
 
+export const CHIP_STYLE: CSSProperties = {
+  backgroundColor: "color-mix(in srgb, var(--muted) 58%, var(--card))",
+  color: "color-mix(in srgb, var(--foreground) 68%, var(--muted-foreground))",
+};
+
+export const CHIP_SECTION_STYLE: CSSProperties = {
+  backgroundColor: "color-mix(in srgb, var(--kind-accent, var(--muted-foreground)) 14%, var(--card))",
+  color: "var(--kind-accent, var(--foreground))",
+  boxShadow: "inset 0 0 0 1px color-mix(in srgb, var(--kind-accent, var(--border)) 28%, transparent)",
+};
+
+export const BADGE_STYLE: CSSProperties = {
+  backgroundColor: "color-mix(in srgb, var(--muted) 72%, var(--card))",
+  color: "var(--muted-foreground)",
+};
+
+export const SECTION_TITLE_STYLE: CSSProperties = {
+  color: "var(--kind-accent, var(--muted-foreground))",
+};
+
 export function getKindStyles(kind: LineItemKind) {
   const config = KIND_CONFIG[kind];
   return {
@@ -59,17 +79,13 @@ export function getKindStyles(kind: LineItemKind) {
     icon: LOVABLE_KIND_ICONS[kind],
     iconClassName: "h-[18px] w-[18px] shrink-0",
     iconStrokeWidth: LOVABLE_KIND_ICON_STROKE,
-    chipClassName: cn(
-      "booking-kind-chip flex h-9 w-9 shrink-0 items-center justify-center rounded-lg",
-    ),
-    chipSmClassName: cn(
-      "booking-kind-chip booking-kind-chip--sm flex h-7 w-7 shrink-0 items-center justify-center rounded-md",
-    ),
+    chipClassName: "flex h-9 w-9 shrink-0 items-center justify-center rounded-lg",
+    chipSmClassName: "flex h-7 w-7 shrink-0 items-center justify-center rounded-md",
     iconSmClassName: "h-3.5 w-3.5 shrink-0",
     badgeClassName: cn(
-      "booking-kind-badge rounded px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide",
+      "rounded px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide",
     ),
-    sectionClassName: "booking-kind-section-title",
+    sectionClassName: "text-[13px] font-extrabold tracking-[0.07em] leading-[1.25] uppercase",
   };
 }
 

@@ -1033,12 +1033,11 @@ export default function AddOnsTab({
             allocation = Array(table.quantity).fill(tableSize.min_persons || 1);
           }
 
-          // Send allocation in new format: tables[i][allocation][j][parent_id] and tables[i][allocation][j][seats]
-          // For new tables, use sequential parent_ids starting from 1
+          // New tables have no parent allocation — parent_id must be null.
           allocation.forEach((seats, allocationIndex) => {
             formData.append(
               `tables[${tableIndex}][allocation][${allocationIndex}][parent_id]`,
-              (allocationIndex + 1).toString()
+              "",
             );
             formData.append(
               `tables[${tableIndex}][allocation][${allocationIndex}][seats]`,

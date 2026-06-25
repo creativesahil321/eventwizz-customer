@@ -1,7 +1,10 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import { CircleChevronLeft, CircleChevronRight } from "lucide-react";
+import {
+  CircleChevronLeft,
+  CircleChevronRight,
+} from "lucide-react";
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useRouter } from "next/navigation";
@@ -10,7 +13,6 @@ import { CHECKOUT_CONSTANTS } from "@/app/(public)/vendor/checkout/_lib/constant
 // Professional API-only approach - no cart store needed
 import { useStoreEventBooking } from "@/services/customer/cart/query";
 import { CartRequest } from "@/services/customer/cart/type";
-import { toast } from "sonner";
 import { normalizeSlug } from "@/lib/utils";
 import {
   selectScopedDrinks,
@@ -22,8 +24,10 @@ import { useGetCartData } from "@/services/customer/cart/query";
 import {
   buildCartDateLookupKey,
   findApiCartEventBySlug,
-  isDateInApiCart,
+  resolveDateCartStatus,
+  shouldShowViewCartOnDateCard,
 } from "@/app/(public)/vendor/checkout/_lib/cart-calculations";
+import { reconcileLocalCartWithApi } from "@/lib/utils/cart-sync-helper";
 import { useOnboarding } from "@/hooks/use-onboarding";
 import { useIsPreviewMode } from "@/contexts/preview-context";
 import { addCacheBusting } from "@/lib/image-utils";
@@ -55,6 +59,121 @@ type DatesSectionProps = {
   roomIndex?: number;
 };
 
+type DateInfo = {
+  day: string;
+  month: string;
+  date: number | "—";
+  price: string;
+  isPlaceholder: boolean;
+};
+
+type DateCardVisualState = {
+  isSoldOut: boolean;
+  isInCart: boolean;
+  isSelecting: boolean;
+  isOtherBusy: boolean;
+};
+
+function resolveDateCardVisual(
+  eventDate: string,
+  soldOut: boolean | undefined,
+  selectingDateKey: string | null,
+  isPending: boolean,
+  showViewCart: (date: string) => boolean,
+  roomId?: number,
+): DateCardVisualState {
+  const dateKey = buildCartDateLookupKey(eventDate, roomId);
+  const isSelecting = selectingDateKey === dateKey;
+  const isBusy = selectingDateKey !== null || isPending;
+
+  return {
+    isSoldOut: soldOut === true,
+    isInCart: showViewCart(eventDate),
+    isSelecting,
+    isOtherBusy: isBusy && !isSelecting,
+  };
+}
+
+function getDateCardContainerClass(visual: DateCardVisualState): string {
+  const base =
+    "border rounded-2xl overflow-hidden text-center w-[85px] sm:w-[100px] md:w-[120px] flex-shrink-0 transition-all duration-300";
+
+  if (visual.isSoldOut) {
+    return `${base} border-red-500/60 cursor-not-allowed bg-slate-900/40 backdrop-blur-sm opacity-80 shadow-[0_0_25px_rgba(239,68,68,0.45)]`;
+  }
+  if (visual.isSelecting) {
+    return `${base} border-[var(--color-primary)] ring-1 ring-white/30 shadow-[0_0_22px_rgba(255,255,255,0.12)] cursor-wait bg-black/30 backdrop-blur-sm`;
+  }
+  if (visual.isOtherBusy) {
+    return `${base} border-[var(--color-primary)] opacity-45 cursor-not-allowed shadow-[0_0_15px_rgba(60,70,147,0.25)] bg-transparent`;
+  }
+  if (visual.isInCart) {
+    return `${base} border-[var(--color-primary)] bg-black/20 backdrop-blur-sm opacity-95 cursor-pointer shadow-[0_0_20px_var(--color-primary)]/30`;
+  }
+  return `${base} border-[var(--color-primary)] cursor-pointer shadow-[0_0_15px_rgba(60,70,147,0.25)] bg-transparent hover:shadow-[0_0_25px_rgba(60,70,147,0.5)] hover:border-[var(--color-primary)] hover:bg-gradient-to-b hover:from-[var(--color-primary)]/10 hover:to-transparent`;
+}
+
+function getDateCardFooterClass(
+  visual: DateCardVisualState,
+  inCartStyle: "primary" | "green",
+): string {
+  const base =
+    "text-white text-sm sm:text-base tracking-wider py-1 sm:py-1.5 transition-all duration-300";
+
+  if (visual.isSoldOut) {
+    return `${base} bg-gradient-to-b from-red-600 to-red-800 text-white font-semibold border-t border-red-500/40 tracking-wide`;
+  }
+  if (visual.isSelecting) {
+    return `${base} bg-gradient-to-b from-[var(--color-primary)]/95 to-[#232a61]`;
+  }
+  if (visual.isInCart) {
+    return inCartStyle === "green"
+      ? `${base} bg-gradient-to-b from-green-500 to-green-700`
+      : `${base} bg-gradient-to-b from-[var(--color-primary)] to-[var(--color-primary)]/80 text-white font-semibold shadow-lg`;
+  }
+  return `${base} bg-gradient-to-b from-[var(--color-primary)] to-[#232a61] hover:from-[var(--color-primary)]/90 hover:to-[#232a61]/90 hover:shadow-lg`;
+}
+
+function DateCardSelectingIndicator() {
+  return (
+    <span className="flex w-full items-center justify-center py-0.5">
+      <span
+        className="relative h-[3px] w-11 overflow-hidden rounded-full bg-white/20 sm:w-12"
+        aria-hidden
+      >
+        <motion.span
+          className="absolute inset-y-0 left-0 w-1/2 rounded-full bg-white/85"
+          animate={{ x: ["-120%", "220%"] }}
+          transition={{
+            duration: 1.15,
+            repeat: Infinity,
+            ease: "easeInOut",
+          }}
+        />
+      </span>
+      <span className="sr-only">Adding date to your booking</span>
+    </span>
+  );
+}
+
+function DateCardFooterContent({
+  visual,
+  dateInfo,
+  currencySymbol,
+}: {
+  visual: DateCardVisualState;
+  dateInfo: DateInfo;
+  currencySymbol: string;
+}) {
+  if (visual.isSoldOut) return <>SOLD OUT</>;
+  if (visual.isSelecting) return <DateCardSelectingIndicator />;
+  if (visual.isInCart) return <>VIEW CART</>;
+  if (dateInfo.isPlaceholder && dateInfo.price === "—") {
+    return <>Set date</>;
+  }
+  return <>{`${currencySymbol}${dateInfo.price}`}</>;
+}
+
 export default function DatesSection({
   dates,
   eventSlug,
@@ -73,7 +192,8 @@ export default function DatesSection({
   const selectedDrinks = useDrinkSelectionStore(selectScopedDrinks);
 
   // Use Zustand store instead of direct localStorage access
-  const { getDateData } = useCartEditStore();
+  const editingData = useCartEditStore((state) => state.editingData);
+  const getDateData = useCartEditStore((state) => state.getDateData);
 
   // Cart conflict detection - conditional based on onboarding status
   let checkAndHandleConflict:
@@ -94,9 +214,18 @@ export default function DatesSection({
   }
 
   const sessionUser = session?.user as SessionUser | undefined;
-  const { data: apiCartData } = useGetCartData(
-    sessionUser?.account_type === "customer" && !isOnboarding && !isPreviewMode,
+  const cartQueryEnabled =
+    sessionUser?.account_type === "customer" && !isOnboarding && !isPreviewMode;
+  const { data: apiCartData, isLoading: isCartDataLoading } = useGetCartData(
+    cartQueryEnabled,
   );
+
+  useEffect(() => {
+    if (!cartQueryEnabled || isCartDataLoading || apiCartData === undefined) {
+      return;
+    }
+    reconcileLocalCartWithApi(apiCartData);
+  }, [apiCartData, cartQueryEnabled, isCartDataLoading]);
 
   const cartEventData = useMemo(() => {
     if (!eventSlug || !apiCartData) return null;
@@ -111,6 +240,7 @@ export default function DatesSection({
   const [screenSize, setScreenSize] = useState({ width: 0, height: 0 });
   const [isClient, setIsClient] = useState(false);
   const [currentPage, setCurrentPage] = useState(0);
+  const [selectingDateKey, setSelectingDateKey] = useState<string | null>(null);
   const [datesBackgroundImageFailed, setDatesBackgroundImageFailed] =
     useState(false);
   // Professional API-only approach - no conflict modal needed
@@ -157,38 +287,56 @@ export default function DatesSection({
     return () => clearTimeout(timer);
   }, [isClient]);
 
-  // Helper function to check if a date is already in cart (room-aware)
-  const isDateInCart = useCallback(
-    (dateToCheck: string): boolean => {
+  const getDateCartStatus = useCallback(
+    (dateToCheck: string) => {
       if (!eventSlug) {
-        return false;
+        return { hasSelections: false, hasSession: false };
       }
 
       try {
         const decodedEventSlug = decodeURIComponent(eventSlug);
         const storeKey = buildCartDateLookupKey(dateToCheck, roomId);
+        const localData = getDateData(decodedEventSlug, storeKey);
 
-        if (isDateInApiCart(cartEventData, dateToCheck, roomId)) {
-          return true;
-        }
-
-        return Boolean(getDateData(decodedEventSlug, storeKey));
+        return resolveDateCartStatus({
+          date: dateToCheck,
+          roomId,
+          cartEventData,
+          localData,
+        });
       } catch (error) {
         console.error("Error checking cart data:", error);
-        return false;
+        return { hasSelections: false, hasSession: false };
       }
     },
-    [eventSlug, roomId, cartEventData, getDateData],
+    [eventSlug, roomId, cartEventData, getDateData, editingData],
   );
+
+  const shouldShowViewCartOnDate = useCallback(
+    (dateToCheck: string) =>
+      shouldShowViewCartOnDateCard(getDateCartStatus(dateToCheck)),
+    [getDateCartStatus],
+  );
+
+  const getDateSelectionKey = useCallback(
+    (eventDate: string) => buildCartDateLookupKey(eventDate, roomId),
+    [roomId],
+  );
+
+  const clearDateSelection = useCallback(() => {
+    setSelectingDateKey(null);
+  }, []);
 
   // Handle date card click - add to cart and redirect to checkout
   const handleDateClick = (dateItem: DatesSectionType[0]) => {
     if (isPreviewMode) return;
+    if (selectingDateKey || isPending) return;
 
-    // Check if this date is already in cart
-    if (isDateInCart(dateItem.event_date)) {
-      toast.info("This date is already in your cart!");
-      // Redirect to simple checkout page to manage existing cart items
+    const dateKey = getDateSelectionKey(dateItem.event_date);
+    setSelectingDateKey(dateKey);
+
+    // Resume checkout when the date is already in cart (with or without selections).
+    if (shouldShowViewCartOnDate(dateItem.event_date)) {
       router.push("/vendor/checkout");
       return;
     }
@@ -218,6 +366,7 @@ export default function DatesSection({
 
       if (!canProceed) {
         // Conflict detected - modal will be shown, don't proceed with API call
+        clearDateSelection();
         return;
       }
     }
@@ -270,10 +419,12 @@ export default function DatesSection({
             router.push("/vendor/checkout");
           } else {
             console.error("Failed to select event. Please try again.");
+            clearDateSelection();
           }
         } catch (error) {
           console.error("Error storing event data:", error);
           console.error("Failed to select event. Please try again.");
+          clearDateSelection();
         }
       } else {
         // User is not a customer, redirect to unauthorized page
@@ -323,13 +474,121 @@ export default function DatesSection({
     };
   };
 
-  const dateCardPriceFooter = (
-    dateInfo: ReturnType<typeof getDateInfo>,
-  ): string => {
-    if (dateInfo.isPlaceholder && dateInfo.price === "—") {
-      return "Set date";
-    }
-    return `${currencySymbol}${dateInfo.price}`;
+  const handleDateCardClick = (
+    dateItem: DatesSectionType[0],
+    visual: DateCardVisualState,
+  ) => {
+    if (visual.isSoldOut || visual.isOtherBusy) return;
+    handleDateClick(dateItem);
+  };
+
+  const renderStaticDateCard = (
+    dateItem: DatesSectionType[0],
+    cardKey: string,
+    inCartStyle: "primary" | "green" = "primary",
+  ) => {
+    const dateInfo = getDateInfo(dateItem);
+    const visual = resolveDateCardVisual(
+      dateItem.event_date,
+      dateItem.sold_out,
+      selectingDateKey,
+      isPending,
+      shouldShowViewCartOnDate,
+      roomId,
+    );
+
+    return (
+      <div
+        className={getDateCardContainerClass(visual)}
+        key={cardKey}
+        onClick={() => handleDateCardClick(dateItem, visual)}
+        aria-busy={visual.isSelecting}
+      >
+        <div className="p-2 sm:p-3">
+          <p className="text-xs sm:text-sm mb-0.5 sm:mb-1">{dateInfo.day}</p>
+          <p className="text-3xl sm:text-4xl md:text-5xl font-bold py-1">
+            {dateInfo.date}
+          </p>
+          <p className="text-xs sm:text-sm">{dateInfo.month}</p>
+        </div>
+        <div className={getDateCardFooterClass(visual, inCartStyle)}>
+          <DateCardFooterContent
+            visual={visual}
+            dateInfo={dateInfo}
+            currencySymbol={currencySymbol}
+          />
+        </div>
+      </div>
+    );
+  };
+
+  const renderAnimatedDateCard = (
+    dateItem: DatesSectionType[0],
+    cardKey: string,
+    animationIndex: number,
+  ) => {
+    const dateInfo = getDateInfo(dateItem);
+    const visual = resolveDateCardVisual(
+      dateItem.event_date,
+      dateItem.sold_out,
+      selectingDateKey,
+      isPending,
+      shouldShowViewCartOnDate,
+      roomId,
+    );
+
+    return (
+      <motion.div
+        className={getDateCardContainerClass(visual)}
+        key={cardKey}
+        initial={{ opacity: 1, y: 0 }}
+        animate={{
+          opacity: visual.isOtherBusy ? 0.45 : visual.isSoldOut ? 0.75 : 1,
+          y: 0,
+        }}
+        transition={{ duration: 0.2, delay: animationIndex * 0.02 }}
+        whileHover={{
+          scale:
+            visual.isOtherBusy ||
+            visual.isInCart ||
+            visual.isSoldOut ||
+            visual.isSelecting
+              ? 1
+              : 1.02,
+          boxShadow:
+            visual.isOtherBusy || visual.isInCart || visual.isSoldOut
+              ? "none"
+              : "0 0 25px rgba(60,70,147,0.5)",
+          transition: { duration: 0.2 },
+        }}
+        whileTap={{
+          scale:
+            visual.isOtherBusy ||
+            visual.isInCart ||
+            visual.isSoldOut ||
+            visual.isSelecting
+              ? 1
+              : 0.98,
+        }}
+        onClick={() => handleDateCardClick(dateItem, visual)}
+        aria-busy={visual.isSelecting}
+      >
+        <div className="p-2 sm:p-3">
+          <p className="text-xs sm:text-sm mb-0.5 sm:mb-1">{dateInfo.day}</p>
+          <p className="text-3xl sm:text-4xl md:text-5xl font-bold py-1">
+            {dateInfo.date}
+          </p>
+          <p className="text-xs sm:text-sm">{dateInfo.month}</p>
+        </div>
+        <div className={getDateCardFooterClass(visual, "primary")}>
+          <DateCardFooterContent
+            visual={visual}
+            dateInfo={dateInfo}
+            currencySymbol={currencySymbol}
+          />
+        </div>
+      </motion.div>
+    );
   };
 
   // If no dates, show a default preview with dummy data
@@ -435,58 +694,10 @@ export default function DatesSection({
                 }).map((_, i) => {
                   const index = i;
                   if (index >= displayDates.length) return null;
-
-                  const dateItem = displayDates[index];
-                  const dateInfo = getDateInfo(dateItem);
-                  const isInCart = isDateInCart(dateItem.event_date);
-                  const isSoldOut = dateItem.sold_out === true;
-
-                  return (
-                    <div
-                      className={`border rounded-2xl overflow-hidden text-center w-[85px] sm:w-[100px] md:w-[120px] flex-shrink-0 transition-all duration-300 ${
-                        isSoldOut
-                          ? "border-red-500/60 cursor-not-allowed bg-slate-900/40 backdrop-blur-sm opacity-80 shadow-[0_0_25px_rgba(239,68,68,0.45)]"
-                          : isInCart
-                            ? "border-[var(--color-primary)] bg-black/20 backdrop-blur-sm opacity-95 cursor-pointer shadow-[0_0_20px_var(--color-primary)]/30"
-                            : isPending
-                              ? "border-[var(--color-primary)] opacity-50 cursor-not-allowed shadow-[0_0_15px_rgba(60,70,147,0.25)] bg-transparent"
-                              : "border-[var(--color-primary)] cursor-pointer shadow-[0_0_15px_rgba(60,70,147,0.25)] bg-transparent hover:shadow-[0_0_25px_rgba(60,70,147,0.5)] hover:border-[var(--color-primary)] hover:bg-gradient-to-b hover:from-[var(--color-primary)]/10 hover:to-transparent"
-                      }`}
-                      key={`first-${index}`}
-                      onClick={() => {
-                        if (isSoldOut) return; // Don't allow clicks on sold out dates
-                        if (!isPending && !isInCart) {
-                          handleDateClick(dateItem);
-                        } else if (isInCart) {
-                          handleDateClick(dateItem); // This will redirect to checkout
-                        }
-                      }}
-                    >
-                      <div className="p-2 sm:p-3">
-                        <p className="text-xs sm:text-sm mb-0.5 sm:mb-1">
-                          {dateInfo.day}
-                        </p>
-                        <p className="text-3xl sm:text-4xl md:text-5xl font-bold py-1">
-                          {dateInfo.date}
-                        </p>
-                        <p className="text-xs sm:text-sm">{dateInfo.month}</p>
-                      </div>
-                      <div
-                        className={`text-white text-sm sm:text-base tracking-wider py-1 sm:py-1.5 transition-all duration-300 ${
-                          isSoldOut
-                            ? "bg-gradient-to-b from-red-600 to-red-800 text-white font-semibold border-t border-red-500/40 tracking-wide"
-                            : isInCart
-                              ? "bg-gradient-to-b from-green-500 to-green-700"
-                              : "bg-gradient-to-b from-[var(--color-primary)] to-[#232a61] hover:from-[var(--color-primary)]/90 hover:to-[#232a61]/90 hover:shadow-lg"
-                        }`}
-                      >
-                        {isSoldOut
-                          ? "SOLD OUT"
-                          : isInCart
-                            ? "VIEW CART"
-                            : dateCardPriceFooter(dateInfo)}
-                      </div>
-                    </div>
+                  return renderStaticDateCard(
+                    displayDates[index],
+                    `first-${index}`,
+                    "green",
                   );
                 })}
               </div>
@@ -500,58 +711,10 @@ export default function DatesSection({
                 }).map((_, i) => {
                   const index = itemsPerRow + i;
                   if (index >= displayDates.length) return null;
-
-                  const dateItem = displayDates[index];
-                  const dateInfo = getDateInfo(dateItem);
-                  const isInCart = isDateInCart(dateItem.event_date);
-                  const isSoldOut = dateItem.sold_out === true;
-
-                  return (
-                    <div
-                      className={`border rounded-2xl overflow-hidden text-center w-[85px] sm:w-[100px] md:w-[120px] flex-shrink-0 transition-all duration-300 ${
-                        isSoldOut
-                          ? "border-red-500/60 cursor-not-allowed bg-slate-900/40 backdrop-blur-sm opacity-80 shadow-[0_0_25px_rgba(239,68,68,0.45)]"
-                          : isInCart
-                            ? "border-[var(--color-primary)] bg-black/20 backdrop-blur-sm opacity-95 cursor-pointer shadow-[0_0_20px_var(--color-primary)]/30"
-                            : isPending
-                              ? "border-[var(--color-primary)] opacity-50 cursor-not-allowed shadow-[0_0_15px_rgba(60,70,147,0.25)] bg-transparent"
-                              : "border-[var(--color-primary)] cursor-pointer shadow-[0_0_15px_rgba(60,70,147,0.25)] bg-transparent hover:shadow-[0_0_25px_rgba(60,70,147,0.5)] hover:border-[var(--color-primary)] hover:bg-gradient-to-b hover:from-[var(--color-primary)]/10 hover:to-transparent"
-                      }`}
-                      key={`second-${index}`}
-                      onClick={() => {
-                        if (isSoldOut) return; // Don't allow clicks on sold out dates
-                        if (!isPending && !isInCart) {
-                          handleDateClick(dateItem);
-                        } else if (isInCart) {
-                          handleDateClick(dateItem); // This will redirect to checkout
-                        }
-                      }}
-                    >
-                      <div className="p-2 sm:p-3">
-                        <p className="text-xs sm:text-sm mb-0.5 sm:mb-1">
-                          {dateInfo.day}
-                        </p>
-                        <p className="text-3xl sm:text-4xl md:text-5xl font-bold py-1">
-                          {dateInfo.date}
-                        </p>
-                        <p className="text-xs sm:text-sm">{dateInfo.month}</p>
-                      </div>
-                      <div
-                        className={`text-white text-sm sm:text-base tracking-wider py-1 sm:py-1.5 transition-all duration-300 ${
-                          isSoldOut
-                            ? "bg-gradient-to-b from-red-600 to-red-800 text-white font-semibold border-t border-red-500/40 tracking-wide"
-                            : isInCart
-                              ? "bg-gradient-to-b from-green-500 to-green-700"
-                              : "bg-gradient-to-b from-[var(--color-primary)] to-[#232a61] hover:from-[var(--color-primary)]/90 hover:to-[#232a61]/90 hover:shadow-lg"
-                        }`}
-                      >
-                        {isSoldOut
-                          ? "SOLD OUT"
-                          : isInCart
-                            ? "VIEW CART"
-                            : dateCardPriceFooter(dateInfo)}
-                      </div>
-                    </div>
+                  return renderStaticDateCard(
+                    displayDates[index],
+                    `second-${index}`,
+                    "green",
                   );
                 })}
               </div>
@@ -651,7 +814,7 @@ export default function DatesSection({
         )}
 
         {/* Date cards container with transition */}
-        <div className="overflow-hidden">
+        <div className="overflow-hidden relative">
           {/* First row of date cards */}
           <div className="flex flex-col gap-4 sm:gap-5">
             <div
@@ -662,75 +825,10 @@ export default function DatesSection({
               }).map((_, i) => {
                 const index = currentPage * itemsPerRow + i;
                 if (index >= displayDates.length) return null;
-
-                const dateItem = displayDates[index];
-                const dateInfo = getDateInfo(dateItem);
-                const isInCart = isDateInCart(dateItem.event_date);
-                const isSoldOut = dateItem.sold_out === true;
-
-                return (
-                  <motion.div
-                    className={`border rounded-2xl overflow-hidden text-center w-[85px] sm:w-[100px] md:w-[120px] flex-shrink-0 transition-all duration-300 ${
-                      isSoldOut
-                        ? "border-red-500/60 cursor-not-allowed bg-slate-900/40 backdrop-blur-sm opacity-80 shadow-[0_0_25px_rgba(239,68,68,0.45)]"
-                        : isInCart
-                          ? "border-[var(--color-primary)] bg-black/20 backdrop-blur-sm opacity-95 cursor-pointer shadow-[0_0_20px_var(--color-primary)]/30"
-                          : isPending
-                            ? "border-[var(--color-primary)] opacity-50 cursor-not-allowed shadow-[0_0_15px_rgba(60,70,147,0.25)] bg-transparent"
-                            : "border-[var(--color-primary)] cursor-pointer shadow-[0_0_15px_rgba(60,70,147,0.25)] bg-transparent hover:shadow-[0_0_25px_rgba(60,70,147,0.5)] hover:border-[var(--color-primary)] hover:bg-gradient-to-b hover:from-[var(--color-primary)]/10 hover:to-transparent"
-                    }`}
-                    key={`first-${index}`}
-                    initial={{ opacity: 1, y: 0 }}
-                    animate={{
-                      opacity: isPending ? 0.5 : isSoldOut ? 0.75 : 1,
-                      y: 0,
-                    }}
-                    transition={{ duration: 0.1, delay: i * 0.02 }}
-                    whileHover={{
-                      scale: isPending || isInCart || isSoldOut ? 1 : 1.02,
-                      boxShadow:
-                        isPending || isInCart || isSoldOut
-                          ? "none"
-                          : "0 0 25px rgba(60,70,147,0.5)",
-                      transition: { duration: 0.2 },
-                    }}
-                    whileTap={{
-                      scale: isPending || isInCart || isSoldOut ? 1 : 0.98,
-                    }}
-                    onClick={() => {
-                      if (isSoldOut) return; // Don't allow clicks on sold out dates
-                      if (!isPending && !isInCart) {
-                        handleDateClick(dateItem);
-                      } else if (isInCart) {
-                        handleDateClick(dateItem); // This will redirect to checkout
-                      }
-                    }}
-                  >
-                    <div className="p-2 sm:p-3">
-                      <p className="text-xs sm:text-sm mb-0.5 sm:mb-1">
-                        {dateInfo.day}
-                      </p>
-                      <p className="text-3xl sm:text-4xl md:text-5xl font-bold py-1">
-                        {dateInfo.date}
-                      </p>
-                      <p className="text-xs sm:text-sm">{dateInfo.month}</p>
-                    </div>
-                    <div
-                      className={`text-white text-sm sm:text-base tracking-wider py-1 sm:py-1.5 transition-all duration-300 ${
-                        isSoldOut
-                          ? "bg-gradient-to-b from-red-600 to-red-800 text-white font-semibold border-t border-red-500/40 tracking-wide"
-                          : isInCart
-                            ? "bg-gradient-to-b from-[var(--color-primary)] to-[var(--color-primary)]/80 text-white font-semibold shadow-lg"
-                            : "bg-gradient-to-b from-[var(--color-primary)] to-[#232a61] hover:from-[var(--color-primary)]/90 hover:to-[#232a61]/90 hover:shadow-lg"
-                      }`}
-                    >
-                      {isSoldOut
-                        ? "SOLD OUT"
-                        : isInCart
-                          ? "VIEW CART"
-                          : dateCardPriceFooter(dateInfo)}
-                    </div>
-                  </motion.div>
+                return renderAnimatedDateCard(
+                  displayDates[index],
+                  `first-${index}`,
+                  i,
                 );
               })}
             </div>
@@ -744,78 +842,10 @@ export default function DatesSection({
               }).map((_, i) => {
                 const index = currentPage * itemsPerRow + itemsPerRow + i;
                 if (index >= displayDates.length) return null;
-
-                const dateItem = displayDates[index];
-                const dateInfo = getDateInfo(dateItem);
-                const isInCart = isDateInCart(dateItem.event_date);
-                const isSoldOut = dateItem.sold_out === true;
-
-                return (
-                  <motion.div
-                    className={`border rounded-2xl overflow-hidden text-center w-[85px] sm:w-[100px] md:w-[120px] flex-shrink-0 transition-all duration-300 ${
-                      isSoldOut
-                        ? "border-red-500/60 cursor-not-allowed bg-slate-900/40 backdrop-blur-sm opacity-80 shadow-[0_0_25px_rgba(239,68,68,0.45)]"
-                        : isInCart
-                          ? "border-[var(--color-primary)] bg-black/20 backdrop-blur-sm opacity-95 cursor-pointer shadow-[0_0_20px_var(--color-primary)]/30"
-                          : isPending
-                            ? "border-[var(--color-primary)] opacity-50 cursor-not-allowed shadow-[0_0_15px_rgba(60,70,147,0.25)] bg-transparent"
-                            : "border-[var(--color-primary)] cursor-pointer shadow-[0_0_15px_rgba(60,70,147,0.25)] bg-transparent hover:shadow-[0_0_25px_rgba(60,70,147,0.5)] hover:border-[var(--color-primary)] hover:bg-gradient-to-b hover:from-[var(--color-primary)]/10 hover:to-transparent"
-                    }`}
-                    key={`second-${index}`}
-                    initial={{ opacity: 1, y: 0 }}
-                    animate={{
-                      opacity: isPending ? 0.5 : 1,
-                      y: 0,
-                    }}
-                    transition={{
-                      duration: 0.1,
-                      delay: i * 0.02,
-                    }}
-                    whileHover={{
-                      scale: isPending || isInCart || isSoldOut ? 1 : 1.02,
-                      boxShadow:
-                        isPending || isInCart || isSoldOut
-                          ? "none"
-                          : "0 0 25px rgba(60,70,147,0.5)",
-                      transition: { duration: 0.2 },
-                    }}
-                    whileTap={{
-                      scale: isPending || isInCart || isSoldOut ? 1 : 0.98,
-                    }}
-                    onClick={() => {
-                      if (isSoldOut) return; // Don't allow clicks on sold out dates
-                      if (!isPending && !isInCart) {
-                        handleDateClick(dateItem);
-                      } else if (isInCart) {
-                        handleDateClick(dateItem); // This will redirect to checkout
-                      }
-                    }}
-                  >
-                    <div className="p-2 sm:p-3">
-                      <p className="text-xs sm:text-sm mb-0.5 sm:mb-1">
-                        {dateInfo.day}
-                      </p>
-                      <p className="text-3xl sm:text-4xl md:text-5xl font-bold py-1">
-                        {dateInfo.date}
-                      </p>
-                      <p className="text-xs sm:text-sm">{dateInfo.month}</p>
-                    </div>
-                    <div
-                      className={`text-white text-sm sm:text-base tracking-wider py-1 sm:py-1.5 transition-all duration-300 ${
-                        isSoldOut
-                          ? "bg-gradient-to-b from-red-600 to-red-800 text-white font-semibold border-t border-red-500/40 tracking-wide"
-                          : isInCart
-                            ? "bg-gradient-to-b from-[var(--color-primary)] to-[var(--color-primary)]/80 text-white font-semibold shadow-lg"
-                            : "bg-gradient-to-b from-[var(--color-primary)] to-[#232a61] hover:from-[var(--color-primary)]/90 hover:to-[#232a61]/90 hover:shadow-lg"
-                      }`}
-                    >
-                      {isSoldOut
-                        ? "SOLD OUT"
-                        : isInCart
-                          ? "VIEW CART"
-                          : dateCardPriceFooter(dateInfo)}
-                    </div>
-                  </motion.div>
+                return renderAnimatedDateCard(
+                  displayDates[index],
+                  `second-${index}`,
+                  i,
                 );
               })}
             </div>

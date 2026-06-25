@@ -23,6 +23,7 @@ import {
   getAvailableDates,
   extractCurrentEventData,
   extractEventsFromApiResponse,
+  isApiCartResponseEmpty,
   isRoomBasedCart,
   getCartRooms,
   getRoomDates,
@@ -35,6 +36,7 @@ import {
   hasRoomsAvailableToAdd,
   getRoomDrinkTitle,
   calculateRoomSubtotal,
+  getDateGuestCount,
 } from "../_lib/cart-calculations";
 import { useCurrencyFormat } from "@/hooks/use-currency-format";
 import { cn } from "@/lib/utils";
@@ -183,8 +185,20 @@ export default function CartManager({}: CartManagerProps) {
   // Hydrate Zustand from GET cart-data before paint to avoid delayed summary UI.
   // Checkout saves use POST without invalidation — local edits stay authoritative.
   useLayoutEffect(() => {
-    if (!currentEventSlug) return;
+    if (isLoadingCartData || apiCartData === undefined) return;
+
     const currentEditingData = useCartEditStore.getState().editingData;
+
+    if (isApiCartResponseEmpty(apiCartData)) {
+      const awaitingPayment =
+        useCheckoutPaymentUiStore.getState().isAwaitingStripePayment;
+      if (Object.keys(currentEditingData).length > 0 && !awaitingPayment) {
+        clearAllCarts();
+      }
+      return;
+    }
+
+    if (!currentEventSlug) return;
 
     if (!currentEventApiData || Object.keys(currentEventApiData).length === 0) {
       const awaitingPayment =
@@ -234,9 +248,10 @@ export default function CartManager({}: CartManagerProps) {
       });
     }
   }, [
+    apiCartData,
     currentEventApiData,
     currentEventSlug,
-    apiCartData,
+    isLoadingCartData,
     initializeFromAPI,
     syncNewDatesFromAPI,
     reconcileSavedDatesFromAPI,
@@ -321,21 +336,7 @@ export default function CartManager({}: CartManagerProps) {
     return dateKeys.reduce((sum, dateKey) => {
       const dateData = getDateData(currentEventSlug, dateKey);
       if (!dateData) return sum;
-      const fromPeople = dateData.peopleCount ?? 0;
-      if (fromPeople > 0) return sum + fromPeople;
-      return (
-        sum +
-        dateData.tables
-          .filter((t) => t.quantity > 0)
-          .reduce((tableSum, table) => {
-            if (table.allocation?.length) {
-              return (
-                tableSum + table.allocation.reduce((guestSum, g) => guestSum + g, 0)
-              );
-            }
-            return tableSum + (table.minPersons || 1) * table.quantity;
-          }, 0)
-      );
+      return sum + getDateGuestCount(dateData);
     }, 0);
   }, [currentEventSlug, currentEventApiData, roomMode, getDateData]);
 
@@ -436,9 +437,13 @@ export default function CartManager({}: CartManagerProps) {
     0,
     rooms.findIndex((r) => r.room_id === activeRoomId),
   );
+  const guestMetaSuffix =
+    totalGuestsAcrossCart > 0
+      ? ` · ${totalGuestsAcrossCart} guest${totalGuestsAcrossCart !== 1 ? "s" : ""}`
+      : "";
   const bookingMetaLine = roomMode && rooms.length > 0
-    ? `${totalEventRooms} ${totalEventRooms === 1 ? "room" : "rooms"} · ${totalDatesAcrossRooms} ${totalDatesAcrossRooms === 1 ? "date" : "dates"} · ${totalGuestsAcrossCart} total guests`
-    : `${totalCartItems} ${totalCartItems === 1 ? "date" : "dates"}${totalGuestsAcrossCart > 0 ? ` · ${totalGuestsAcrossCart} guests` : ""}`;
+    ? `${totalEventRooms} ${totalEventRooms === 1 ? "room" : "rooms"} · ${totalDatesAcrossRooms} ${totalDatesAcrossRooms === 1 ? "date" : "dates"}${guestMetaSuffix}`
+    : `${totalCartItems} ${totalCartItems === 1 ? "date" : "dates"}${guestMetaSuffix}`;
 
   const bookingHeader = (
     <div className="mb-3 flex flex-col gap-3 sm:mb-4 sm:flex-row sm:items-start sm:justify-between">

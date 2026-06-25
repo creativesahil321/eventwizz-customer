@@ -5,7 +5,11 @@ import { Calendar, ChevronDown, ChevronUp } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 import { EditableDateData } from "@/store/cart-edit.store";
 import type { ApiRoomCartData } from "@/lib/types/cart.types";
-import { parseRoomDateKey, getBillableTables } from "../_lib/cart-calculations";
+import {
+  parseRoomDateKey,
+  getBillableTables,
+  getDateGuestCount,
+} from "../_lib/cart-calculations";
 import { getRoomFloatingAccent } from "@/lib/room-accent-palette";
 import { cn } from "@/lib/utils";
 
@@ -23,19 +27,6 @@ interface OrderViewBreakdownProps {
     laterAmount: number;
     fullAmount: number;
   }>;
-}
-
-function getGuestCount(dateData: EditableDateData): number {
-  const activeTables = dateData.tables.filter((t) => t.quantity > 0);
-  return (
-    dateData.peopleCount ??
-    activeTables.reduce((sum, table) => {
-      if (table.allocation?.length) {
-        return sum + table.allocation.reduce((s, g) => s + g, 0);
-      }
-      return sum + (table.minPersons || 1) * table.quantity;
-    }, 0)
-  );
 }
 
 function CategoryDivider({
@@ -111,7 +102,7 @@ function DateBreakdownCard({
   const activeTables = getBillableTables(dateData);
   const activeTickets = dateData.tickets.filter((t) => t.quantity > 0);
   const activeDrinks = dateData.drinks.filter((d) => d.quantity > 0);
-  const guestCount = getGuestCount(dateData);
+  const guestCount = getDateGuestCount(dateData);
 
   return (
     <div className="rounded-xl border border-[color:var(--checkout-border)] bg-white p-3">

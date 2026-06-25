@@ -19,7 +19,7 @@ import {
   CalendarDays,
 } from "lucide-react";
 import { Booking } from "../_lib/types";
-import { formatBookingStatus } from "../_lib/utils";
+import { formatBookingStatus, getBookingDateRowKey } from "../_lib/utils";
 import { addCacheBusting } from "@/lib/image-utils";
 import { useCurrencyFormat } from "@/hooks/use-currency-format";
 import { parseFormattedMoney } from "@/lib/currency-format";
@@ -140,7 +140,7 @@ export default function BookingCard({
                     <div className="space-y-1.5">
                       {booking.booking_dates.map((date, index) => (
                         <div
-                          key={date.date_key}
+                          key={getBookingDateRowKey(date, index)}
                           className="flex items-center gap-2 text-xs text-muted-foreground"
                         >
                           <span className="font-medium text-foreground text-black">

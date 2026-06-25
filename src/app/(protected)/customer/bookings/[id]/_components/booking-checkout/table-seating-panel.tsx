@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AlertCircle, Minus, Plus, RotateCcw, Wand2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -8,9 +8,10 @@ import {
   autoArrangeGuests,
   validateAllocation,
   type TableAllocationData,
-} from "../../_lib/guest-allocation";
+} from "@/app/(public)/vendor/checkout/_lib/guest-allocation";
 import { formatTableCapacityTitle } from "@/app/(public)/vendor/checkout/_lib/table-labels";
 import VenueContactNotice from "@/app/(public)/vendor/checkout/_components/venue-contact-notice";
+import { resolveVenueContact } from "@/lib/resolve-venue-contact";
 import { useDomain } from "@/providers/domain-provider/domain-provider";
 import { QuantityStepper } from "./quantity-stepper";
 
@@ -28,6 +29,8 @@ export interface TableSeatingSnapshot {
   seatingConfirmed: boolean;
   tableTotal: number;
   tableItemCount: number;
+  /** Draft allocation total — used for progress before Confirm seating. */
+  draftGuestTotal: number;
 }
 
 interface TableSeatingPanelProps {
@@ -35,6 +38,13 @@ interface TableSeatingPanelProps {
   formatCurrency: (amount: number) => string;
   formatUnit: (amount: number) => string;
   onStateChange?: (snapshot: TableSeatingSnapshot) => void;
+  /** When set, controls group size externally (e.g. remaining guests after fill-existing). */
+  externalGroupSize?: number | null;
+  sectionTitle?: string;
+  /** Existing-table capacity hint for below-minimum messaging in add-guests flow. */
+  existingTableCapacity?: number;
+  /** Smallest top-level guest count that fills existing tables + one new table. */
+  minimumTotalGroupSize?: number;
 }
 
 function resolveTableQuantity(
@@ -77,16 +87,13 @@ export function TableSeatingPanel({
   formatCurrency,
   formatUnit,
   onStateChange,
+  externalGroupSize = null,
+  sectionTitle,
+  existingTableCapacity,
+  minimumTotalGroupSize,
 }: TableSeatingPanelProps) {
   const { settings } = useDomain();
-  const venuePhone =
-    settings?.contactDetails?.phone ||
-    settings?.contactDetails?.alternativePhone ||
-    null;
-  const venueEmail =
-    settings?.contactDetails?.email ||
-    settings?.contactDetails?.alternativeEmail ||
-    null;
+  const { phone: venuePhone, email: venueEmail } = resolveVenueContact(settings);
 
   const minPersons = tableConfig.min;
   const maxPersons = tableConfig.max;
@@ -97,49 +104,43 @@ export function TableSeatingPanel({
   const capacityTitle = formatTableCapacityTitle(minPersons, maxPersons);
 
   const [groupSize, setGroupSize] = useState(0);
-  const [tableQuantity, setTableQuantity] = useState(0);
+  const isControlledGroupSize = externalGroupSize != null;
+  const effectiveGroupSize = isControlledGroupSize
+    ? Math.max(0, externalGroupSize ?? 0)
+    : groupSize;
+
+  useEffect(() => {
+    if (isControlledGroupSize) {
+      setGroupSize(Math.max(0, externalGroupSize ?? 0));
+    }
+  }, [externalGroupSize, isControlledGroupSize]);
+
   const [draftAllocation, setDraftAllocation] = useState<number[]>([]);
   const [seatingConfirmed, setSeatingConfirmed] = useState(false);
+  const lastAppliedPlanRef = useRef<string>("");
 
-  const belowMinimum = groupSize > 0 && groupSize < minPersons;
+  const belowMinimum = effectiveGroupSize > 0 && effectiveGroupSize < minPersons;
   const tablesSoldOut = maxTables <= 0;
   const resolvedQty =
-    groupSize > 0
-      ? resolveTableQuantity(groupSize, minPersons, maxPersons, maxTables)
+    effectiveGroupSize > 0
+      ? resolveTableQuantity(effectiveGroupSize, minPersons, maxPersons, maxTables)
       : null;
+  const tableQuantity = resolvedQty ?? 0;
   const idealQty =
-    groupSize > 0
-      ? resolveTableQuantity(groupSize, minPersons, maxPersons, 999)
+    effectiveGroupSize > 0
+      ? resolveTableQuantity(effectiveGroupSize, minPersons, maxPersons, 999)
       : null;
   const exceedsAvailability =
-    groupSize > 0 &&
+    effectiveGroupSize > 0 &&
     maxTables > 0 &&
     idealQty !== null &&
     (resolvedQty === null || idealQty > maxTables);
   const hasViablePlan =
-    groupSize > 0 && resolvedQty !== null && maxTables > 0 && !tablesSoldOut;
+    effectiveGroupSize > 0 && resolvedQty !== null && maxTables > 0 && !tablesSoldOut;
 
-  const applyPlanForGroupSize = useCallback(
-    (nextGroupSize: number) => {
-      if (nextGroupSize <= 0) {
-        setTableQuantity(0);
-        setDraftAllocation([]);
-        setSeatingConfirmed(false);
-        return;
-      }
-
-      const qty = resolveTableQuantity(
-        nextGroupSize,
-        minPersons,
-        maxPersons,
-        maxTables,
-      );
-      if (!qty) {
-        setTableQuantity(0);
-        setDraftAllocation([]);
-        setSeatingConfirmed(false);
-        return;
-      }
+  const buildAutoAllocation = useCallback(
+    (guestCount: number, quantity: number) => {
+      if (guestCount <= 0 || quantity <= 0) return [] as number[];
 
       const arranged = autoArrangeGuests(
         [
@@ -148,24 +149,52 @@ export function TableSeatingPanel({
             title: capacityTitle,
             minPersons,
             maxPersons,
-            quantity: qty,
+            quantity,
           },
         ],
-        nextGroupSize,
+        guestCount,
       );
 
-      setTableQuantity(qty);
-      setDraftAllocation(
-        normalizeAllocation(arranged[tableConfig.id] ?? [], qty, minPersons),
+      return normalizeAllocation(
+        arranged[tableConfig.id] ?? [],
+        quantity,
+        minPersons,
       );
-      setSeatingConfirmed(false);
     },
-    [capacityTitle, maxPersons, maxTables, minPersons, tableConfig.id],
+    [capacityTitle, maxPersons, minPersons, tableConfig.id],
   );
 
   useEffect(() => {
-    applyPlanForGroupSize(groupSize);
-  }, [groupSize, applyPlanForGroupSize]);
+    const planKey = `${effectiveGroupSize}:${tableQuantity}:${tableConfig.id}`;
+    if (planKey === lastAppliedPlanRef.current) return;
+
+    lastAppliedPlanRef.current = planKey;
+
+    if (effectiveGroupSize <= 0 || tableQuantity <= 0) {
+      setDraftAllocation([]);
+      setSeatingConfirmed(false);
+      return;
+    }
+
+    setDraftAllocation(buildAutoAllocation(effectiveGroupSize, tableQuantity));
+    setSeatingConfirmed(false);
+  }, [
+    buildAutoAllocation,
+    effectiveGroupSize,
+    tableConfig.id,
+    tableQuantity,
+  ]);
+
+  const activeAllocation = useMemo(() => {
+    if (tableQuantity <= 0) return [] as number[];
+    if (draftAllocation.length === tableQuantity) return draftAllocation;
+    return buildAutoAllocation(effectiveGroupSize, tableQuantity);
+  }, [
+    buildAutoAllocation,
+    draftAllocation,
+    effectiveGroupSize,
+    tableQuantity,
+  ]);
 
   const tableAllocationData: TableAllocationData[] = useMemo(
     () =>
@@ -177,13 +206,13 @@ export function TableSeatingPanel({
               minPersons,
               maxPersons,
               quantity: tableQuantity,
-              allocation: draftAllocation,
+              allocation: activeAllocation,
             },
           ]
         : [],
     [
+      activeAllocation,
       capacityTitle,
-      draftAllocation,
       maxPersons,
       minPersons,
       tableConfig.id,
@@ -194,25 +223,27 @@ export function TableSeatingPanel({
   const validation = useMemo(
     () =>
       tableQuantity > 0
-        ? validateAllocation(tableAllocationData, groupSize)
+        ? validateAllocation(tableAllocationData, effectiveGroupSize)
         : {
             isValid: false,
             errors: [] as string[],
             warnings: [] as string[],
             totalAllocated: 0,
-            totalRequired: groupSize,
+            totalRequired: effectiveGroupSize,
           },
-    [groupSize, tableAllocationData, tableQuantity],
+    [effectiveGroupSize, tableAllocationData, tableQuantity],
   );
 
-  const draftGuestTotal = draftAllocation.reduce(
+  const draftGuestTotal = activeAllocation.reduce(
     (sum, guests) => sum + guests,
     0,
   );
 
   const progressPercent = Math.min(
     100,
-    Math.round((validation.totalAllocated / Math.max(1, groupSize)) * 100),
+    Math.round(
+      (validation.totalAllocated / Math.max(1, effectiveGroupSize)) * 100,
+    ),
   );
 
   const confirmedGuestTotal = seatingConfirmed ? draftGuestTotal : 0;
@@ -220,20 +251,22 @@ export function TableSeatingPanel({
     ? confirmedGuestTotal * pricePerPerson
     : 0;
   const tableItemCount = seatingConfirmed
-    ? draftAllocation.filter((count) => count > 0).length
+    ? activeAllocation.filter((count) => count > 0).length
     : 0;
 
   useEffect(() => {
     onStateChange?.({
-      groupSize,
-      allocation: seatingConfirmed ? draftAllocation : [],
+      groupSize: effectiveGroupSize,
+      allocation: seatingConfirmed ? activeAllocation : [],
       seatingConfirmed,
       tableTotal,
       tableItemCount,
+      draftGuestTotal,
     });
   }, [
-    draftAllocation,
-    groupSize,
+    activeAllocation,
+    draftGuestTotal,
+    effectiveGroupSize,
     onStateChange,
     seatingConfirmed,
     tableItemCount,
@@ -257,34 +290,28 @@ export function TableSeatingPanel({
   };
 
   const handleAutoDistribute = () => {
-    if (groupSize <= 0 || tableQuantity <= 0) return;
+    if (effectiveGroupSize <= 0 || tableQuantity <= 0) {
+      toast.error("Set your group size before auto distributing guests.");
+      return;
+    }
 
-    const arranged = autoArrangeGuests(
-      [
-        {
-          id: tableConfig.id,
-          title: capacityTitle,
-          minPersons,
-          maxPersons,
-          quantity: tableQuantity,
-        },
-      ],
-      groupSize,
-    );
-
-    updateDraft(
-      normalizeAllocation(
-        arranged[tableConfig.id] ?? [],
-        tableQuantity,
-        minPersons,
-      ),
-    );
+    updateDraft(buildAutoAllocation(effectiveGroupSize, tableQuantity));
   };
 
   const handleReset = () => {
-    setGroupSize(0);
-    setTableQuantity(0);
-    setDraftAllocation([]);
+    if (!isControlledGroupSize) {
+      setGroupSize(0);
+      lastAppliedPlanRef.current = "";
+      setDraftAllocation([]);
+      setSeatingConfirmed(false);
+      return;
+    }
+
+    if (tableQuantity > 0) {
+      updateDraft(Array(tableQuantity).fill(minPersons));
+    } else {
+      setDraftAllocation([]);
+    }
     setSeatingConfirmed(false);
   };
 
@@ -307,26 +334,35 @@ export function TableSeatingPanel({
   };
 
   const showConfirmButton =
-    groupSize > 0 &&
+    effectiveGroupSize > 0 &&
     tableQuantity > 0 &&
     validation.isValid &&
     !seatingConfirmed &&
     tableQuantity <= maxTables;
 
   return (
-    <div className="booking-table-panel booking-table-panel--compact overflow-hidden rounded-lg border border-border bg-card">
-      <div className="flex items-center justify-between gap-2 border-b border-border px-3 py-2.5">
-        <span className="text-xs font-medium text-foreground">Group size</span>
-        <QuantityStepper
-          value={groupSize}
-          max={maxGroupSize}
-          onChange={(next) => setGroupSize(next)}
-          size="sm"
-          useKindAccent
-        />
-      </div>
+    <div className="flex flex-col gap-3 overflow-hidden rounded-lg border border-border bg-card p-3">
+      {sectionTitle && (
+        <div className="border-b border-border px-3 py-2">
+          <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-[color:var(--booking-kind-table)]">
+            {sectionTitle}
+          </p>
+        </div>
+      )}
+      {!isControlledGroupSize && (
+        <div className="flex items-center justify-between gap-2 border-b border-border px-3 py-2.5">
+          <span className="text-xs font-medium text-foreground">Group size</span>
+          <QuantityStepper
+            value={groupSize}
+            max={maxGroupSize}
+            onChange={(next) => setGroupSize(next)}
+            size="sm"
+            useKindAccent
+          />
+        </div>
+      )}
 
-      {groupSize > 0 && (
+      {effectiveGroupSize > 0 && (
         <div className="flex flex-col gap-3 p-3">
           {tablesSoldOut ? (
             <VenueContactNotice
@@ -337,14 +373,24 @@ export function TableSeatingPanel({
             />
           ) : belowMinimum ? (
             <VenueContactNotice
-              message={`Tables start from ${minPersons} guests. Contact the venue for smaller groups.`}
+              title={`${isControlledGroupSize ? "New tables" : "Tables"} start from ${minPersons} guests.`}
+              message={
+                isControlledGroupSize &&
+                minimumTotalGroupSize != null &&
+                existingTableCapacity != null &&
+                minimumTotalGroupSize > existingTableCapacity
+                  ? `Increase your group size to at least ${minimumTotalGroupSize} guests (${existingTableCapacity} in existing tables + ${minPersons} for a new table), or contact the venue for smaller groups.`
+                  : isControlledGroupSize
+                    ? `Increase your group size to at least ${minPersons} guests for a new table, or contact the venue for smaller groups.`
+                    : "Contact the venue for smaller groups."
+              }
               phone={venuePhone}
               email={venueEmail}
             />
           ) : exceedsAvailability ? (
             <VenueContactNotice
               title={`Only ${maxTables} table${maxTables === 1 ? "" : "s"} available.`}
-              message={`Your group of ${groupSize} needs ${idealQty ?? tableQuantity} table${(idealQty ?? tableQuantity) === 1 ? "" : "s"}. Contact the venue for larger groups.`}
+              message={`Your group of ${effectiveGroupSize} needs ${idealQty ?? tableQuantity} table${(idealQty ?? tableQuantity) === 1 ? "" : "s"}. Contact the venue for larger groups.`}
               phone={venuePhone}
               email={venueEmail}
             />
@@ -383,7 +429,7 @@ export function TableSeatingPanel({
                     "h-full rounded-full transition-all duration-300",
                     validation.isValid
                       ? "bg-emerald-500"
-                      : validation.totalAllocated > groupSize
+                      : validation.totalAllocated > effectiveGroupSize
                         ? "bg-red-500"
                         : "bg-primary",
                   )}
@@ -394,7 +440,11 @@ export function TableSeatingPanel({
               <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
                 <button
                   type="button"
-                  className="booking-table-auto-btn"
+                  className="inline-flex h-8 w-full items-center justify-center gap-1.5 rounded-lg border-0 text-xs font-semibold leading-none transition-opacity hover:opacity-90 sm:w-auto sm:px-3"
+                  style={{
+                    backgroundColor: "var(--color-primary)",
+                    color: "var(--color-primary-foreground, #fff)",
+                  }}
                   onClick={handleAutoDistribute}
                 >
                   <Wand2 className="h-3 w-3" strokeWidth={2} />
@@ -402,7 +452,7 @@ export function TableSeatingPanel({
                 </button>
                 <button
                   type="button"
-                  className="booking-table-reset-btn"
+                  className="inline-flex h-8 w-full items-center justify-center gap-1.5 rounded-lg border border-border bg-card text-xs font-semibold leading-none text-muted-foreground transition-colors hover:bg-[color-mix(in_srgb,var(--muted)_40%,var(--card))] sm:w-auto sm:px-3"
                   onClick={handleReset}
                 >
                   <RotateCcw className="h-3 w-3" strokeWidth={2} />
@@ -421,7 +471,11 @@ export function TableSeatingPanel({
                   </p>
                   <button
                     type="button"
-                    className="booking-table-confirm-btn"
+                    className="h-8 w-full rounded-md text-xs font-bold leading-none hover:opacity-[0.92]"
+                    style={{
+                      backgroundColor: "var(--color-success)",
+                      color: "var(--color-primary-foreground, #fff)",
+                    }}
                     onClick={handleConfirmSeating}
                   >
                     Confirm seating
@@ -445,7 +499,7 @@ export function TableSeatingPanel({
                 )}
               >
                 {Array.from({ length: tableQuantity }, (_, index) => {
-                  const currentValue = draftAllocation[index] ?? minPersons;
+                  const currentValue = activeAllocation[index] ?? minPersons;
                   const isFull = currentValue >= maxPersons;
                   const isOverflow = currentValue > maxPersons;
                   const isUnder = currentValue < minPersons;

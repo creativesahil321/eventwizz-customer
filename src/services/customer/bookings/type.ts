@@ -21,6 +21,8 @@ export interface BookingsQueryParams {
 export interface BookingDate {
   date_key: string;
   date: string;
+  room_id?: number | null;
+  room_name?: string | null;
   table: {
     table_id: number;
     table_size: number;
@@ -127,7 +129,23 @@ export interface BookingTableAllocation {
   table_number: string | number;
   label: string;
   people: number;
+  base_seats?: number;
+  addon_seats?: number;
+  capacity?: number;
+  seats_label?: string;
 }
+
+/** Incremental add-on merged into an original checkout line item */
+export interface BookingDetailsAddonBreakdown {
+  id: number;
+  label: string;
+  amount: number;
+  quantity?: number;
+  seats?: number;
+  parent_allocation_id?: number;
+}
+
+export type BookingDetailsPurchaseType = "checkout" | "addon";
 
 /** Booked table line item */
 export interface BookingDetailsTable {
@@ -140,6 +158,13 @@ export interface BookingDetailsTable {
   table_size: number;
   table_count: number;
   allocations?: BookingTableAllocation[];
+  purchase_type?: BookingDetailsPurchaseType;
+  is_addon?: boolean;
+  addon_breakdown?: BookingDetailsAddonBreakdown[];
+  addon_extra_total?: number;
+  addon_extra_label?: string;
+  has_addon_breakdown?: boolean;
+  guest_pricing_label?: string;
 }
 
 /** Booked ticket line item */
@@ -150,6 +175,11 @@ export interface BookingDetailsTicket {
   unit_price: number;
   quantity: number;
   total_amount: number;
+  purchase_type?: BookingDetailsPurchaseType;
+  is_addon?: boolean;
+  addon_breakdown?: BookingDetailsAddonBreakdown[];
+  addon_extra_total?: number;
+  has_addon_breakdown?: boolean;
 }
 
 /** Booked package line item (drinks / brunch / etc.) */
@@ -160,6 +190,11 @@ export interface BookingDetailsPackage {
   unit_price: number;
   quantity: number;
   total_amount: number;
+  purchase_type?: BookingDetailsPurchaseType;
+  is_addon?: boolean;
+  addon_breakdown?: BookingDetailsAddonBreakdown[];
+  addon_extra_total?: number;
+  has_addon_breakdown?: boolean;
 }
 
 /** Saved add-on ticket on a booking date */
@@ -241,6 +276,7 @@ export interface BookingDetailsDate {
   paid_amount: number | null;
   pending_amount?: number | null;
   can_pay_now?: boolean;
+  is_menu_choice?: boolean;
   tickets: BookingDetailsTicket[];
   packages: BookingDetailsPackage[];
   tables: BookingDetailsTable[];
@@ -478,6 +514,8 @@ export interface MenuChoiceItem {
 export interface SaveMenuChoicePayload {
   booking_id: number;
   table_id: number;
+  /** Required for multi-room events */
+  room_id?: number;
   no_of_attendees: number; // Required for both add and edit
   title: string;
   name: string; // Changed from full_name to name

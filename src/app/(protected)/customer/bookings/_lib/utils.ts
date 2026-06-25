@@ -4,6 +4,20 @@
 
 import { parseAsString } from "@/types";
 import { getStatusColorClass } from "@/lib/status-theme";
+import type { BookingDate } from "./types";
+
+/**
+ * Stable React key for booking date rows (room bookings can share date_key).
+ */
+export function getBookingDateRowKey(
+  date: Pick<BookingDate, "date_key"> & { room_id?: number | null },
+  index: number,
+): string {
+  if (date.room_id != null && date.room_id > 0) {
+    return `${date.room_id}:${date.date_key}`;
+  }
+  return `${date.date_key}-${index}`;
+}
 
 /**
  * Safely converts search param value to string

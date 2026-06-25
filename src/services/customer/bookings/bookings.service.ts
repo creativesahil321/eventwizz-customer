@@ -68,16 +68,29 @@ export const bookingsService = {
   },
 
   /**
-   * Get add-ons details for a specific booking and date
+   * Get add-ons details for a specific booking and date.
+   * Multi-room events include room_id in the path; flat events omit it.
    */
   getAddOnsDetails: async (
     bookingId: number,
-    date: string
+    date: string,
+    roomId?: number | null,
   ): Promise<AddOnsResponse> => {
-    const endpoint = API_ENDPOINTS.CUSTOMER.BOOKINGS.ADD_ONS_DETAILS.replace(
-      "{id}",
-      bookingId.toString()
-    ).replace("{date}", date);
+    const resolvedRoomId =
+      roomId != null && Number(roomId) > 0 ? Number(roomId) : undefined;
+
+    const endpoint = resolvedRoomId
+      ? API_ENDPOINTS.CUSTOMER.BOOKINGS.ADD_ONS_DETAILS.replace(
+          "{id}",
+          bookingId.toString(),
+        )
+          .replace("{room_id}", resolvedRoomId.toString())
+          .replace("{date}", date)
+      : API_ENDPOINTS.CUSTOMER.BOOKINGS.ADD_ONS_DETAILS_FLAT.replace(
+          "{id}",
+          bookingId.toString(),
+        ).replace("{date}", date);
+
     return api.get<AddOnsResponse>(endpoint, {
       returnFullResponse: true,
     });
@@ -110,14 +123,27 @@ export const bookingsService = {
   getMenuItems: async (
     bookingId: number,
     date: string,
-    tableId: number
+    tableId: number,
+    roomId?: number | null,
   ): Promise<MenuItemsResponse> => {
-    const endpoint = API_ENDPOINTS.CUSTOMER.MENU_CHOICES.ADD_MENU.replace(
-      "{id}",
-      bookingId.toString()
-    )
-      .replace("{date}", date)
-      .replace("{table_id}", tableId.toString());
+    const resolvedRoomId =
+      roomId != null && Number(roomId) > 0 ? Number(roomId) : undefined;
+
+    const endpoint = resolvedRoomId
+      ? API_ENDPOINTS.CUSTOMER.MENU_CHOICES.ADD_MENU_ROOM.replace(
+          "{id}",
+          bookingId.toString(),
+        )
+          .replace("{room_id}", resolvedRoomId.toString())
+          .replace("{date}", date)
+          .replace("{table_id}", tableId.toString())
+      : API_ENDPOINTS.CUSTOMER.MENU_CHOICES.ADD_MENU.replace(
+          "{id}",
+          bookingId.toString(),
+        )
+          .replace("{date}", date)
+          .replace("{table_id}", tableId.toString());
+
     return api.get<MenuItemsResponse>(endpoint, {
       returnFullResponse: true,
     });

@@ -16,8 +16,33 @@ import type { EditableDateData } from "@/store/cart-edit.store";
 
 type CartApiTableBucket = ApiTableData & {
   no_tables?: number;
+  quantity?: number;
   allocation?: number[];
 };
+
+function getApiTableOrderQty(
+  table: CartApiTableBucket,
+): number {
+  return Number(table.no_tables ?? table.quantity ?? 0);
+}
+
+function getApiTicketOrderQty(ticket: unknown): number {
+  const row = ticket as {
+    quantity?: number | string;
+    selected_quantity?: number | string;
+  };
+  return Number(row.quantity ?? row.selected_quantity ?? 0);
+}
+
+function getApiDrinkRows(dateData: ApiDateData): Array<{
+  price?: string | number;
+  quantity?: string | number;
+}> {
+  if (dateData.selected_drinks?.length) {
+    return dateData.selected_drinks;
+  }
+  return dateData.drinks ?? [];
+}
 
 /**
  * Calculate total items and amount from API cart data
@@ -29,25 +54,26 @@ function sumApiDateBucketAmount(dateData: ApiDateData | null): number {
 
   let amount = 0;
 
-  if (dateData.selected_drinks?.length) {
-    dateData.selected_drinks.forEach((drink) => {
-      const quantity = Number(drink.quantity) || 0;
-      if (quantity <= 0) return;
-      amount += parseFloat(String(drink.price || "0")) * quantity;
-    });
-  }
+  getApiDrinkRows(dateData).forEach((drink) => {
+    const quantity = Number(drink.quantity) || 0;
+    if (quantity <= 0) return;
+    amount += parseFloat(String(drink.price || "0")) * quantity;
+  });
 
   if (dateData.tables?.length) {
     dateData.tables.forEach((rawTable) => {
       const table = rawTable as CartApiTableBucket;
-      const qty = Number(table.no_tables ?? 0);
-      if (qty <= 0) return;
+      const qty = getApiTableOrderQty(table);
+      const allocation = table.allocation ?? [];
+      const allocatedGuests = allocation.reduce(
+        (sum, guests) => sum + Number(guests),
+        0,
+      );
+      if (qty <= 0 && allocatedGuests <= 0) return;
+
       const pricePerPerson = parseFloat(String(table.price || 0));
-      if (table.allocation?.length) {
-        amount += pricePerPerson * table.allocation.reduce(
-          (sum, guests) => sum + guests,
-          0,
-        );
+      if (allocatedGuests > 0) {
+        amount += pricePerPerson * allocatedGuests;
       } else {
         amount += pricePerPerson * (table.min_persons || 1) * qty;
       }
@@ -56,15 +82,20 @@ function sumApiDateBucketAmount(dateData: ApiDateData | null): number {
 
   if (dateData.tickets?.length) {
     dateData.tickets.forEach((ticket) => {
-      const quantity = Number(
-        (ticket as unknown as { quantity?: number }).quantity ?? 0,
-      );
+      const quantity = getApiTicketOrderQty(ticket);
       if (quantity <= 0) return;
       amount += parseFloat(String(ticket.price || 0)) * quantity;
     });
   }
 
   return amount;
+}
+
+/** Billable total for one API date bucket (tables, tickets, drinks). */
+export function getApiDateBucketAmount(
+  dateData: ApiDateData | null | undefined,
+): number {
+  return sumApiDateBucketAmount(dateData ?? null);
 }
 
 export function calculateCartTotals(eventData: ApiEventCartData | null) {
@@ -515,12 +546,36 @@ export function getBillableTables(
   );
 }
 
+/** Guest count for display — only when table seating is active and billable. */
+export function getDateGuestCount(
+  dateData: Pick<
+    EditableDateData,
+    "tables" | "confirmedTableIds" | "peopleCount" | "tableSeatingSkipped"
+  >,
+): number {
+  if (dateData.tableSeatingSkipped) return 0;
+
+  const billableTables = getBillableTables(dateData);
+  if (billableTables.length === 0) return 0;
+
+  const fromTables = billableTables.reduce((sum, table) => {
+    if (table.allocation?.length) {
+      return sum + table.allocation.reduce((s, g) => s + g, 0);
+    }
+    return sum + (table.minPersons || 1) * table.quantity;
+  }, 0);
+  if (fromTables > 0) return fromTables;
+
+  const peopleCount = dateData.peopleCount ?? 0;
+  return peopleCount > 0 ? peopleCount : 0;
+}
+
 /** Saved cart tables from GET — billable when quantity and allocation exist. */
 export function hasApiBillableTables(apiDate: ApiDateData | null): boolean {
   if (!apiDate?.tables?.length) return false;
   return apiDate.tables.some((table) => {
     const bucket = table as CartApiTableBucket;
-    const qty = Number(bucket.no_tables ?? 0);
+    const qty = getApiTableOrderQty(bucket);
     const allocation = bucket.allocation ?? [];
     return qty > 0 && allocation.length > 0;
   });
@@ -767,8 +822,39 @@ export function findApiCartEventBySlug(
   );
 }
 
-/** Whether a date is already in the API cart for an optional room scope. */
-export function isDateInApiCart(
+/** Whether editable cart state has tables, tickets, or drinks selected. */
+export function hasEditableCartSelections(
+  dateData:
+    | Pick<EditableDateData, "tables" | "tickets" | "drinks">
+    | null
+    | undefined,
+): boolean {
+  if (!dateData) return false;
+
+  return (
+    dateData.tables.some((table) => table.quantity > 0) ||
+    dateData.tickets.some((ticket) => ticket.quantity > 0) ||
+    dateData.drinks.some((drink) => drink.quantity > 0)
+  );
+}
+
+/** Whether an API date bucket has billable selections (not just an empty shell). */
+export function hasActiveApiDateSelections(
+  dateData: ApiDateData | null | undefined,
+): boolean {
+  if (!dateData) return false;
+
+  const subtotal = Number(
+    (dateData as ApiDateData & { date_subtotal?: number }).date_subtotal ?? 0,
+  );
+  if (subtotal > 0) return true;
+  if (getApiDateBucketAmount(dateData) > 0) return true;
+
+  return hasApiBillableTables(dateData);
+}
+
+/** Whether a date bucket exists in the API cart (including empty initialized shells). */
+export function isDateInApiCartShell(
   eventData: ApiEventCartData | null | undefined,
   date: string,
   roomId?: number | null,
@@ -788,6 +874,71 @@ export function isDateInApiCart(
 
   const bucket = eventData[date];
   return bucket != null && typeof bucket === "object" && !Array.isArray(bucket);
+}
+
+/** Whether a date is in the API cart with actual selections (not an empty shell). */
+export function isDateInApiCart(
+  eventData: ApiEventCartData | null | undefined,
+  date: string,
+  roomId?: number | null,
+): boolean {
+  if (!isDateInApiCartShell(eventData, date, roomId)) return false;
+
+  const storeKey = buildCartDateLookupKey(date, roomId);
+  const apiDate = eventData ? getApiDateData(eventData, storeKey) : null;
+  return hasActiveApiDateSelections(apiDate);
+}
+
+/** Per-date cart state for event page date cards and checkout navigation. */
+export type DateCartStatus = {
+  /** Billable items selected (tables / tickets / drinks with qty > 0). */
+  hasSelections: boolean;
+  /** Date bucket exists in API or local store (includes empty initialized shells). */
+  hasSession: boolean;
+};
+
+/** Whether local/API editable state represents an initialized cart session. */
+export function hasInitializedEditableDateSession(
+  dateData: EditableDateData | null | undefined,
+): boolean {
+  if (!dateData) return false;
+  if (dateData.hasChanges) return true;
+  if (hasEditableCartSelections(dateData)) return true;
+
+  if (dateData.tables.some((table) => table.quantity > 0)) return true;
+  if ((dateData.confirmedTableIds?.length ?? 0) > 0) return true;
+
+  return false;
+}
+
+/** Whether a local date bucket should remain in persisted cart-edit storage. */
+export function shouldPersistEditableDate(dateData: EditableDateData): boolean {
+  return hasInitializedEditableDateSession(dateData);
+}
+
+/** Resolve cart status for one event date (API + optional local overlay). */
+export function resolveDateCartStatus(params: {
+  date: string;
+  roomId?: number | null;
+  cartEventData: ApiEventCartData | null | undefined;
+  localData: EditableDateData | null | undefined;
+}): DateCartStatus {
+  const { date, roomId, cartEventData, localData } = params;
+  const eventData = cartEventData ?? null;
+
+  return {
+    hasSelections:
+      hasEditableCartSelections(localData) ||
+      isDateInApiCart(eventData, date, roomId),
+    hasSession:
+      hasInitializedEditableDateSession(localData) ||
+      isDateInApiCartShell(eventData, date, roomId),
+  };
+}
+
+/** Whether the event page date card should show the VIEW CART label. */
+export function shouldShowViewCartOnDateCard(status: DateCartStatus): boolean {
+  return status.hasSelections || status.hasSession;
 }
 
 /** Human-readable selection summary for a date row, e.g. "2 tables · group of 20 · 2 drinks". */
@@ -889,32 +1040,106 @@ export function getApiCartDateKeys(
   return getAvailableDates(eventData);
 }
 
-/** Count dates in cart (used by header badge and conflict modal). */
+/** Count all date buckets in the API cart (including empty initialized shells). */
+export function countDatesInEventCart(
+  eventData: ApiEventCartData | null,
+): number {
+  if (!eventData) return 0;
+  return getApiCartDateKeys(eventData).length;
+}
+
+/** Count dates with billable selections (conflict modal, payment totals). */
 export function countEventCartDates(
   eventData: ApiEventCartData | null,
 ): number {
-  return getApiCartDateKeys(eventData).length;
+  return countActiveDates(eventData);
 }
 
 /** Count dates that have tables, tickets, or drinks in the API payload. */
 export function countActiveDates(eventData: ApiEventCartData | null): number {
   if (!eventData) return 0;
 
-  return getApiCartDateKeys(eventData).filter((dateKey) => {
-    const dateData = getApiDateData(eventData, dateKey);
-    const hasDrinks = Boolean(
-      dateData?.selected_drinks?.some((drink) => Number(drink.quantity) > 0),
+  return getApiCartDateKeys(eventData).filter((dateKey) =>
+    hasActiveApiDateSelections(getApiDateData(eventData, dateKey)),
+  ).length;
+}
+
+/** True when GET cart returns no event rows (fully empty cart). */
+export function isApiCartResponseEmpty(apiCartData: unknown): boolean {
+  if (apiCartData == null) return false;
+  if (typeof apiCartData !== "object") return true;
+  if (Array.isArray(apiCartData)) return apiCartData.length === 0;
+
+  const events = extractEventsFromApiResponse(apiCartData);
+  return events.length === 0;
+}
+
+function countZustandCartDates(
+  editingData: Record<string, Record<string, EditableDateData>>,
+): { totalDates: number; totalEvents: number } {
+  let totalDates = 0;
+  let totalEvents = 0;
+
+  Object.values(editingData).forEach((eventData) => {
+    const dateCount = Object.keys(eventData).length;
+    if (dateCount > 0) {
+      totalDates += dateCount;
+      totalEvents++;
+    }
+  });
+
+  return { totalDates, totalEvents };
+}
+
+export type CartDatesSummary = {
+  totalDates: number;
+  totalEvents: number;
+  hasItems: boolean;
+  /** Header badge — prefers date count, falls back to event count when dates are missing. */
+  badgeCount: number;
+};
+
+function buildCartDatesSummary(
+  totalDates: number,
+  totalEvents: number,
+): CartDatesSummary {
+  const hasItems = totalDates > 0 || totalEvents > 0;
+  const badgeCount =
+    totalDates > 0 ? totalDates : totalEvents > 0 ? totalEvents : 0;
+
+  return { totalDates, totalEvents, hasItems, badgeCount };
+}
+
+/** Header / badge counts — all cart dates (shells + selections), merged with Zustand. */
+export function summarizeCartDates(
+  apiCartData: unknown,
+  editingData: Record<
+    string,
+    Record<string, EditableDateData>
+  >,
+): CartDatesSummary {
+  const zustandCounts = countZustandCartDates(editingData);
+
+  if (apiCartData == null) {
+    return buildCartDatesSummary(
+      zustandCounts.totalDates,
+      zustandCounts.totalEvents,
     );
-    const hasTables = Boolean(
-      dateData?.tables?.some(
-        (table) => Number((table as CartApiTableBucket).no_tables ?? 0) > 0,
-      ),
-    );
-    const hasTickets = Boolean(
-      dateData?.tickets?.some(
-        (ticket) => Number((ticket as { quantity?: number }).quantity ?? 0) > 0,
-      ),
-    );
-    return hasDrinks || hasTables || hasTickets;
-  }).length;
+  }
+
+  if (isApiCartResponseEmpty(apiCartData)) {
+    return buildCartDatesSummary(0, 0);
+  }
+
+  const eventsArray = extractEventsFromApiResponse(apiCartData);
+  let totalDatesFromAPI = 0;
+
+  eventsArray.forEach((event) => {
+    totalDatesFromAPI += countDatesInEventCart(event);
+  });
+
+  const totalDates = Math.max(totalDatesFromAPI, zustandCounts.totalDates);
+  const totalEvents = Math.max(eventsArray.length, zustandCounts.totalEvents);
+
+  return buildCartDatesSummary(totalDates, totalEvents);
 }

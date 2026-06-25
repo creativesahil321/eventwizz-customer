@@ -16,7 +16,10 @@ import {
   useClearAllCart,
   useGetCartData,
 } from "@/services/customer/cart/query";
-import { countEventCartDates } from "@/app/(public)/vendor/checkout/_lib/cart-calculations";
+import {
+  countEventCartDates,
+  extractEventsFromApiResponse,
+} from "@/app/(public)/vendor/checkout/_lib/cart-calculations";
 import { useIsPreviewMode } from "@/contexts/preview-context";
 
 export interface EventInfo {
@@ -70,12 +73,9 @@ export function useCartConflict(): UseCartConflictReturn {
   const checkForConflict = useCallback(
     (newEventSlug: string, newEventInfo: EventInfo): boolean => {
       // Check API data first (most reliable)
-      if (
-        apiCartData?.data &&
-        Array.isArray(apiCartData.data) &&
-        apiCartData.data.length > 0
-      ) {
-        const currentEvent = apiCartData.data[0];
+      const apiEvents = extractEventsFromApiResponse(apiCartData);
+      if (apiEvents.length > 0) {
+        const currentEvent = apiEvents[0];
         const currentEventSlug = currentEvent.event_slug;
 
         // No conflict if it's the same event (normalize both slugs for comparison)

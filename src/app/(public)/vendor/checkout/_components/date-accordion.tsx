@@ -36,6 +36,7 @@ import {
 import {
   buildDateSelectionSummary,
   calculateEditableDateTotal,
+  getDateGuestCount,
 } from "../_lib/cart-calculations";
 import { useCurrencyFormat } from "@/hooks/use-currency-format";
 import { getCheckoutRoomTone } from "../_lib/checkout-room-tones";
@@ -362,23 +363,16 @@ export default function DateAccordion({
   const tableQty = dateData.tables
     .filter((t) => t.quantity > 0)
     .reduce((s, t) => s + t.quantity, 0);
-  const guestQty =
-    currentDateData?.peopleCount ??
-    dateData.tables
-      .filter((t) => t.quantity > 0)
-      .reduce((sum, table) => {
-        if (table.allocation?.length) {
-          return sum + table.allocation.reduce((s, g) => s + g, 0);
-        }
-        return sum + (table.minPersons || 1) * table.quantity;
-      }, 0);
+  const guestQty = currentDateData
+    ? getDateGuestCount(currentDateData)
+    : 0;
   if (ticketQty > 0)
     metaParts.push(`${ticketQty} ticket${ticketQty !== 1 ? "s" : ""}`);
   if (drinkQty > 0)
     metaParts.push(`${drinkQty} drink${drinkQty !== 1 ? "s" : ""}`);
   if (tableQty > 0)
     metaParts.push(`${tableQty} table${tableQty !== 1 ? "s" : ""}`);
-  if (guestQty > 0 && !currentDateData?.tableSeatingSkipped)
+  if (guestQty > 0)
     metaParts.push(`${guestQty} guest${guestQty !== 1 ? "s" : ""}`);
   const metaLine = metaParts.join(" · ");
 

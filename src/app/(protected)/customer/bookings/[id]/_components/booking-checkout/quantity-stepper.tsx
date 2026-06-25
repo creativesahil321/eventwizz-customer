@@ -47,10 +47,15 @@ export function QuantityStepper({
       <span
         className={cn(
           useKindAccent
-            ? "booking-catalog-stepper-value"
+            ? "min-w-5 text-center text-xs font-bold tabular-nums"
             : "min-w-[1.75rem] text-center text-sm font-bold tabular-nums text-foreground",
           size === "sm" ? "text-sm" : "text-base",
         )}
+        style={
+          useKindAccent
+            ? { color: "var(--kind-accent, var(--color-primary))" }
+            : undefined
+        }
       >
         {value}
       </span>

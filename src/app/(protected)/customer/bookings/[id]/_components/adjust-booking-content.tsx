@@ -13,6 +13,7 @@ import {
 import { bookingsService } from "@/services/customer/bookings/bookings.service";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useCurrencyFormat } from "@/hooks/use-currency-format";
+import { buildCartDateLookupKey } from "@/app/(public)/vendor/checkout/_lib/cart-calculations";
 import BookingCheckoutPage from "./booking-checkout/booking-checkout-page";
 import type { BookingDateSource } from "./booking-checkout/build-line-items";
 import type { BookingRescheduleRequest } from "@/services/customer/bookings/type";
@@ -93,9 +94,11 @@ export default function AdjustBookingContent({
           bookingData.payment_status_label?.trim() || "Pending";
 
         const bookingCanPay = apiSummary?.can_pay_now !== false;
+        const isRoomSystem = bookingData.is_room_system === true;
 
         const dates: (BookingDateSource & {
           booking_date_id: number;
+          is_menu_choice?: boolean;
           total: string;
           totalAmount: number;
           paidAmount: number;
@@ -123,8 +126,14 @@ export default function AdjustBookingContent({
               : paymentStatus !== "paid");
 
           return {
-            id: dateEntry.date_key,
+            id: isRoomSystem
+              ? buildCartDateLookupKey(dateEntry.date_key, dateEntry.room_id)
+              : dateEntry.date_key,
+            date_key: dateEntry.date_key,
+            room_id: dateEntry.room_id,
             booking_date_id: dateEntry.booking_date_id,
+            is_menu_choice:
+              dateEntry.is_menu_choice ?? bookingData.is_menu_choice ?? false,
             date: dateEntry.date_label,
             room_name: dateEntry.room_name,
             package_title: dateEntry.package_title,

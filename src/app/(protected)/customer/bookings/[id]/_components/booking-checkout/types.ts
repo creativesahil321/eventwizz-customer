@@ -62,6 +62,18 @@ export interface AllocationPill {
   id?: number;
   label: string;
   value: string;
+  /** Pre-formatted e.g. "Table 1: 11 / 12 seats" */
+  seatsLabel?: string;
+  occupied?: number;
+  capacity?: number;
+}
+
+export interface AddonBreakdownLine {
+  id: number;
+  label: string;
+  amount: number;
+  quantity?: number;
+  seats?: number;
 }
 
 export interface CheckoutLineItem {
@@ -74,11 +86,19 @@ export interface CheckoutLineItem {
   unitPrice?: number;
   allocation?: AllocationPill[];
   quantity?: number;
-  /** Saved add-on rows (vs original booking lines) */
+  /** Saved add-on rows (pending or paid history) */
   isSavedAddon?: boolean;
+  /** Paid add-on line items moved from checkout arrays after settlement */
+  isPaidAddonHistory?: boolean;
+  /** Incremental add-ons merged into an original checkout line */
+  addonBreakdown?: AddonBreakdownLine[];
+  addonExtraTotal?: number;
+  addonExtraLabel?: string;
+  /** API flag — when false, never show View add-ons on this line */
+  hasAddonBreakdown?: boolean;
   /** Grouped add-on rows for compact display */
   groupMembers?: CheckoutLineItem[];
-  /** When true, show delete action (saved add-ons only) */
+  /** When true, show delete action (pending add-ons only) */
   deletable?: boolean;
   deletePayload?: {
     type: "table" | "package" | "ticket";
@@ -86,6 +106,18 @@ export interface CheckoutLineItem {
   };
   /** Menu choices shortcut for table rows */
   showMenuChoices?: boolean;
+  /** Menu choice context — only on table rows with showMenuChoices */
+  menuChoiceContext?: {
+    bookingId: number;
+    dateKey: string;
+    roomId?: number;
+    tableAllocations: Array<{
+      id: number;
+      label: string;
+      people: number;
+      capacity: number;
+    }>;
+  };
 }
 
 export interface DateLineItemsSplit {

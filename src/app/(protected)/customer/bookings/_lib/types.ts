@@ -7,6 +7,8 @@ import { ReactNode } from "react";
 export interface BookingDate {
   date_key: string;
   date: string;
+  room_id?: number | null;
+  room_name?: string | null;
   tables: number;
   tickets: number;
   drinks: number;

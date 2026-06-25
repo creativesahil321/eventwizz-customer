@@ -23,9 +23,11 @@ import {
   buildRoomDateKey,
   getApiCartDateKeys,
   getBillableTables,
+  hasEditableCartSelections,
   hasUnconfirmedTableSeating,
   isRoomBasedApiRecord,
   parseRoomDateKey,
+  shouldPersistEditableDate,
 } from "@/app/(public)/vendor/checkout/_lib/cart-calculations";
 import { formatTableCapacityTitle } from "@/app/(public)/vendor/checkout/_lib/table-labels";
 import type { ApiEventCartData } from "@/lib/types/cart.types";
@@ -165,7 +167,7 @@ function mapApiTablesToEditable(
       ),
       description: `Seating for ${table.min_persons} to ${table.max_persons} people`,
       price: Number(table.price),
-      quantity: Number(table.no_tables || 0),
+      quantity: Number(table.no_tables ?? table.quantity ?? 0),
       maxQuantity: Number(table.total_tables),
       type: "table" as const,
       depositAmount,
@@ -193,7 +195,7 @@ function mapApiTicketsToEditable(
         title: String(ticket.title),
         description: String(ticket.description),
         price: Number(ticket.price),
-        quantity: Number(ticket.quantity || 0),
+        quantity: Number(ticket.quantity ?? ticket.selected_quantity ?? 0),
         maxQuantity,
         type: "ticket" as const,
         depositAmount,
@@ -599,6 +601,8 @@ export interface CartEditState {
   } | null;
   wouldCreateConflict: (newEventSlug: string) => boolean;
   clearAllCarts: () => void;
+  /** Drop local date buckets with no selections and no unsaved edits. */
+  pruneEmptyCartDates: () => void;
 
   // Debug and utility functions
   debugUnsavedState: (eventSlug: string) => void;
@@ -705,6 +709,28 @@ export interface CartEditState {
     depositDates: string[];
     fullPaymentDates: string[];
   };
+}
+
+function pruneEmptyDatesFromEditingData(
+  editingData: Record<string, Record<string, EditableDateData>>,
+): Record<string, Record<string, EditableDateData>> {
+  const next: Record<string, Record<string, EditableDateData>> = {};
+
+  for (const [eventSlug, eventDates] of Object.entries(editingData)) {
+    const keptDates: Record<string, EditableDateData> = {};
+
+    for (const [dateKey, dateData] of Object.entries(eventDates)) {
+      if (shouldPersistEditableDate(dateData)) {
+        keptDates[dateKey] = dateData;
+      }
+    }
+
+    if (Object.keys(keptDates).length > 0) {
+      next[eventSlug] = keptDates;
+    }
+  }
+
+  return next;
 }
 
 export const useCartEditStore = create<CartEditState>()(
@@ -1258,6 +1284,16 @@ export const useCartEditStore = create<CartEditState>()(
             // private browsing / storage quota — safe to ignore
           }
         }
+      },
+
+      pruneEmptyCartDates: () => {
+        set((state) => {
+          const pruned = pruneEmptyDatesFromEditingData(state.editingData);
+          if (JSON.stringify(pruned) === JSON.stringify(state.editingData)) {
+            return state;
+          }
+          return { editingData: pruned };
+        });
       },
 
       debugUnsavedState: (eventSlug: string) => {
@@ -1817,6 +1853,13 @@ export const useCartEditStore = create<CartEditState>()(
     {
       name: CART_EDIT_STORAGE_KEY,
       partialize: (state) => ({ editingData: state.editingData }),
+      onRehydrateStorage: () => (state) => {
+        if (!state) return;
+        const pruned = pruneEmptyDatesFromEditingData(state.editingData);
+        if (pruned !== state.editingData) {
+          state.editingData = pruned;
+        }
+      },
     }
   )
 );

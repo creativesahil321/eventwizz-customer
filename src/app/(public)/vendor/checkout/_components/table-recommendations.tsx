@@ -12,6 +12,7 @@ import {
   getLowestTableMinimum,
 } from "../_lib/table-recommendations";
 import { useDomain } from "@/providers/domain-provider/domain-provider";
+import { resolveVenueContact } from "@/lib/resolve-venue-contact";
 import VenueContactNotice from "./venue-contact-notice";
 import { useCurrencyFormat } from "@/hooks/use-currency-format";
 import { cn } from "@/lib/utils";
@@ -194,15 +195,7 @@ export default function TableRecommendations({
   const { format: formatMoney } = useCurrencyFormat();
   const { settings } = useDomain();
   const tablePriceHint = formatTablePriceHint(tables, formatMoney);
-
-  const venuePhone =
-    settings?.contactDetails?.phone ||
-    settings?.contactDetails?.alternativePhone ||
-    null;
-  const venueEmail =
-    settings?.contactDetails?.email ||
-    settings?.contactDetails?.alternativeEmail ||
-    null;
+  const { phone: venuePhone, email: venueEmail } = resolveVenueContact(settings);
 
   const dateData = getDateData(eventSlug, date);
   const peopleCount = dateData?.peopleCount || 20;

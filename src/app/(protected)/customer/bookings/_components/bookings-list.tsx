@@ -7,7 +7,7 @@ import { Booking } from "../_lib/types";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { formatBookingStatus } from "../_lib/utils";
+import { formatBookingStatus, getBookingDateRowKey } from "../_lib/utils";
 import {
   Search,
   Filter,
@@ -112,8 +112,7 @@ export default function BookingsList({
   };
 
   const handleAddMenu = (booking: Booking) => {
-    // Navigate directly to menu choices with bookingId in route
-    router.push(`/customer/menu-choices/${booking.booking_id}`);
+    router.push(`/customer/bookings/${booking.booking_id}`);
   };
 
   // API handles all filtering (search, payment_status), so we use bookings directly
@@ -258,8 +257,8 @@ export default function BookingsList({
           <div className="space-y-2 py-2 sm:py-4 max-h-[60vh] overflow-y-auto">
             {selectedBooking?.booking_dates?.map((bookingDate, index) => (
               <Button
-                key={bookingDate.date_key}
-                onClick={() => handleDateSelection(bookingDate.date_key)}
+                key={getBookingDateRowKey(bookingDate, index)}
+                onClick={() => setShowDateModal(false)}
                 variant="outline"
                 className="w-full justify-start text-left h-auto py-2 sm:py-3 cursor-pointer hover:bg-muted/50"
               >

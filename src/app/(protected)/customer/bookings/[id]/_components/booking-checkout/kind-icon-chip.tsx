@@ -1,4 +1,12 @@
-import { getKindStyles, kindAccentStyle, type LineItemKind } from "./item-kinds";
+import {
+  getKindStyles,
+  kindAccentStyle,
+  CHIP_STYLE,
+  CHIP_SECTION_STYLE,
+  BADGE_STYLE,
+  SECTION_TITLE_STYLE,
+  type LineItemKind,
+} from "./item-kinds";
 import { cn } from "@/lib/utils";
 
 interface KindIconChipProps {
@@ -17,13 +25,15 @@ export function KindIconChip({
   const Icon = kindStyles.icon;
   const compact = size === "sm";
 
+  const chipStyle =
+    variant === "section"
+      ? { ...CHIP_SECTION_STYLE, ...kindAccentStyle(kind) }
+      : CHIP_STYLE;
+
   return (
     <div
-      className={cn(
-        compact ? kindStyles.chipSmClassName : kindStyles.chipClassName,
-        variant === "section" && "booking-kind-chip--section",
-      )}
-      style={variant === "section" ? kindAccentStyle(kind) : undefined}
+      className={compact ? kindStyles.chipSmClassName : kindStyles.chipClassName}
+      style={chipStyle}
     >
       <Icon
         className={
@@ -34,3 +44,5 @@ export function KindIconChip({
     </div>
   );
 }
+
+export { BADGE_STYLE, SECTION_TITLE_STYLE };

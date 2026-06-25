@@ -8,6 +8,11 @@
  */
 
 import { useCartEditStore } from "@/store/cart-edit.store";
+import {
+  countDatesInEventCart,
+  extractEventsFromApiResponse,
+  isApiCartResponseEmpty,
+} from "@/app/(public)/vendor/checkout/_lib/cart-calculations";
 
 /**
  * Check if cart data is synchronized across all sources
@@ -67,22 +72,44 @@ export function logCartSyncStatus(): void {
  * Returns true if cleanup was performed
  */
 export function detectAndFixStaleZustand(apiCartData: unknown): boolean {
-  const status = checkCartSyncStatus();
-  
-  // Check if API is empty but Zustand has data
-  const isApiEmpty = !apiCartData || 
-    (typeof apiCartData === 'object' && 
-     'data' in apiCartData && 
-     Array.isArray(apiCartData.data) && 
-     apiCartData.data.length === 0);
-  
-  if (isApiEmpty && status.hasZustandData) {
-    console.warn("🚨 Stale Zustand data detected!");
-    console.warn(`API is empty but Zustand has ${status.zustandEventCount} event(s) with ${status.zustandDateCount} date(s)`);
-    
-    forceCleanZustandCart();
+  const { clearAllCarts, pruneEmptyCartDates } = useCartEditStore.getState();
+
+  pruneEmptyCartDates();
+
+  const { editingData } = useCartEditStore.getState();
+  const eventsArray = extractEventsFromApiResponse(apiCartData);
+  const apiCartDates = eventsArray.reduce(
+    (sum, event) => sum + countDatesInEventCart(event),
+    0,
+  );
+
+  const zustandCartDates = Object.values(editingData).reduce(
+    (sum, eventDates) => sum + Object.keys(eventDates).length,
+    0,
+  );
+
+  const isApiEmpty = isApiCartResponseEmpty(apiCartData);
+
+  if (isApiEmpty && zustandCartDates > 0) {
+    console.warn("🚨 Stale Zustand cart detected — API empty but local has data");
+    clearAllCarts();
     return true;
   }
-  
+
+  if (isApiEmpty && Object.keys(editingData).length > 0) {
+    console.warn("🚨 Stale Zustand cart detected — API empty but local events remain");
+    clearAllCarts();
+    return true;
+  }
+
+  if (apiCartDates === 0 && zustandCartDates === 0) {
+    return Object.keys(editingData).length === 0;
+  }
+
   return false;
+}
+
+/** Sync local cart-edit storage with GET /customer/event (call after fetch settles). */
+export function reconcileLocalCartWithApi(apiCartData: unknown): boolean {
+  return detectAndFixStaleZustand(apiCartData);
 }

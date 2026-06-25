@@ -294,8 +294,7 @@ export default function BookingInfoTab({ bookingData }: BookingInfoTabProps) {
   };
 
   const handleMenuChoices = () => {
-    // Navigate to menu choices with bookingId in route
-    router.push(`/customer/menu-choices/${bookingData.id}`);
+    router.push(`/customer/bookings/${bookingData.id}`);
   };
 
   const handleDeleteAddon = (

@@ -32,6 +32,7 @@ import {
   calculateEditableDateTotal,
   isDepositChoiceAvailable,
   hasUnconfirmedTableSeating,
+  getDateGuestCount,
 } from "../_lib/cart-calculations";
 import {
   transformCartToCheckout,
@@ -453,48 +454,19 @@ export default function BookingSummary({}: BookingSummaryProps) {
     return availableDates.reduce((sum, dateKey) => {
       const dateData = getDateData(currentEventSlug, dateKey);
       if (!dateData) return sum;
-
-      if (dateData.tableSeatingSkipped) {
-        return (
-          sum +
-          dateData.tables
-            .filter((t) => t.quantity > 0)
-            .reduce((tableSum, table) => {
-              if (table.allocation?.length) {
-                return (
-                  tableSum +
-                  table.allocation.reduce((guestSum, g) => guestSum + g, 0)
-                );
-              }
-              return tableSum + (table.minPersons || 1) * table.quantity;
-            }, 0)
-        );
-      }
-
-      const fromPeople = dateData.peopleCount ?? 0;
-      if (fromPeople > 0) return sum + fromPeople;
-      return (
-        sum +
-        dateData.tables
-          .filter((t) => t.quantity > 0)
-          .reduce((tableSum, table) => {
-            if (table.allocation?.length) {
-              return (
-                tableSum +
-                table.allocation.reduce((guestSum, g) => guestSum + g, 0)
-              );
-            }
-            return tableSum + (table.minPersons || 1) * table.quantity;
-          }, 0)
-      );
+      return sum + getDateGuestCount(dateData);
     }, 0);
   }, [availableDates, currentEventSlug, editingData, getDateData]);
 
   const summaryMetaLine = useMemo(() => {
+    const guestSuffix =
+      totalGuests > 0
+        ? ` · ${totalGuests} guest${totalGuests !== 1 ? "s" : ""}`
+        : "";
     if (roomMode && rooms.length > 0) {
-      return `${rooms.length} room${rooms.length > 1 ? "s" : ""} · ${totalItems} date${totalItems !== 1 ? "s" : ""} · ${totalGuests} guest${totalGuests !== 1 ? "s" : ""}`;
+      return `${rooms.length} room${rooms.length > 1 ? "s" : ""} · ${totalItems} date${totalItems !== 1 ? "s" : ""}${guestSuffix}`;
     }
-    return `${totalItems} date${totalItems !== 1 ? "s" : ""}${totalGuests > 0 ? ` · ${totalGuests} guest${totalGuests !== 1 ? "s" : ""}` : ""}`;
+    return `${totalItems} date${totalItems !== 1 ? "s" : ""}${guestSuffix}`;
   }, [roomMode, rooms.length, totalItems, totalGuests]);
 
   const itineraryDates = useMemo(() => {

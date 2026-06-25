@@ -26,17 +26,15 @@ import {
   VendorPublicLocationBookNow,
   VendorPublicLocationMobileMenuEntries,
 } from "./vendor-public-location-book-now";
-import { useGetCartData } from "@/services/customer/cart/query";
-import {
-  countEventCartDates,
-  extractEventsFromApiResponse,
-} from "@/app/(public)/vendor/checkout/_lib/cart-calculations";
-import type { ApiEventCartData } from "@/lib/types/cart.types";
+import { useCartVisibility } from "@/app/(public)/vendor/checkout/_lib/hooks/useCartVisibility";
 import { addCacheBusting } from "@/lib/image-utils";
 import { cn } from "@/lib/utils";
 import { getAnchorColor, relativeLuminance } from "@/lib/color-contrast";
 import { useMediaPreviewUrl } from "@/hooks/use-media-preview-url";
-import { useIsPreviewModeFromProvider } from "@/contexts/preview-context";
+import {
+  useIsPreviewModeFromProvider,
+  useIsPreviewMode,
+} from "@/contexts/preview-context";
 import type { HeaderDownloadLink } from "@/lib/event-header-downloads";
 import {
   DropdownMenu,
@@ -60,6 +58,15 @@ interface CartOrLocationSlotProps {
   align?: "start" | "end";
 }
 
+function useCustomerCartVisibility() {
+  const { data: session } = useSession();
+  const isPreviewMode = useIsPreviewMode();
+  return useCartVisibility({
+    enabled:
+      session?.user?.account_type === "customer" && !isPreviewMode,
+  });
+}
+
 function CartOrLocationSlot({
   pillClassName,
   textColorClass,
@@ -69,18 +76,9 @@ function CartOrLocationSlot({
   iconTriggerClassName,
   align,
 }: CartOrLocationSlotProps) {
-  const { data: session } = useSession();
-  const { data: apiCartData, isLoading } = useGetCartData(
-    session?.user?.account_type === "customer",
-  );
+  const { hasItems: hasCartItems, isLoading } = useCustomerCartVisibility();
 
-  const hasCartItems = useMemo(() => {
-    if (isLoading || !apiCartData) return false;
-    const events = extractEventsFromApiResponse(apiCartData);
-    return events.some((e: ApiEventCartData) => countEventCartDates(e) > 0);
-  }, [apiCartData, isLoading]);
-
-  if (isLoading) return null;
+  if (isLoading && !hasCartItems) return null;
 
   if (hasCartItems) {
     if (variant === "icon") {
@@ -129,18 +127,9 @@ function MobileCartOrLocationSlot({
   hoverColorClass,
   onNavigate,
 }: MobileCartOrLocationSlotProps) {
-  const { data: session } = useSession();
-  const { data: apiCartData, isLoading } = useGetCartData(
-    session?.user?.account_type === "customer",
-  );
+  const { hasItems: hasCartItems, isLoading } = useCustomerCartVisibility();
 
-  const hasCartItems = useMemo(() => {
-    if (isLoading || !apiCartData) return false;
-    const events = extractEventsFromApiResponse(apiCartData);
-    return events.some((e: ApiEventCartData) => countEventCartDates(e) > 0);
-  }, [apiCartData, isLoading]);
-
-  if (isLoading) return null;
+  if (isLoading && !hasCartItems) return null;
 
   if (hasCartItems) {
     return (

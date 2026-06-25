@@ -38,8 +38,22 @@ export const bookingsKeys = {
   bookingDetail: (id: number) =>
     [...bookingsKeys.bookingDetails(), id] as const,
   menuItems: () => [...bookingsKeys.all, "menu-items"] as const,
-  menuItem: (bookingId: number, date: string, tableId?: number) =>
-    [...bookingsKeys.menuItems(), bookingId, date, tableId] as const,
+  menuItem: (
+    bookingId: number,
+    date: string,
+    tableId?: number,
+    roomId?: number | null,
+  ) => {
+    const resolvedRoomId =
+      roomId != null && Number(roomId) > 0 ? Number(roomId) : undefined;
+    return [
+      ...bookingsKeys.menuItems(),
+      bookingId,
+      resolvedRoomId ?? "flat",
+      date,
+      tableId,
+    ] as const;
+  },
   rescheduleDates: () => [...bookingsKeys.all, "reschedule-dates"] as const,
   rescheduleDate: (bookingId: number, bookingDateId: number) =>
     [...bookingsKeys.rescheduleDates(), bookingId, bookingDateId] as const,
@@ -95,15 +109,24 @@ export const useMenuItems = (
   bookingId: number,
   date: string,
   tableId?: number,
-  enabled = true
+  enabled = true,
+  roomId?: number | null,
 ) => {
+  const resolvedRoomId =
+    roomId != null && Number(roomId) > 0 ? Number(roomId) : undefined;
+
   return useQuery<MenuItemsResponse>({
-    queryKey: bookingsKeys.menuItem(bookingId, date, tableId),
+    queryKey: bookingsKeys.menuItem(bookingId, date, tableId, resolvedRoomId),
     queryFn: () => {
       if (!tableId) {
         throw new Error("Table ID is required to fetch menu items");
       }
-      return bookingsService.getMenuItems(bookingId, date, tableId);
+      return bookingsService.getMenuItems(
+        bookingId,
+        date,
+        tableId,
+        resolvedRoomId,
+      );
     },
     enabled: enabled && !!bookingId && !!date && !!tableId,
     staleTime: 2 * 60 * 1000, // 2 minutes - data stays fresh, prevents duplicate calls

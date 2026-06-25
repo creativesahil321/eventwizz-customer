@@ -222,7 +222,9 @@ export const API_ENDPOINTS = {
     BOOKINGS: {
       BOOKINGS: "/customer/bookings",
       BOOKING_DETAILS: "/customer/bookings/show/{id}",
-      ADD_ONS_DETAILS: "/customer/bookings/add-ons/{id}/{date}",
+      ADD_ONS_DETAILS: "/customer/bookings/add-ons/{id}/{room_id}/{date}",
+      /** Flat events (no room system) — same shape as vendor add-ons GET. */
+      ADD_ONS_DETAILS_FLAT: "/customer/bookings/add-ons/{id}/{date}",
       RESCHEDULE_BOOKING:
         "/customer/bookings/reschedule/{booking_id}/{date_id}",
       RESCHEDULE_BOOKING_WITH_DATE:
@@ -239,6 +241,9 @@ export const API_ENDPOINTS = {
     },
     MENU_CHOICES: {
       ADD_MENU: "/customer/bookings/menu-items/{id}/{date}/{table_id}",
+      /** Multi-room events — room_id scopes menu items to the correct room/date. */
+      ADD_MENU_ROOM:
+        "/customer/bookings/menu-items/{id}/{room_id}/{date}/{table_id}",
       SAVE_MENU_CHOICES: "/customer/bookings/menu-items/store",
     },
 
