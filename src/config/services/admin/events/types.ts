@@ -1,0 +1,18 @@
+import type { EventDetailData } from "@/services/vendor/events/type";
+
+export interface AdminEventShowResponse {
+  status: boolean;
+  message: string;
+  data: EventDetailData;
+  errors: unknown[];
+}
+
+export interface AdminEventActionResponse {
+  status: boolean;
+  message: string;
+  data?: {
+    id?: number;
+    [key: string]: unknown;
+  };
+  errors: unknown[];
+}

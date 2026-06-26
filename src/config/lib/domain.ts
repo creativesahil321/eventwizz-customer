@@ -1,0 +1,178 @@
+import { ThemeSchema } from "@/types/theme.types";
+import { UserType } from "@/types/auth.types";
+import { themeService } from "@/services/common/theme/theme.service";
+import { resolveCurrencySymbol } from "@/lib/currency-format";
+
+// Interface for processed tenant data
+export interface TenantData {
+  tenantId: string;
+  website_role: UserType | null;
+  parentDomain: string | null;
+  settings: ThemeSchema;
+}
+
+export const getDomain = () => {
+  if (typeof window === "undefined") return null;
+
+  const hostname = window.location.hostname;
+
+  // Local development case - use domain query param
+  if (hostname === "localhost" || hostname === "127.0.0.1") {
+    const params = new URLSearchParams(window.location.search);
+    return params.get("domain") || null;
+  }
+
+  return hostname;
+};
+
+// Get just the subdomain part for internal use
+export const getSubdomain = () => {
+  if (typeof window === "undefined") return null;
+
+  const hostname = window.location.hostname;
+
+  if (hostname === "localhost" || hostname === "127.0.0.1") {
+    return null;
+  }
+
+  const parts = hostname.split(".");
+
+  if (parts.length <= 2) {
+    return null;
+  }
+
+  return parts.slice(0, -2).join(".");
+};
+
+export const isDomainRequest = () => {
+  return !!getDomain();
+};
+
+// Returns null as we rely on API for website role
+export const getWebsiteRoleFromDomain = () => {
+  return null;
+};
+
+// Returns null as we rely on API for parent-child relationships
+export const getParentDomainFromNestedDomain = () => {
+  return null;
+};
+
+// Create a request cache to prevent duplicate API calls
+const domainRequestCache = new Map<string, Promise<TenantData | null>>();
+
+/**
+ * Map theme API schema to tenant store shape (shared by SSR hydration and API responses).
+ */
+export const buildTenantDataFromTheme = (
+  domain: string,
+  themeData: ThemeSchema,
+): TenantData => ({
+  tenantId: domain,
+  website_role: (themeData?.website_role as UserType) || null,
+  parentDomain: null,
+  settings: {
+    ...themeData,
+    colors: themeData?.colors || {
+      primary: "#019ead",
+      secondary: "#2D2D2D",
+    },
+    typography: themeData?.typography || {
+      fontFamily: {
+        heading: "Montserrat",
+        body: "Inter",
+      },
+    },
+    contactDetails: themeData?.contactDetails || {
+      email: "",
+      alternativeEmail: "",
+      phone: "",
+      alternativePhone: "",
+      address: "",
+    },
+    logo: themeData?.logo || "",
+    favicon: themeData?.favicon || "",
+    name: themeData?.name || "EventWizz",
+    website_role: themeData?.website_role || "",
+    locations: themeData?.locations || [],
+    currency_symbol: resolveCurrencySymbol(themeData?.currency_symbol),
+  },
+});
+
+/**
+ * When theme was resolved on the server, prime the cache so other callers skip the network.
+ */
+export const primeTenantDataCache = (
+  domain: string,
+  data: TenantData,
+): void => {
+  const key = domain.split(":")[0];
+  domainRequestCache.set(key, Promise.resolve(data));
+};
+
+export const getTenantIdFromDomain = async (
+  domain: string
+): Promise<TenantData | null> => {
+  const cacheKey = domain.split(":")[0];
+
+  const cached = domainRequestCache.get(cacheKey);
+  if (cached) {
+    return cached;
+  }
+
+  // Create a promise for this request
+  const requestPromise = new Promise<TenantData | null>(async (resolve) => {
+    try {
+      const response = await themeService.getThemeSettingsByDomain(domain);
+
+      if (!response.isSuccess || !response.data) {
+        resolve(null);
+        return;
+      }
+
+      const result = buildTenantDataFromTheme(cacheKey, response.data);
+
+      resolve(result);
+    } catch (error) {
+      console.error("Error fetching tenant theme settings:", error);
+
+      // Fallback when API call fails
+      const fallbackResult: TenantData = {
+        tenantId: getSubdomain() || domain,
+        website_role: null,
+        parentDomain: getParentDomainFromNestedDomain(),
+        settings: {
+          colors: {
+            primary: "#019ead",
+            secondary: "#2D2D2D",
+          },
+          typography: {
+            fontFamily: {
+              heading: "Montserrat",
+              body: "Inter",
+            },
+          },
+          contactDetails: {
+            email: "",
+            alternativeEmail: "",
+            phone: "",
+            alternativePhone: "",
+            address: "",
+          },
+          logo: "",
+          favicon: "",
+          name: "EventWizz",
+          currency_symbol: resolveCurrencySymbol(undefined),
+        },
+      };
+
+      // Remove from cache on error to allow retry
+      domainRequestCache.delete(cacheKey);
+      resolve(fallbackResult);
+    }
+  });
+
+  // Store the promise in the cache
+  domainRequestCache.set(cacheKey, requestPromise);
+  return requestPromise;
+};

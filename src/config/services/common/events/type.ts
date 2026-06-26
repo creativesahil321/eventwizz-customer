@@ -1,0 +1,289 @@
+/**
+ * Events Service Type Definitions
+ *
+ * Contains service-specific types needed for the events service.
+ */
+
+import { ApiResponse as BaseApiResponse } from "../../core/api-client";
+import { DatesSectionType } from "@/app/(on-boarding)/on-boarding/_components/form-preview/_components/Dates-section";
+
+/**
+ * Event definition for location pages
+ */
+export interface Event {
+  name: string;
+  slug: string;
+  banner_image: string;
+  lowest_price: number;
+  /** Event category label for marketing cards (e.g. Christmas, Lipstick) */
+  event_category_name?: string | null;
+  event_category?: string | { name?: string | null } | null;
+  /** Human-readable date for marketing cards when API provides it */
+  event_date?: string | null;
+  formatted_date?: string | null;
+  date?: string | null;
+  start_date?: string | null;
+}
+
+/**
+ * Gallery image definition
+ */
+export interface GalleryImage {
+  id: number;
+  url: string;
+}
+
+/**
+ * Location data with events definition
+ */
+export interface LocationData {
+  latitude: string;
+  longitude: string;
+  address: string;
+  slug: string;
+  city?: string;
+  cover_image: string | null;
+  cover_video: string | null;
+  banner_heading: string | null;
+  banner_sub_heading: string | null;
+  about_title: string | null;
+  about_cta_link: string | null;
+  about_description: string | null;
+  about_link_title: string | null;
+  event_title_1: string | null;
+  latest_events: Event[];
+  event_title_2: string | null;
+  upcoming_events: Event[];
+  event_gallery_title: string | null;
+  event_gallery: GalleryImage[];
+}
+
+/**
+ * Query parameters for events list requests
+ */
+export interface EventsQueryParams {
+  vendor_location_id?: number | string | string[];
+  search?: string | string[];
+  page?: number;
+  per_page?: number;
+  status?: string;
+}
+
+/**
+ * Individual event item in API responses
+ */
+export interface EventApiResponse {
+  status?: boolean;
+  message?: string;
+  data?: EventItem;
+  errors?: string[];
+}
+export interface EventItem {
+  current_step: number;
+  event_id: number;
+  id: number;
+  name: string;
+  slug: string;
+  image: string;
+  status: string;
+}
+
+/**
+ * Event category definition
+ */
+export interface EventCategory {
+  id: number;
+  parent_id: number | null;
+  name: string;
+  slug: string;
+  image: string;
+  description: string;
+}
+
+/**
+ * Event menu category definition
+ */
+export interface EventMenuCategory {
+  id: number;
+  name: string;
+}
+
+/**
+ * Payload for creating event categories
+ */
+export interface EventCategoryPayload {
+  name: string;
+}
+
+/**
+ * Payload for creating event menu categories
+ */
+export interface EventMenuCategoryPayload {
+  vendor_event_id: number;
+  name: string;
+}
+
+/**
+ * Paginated response data for events list
+ */
+export interface EventsResponseData {
+  data: EventItem[];
+  links: {
+    first: string;
+    last: string;
+    prev: string | null;
+    next: string | null;
+  };
+  meta: {
+    current_page: number;
+    from: number;
+    last_page: number;
+    links: Array<{
+      url: string | null;
+      label: string;
+      active: boolean;
+    }>;
+    path: string;
+    per_page: number;
+    to: number;
+    total: number;
+  };
+}
+
+/**
+ * Complete response type for events list
+ */
+export type EventsResponse = BaseApiResponse<EventsResponseData>;
+
+/**
+ * Per-room payload on the public event detail API when `is_rooms` is enabled.
+ */
+export interface EventDetailRoom {
+  room_id: number;
+  event_schedular_title: string;
+  event_schedular_background_image: string | null;
+  event_schedular: Array<{
+    time: string;
+    title: string;
+  }>;
+  package_title: string;
+  package_description?: string | null;
+  package_image: string;
+  package_details: Array<{
+    title: string;
+  }>;
+  dates: DatesSectionType | undefined;
+  event_galley: Array<{
+    url: string;
+  }>;
+  menu_title: string;
+  menu_background_image: string | null;
+  menu_description: string;
+  menus: Array<{
+    name: string;
+    items: Array<{
+      title: string;
+      description: string;
+    }>;
+  }>;
+  drink_title: string;
+  drink_description: string;
+  packages: Array<{
+    id: number;
+    title: string;
+    description: string;
+    price: string;
+    available_quantity?: number;
+  }>;
+  event_address?: string | null;
+  lat?: string | number | null;
+  long?: string | number | null;
+  brochure_pdf: string | null;
+  brochure_pdf_2: string | null;
+}
+
+/**
+ * Event detail type definition for single event page
+ */
+export interface EventDetail {
+  /** When true, room-specific sections live under `rooms` keyed by room name. */
+  is_rooms?: boolean | number | string;
+  /** Room-keyed payloads returned by the public event detail API. */
+  rooms?: Record<string, EventDetailRoom>;
+  /** Present on single-room events; room-mode payloads use `rooms` instead. */
+  event_schedular_background_image?: string | null;
+  menu_background_image?: string | null;
+  address: string;
+  phone: string;
+  email: string;
+  package_title?: string;
+  /** Legacy / alternate API key; prefer `package_description` (matches vendor + onboarding). */
+  package_sub_title?: string;
+  package_description?: string | null;
+  dates?: DatesSectionType | undefined;
+  logo: string | File | null | undefined;
+  event_name: string;
+  slug: string;
+  event_banner_image: string;
+  event_banner_video: string | null;
+  event_banner_heading: string;
+  /** Optional substring of the hero line: accent tail (heading font + primary) when theme uses accent_tail */
+  event_banner_heading_accent?: string | null;
+  event_banner_sub_heading: string;
+  about_event_heading: string;
+  about_event_sub_heading: string;
+  about_event_description: string;
+  event_schedular_title?: string;
+  event_schedular?: Array<{
+    time: string;
+    title: string;
+  }>;
+  package_image?: string;
+  package_details?: Array<{
+    title: string;
+  }>;
+  package_button_name?: string;
+  event_galley?: Array<{
+    url: string;
+  }>;
+  menu_title?: string;
+  menu_description?: string;
+  menus?: Array<{
+    name: string;
+    items: Array<{
+      title: string;
+      description: string;
+    }>;
+  }>;
+  drink_title?: string;
+  drink_description?: string;
+  packages?: Array<{
+    id: number;
+    title: string;
+    description: string;
+    price: string;
+    available_quantity?: number;
+  }>;
+  brochure_pdf?: string | null;
+  brochure_pdf_2?: string | null;
+  faq_pdf: string | null;
+  event_address?: string | null;
+  lat?: string | number | null;
+  long?: string | number | null;
+  faqs: Array<{
+    question: string;
+    answer: string;
+  }>;
+  // Theme-related fields
+  detected_theme?: string;
+  theme_animations?: {
+    enabled: boolean;
+    decorations: string[];
+    effects: string[];
+  };
+}
+
+/**
+ * Event detail response type
+ */
+export type EventDetailResponse = BaseApiResponse<EventDetail>;

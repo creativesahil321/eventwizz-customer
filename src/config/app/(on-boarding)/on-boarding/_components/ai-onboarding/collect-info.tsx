@@ -1,0 +1,1154 @@
+"use client";
+
+import React, {
+  useEffect,
+  useRef,
+  useState,
+  useCallback,
+  useMemo,
+} from "react";
+import { useForm, useFieldArray, type Resolver } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
+import { Loader } from "@googlemaps/js-api-loader";
+import {
+  Sparkles,
+  Building2,
+  Mail,
+  Phone,
+  MapPin,
+  ArrowLeft,
+  ChevronRight,
+  Globe,
+  Search,
+  X,
+  Info,
+} from "lucide-react";
+import { env } from "@/env";
+import type { AIOnboardingInput } from "@/app/api/ai/generate-onboarding/route";
+import { useEventCategories } from "@/services/vendor/events/query";
+import { useCurrencySymbol } from "@/hooks/use-currency-format";
+import { useBrandNameAvailability } from "@/hooks/use-brand-name-availability";
+
+const themeAccent = {
+  badge: {
+    backgroundColor: `color-mix(in srgb, var(--color-primary, #3b82f6) 10%, transparent)`,
+    borderColor: `color-mix(in srgb, var(--color-primary, #3b82f6) 20%, transparent)`,
+  } as React.CSSProperties,
+  text: { color: `var(--color-primary, #3b82f6)` } as React.CSSProperties,
+  button: {
+    background: `linear-gradient(to right, var(--color-primary, #3b82f6), var(--color-secondary, #8b5cf6))`,
+  } as React.CSSProperties,
+  selectedCard: {
+    backgroundColor: `color-mix(in srgb, var(--color-primary, #3b82f6) 15%, transparent)`,
+    borderColor: `color-mix(in srgb, var(--color-primary, #3b82f6) 40%, transparent)`,
+  } as React.CSSProperties,
+};
+
+const INPUT_CLASS =
+  "w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white placeholder-slate-500 text-sm focus:outline-none focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/25 transition-colors";
+
+const collectInfoSchema = z
+  .object({
+    has_multiple_locations: z.boolean(),
+    has_room_system: z.boolean().optional(),
+    /** Object rows: RHF `useFieldArray` excludes `string[]`; default `[]` in `useForm` only. */
+    room_names: z.array(z.object({ name: z.string() })),
+    venueName: z.string(),
+    selectedPlaceId: z.string().optional(),
+    venueType: z.string().min(1, "Please select an event category"),
+    city: z.string().min(1, "City is required"),
+    address: z.string().min(1, "Address is required"),
+    contactNumber: z
+      .string()
+      .min(1, "Contact number is required")
+      .max(20, "Max 20 characters")
+      .regex(/^[\d\s\-+()]+$/, "Invalid phone format"),
+    email: z.string().email("Invalid email").min(1, "Email is required"),
+    eventType: z.string().optional(),
+    guestCount: z.string().optional(),
+    priceRange: z.string().optional(),
+    description: z.string().max(800, "Max 800 characters").optional(),
+  })
+  .superRefine((data, ctx) => {
+    if (typeof data.has_room_system !== "boolean") {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Please choose whether you have a room system",
+        path: ["has_room_system"],
+      });
+    }
+    if (data.has_room_system === true) {
+      const names = data.room_names
+        .map((r) => r.name.trim())
+        .filter((n) => n.length > 0);
+      if (names.length < 2) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Please add at least 2 room names",
+          path: ["room_names"],
+        });
+      }
+      if (names.length > 3) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "You can add up to 3 room names only",
+          path: ["room_names"],
+        });
+      }
+    }
+
+    const multi = data.has_multiple_locations === true;
+    const name = data.venueName?.trim() ?? "";
+    if (multi) {
+      if (!name) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Brand name is required",
+          path: ["venueName"],
+        });
+      } else if (name.length > 120) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Brand name must be at most 120 characters",
+          path: ["venueName"],
+        });
+      }
+      return;
+    }
+    if (!name) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Venue name is required",
+        path: ["venueName"],
+      });
+      return;
+    }
+    if (name.length >= 2 && !data.selectedPlaceId) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Please select a venue from the Google suggestions",
+        path: ["venueName"],
+      });
+    }
+  });
+
+type CollectInfoForm = z.infer<typeof collectInfoSchema>;
+
+const INITIAL_CATEGORY_VISIBLE = 8; // 2 rows × 4 columns
+
+/** Icons for static backend categories (match by name, case-insensitive). */
+const CATEGORY_ICONS: Record<string, string> = {
+  "christmas events": "🎄",
+  "new year parties": "🎆",
+  "halloween events": "🎃",
+  "valentine's day specials": "💝",
+  "easter events": "🐣",
+  "bottomless brunch": "🥂",
+  "lipstick powder & paint": "💄",
+  "live music & gigs": "🎵",
+  "dj nights & club events": "🎧",
+  "comedy shows": "🎤",
+  "drag shows & brunches": "👠",
+  "themed parties (90s, 00s, ibiza, etc.)": "🪩",
+  "themed parties": "🪩",
+  "food & drink festivals": "🍔",
+  "street food markets": "🥡",
+  "pride events": "🌈",
+  "afrobeats / bashment nights": "🎶",
+  "day raves / outdoor parties": "☀️",
+  "open mic & spoken word": "🎙️",
+  "networking & business events": "🤝",
+  "workshops & masterclasses": "📚",
+  diwali: "🪔",
+  eid: "🌙",
+};
+
+function getCategoryIcon(categoryName: string): string {
+  const key = categoryName.toLowerCase().trim();
+  return CATEGORY_ICONS[key] ?? "📌";
+}
+
+interface AICollectInfoProps {
+  onSubmit: (data: AIOnboardingInput) => void;
+  onSwitchToManual: () => void;
+  isLoading: boolean;
+  initialData: AIOnboardingInput | null;
+  /** GET persistence: only `null` means “never answered” → show location gate. */
+  persistedHasMultipleLocations: boolean | null;
+  /** GET persistence: when known, room-system question is pre-answered and locked. */
+  persistedHasRoomSystem: boolean | null;
+  /** Existing room names from persistence (stepFour rooms keys). */
+  persistedRoomNames: string[];
+}
+
+function resolveKnownHasMultipleLocations(
+  initial: AIOnboardingInput | null,
+  persisted: boolean | null,
+): boolean | null {
+  if (typeof initial?.has_multiple_locations === "boolean") {
+    return initial.has_multiple_locations;
+  }
+  if (persisted === true || persisted === false) return persisted;
+  return null;
+}
+
+function resolveKnownHasRoomSystem(
+  initial: AIOnboardingInput | null,
+  persisted: boolean | null,
+): boolean | null {
+  if (typeof initial?.has_room_system === "boolean") {
+    return initial.has_room_system;
+  }
+  if (persisted === true || persisted === false) return persisted;
+  return null;
+}
+
+type Suggestion = { description: string; place_id: string };
+
+export default function AICollectInfo({
+  onSubmit,
+  onSwitchToManual,
+  isLoading,
+  initialData,
+  persistedHasMultipleLocations,
+  persistedHasRoomSystem,
+  persistedRoomNames,
+}: AICollectInfoProps) {
+  const currencySymbol = useCurrencySymbol();
+  const knownMultiOnMount = resolveKnownHasMultipleLocations(
+    initialData,
+    persistedHasMultipleLocations,
+  );
+  const [locationGateDone, setLocationGateDone] = useState(
+    knownMultiOnMount === true || knownMultiOnMount === false,
+  );
+  const knownRoomSystemOnMount = resolveKnownHasRoomSystem(
+    initialData,
+    persistedHasRoomSystem,
+  );
+  const roomSystemLocked =
+    knownRoomSystemOnMount === true || knownRoomSystemOnMount === false;
+
+  const form = useForm<CollectInfoForm>({
+    resolver: zodResolver(collectInfoSchema) as Resolver<CollectInfoForm>,
+    defaultValues: {
+      has_multiple_locations:
+        knownMultiOnMount ?? false,
+      has_room_system:
+        typeof initialData?.has_room_system === "boolean"
+          ? initialData.has_room_system
+          : knownRoomSystemOnMount ?? undefined,
+      room_names:
+        initialData?.room_names && initialData.room_names.length > 0
+          ? initialData.room_names.map((n) => ({ name: n }))
+          : persistedRoomNames.length > 0
+            ? persistedRoomNames.slice(0, 3).map((n) => ({ name: n }))
+          : [],
+      venueName: initialData?.venueName || "",
+      selectedPlaceId: "",
+      venueType:
+        initialData?.event_category_id != null
+          ? String(initialData.event_category_id)
+          : initialData?.venueType || "",
+      city: initialData?.city || "",
+      address: initialData?.address || "",
+      contactNumber: initialData?.contactNumber || "",
+      email: initialData?.email || "",
+      eventType: initialData?.eventType || "",
+      guestCount: initialData?.guestCount || "",
+      priceRange: initialData?.priceRange || "",
+      description: initialData?.description || "",
+    },
+    mode: "onChange",
+  });
+  const roomNames = useFieldArray({
+    control: form.control,
+    name: "room_names",
+  });
+
+  useEffect(() => {
+    const known = resolveKnownHasMultipleLocations(
+      initialData,
+      persistedHasMultipleLocations,
+    );
+    if (known !== true && known !== false) return;
+    setLocationGateDone(true);
+    form.setValue("has_multiple_locations", known, { shouldValidate: true });
+  }, [initialData, persistedHasMultipleLocations, form]);
+
+  useEffect(() => {
+    const knownRoom = resolveKnownHasRoomSystem(initialData, persistedHasRoomSystem);
+    if (knownRoom !== true && knownRoom !== false) return;
+
+    form.setValue("has_room_system", knownRoom, { shouldValidate: true });
+    if (knownRoom) {
+      const incoming =
+        initialData?.room_names && initialData.room_names.length > 0
+          ? initialData.room_names
+          : persistedRoomNames;
+      const seeded = incoming
+        .map((name) => name.trim())
+        .filter((name) => name.length > 0)
+        .slice(0, 3)
+        .map((name) => ({ name }));
+      if (seeded.length > 0) {
+        form.setValue("room_names", seeded, { shouldValidate: true });
+      }
+    }
+  }, [initialData, persistedHasRoomSystem, persistedRoomNames, form]);
+
+  const selectedVenueType = form.watch("venueType");
+  const [showAllCategories, setShowAllCategories] = useState(false);
+  const { data: categoriesResponse, isLoading: isCategoriesLoading } =
+    useEventCategories();
+  const eventCategories = React.useMemo(
+    () => categoriesResponse?.data ?? [],
+    [categoriesResponse?.data],
+  );
+  const firstPageCategories = eventCategories.slice(
+    0,
+    INITIAL_CATEGORY_VISIBLE,
+  );
+  const restCategories = eventCategories.slice(INITIAL_CATEGORY_VISIBLE);
+  const hasMoreCategories = restCategories.length > 0;
+
+  // When categories load, sync venueType from name to id if needed (e.g. after "Back" with old data)
+  useEffect(() => {
+    if (eventCategories.length === 0 || !selectedVenueType) return;
+    const isNumericId = /^\d+$/.test(selectedVenueType);
+    if (
+      isNumericId &&
+      eventCategories.some((c) => String(c.id) === selectedVenueType)
+    )
+      return;
+    const byName = eventCategories.find(
+      (c) => c.name.toLowerCase() === selectedVenueType.toLowerCase(),
+    );
+    if (byName)
+      form.setValue("venueType", String(byName.id), { shouldValidate: true });
+  }, [eventCategories, selectedVenueType, form]);
+
+  // --- Google Places Autocomplete ---
+  const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [isSearching, setIsSearching] = useState(false);
+  const [isPlaceSelected, setIsPlaceSelected] = useState(
+    !!initialData?.venueName &&
+      initialData?.has_multiple_locations !== true,
+  );
+  const autocompleteRef = useRef<google.maps.places.AutocompleteService | null>(
+    null,
+  );
+  const debounceRef = useRef<NodeJS.Timeout | null>(null);
+
+  useEffect(() => {
+    const loader = new Loader({
+      apiKey: env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY,
+      libraries: ["places"],
+    });
+    loader.load().then(() => {
+      if (window.google?.maps?.places) {
+        autocompleteRef.current =
+          new window.google.maps.places.AutocompleteService();
+      }
+    });
+  }, []);
+
+  const handleVenueSearch = useCallback(
+    (query: string) => {
+      if (isPlaceSelected) return;
+      setSearchQuery(query);
+      if (!query) {
+        setSuggestions([]);
+        setIsSearching(false);
+        return;
+      }
+      setIsSearching(true);
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+      debounceRef.current = setTimeout(() => {
+        if (!autocompleteRef.current) {
+          setIsSearching(false);
+          return;
+        }
+        autocompleteRef.current.getPlacePredictions(
+          {
+            input: query,
+            types: ["establishment"],
+            componentRestrictions: { country: ["gb"] },
+          },
+          (predictions, status) => {
+            if (
+              status === google.maps.places.PlacesServiceStatus.OK &&
+              predictions
+            ) {
+              setSuggestions(
+                predictions.map((p) => ({
+                  description: p.description,
+                  place_id: p.place_id,
+                })),
+              );
+            } else {
+              setSuggestions([]);
+            }
+            setIsSearching(false);
+          },
+        );
+      }, 300);
+    },
+    [isPlaceSelected],
+  );
+
+  const handlePlaceSelect = useCallback(
+    (suggestion: Suggestion) => {
+      setSuggestions([]);
+      setSearchQuery("");
+      setIsPlaceSelected(true);
+
+      // Set selectedPlaceId and venue name immediately so validation passes
+      // even before getDetails callback runs (avoids "Please select from Google" error)
+      form.setValue("selectedPlaceId", suggestion.place_id, {
+        shouldValidate: true,
+      });
+      form.setValue("venueName", suggestion.description || "", {
+        shouldValidate: true,
+      });
+
+      if (!window.google?.maps?.places?.PlacesService) return;
+
+      const service = new window.google.maps.places.PlacesService(
+        document.createElement("div"),
+      );
+      service.getDetails(
+        {
+          placeId: suggestion.place_id,
+          fields: [
+            "name",
+            "formatted_address",
+            "formatted_phone_number",
+            "international_phone_number",
+            "website",
+            "url",
+            "business_status",
+            "address_components",
+          ],
+        },
+        (place, status) => {
+          if (
+            status !== window.google.maps.places.PlacesServiceStatus.OK ||
+            !place
+          )
+            return;
+
+          form.setValue(
+            "venueName",
+            place.name ?? suggestion.description ?? "",
+            {
+              shouldValidate: true,
+            },
+          );
+          form.setValue(
+            "contactNumber",
+            place.international_phone_number ??
+              place.formatted_phone_number ??
+              "",
+            { shouldValidate: true },
+          );
+          form.setValue("address", place.formatted_address ?? "", {
+            shouldValidate: true,
+          });
+
+          if (place.address_components) {
+            const cityComp = place.address_components.find(
+              (c) =>
+                c.types.includes("locality") ||
+                c.types.includes("postal_town") ||
+                c.types.includes("administrative_area_level_1"),
+            );
+            if (cityComp) {
+              form.setValue("city", cityComp.long_name, {
+                shouldValidate: true,
+              });
+            }
+          }
+        },
+      );
+    },
+    [form],
+  );
+
+  const handleClearPlace = () => {
+    form.setValue("venueName", "");
+    form.setValue("selectedPlaceId", "");
+    form.setValue("address", "");
+    form.setValue("city", "");
+    form.setValue("contactNumber", "");
+    setSearchQuery("");
+    setSuggestions([]);
+    setIsPlaceSelected(false);
+  };
+
+  const venueNameValue = form.watch("venueName");
+  const isBrandMode = form.watch("has_multiple_locations") === true;
+  const {
+    status: brandNameCheckStatus,
+    message: brandNameCheckMessage,
+    isChecking: brandNameChecking,
+    isTaken: brandNameTaken,
+  } = useBrandNameAvailability(venueNameValue ?? "", {
+    takenFallback: isBrandMode
+      ? "This brand name is already in use"
+      : "This venue name is already in use",
+  });
+
+  const handleFormSubmit = (data: CollectInfoForm) => {
+    if (brandNameTaken || brandNameChecking) return;
+    const { selectedPlaceId: _, ...rest } = data;
+    const categoryId = data.venueType ? Number(data.venueType) : undefined;
+    const category = eventCategories.find((c) => c.id === categoryId);
+    const normalizedRoomNames = data.room_names
+      .map((r) => r.name.trim())
+      .filter((n) => n.length > 0)
+      .slice(0, 3);
+    const hasValidRoomSystem =
+      data.has_room_system === true && normalizedRoomNames.length >= 2;
+    const payload: AIOnboardingInput = {
+      ...rest,
+      venueType: category?.name ?? data.venueType,
+      event_category_id: categoryId,
+      has_multiple_locations: data.has_multiple_locations,
+      has_room_system: hasValidRoomSystem,
+      room_names: hasValidRoomSystem ? normalizedRoomNames : [],
+    };
+    onSubmit(payload);
+  };
+
+  const hasRoomSystem = form.watch("has_room_system");
+  const roomNameFields = form.watch("room_names");
+
+  const descriptionPlaceholder = useMemo(() => {
+    if (hasRoomSystem !== true) {
+      return `e.g. "Tickets ${currencySymbol}50 and VIP ${currencySymbol}120, tables for 6–10 at ${currencySymbol}150, deposit 25% due 2 weeks before event. Soft drinks package ${currencySymbol}50…"`;
+    }
+
+    const namedRooms = (roomNameFields ?? [])
+      .map((entry) => String(entry?.name ?? "").trim())
+      .filter((name) => name.length > 0);
+
+    if (namedRooms.length >= 2) {
+      const [first, second] = namedRooms;
+      return `e.g. "${first} tickets ${currencySymbol}25, ${second} tables ${currencySymbol}150 with 25% deposit due 2 weeks before, same date July 21 for both spaces. Soft drinks ${currencySymbol}50…"`;
+    }
+
+    if (namedRooms.length === 1) {
+      const first = namedRooms[0];
+      return `e.g. "${first} tickets ${currencySymbol}25, other space tables ${currencySymbol}150 with deposit, same date for all spaces. Soft drinks ${currencySymbol}50…"`;
+    }
+
+    return `e.g. "Main Hall tickets ${currencySymbol}25, Garden tables ${currencySymbol}150 with 25% deposit due 2 weeks before, same date July 21 for both spaces. Soft drinks ${currencySymbol}50…"`;
+  }, [currencySymbol, hasRoomSystem, roomNameFields]);
+
+  const setRoomSystem = (value: boolean) => {
+    form.setValue("has_room_system", value, { shouldValidate: true });
+    const current = form.getValues("room_names");
+    if (value) {
+      if (current.length < 2) {
+        const seeded = [...current];
+        while (seeded.length < 2) seeded.push({ name: "" });
+        form.setValue("room_names", seeded, { shouldValidate: true });
+      }
+    } else {
+      form.setValue("room_names", [], { shouldValidate: true });
+    }
+  };
+
+  const pickMultipleLocations = (value: boolean) => {
+    form.setValue("has_multiple_locations", value, { shouldValidate: true });
+    if (value) {
+      form.setValue("selectedPlaceId", "", { shouldValidate: true });
+      setIsPlaceSelected(false);
+      setSearchQuery("");
+      setSuggestions([]);
+    }
+    setLocationGateDone(true);
+  };
+
+  return (
+    <div className="relative z-10 flex items-center justify-center min-h-screen py-10 px-4">
+      <div className="w-full max-w-2xl">
+        {/* Header */}
+        <div className="text-center mb-8">
+          <div
+            className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border backdrop-blur-sm mb-5"
+            style={themeAccent.badge}
+          >
+            <Sparkles className="w-3.5 h-3.5" style={themeAccent.text} />
+            <span
+              className="text-xs font-medium tracking-wide uppercase"
+              style={themeAccent.text}
+            >
+              AI-Powered Setup
+            </span>
+          </div>
+          <h1 className="text-3xl font-bold text-white mb-3">
+            Tell us about your business
+          </h1>
+          <p className="text-slate-400 text-sm max-w-md mx-auto">
+            {locationGateDone
+              ? isBrandMode
+                ? "Enter your brand name (any name is fine) and your business details below. Our AI will generate your website."
+                : "Search for your venue on Google (UK only) and select it from the suggestions to autofill details. Our AI will then generate your entire website."
+              : "First, let us know if you operate more than one location so we can tailor labels and data for your setup."}
+          </p>
+        </div>
+
+        {!locationGateDone ? (
+          <div className="rounded-2xl border border-white/10 bg-slate-900/60 backdrop-blur-xl p-8 space-y-6">
+            <h2 className="text-lg font-semibold text-white text-center">
+              Do you have multiple locations?
+            </h2>
+            <p className="text-slate-400 text-sm text-center max-w-md mx-auto">
+              Choose Yes if you run several venues under one brand. We’ll use
+              brand-oriented labels and the correct fields for your account.
+            </p>
+            <div className="flex flex-col sm:flex-row gap-3 justify-center">
+              <button
+                type="button"
+                disabled={isLoading}
+                onClick={() => pickMultipleLocations(true)}
+                className="px-6 py-3 rounded-xl text-white text-sm font-medium transition-opacity disabled:opacity-50"
+                style={themeAccent.button}
+              >
+                Yes, multiple locations
+              </button>
+              <button
+                type="button"
+                disabled={isLoading}
+                onClick={() => pickMultipleLocations(false)}
+                className="px-6 py-3 rounded-xl bg-white/5 border border-white/10 text-white text-sm font-medium hover:bg-white/10 transition-colors disabled:opacity-50"
+              >
+                No, single location
+              </button>
+            </div>
+          </div>
+        ) : (
+        <div className="rounded-2xl border border-white/10 bg-slate-900/60 backdrop-blur-xl p-8">
+          <form
+            onSubmit={form.handleSubmit(handleFormSubmit)}
+            className="space-y-6"
+          >
+            {/* Brand name (free text) or venue via Google Places */}
+            <div>
+              <label className="flex items-center gap-2 text-sm font-medium text-slate-300 mb-2">
+                <Building2 className="w-4 h-4" style={themeAccent.text} />
+                {isBrandMode ? "Brand name" : "Venue Name"}{" "}
+                <span className="text-red-400">*</span>
+              </label>
+              {isBrandMode ? (
+                <>
+                  <input
+                    {...form.register("venueName")}
+                    maxLength={120}
+                    placeholder="e.g. Acme Events Co."
+                    className={INPUT_CLASS}
+                  />
+                  <p className="text-xs text-slate-500 mt-1.5">
+                    Type your trading or brand name — it does not need to match
+                    a Google listing.
+                  </p>
+                </>
+              ) : (
+                <>
+                  <div className="relative">
+                    <div className="absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none">
+                      <Search className="w-4 h-4 text-slate-500" />
+                    </div>
+                    <input
+                      value={
+                        isPlaceSelected ? form.watch("venueName") : searchQuery
+                      }
+                      onChange={(e) => {
+                        if (isPlaceSelected) return;
+                        const value = e.target.value;
+                        handleVenueSearch(value);
+                        form.setValue("venueName", value, {
+                          shouldValidate: true,
+                        });
+                        form.setValue("selectedPlaceId", "", {
+                          shouldValidate: true,
+                        });
+                      }}
+                      readOnly={isPlaceSelected}
+                      placeholder="Search for your venue on Google..."
+                      className={`${INPUT_CLASS} pl-10 pr-10 ${
+                        isPlaceSelected
+                          ? "bg-green-500/10 border-green-500/20"
+                          : ""
+                      }`}
+                    />
+                    {isSearching && !isPlaceSelected && (
+                      <div className="absolute right-3.5 top-1/2 -translate-y-1/2">
+                        <div className="w-4 h-4 border-2 border-white/10 border-t-white/40 rounded-full animate-spin" />
+                      </div>
+                    )}
+                    {isPlaceSelected && (
+                      <button
+                        type="button"
+                        onClick={handleClearPlace}
+                        className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-red-400 transition-colors"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    )}
+
+                    {suggestions.length > 0 && !isPlaceSelected && searchQuery && (
+                      <ul className="absolute z-50 bg-slate-800 border border-white/10 rounded-xl w-full mt-1.5 max-h-60 overflow-auto shadow-2xl">
+                        {suggestions.map((sug, i) => (
+                          <li
+                            key={i}
+                            onClick={() => handlePlaceSelect(sug)}
+                            className="px-4 py-3 hover:bg-white/5 cursor-pointer border-b border-white/5 last:border-0 transition-colors"
+                          >
+                            <div className="flex items-start gap-2.5">
+                              <MapPin
+                                className="w-4 h-4 mt-0.5 flex-shrink-0"
+                                style={themeAccent.text}
+                              />
+                              <span className="text-sm text-slate-300">
+                                {sug.description}
+                              </span>
+                            </div>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                    {searchQuery &&
+                      suggestions.length === 0 &&
+                      !isSearching &&
+                      !isPlaceSelected && (
+                        <div className="absolute z-50 bg-slate-800 border border-white/10 rounded-xl w-full mt-1.5 p-3.5 shadow-2xl">
+                          <p className="text-sm text-slate-500 text-center">
+                            No venues found. Try a different search, or switch
+                            to Manual to enter details manually.
+                          </p>
+                        </div>
+                      )}
+                  </div>
+                  <p className="text-xs text-slate-500 mt-1.5">
+                    Only verified venues from Google suggestions can be used —
+                    same as manual mode. Select one from the dropdown.
+                  </p>
+                </>
+              )}
+              {brandNameChecking ? (
+                <p className="text-xs text-slate-500 mt-1.5">
+                  Checking name availability…
+                </p>
+              ) : null}
+              {brandNameCheckStatus === "available" &&
+              (venueNameValue?.trim().length ?? 0) >= 2 ? (
+                <p className="text-xs text-emerald-400/90 mt-1.5">
+                  {isBrandMode
+                    ? "This brand name is available."
+                    : "This venue name is available."}
+                </p>
+              ) : null}
+              {brandNameCheckStatus === "taken" &&
+              (venueNameValue?.trim().length ?? 0) >= 2 &&
+              brandNameCheckMessage ? (
+                <p className="text-xs text-red-400/90 mt-1.5">
+                  {brandNameCheckMessage}
+                </p>
+              ) : null}
+              {form.formState.errors.venueName && (
+                <p className="text-red-400 text-xs mt-1.5">
+                  {form.formState.errors.venueName.message}
+                </p>
+              )}
+            </div>
+
+            {/* Event Category: 2×4 initially, "More" to expand (same list as manual step 3) */}
+            <div>
+              <label className="flex items-center gap-2 text-sm font-medium text-slate-300 mb-3">
+                <Building2 className="w-4 h-4" style={themeAccent.text} />
+                Do you have multiple event spaces (room system)?{" "}
+                <span className="text-red-400">*</span>
+              </label>
+              {roomSystemLocked ? (
+                <div className="rounded-lg border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-slate-300">
+                  Using your saved room system preference:{" "}
+                  <span className="font-semibold text-white">
+                    {hasRoomSystem ? "Yes" : "No"}
+                  </span>
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setRoomSystem(true)}
+                    className={`px-4 py-2.5 rounded-lg border text-sm font-medium transition-colors ${
+                      hasRoomSystem === true
+                        ? "text-white"
+                        : "bg-white/5 border-white/10 text-slate-400 hover:bg-white/10"
+                    }`}
+                    style={
+                      hasRoomSystem === true ? themeAccent.selectedCard : undefined
+                    }
+                  >
+                    Yes
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setRoomSystem(false)}
+                    className={`px-4 py-2.5 rounded-lg border text-sm font-medium transition-colors ${
+                      hasRoomSystem === false
+                        ? "text-white"
+                        : "bg-white/5 border-white/10 text-slate-400 hover:bg-white/10"
+                    }`}
+                    style={
+                      hasRoomSystem === false
+                        ? themeAccent.selectedCard
+                        : undefined
+                    }
+                  >
+                    No
+                  </button>
+                </div>
+              )}
+              {form.formState.errors.has_room_system && (
+                <p className="text-red-400 text-xs mt-1.5">
+                  {form.formState.errors.has_room_system.message}
+                </p>
+              )}
+            </div>
+
+            {hasRoomSystem === true && (
+              <div>
+                <label className="flex items-center gap-2 text-sm font-medium text-slate-300 mb-2">
+                  <Building2 className="w-4 h-4" style={themeAccent.text} />
+                  Room names (min 2, max 3) <span className="text-red-400">*</span>
+                </label>
+                <div className="space-y-2">
+                  {roomNames.fields.map((field, index) => (
+                    <div key={field.id} className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <input
+                          {...form.register(`room_names.${index}.name`)}
+                          maxLength={40}
+                          placeholder={`Room ${index + 1} name`}
+                          className={INPUT_CLASS}
+                        />
+                        {roomNames.fields.length > 2 && (
+                          <button
+                            type="button"
+                            onClick={() => roomNames.remove(index)}
+                            className="px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-slate-300 hover:bg-white/10"
+                          >
+                            Remove
+                          </button>
+                        )}
+                      </div>
+                      {form.formState.errors.room_names?.[index]?.name
+                        ?.message && (
+                        <p className="text-red-400 text-xs">
+                          {
+                            form.formState.errors.room_names[index]?.name
+                              ?.message
+                          }
+                        </p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+                <div className="mt-2 flex items-center gap-2">
+                  {roomNames.fields.length < 3 && (
+                    <button
+                      type="button"
+                      onClick={() => roomNames.append({ name: "" })}
+                      className="px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-slate-300 hover:bg-white/10 text-xs"
+                    >
+                      + Add room
+                    </button>
+                  )}
+                  <p className="text-xs text-slate-500">
+                    These names will guide AI content tone per room.
+                  </p>
+                </div>
+                {form.formState.errors.room_names && (
+                  <p className="text-red-400 text-xs mt-1.5">
+                    {
+                      (form.formState.errors.room_names as unknown as {
+                        message?: string;
+                      })?.message
+                    }
+                  </p>
+                )}
+              </div>
+            )}
+
+            {/* Event Category: 2×4 initially, "More" to expand (same list as manual step 3) */}
+            <div>
+              <label className="flex items-center gap-2 text-sm font-medium text-slate-300 mb-3">
+                <Globe className="w-4 h-4" style={themeAccent.text} />
+                Event Category <span className="text-red-400">*</span>
+              </label>
+              {isCategoriesLoading ? (
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  {Array.from({ length: 8 }, (_, i) => (
+                    <div
+                      key={i}
+                      className="h-12 rounded-lg bg-white/5 border border-white/10 animate-pulse"
+                    />
+                  ))}
+                </div>
+              ) : eventCategories.length > 0 ? (
+                <div className="space-y-2">
+                  {/* First 2 rows × 4 columns (2 cols on mobile) */}
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                    {firstPageCategories.map((cat) => (
+                      <button
+                        key={cat.id}
+                        type="button"
+                        onClick={() =>
+                          form.setValue("venueType", String(cat.id), {
+                            shouldValidate: true,
+                          })
+                        }
+                        className={`flex flex-col items-center justify-center gap-1 px-2 py-2.5 rounded-lg border text-[11px] font-medium transition-all duration-200 min-h-[52px] ${
+                          selectedVenueType === String(cat.id)
+                            ? ""
+                            : "bg-white/5 border-white/10 text-slate-400 hover:border-white/20 hover:text-slate-300"
+                        }`}
+                        style={
+                          selectedVenueType === String(cat.id)
+                            ? {
+                                ...themeAccent.selectedCard,
+                                color: `var(--color-primary, #93c5fd)`,
+                              }
+                            : undefined
+                        }
+                      >
+                        <span className="text-base leading-none">
+                          {getCategoryIcon(cat.name)}
+                        </span>
+                        <span className="text-center leading-tight line-clamp-2">
+                          {cat.name}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                  {hasMoreCategories && (
+                    <button
+                      type="button"
+                      onClick={() => setShowAllCategories((v) => !v)}
+                      className="w-full py-2 rounded-lg border border-dashed border-white/20 text-xs font-medium text-slate-400 hover:bg-white/5 hover:text-slate-300 hover:border-white/30 transition-colors"
+                    >
+                      {showAllCategories
+                        ? "Show less"
+                        : `More categories (${restCategories.length} more)`}
+                    </button>
+                  )}
+                  {showAllCategories && hasMoreCategories && (
+                    <div className="max-h-44 overflow-y-auto rounded-lg border border-white/10 bg-white/[0.02] p-2">
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                        {restCategories.map((cat) => (
+                          <button
+                            key={cat.id}
+                            type="button"
+                            onClick={() =>
+                              form.setValue("venueType", String(cat.id), {
+                                shouldValidate: true,
+                              })
+                            }
+                            className={`flex flex-col items-center justify-center gap-1 px-2 py-2 rounded-lg border text-[11px] font-medium transition-all duration-200 min-h-[48px] ${
+                              selectedVenueType === String(cat.id)
+                                ? ""
+                                : "bg-white/5 border-white/10 text-slate-400 hover:border-white/20 hover:text-slate-300"
+                            }`}
+                            style={
+                              selectedVenueType === String(cat.id)
+                                ? {
+                                    ...themeAccent.selectedCard,
+                                    color: `var(--color-primary, #93c5fd)`,
+                                  }
+                                : undefined
+                            }
+                          >
+                            <span className="text-base leading-none">
+                              {getCategoryIcon(cat.name)}
+                            </span>
+                            <span className="text-center leading-tight line-clamp-2">
+                              {cat.name}
+                            </span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <p className="text-sm text-slate-500">
+                  No categories available. Please try again or switch to Manual
+                  setup.
+                </p>
+              )}
+              {form.formState.errors.venueType && (
+                <p className="text-red-400 text-xs mt-1.5">
+                  {form.formState.errors.venueType.message}
+                </p>
+              )}
+            </div>
+
+            {/* Two column grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="flex items-center gap-2 text-sm font-medium text-slate-300 mb-2">
+                  <Mail className="w-4 h-4" style={themeAccent.text} />
+                  Email <span className="text-red-400">*</span>
+                </label>
+                <input
+                  {...form.register("email")}
+                  type="email"
+                  placeholder="venue@example.com"
+                  className={INPUT_CLASS}
+                />
+                {form.formState.errors.email && (
+                  <p className="text-red-400 text-xs mt-1.5">
+                    {form.formState.errors.email.message}
+                  </p>
+                )}
+              </div>
+
+              <div>
+                <label className="flex items-center gap-2 text-sm font-medium text-slate-300 mb-2">
+                  <Phone className="w-4 h-4" style={themeAccent.text} />
+                  Contact Number <span className="text-red-400">*</span>
+                </label>
+                <input
+                  {...form.register("contactNumber")}
+                  type="tel"
+                  placeholder="+44 123 456 7890"
+                  maxLength={20}
+                  className={INPUT_CLASS}
+                />
+                {form.formState.errors.contactNumber && (
+                  <p className="text-red-400 text-xs mt-1.5">
+                    {form.formState.errors.contactNumber.message}
+                  </p>
+                )}
+              </div>
+
+              <div>
+                <label className="flex items-center gap-2 text-sm font-medium text-slate-300 mb-2">
+                  <MapPin className="w-4 h-4" style={themeAccent.text} />
+                  Address <span className="text-red-400">*</span>
+                </label>
+                <input
+                  {...form.register("address")}
+                  placeholder={
+                    isBrandMode
+                      ? "Head office or main site address"
+                      : "Full venue address"
+                  }
+                  className={INPUT_CLASS}
+                />
+                {form.formState.errors.address && (
+                  <p className="text-red-400 text-xs mt-1.5">
+                    {form.formState.errors.address.message}
+                  </p>
+                )}
+              </div>
+
+              <div>
+                <label className="flex items-center gap-2 text-sm font-medium text-slate-300 mb-2">
+                  <MapPin className="w-4 h-4" style={themeAccent.text} />
+                  City <span className="text-red-400">*</span>
+                </label>
+                <input
+                  {...form.register("city")}
+                  placeholder={
+                    isBrandMode
+                      ? "e.g. London (main trading city)"
+                      : "e.g. London"
+                  }
+                  className={INPUT_CLASS}
+                />
+                {form.formState.errors.city && (
+                  <p className="text-red-400 text-xs mt-1.5">
+                    {form.formState.errors.city.message}
+                  </p>
+                )}
+              </div>
+            </div>
+
+            {/* Description (optional — helps AI) */}
+            <div>
+              <label className="flex items-center gap-2 text-sm font-medium text-slate-300 mb-2">
+                <Info className="w-4 h-4" style={themeAccent.text} />
+                Describe your event setup{" "}
+                <span className="text-slate-500 font-normal">
+                  (optional but helps AI)
+                </span>
+              </label>
+
+              <p className="text-slate-500 text-xs mb-2.5 leading-relaxed">
+                Write anything — casual notes are fine. Mention tickets, tables,
+                prices, deposit vs full payment, and food/drinks if you have them.
+                {hasRoomSystem === true ? (
+                  <>
+                    {" "}
+                    Because you enabled multiple event spaces, you can also say
+                    which space gets which dates, tickets, or tables (e.g.
+                    &quot;same dates for every space&quot; or different setups per
+                    space).
+                  </>
+                ) : null}{" "}
+                We&apos;ll use your notes to pre-fill tickets, tables, pricing,
+                and other details. You can review and adjust everything before
+                you publish—and if anything is missing, you can complete or
+                change it manually in the onboarding steps at any time.
+              </p>
+
+              <textarea
+                {...form.register("description")}
+                placeholder={descriptionPlaceholder}
+                rows={5}
+                maxLength={800}
+                className={`${INPUT_CLASS} resize-none`}
+              />
+              <div className="flex justify-end mt-1">
+                <p className="text-slate-600 text-xs">
+                  {form.watch("description")?.length || 0}/800
+                </p>
+              </div>
+            </div>
+
+            {/* Actions */}
+            <div className="flex items-center justify-between pt-2">
+              <button
+                type="button"
+                onClick={onSwitchToManual}
+                className="flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-300 transition-colors"
+              >
+                <ArrowLeft className="w-4 h-4" />
+                Switch to Manual
+              </button>
+
+              <button
+                type="submit"
+                disabled={isLoading || brandNameChecking || brandNameTaken}
+                className="flex items-center gap-2 px-8 py-3 rounded-full text-white text-sm font-semibold shadow-lg disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300"
+                style={themeAccent.button}
+              >
+                <Sparkles className="w-4 h-4" />
+                {isLoading ? "Generating..." : "Generate My Site"}
+                {!isLoading && <ChevronRight className="w-4 h-4" />}
+              </button>
+            </div>
+          </form>
+        </div>
+        )}
+      </div>
+    </div>
+  );
+}
