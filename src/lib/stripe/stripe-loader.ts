@@ -2,9 +2,22 @@
 // as soon as this module is loaded (before first render), satisfying Stripe's
 // "load Stripe.js early" optimisation recommendation.
 // @see https://docs.stripe.com/sdks/stripejs-esmodule
-import { loadStripe, type Stripe } from "@stripe/stripe-js";
+import {
+  loadStripe,
+  type Stripe,
+  type StripeConstructorOptions,
+} from "@stripe/stripe-js";
 
 const stripePromiseCache = new Map<string, Promise<Stripe | null>>();
+
+/** Disable the Elements sandbox assistant UI in checkout. */
+const STRIPE_INIT_OPTIONS: StripeConstructorOptions = {
+  developerTools: {
+    assistant: {
+      enabled: false,
+    },
+  },
+};
 
 /**
  * Return (or create) a cached Stripe instance for the given publishable key.
@@ -17,7 +30,7 @@ export function getStripePromise(
   const cached = stripePromiseCache.get(publishableKey);
   if (cached) return cached;
 
-  const promise = loadStripe(publishableKey);
+  const promise = loadStripe(publishableKey, STRIPE_INIT_OPTIONS);
   stripePromiseCache.set(publishableKey, promise);
   return promise;
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { AlertCircle, Minus, Plus } from "lucide-react";
 import { toast } from "sonner";
 
@@ -40,7 +40,7 @@ interface TableRecommendationsProps {
   onQuantityChange: (tableId: number, change: number) => void;
   onUpdateQuantity: (tableId: number, quantity: number) => void;
   getTotalQuantity: (tableId: number) => number;
-  onTableSeatingConfirmed?: () => void | Promise<void>;
+  onTableSeatingConfirmed?: () => boolean | Promise<boolean>;
 }
 
 function GroupSizeStepper({
@@ -201,24 +201,18 @@ export default function TableRecommendations({
   const peopleCount = dateData?.peopleCount || 20;
   const tableSeatingSkipped = dateData?.tableSeatingSkipped ?? false;
 
-  const prevPeopleCountRef = useRef(peopleCount);
-
-  // Auto-apply the best table match on mount and whenever people count changes,
-  // so tables are shown immediately without requiring a button click.
+  // Auto-apply the best table match on first load when nothing is selected yet.
+  // Group-size changes call applyBestTableMatch inside updatePeopleCount — duplicating
+  // here caused a second pass that could fight the confirm flow.
   useEffect(() => {
     if (tables.length === 0 || tableSeatingSkipped) return;
 
     const hasDraftSelection = tables.some((table) => table.quantity > 0);
-    const peopleCountChanged = prevPeopleCountRef.current !== peopleCount;
-    prevPeopleCountRef.current = peopleCount;
-
-    // Auto-suggest on first load (no selection yet) or when group size changes
-    if (!hasDraftSelection || peopleCountChanged) {
+    if (!hasDraftSelection) {
       resumeTableSeating(eventSlug, date);
       applyBestTableMatch(eventSlug, date);
     }
   }, [
-    peopleCount,
     eventSlug,
     date,
     tables.length,

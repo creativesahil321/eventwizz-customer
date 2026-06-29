@@ -32,6 +32,7 @@ import { useOnboarding } from "@/hooks/use-onboarding";
 import { useIsPreviewMode } from "@/contexts/preview-context";
 import { addCacheBusting } from "@/lib/image-utils";
 import { useCurrencySymbol } from "@/hooks/use-currency-format";
+import { cn } from "@/lib/utils";
 
 // Define proper user interface for session
 interface SessionUser {
@@ -198,9 +199,25 @@ function DateRowsScroller({
   getDateRowJustifyClass,
   renderCard,
 }: DateRowsScrollerProps) {
+  const hasPartialRow =
+    (firstRowCount > 0 && firstRowCount < itemsPerRow) ||
+    (secondRowCount > 0 && secondRowCount < itemsPerRow);
+
   return (
-    <div className="overflow-x-auto sm:overflow-hidden pb-2 [-webkit-overflow-scrolling:touch]">
-      <div className="inline-flex w-max flex-col gap-4 sm:flex sm:w-full sm:gap-5">
+    <div
+      className={cn(
+        "pb-2",
+        hasPartialRow
+          ? "overflow-visible"
+          : "overflow-x-auto sm:overflow-hidden [-webkit-overflow-scrolling:touch]",
+      )}
+    >
+      <div
+        className={cn(
+          "flex flex-col gap-4 sm:gap-5",
+          hasPartialRow ? "w-full" : "inline-flex w-max sm:w-full",
+        )}
+      >
         <div
           className={`flex flex-nowrap ${getDateRowJustifyClass(firstRowCount)} items-center gap-3 sm:gap-5`}
         >
@@ -210,15 +227,17 @@ function DateRowsScroller({
             return renderCard(displayDates[index], `first-${index}`, i);
           })}
         </div>
-        <div
-          className={`flex flex-nowrap ${getDateRowJustifyClass(secondRowCount)} items-center gap-3 sm:gap-5`}
-        >
-          {Array.from({ length: secondRowCount }).map((_, i) => {
-            const index = pageOffset + itemsPerRow + i;
-            if (index >= displayDates.length) return null;
-            return renderCard(displayDates[index], `second-${index}`, i);
-          })}
-        </div>
+        {secondRowCount > 0 ? (
+          <div
+            className={`flex flex-nowrap ${getDateRowJustifyClass(secondRowCount)} items-center gap-3 sm:gap-5`}
+          >
+            {Array.from({ length: secondRowCount }).map((_, i) => {
+              const index = pageOffset + itemsPerRow + i;
+              if (index >= displayDates.length) return null;
+              return renderCard(displayDates[index], `second-${index}`, i);
+            })}
+          </div>
+        ) : null}
       </div>
     </div>
   );
@@ -298,7 +317,7 @@ export default function DatesSection({
   const datesPerPage = itemsPerRow * 2; // Total dates visible per page (2 rows)
 
   const getDateRowJustifyClass = (itemCount: number) =>
-    itemCount < itemsPerRow
+    itemCount > 0 && itemCount < itemsPerRow
       ? "justify-center"
       : "justify-start sm:justify-center";
 

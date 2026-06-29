@@ -32,7 +32,7 @@
 
 /* Extra bottom inset when the mobile pending-payment countdown strip is visible */
 .checkout-page[data-pending-payment="true"] {
-  --checkout-mobile-pending-extra: 3.25rem;
+  --checkout-mobile-pending-extra: 4rem;
 }
 
 .checkout-page .checkout-trust-badge {

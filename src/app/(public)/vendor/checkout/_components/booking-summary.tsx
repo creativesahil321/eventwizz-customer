@@ -55,7 +55,7 @@ import { usePaymentGatewaySelection } from "@/store/payment-gateway-selection.st
 import PaymentGatewaySelector from "./payment-gateway-selector";
 import CheckoutStripePaymentModal from "./checkout-stripe-payment-modal";
 import { PaymentSessionCountdownPill } from "./payment-session-countdown-pill";
-import { usePaymentSessionCountdown } from "../_lib/use-payment-session-countdown";
+import { usePaymentSessionCountdown, formatPaymentTimeRemainingVerbose } from "../_lib/use-payment-session-countdown";
 import { addCacheBusting } from "@/lib/image-utils";
 import { useCurrencyFormat } from "@/hooks/use-currency-format";
 import OrderViewBreakdown from "./order-view-breakdown";
@@ -81,8 +81,12 @@ export default function BookingSummary({}: BookingSummaryProps) {
   const [showViewBreakdown, setShowViewBreakdown] = useState(false);
   const [showMobileDrawer, setShowMobileDrawer] = useState(false);
   const [isStripePaymentOpen, setIsStripePaymentOpen] = useState(false);
+  const [justExpiredBookingNumber, setJustExpiredBookingNumber] = useState<
+    string | null
+  >(null);
   const isCheckoutInProgressRef = useRef(false);
   const stripePaymentCompletedRef = useRef(false);
+  const expireHandledRef = useRef(false);
 
   // Session persisted in sessionStorage — survives page refresh
   const {
@@ -90,6 +94,9 @@ export default function BookingSummary({}: BookingSummaryProps) {
     setStripePaymentSession,
     clearPaymentSession,
     completePaymentSession,
+    markPendingPaymentExpired,
+    clearExpiredPaymentNotice,
+    expiredPendingBookingNumbers,
   } = useCheckoutPaymentUiStore();
 
   // On mount — warm up Stripe.js if we already have a session (page refresh restore
@@ -125,17 +132,81 @@ export default function BookingSummary({}: BookingSummaryProps) {
   const { clearDrinksForNewEvent } = useDrinkSelectionStore();
 
   const expireSession = useCallback(() => {
-    clearPaymentSession();
-    clearAllCarts();
-    clearDrinksForNewEvent();
-    toast.info("Payment session expired. Please restart your checkout.");
-    window.location.reload();
-  }, [clearPaymentSession, clearAllCarts, clearDrinksForNewEvent]);
+    if (expireHandledRef.current) return;
+
+    const bookingNumber =
+      useCheckoutPaymentUiStore.getState().stripePaymentSession?.bookingNumber;
+    if (!bookingNumber) return;
+
+    expireHandledRef.current = true;
+    markPendingPaymentExpired(bookingNumber);
+    setJustExpiredBookingNumber(bookingNumber);
+    setIsStripePaymentOpen(false);
+    void queryClient.invalidateQueries({ queryKey: ["cart-data"] });
+
+    toast.error("Payment session expired", {
+      description:
+        "Your items are still in your cart. Start checkout again when you're ready.",
+      duration: 8000,
+    });
+
+    if (
+      typeof window !== "undefined" &&
+      window.matchMedia("(max-width: 1023px)").matches
+    ) {
+      requestAnimationFrame(() => {
+        document
+          .getElementById("checkout-cart-section")
+          ?.scrollIntoView({ behavior: "smooth", block: "start" });
+      });
+    }
+  }, [markPendingPaymentExpired, queryClient]);
+
+  useEffect(() => {
+    if (stripePaymentSession?.bookingNumber) {
+      expireHandledRef.current = false;
+    }
+  }, [stripePaymentSession?.bookingNumber]);
 
   const sessionSecondsLeft = usePaymentSessionCountdown(
     stripePaymentSession?.expiresAt,
     expireSession,
   );
+
+  // Refresh expiry when a restored session has no countdown (common on /resume omit).
+  useEffect(() => {
+    const bookingNumber = stripePaymentSession?.bookingNumber;
+    if (!bookingNumber || stripePaymentSession.expiresAt) return;
+
+    let cancelled = false;
+    void (async () => {
+      try {
+        const response = await resumeCheckoutMutation.mutateAsync(bookingNumber);
+        if (cancelled || !response.status || !response.data) return;
+        const paymentAction = resolveCheckoutPaymentAction(response.data);
+        if (paymentAction?.type !== "stripe" || !paymentAction.session.expiresAt) {
+          return;
+        }
+        setStripePaymentSession(
+          mergeStripePaymentSession(
+            useCheckoutPaymentUiStore.getState().stripePaymentSession,
+            paymentAction.session,
+          ),
+        );
+      } catch {
+        // Silent — banner still prompts user to pay; resume runs again on CTA tap.
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    stripePaymentSession?.bookingNumber,
+    stripePaymentSession?.expiresAt,
+    resumeCheckoutMutation,
+    setStripePaymentSession,
+  ]);
 
   const { currentEventSlug, currentEventApiData } = useMemo(() => {
     const { currentEventSlug, currentEventApiData } =
@@ -167,6 +238,9 @@ export default function BookingSummary({}: BookingSummaryProps) {
     // Skip restore if we already paid this booking in the current session —
     // prevents re-hydration while the backend webhook is still processing.
     if (store.isBookingCompleted(pending.booking_number)) return;
+
+    // Skip restore if the payment window already expired on this device.
+    if (store.isPendingPaymentExpired(pending.booking_number)) return;
 
     const checkoutResponseShape = {
       booking_number: pending.booking_number,
@@ -499,6 +573,30 @@ export default function BookingSummary({}: BookingSummaryProps) {
 
   const hasPendingStripePayment = Boolean(stripePaymentSession);
 
+  const apiPendingBookingNumber = (
+    currentEventApiData?.pending_payment as
+      | import("@/lib/types/cart.types").ApiPendingPayment
+      | null
+      | undefined
+  )?.booking_number;
+
+  const showExpiredPaymentNotice = Boolean(
+    justExpiredBookingNumber ||
+      (apiPendingBookingNumber &&
+        expiredPendingBookingNumbers.includes(apiPendingBookingNumber) &&
+        !hasPendingStripePayment),
+  );
+
+  const expiredBookingNumber =
+    justExpiredBookingNumber ??
+    (showExpiredPaymentNotice ? (apiPendingBookingNumber ?? null) : null);
+
+  const dismissExpiredPaymentNotice = useCallback(() => {
+    if (!expiredBookingNumber) return;
+    clearExpiredPaymentNotice(expiredBookingNumber);
+    setJustExpiredBookingNumber(null);
+  }, [clearExpiredPaymentNotice, expiredBookingNumber]);
+
   const refreshCartAfterCheckout = useCallback(() => {
     queryClient.invalidateQueries({ queryKey: ["cart-data"] });
     void invalidateCustomerBookingsList(queryClient);
@@ -575,17 +673,80 @@ export default function BookingSummary({}: BookingSummaryProps) {
     />
   );
 
-  // Taller mobile bottom bar when pending-payment strip is shown
+  // Taller mobile bottom bar when pending-payment or expired strip is shown
   useEffect(() => {
     const root = document.querySelector(".checkout-page");
     if (!root) return;
-    if (hasPendingStripePayment) {
+    if (hasPendingStripePayment || showExpiredPaymentNotice) {
       root.setAttribute("data-pending-payment", "true");
     } else {
       root.removeAttribute("data-pending-payment");
     }
     return () => root.removeAttribute("data-pending-payment");
-  }, [hasPendingStripePayment]);
+  }, [hasPendingStripePayment, showExpiredPaymentNotice]);
+
+  const renderExpiredPaymentBanner = (
+    variant: "card" | "mobile-sticky" = "card",
+  ) => {
+    if (!showExpiredPaymentNotice || !expiredBookingNumber) return null;
+
+    const body = (
+      <div className="flex items-start gap-3">
+        <AlertCircle
+          className={cn(
+            "shrink-0 text-red-600",
+            variant === "mobile-sticky" ? "mt-0.5 h-4 w-4" : "mt-0.5 h-4 w-4",
+          )}
+          aria-hidden
+        />
+        <div className="min-w-0 flex-1">
+          <p className="text-xs font-semibold text-red-900">
+            Payment session expired · {expiredBookingNumber}
+          </p>
+          <p className="mt-1 text-xs leading-relaxed text-red-800/90">
+            Your checkout reservation timed out. Your cart is unchanged — use Pay
+            now below to start a new checkout.
+          </p>
+          {variant === "card" ? (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="mt-2 h-7 px-2 text-xs text-red-800 hover:bg-red-100/80 hover:text-red-900"
+              onClick={dismissExpiredPaymentNotice}
+            >
+              Dismiss
+            </Button>
+          ) : null}
+        </div>
+        {variant === "mobile-sticky" ? (
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="h-7 shrink-0 px-2 text-xs text-red-800 hover:bg-red-100/80 hover:text-red-900"
+            onClick={dismissExpiredPaymentNotice}
+          >
+            Dismiss
+          </Button>
+        ) : null}
+      </div>
+    );
+
+    if (variant === "mobile-sticky") {
+      return (
+        <div className="border-b border-red-200/80 bg-red-50/90 px-3 py-3 sm:px-4">
+          {body}
+        </div>
+      );
+    }
+
+    return (
+      <div className="rounded-xl border border-red-200/80 bg-red-50/50 px-4 py-3">
+        {body}
+      </div>
+    );
+  };
 
   const renderPendingPaymentBanner = (
     variant: "card" | "mobile-sticky" = "card",
@@ -594,26 +755,34 @@ export default function BookingSummary({}: BookingSummaryProps) {
 
     const isUrgent =
       sessionSecondsLeft !== null && sessionSecondsLeft <= 60;
+    const hasTimer = sessionSecondsLeft !== null && sessionSecondsLeft > 0;
 
-    const timerPill =
-      sessionSecondsLeft !== null ? (
-        <PaymentSessionCountdownPill
-          secondsLeft={sessionSecondsLeft}
-          size={variant === "mobile-sticky" ? "md" : "sm"}
-        />
-      ) : null;
+    const timerPill = hasTimer ? (
+      <PaymentSessionCountdownPill
+        secondsLeft={sessionSecondsLeft}
+        size={variant === "mobile-sticky" ? "md" : "sm"}
+      />
+    ) : null;
+
+    const countdownMessage = hasTimer
+      ? isUrgent
+        ? `Only ${formatPaymentTimeRemainingVerbose(sessionSecondsLeft)} left — complete payment now.`
+        : `${formatPaymentTimeRemainingVerbose(sessionSecondsLeft)} left to complete payment and keep this booking reserved.`
+      : isUrgent
+        ? "Hurry! Your reserved session expires soon."
+        : "Complete payment to keep your booking reserved.";
 
     if (variant === "mobile-sticky") {
       return (
         <div
           className={cn(
-            "border-b px-3 py-2.5 sm:px-4",
+            "border-b px-3 py-3 sm:px-4",
             isUrgent
               ? "border-red-200/80 bg-red-50/90"
               : "border-amber-200/80 bg-amber-50/90",
           )}
         >
-          <div className="flex items-center justify-between gap-3">
+          <div className="flex items-start justify-between gap-3">
             <div className="min-w-0 flex-1">
               <p
                 className={cn(
@@ -625,13 +794,11 @@ export default function BookingSummary({}: BookingSummaryProps) {
               </p>
               <p
                 className={cn(
-                  "mt-0.5 text-[11px] leading-snug",
-                  isUrgent ? "text-red-800/90" : "text-amber-800/90",
+                  "mt-1 text-[12px] font-medium leading-snug",
+                  isUrgent ? "text-red-800" : "text-amber-900/95",
                 )}
               >
-                {isUrgent
-                  ? "Hurry! Your reserved session expires soon."
-                  : "Complete payment to keep your booking reserved."}
+                {countdownMessage}
               </p>
             </div>
             {timerPill}
@@ -649,7 +816,7 @@ export default function BookingSummary({}: BookingSummaryProps) {
             : "border-amber-200/80 bg-amber-50/50",
         )}
       >
-        <div className="flex items-center justify-between gap-2">
+        <div className="flex items-start justify-between gap-3">
           <p
             className={cn(
               "text-xs font-semibold",
@@ -662,13 +829,11 @@ export default function BookingSummary({}: BookingSummaryProps) {
         </div>
         <p
           className={cn(
-            "mt-1 text-xs leading-relaxed",
+            "mt-1.5 text-xs leading-relaxed",
             isUrgent ? "text-red-800/90" : "text-amber-800/90",
           )}
         >
-          {isUrgent
-            ? "Hurry! Your reserved session expires soon."
-            : "Your booking is reserved. Complete payment to confirm — closing the window does not cancel your booking."}
+          {countdownMessage}
         </p>
       </div>
     );
@@ -823,6 +988,7 @@ export default function BookingSummary({}: BookingSummaryProps) {
   // ──────────────────────────────────────────────
   const OrderSummaryContent = () => (
     <div className="space-y-4">
+      {renderExpiredPaymentBanner("card")}
       {renderPendingPaymentBanner("card")}
 
       {availableDates.length > 0 && hasPayableTotal && (
@@ -1044,7 +1210,8 @@ export default function BookingSummary({}: BookingSummaryProps) {
       <div className="lg:hidden">
         {/* Fixed Bottom Bar */}
         <div className="fixed inset-x-0 bottom-0 z-50 border-t border-[color:var(--checkout-border)] bg-white shadow-[0_-4px_20px_rgba(0,0,0,0.08)]">
-          {/* Always-visible pending payment + countdown (not hidden in drawer) */}
+          {/* Always-visible pending / expired payment strip (not hidden in drawer) */}
+          {renderExpiredPaymentBanner("mobile-sticky")}
           {renderPendingPaymentBanner("mobile-sticky")}
           {/* Expandable Drawer */}
           <AnimatePresence>

@@ -544,7 +544,7 @@ export default function CartManager({}: CartManagerProps) {
 
   if (roomMode && rooms.length > 0 && activeRoomId != null && activeRoom) {
     return (
-      <div className="space-y-4">
+      <div id="checkout-cart-section" className="space-y-4">
         {bookingHeader}
 
         <RoomTabSelector
@@ -566,7 +566,7 @@ export default function CartManager({}: CartManagerProps) {
   }
 
   return (
-    <div className="space-y-4">
+    <div id="checkout-cart-section" className="space-y-4">
       {bookingHeader}
       <div className="space-y-3">{dateSections}</div>
     </div>
