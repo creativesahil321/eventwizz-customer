@@ -96,6 +96,12 @@ export default function AdjustBookingContent({
         const bookingCanPay = apiSummary?.can_pay_now !== false;
         const isRoomSystem = bookingData.is_room_system === true;
 
+        const effectiveBookingPaymentStatus =
+          outstandingAmount > 0 &&
+          paymentStatusLabel.toLowerCase().includes("paid")
+            ? "Partial Payment"
+            : paymentStatusLabel;
+
         const dates: (BookingDateSource & {
           booking_date_id: number;
           is_menu_choice?: boolean;
@@ -116,9 +122,20 @@ export default function AdjustBookingContent({
               : null;
           const paidAmountForDate = parseAmount(dateEntry.paid_amount);
           const totalAmountForDate = parseAmount(dateEntry.total_amount);
-          const paymentStatus = normalizePaymentStatus(
+          const hasPendingReschedule = (dateEntry.reschedule_requests?.length ?? 0) > 0;
+          const rawPaymentStatus = normalizePaymentStatus(
             dateEntry.payment_status_label,
           );
+          const paymentStatus =
+            pendingAmount != null && pendingAmount > 0 && rawPaymentStatus === "paid"
+              ? "partial"
+              : rawPaymentStatus;
+          const paymentStatusLabel =
+            pendingAmount != null && pendingAmount > 0
+              ? hasPendingReschedule
+                ? "Reschedule Due"
+                : dateEntry.payment_status_label?.trim() || "Partial"
+              : dateEntry.payment_status_label?.trim() || undefined;
           const dateCanPay =
             bookingCanPay &&
             dateEntry.can_pay_now !== false &&
@@ -143,7 +160,7 @@ export default function AdjustBookingContent({
             package_title: dateEntry.package_title,
             item_summary: dateEntry.item_summary,
             paymentStatus,
-            paymentStatusLabel: dateEntry.payment_status_label?.trim() || undefined,
+            paymentStatusLabel,
             addOnsPaymentStatus: normalizePaymentStatusForAddOnsDate(
               dateEntry.payment_status_label,
             ),
@@ -170,7 +187,7 @@ export default function AdjustBookingContent({
           booking_number:
             bookingData.booking_number || bookingData.booking_id.toString(),
           location: bookingData.location,
-          payment_status: paymentStatusLabel,
+          payment_status: effectiveBookingPaymentStatus,
           canPayNow: bookingCanPay && outstandingAmount > 0,
           isRoomSystem: bookingData.is_room_system === true,
           is_menu_choice: bookingData.is_menu_choice || false,

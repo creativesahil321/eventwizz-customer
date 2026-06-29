@@ -28,6 +28,7 @@ import {
 import { useCurrencyFormat } from "@/hooks/use-currency-format";
 import { useBookingPayment, bookingsKeys, useRescheduleBooking } from "@/services/customer/bookings/query";
 import { resolveBookingPaymentAction } from "@/services/customer/bookings/booking-payment";
+import { resolveReschedulePaymentAction } from "@/services/customer/bookings/reschedule-payment";
 import type { BookingPaymentResponse } from "@/services/customer/bookings/type";
 import type { CheckoutStripePaymentSession } from "@/services/customer/checkout";
 import CheckoutStripePaymentModal from "@/app/(public)/vendor/checkout/_components/checkout-stripe-payment-modal";
@@ -617,8 +618,14 @@ export default function BookingCheckoutPage({
   const paymentDate = dates.find((d) => d.id === paymentDateId);
 
   const handlePayForDate = (dateId: string) => {
+    const date = dates.find((d) => d.id === dateId) as CheckoutDate | undefined;
+    const pendingRequest =
+      date?.reschedule_requests?.find((request) => request.unpaid_amount > 0) ??
+      date?.reschedule_requests?.[0] ??
+      null;
+
     setPaymentDateId(dateId);
-    setRescheduleRequest(null);
+    setRescheduleRequest(pendingRequest);
     setPaymentModalOpen(true);
   };
 
@@ -634,10 +641,23 @@ export default function BookingCheckoutPage({
 
     rescheduleMutation.mutate(payload, {
       onSuccess: (response) => {
-        if (response.status && !response.data?.payment?.redirect_url) {
+        if (!response.status || !response.data) return;
+
+        const action = resolveReschedulePaymentAction(response.data);
+        if (action?.type === "stripe") {
           setRescheduleModalOpen(false);
           setSelectedDateForReschedule(null);
+          setStripePaymentSession(action.session);
+          setIsStripePaymentOpen(true);
+          return;
         }
+
+        if (action?.type === "redirect") {
+          return;
+        }
+
+        setRescheduleModalOpen(false);
+        setSelectedDateForReschedule(null);
       },
     });
   };
@@ -688,6 +708,9 @@ export default function BookingCheckoutPage({
         queryKey: bookingsKeys.bookingDetail(parsedBookingId),
       });
       queryClient.invalidateQueries({
+        queryKey: bookingsKeys.rescheduleDates(),
+      });
+      queryClient.invalidateQueries({
         queryKey: bookingsKeys.lists(),
       });
     }
@@ -695,6 +718,8 @@ export default function BookingCheckoutPage({
     setIsStripePaymentOpen(false);
     setPaymentDateId(null);
     setRescheduleRequest(null);
+    setRescheduleModalOpen(false);
+    setSelectedDateForReschedule(null);
   }, [bookingId, queryClient]);
 
   const submitPayment = (targetDates: CheckoutDate[]) => {
@@ -773,9 +798,13 @@ export default function BookingCheckoutPage({
                     <StatusBadge
                       status={paymentStatus}
                       label={
-                        paymentStatus.toLowerCase().includes("paid")
-                          ? "Paid"
-                          : undefined
+                        bookingOutstanding > 0
+                          ? paymentStatus.toLowerCase().includes("partial")
+                            ? "Partial"
+                            : undefined
+                          : paymentStatus.toLowerCase().includes("paid")
+                            ? "Paid"
+                            : undefined
                       }
                       className="text-[11px] font-semibold"
                     />
@@ -994,7 +1023,7 @@ export default function BookingCheckoutPage({
             </div>
           )}
 
-          {!hasMultipleDates ? null : (
+          {(hasMultipleDates || bookingOutstanding > 0 || pendingExtrasTotal > 0) && (
           <div className="bg-foreground text-card p-4 sm:p-6 lg:p-8 py-4 lg:rounded-b-xl">
             <div className="flex items-center justify-between gap-4">
               <div>
@@ -1026,6 +1055,22 @@ export default function BookingCheckoutPage({
                   disabled={paymentMutation.isPending}
                 >
                   {paymentMutation.isPending ? "Processing…" : "Pay All"}
+                </Button>
+              ) : !isFullyPaid && payableDates.length === 1 ? (
+                <Button
+                  type="button"
+                  size="lg"
+                  className="h-11 shrink-0 rounded-lg px-7 text-sm font-bold shadow-none hover:opacity-[0.92]"
+                  style={{
+                    backgroundColor: "var(--color-primary)",
+                    color: "var(--color-primary-foreground, var(--primary-foreground))",
+                  }}
+                  onClick={() => handlePayForDate(payableDates[0].id)}
+                  disabled={paymentMutation.isPending}
+                >
+                  {paymentMutation.isPending
+                    ? "Processing…"
+                    : `Pay ${formatCurrency(bookingOutstanding)}`}
                 </Button>
               ) : isFullyPaid ? (
                 <div className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-emerald-400/80 bg-emerald-600 px-4 py-2 text-xs font-bold text-white shadow-sm">
@@ -1081,6 +1126,7 @@ export default function BookingCheckoutPage({
           bookingDateId={selectedDateForReschedule.booking_date_id}
           hasAddons={dateHasAddons(selectedDateForReschedule)}
           isProcessing={rescheduleMutation.isPending}
+          bookingPaymentGateways={paymentGateways}
           onConfirm={handleRescheduleConfirm}
         />
       )}

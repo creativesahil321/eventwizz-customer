@@ -40,6 +40,7 @@ import {
   bookingsKeys,
 } from "@/services/customer/bookings/query";
 import { resolveBookingPaymentAction } from "@/services/customer/bookings/booking-payment";
+import { resolveReschedulePaymentAction } from "@/services/customer/bookings/reschedule-payment";
 import type {
   RescheduleBookingPayload,
   BookingPaymentPayload,
@@ -346,21 +347,23 @@ export default function BookingInfoTab({ bookingData }: BookingInfoTabProps) {
 
     rescheduleMutation.mutate(payload, {
       onSuccess: (response) => {
-        if (response.status) {
-          // Check if payment gateway redirect is required
-          // If redirect_url exists, the mutation hook will handle the redirect
-          // and the modal will stay open during the redirect process
-          if (!response.data?.payment?.redirect_url) {
-            // No payment required, close modal
-            // Toast is handled by API interceptor
-            // Data will be refetched automatically via query invalidation
-            setRescheduleModalOpen(false);
-            setSelectedDateForReschedule(null);
-          }
-          // If payment redirect exists, keep modal open during redirect
-          // The page will navigate away to payment gateway
+        if (!response.status || !response.data) return;
+
+        const action = resolveReschedulePaymentAction(response.data);
+        if (action?.type === "stripe") {
+          setRescheduleModalOpen(false);
+          setSelectedDateForReschedule(null);
+          setStripePaymentSession(action.session);
+          setIsStripePaymentOpen(true);
+          return;
         }
-        // Error toasts are handled by API interceptor
+
+        if (action?.type === "redirect") {
+          return;
+        }
+
+        setRescheduleModalOpen(false);
+        setSelectedDateForReschedule(null);
       },
       onError: (error) => {
         // Error toasts are handled by API interceptor
@@ -458,6 +461,9 @@ export default function BookingInfoTab({ bookingData }: BookingInfoTabProps) {
         queryKey: bookingsKeys.bookingDetail(parsedBookingId),
       });
       queryClient.invalidateQueries({
+        queryKey: bookingsKeys.rescheduleDates(),
+      });
+      queryClient.invalidateQueries({
         queryKey: bookingsKeys.lists(),
       });
     }
@@ -465,6 +471,8 @@ export default function BookingInfoTab({ bookingData }: BookingInfoTabProps) {
     setIsStripePaymentOpen(false);
     setSelectedDateForPayment(null);
     setSelectedRescheduleRequest(null);
+    setRescheduleModalOpen(false);
+    setSelectedDateForReschedule(null);
   }, [bookingData.booking_id, queryClient]);
 
   const getPaymentStatusBadge = (status: string) => (
@@ -1930,6 +1938,7 @@ export default function BookingInfoTab({ bookingData }: BookingInfoTabProps) {
           bookingDateId={selectedDateForReschedule.booking_date_id}
           hasAddons={(selectedDateForReschedule.addons?.total_amount ?? 0) > 0}
           isProcessing={rescheduleMutation.isPending}
+          bookingPaymentGateways={bookingData.payment_gateways}
           onConfirm={handleRescheduleConfirm}
         />
       )}

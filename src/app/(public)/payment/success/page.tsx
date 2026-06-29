@@ -3,7 +3,7 @@
 import React, { useEffect, useState, useCallback, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
-import { invalidateCustomerBookingsList } from "@/services/customer/bookings/query";
+import { invalidateCustomerBookingsList, bookingsKeys } from "@/services/customer/bookings/query";
 import {
   CheckCircle,
   Calendar,
@@ -148,6 +148,15 @@ function PaymentSuccessContent() {
   useEffect(() => {
     if (!paymentData) return;
     void invalidateCustomerBookingsList(queryClient);
+    if (paymentData.booking_id > 0) {
+      void queryClient.invalidateQueries({
+        queryKey: bookingsKeys.bookingDetail(paymentData.booking_id),
+      });
+      void queryClient.refetchQueries({
+        queryKey: bookingsKeys.bookingDetail(paymentData.booking_id),
+        type: "active",
+      });
+    }
   }, [paymentData, queryClient]);
 
   const handleViewBookings = () => {

@@ -25,13 +25,18 @@ import type {
   RescheduleBookingPayload,
   RescheduleDataResponse,
 } from "@/services/customer/bookings/type";
+import {
+  buildRescheduleStorePayload,
+  getAdditionalPaymentRequired,
+  normalizeReschedulePaymentGateways,
+  resolveRescheduleDateKey,
+  resolveRescheduleDateLabel,
+  selectedRequiresPayment,
+} from "@/services/customer/bookings/reschedule-utils";
+import type { ReschedulePaymentGateway } from "@/services/customer/bookings/type";
 import PaymentGatewaySelector from "@/app/(public)/vendor/checkout/_components/payment-gateway-selector";
 import { useCurrencyFormat } from "@/hooks/use-currency-format";
 import { toast } from "sonner";
-
-function resolveRescheduleDateKey(date: AvailableRescheduleDate): string {
-  return date.dateKey ?? date.date_key ?? "";
-}
 
 function normalizeAvailableDates(
   data?: RescheduleDataResponse["data"],
@@ -55,6 +60,8 @@ interface RescheduleDateModalProps {
   bookingDateId: number;
   hasAddons: boolean;
   isProcessing?: boolean;
+  /** From GET show/{bookingId} — used when reschedule GET omits gateways */
+  bookingPaymentGateways?: ReschedulePaymentGateway[];
   onConfirm: (payload: RescheduleBookingPayload) => void;
 }
 
@@ -77,6 +84,7 @@ export function RescheduleDateModal({
   bookingDateId,
   hasAddons,
   isProcessing = false,
+  bookingPaymentGateways,
   onConfirm,
 }: RescheduleDateModalProps) {
   const { format: formatMoney } = useCurrencyFormat();
@@ -86,8 +94,8 @@ export function RescheduleDateModal({
   const [selectedDate, setSelectedDate] =
     useState<AvailableRescheduleDate | null>(null);
   const [termsAccepted, setTermsAccepted] = useState(false);
-  const [selectedPaymentGateway, setSelectedPaymentGateway] = useState<
-    string | null
+  const [selectedPaymentGatewayId, setSelectedPaymentGatewayId] = useState<
+    number | null
   >(null);
   const isSubmittingRef = useRef(false);
 
@@ -113,6 +121,14 @@ export function RescheduleDateModal({
   const rescheduleData = rescheduleDataResponse?.data;
   const availableDates = normalizeAvailableDates(rescheduleData);
   const currentDateData = rescheduleData?.current;
+  const paymentGateways = useMemo(
+    () =>
+      normalizeReschedulePaymentGateways(
+        rescheduleData,
+        bookingPaymentGateways,
+      ),
+    [rescheduleData, bookingPaymentGateways],
+  );
   const isRoomScoped =
     rescheduleData?.is_room_scoped === true ||
     rescheduleData?.is_room_system === true;
@@ -154,18 +170,30 @@ export function RescheduleDateModal({
       setCurrentStep(hasAddons ? "warning" : "select");
       setSelectedDate(null);
       setTermsAccepted(false);
-      setSelectedPaymentGateway(null);
+      setSelectedPaymentGatewayId(null);
       isSubmittingRef.current = false; // Reset submission flag
     }
   }, [isOpen, hasAddons]);
 
   // Auto-select payment gateway when data is loaded (if only one option)
   useEffect(() => {
-    const paymentGateways = rescheduleData?.payment_gateways || [];
-    if (paymentGateways.length === 1 && !selectedPaymentGateway) {
-      setSelectedPaymentGateway(paymentGateways[0].slug);
+    if (paymentGateways.length === 1 && selectedPaymentGatewayId == null) {
+      setSelectedPaymentGatewayId(paymentGateways[0].id);
     }
-  }, [rescheduleData?.payment_gateways, selectedPaymentGateway]);
+  }, [paymentGateways, selectedPaymentGatewayId]);
+
+  const currentPriceValue = currentDateData
+    ? Number.parseFloat(String(currentDateData.price))
+    : currentDate.price;
+
+  const selectedRequiresUpgrade =
+    selectedDate != null &&
+    selectedRequiresPayment(selectedDate, currentPriceValue);
+
+  const selectedAdditionalPayment =
+    selectedDate != null
+      ? getAdditionalPaymentRequired(selectedDate, currentPriceValue)
+      : 0;
 
   const handleClose = () => {
     if (isProcessing) return; // Prevent closing during processing
@@ -189,6 +217,7 @@ export function RescheduleDateModal({
   };
 
   const handleReviewConfirm = () => {
+    if (!selectedDate) return;
     setCurrentStep("confirm");
   };
 
@@ -204,65 +233,27 @@ export function RescheduleDateModal({
       return;
     }
 
-    // Use server-provided unpaid_amount when available; otherwise price delta
-    const currentPriceCalc = Number.parseFloat(currentDateData.price);
-    const unpaidAmountCalc =
-      selectedDate.unpaid_amount != null
-        ? selectedDate.unpaid_amount
-        : selectedDate.price > currentPriceCalc
-          ? selectedDate.price - currentPriceCalc
-          : 0;
-
-    // Get selected payment gateway (only required if there's an unpaid amount)
-    let paymentGateway = "stripe"; // Default fallback
-    if (unpaidAmountCalc > 0) {
-      if (!selectedPaymentGateway) {
-        console.error("Payment gateway not selected");
-        return;
-      }
-      paymentGateway = selectedPaymentGateway;
-    } else {
-      // If no unpaid amount, use default or first available
-      const paymentGateways = rescheduleData?.payment_gateways || [];
-      paymentGateway =
-        paymentGateways.find((pg) => pg.slug === "stripe")?.slug ||
-        paymentGateways[0]?.slug ||
-        "stripe";
-    }
-
-    // Prepare table details payload
-    // allocated_seat is an array of seat allocations per table
-    const tableDetails = selectedDate.table_details.map((table) => ({
-      event_date_table_id: table.event_date_table_id,
-      allocated_seat: table.allocated_seat, // Keep as array
-      table_size: table.table_size,
-      price_per_person: table.price_per_person,
-      total: table.total,
-    }));
-
-    // Set flag to prevent double submission
-    isSubmittingRef.current = true;
-
-    // Call parent with full payload
-    onConfirm({
-      booking_id: bookingId,
-      booking_date_id: bookingDateId,
-      new_booking_date_id: selectedDate.id,
-      new_date: resolveRescheduleDateKey(selectedDate),
-      total_amount: selectedDate.price,
-      unpaid_amount: unpaidAmountCalc,
-      payment_gateway: paymentGateway,
-      table_details: tableDetails,
+    const payload = buildRescheduleStorePayload({
+      bookingId,
+      bookingDateId,
+      selected: selectedDate,
+      current: currentDateData,
+      paymentGateways,
+      paymentGatewayId: selectedPaymentGatewayId,
     });
 
-    // Reset flag after a delay (in case of error, allow retry)
+    if (!payload) {
+      toast.error("Could not prepare reschedule. Please try again.");
+      return;
+    }
+
+    isSubmittingRef.current = true;
+
+    onConfirm(payload);
+
     setTimeout(() => {
       isSubmittingRef.current = false;
     }, 2000);
-
-    // Note: Error handling and processing state are managed in parent component via mutation
-    // Toast notifications are handled by API interceptor
-    // Modal will be closed by parent on success
   };
 
   const handleBack = () => {
@@ -278,12 +269,9 @@ export function RescheduleDateModal({
     }
   };
 
-  // Calculate price difference using selected date and current date data
-  const priceDifference =
-    selectedDate && currentDateData
-      ? selectedDate.price - Number.parseFloat(currentDateData.price)
-      : 0;
-  const isPriceIncrease = priceDifference > 0;
+  // Price difference for review — prefer server `additional_payment_required`
+  const priceDifference = selectedAdditionalPayment;
+  const isPriceIncrease = selectedRequiresUpgrade && priceDifference > 0;
 
   const getStepProgress = () => {
     const steps: Step[] = hasAddons
@@ -562,12 +550,18 @@ export function RescheduleDateModal({
                 ) : (
                   <div className="space-y-2 sm:space-y-3">
                     {availableDates.map((date) => {
-                      const datePriceDiff = date.price - currentDate.price;
-                      const isSame = datePriceDiff === 0;
+                      const dateRequiresPayment = selectedRequiresPayment(
+                        date,
+                        currentPriceValue,
+                      );
+                      const extraPayment = getAdditionalPaymentRequired(
+                        date,
+                        currentPriceValue,
+                      );
 
                       return (
                         <div
-                          key={date.id}
+                          key={date.event_date_id ?? date.id}
                           className="border rounded-lg p-3 sm:p-4 transition-all hover:border-blue-400 hover:bg-blue-50/30 cursor-pointer active:scale-[0.98]"
                           onClick={() => handleDateSelect(date)}
                         >
@@ -576,16 +570,21 @@ export function RescheduleDateModal({
                               <div className="flex items-center gap-2 mb-2">
                                 <Calendar className="h-4 w-4 text-gray-600" />
                                 <h4 className="font-semibold text-gray-900">
-                                  {date.date}
+                                  {resolveRescheduleDateLabel(date)}
                                 </h4>
                               </div>
                               <div className="flex items-center gap-2 flex-wrap">
-                                {isSame && (
+                                {!dateRequiresPayment && (
                                   <Badge
                                     variant="secondary"
                                     className="bg-gray-100 text-gray-700"
                                   >
-                                    Same Price
+                                    Same or lower price
+                                  </Badge>
+                                )}
+                                {dateRequiresPayment && extraPayment > 0 && (
+                                  <Badge className="bg-orange-100 text-orange-800 hover:bg-orange-100">
+                                    +{formatMoney(extraPayment)} due
                                   </Badge>
                                 )}
                               </div>
@@ -640,16 +639,27 @@ export function RescheduleDateModal({
                     </div>
                     <div className="space-y-2 text-sm">
                       <p className="font-medium text-red-900">
-                        {currentDateData.date}
+                        {resolveRescheduleDateLabel(currentDateData)}
                       </p>
                       <div className="flex items-center justify-between text-red-700">
                         <span>Price:</span>
                         <span className="font-bold">
-                          {formatMoney(
-                            Number.parseFloat(String(currentDateData.price)),
-                          )}
+                          {formatMoney(currentPriceValue)}
                         </span>
                       </div>
+                      {currentDateData.paid_amount != null &&
+                        String(currentDateData.paid_amount).trim() !== "" && (
+                          <div className="flex items-center justify-between text-red-700">
+                            <span>Paid:</span>
+                            <span className="font-bold">
+                              {formatMoney(
+                                Number.parseFloat(
+                                  String(currentDateData.paid_amount),
+                                ),
+                              )}
+                            </span>
+                          </div>
+                        )}
                       <div className="flex items-center justify-between text-red-700">
                         <span>People:</span>
                         <span>{currentDateData.people}</span>
@@ -677,7 +687,7 @@ export function RescheduleDateModal({
                     </div>
                     <div className="space-y-2 text-sm">
                       <p className="font-medium text-green-900">
-                        {selectedDate.date}
+                        {resolveRescheduleDateLabel(selectedDate)}
                       </p>
                       <div className="flex items-center justify-between text-green-700">
                         <span>Price:</span>
@@ -749,68 +759,63 @@ export function RescheduleDateModal({
                     <div className="flex items-center justify-between text-sm">
                       <span className="text-gray-600">From:</span>
                       <span className="font-medium text-gray-900">
-                        {currentDateData?.date || currentDate.date}
+                        {currentDateData
+                          ? resolveRescheduleDateLabel(currentDateData)
+                          : currentDate.date}
                       </span>
                     </div>
                     <div className="flex items-center justify-between text-sm">
                       <span className="text-gray-600">To:</span>
                       <span className="font-medium text-gray-900">
-                        {selectedDate?.date}
+                        {resolveRescheduleDateLabel(selectedDate)}
                       </span>
                     </div>
+                    {selectedRequiresUpgrade && selectedAdditionalPayment > 0 ? (
+                      <div className="flex items-center justify-between border-t border-blue-100 pt-2 text-sm">
+                        <span className="text-gray-600">Additional payment:</span>
+                        <span className="font-bold text-orange-700">
+                          {formatMoney(selectedAdditionalPayment)}
+                        </span>
+                      </div>
+                    ) : null}
                   </div>
                 </div>
 
-                {/* Payment Gateway Selection - Only show if there's an unpaid amount */}
-                {(() => {
-                  // Calculate unpaid amount for this step
-                  const currentPrice = currentDateData
-                    ? Number.parseFloat(currentDateData.price)
-                    : currentDate.price;
-                  const newPrice = selectedDate.price;
-                  const unpaidAmount =
-                    newPrice > currentPrice ? newPrice - currentPrice : 0;
+                {/* Payment gateway — only when upgrade requires payment */}
+                {selectedRequiresUpgrade &&
+                  selectedAdditionalPayment > 0 &&
+                  paymentGateways.length > 1 && (
+                    <div className="border rounded-lg p-3 sm:p-4 bg-white">
+                      <PaymentGatewaySelector
+                        availableGateways={paymentGateways}
+                        selectedGateway={
+                          selectedPaymentGatewayId != null
+                            ? selectedPaymentGatewayId.toString()
+                            : null
+                        }
+                        onGatewaySelect={(gatewayId) => {
+                          const parsed = Number.parseInt(gatewayId, 10);
+                          setSelectedPaymentGatewayId(
+                            Number.isFinite(parsed) ? parsed : null,
+                          );
+                        }}
+                        disabled={isProcessing}
+                        showError={
+                          selectedPaymentGatewayId == null &&
+                          !isProcessing &&
+                          paymentGateways.length > 1
+                        }
+                      />
+                    </div>
+                  )}
 
-                  // Only show payment gateway if there's an unpaid amount
-                  if (
-                    unpaidAmount > 0 &&
-                    rescheduleData?.payment_gateways &&
-                    rescheduleData.payment_gateways.length > 0
-                  ) {
-                    return (
-                      <div className="border rounded-lg p-3 sm:p-4 bg-white">
-                        <PaymentGatewaySelector
-                          availableGateways={rescheduleData.payment_gateways}
-                          selectedGateway={
-                            selectedPaymentGateway
-                              ? rescheduleData.payment_gateways
-                                  .find(
-                                    (pg) => pg.slug === selectedPaymentGateway
-                                  )
-                                  ?.id.toString() || null
-                              : null
-                          }
-                          onGatewaySelect={(gatewayId) => {
-                            const gateway =
-                              rescheduleData.payment_gateways.find(
-                                (pg) => pg.id.toString() === gatewayId
-                              );
-                            if (gateway) {
-                              setSelectedPaymentGateway(gateway.slug);
-                            }
-                          }}
-                          disabled={isProcessing}
-                          showError={
-                            !selectedPaymentGateway &&
-                            !isProcessing &&
-                            rescheduleData.payment_gateways.length > 1
-                          }
-                        />
-                      </div>
-                    );
-                  }
-                  return null;
-                })()}
+                {selectedRequiresUpgrade && selectedAdditionalPayment > 0 ? (
+                  <p className="text-xs text-muted-foreground">
+                    {paymentGateways.length > 1
+                      ? "Select how you would like to pay the upgrade amount."
+                      : "You will be redirected to secure card payment for the upgrade amount."}
+                  </p>
+                ) : null}
 
                 {/* Terms and Conditions - Compact */}
                 <div className="border rounded-lg p-3 sm:p-4 bg-gray-50">
@@ -925,24 +930,10 @@ export function RescheduleDateModal({
                   isProcessing ||
                   !termsAccepted ||
                   isSubmittingRef.current ||
-                  (() => {
-                    // Only require payment gateway if there's an unpaid amount
-                    if (!selectedDate || !currentDateData) return false;
-                    const currentPriceCheck = Number.parseFloat(
-                      currentDateData.price
-                    );
-                    const newPriceCheck = selectedDate.price;
-                    const unpaidAmountCheck =
-                      newPriceCheck > currentPriceCheck
-                        ? newPriceCheck - currentPriceCheck
-                        : 0;
-                    return (
-                      unpaidAmountCheck > 0 &&
-                      rescheduleData?.payment_gateways &&
-                      rescheduleData.payment_gateways.length > 1 &&
-                      !selectedPaymentGateway
-                    );
-                  })()
+                  (selectedRequiresUpgrade &&
+                    selectedAdditionalPayment > 0 &&
+                    paymentGateways.length > 1 &&
+                    selectedPaymentGatewayId == null)
                 }
                 className="w-full sm:w-auto"
                 style={{
