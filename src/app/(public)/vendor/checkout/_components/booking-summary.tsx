@@ -87,6 +87,7 @@ export default function BookingSummary({}: BookingSummaryProps) {
   const isCheckoutInProgressRef = useRef(false);
   const stripePaymentCompletedRef = useRef(false);
   const expireHandledRef = useRef(false);
+  const hasLoadedCartRef = useRef(false);
 
   // Session persisted in sessionStorage — survives page refresh
   const {
@@ -119,6 +120,12 @@ export default function BookingSummary({}: BookingSummaryProps) {
     isLoading: isLoadingCartData,
     isFetching: isFetchingCartData,
   } = useGetCartData(!isPreviewMode);
+
+  useEffect(() => {
+    if (apiCartData) {
+      hasLoadedCartRef.current = true;
+    }
+  }, [apiCartData]);
 
   const {
     getDateData,
@@ -839,8 +846,9 @@ export default function BookingSummary({}: BookingSummaryProps) {
     );
   };
 
-  // Show skeleton only on initial load
-  const isInitialLoad = isLoadingCartData && !apiCartData;
+  // Show skeleton only on first visit — never again after delete/refetch.
+  const isInitialLoad =
+    !hasLoadedCartRef.current && isLoadingCartData && !apiCartData;
   if (isInitialLoad && !hasPendingStripePayment) {
     return (
       <>

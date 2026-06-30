@@ -102,7 +102,15 @@ export interface VendorBookingTable {
   table_size: number;
   price_per_person: number;
   no_tables: number;
-  allocation: Record<string, number>; // { "214": 15, "215": 15 } - tableId: peopleCount
+  allocation:
+    | Record<string, number | string>
+    | Array<{
+        id?: number;
+        table_number?: number | string;
+        final_table_number?: number | string;
+        parent_id?: number;
+        seats?: number;
+      }>;
   people: number;
   total: number;
 }

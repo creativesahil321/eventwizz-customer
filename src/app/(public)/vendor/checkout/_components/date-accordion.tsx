@@ -19,6 +19,7 @@ import {
   Ticket,
   MessageSquare,
   Trash2,
+  Loader2,
 } from "lucide-react";
 import { format } from "date-fns";
 import { toast } from "sonner";
@@ -54,6 +55,8 @@ interface DateAccordionProps {
   isExpanded: boolean;
   onToggle: () => void;
   onRemoveDate?: (date: string) => void;
+  /** Shows a subtle spinner on the date delete control while the API request runs. */
+  isRemoving?: boolean;
   /** Room ID for multi-room events (display/context only — store uses composite key). */
   roomId?: number;
   /** Nested inside the room checkout card (no outer card chrome). */
@@ -99,6 +102,7 @@ export default function DateAccordion({
   isExpanded,
   onToggle,
   onRemoveDate,
+  isRemoving = false,
   roomId,
   embedded = false,
   roomAccentIndex = 0,
@@ -485,11 +489,17 @@ export default function DateAccordion({
             <button
               type="button"
               onClick={() => onRemoveDate(date)}
-              className="rounded-lg p-1.5 text-gray-300 transition-colors hover:bg-red-50 hover:text-red-500"
+              disabled={isRemoving}
+              className="rounded-lg p-1.5 text-gray-300 transition-colors hover:bg-red-50 hover:text-red-500 disabled:pointer-events-none disabled:opacity-60"
               title="Remove this date"
               aria-label="Remove this date"
+              aria-busy={isRemoving}
             >
-              <Trash2 className="h-3.5 w-3.5" />
+              {isRemoving ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin text-red-400" />
+              ) : (
+                <Trash2 className="h-3.5 w-3.5" />
+              )}
             </button>
           )}
 

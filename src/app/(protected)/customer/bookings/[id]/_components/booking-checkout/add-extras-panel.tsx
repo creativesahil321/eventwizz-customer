@@ -5,6 +5,9 @@ import { ChevronDown, Plus, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAddOnsDetails } from "@/services/customer/bookings/hooks/useAddOnsDetails";
 import { useSaveAddOns } from "@/services/customer/bookings/hooks/useSaveAddOns";
+import { useVendorAddOns } from "@/services/vendor/bookings/hooks/useVendorAddOns";
+import { useSaveVendorAddOns } from "@/services/vendor/bookings/hooks/useSaveVendorAddOns";
+import { mapVendorAddOnsToCustomer } from "@/app/(protected)/vendor/booking-history/[id]/_components/map-vendor-addons-to-customer";
 import {
   isBookingDateEligibleForAddOns,
   type BookingDatePaymentStatus,
@@ -70,6 +73,8 @@ interface AddExtrasSectionProps {
   formatUnit: (amount: number) => string;
   onPendingTotalChange?: (total: number, itemCount: number) => void;
   onSaveSuccess?: () => void;
+  /** When `vendor`, uses vendor add-ons API (vendor booking dashboard). */
+  addonApi?: "customer" | "vendor";
 }
 
 function getNewTableStock(table: AddOnsTable): number {
@@ -513,14 +518,44 @@ export function AddExtrasSection({
   formatUnit,
   onPendingTotalChange,
   onSaveSuccess,
+  addonApi = "customer",
 }: AddExtrasSectionProps) {
   const eligible = isBookingDateEligibleForAddOns(paymentStatus);
-  const { data: addOnsData, isLoading } = useAddOnsDetails(
+  const useVendorApi = addonApi === "vendor";
+
+  const customerAddonsQuery = useAddOnsDetails(
     bookingId,
-    eligible ? dateKey : "",
+    eligible && !useVendorApi ? dateKey : "",
     roomId,
   );
-  const { mutate: saveAddOns, isPending: isSavingAddOns } = useSaveAddOns();
+  const vendorAddonsQuery = useVendorAddOns(
+    bookingId,
+    dateKey,
+    eligible && useVendorApi && open,
+  );
+
+  const addOnsData = useVendorApi
+    ? vendorAddonsQuery.data?.data
+      ? {
+          ...vendorAddonsQuery.data,
+          data: mapVendorAddOnsToCustomer(vendorAddonsQuery.data.data),
+        }
+      : undefined
+    : customerAddonsQuery.data;
+
+  const isLoading = useVendorApi
+    ? vendorAddonsQuery.isLoading
+    : customerAddonsQuery.isLoading;
+
+  const { mutate: saveCustomerAddOns, isPending: isSavingCustomerAddOns } =
+    useSaveAddOns();
+  const { mutate: saveVendorAddOns, isPending: isSavingVendorAddOns } =
+    useSaveVendorAddOns(bookingId);
+
+  const saveAddOns = useVendorApi ? saveVendorAddOns : saveCustomerAddOns;
+  const isSavingAddOns = useVendorApi
+    ? isSavingVendorAddOns
+    : isSavingCustomerAddOns;
 
   const [tickets, setTickets] = useState<CatalogItem[]>([]);
   const [drinks, setDrinks] = useState<CatalogItem[]>([]);

@@ -1,6 +1,8 @@
 "use client";
 
 import { useMemo, useState, useEffect, useLayoutEffect, useRef } from "react";
+import { useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 import {
   ShoppingCart,
   CalendarPlus,
@@ -9,6 +11,7 @@ import {
   Trash2,
   MoreHorizontal,
   Package,
+  Loader2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
@@ -55,11 +58,13 @@ type CartManagerProps = Record<string, never>;
 
 export default function CartManager({}: CartManagerProps) {
   const [isProcessing, setIsProcessing] = useState(false);
+  const [removingDateKey, setRemovingDateKey] = useState<string | null>(null);
   const [expandedDates, setExpandedDates] = useState<Set<string>>(new Set());
   const [showClearConfirm, setShowClearConfirm] = useState(false);
   const [showActions, setShowActions] = useState(false);
   const [activeRoomId, setActiveRoomId] = useState<number | null>(null);
   const hasInitializedExpanded = useRef(false);
+  const hasLoadedCartRef = useRef(false);
   const isPreviewMode = useIsPreviewMode();
   const { data: session } = useSession();
 
@@ -88,6 +93,7 @@ export default function CartManager({}: CartManagerProps) {
   const { syncCart } = useCartSync(apiCartData);
   const deleteCartDateMutation = useDeleteCartDate();
   const clearAllCartMutation = useClearAllCart();
+  const queryClient = useQueryClient();
   const { format: formatMoney } = useCurrencyFormat();
 
   const { currentEventSlug, currentEventApiData, firstDate } = useMemo(() => {
@@ -341,45 +347,61 @@ export default function CartManager({}: CartManagerProps) {
   }, [currentEventSlug, currentEventApiData, roomMode, getDateData]);
 
   const handleRemoveDate = async (dateKey: string) => {
+    if (removingDateKey || deleteCartDateMutation.isPending) return;
+
+    setRemovingDateKey(dateKey);
+
+    // Optimistic: remove locally immediately so the row disappears without waiting on the API.
+    if (currentEventSlug) {
+      removeDate(currentEventSlug, dateKey);
+    }
+    setExpandedDates((prev) => {
+      const newSet = new Set(prev);
+      newSet.delete(dateKey);
+      return newSet;
+    });
+
     try {
-      setIsProcessing(true);
       const { roomId, date: eventDate } = parseRoomDateKey(dateKey);
       await deleteCartDateMutation.mutateAsync({
         eventDate,
         roomId: roomId ?? undefined,
         storeDateKey: dateKey,
       });
-      if (currentEventSlug) {
-        removeDate(currentEventSlug, dateKey);
-      }
-      setExpandedDates((prev) => {
-        const newSet = new Set(prev);
-        newSet.delete(dateKey);
-        return newSet;
-      });
     } catch (error) {
       console.error("Error removing date:", error);
+      toast.error("Couldn't remove this date. Please try again.");
+      void queryClient.invalidateQueries({ queryKey: ["cart-data"] });
     } finally {
-      setIsProcessing(false);
+      setRemovingDateKey(null);
     }
   };
 
   const handleClearAllCart = async () => {
     try {
       setIsProcessing(true);
-      await clearAllCartMutation.mutateAsync();
       clearAllCarts();
       setExpandedDates(new Set());
       setShowClearConfirm(false);
+      await clearAllCartMutation.mutateAsync();
     } catch (error) {
       console.error("Error clearing cart:", error);
+      toast.error("Couldn't clear your cart. Please try again.");
+      void queryClient.invalidateQueries({ queryKey: ["cart-data"] });
     } finally {
       setIsProcessing(false);
     }
   };
 
-  // Show skeleton only on initial load
-  const isInitialLoad = isLoadingCartData && !apiCartData;
+  useEffect(() => {
+    if (apiCartData) {
+      hasLoadedCartRef.current = true;
+    }
+  }, [apiCartData]);
+
+  // Show skeleton only on first visit — never again after delete/refetch.
+  const isInitialLoad =
+    !hasLoadedCartRef.current && isLoadingCartData && !apiCartData;
   if (isInitialLoad) {
     return <CartSkeletonLoader />;
   }
@@ -531,6 +553,7 @@ export default function CartManager({}: CartManagerProps) {
               isExpanded={isExpanded}
               onToggle={() => toggleDateExpansion(date)}
               onRemoveDate={handleRemoveDate}
+              isRemoving={removingDateKey === date}
               roomId={roomMode ? (activeRoomId ?? undefined) : undefined}
               embedded={roomMode}
               roomAccentIndex={activeRoomIndex}
