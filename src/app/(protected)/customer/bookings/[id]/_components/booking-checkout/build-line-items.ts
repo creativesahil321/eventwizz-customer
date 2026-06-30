@@ -267,6 +267,13 @@ export function buildLineItemsForDate(
   });
 
   date.tables?.forEach((table, idx) => {
+    const isAddonTable = isPaidAddonRecord(table);
+    const menuChoiceContext = buildMenuChoiceContext(
+      date,
+      table,
+      options?.bookingId,
+    );
+
     const base = {
       id: `table-${date.id}-${table.id}-${idx}`,
       kind: "table" as const,
@@ -276,20 +283,13 @@ export function buildLineItemsForDate(
       amount: normalizeLineAmount(table.total_amount),
       unitPrice: table.unit_price,
       quantity: table.table_count > 1 ? table.table_count : undefined,
-      showMenuChoices: true,
+      showMenuChoices: menuChoiceContext != null,
     };
 
-    const menuChoiceContext = buildMenuChoiceContext(
-      date,
-      table,
-      options?.bookingId,
-    );
-
-    if (isPaidAddonRecord(table)) {
+    if (isAddonTable) {
       pushPaidAddonBookingItem(items, {
         ...base,
         allocation: formatAllocations(table.allocations, table.table_size),
-        showMenuChoices: true,
         menuChoiceContext,
       });
       return;
@@ -308,11 +308,6 @@ export function buildLineItemsForDate(
 
   date.addons?.tables?.forEach((table, idx) => {
     const unitPrice = parseUnitPrice(table.unit_price);
-    const menuChoiceContext = buildMenuChoiceContext(
-      date,
-      table,
-      options?.bookingId,
-    );
     items.push({
       id: `addon-table-${date.id}-${idx}`,
       kind: "table",
@@ -322,8 +317,6 @@ export function buildLineItemsForDate(
       unitPrice,
       quantity: table.table_count && table.table_count > 1 ? table.table_count : undefined,
       allocation: formatAllocations(table.allocations, table.table_size),
-      showMenuChoices: true,
-      menuChoiceContext,
       isSavedAddon: true,
       deletable: true,
       deletePayload: {

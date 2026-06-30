@@ -34,6 +34,11 @@ import {
   type ExistingTableSlot,
 } from "./fill-existing-tables-panel";
 import type { BookingDateSource } from "./build-line-items";
+import type { AddOnsTable } from "@/services/customer/bookings/type";
+import {
+  generateTableRecommendations,
+  type AvailableTableSize,
+} from "../../_lib/table-recommendations";
 
 interface CatalogItem {
   id: number;
@@ -67,10 +72,74 @@ interface AddExtrasSectionProps {
   onSaveSuccess?: () => void;
 }
 
-function maxGroupSizeForGuests(tableConfig: TableSeatingConfig): number {
-  return tableConfig.maxTables > 0
-    ? tableConfig.maxTables * tableConfig.max
-    : tableConfig.max;
+function getNewTableStock(table: AddOnsTable): number {
+  const stock = table.available_new_tables ?? table.available_tables;
+  return Math.max(0, stock ?? 0);
+}
+
+function canBookNewTable(table: AddOnsTable): boolean {
+  return table.can_add_new_table !== false && getNewTableStock(table) > 0;
+}
+
+function toAvailableTableSize(table: AddOnsTable): AvailableTableSize {
+  return {
+    id: table.id,
+    size: table.max_persons,
+    min_persons: table.min_persons,
+    max_persons: table.max_persons,
+    price: table.price,
+    available: getNewTableStock(table),
+  };
+}
+
+function toTableSeatingConfig(table: AddOnsTable): TableSeatingConfig {
+  const stock = getNewTableStock(table);
+  return {
+    id: table.id,
+    min: Math.max(1, table.min_persons),
+    max: Math.max(table.min_persons, table.max_persons),
+    price: Math.max(0, table.price),
+    maxTables: stock,
+  };
+}
+
+/** Max guests: free seats on booked tables + all new-table capacity across tiers. */
+function computeMaxAddableGuests(
+  catalogTables: AddOnsTable[],
+  existingFreeSeats: number,
+): number {
+  const newCapacity = catalogTables.reduce((sum, table) => {
+    if (!canBookNewTable(table)) return sum;
+    const maxPersons = Math.max(table.min_persons, table.max_persons);
+    return sum + getNewTableStock(table) * maxPersons;
+  }, 0);
+
+  return existingFreeSeats + newCapacity;
+}
+
+function resolveActiveTableConfig(
+  catalogTables: AddOnsTable[],
+  guestsNeedingNewTable: number,
+): TableSeatingConfig | null {
+  const eligible = catalogTables.filter(canBookNewTable);
+  if (eligible.length === 0) return null;
+
+  if (guestsNeedingNewTable <= 0) {
+    return toTableSeatingConfig(eligible[0]);
+  }
+
+  const sizes = eligible.map(toAvailableTableSize);
+  const { recommended } = generateTableRecommendations(
+    sizes,
+    guestsNeedingNewTable,
+  );
+  const picked = recommended[0]?.table;
+  if (picked) {
+    const match = eligible.find((table) => table.id === picked.id);
+    if (match) return toTableSeatingConfig(match);
+  }
+
+  return toTableSeatingConfig(eligible[0]);
 }
 
 /** Booked table rate for add-guests flow — not the first catalog table tier. */
@@ -350,17 +419,31 @@ function CatalogCard({
   );
 }
 
+function formatPendingExtrasSummary(
+  tableGuestCount: number,
+  catalogItemCount: number,
+): string | null {
+  const parts: string[] = [];
+  if (tableGuestCount > 0) {
+    parts.push(`${tableGuestCount} guest${tableGuestCount === 1 ? "" : "s"}`);
+  }
+  if (catalogItemCount > 0) {
+    parts.push(`${catalogItemCount} item${catalogItemCount === 1 ? "" : "s"}`);
+  }
+  return parts.length > 0 ? parts.join(", ") : null;
+}
+
 function AddExtrasHeader({
   open,
   onToggle,
-  pendingGuestCount,
+  pendingSummaryLabel,
   pendingTotalFormatted,
   isSaving,
   onSave,
 }: {
   open: boolean;
   onToggle: () => void;
-  pendingGuestCount: number;
+  pendingSummaryLabel: string | null;
   pendingTotalFormatted: string;
   isSaving: boolean;
   onSave: () => void;
@@ -388,7 +471,7 @@ function AddExtrasHeader({
           strokeWidth={2}
         />
       </button>
-      {pendingGuestCount > 0 && (
+      {pendingSummaryLabel && (
         <div className="flex flex-col gap-2 border-t border-border/50 pt-2 sm:flex-row sm:items-center sm:justify-between">
           <span
             className="self-start rounded-full px-3 py-1 text-[0.6875rem] font-semibold tabular-nums whitespace-nowrap"
@@ -397,8 +480,7 @@ function AddExtrasHeader({
               color: "var(--color-primary)",
             }}
           >
-            {pendingGuestCount} guest{pendingGuestCount === 1 ? "" : "s"} ·{" "}
-            {pendingTotalFormatted}
+            {pendingSummaryLabel} · {pendingTotalFormatted}
           </span>
           <button
             type="button"
@@ -442,9 +524,6 @@ export function AddExtrasSection({
 
   const [tickets, setTickets] = useState<CatalogItem[]>([]);
   const [drinks, setDrinks] = useState<CatalogItem[]>([]);
-  const [tableConfig, setTableConfig] = useState<TableSeatingConfig | null>(
-    null,
-  );
   const [tableSeating, setTableSeating] = useState<TableSeatingSnapshot>({
     groupSize: 0,
     allocation: [],
@@ -483,11 +562,32 @@ export function AddExtrasSection({
     [availableExistingTableSlots],
   );
 
+  const catalogTables = addOnsData?.data?.tables ?? [];
+
   /** Guests to place on a new table (total minus any optional existing-table fill). */
   const guestsNeedingNewTable = useMemo(() => {
     if (!useAddGuestsFlow || guestsToAdd <= 0) return 0;
     return Math.max(0, guestsToAdd - existingFill.totalAdded);
   }, [useAddGuestsFlow, guestsToAdd, existingFill.totalAdded]);
+
+  const tableConfig = useMemo(
+    () =>
+      resolveActiveTableConfig(
+        catalogTables,
+        useAddGuestsFlow ? guestsNeedingNewTable : tableSeating.groupSize,
+      ),
+    [
+      catalogTables,
+      useAddGuestsFlow,
+      guestsNeedingNewTable,
+      tableSeating.groupSize,
+    ],
+  );
+
+  const maxAddableGuests = useMemo(
+    () => computeMaxAddableGuests(catalogTables, totalFreeExistingSeats),
+    [catalogTables, totalFreeExistingSeats],
+  );
 
   const guestAddPriceHint = useMemo(
     () =>
@@ -586,19 +686,6 @@ export function AddExtrasSection({
         }),
     );
 
-    const firstTable = addOnsData.data.tables[0];
-    if (firstTable && firstTable.available_tables > 0) {
-      setTableConfig({
-        id: firstTable.id,
-        min: Math.max(1, firstTable.min_persons),
-        max: Math.max(firstTable.min_persons, firstTable.max_persons),
-        price: Math.max(0, firstTable.price),
-        maxTables: Math.max(0, firstTable.available_tables),
-      });
-    } else {
-      setTableConfig(null);
-    }
-
     setTableSeating({
       groupSize: 0,
       allocation: [],
@@ -665,17 +752,25 @@ export function AddExtrasSection({
     tickets.reduce((s, t) => s + t.quantity, 0) +
     drinks.reduce((s, d) => s + d.quantity, 0);
   const tableGuestCount = existingFill.totalAdded + newTablePlacedCount;
-  const pendingGuestCount = catalogItemCount + tableGuestCount;
+  const pendingTableGuestCount =
+    useAddGuestsFlow && guestsToAdd > 0 ? guestsToAdd : tableGuestCount;
+  const pendingSummaryLabel = formatPendingExtrasSummary(
+    pendingTableGuestCount,
+    catalogItemCount,
+  );
   const pendingTotal =
     ticketTotal + drinkTotal + existingFill.totalCost + tableSeating.tableTotal;
   const tableGuestTotal = existingFill.totalCost + tableSeating.tableTotal;
 
   useEffect(() => {
-    onPendingTotalChange?.(pendingTotal, pendingGuestCount);
-  }, [pendingTotal, pendingGuestCount, onPendingTotalChange]);
+    onPendingTotalChange?.(
+      pendingTotal,
+      catalogItemCount + tableGuestCount,
+    );
+  }, [pendingTotal, catalogItemCount, tableGuestCount, onPendingTotalChange]);
 
   const handleSave = useCallback(() => {
-    if (!eligible || pendingGuestCount === 0 || isSavingAddOns) return;
+    if (!eligible || pendingTotal <= 0 || isSavingAddOns) return;
 
     const overTicket = tickets.find((t) => t.quantity > t.maxQuantity);
     if (overTicket) {
@@ -836,7 +931,7 @@ export function AddExtrasSection({
     existingFill,
     guestsToAdd,
     onSaveSuccess,
-    pendingGuestCount,
+    pendingTotal,
     resetExtrasCatalog,
     saveAddOns,
     tableConfig,
@@ -861,7 +956,7 @@ export function AddExtrasSection({
       <AddExtrasHeader
         open={open}
         onToggle={onToggle}
-        pendingGuestCount={pendingGuestCount}
+        pendingSummaryLabel={pendingSummaryLabel}
         pendingTotalFormatted={pendingTotalFormatted}
         isSaving={isSavingAddOns}
         onSave={handleSave}
@@ -963,7 +1058,7 @@ export function AddExtrasSection({
                   </div>
                   <QuantityStepper
                     value={guestsToAdd}
-                    max={maxGroupSizeForGuests(tableConfig)}
+                    max={maxAddableGuests}
                     onChange={setGuestsToAdd}
                     size="sm"
                     useKindAccent

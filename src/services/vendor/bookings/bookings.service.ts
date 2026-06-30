@@ -22,6 +22,22 @@ import type {
   VendorUpdateBookingStatusResponse,
 } from "./type";
 
+export interface VendorBookingRoomFilterOption {
+  room_id: number;
+  room_name: string;
+}
+
+export interface VendorBookingFilterMeta {
+  from_date?: string | null;
+  to_date?: string | null;
+  date_filter_on?: string | null;
+  has_room_bookings?: boolean;
+  room_scope?: string | null;
+  selected_room_id?: number | null;
+  selected_room_name?: string | null;
+  available_rooms?: VendorBookingRoomFilterOption[];
+}
+
 export interface VendorBookingHistoryResponse {
   status: boolean;
   message: string;
@@ -34,6 +50,8 @@ export interface VendorBookingHistoryResponse {
     refunded_amount?: string;
     platform_fee_due?: string;
   };
+  summary_by_location?: unknown[];
+  filter_meta?: VendorBookingFilterMeta;
   links: {
     first: string | null;
     last: string | null;
@@ -186,6 +204,7 @@ export interface VendorBookingsQueryParams {
   event_date?: string;
   from_date?: string;
   to_date?: string;
+  room_id?: number | string;
 }
 
 /**

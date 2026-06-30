@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   ArrowLeft,
-  CheckCircle2,
   ChevronDown,
   ChevronUp,
   Download,
@@ -452,9 +451,6 @@ export default function BookingCheckoutPage({
   const [openBreakdownDates, setOpenBreakdownDates] = useState<string[]>(() =>
     dates[0]?.id ? [dates[0].id] : [],
   );
-  const [pendingExtrasByDate, setPendingExtrasByDate] = useState<
-    Record<string, { total: number; count: number }>
-  >({});
 
   const [paymentModalOpen, setPaymentModalOpen] = useState(false);
   const [paymentDateId, setPaymentDateId] = useState<string | null>(null);
@@ -471,10 +467,6 @@ export default function BookingCheckoutPage({
   const isMenuChoiceForDate =
     selectedDate?.is_menu_choice ?? isMenuChoice ?? false;
   const hasMultipleDates = dates.length > 1;
-  const pendingExtras = pendingExtrasByDate[selectedDateId] ?? {
-    total: 0,
-    count: 0,
-  };
 
   const dateCards: CheckoutDateCard[] = useMemo(
     () =>
@@ -547,11 +539,6 @@ export default function BookingCheckoutPage({
     );
   }, [breakdownOpen, selectedDateId]);
 
-  const pendingExtrasTotal = Object.values(pendingExtrasByDate).reduce(
-    (s, p) => s + p.total,
-    0,
-  );
-
   const payableDates = useMemo(
     () => dates.filter((date) => isDatePayable(date as CheckoutDate)),
     [dates],
@@ -561,32 +548,15 @@ export default function BookingCheckoutPage({
     selectedDate != null && canShowRescheduleButton(selectedDate);
 
   const bookingOutstanding = summary.outstanding;
-  const isFullyPaid = bookingOutstanding <= 0 && pendingExtrasTotal <= 0;
-  const footerLabel = isFullyPaid
-    ? "Total Paid"
-    : hasMultipleDates
-      ? "Total Due (all dates)"
-      : "Total Due";
-  const footerAmount = isFullyPaid
-    ? summary.paid > 0
-      ? summary.paid
-      : summary.total
-    : bookingOutstanding;
+  const showPaymentFooter = bookingOutstanding > 0;
+  const footerLabel = hasMultipleDates
+    ? "Total Due (all dates)"
+    : "Total Due";
+  const footerAmount = bookingOutstanding;
   const showFooterPayAll =
     canPayNow && bookingOutstanding > 0 && payableDates.length > 0 && hasMultipleDates;
   const showPayAll =
     canPayNow && bookingOutstanding > 0 && payableDates.length > 0;
-
-  const handlePendingExtrasChange = useCallback(
-    (total: number, count: number) => {
-      setPendingExtrasByDate((prev) => ({
-        ...prev,
-        [selectedDateId]: { total, count },
-      }));
-    },
-    [selectedDateId],
-  );
-
 
   const canModifyAddOns = isBookingDateEligibleForAddOns(
     selectedDate?.addOnsPaymentStatus,
@@ -758,7 +728,7 @@ export default function BookingCheckoutPage({
         "--booking-kind-ticket": "var(--chart-3)",
         "--booking-kind-package": "var(--color-success)",
         "--booking-kind-addon": "var(--color-warning)",
-        paddingBottom: hasMultipleDates
+        paddingBottom: showPaymentFooter
           ? "calc(8.5rem + max(0.75rem, env(safe-area-inset-bottom, 0px)))"
           : "max(1rem, env(safe-area-inset-bottom, 0px))",
       } as CSSProperties}
@@ -927,7 +897,6 @@ export default function BookingCheckoutPage({
                     dateSource={selectedDate}
                     formatCurrency={formatCurrency}
                     formatUnit={formatUnit}
-                    onPendingTotalChange={handlePendingExtrasChange}
                   />
                 )}
 
@@ -955,13 +924,13 @@ export default function BookingCheckoutPage({
       <section
         className={cn(
           "border-t border-border bg-card",
-          hasMultipleDates
+          showPaymentFooter
             ? "max-lg:fixed max-lg:inset-x-0 max-lg:bottom-0 max-lg:z-40 max-lg:rounded-t-xl"
             : "max-lg:static max-lg:z-auto max-lg:rounded-none max-lg:shadow-none",
           "lg:overflow-hidden lg:border lg:rounded-b-xl",
         )}
         style={{
-          ...(hasMultipleDates ? {
+          ...(showPaymentFooter ? {
             boxShadow: "0 -8px 24px color-mix(in srgb, var(--foreground) 10%, transparent), 0 -1px 0 var(--border)",
           } : {}),
         } as CSSProperties}
@@ -1023,7 +992,7 @@ export default function BookingCheckoutPage({
             </div>
           )}
 
-          {(hasMultipleDates || bookingOutstanding > 0 || pendingExtrasTotal > 0) && (
+          {showPaymentFooter && (
           <div className="bg-foreground text-card p-4 sm:p-6 lg:p-8 py-4 lg:rounded-b-xl">
             <div className="flex items-center justify-between gap-4">
               <div>
@@ -1056,7 +1025,7 @@ export default function BookingCheckoutPage({
                 >
                   {paymentMutation.isPending ? "Processing…" : "Pay All"}
                 </Button>
-              ) : !isFullyPaid && payableDates.length === 1 ? (
+              ) : payableDates.length === 1 ? (
                 <Button
                   type="button"
                   size="lg"
@@ -1072,11 +1041,6 @@ export default function BookingCheckoutPage({
                     ? "Processing…"
                     : `Pay ${formatCurrency(bookingOutstanding)}`}
                 </Button>
-              ) : isFullyPaid ? (
-                <div className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-emerald-400/80 bg-emerald-600 px-4 py-2 text-xs font-bold text-white shadow-sm">
-                  <CheckCircle2 className="h-3.5 w-3.5 shrink-0" strokeWidth={2.5} />
-                  Paid
-                </div>
               ) : (
                 <StatusBadge
                   status={paymentStatus}

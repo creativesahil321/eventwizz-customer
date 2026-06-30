@@ -347,6 +347,10 @@ export interface AddOnsTable {
   total_tables: number;
   sold_tables: number;
   available_tables: number;
+  available_new_tables?: number;
+  has_existing_on_booking?: boolean;
+  can_extend_existing?: boolean;
+  can_add_new_table?: boolean;
 }
 
 export interface AddOnsTicket {

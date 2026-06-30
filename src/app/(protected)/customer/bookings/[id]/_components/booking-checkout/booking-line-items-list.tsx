@@ -122,7 +122,13 @@ function MenuChoicesSlot({
   item: CheckoutLineItem;
   isMenuChoice?: boolean;
 }) {
-  if (item.kind !== "table" || !isMenuChoice || !item.menuChoiceContext) {
+  if (
+    item.kind !== "table" ||
+    !isMenuChoice ||
+    item.showMenuChoices === false ||
+    item.isSavedAddon ||
+    !item.menuChoiceContext
+  ) {
     return null;
   }
 
