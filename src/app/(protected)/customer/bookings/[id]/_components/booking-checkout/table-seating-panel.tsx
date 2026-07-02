@@ -41,13 +41,15 @@ interface TableSeatingPanelProps {
   /** When set, controls group size externally (e.g. remaining guests after fill-existing). */
   externalGroupSize?: number | null;
   sectionTitle?: string;
+  /** Renders a Close control in the section header row. */
+  onClose?: () => void;
   /** Existing-table capacity hint for below-minimum messaging in add-guests flow. */
   existingTableCapacity?: number;
   /** Smallest top-level guest count that fills existing tables + one new table. */
   minimumTotalGroupSize?: number;
 }
 
-function resolveTableQuantity(
+export function resolveTableQuantity(
   groupSize: number,
   minPersons: number,
   maxPersons: number,
@@ -73,6 +75,34 @@ function resolveTableQuantity(
   return null;
 }
 
+/** Whether `guestCount` can be seated with available new-table stock. */
+export function isNewTableGroupViable(
+  guestCount: number,
+  config: Pick<TableSeatingConfig, "min" | "max" | "maxTables">,
+): boolean {
+  if (guestCount <= 0 || config.maxTables <= 0) return false;
+  if (guestCount < config.min) return false;
+
+  const idealQty = resolveTableQuantity(
+    guestCount,
+    config.min,
+    config.max,
+    999,
+  );
+  const resolvedQty = resolveTableQuantity(
+    guestCount,
+    config.min,
+    config.max,
+    config.maxTables,
+  );
+
+  return (
+    idealQty !== null &&
+    resolvedQty !== null &&
+    idealQty <= config.maxTables
+  );
+}
+
 function normalizeAllocation(
   allocation: number[],
   quantity: number,
@@ -89,6 +119,7 @@ export function TableSeatingPanel({
   onStateChange,
   externalGroupSize = null,
   sectionTitle,
+  onClose,
   existingTableCapacity,
   minimumTotalGroupSize,
 }: TableSeatingPanelProps) {
@@ -342,11 +373,24 @@ export function TableSeatingPanel({
 
   return (
     <div className="flex flex-col gap-3 overflow-hidden rounded-lg border border-border bg-card p-3">
-      {sectionTitle && (
-        <div className="border-b border-border px-3 py-2">
-          <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-[color:var(--booking-kind-table)]">
-            {sectionTitle}
-          </p>
+      {(sectionTitle || onClose) && (
+        <div className="flex items-center justify-between gap-3 border-b border-border pb-2">
+          {sectionTitle ? (
+            <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-[color:var(--booking-kind-table)]">
+              {sectionTitle}
+            </p>
+          ) : (
+            <span aria-hidden className="min-w-0 flex-1" />
+          )}
+          {onClose ? (
+            <button
+              type="button"
+              className="shrink-0 text-[10px] font-semibold text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
+              onClick={onClose}
+            >
+              Close
+            </button>
+          ) : null}
         </div>
       )}
       {!isControlledGroupSize && (

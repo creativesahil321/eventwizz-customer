@@ -28,7 +28,7 @@ const stripBaseStyle: CSSProperties = {
 
 const stripPaidStyle: CSSProperties = {
   ...stripBaseStyle,
-  borderColor: "color-mix(in srgb, var(--color-primary) 34%, var(--border))",
+  border: "1.5px solid color-mix(in srgb, var(--color-primary) 34%, var(--border))",
   background: "color-mix(in srgb, var(--color-primary) 5%, var(--card))",
   boxShadow:
     "0 0 0 1px color-mix(in srgb, var(--color-primary) 14%, transparent), 0 2px 8px color-mix(in srgb, var(--color-primary) 10%, transparent)",
@@ -36,7 +36,7 @@ const stripPaidStyle: CSSProperties = {
 
 const stripPayableStyle: CSSProperties = {
   ...stripBaseStyle,
-  borderColor: "color-mix(in srgb, var(--color-primary) 52%, var(--border))",
+  border: "1.5px solid color-mix(in srgb, var(--color-primary) 52%, var(--border))",
   background: "color-mix(in srgb, var(--color-primary) 6%, var(--card))",
   boxShadow:
     "0 0 0 1px color-mix(in srgb, var(--color-primary) 18%, transparent), 0 4px 14px color-mix(in srgb, var(--color-primary) 16%, transparent)",

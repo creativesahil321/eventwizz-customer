@@ -59,6 +59,7 @@ interface RescheduleDateModalProps {
   bookingId: number;
   bookingDateId: number;
   hasAddons: boolean;
+  packageSectionTitle?: string;
   isProcessing?: boolean;
   /** From GET show/{bookingId} — used when reschedule GET omits gateways */
   bookingPaymentGateways?: ReschedulePaymentGateway[];
@@ -83,6 +84,7 @@ export function RescheduleDateModal({
   bookingId,
   bookingDateId,
   hasAddons,
+  packageSectionTitle,
   isProcessing = false,
   bookingPaymentGateways,
   onConfirm,
@@ -453,7 +455,7 @@ export function RescheduleDateModal({
                         <ul className="mt-2 space-y-1 text-sm text-orange-800">
                           <li>• Additional tables</li>
                           <li>• Extra tickets</li>
-                          <li>• Drink packages</li>
+                          <li>• {packageSectionTitle?.trim() || "Drink packages"}</li>
                           <li>• All other add-ons</li>
                         </ul>
                       </div>

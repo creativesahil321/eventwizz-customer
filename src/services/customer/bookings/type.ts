@@ -280,6 +280,9 @@ export interface BookingDetailsDate {
   can_pay_now?: boolean;
   is_menu_choice?: boolean;
   has_unbooked_event_dates?: boolean;
+  /** API-driven — when false, reschedule must not be offered for this date */
+  can_reschedule?: boolean;
+  reschedule_block_reason?: string;
   tickets: BookingDetailsTicket[];
   packages: BookingDetailsPackage[];
   tables: BookingDetailsTable[];
@@ -314,6 +317,8 @@ export interface BookingDetailsData {
   event_slug: string;
   location: string;
   is_room_system?: boolean;
+  /** Whole-booking order status (e.g. Cancelled, Confirmed) */
+  status?: string;
   payment_status_code?: number;
   payment_status_label: string;
   is_menu_choice?: boolean;

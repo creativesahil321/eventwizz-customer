@@ -28,6 +28,8 @@ import { usePermission } from "@/hooks/usePermission";
 import { VendorRescheduleDateModal } from "./vendor-reschedule-modal";
 import { mapVendorBookingToCheckout } from "./map-vendor-booking-to-checkout";
 import type { VendorCheckoutDate } from "./map-vendor-booking-to-checkout";
+import { buildRescheduleDateSummary, dateHasAddons } from "@/app/(protected)/customer/bookings/[id]/_components/booking-checkout/build-reschedule-date-summary";
+import { resolvePackageSectionTitle } from "@/app/(protected)/customer/bookings/[id]/_components/booking-checkout/build-line-items";
 import { VendorBookingCheckoutPage } from "./vendor-booking-checkout-page";
 import { getPaymentStatusLabel } from "./vendor-booking-status";
 
@@ -50,6 +52,7 @@ export default function AdjustBookingContent({
     booking_date_id: number;
     date_key: string;
     hasAddons: boolean;
+    packageSectionTitle?: string;
   } | null>(null);
   const [statusUpdateDialog, setStatusUpdateDialog] = useState<{
     open: boolean;
@@ -113,34 +116,23 @@ export default function AdjustBookingContent({
   const handleRescheduleClick = (date: VendorCheckoutDate) => {
     if (!canUpdateBooking) return;
 
-    const totalPeople =
-      (date.tables?.reduce((sum, table) => sum + (table.quantity ?? 0), 0) ??
-        0) +
-      (date.tickets?.reduce((sum, ticket) => sum + (ticket.quantity ?? 0), 0) ??
-        0);
-    const totalTables =
-      date.tables?.reduce((sum, table) => sum + (table.table_count ?? 0), 0) ??
-      0;
-    const totalTickets =
-      date.tickets?.reduce((sum, ticket) => sum + (ticket.quantity ?? 0), 0) ??
-      0;
-    const totalDrinks =
-      date.packages?.reduce((sum, pkg) => sum + (pkg.quantity ?? 0), 0) ?? 0;
+    const summary = buildRescheduleDateSummary({
+      ...date,
+      totalAmount: date.totalAmount,
+    });
     const hasAddons =
-      (date.addons?.tables?.length ?? 0) > 0 ||
-      (date.addons?.tickets?.length ?? 0) > 0 ||
-      (date.addons?.packages?.length ?? 0) > 0;
+      dateHasAddons(date) ||
+      (date.packages?.some(
+        (pkg) => pkg.is_addon || pkg.purchase_type === "addon",
+      ) ??
+        false);
 
     setSelectedDateForReschedule({
-      date: date.date,
-      people: totalPeople,
-      tables: totalTables,
-      tickets: totalTickets,
-      drinks: totalDrinks,
-      price: date.totalAmount,
+      ...summary,
       booking_date_id: date.booking_date_id,
       date_key: date.date_key ?? date.id,
       hasAddons,
+      packageSectionTitle: resolvePackageSectionTitle(date, checkout?.drinkTitle),
     });
     setRescheduleModalOpen(true);
   };
@@ -226,17 +218,17 @@ export default function AdjustBookingContent({
 
   if (error || !bookingData || !checkout) {
     return (
-      <Card className="p-6">
-        <div className="flex flex-col items-center justify-center py-12 text-center">
+        <Card className="p-6">
+          <div className="flex flex-col items-center justify-center py-12 text-center">
           <AlertCircle className="mb-4 h-12 w-12 text-destructive" />
           <p className="mb-2 text-lg font-semibold text-destructive">
-            Failed to load booking details
-          </p>
-          <p className="text-sm text-muted-foreground">
-            {error?.message || "Please try again later"}
-          </p>
-        </div>
-      </Card>
+              Failed to load booking details
+            </p>
+            <p className="text-sm text-muted-foreground">
+              {error?.message || "Please try again later"}
+            </p>
+          </div>
+        </Card>
     );
   }
 
@@ -286,9 +278,16 @@ export default function AdjustBookingContent({
               to{" "}
               <span className="font-semibold">
                 {statusUpdateDialog.newStatus != null
-                  ? getPaymentStatusLabel(statusUpdateDialog.newStatus)
+                  ? getPaymentStatusLabel(
+                      statusUpdateDialog.newStatus,
+                      checkout.dates.find(
+                        (date) =>
+                          date.booking_date_id ===
+                          statusUpdateDialog.bookingDateId,
+                      )?.vendorStatusOptions,
+                    )
                   : ""}
-              </span>
+                                          </span>
               .
             </AlertDialogDescription>
           </AlertDialogHeader>
@@ -311,6 +310,7 @@ export default function AdjustBookingContent({
           bookingId={Number.parseInt(bookingId, 10)}
           bookingDateId={selectedDateForReschedule.booking_date_id}
           hasAddons={selectedDateForReschedule.hasAddons}
+          packageSectionTitle={selectedDateForReschedule.packageSectionTitle}
           currentDate={{
             date: selectedDateForReschedule.date,
             people: selectedDateForReschedule.people,

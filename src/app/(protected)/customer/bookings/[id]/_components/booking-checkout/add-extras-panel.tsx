@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ChevronDown, Plus, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAddOnsDetails } from "@/services/customer/bookings/hooks/useAddOnsDetails";
@@ -8,6 +8,10 @@ import { useSaveAddOns } from "@/services/customer/bookings/hooks/useSaveAddOns"
 import { useVendorAddOns } from "@/services/vendor/bookings/hooks/useVendorAddOns";
 import { useSaveVendorAddOns } from "@/services/vendor/bookings/hooks/useSaveVendorAddOns";
 import { mapVendorAddOnsToCustomer } from "@/app/(protected)/vendor/booking-history/[id]/_components/map-vendor-addons-to-customer";
+import {
+  VendorAddonsPaymentModeDialog,
+  type VendorAddonsPaymentMode,
+} from "@/app/(protected)/vendor/booking-history/[id]/_components/vendor-addons-payment-mode-dialog";
 import {
   isBookingDateEligibleForAddOns,
   type BookingDatePaymentStatus,
@@ -25,23 +29,84 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
 import {
   TableSeatingPanel,
+  isNewTableGroupViable,
   type TableSeatingConfig,
   type TableSeatingSnapshot,
 } from "./table-seating-panel";
 import {
-  ExistingTablesPlacedSummary,
   FillExistingTablesPanel,
   buildExistingTableSlots,
   hasBookedTableAllocations,
   type ExistingTableFillSnapshot,
   type ExistingTableSlot,
 } from "./fill-existing-tables-panel";
-import type { BookingDateSource } from "./build-line-items";
-import type { AddOnsTable } from "@/services/customer/bookings/type";
+import {
+  resolvePackageSectionTitle,
+  type BookingDateSource,
+} from "./build-line-items";
+import {
+  canExtendExistingTables,
+  getAddOnNewTableStock,
+  normalizeAddOnsCatalogData,
+} from "./normalize-addons-catalog";
+import type { AddOnsResponse, AddOnsTable } from "@/services/customer/bookings/type";
+import type { VendorAddOnsData } from "@/services/vendor/bookings/add-ons.service";
 import {
   generateTableRecommendations,
   type AvailableTableSize,
 } from "../../_lib/table-recommendations";
+import VenueContactNotice from "@/app/(public)/vendor/checkout/_components/venue-contact-notice";
+import { resolveVenueContact } from "@/lib/resolve-venue-contact";
+import { useDomain } from "@/providers/domain-provider/domain-provider";
+
+function buildConfirmedSeatingMessage(
+  existingGuestCount: number,
+  newTableGuestCount: number,
+): string {
+  const hasExisting = existingGuestCount > 0;
+  const hasNew = newTableGuestCount > 0;
+
+  if (hasExisting && hasNew) {
+    return `${existingGuestCount} guest${existingGuestCount === 1 ? "" : "s"} added to your existing tables and ${newTableGuestCount} ${newTableGuestCount === 1 ? "is" : "are"} added in new table`;
+  }
+  if (hasExisting) {
+    return `${existingGuestCount} guest${existingGuestCount === 1 ? "" : "s"} added to your existing tables`;
+  }
+  return `${newTableGuestCount} guest${newTableGuestCount === 1 ? "" : "s"} added in new table`;
+}
+
+function ConfirmedSeatingSummary({
+  existingGuestCount,
+  newTableGuestCount,
+  onEdit,
+}: {
+  existingGuestCount: number;
+  newTableGuestCount: number;
+  onEdit: () => void;
+}) {
+  return (
+    <div
+      className="flex items-center justify-between gap-3 rounded-lg border border-border p-3"
+      style={{
+        borderColor:
+          "color-mix(in srgb, var(--booking-kind-table) 22%, var(--border))",
+        background:
+          "color-mix(in srgb, var(--booking-kind-table) 5%, var(--card))",
+      }}
+    >
+      <p className="m-0 text-[12px] font-medium leading-[1.45] text-foreground">
+        {buildConfirmedSeatingMessage(existingGuestCount, newTableGuestCount)}
+      </p>
+      <button
+        type="button"
+        className="shrink-0 text-[11px] font-semibold text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
+        onClick={onEdit}
+      >
+        Edit
+      </button>
+    </div>
+  );
+}
 
 interface CatalogItem {
   id: number;
@@ -50,12 +115,6 @@ interface CatalogItem {
   price: number;
   quantity: number;
   maxQuantity: number;
-}
-
-/** Already-booked quantities on this date (base booking + saved add-ons). */
-export interface BookedCatalogQuantities {
-  tickets: Record<number, number>;
-  packages: Record<number, number>;
 }
 
 interface AddExtrasSectionProps {
@@ -69,6 +128,8 @@ interface AddExtrasSectionProps {
   roomId?: number;
   paymentStatus?: BookingDatePaymentStatus;
   dateSource?: BookingDateSource;
+  /** Booking-level drink/package section title when date omits `package_title`. */
+  packageTitleFallback?: string;
   formatCurrency: (amount: number) => string;
   formatUnit: (amount: number) => string;
   onPendingTotalChange?: (total: number, itemCount: number) => void;
@@ -78,12 +139,12 @@ interface AddExtrasSectionProps {
 }
 
 function getNewTableStock(table: AddOnsTable): number {
-  const stock = table.available_new_tables ?? table.available_tables;
-  return Math.max(0, stock ?? 0);
+  return getAddOnNewTableStock(table);
 }
 
 function canBookNewTable(table: AddOnsTable): boolean {
-  return table.can_add_new_table !== false && getNewTableStock(table) > 0;
+  if (table.can_add_new_table === false) return false;
+  return getNewTableStock(table) > 0;
 }
 
 function toAvailableTableSize(table: AddOnsTable): AvailableTableSize {
@@ -147,6 +208,176 @@ function resolveActiveTableConfig(
   return toTableSeatingConfig(eligible[0]);
 }
 
+type NewTablePanelScope = "all" | "remaining";
+
+const EMPTY_EXISTING_FILL: ExistingTableFillSnapshot = {
+  additionsBySlot: {},
+  totalAdded: 0,
+  totalCost: 0,
+  saveGroups: [],
+};
+
+const EMPTY_TABLE_SEATING: TableSeatingSnapshot = {
+  groupSize: 0,
+  allocation: [],
+  seatingConfirmed: false,
+  tableTotal: 0,
+  tableItemCount: 0,
+  draftGuestTotal: 0,
+};
+
+interface GuestPlacementIssue {
+  existingOnlySize: number;
+  mixedGroupSize: number;
+}
+
+/**
+ * When guest count cannot be fully seated (existing capacity + new-table rules).
+ * E.g. 5 guests, 2 existing seats, new tables min 4 → 2+3 is invalid (3 < min).
+ */
+function resolveGuestPlacementIssue(
+  guestsToAdd: number,
+  totalFreeExistingSeats: number,
+  tableConfig: TableSeatingConfig | null,
+  hasExistingTables: boolean,
+): GuestPlacementIssue | null {
+  if (guestsToAdd <= 0 || !tableConfig) return null;
+
+  if (isNewTableGroupViable(guestsToAdd, tableConfig)) return null;
+  if (hasExistingTables && guestsToAdd <= totalFreeExistingSeats) return null;
+
+  const existingCap = Math.max(0, totalFreeExistingSeats);
+  const remainderAfterMaxExisting = Math.max(0, guestsToAdd - existingCap);
+  const mixedGroupSize = existingCap + tableConfig.min;
+
+  const stuckInMixedGap =
+    hasExistingTables &&
+    guestsToAdd > existingCap &&
+    remainderAfterMaxExisting > 0 &&
+    remainderAfterMaxExisting < tableConfig.min;
+
+  const cannotSeatAtAll =
+    !hasExistingTables ||
+    (guestsToAdd > existingCap &&
+      remainderAfterMaxExisting > 0 &&
+      !isNewTableGroupViable(remainderAfterMaxExisting, tableConfig));
+
+  if (!stuckInMixedGap && !cannotSeatAtAll) return null;
+
+  return {
+    existingOnlySize: hasExistingTables
+      ? Math.min(guestsToAdd, existingCap)
+      : 0,
+    mixedGroupSize,
+  };
+}
+
+function formatGuestPlacementIssueMessage(
+  guestsToAdd: number,
+  totalFreeExistingSeats: number,
+  newTableMinGuests: number,
+  showExistingTableContext: boolean,
+): string {
+  const guestLabel = `${guestsToAdd} guest${guestsToAdd === 1 ? "" : "s"}`;
+
+  if (showExistingTableContext && totalFreeExistingSeats === 0) {
+    return `${guestLabel} cannot all be seated. Your existing tables are full, and new tables require at least ${newTableMinGuests} guests. Contact the venue for assistance.`;
+  }
+
+  if (showExistingTableContext && totalFreeExistingSeats > 0) {
+    const existingCapacity =
+      totalFreeExistingSeats === 1
+        ? "Only 1 guest can be seated at your existing tables"
+        : `Only ${totalFreeExistingSeats} guests can be seated at your existing tables`;
+    return `${guestLabel} cannot all be seated. ${existingCapacity}, and new tables require at least ${newTableMinGuests} guests. Contact the venue for assistance.`;
+  }
+
+  return `New tables require at least ${newTableMinGuests} guests. Increase your group size, or contact the venue for assistance.`;
+}
+
+function formatGuestAddPriceHintLabel(
+  hint: { single: number | null; min: number | null; max: number | null },
+  formatUnit: (amount: number) => string,
+  showExistingTableContext: boolean,
+): string | null {
+  if (hint.single != null) {
+    return showExistingTableContext
+      ? `${formatUnit(hint.single)} per person on existing tables`
+      : `${formatUnit(hint.single)} per person`;
+  }
+
+  if (hint.min != null && hint.max != null) {
+    return showExistingTableContext
+      ? `${formatUnit(hint.min)}–${formatUnit(hint.max)} per person on existing tables`
+      : `${formatUnit(hint.min)}–${formatUnit(hint.max)} per person`;
+  }
+
+  return null;
+}
+
+function formatNewTablePanelMessage(
+  scope: NewTablePanelScope,
+  showExistingTableContext: boolean,
+): string | null {
+  if (!showExistingTableContext) return null;
+
+  if (scope === "all") {
+    return "Booking a new table for all guests — any placements on existing tables will be cleared.";
+  }
+
+  return "Booking a new table for guests not yet placed on existing tables.";
+}
+
+function NewTableSetupPrompt({
+  title,
+  description,
+  actionLabel,
+  onAction,
+}: {
+  title: string;
+  description?: string;
+  actionLabel: string;
+  onAction: () => void;
+}) {
+  return (
+    <div
+      className="flex flex-col gap-3 rounded-lg border border-dashed p-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4"
+      style={{
+        borderColor:
+          "color-mix(in srgb, var(--booking-kind-table) 28%, var(--border))",
+        background:
+          "color-mix(in srgb, var(--booking-kind-table) 5%, var(--card))",
+      }}
+    >
+      <div className="min-w-0">
+        <p className="text-[0.8125rem] font-semibold leading-snug text-foreground">
+          {title}
+        </p>
+        {description ? (
+          <p className="mt-0.5 text-[10px] leading-snug text-muted-foreground">
+            {description}
+          </p>
+        ) : null}
+      </div>
+      <button
+        type="button"
+        className="inline-flex h-8 shrink-0 items-center justify-center self-stretch rounded-md px-4 text-xs font-bold leading-none transition-opacity hover:opacity-90 sm:self-auto"
+        style={{
+          background:
+            "color-mix(in srgb, var(--booking-kind-table) 14%, var(--card))",
+          border:
+            "1px solid color-mix(in srgb, var(--booking-kind-table) 35%, var(--border))",
+          color:
+            "color-mix(in srgb, var(--booking-kind-table) 90%, var(--foreground))",
+        }}
+        onClick={onAction}
+      >
+        {actionLabel}
+      </button>
+    </div>
+  );
+}
+
 /** Booked table rate for add-guests flow — not the first catalog table tier. */
 function resolveGuestAddPriceHint(
   useAddGuestsFlow: boolean,
@@ -182,114 +413,28 @@ function resolveGuestAddPriceHint(
   };
 }
 
-function normalizeCatalogLabel(value: string): string {
-  return value.trim().toLowerCase().replace(/\s+/g, " ");
-}
+function buildDateSourceSyncKey(
+  dateId: string,
+  date?: BookingDateSource,
+): string {
+  if (!date) return dateId;
 
-function resolveCatalogTicketId(
-  catalogTickets: Array<{ id: number; title: string }>,
-  item: { id?: number; name: string },
-): number | undefined {
-  if (
-    item.id != null &&
-    catalogTickets.some((ticket) => ticket.id === item.id)
-  ) {
-    return item.id;
-  }
-
-  const label = normalizeCatalogLabel(item.name);
-  return catalogTickets.find(
-    (ticket) => normalizeCatalogLabel(ticket.title) === label,
-  )?.id;
-}
-
-function resolveCatalogPackageId(
-  catalogPackages: Array<{ id: number; title: string }>,
-  item: { id?: number; name: string },
-): number | undefined {
-  if (item.id != null && catalogPackages.some((pkg) => pkg.id === item.id)) {
-    return item.id;
-  }
-
-  const label = normalizeCatalogLabel(item.name);
-  return catalogPackages.find(
-    (pkg) => normalizeCatalogLabel(pkg.title) === label,
-  )?.id;
-}
-
-function resolveBookedCatalogQuantities(
-  date: BookingDateSource | undefined,
-  catalogTickets: Array<{ id: number; title: string }>,
-  catalogPackages: Array<{ id: number; title: string }>,
-): BookedCatalogQuantities {
-  const tickets: Record<number, number> = {};
-  const packages: Record<number, number> = {};
-
-  if (!date) {
-    return { tickets, packages };
-  }
-
-  const addTicketQty = (catalogId: number, qty: number) => {
-    if (qty <= 0) return;
-    tickets[catalogId] = (tickets[catalogId] ?? 0) + qty;
-  };
-
-  const addPackageQty = (catalogId: number, qty: number) => {
-    if (qty <= 0) return;
-    packages[catalogId] = (packages[catalogId] ?? 0) + qty;
-  };
-
-  date.tickets?.forEach((ticket) => {
-    const catalogId = resolveCatalogTicketId(catalogTickets, {
-      id: ticket.id,
-      name: ticket.name,
-    });
-    if (catalogId != null) addTicketQty(catalogId, ticket.quantity);
+  return JSON.stringify({
+    dateId,
+    id: date.id,
+    date_key: date.date_key,
+    tickets: (date.tickets ?? []).map((ticket) => [ticket.id, ticket.quantity]),
+    packages: (date.packages ?? []).map((pkg) => [pkg.id, pkg.quantity]),
+    addonTickets: (date.addons?.tickets ?? []).map((ticket) => [
+      ticket.id,
+      ticket.quantity ?? 1,
+    ]),
+    addonPackages: (date.addons?.packages ?? []).map((pkg) => [
+      pkg.id,
+      pkg.quantity,
+    ]),
+    tableIds: (date.tables ?? []).map((table) => table.id),
   });
-
-  date.addons?.tickets?.forEach((ticket) => {
-    const catalogId = resolveCatalogTicketId(catalogTickets, {
-      id: ticket.id,
-      name: ticket.name,
-    });
-    if (catalogId != null) addTicketQty(catalogId, ticket.quantity ?? 1);
-  });
-
-  date.packages?.forEach((pkg) => {
-    const catalogId = resolveCatalogPackageId(catalogPackages, {
-      id: pkg.id,
-      name: pkg.name,
-    });
-    if (catalogId != null) addPackageQty(catalogId, pkg.quantity);
-  });
-
-  const addonPackages = [
-    ...(date.addons?.packages ?? []),
-    ...((
-      date.addons as
-        | { drinks?: Array<{ id?: number; name: string; quantity?: number }> }
-        | undefined
-    )?.drinks ?? []),
-  ];
-
-  addonPackages.forEach((pkg) => {
-    const catalogId = resolveCatalogPackageId(catalogPackages, {
-      id: pkg.id,
-      name: pkg.name,
-    });
-    if (catalogId != null) addPackageQty(catalogId, pkg.quantity ?? 1);
-  });
-
-  return { tickets, packages };
-}
-
-function getAdditionalMax(
-  availableFromApi: number,
-  catalogId: number,
-  bookedMap: Record<number, number>,
-): number {
-  const alreadyBooked = bookedMap[catalogId] ?? 0;
-  return Math.max(0, availableFromApi - alreadyBooked);
 }
 
 function ExtrasSectionHeader({
@@ -514,6 +659,7 @@ export function AddExtrasSection({
   roomId,
   paymentStatus,
   dateSource,
+  packageTitleFallback,
   formatCurrency,
   formatUnit,
   onPendingTotalChange,
@@ -521,7 +667,13 @@ export function AddExtrasSection({
   addonApi = "customer",
 }: AddExtrasSectionProps) {
   const eligible = isBookingDateEligibleForAddOns(paymentStatus);
+  const packageSectionTitle = useMemo(
+    () => resolvePackageSectionTitle(dateSource, packageTitleFallback),
+    [dateSource, packageTitleFallback],
+  );
   const useVendorApi = addonApi === "vendor";
+  const { settings } = useDomain();
+  const { phone: venuePhone, email: venueEmail } = resolveVenueContact(settings);
 
   const customerAddonsQuery = useAddOnsDetails(
     bookingId,
@@ -531,17 +683,31 @@ export function AddExtrasSection({
   const vendorAddonsQuery = useVendorAddOns(
     bookingId,
     dateKey,
-    eligible && useVendorApi && open,
+    eligible && useVendorApi,
+    roomId,
   );
 
-  const addOnsData = useVendorApi
-    ? vendorAddonsQuery.data?.data
-      ? {
-          ...vendorAddonsQuery.data,
-          data: mapVendorAddOnsToCustomer(vendorAddonsQuery.data.data),
-        }
-      : undefined
+  const addonsCatalogSource = useVendorApi
+    ? vendorAddonsQuery.data
     : customerAddonsQuery.data;
+
+  const addOnsData = useMemo((): AddOnsResponse | undefined => {
+    if (!addonsCatalogSource?.data) return undefined;
+
+    const rawData = useVendorApi
+      ? mapVendorAddOnsToCustomer(addonsCatalogSource.data as VendorAddOnsData)
+      : (addonsCatalogSource.data as AddOnsResponse["data"]);
+
+    return {
+      ...addonsCatalogSource,
+      data: normalizeAddOnsCatalogData(rawData),
+    };
+  }, [addonsCatalogSource, useVendorApi]);
+
+  const dateSourceSyncKey = useMemo(
+    () => buildDateSourceSyncKey(dateId, dateSource),
+    [dateId, dateSource],
+  );
 
   const isLoading = useVendorApi
     ? vendorAddonsQuery.isLoading
@@ -569,12 +735,19 @@ export function AddExtrasSection({
   });
   const [tablePanelResetKey, setTablePanelResetKey] = useState(0);
   const [guestsToAdd, setGuestsToAdd] = useState(0);
-  const [existingFill, setExistingFill] = useState<ExistingTableFillSnapshot>({
-    additionsBySlot: {},
-    totalAdded: 0,
-    totalCost: 0,
-    saveGroups: [],
-  });
+  const [paymentModeDialogOpen, setPaymentModeDialogOpen] = useState(false);
+  const [newTablePanelOpen, setNewTablePanelOpen] = useState(false);
+  const [newTablePanelScope, setNewTablePanelScope] =
+    useState<NewTablePanelScope>("all");
+  const [existingFillPanelKey, setExistingFillPanelKey] = useState(0);
+  const [existingAutoFillSignal, setExistingAutoFillSignal] = useState(0);
+  const [existingSeatingConfirmed, setExistingSeatingConfirmed] = useState(false);
+  const [isEditingSeating, setIsEditingSeating] = useState(true);
+  const awaitingMixedAutoFillSignalRef = useRef<number | null>(null);
+  const wasSeatingFullyConfirmedRef = useRef(false);
+  const [existingFill, setExistingFill] = useState<ExistingTableFillSnapshot>(
+    EMPTY_EXISTING_FILL,
+  );
 
   const availableExistingTableSlots = useMemo(
     () =>
@@ -585,7 +758,11 @@ export function AddExtrasSection({
     [addOnsData?.data?.selected_tables, dateSource],
   );
 
-  const useAddGuestsFlow = hasBookedTableAllocations(dateSource);
+  const selectedTables = addOnsData?.data?.selected_tables ?? [];
+  const useAddGuestsFlow = hasBookedTableAllocations(
+    dateSource,
+    selectedTables,
+  );
   const hasAvailableExistingTables = availableExistingTableSlots.length > 0;
 
   const totalFreeExistingSeats = useMemo(
@@ -598,24 +775,52 @@ export function AddExtrasSection({
   );
 
   const catalogTables = addOnsData?.data?.tables ?? [];
+  const hasNewTablesAvailable = catalogTables.some(canBookNewTable);
+  const canExtendExisting = canExtendExistingTables(catalogTables);
+  const canUseExistingTables =
+    hasAvailableExistingTables && canExtendExisting;
 
-  /** Guests to place on a new table (total minus any optional existing-table fill). */
-  const guestsNeedingNewTable = useMemo(() => {
+  /** Guests still unplaced after optional existing-table fill. */
+  const guestsRemainingUnplaced = useMemo(() => {
     if (!useAddGuestsFlow || guestsToAdd <= 0) return 0;
     return Math.max(0, guestsToAdd - existingFill.totalAdded);
   }, [useAddGuestsFlow, guestsToAdd, existingFill.totalAdded]);
+
+  const freeExistingSeatsLeft = useMemo(
+    () => Math.max(0, totalFreeExistingSeats - existingFill.totalAdded),
+    [existingFill.totalAdded, totalFreeExistingSeats],
+  );
+
+  const guestsForNewTablePanel = useMemo(() => {
+    if (!newTablePanelOpen || guestsToAdd <= 0) return 0;
+    if (newTablePanelScope === "all") {
+      return guestsToAdd;
+    }
+    return guestsRemainingUnplaced;
+  }, [
+    guestsRemainingUnplaced,
+    guestsToAdd,
+    newTablePanelOpen,
+    newTablePanelScope,
+  ]);
 
   const tableConfig = useMemo(
     () =>
       resolveActiveTableConfig(
         catalogTables,
-        useAddGuestsFlow ? guestsNeedingNewTable : tableSeating.groupSize,
+        useAddGuestsFlow
+          ? guestsForNewTablePanel ||
+              guestsRemainingUnplaced ||
+              guestsToAdd
+          : tableSeating.groupSize,
       ),
     [
       catalogTables,
-      useAddGuestsFlow,
-      guestsNeedingNewTable,
+      guestsForNewTablePanel,
+      guestsRemainingUnplaced,
+      guestsToAdd,
       tableSeating.groupSize,
+      useAddGuestsFlow,
     ],
   );
 
@@ -624,29 +829,80 @@ export function AddExtrasSection({
     [catalogTables, totalFreeExistingSeats],
   );
 
-  const guestAddPriceHint = useMemo(
-    () =>
-      resolveGuestAddPriceHint(
-        useAddGuestsFlow,
-        availableExistingTableSlots,
-        dateSource,
-        tableConfig?.price ?? null,
-      ),
-    [
+  const guestAddPriceHint = useMemo(() => {
+    if (!canUseExistingTables && tableConfig?.price != null) {
+      return { single: tableConfig.price, min: null, max: null };
+    }
+
+    return resolveGuestAddPriceHint(
       useAddGuestsFlow,
       availableExistingTableSlots,
       dateSource,
-      tableConfig?.price,
-    ],
-  );
+      tableConfig?.price ?? null,
+    );
+  }, [
+    availableExistingTableSlots,
+    canUseExistingTables,
+    dateSource,
+    tableConfig?.price,
+    useAddGuestsFlow,
+  ]);
 
   const existingOnlyGroupSize = totalFreeExistingSeats;
+  const guestAddPriceHintLabel = useMemo(
+    () =>
+      formatGuestAddPriceHintLabel(
+        guestAddPriceHint,
+        formatUnit,
+        canUseExistingTables,
+      ),
+    [canUseExistingTables, formatUnit, guestAddPriceHint],
+  );
+  const newTablePanelMessage = useMemo(
+    () => formatNewTablePanelMessage(newTablePanelScope, canUseExistingTables),
+    [canUseExistingTables, newTablePanelScope],
+  );
   const newTableBelowMinimum =
-    guestsNeedingNewTable > 0 &&
+    guestsForNewTablePanel > 0 &&
     tableConfig != null &&
-    guestsNeedingNewTable < tableConfig.min;
+    guestsForNewTablePanel < tableConfig.min;
   const suggestedIncreasedGroupSize =
-    guestsToAdd + (tableConfig != null ? tableConfig.min - guestsNeedingNewTable : 0);
+    guestsToAdd +
+    (tableConfig != null ? tableConfig.min - guestsForNewTablePanel : 0);
+  const canBookAllGuestsOnNewTable = useMemo(
+    () =>
+      hasNewTablesAvailable &&
+      tableConfig != null &&
+      guestsToAdd > 0 &&
+      isNewTableGroupViable(guestsToAdd, tableConfig),
+    [guestsToAdd, hasNewTablesAvailable, tableConfig],
+  );
+  const canBookRemainingOnNewTable = useMemo(
+    () =>
+      hasNewTablesAvailable &&
+      tableConfig != null &&
+      guestsRemainingUnplaced > 0 &&
+      isNewTableGroupViable(guestsRemainingUnplaced, tableConfig),
+    [guestsRemainingUnplaced, hasNewTablesAvailable, tableConfig],
+  );
+  const canBookSuggestedGroupOnNewTable = useMemo(
+    () =>
+      hasNewTablesAvailable &&
+      tableConfig != null &&
+      suggestedIncreasedGroupSize > guestsToAdd &&
+      isNewTableGroupViable(suggestedIncreasedGroupSize, tableConfig),
+    [guestsToAdd, hasNewTablesAvailable, suggestedIncreasedGroupSize, tableConfig],
+  );
+  const guestPlacementIssue = useMemo(
+    () =>
+      resolveGuestPlacementIssue(
+        guestsToAdd,
+        totalFreeExistingSeats,
+        tableConfig,
+        canUseExistingTables,
+      ),
+    [canUseExistingTables, guestsToAdd, tableConfig, totalFreeExistingSeats],
+  );
   const showNewTableMinimumHint =
     guestsToAdd > 0 &&
     newTableBelowMinimum &&
@@ -655,29 +911,9 @@ export function AddExtrasSection({
   useEffect(() => {
     if (!addOnsData?.data) return;
 
-    const catalogTickets = addOnsData.data.tickets.map((ticket) => ({
-      id: ticket.id,
-      title: ticket.title,
-    }));
-    const catalogPackages = addOnsData.data.drinks
-      .filter((drink) => drink.status === 1)
-      .map((drink) => ({
-        id: drink.id,
-        title: drink.title,
-      }));
-    const booked = resolveBookedCatalogQuantities(
-      dateSource,
-      catalogTickets,
-      catalogPackages,
-    );
-
     setTickets((prev) =>
       addOnsData.data.tickets.map((t) => {
-        const maxQuantity = getAdditionalMax(
-          t.available_tickets,
-          t.id,
-          booked.tickets,
-        );
+        const maxQuantity = Math.max(0, t.available_tickets);
         const previous = prev.find((item) => item.id === t.id);
         const quantity = Math.max(
           0,
@@ -699,11 +935,7 @@ export function AddExtrasSection({
       addOnsData.data.drinks
         .filter((d) => d.status === 1)
         .map((d) => {
-          const maxQuantity = getAdditionalMax(
-            d.available_drinks,
-            d.id,
-            booked.packages,
-          );
+          const maxQuantity = Math.max(0, d.available_drinks);
           const previous = prev.find((item) => item.id === d.id);
           const quantity = Math.max(
             0,
@@ -730,14 +962,13 @@ export function AddExtrasSection({
       draftGuestTotal: 0,
     });
     setGuestsToAdd(0);
-    setExistingFill({
-      additionsBySlot: {},
-      totalAdded: 0,
-      totalCost: 0,
-      saveGroups: [],
-    });
+    setExistingFill(EMPTY_EXISTING_FILL);
+    setExistingSeatingConfirmed(false);
+    setNewTablePanelOpen(false);
+    setNewTablePanelScope("all");
+    setExistingFillPanelKey((key) => key + 1);
     setTablePanelResetKey((key) => key + 1);
-  }, [addOnsData, dateId, dateSource]);
+  }, [addOnsData?.data, dateId, dateSourceSyncKey]);
 
   const clampCatalogQuantity = useCallback(
     (qty: number, maxQuantity: number) =>
@@ -752,6 +983,113 @@ export function AddExtrasSection({
     [],
   );
 
+  const handleExistingFillChange = useCallback(
+    (snapshot: ExistingTableFillSnapshot) => {
+      setExistingFill((prev) => {
+        if (prev.totalAdded !== snapshot.totalAdded) {
+          setExistingSeatingConfirmed(false);
+        }
+        return snapshot;
+      });
+    },
+    [],
+  );
+
+  const handleConfirmExistingSeating = useCallback(() => {
+    if (existingFill.totalAdded <= 0) return;
+    setExistingSeatingConfirmed(true);
+  }, [existingFill.totalAdded]);
+
+  const resetNewTableSeating = useCallback(() => {
+    setTableSeating(EMPTY_TABLE_SEATING);
+    setTablePanelResetKey((key) => key + 1);
+  }, []);
+
+  const clearExistingFill = useCallback(() => {
+    setExistingFill(EMPTY_EXISTING_FILL);
+    setExistingSeatingConfirmed(false);
+    setExistingFillPanelKey((key) => key + 1);
+  }, []);
+
+  const openNewTableForAllGuests = useCallback(() => {
+    if (existingFill.totalAdded > 0) {
+      toast.error(
+        "Confirm or clear your existing-table guests before booking a new table for everyone.",
+      );
+      return;
+    }
+    clearExistingFill();
+    setNewTablePanelScope("all");
+    setNewTablePanelOpen(true);
+    resetNewTableSeating();
+  }, [clearExistingFill, existingFill.totalAdded, resetNewTableSeating]);
+
+  const openNewTableForRemainingGuests = useCallback(() => {
+    setNewTablePanelScope("remaining");
+    setNewTablePanelOpen(true);
+    resetNewTableSeating();
+  }, [resetNewTableSeating]);
+
+  const closeNewTablePanel = useCallback(() => {
+    setNewTablePanelOpen(false);
+    resetNewTableSeating();
+  }, [resetNewTableSeating]);
+
+  const handleEditSeatingPlacement = useCallback(() => {
+    setIsEditingSeating(true);
+    if (existingFill.totalAdded > 0) {
+      setExistingSeatingConfirmed(false);
+    }
+    const confirmedNewGuests =
+      tableSeating.seatingConfirmed && tableSeating.allocation.length > 0
+        ? tableSeating.allocation.reduce((sum, seats) => sum + seats, 0)
+        : 0;
+    if (confirmedNewGuests > 0) {
+      setTableSeating((prev) => ({
+        ...prev,
+        seatingConfirmed: false,
+        draftGuestTotal: prev.allocation.reduce((sum, seats) => sum + seats, 0),
+      }));
+      setNewTablePanelScope(
+        existingFill.totalAdded > 0 ? "remaining" : "all",
+      );
+      setNewTablePanelOpen(true);
+    }
+  }, [
+    existingFill.totalAdded,
+    tableSeating.allocation,
+    tableSeating.seatingConfirmed,
+  ]);
+
+  const applyExistingOnlyGuestCount = useCallback(
+    (count: number) => {
+      setNewTablePanelOpen(false);
+      resetNewTableSeating();
+      setExistingSeatingConfirmed(false);
+      awaitingMixedAutoFillSignalRef.current = null;
+      setGuestsToAdd(count);
+      setExistingFillPanelKey((key) => key + 1);
+      setExistingAutoFillSignal((signal) => signal + 1);
+    },
+    [resetNewTableSeating],
+  );
+
+  const applyMixedGroupSize = useCallback(
+    (total: number) => {
+      setNewTablePanelOpen(false);
+      resetNewTableSeating();
+      setExistingSeatingConfirmed(false);
+      setGuestsToAdd(total);
+      setExistingFillPanelKey((key) => key + 1);
+      setExistingAutoFillSignal((signal) => {
+        const next = signal + 1;
+        awaitingMixedAutoFillSignalRef.current = next;
+        return next;
+      });
+    },
+    [resetNewTableSeating],
+  );
+
   const resetExtrasCatalog = useCallback(() => {
     setTableSeating({
       groupSize: 0,
@@ -762,12 +1100,12 @@ export function AddExtrasSection({
       draftGuestTotal: 0,
     });
     setGuestsToAdd(0);
-    setExistingFill({
-      additionsBySlot: {},
-      totalAdded: 0,
-      totalCost: 0,
-      saveGroups: [],
-    });
+    setExistingFill(EMPTY_EXISTING_FILL);
+    setExistingSeatingConfirmed(false);
+    setIsEditingSeating(true);
+    setNewTablePanelOpen(false);
+    setNewTablePanelScope("all");
+    setExistingFillPanelKey((key) => key + 1);
     setTablePanelResetKey((key) => key + 1);
     setTickets((prev) => prev.map((ticket) => ({ ...ticket, quantity: 0 })));
     setDrinks((prev) => prev.map((drink) => ({ ...drink, quantity: 0 })));
@@ -783,26 +1121,385 @@ export function AddExtrasSection({
     ? newTableGuestCount
     : tableSeating.draftGuestTotal;
   const newTableSeatingConfirmed = newTableGuestCount > 0;
+  const allGuestsPlacedOnExisting =
+    guestsToAdd > 0 && existingFill.totalAdded === guestsToAdd;
+  const hideExistingFillPanel =
+    existingSeatingConfirmed && existingFill.totalAdded > 0;
+  const confirmedExistingGuestCount = existingSeatingConfirmed
+    ? existingFill.totalAdded
+    : 0;
+  const confirmedNewTableGuestCount = newTableSeatingConfirmed
+    ? newTableGuestCount
+    : 0;
+  const isSeatingFullyConfirmed =
+    guestsToAdd > 0 &&
+    confirmedExistingGuestCount + confirmedNewTableGuestCount === guestsToAdd &&
+    (existingFill.totalAdded === 0 || existingSeatingConfirmed) &&
+    (newTableGuestCount === 0 || newTableSeatingConfirmed);
+  const showCompactSeatingSummary =
+    isSeatingFullyConfirmed && !isEditingSeating;
+  const remainingBelowNewTableMinimum =
+    guestsRemainingUnplaced > 0 &&
+    tableConfig != null &&
+    guestsRemainingUnplaced < tableConfig.min;
+  const showStuckPlacementHelp =
+    guestPlacementIssue != null &&
+    guestsRemainingUnplaced > 0 &&
+    !canBookRemainingOnNewTable &&
+    !newTableSeatingConfirmed;
+  const reduceGuestCountTo =
+    existingFill.totalAdded > 0
+      ? existingFill.totalAdded
+      : (guestPlacementIssue?.existingOnlySize ?? 0);
+  const canBookMixedGroupSize = useMemo(
+    () =>
+      guestPlacementIssue != null &&
+      tableConfig != null &&
+      guestPlacementIssue.mixedGroupSize > guestsToAdd &&
+      guestPlacementIssue.mixedGroupSize <= maxAddableGuests &&
+      isNewTableGroupViable(tableConfig.min, tableConfig),
+    [
+      guestPlacementIssue,
+      guestsToAdd,
+      maxAddableGuests,
+      tableConfig,
+    ],
+  );
   const catalogItemCount =
     tickets.reduce((s, t) => s + t.quantity, 0) +
     drinks.reduce((s, d) => s + d.quantity, 0);
   const tableGuestCount = existingFill.totalAdded + newTablePlacedCount;
-  const pendingTableGuestCount =
-    useAddGuestsFlow && guestsToAdd > 0 ? guestsToAdd : tableGuestCount;
+  const newTablePendingCost = tableSeating.seatingConfirmed
+    ? tableSeating.tableTotal
+    : tableSeating.draftGuestTotal > 0 && tableConfig
+      ? tableSeating.draftGuestTotal * tableConfig.price
+      : 0;
+  const pendingTableGuestCount = useAddGuestsFlow ? guestsToAdd : tableGuestCount;
+  const pendingTableCharges =
+    useAddGuestsFlow && guestsToAdd <= 0
+      ? 0
+      : existingFill.totalCost + newTablePendingCost;
   const pendingSummaryLabel = formatPendingExtrasSummary(
     pendingTableGuestCount,
     catalogItemCount,
   );
-  const pendingTotal =
-    ticketTotal + drinkTotal + existingFill.totalCost + tableSeating.tableTotal;
-  const tableGuestTotal = existingFill.totalCost + tableSeating.tableTotal;
+  const pendingTotal = ticketTotal + drinkTotal + pendingTableCharges;
 
   useEffect(() => {
     onPendingTotalChange?.(
       pendingTotal,
-      catalogItemCount + tableGuestCount,
+      catalogItemCount + pendingTableGuestCount,
     );
-  }, [pendingTotal, catalogItemCount, tableGuestCount, onPendingTotalChange]);
+  }, [
+    pendingTotal,
+    catalogItemCount,
+    pendingTableGuestCount,
+    onPendingTotalChange,
+  ]);
+
+  useEffect(() => {
+    if (!isSeatingFullyConfirmed) {
+      setIsEditingSeating(true);
+    }
+  }, [guestsToAdd, isSeatingFullyConfirmed]);
+
+  useEffect(() => {
+    if (isSeatingFullyConfirmed && !wasSeatingFullyConfirmedRef.current) {
+      setIsEditingSeating(false);
+    }
+    wasSeatingFullyConfirmedRef.current = isSeatingFullyConfirmed;
+  }, [isSeatingFullyConfirmed]);
+
+  useEffect(() => {
+    if (newTableSeatingConfirmed && newTablePanelOpen) {
+      setNewTablePanelOpen(false);
+    }
+  }, [newTableSeatingConfirmed, newTablePanelOpen]);
+
+  useEffect(() => {
+    if (awaitingMixedAutoFillSignalRef.current === null) return;
+    if (existingAutoFillSignal < awaitingMixedAutoFillSignalRef.current) {
+      return;
+    }
+
+    const hasExistingCapacity =
+      hasAvailableExistingTables && totalFreeExistingSeats > 0;
+    if (hasExistingCapacity && existingFill.totalAdded === 0) {
+      return;
+    }
+
+    const placedOnExisting = existingFill.totalAdded;
+    if (placedOnExisting > 0) {
+      setExistingSeatingConfirmed(true);
+    }
+
+    const remaining = Math.max(0, guestsToAdd - placedOnExisting);
+    if (
+      remaining > 0 &&
+      hasNewTablesAvailable &&
+      tableConfig &&
+      isNewTableGroupViable(remaining, tableConfig)
+    ) {
+      setNewTablePanelScope("remaining");
+      setNewTablePanelOpen(true);
+      resetNewTableSeating();
+    }
+
+    awaitingMixedAutoFillSignalRef.current = null;
+  }, [
+    existingAutoFillSignal,
+    existingFill.totalAdded,
+    guestsToAdd,
+    hasAvailableExistingTables,
+    hasNewTablesAvailable,
+    resetNewTableSeating,
+    tableConfig,
+    totalFreeExistingSeats,
+  ]);
+
+  useEffect(() => {
+    if (hasNewTablesAvailable) return;
+    setNewTablePanelOpen(false);
+    setTableSeating(EMPTY_TABLE_SEATING);
+    setTablePanelResetKey((key) => key + 1);
+  }, [hasNewTablesAvailable]);
+
+  useEffect(() => {
+    if (!useAddGuestsFlow || guestsToAdd > 0) return;
+
+    setExistingFill(EMPTY_EXISTING_FILL);
+    setTableSeating(EMPTY_TABLE_SEATING);
+    setNewTablePanelOpen(false);
+    setNewTablePanelScope("all");
+    setTablePanelResetKey((key) => key + 1);
+  }, [useAddGuestsFlow, guestsToAdd]);
+
+  useEffect(() => {
+    if (!useAddGuestsFlow || guestsToAdd <= 0) return;
+
+    setNewTablePanelScope("all");
+    resetNewTableSeating();
+
+    if (!hasAvailableExistingTables && hasNewTablesAvailable) {
+      setNewTablePanelOpen(canBookAllGuestsOnNewTable);
+    } else {
+      setNewTablePanelOpen(false);
+    }
+  }, [
+    canBookAllGuestsOnNewTable,
+    guestsToAdd,
+    hasAvailableExistingTables,
+    hasNewTablesAvailable,
+    resetNewTableSeating,
+    useAddGuestsFlow,
+  ]);
+
+  useEffect(() => {
+    if (
+      guestsToAdd > 0 &&
+      existingFill.totalAdded >= guestsToAdd &&
+      newTablePanelOpen
+    ) {
+      closeNewTablePanel();
+    }
+  }, [
+    closeNewTablePanel,
+    existingFill.totalAdded,
+    guestsToAdd,
+    newTablePanelOpen,
+  ]);
+
+  useEffect(() => {
+    if (
+      newTablePanelOpen &&
+      newTablePanelScope === "remaining" &&
+      guestsRemainingUnplaced <= 0
+    ) {
+      closeNewTablePanel();
+    }
+  }, [
+    closeNewTablePanel,
+    guestsRemainingUnplaced,
+    newTablePanelOpen,
+    newTablePanelScope,
+  ]);
+
+  useEffect(() => {
+    if (!newTablePanelOpen || !tableConfig) return;
+
+    const panelGuestCount =
+      newTablePanelScope === "all"
+        ? guestsToAdd
+        : guestsRemainingUnplaced;
+
+    if (!isNewTableGroupViable(panelGuestCount, tableConfig)) {
+      closeNewTablePanel();
+    }
+  }, [
+    closeNewTablePanel,
+    guestsRemainingUnplaced,
+    guestsToAdd,
+    newTablePanelOpen,
+    newTablePanelScope,
+    tableConfig,
+  ]);
+
+  const submitSave = useCallback(
+    (paymentMode?: VendorAddonsPaymentMode) => {
+      if (!eligible || pendingTotal <= 0 || isSavingAddOns) return;
+
+      const confirmedNewTableGuests =
+        tableSeating.seatingConfirmed && tableSeating.allocation.length > 0
+          ? tableSeating.allocation.reduce((sum, seats) => sum + seats, 0)
+          : 0;
+
+      const formData = new FormData();
+      formData.append("booking_id", bookingId);
+      formData.append("date", dateKey);
+      if (roomId != null && roomId > 0) {
+        formData.append("room_id", roomId.toString());
+      }
+      if (paymentMode) {
+        formData.append("payment_mode", paymentMode);
+      }
+      formData.append(
+        "people_in_group",
+        String(
+          useAddGuestsFlow && guestsToAdd > 0
+            ? guestsToAdd
+            : existingFill.totalAdded + confirmedNewTableGuests ||
+                tableSeating.groupSize ||
+                0,
+        ),
+      );
+
+      drinks
+        .filter((d) => d.quantity > 0)
+        .forEach((drink, index) => {
+          formData.append(`drink_package[${index}][id]`, drink.id.toString());
+          formData.append(`drink_package[${index}][title]`, drink.title);
+          formData.append(
+            `drink_package[${index}][price]`,
+            drink.price.toString(),
+          );
+          formData.append(
+            `drink_package[${index}][quantity]`,
+            drink.quantity.toString(),
+          );
+        });
+
+      tickets
+        .filter((t) => t.quantity > 0)
+        .forEach((ticket, index) => {
+          formData.append(`tickets[${index}][id]`, ticket.id.toString());
+          formData.append(`tickets[${index}][title]`, ticket.title);
+          formData.append(
+            `tickets[${index}][description]`,
+            ticket.description || "",
+          );
+          formData.append(
+            `tickets[${index}][price_per_ticket]`,
+            ticket.price.toString(),
+          );
+          formData.append(
+            `tickets[${index}][quantity]`,
+            ticket.quantity.toString(),
+          );
+        });
+
+      let tableIndex = 0;
+
+      existingFill.saveGroups.forEach((group) => {
+        formData.append(`tables[${tableIndex}][id]`, group.tableConfigId.toString());
+        formData.append(
+          `tables[${tableIndex}][table_size]`,
+          group.tableSize.toString(),
+        );
+        formData.append(
+          `tables[${tableIndex}][price_per_person]`,
+          group.pricePerPerson.toString(),
+        );
+        formData.append(`tables[${tableIndex}][type]`, "existing");
+        formData.append(
+          `tables[${tableIndex}][no_tables]`,
+          group.allocations.length.toString(),
+        );
+        group.allocations.forEach((alloc, allocationIndex) => {
+          formData.append(
+            `tables[${tableIndex}][allocation][${allocationIndex}][parent_id]`,
+            alloc.parentId.toString(),
+          );
+          formData.append(
+            `tables[${tableIndex}][allocation][${allocationIndex}][seats]`,
+            alloc.seats.toString(),
+          );
+        });
+        tableIndex += 1;
+      });
+
+      if (
+        tableSeating.seatingConfirmed &&
+        tableConfig &&
+        hasNewTablesAvailable &&
+        tableSeating.allocation.length > 0
+      ) {
+        formData.append(`tables[${tableIndex}][id]`, tableConfig.id.toString());
+        formData.append(
+          `tables[${tableIndex}][table_size]`,
+          tableConfig.max.toString(),
+        );
+        formData.append(
+          `tables[${tableIndex}][price_per_person]`,
+          tableConfig.price.toString(),
+        );
+        formData.append(`tables[${tableIndex}][type]`, "new");
+        formData.append(
+          `tables[${tableIndex}][no_tables]`,
+          tableSeating.allocation.length.toString(),
+        );
+        tableSeating.allocation.forEach((seats, allocationIndex) => {
+          formData.append(
+            `tables[${tableIndex}][allocation][${allocationIndex}][parent_id]`,
+            "",
+          );
+          formData.append(
+            `tables[${tableIndex}][allocation][${allocationIndex}][seats]`,
+            seats.toString(),
+          );
+        });
+      }
+
+      saveAddOns(formData, {
+        onSuccess: () => {
+          setPaymentModeDialogOpen(false);
+          resetExtrasCatalog();
+          onSaveSuccess?.();
+        },
+        onError: () => {
+          // Toast is shown by the API client interceptor.
+        },
+      });
+    },
+    [
+      bookingId,
+      dateKey,
+      drinks,
+      eligible,
+      existingFill,
+      guestsToAdd,
+      isSavingAddOns,
+      hasNewTablesAvailable,
+      onSaveSuccess,
+      pendingTotal,
+      resetExtrasCatalog,
+      roomId,
+      saveAddOns,
+      tableConfig,
+      tableSeating,
+      tickets,
+      useAddGuestsFlow,
+    ],
+  );
 
   const handleSave = useCallback(() => {
     if (!eligible || pendingTotal <= 0 || isSavingAddOns) return;
@@ -823,18 +1520,64 @@ export function AddExtrasSection({
       return;
     }
 
+    if (
+      existingFill.totalAdded > 0 &&
+      !existingSeatingConfirmed
+    ) {
+      toast.error("Confirm seating on your existing tables before saving.");
+      return;
+    }
+
+    if (
+      tableConfig &&
+      !tableSeating.seatingConfirmed &&
+      tableSeating.draftGuestTotal > 0
+    ) {
+      toast.error("Confirm seating on your new table before saving.");
+      return;
+    }
+
+    if (!hasNewTablesAvailable && tableSeating.seatingConfirmed) {
+      toast.error(
+        canUseExistingTables
+          ? "No new tables are available for this date. Add guests to your existing tables instead."
+          : "No new tables are available for this date.",
+      );
+      return;
+    }
+
+    if (!hasNewTablesAvailable && tableSeating.draftGuestTotal > 0) {
+      toast.error(
+        canUseExistingTables
+          ? "No new tables are available for this date. Add guests to your existing tables instead."
+          : "No new tables are available for this date.",
+      );
+      return;
+    }
+
     if (useAddGuestsFlow && guestsToAdd > 0) {
       const newTableGuests = tableSeating.seatingConfirmed
         ? tableSeating.allocation.reduce((sum, seats) => sum + seats, 0)
         : 0;
-      const totalPlaced = existingFill.totalAdded + newTableGuests;
+      const confirmedExistingGuests = existingSeatingConfirmed
+        ? existingFill.totalAdded
+        : 0;
+      const totalPlaced = confirmedExistingGuests + newTableGuests;
 
       if (totalPlaced < guestsToAdd) {
         const shortfall = guestsToAdd - totalPlaced;
+        if (!hasNewTablesAvailable) {
+          toast.error(
+            canUseExistingTables
+              ? `${shortfall} guest${shortfall === 1 ? "" : "s"} still unplaced — no new tables are available. You can add up to ${totalFreeExistingSeats} guest${totalFreeExistingSeats === 1 ? "" : "s"} on your existing tables.`
+              : `${shortfall} guest${shortfall === 1 ? "" : "s"} still unplaced — no new tables are available for this date.`,
+          );
+          return;
+        }
         if (
-          guestsNeedingNewTable > 0 &&
+          guestsForNewTablePanel > 0 &&
           tableConfig &&
-          guestsNeedingNewTable < tableConfig.min &&
+          guestsForNewTablePanel < tableConfig.min &&
           !tableSeating.seatingConfirmed
         ) {
           toast.error(
@@ -849,131 +1592,29 @@ export function AddExtrasSection({
       }
     }
 
-    const formData = new FormData();
-    formData.append("booking_id", bookingId);
-    formData.append("date", dateKey);
-    if (roomId != null && roomId > 0) {
-      formData.append("room_id", roomId.toString());
-    }
-    formData.append("people_in_group", String(guestsToAdd || tableSeating.groupSize));
-
-    drinks
-      .filter((d) => d.quantity > 0)
-      .forEach((drink, index) => {
-        formData.append(`drink_package[${index}][id]`, drink.id.toString());
-        formData.append(`drink_package[${index}][title]`, drink.title);
-        formData.append(
-          `drink_package[${index}][price]`,
-          drink.price.toString(),
-        );
-        formData.append(
-          `drink_package[${index}][quantity]`,
-          drink.quantity.toString(),
-        );
-      });
-
-    tickets
-      .filter((t) => t.quantity > 0)
-      .forEach((ticket, index) => {
-        formData.append(`tickets[${index}][id]`, ticket.id.toString());
-        formData.append(`tickets[${index}][title]`, ticket.title);
-        formData.append(
-          `tickets[${index}][description]`,
-          ticket.description || "",
-        );
-        formData.append(
-          `tickets[${index}][price_per_ticket]`,
-          ticket.price.toString(),
-        );
-        formData.append(
-          `tickets[${index}][quantity]`,
-          ticket.quantity.toString(),
-        );
-      });
-
-    let tableIndex = 0;
-
-    existingFill.saveGroups.forEach((group) => {
-      formData.append(`tables[${tableIndex}][id]`, group.tableConfigId.toString());
-      formData.append(
-        `tables[${tableIndex}][table_size]`,
-        group.tableSize.toString(),
-      );
-      formData.append(
-        `tables[${tableIndex}][price_per_person]`,
-        group.pricePerPerson.toString(),
-      );
-      formData.append(`tables[${tableIndex}][type]`, "existing");
-      formData.append(
-        `tables[${tableIndex}][no_tables]`,
-        group.tableCount.toString(),
-      );
-      group.allocations.forEach((alloc, allocationIndex) => {
-        formData.append(
-          `tables[${tableIndex}][allocation][${allocationIndex}][parent_id]`,
-          alloc.parentId.toString(),
-        );
-        formData.append(
-          `tables[${tableIndex}][allocation][${allocationIndex}][seats]`,
-          alloc.seats.toString(),
-        );
-      });
-      tableIndex += 1;
-    });
-
-    if (
-      tableSeating.seatingConfirmed &&
-      tableConfig &&
-      tableSeating.allocation.length > 0
-    ) {
-      formData.append(`tables[${tableIndex}][id]`, tableConfig.id.toString());
-      formData.append(`tables[${tableIndex}][table_size]`, tableConfig.max.toString());
-      formData.append(
-        `tables[${tableIndex}][price_per_person]`,
-        tableConfig.price.toString(),
-      );
-      formData.append(`tables[${tableIndex}][type]`, "new");
-      formData.append(
-        `tables[${tableIndex}][no_tables]`,
-        tableSeating.allocation.length.toString(),
-      );
-      tableSeating.allocation.forEach((seats, allocationIndex) => {
-        formData.append(
-          `tables[${tableIndex}][allocation][${allocationIndex}][parent_id]`,
-          "",
-        );
-        formData.append(
-          `tables[${tableIndex}][allocation][${allocationIndex}][seats]`,
-          seats.toString(),
-        );
-      });
+    if (useVendorApi) {
+      setPaymentModeDialogOpen(true);
+      return;
     }
 
-    saveAddOns(formData, {
-      onSuccess: () => {
-        resetExtrasCatalog();
-        onSaveSuccess?.();
-      },
-    });
+    submitSave();
   }, [
-    bookingId,
-    dateId,
-    dateKey,
-    roomId,
     drinks,
     eligible,
-    isSavingAddOns,
-    existingFill,
+    existingFill.totalAdded,
+    existingSeatingConfirmed,
+    guestsForNewTablePanel,
     guestsToAdd,
-    onSaveSuccess,
+    hasNewTablesAvailable,
+    isSavingAddOns,
     pendingTotal,
-    resetExtrasCatalog,
-    saveAddOns,
+    submitSave,
     tableConfig,
     tableSeating,
     tickets,
+    totalFreeExistingSeats,
     useAddGuestsFlow,
-    guestsNeedingNewTable,
+    useVendorApi,
   ]);
 
   const hasCatalog =
@@ -1072,22 +1713,22 @@ export function AddExtrasSection({
 
             {useAddGuestsFlow ? (
               <div className="flex flex-col gap-3.5">
+                {showCompactSeatingSummary ? (
+                  <ConfirmedSeatingSummary
+                    existingGuestCount={confirmedExistingGuestCount}
+                    newTableGuestCount={confirmedNewTableGuestCount}
+                    onEdit={handleEditSeatingPlacement}
+                  />
+                ) : (
+                  <>
                 <div className="flex flex-col gap-3 rounded-lg border border-border bg-card p-3 px-3.5 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
                   <div>
                     <p className="text-[0.8125rem] font-semibold text-foreground">
                       How many guests are you adding?
                     </p>
-                    {guestAddPriceHint.single != null ? (
+                    {guestAddPriceHintLabel ? (
                       <p className="mt-[0.15rem] text-[10px] text-muted-foreground">
-                        {formatUnit(guestAddPriceHint.single)} per person on
-                        existing tables
-                      </p>
-                    ) : guestAddPriceHint.min != null &&
-                      guestAddPriceHint.max != null ? (
-                      <p className="mt-[0.15rem] text-[10px] text-muted-foreground">
-                        {formatUnit(guestAddPriceHint.min)}–
-                        {formatUnit(guestAddPriceHint.max)} per person on
-                        existing tables
+                        {guestAddPriceHintLabel}
                       </p>
                     ) : null}
                   </div>
@@ -1100,7 +1741,38 @@ export function AddExtrasSection({
                   />
                 </div>
 
-                {showNewTableMinimumHint && (
+                {guestPlacementIssue &&
+                  existingFill.totalAdded === 0 &&
+                  tableConfig &&
+                  (!canUseExistingTables ? (
+                    <VenueContactNotice
+                      title={`New tables require at least ${tableConfig.min} guests.`}
+                      message={`Increase your group size to at least ${tableConfig.min} guests, or contact the venue for assistance with smaller groups.`}
+                      phone={venuePhone}
+                      email={venueEmail}
+                    />
+                  ) : (
+                  <div
+                    className="rounded-lg p-[0.625rem_0.75rem] text-[0.6875rem] leading-[1.45] text-foreground"
+                    style={{
+                      border:
+                        "1px solid color-mix(in srgb, #d97706 28%, var(--border))",
+                      background:
+                        "color-mix(in srgb, #d97706 8%, var(--card))",
+                    }}
+                  >
+                    <p>
+                      {formatGuestPlacementIssueMessage(
+                        guestsToAdd,
+                        totalFreeExistingSeats,
+                        tableConfig.min,
+                        canUseExistingTables,
+                      )}
+                    </p>
+                  </div>
+                  ))}
+
+                {showNewTableMinimumHint && canUseExistingTables && (
                     <div
                       className="rounded-lg p-[0.625rem_0.75rem] text-[0.6875rem] leading-[1.45] text-foreground"
                       style={{
@@ -1109,40 +1781,77 @@ export function AddExtrasSection({
                       }}
                     >
                       <p>
-                        {guestsNeedingNewTable} guest
-                        {guestsNeedingNewTable === 1 ? "" : "s"} still need a
+                        {guestsForNewTablePanel} guest
+                        {guestsForNewTablePanel === 1 ? "" : "s"} still need a
                         table — new tables require at least {tableConfig.min}.
                         Increase group size to {suggestedIncreasedGroupSize},
-                        or adjust existing-table guests.
+                        or adjust guests on your existing tables.
                       </p>
                     </div>
                   )}
 
                 {guestsToAdd > 0 &&
-                  hasAvailableExistingTables &&
-                  !newTableSeatingConfirmed && (
+                  canUseExistingTables &&
+                  !hideExistingFillPanel && (
                   <FillExistingTablesPanel
+                    key={`existing-${existingFillPanelKey}`}
                     slots={availableExistingTableSlots}
                     guestsToAdd={guestsToAdd}
                     guestsPlacedOnNewTable={newTablePlacedCount}
                     formatCurrency={formatCurrency}
-                    onStateChange={setExistingFill}
+                    onStateChange={handleExistingFillChange}
+                    autoFillSignal={existingAutoFillSignal}
+                    canPlaceRemainingOnNewTable={canBookRemainingOnNewTable}
+                    newTableMinGuests={tableConfig?.min}
+                    remainingBelowNewTableMin={remainingBelowNewTableMinimum}
+                    seatingConfirmed={existingSeatingConfirmed}
+                    onConfirmSeating={handleConfirmExistingSeating}
                     optional
                   />
                 )}
 
-                {newTableSeatingConfirmed && existingFill.totalAdded > 0 && (
-                  <ExistingTablesPlacedSummary
-                    slots={availableExistingTableSlots}
-                    snapshot={existingFill}
-                    formatCurrency={formatCurrency}
+                {guestsToAdd > 0 &&
+                  hasNewTablesAvailable &&
+                  !newTablePanelOpen &&
+                  !newTableSeatingConfirmed &&
+                  canUseExistingTables &&
+                  existingFill.totalAdded === 0 &&
+                  canBookAllGuestsOnNewTable && (
+                  <NewTableSetupPrompt
+                    title={`Book a new table for ${guestsToAdd} guest${guestsToAdd === 1 ? "" : "s"}`}
+                    description={
+                      tableConfig
+                        ? `${formatUnit(tableConfig.price)} per person for the new table`
+                        : guestAddPriceHintLabel ?? undefined
+                    }
+                    actionLabel="Set up new table"
+                    onAction={openNewTableForAllGuests}
                   />
                 )}
 
-                {newTableBelowMinimum &&
-                  existingFill.totalAdded === 0 &&
-                  existingOnlyGroupSize > 0 &&
-                  !newTableSeatingConfirmed && (
+                {guestsToAdd > 0 &&
+                  hasAvailableExistingTables &&
+                  hasNewTablesAvailable &&
+                  existingSeatingConfirmed &&
+                  !newTableSeatingConfirmed &&
+                  guestsRemainingUnplaced > 0 &&
+                  !newTablePanelOpen &&
+                  canBookRemainingOnNewTable && (
+                  <NewTableSetupPrompt
+                    title={`Add a new table for ${guestsRemainingUnplaced} remaining guest${guestsRemainingUnplaced === 1 ? "" : "s"}`}
+                    description="Configure seating for guests not placed on existing tables."
+                    actionLabel="Set up new table"
+                    onAction={openNewTableForRemainingGuests}
+                  />
+                )}
+
+                {canUseExistingTables &&
+                  (showStuckPlacementHelp ||
+                  (newTableBelowMinimum &&
+                    existingFill.totalAdded === 0 &&
+                    existingOnlyGroupSize > 0)) &&
+                  !newTableSeatingConfirmed &&
+                  tableConfig && (
                   <div
                     className="flex flex-col gap-2 rounded-lg p-[0.625rem_0.75rem]"
                     style={{
@@ -1151,86 +1860,105 @@ export function AddExtrasSection({
                     }}
                   >
                     <p className="m-0 text-[10px] font-bold tracking-[0.08em] uppercase text-muted-foreground">
-                      Quick options
+                      {showStuckPlacementHelp ? "Can't seat all guests" : "Quick options"}
                     </p>
+                    {showStuckPlacementHelp && (
+                      <p className="m-0 text-[11px] leading-[1.45] text-muted-foreground">
+                        {guestsRemainingUnplaced} guest
+                        {guestsRemainingUnplaced === 1 ? "" : "s"} remaining —
+                        new tables require at least {tableConfig.min}. Choose an
+                        option:
+                      </p>
+                    )}
                     <div className="flex flex-wrap gap-2">
-                      <button
-                        type="button"
-                        className="rounded-full border border-border bg-card px-3 py-1.5 text-[11px] font-semibold text-foreground transition-colors"
-                        onClick={() => setGuestsToAdd(existingOnlyGroupSize)}
-                      >
-                        Use {existingOnlyGroupSize} (existing tables only)
-                      </button>
-                      <button
-                        type="button"
-                        className="rounded-full px-3 py-1.5 text-[11px] font-semibold transition-colors"
-                        style={{
-                          border: "1px solid color-mix(in srgb, var(--booking-kind-table) 45%, var(--border))",
-                          background: "color-mix(in srgb, var(--booking-kind-table) 12%, var(--card))",
-                          color: "color-mix(in srgb, var(--booking-kind-table) 85%, var(--foreground))",
-                        }}
-                        onClick={() =>
-                          setGuestsToAdd(suggestedIncreasedGroupSize)
-                        }
-                      >
-                        Increase to {suggestedIncreasedGroupSize} (existing +
-                        new table)
-                      </button>
+                      {reduceGuestCountTo > 0 && (
+                        <button
+                          type="button"
+                          className="rounded-full border border-border bg-card px-3 py-1.5 text-[11px] font-semibold text-foreground transition-colors"
+                          onClick={() =>
+                            applyExistingOnlyGuestCount(reduceGuestCountTo)
+                          }
+                        >
+                          {showStuckPlacementHelp
+                            ? `Seat ${reduceGuestCountTo} on existing only`
+                            : `Use ${existingOnlyGroupSize} (existing tables only)`}
+                        </button>
+                      )}
+                      {(showStuckPlacementHelp
+                        ? canBookMixedGroupSize
+                        : canBookSuggestedGroupOnNewTable) && (
+                        <button
+                          type="button"
+                          className="rounded-full px-3 py-1.5 text-[11px] font-semibold transition-colors"
+                          style={{
+                            border: "1px solid color-mix(in srgb, var(--booking-kind-table) 45%, var(--border))",
+                            background: "color-mix(in srgb, var(--booking-kind-table) 12%, var(--card))",
+                            color: "color-mix(in srgb, var(--booking-kind-table) 85%, var(--foreground))",
+                          }}
+                          onClick={() => {
+                            if (showStuckPlacementHelp && guestPlacementIssue) {
+                              applyMixedGroupSize(
+                                guestPlacementIssue.mixedGroupSize,
+                              );
+                              return;
+                            }
+                            applyMixedGroupSize(suggestedIncreasedGroupSize);
+                          }}
+                        >
+                          Increase to{" "}
+                          {showStuckPlacementHelp && guestPlacementIssue
+                            ? guestPlacementIssue.mixedGroupSize
+                            : suggestedIncreasedGroupSize}{" "}
+                          (existing + new table)
+                        </button>
+                      )}
                     </div>
                   </div>
                 )}
 
-                {guestsNeedingNewTable > 0 && (
-                  <TableSeatingPanel
-                    key={`${dateId}-${tableConfig.id}-${tablePanelResetKey}-new`}
-                    tableConfig={tableConfig}
-                    formatCurrency={formatCurrency}
-                    formatUnit={formatUnit}
-                    onStateChange={handleTableSeatingChange}
-                    externalGroupSize={guestsNeedingNewTable}
-                    sectionTitle={`New table · ${guestsNeedingNewTable} guest${guestsNeedingNewTable === 1 ? "" : "s"}`}
+                {newTablePanelOpen &&
+                  !newTableSeatingConfirmed &&
+                  guestsForNewTablePanel > 0 &&
+                  tableConfig && (
+                  <div className="flex flex-col gap-2">
+                    {newTablePanelMessage ? (
+                      <p className="text-[10px] font-medium leading-snug text-muted-foreground">
+                        {newTablePanelMessage}
+                      </p>
+                    ) : null}
+                    <TableSeatingPanel
+                      key={`${dateId}-${tableConfig.id}-${tablePanelResetKey}-new-${newTablePanelScope}`}
+                      tableConfig={tableConfig}
+                      formatCurrency={formatCurrency}
+                      formatUnit={formatUnit}
+                      onStateChange={handleTableSeatingChange}
+                      externalGroupSize={guestsForNewTablePanel}
+                      existingTableCapacity={
+                        canUseExistingTables ? freeExistingSeatsLeft : undefined
+                      }
+                      minimumTotalGroupSize={guestsToAdd}
+                      sectionTitle={`New table · ${guestsForNewTablePanel} guest${guestsForNewTablePanel === 1 ? "" : "s"}`}
+                      onClose={closeNewTablePanel}
+                    />
+                  </div>
+                )}
+
+                {guestsToAdd > 0 &&
+                  hasNewTablesAvailable &&
+                  !hasAvailableExistingTables &&
+                  !newTablePanelOpen &&
+                  canBookAllGuestsOnNewTable && (
+                  <NewTableSetupPrompt
+                    title={`Set up your new table`}
+                    description={`${guestsToAdd} guest${guestsToAdd === 1 ? "" : "s"}${guestAddPriceHintLabel ? ` · ${guestAddPriceHintLabel}` : ""}`}
+                    actionLabel="Configure new table"
+                    onAction={openNewTableForAllGuests}
                   />
                 )}
 
-                {guestsToAdd > 0 && (
-                  <div
-                    className="flex items-start justify-between gap-3 rounded-lg border border-border p-3 px-3.5"
-                    style={{ background: "color-mix(in srgb, var(--booking-kind-table) 6%, var(--card))" }}
-                  >
-                    <div>
-                      <p className="m-0 text-[10px] font-bold tracking-[0.08em] uppercase text-muted-foreground">
-                        Overall progress
-                      </p>
-                      <p className="mt-[0.2rem] text-[0.8125rem] font-bold text-foreground">
-                        {tableGuestCount} / {guestsToAdd} guests placed
-                      </p>
-                      {tableGuestCount < guestsToAdd && !newTableSeatingConfirmed && (
-                        <p className="mt-1 text-[10px] leading-[1.4] text-muted-foreground">
-                          {newTablePlacedCount > 0 && existingFill.totalAdded > 0
-                            ? "Confirm seating on the new table to finish."
-                            : existingFill.totalAdded > 0
-                              ? "Assign remaining guests on the new table below, then confirm seating."
-                              : "Add guests to existing tables, or confirm a new table below."}
-                        </p>
-                      )}
-                      {tableGuestCount >= guestsToAdd && !newTableSeatingConfirmed && (
-                        <p className="mt-1 text-[10px] leading-[1.4] text-muted-foreground">
-                          Confirm seating on the new table to finish.
-                        </p>
-                      )}
-                      {newTableSeatingConfirmed && (
-                        <p className="mt-1 text-[10px] leading-[1.4] text-muted-foreground">
-                          Tap Add to booking to save your changes.
-                        </p>
-                      )}
-                    </div>
-                    {tableGuestTotal > 0 && (
-                      <span className="text-sm font-bold text-foreground whitespace-nowrap">
-                        {formatCurrency(tableGuestTotal)}
-                      </span>
-                    )}
-                  </div>
+                  </>
                 )}
+
               </div>
             ) : (
               <TableSeatingPanel
@@ -1248,7 +1976,7 @@ export function AddExtrasSection({
           <section className="flex flex-col gap-2 pb-1 mt-0 pt-4 border-t border-border">
             <ExtrasSectionHeader
               kind="package"
-              title={dateSource?.package_title}
+              title={packageSectionTitle}
             />
             <div className="grid grid-cols-1 items-stretch gap-2 min-[380px]:grid-cols-2 sm:grid-cols-[repeat(auto-fill,minmax(8.5rem,10.5rem))] sm:justify-start">
               {drinks.map((drink) => (
@@ -1290,6 +2018,17 @@ export function AddExtrasSection({
           </div>
         </div>
       )}
+
+      {useVendorApi ? (
+        <VendorAddonsPaymentModeDialog
+          open={paymentModeDialogOpen}
+          onOpenChange={setPaymentModeDialogOpen}
+          pendingTotalFormatted={pendingTotalFormatted}
+          pendingSummaryLabel={pendingSummaryLabel}
+          isSaving={isSavingAddOns}
+          onConfirm={submitSave}
+        />
+      ) : null}
     </div>
   );
 }

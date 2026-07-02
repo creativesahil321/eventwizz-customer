@@ -33,6 +33,7 @@ import {
   buildDateSubtitle,
   buildPaymentBreakdown,
   formatDateStripLabel,
+  resolvePackageSectionTitle,
   splitLineItemsForDate,
 } from "@/app/(protected)/customer/bookings/[id]/_components/booking-checkout/build-line-items";
 import {
@@ -54,10 +55,9 @@ import type {
 } from "./map-vendor-booking-to-checkout";
 import {
   getAllowedStatusOptions,
-  getPaymentStatusLabel,
-  getPaymentStatusNumber,
 } from "./vendor-booking-status";
 import { VendorBookingNotesPanel } from "./vendor-booking-notes-panel";
+import { canShowRescheduleButton } from "@/app/(protected)/customer/bookings/[id]/_components/booking-checkout/reschedule-eligibility";
 
 const FOOTER_STATUS_BADGE_CLASS: Record<StatusThemeKey, string> = {
   success: "border-emerald-400/80 bg-emerald-600 text-white",
@@ -98,6 +98,79 @@ function getDateDisplayStatusLabel(
     return normalized;
   }
   return getDateCardStatusLabel(paymentStatus).toUpperCase();
+}
+
+function VendorDatePaymentStatusRow({
+  date,
+  showDateLabel,
+  isUpdatingStatus,
+  updatingBookingDateId,
+  onStatusChangeRequest,
+}: {
+  date: VendorCheckoutDate;
+  showDateLabel: boolean;
+  isUpdatingStatus: boolean;
+  updatingBookingDateId: number | null;
+  onStatusChangeRequest: (
+    bookingDateId: number,
+    currentStatus: string,
+    newStatus: number,
+    dateLabel: string,
+  ) => void;
+}) {
+  const statusChangeOptions = getAllowedStatusOptions(
+    date.paymentStatusCode,
+    date.vendorStatusOptions,
+  );
+  const isUpdatingThis =
+    isUpdatingStatus && updatingBookingDateId === date.booking_date_id;
+
+  return (
+    <div className="flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-5">
+      <div className="flex min-w-0 flex-wrap items-center gap-2">
+        {showDateLabel ? (
+          <span className="max-w-full truncate text-xs font-semibold text-foreground">
+            {date.date}
+          </span>
+        ) : null}
+        <span className="text-xs font-semibold text-muted-foreground">
+          Payment status
+        </span>
+        <StatusBadge status={date.paymentStatusRaw} />
+      </div>
+      <Select
+        onValueChange={(value) => {
+          const newStatusCode = Number.parseInt(value, 10);
+          if (Number.isNaN(newStatusCode)) return;
+          onStatusChangeRequest(
+            date.booking_date_id,
+            date.paymentStatusRaw,
+            newStatusCode,
+            date.date,
+          );
+        }}
+        disabled={isUpdatingThis || statusChangeOptions.length === 0}
+      >
+        <SelectTrigger className="h-9 w-full min-w-[10rem] rounded-lg border-border text-xs sm:w-[160px]">
+          {isUpdatingThis ? (
+            <span className="flex items-center gap-2">
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              Updating…
+            </span>
+          ) : (
+            <span>Change status</span>
+          )}
+        </SelectTrigger>
+        <SelectContent>
+          {statusChangeOptions.map((option) => (
+            <SelectItem key={option.value} value={String(option.value)}>
+              {option.label}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
+  );
 }
 
 interface VendorBookingCheckoutPageProps {
@@ -159,6 +232,10 @@ export function VendorBookingCheckoutPage({
   const selectedDate =
     checkout.dates.find((date) => date.id === selectedDateId) ??
     checkout.dates[0];
+  const packageSectionTitle = useMemo(
+    () => resolvePackageSectionTitle(selectedDate, checkout.drinkTitle),
+    [selectedDate, checkout.drinkTitle],
+  );
   const hasMultipleDates = checkout.dates.length > 1;
   const isMenuChoiceForDate =
     selectedDate?.is_menu_choice ?? checkout.isMenuChoice;
@@ -170,7 +247,9 @@ export function VendorBookingCheckoutPage({
         booking_date_id: date.booking_date_id,
         date: formatDateStripLabel(date.date_key ?? date.id, date.date),
         previousDateLabel: date.previous_date_label?.trim() || undefined,
-        subtitle: buildDateSubtitle(date),
+        subtitle: checkout.isRoomSystem
+          ? (date.room_name ?? buildDateSubtitle(date))
+          : buildDateSubtitle(date),
         amount: date.totalAmount ?? 0,
         amountFormatted: date.total,
         paidAmount: date.paidAmount ?? 0,
@@ -179,7 +258,7 @@ export function VendorBookingCheckoutPage({
         paymentStatusLabel: date.paymentStatusLabel,
         canPayNow: false,
       })),
-    [checkout.dates, formatCurrency],
+    [checkout.dates, checkout.isRoomSystem, formatCurrency],
   );
 
   const dateCardViews = useMemo((): DateCardViewModel[] => {
@@ -233,10 +312,8 @@ export function VendorBookingCheckoutPage({
     canUpdateBooking &&
     isBookingDateEligibleForAddOns(selectedDate?.addOnsPaymentStatus);
 
-  const selectedStatusNum = selectedDate
-    ? getPaymentStatusNumber(selectedDate.paymentStatusRaw)
-    : 0;
-  const allowedStatusOptions = getAllowedStatusOptions(selectedStatusNum);
+  const showRescheduleForSelectedDate =
+    selectedDate != null && canShowRescheduleButton(selectedDate);
 
   const showPaymentFooter = checkout.summary.outstanding > 0;
   const footerLabel = hasMultipleDates
@@ -289,11 +366,11 @@ export function VendorBookingCheckoutPage({
                     <span className="text-sm font-normal text-muted-foreground">
                       Booking #{checkout.bookingNumber}
                     </span>
-                    {checkout.paymentStatus ? (
+                    {checkout.bookingStatus ? (
                       <>
                         <span className="text-muted-foreground/50">·</span>
                         <StatusBadge
-                          status={checkout.paymentStatus}
+                          status={checkout.bookingStatus}
                           showIcon={false}
                           className="text-[11px] font-semibold"
                         />
@@ -353,6 +430,28 @@ export function VendorBookingCheckoutPage({
             onPayForDate={() => undefined}
             formatCurrency={formatCurrency}
           />
+
+          {canUpdateBooking && checkout.dates.length > 0 ? (
+            <div className="mt-4 overflow-hidden rounded-xl border border-border bg-card">
+              {hasMultipleDates ? (
+                <p className="border-b border-border bg-muted/30 px-4 py-2.5 text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground sm:px-5">
+                  Payment status by date
+                </p>
+              ) : null}
+              <div className="divide-y divide-border">
+                {checkout.dates.map((date) => (
+                  <VendorDatePaymentStatusRow
+                    key={date.id}
+                    date={date}
+                    showDateLabel={hasMultipleDates}
+                    isUpdatingStatus={isUpdatingStatus}
+                    updatingBookingDateId={updatingBookingDateId}
+                    onStatusChangeRequest={onStatusChangeRequest}
+                  />
+                ))}
+              </div>
+            </div>
+          ) : null}
         </section>
 
         {selectedDate ? (
@@ -365,10 +464,11 @@ export function VendorBookingCheckoutPage({
                     addonItems={lineItemSections.addonItems}
                     addonTotal={lineItemSections.addonTotal}
                     addonLineCount={lineItemSections.addonLineCount}
-                    packageSectionTitle={selectedDate.package_title}
+                    packageSectionTitle={packageSectionTitle}
                     formatCurrency={formatCurrency}
                     canModifyAddOns={canModifyAddOns}
                     isMenuChoice={isMenuChoiceForDate}
+                    menuApi="vendor"
                     onDeleteAddon={(type, keyword) =>
                       onDeleteAddon(
                         selectedDate.date_key ?? selectedDate.id,
@@ -387,8 +487,14 @@ export function VendorBookingCheckoutPage({
                     bookingId={bookingId}
                     dateId={selectedDateId}
                     dateKey={selectedDate.date_key ?? selectedDate.id}
+                    roomId={
+                      checkout.isRoomSystem && selectedDate.room_id != null
+                        ? selectedDate.room_id
+                        : undefined
+                    }
                     paymentStatus={selectedDate.addOnsPaymentStatus}
                     dateSource={selectedDate}
+                    packageTitleFallback={checkout.drinkTitle}
                     formatCurrency={formatCurrency}
                     formatUnit={formatUnit}
                     addonApi="vendor"
@@ -396,58 +502,7 @@ export function VendorBookingCheckoutPage({
                   />
                 ) : null}
 
-                {canUpdateBooking && selectedDate ? (
-                  <div className="flex flex-col gap-3 border-t border-border px-5 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-6 lg:px-8">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="text-xs font-semibold text-muted-foreground">
-                        Payment status
-                      </span>
-                      <StatusBadge status={selectedDate.paymentStatusRaw} />
-                    </div>
-                    <Select
-                      value={String(selectedStatusNum)}
-                      onValueChange={(value) => {
-                        const newStatusNum = Number.parseInt(value, 10);
-                        if (newStatusNum !== selectedStatusNum) {
-                          onStatusChangeRequest(
-                            selectedDate.booking_date_id,
-                            selectedDate.paymentStatusRaw,
-                            newStatusNum,
-                            selectedDate.date,
-                          );
-                        }
-                      }}
-                      disabled={
-                        isUpdatingStatus || allowedStatusOptions.length === 0
-                      }
-                    >
-                      <SelectTrigger className="h-9 w-full min-w-[10rem] rounded-lg border-border text-xs sm:w-[160px]">
-                        {isUpdatingStatus &&
-                        updatingBookingDateId ===
-                          selectedDate.booking_date_id ? (
-                          <span className="flex items-center gap-2">
-                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                            Updating…
-                          </span>
-                        ) : (
-                          <span>Change status</span>
-                        )}
-                      </SelectTrigger>
-                      <SelectContent>
-                        {allowedStatusOptions.map((statusNum) => (
-                          <SelectItem
-                            key={statusNum}
-                            value={String(statusNum)}
-                          >
-                            {getPaymentStatusLabel(statusNum)}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                ) : null}
-
-                {canUpdateBooking && onRescheduleClick ? (
+                {canUpdateBooking && onRescheduleClick && showRescheduleForSelectedDate ? (
                   <div className="border-t border-border px-5 py-3 sm:px-6 lg:px-8">
                     <Button
                       type="button"

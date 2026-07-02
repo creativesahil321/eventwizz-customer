@@ -100,6 +100,7 @@ export default function AdjustBookingContent({
           booking_date_id: number;
           is_menu_choice?: boolean;
           has_unbooked_event_dates?: boolean;
+          can_reschedule?: boolean;
           total: string;
           totalAmount: number;
           paidAmount: number;
@@ -139,6 +140,7 @@ export default function AdjustBookingContent({
               dateEntry.is_menu_choice ?? bookingData.is_menu_choice ?? false,
             has_unbooked_event_dates:
               dateEntry.has_unbooked_event_dates === true,
+            can_reschedule: dateEntry.can_reschedule === true,
             date: dateEntry.date_label,
             previous_date_label: dateEntry.previous_date_label ?? null,
             room_name: dateEntry.room_name,
@@ -173,6 +175,8 @@ export default function AdjustBookingContent({
             bookingData.booking_number || bookingData.booking_id.toString(),
           location: bookingData.location,
           payment_status: paymentStatusLabel,
+          booking_status:
+            bookingData.status?.trim() || paymentStatusLabel,
           canPayNow: bookingCanPay && outstandingAmount > 0,
           isRoomSystem: bookingData.is_room_system === true,
           is_menu_choice: bookingData.is_menu_choice || false,
@@ -259,6 +263,7 @@ export default function AdjustBookingContent({
       eventName={transformedData.event_name}
       location={transformedData.location}
       paymentStatus={transformedData.payment_status}
+      bookingStatus={transformedData.booking_status}
       canPayNow={transformedData.canPayNow}
       isRoomSystem={transformedData.isRoomSystem}
       isMenuChoice={transformedData.is_menu_choice}

@@ -593,6 +593,27 @@ apiClient.interceptors.response.use(
             }
           }
           break;
+        case 409: {
+          const conflictData = error.response.data as ApiErrorResponse;
+          if (
+            conflictData?.errors &&
+            Array.isArray(conflictData.errors) &&
+            conflictData.errors.length > 0
+          ) {
+            conflictData.errors.forEach((errorMessage: string) => {
+              if (!isLogoutInProgress) {
+                safeToast.error(errorMessage);
+              }
+            });
+          } else if (conflictData?.message && !isLogoutInProgress) {
+            safeToast.error(conflictData.message);
+          } else if (!isLogoutInProgress) {
+            safeToast.error(
+              "This action conflicts with the current booking state. Refresh the page and try again.",
+            );
+          }
+          break;
+        }
         default:
           // Handle other errors - show toast for non-422 errors
           if (!isLogoutInProgress && error.response.status !== 422) {

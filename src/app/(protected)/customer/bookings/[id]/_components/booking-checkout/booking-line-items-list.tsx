@@ -107,6 +107,7 @@ interface BookingLineItemsListProps {
   formatCurrency: (amount: number) => string;
   canModifyAddOns: boolean;
   isMenuChoice?: boolean;
+  menuApi?: "customer" | "vendor";
   onMenuChoices?: () => void;
   onDeleteAddon: (
     type: "table" | "package" | "ticket",
@@ -118,9 +119,11 @@ interface BookingLineItemsListProps {
 function MenuChoicesSlot({
   item,
   isMenuChoice,
+  menuApi = "customer",
 }: {
   item: CheckoutLineItem;
   isMenuChoice?: boolean;
+  menuApi?: "customer" | "vendor";
 }) {
   if (
     item.kind !== "table" ||
@@ -138,6 +141,7 @@ function MenuChoicesSlot({
       dateKey={item.menuChoiceContext.dateKey}
       roomId={item.menuChoiceContext.roomId}
       tableAllocations={item.menuChoiceContext.tableAllocations}
+      menuApi={menuApi}
     />
   );
 }
@@ -147,6 +151,7 @@ function LineItemRow({
   formatCurrency,
   canModifyAddOns,
   isMenuChoice,
+  menuApi = "customer",
   onMenuChoices,
   onDeleteAddon,
   isDeleting,
@@ -160,6 +165,7 @@ function LineItemRow({
   formatCurrency: (amount: number) => string;
   canModifyAddOns: boolean;
   isMenuChoice?: boolean;
+  menuApi?: "customer" | "vendor";
   onMenuChoices?: () => void;
   onDeleteAddon: (
     type: "table" | "package" | "ticket",
@@ -277,7 +283,11 @@ function LineItemRow({
           </p>
         )}
         {!hideMenuChoices && (
-          <MenuChoicesSlot item={item} isMenuChoice={isMenuChoice} />
+          <MenuChoicesSlot
+            item={item}
+            isMenuChoice={isMenuChoice}
+            menuApi={menuApi}
+          />
         )}
       </div>
     </div>
@@ -289,6 +299,7 @@ function BookingItemWithBreakdown({
   formatCurrency,
   canModifyAddOns,
   isMenuChoice,
+  menuApi = "customer",
   onMenuChoices,
   onDeleteAddon,
   isDeleting,
@@ -299,6 +310,7 @@ function BookingItemWithBreakdown({
   formatCurrency: (amount: number) => string;
   canModifyAddOns: boolean;
   isMenuChoice?: boolean;
+  menuApi?: "customer" | "vendor";
   onMenuChoices?: () => void;
   onDeleteAddon: (
     type: "table" | "package" | "ticket",
@@ -329,6 +341,7 @@ function BookingItemWithBreakdown({
           formatCurrency={formatCurrency}
           canModifyAddOns={canModifyAddOns}
           isMenuChoice={isMenuChoice}
+          menuApi={menuApi}
           onMenuChoices={onMenuChoices}
           onDeleteAddon={onDeleteAddon}
           isDeleting={isDeleting}
@@ -389,7 +402,11 @@ function BookingItemWithBreakdown({
         </>
       )}
       </div>
-      <MenuChoicesSlot item={item} isMenuChoice={isMenuChoice} />
+      <MenuChoicesSlot
+        item={item}
+        isMenuChoice={isMenuChoice}
+        menuApi={menuApi}
+      />
     </div>
   );
 }
@@ -399,6 +416,7 @@ function GroupedAddonRow({
   formatCurrency,
   canModifyAddOns,
   isMenuChoice,
+  menuApi = "customer",
   onMenuChoices,
   onDeleteAddon,
   isDeleting,
@@ -410,6 +428,7 @@ function GroupedAddonRow({
   formatCurrency: (amount: number) => string;
   canModifyAddOns: boolean;
   isMenuChoice?: boolean;
+  menuApi?: "customer" | "vendor";
   onMenuChoices?: () => void;
   onDeleteAddon: (
     type: "table" | "package" | "ticket",
@@ -435,6 +454,7 @@ function GroupedAddonRow({
         formatCurrency={formatCurrency}
         canModifyAddOns={canModifyAddOns}
         isMenuChoice={isMenuChoice}
+        menuApi={menuApi}
         onMenuChoices={onMenuChoices}
         onDeleteAddon={onDeleteAddon}
         isDeleting={isDeleting}
@@ -454,6 +474,7 @@ function GroupedAddonRow({
             formatCurrency={formatCurrency}
             canModifyAddOns={canModifyAddOns}
             isMenuChoice={isMenuChoice}
+            menuApi={menuApi}
             onMenuChoices={onMenuChoices}
             onDeleteAddon={onDeleteAddon}
             isDeleting={isDeleting}
@@ -474,6 +495,7 @@ function GroupedAddonRow({
             formatCurrency={formatCurrency}
             canModifyAddOns={canModifyAddOns}
             isMenuChoice={isMenuChoice}
+            menuApi={menuApi}
             onMenuChoices={onMenuChoices}
             onDeleteAddon={onDeleteAddon}
             isDeleting={isDeleting}
@@ -517,6 +539,7 @@ function GroupedAddonRow({
             formatCurrency={formatCurrency}
             canModifyAddOns={false}
             isMenuChoice={isMenuChoice}
+            menuApi={menuApi}
             onMenuChoices={onMenuChoices}
             onDeleteAddon={onDeleteAddon}
             variant={rowVariant}
@@ -542,6 +565,7 @@ function GroupedAddonRow({
               formatCurrency={formatCurrency}
               canModifyAddOns={canModifyAddOns}
               isMenuChoice={isMenuChoice}
+              menuApi={menuApi}
               onMenuChoices={onMenuChoices}
               onDeleteAddon={onDeleteAddon}
               isDeleting={isDeleting}
@@ -604,6 +628,7 @@ function CategoryGroupedSection({
   formatCurrency,
   canModifyAddOns,
   isMenuChoice,
+  menuApi = "customer",
   onMenuChoices,
   onDeleteAddon,
   isDeleting,
@@ -614,6 +639,7 @@ function CategoryGroupedSection({
   formatCurrency: (amount: number) => string;
   canModifyAddOns: boolean;
   isMenuChoice?: boolean;
+  menuApi?: "customer" | "vendor";
   onMenuChoices?: () => void;
   onDeleteAddon: (
     type: "table" | "package" | "ticket",
@@ -676,6 +702,7 @@ function CategoryGroupedSection({
                     formatCurrency={formatCurrency}
                     canModifyAddOns={canModifyAddOns}
                     isMenuChoice={isMenuChoice}
+                    menuApi={menuApi}
                     onMenuChoices={onMenuChoices}
                     onDeleteAddon={onDeleteAddon}
                     isDeleting={isDeleting}
@@ -690,6 +717,7 @@ function CategoryGroupedSection({
                     formatCurrency={formatCurrency}
                     canModifyAddOns={canModifyAddOns}
                     isMenuChoice={isMenuChoice}
+                    menuApi={menuApi}
                     onMenuChoices={onMenuChoices}
                     onDeleteAddon={onDeleteAddon}
                     isDeleting={isDeleting}
@@ -704,6 +732,7 @@ function CategoryGroupedSection({
                   formatCurrency={formatCurrency}
                   canModifyAddOns={canModifyAddOns}
                   isMenuChoice={isMenuChoice}
+                  menuApi={menuApi}
                   onMenuChoices={onMenuChoices}
                   onDeleteAddon={onDeleteAddon}
                   isDeleting={isDeleting}
@@ -728,6 +757,7 @@ export function BookingLineItemsList({
   formatCurrency,
   canModifyAddOns,
   isMenuChoice,
+  menuApi = "customer",
   onMenuChoices,
   onDeleteAddon,
   isDeleting,
@@ -759,10 +789,9 @@ export function BookingLineItemsList({
             variant="booking"
             packageSectionTitle={packageSectionTitle}
             formatCurrency={formatCurrency}
-            canModifyAddOns={canModifyAddOns}
-            isMenuChoice={isMenuChoice}
-            onMenuChoices={onMenuChoices}
-            onDeleteAddon={onDeleteAddon}
+            canModifyAddOns={canModifyAddOns}            isMenuChoice={isMenuChoice}
+            menuApi={menuApi}
+            onMenuChoices={onMenuChoices}            onDeleteAddon={onDeleteAddon}
             isDeleting={isDeleting}
           />
         </div>
@@ -815,6 +844,7 @@ export function BookingLineItemsList({
                 formatCurrency={formatCurrency}
                 canModifyAddOns={canModifyAddOns}
                 isMenuChoice={isMenuChoice}
+                menuApi={menuApi}
                 onDeleteAddon={onDeleteAddon}
                 isDeleting={isDeleting}
               />

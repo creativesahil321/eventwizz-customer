@@ -1,6 +1,7 @@
 import type { BookingRescheduleRequest } from "@/services/customer/bookings/type";
 
 export interface RescheduleEligibleDate {
+  can_reschedule?: boolean;
   has_unbooked_event_dates?: boolean;
   reschedule_requests?: BookingRescheduleRequest[];
   paymentStatus?: string;
@@ -17,6 +18,10 @@ function isCancelledOrRefunded(date: RescheduleEligibleDate): boolean {
 
 /** Show API-driven Reschedule CTA — do not reimplement server rules. */
 export function canShowRescheduleButton(date: RescheduleEligibleDate): boolean {
+  if (typeof date.can_reschedule === "boolean") {
+    return date.can_reschedule;
+  }
+
   if (date.has_unbooked_event_dates !== true) return false;
   if ((date.reschedule_requests?.length ?? 0) > 0) return false;
   if (isCancelledOrRefunded(date)) return false;

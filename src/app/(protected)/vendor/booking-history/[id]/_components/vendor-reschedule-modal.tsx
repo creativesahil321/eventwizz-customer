@@ -25,9 +25,40 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useVendorRescheduleData } from "@/services/vendor/bookings/query";
 import type {
   VendorAvailableRescheduleDate,
+  VendorMissingTableDetail,
   VendorRescheduleBookingPayload,
 } from "@/services/vendor/bookings/type";
 import { useCurrencyFormat } from "@/hooks/use-currency-format";
+
+function getTotalMissingTableQuantity(
+  missingTables: VendorMissingTableDetail[],
+): number {
+  return missingTables.reduce(
+    (sum, table) => sum + Math.max(0, Number(table.quantity) || 0),
+    0,
+  );
+}
+
+function formatMissingTablesDetail(
+  missingTables: VendorMissingTableDetail[],
+): string {
+  if (missingTables.length === 0) return "";
+
+  const totalQty = getTotalMissingTableQuantity(missingTables);
+  const tierSummary = missingTables
+    .map(
+      (table) =>
+        `${table.quantity}× ${table.min_persons}–${table.max_persons} guests`,
+    )
+    .join(", ");
+
+  if (missingTables.length === 1) {
+    const table = missingTables[0];
+    return `Missing: ${table.quantity} table${table.quantity === 1 ? "" : "s"} (${table.min_persons}–${table.max_persons} persons)`;
+  }
+
+  return `Missing: ${totalQty} tables (${tierSummary})`;
+}
 
 interface VendorRescheduleDateModalProps {
   isOpen: boolean;
@@ -43,6 +74,7 @@ interface VendorRescheduleDateModalProps {
   bookingId: number;
   bookingDateId: number;
   hasAddons: boolean;
+  packageSectionTitle?: string;
   isProcessing?: boolean;
   onConfirm: (payload: VendorRescheduleBookingPayload) => void;
 }
@@ -67,6 +99,7 @@ export function VendorRescheduleDateModal({
   bookingId,
   bookingDateId,
   hasAddons,
+  packageSectionTitle,
   isProcessing = false,
   onConfirm,
 }: VendorRescheduleDateModalProps) {
@@ -104,6 +137,27 @@ export function VendorRescheduleDateModal({
   const availableDates = rescheduleData?.availableDates.available || [];
   const needsTablesDates = rescheduleData?.availableDates.needs_tables || [];
   const currentDateData = rescheduleData?.current;
+
+  const currentBookingDisplay = useMemo(() => {
+    if (currentDateData) {
+      const price =
+        typeof currentDateData.price === "number"
+          ? currentDateData.price
+          : Number.parseFloat(String(currentDateData.price)) ||
+            currentDate.price;
+
+      return {
+        date: currentDateData.date,
+        price,
+        people: currentDateData.people,
+        tables: currentDateData.tables,
+        tickets: currentDateData.tickets ?? 0,
+        drinks: currentDateData.drinks ?? 0,
+      };
+    }
+
+    return currentDate;
+  }, [currentDate, currentDateData]);
 
   // Reset step when modal opens
   useEffect(() => {
@@ -404,7 +458,7 @@ export function VendorRescheduleDateModal({
                         <ul className="mt-2 space-y-1 text-sm text-orange-800">
                           <li>• Additional tables</li>
                           <li>• Extra tickets</li>
-                          <li>• Drink packages</li>
+                          <li>• {packageSectionTitle?.trim() || "Drink packages"}</li>
                           <li>• All other add-ons</li>
                         </ul>
                       </div>
@@ -437,25 +491,25 @@ export function VendorRescheduleDateModal({
                         <div>
                           <span className="text-blue-700">Date:</span>
                           <p className="font-medium text-blue-900">
-                            {currentDate.date}
+                            {currentBookingDisplay.date}
                           </p>
                         </div>
                         <div>
                           <span className="text-blue-700">Price:</span>
                           <p className="font-medium text-blue-900">
-                            {formatMoney(currentDate.price)}
+                            {formatMoney(currentBookingDisplay.price)}
                           </p>
                         </div>
                         <div className="flex items-center gap-2">
                           <Users className="h-4 w-4 text-blue-600" />
                           <span className="text-blue-900">
-                            {currentDate.people} people
+                            {currentBookingDisplay.people} people
                           </span>
                         </div>
                         <div className="flex items-center gap-2">
                           <UtensilsCrossed className="h-4 w-4 text-blue-600" />
                           <span className="text-blue-900">
-                            {currentDate.tables} tables
+                            {currentBookingDisplay.tables} tables
                           </span>
                         </div>
                       </div>
@@ -570,7 +624,12 @@ export function VendorRescheduleDateModal({
                           </AlertDescription>
                         </Alert>
                         {needsTablesDates.map(
-                          (date: (typeof needsTablesDates)[0]) => (
+                          (date: (typeof needsTablesDates)[0]) => {
+                            const requiredTableCount = getTotalMissingTableQuantity(
+                              date.missing_tables,
+                            );
+
+                            return (
                             <div
                               key={date.id}
                               className="border-2 border-orange-200 rounded-lg p-3 sm:p-4 bg-orange-50/50 opacity-60"
@@ -588,18 +647,13 @@ export function VendorRescheduleDateModal({
                                     className="bg-orange-100 text-orange-700"
                                   >
                                     <Plus className="h-3 w-3 mr-1" />
-                                    Requires {date.missing_tables.length} Table
-                                    {date.missing_tables.length > 1 ? "s" : ""}
+                                    Requires {requiredTableCount} Table
+                                    {requiredTableCount === 1 ? "" : "s"}
                                   </Badge>
                                   <div className="mt-2 text-xs text-gray-600">
-                                    Missing: {date.missing_tables[0].quantity}{" "}
-                                    table
-                                    {date.missing_tables[0].quantity > 1
-                                      ? "s"
-                                      : ""}{" "}
-                                    ({date.missing_tables[0].min_persons}-
-                                    {date.missing_tables[0].max_persons}{" "}
-                                    persons)
+                                    {formatMissingTablesDetail(
+                                      date.missing_tables,
+                                    )}
                                   </div>
                                 </div>
                                 <Button
@@ -611,7 +665,8 @@ export function VendorRescheduleDateModal({
                                 </Button>
                               </div>
                             </div>
-                          )
+                            );
+                          },
                         )}
                       </div>
                     )}

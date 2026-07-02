@@ -11,6 +11,8 @@ import { useAuthStore } from "@/store/auth.store";
 import { useDomainStore } from "@/store/domain.store";
 import { getSession } from "next-auth/react";
 import type {
+  BookingDetailsDate,
+  BookingPaymentSummary,
   MenuItemsResponse,
   MenuSelectionResponse,
   SaveMenuChoicePayload,
@@ -103,14 +105,14 @@ export interface VendorBookingTable {
   price_per_person: number;
   no_tables: number;
   allocation:
-    | Record<string, number | string>
-    | Array<{
-        id?: number;
-        table_number?: number | string;
-        final_table_number?: number | string;
-        parent_id?: number;
-        seats?: number;
-      }>;
+  | Record<string, number | string>
+  | Array<{
+    id?: number;
+    table_number?: number | string;
+    final_table_number?: number | string;
+    parent_id?: number;
+    seats?: number;
+  }>;
   people: number;
   total: number;
 }
@@ -168,6 +170,15 @@ export interface VendorBookingEventDate {
   parent_booking_date?: string | VendorBookingParentDate | null;
 }
 
+export interface VendorStatusOption {
+  value: number;
+  label: string;
+}
+
+export type VendorBookingDetailDate = BookingDetailsDate & {
+  vendor_status_options?: VendorStatusOption[];
+};
+
 export interface VendorBookingComment {
   authorName: string;
   role: string;
@@ -180,21 +191,34 @@ export interface VendorBookingDetail {
   booking_number: string;
   user: VendorBookingUser;
   event_name: string;
-  is_menu_choice: boolean;
-  slug: string;
+  event_slug?: string;
   location: string;
-  drink_title: string;
-  payment_status: string;
-  payment_gateways: string[] | { id: number; slug: string }[];
-  sub_total: number;
-  addons_amount: number | null;
-  deposit_paid: number | null;
-  paid_amount: number;
-  pending_payment: number | null;
-  total: number;
+  is_room_system?: boolean;
+  is_menu_choice?: boolean;
+  /** Whole-booking order status (e.g. Cancelled, Confirmed) */
+  status?: string;
+  /** API-driven — when false, reschedule must not be offered */
+  can_reschedule?: boolean;
+  has_unbooked_event_dates?: boolean;
+  payment_status_code?: number;
+  payment_status_label: string;
   reschedule_status?: boolean;
+  reschedule_count?: number;
+  dates?: VendorBookingDetailDate[];
+  payment_summary?: BookingPaymentSummary;
   comments?: VendorBookingComment[];
-  event_dates: VendorBookingEventDate[];
+  /** @deprecated legacy detail shape */
+  slug?: string;
+  drink_title?: string;
+  payment_status?: string;
+  payment_gateways?: string[] | { id: number; slug: string }[];
+  sub_total?: number;
+  addons_amount?: number | null;
+  deposit_paid?: number | null;
+  paid_amount?: number;
+  pending_payment?: number | null;
+  total?: number;
+  event_dates?: VendorBookingEventDate[];
 }
 
 export interface VendorBookingDetailResponse {

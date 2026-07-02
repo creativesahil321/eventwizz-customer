@@ -78,10 +78,21 @@ export interface BookingDateSource {
   addons?: BookingDetailsAddons;
 }
 
+/** Prefer per-date `package_title` from booking API; optional booking-level fallback. */
+export function resolvePackageSectionTitle(
+  date?: Pick<BookingDateSource, "package_title"> | null,
+  fallback?: string | null,
+): string | undefined {
+  const fromDate = date?.package_title?.trim();
+  if (fromDate) return fromDate;
+  const fromFallback = fallback?.trim();
+  return fromFallback || undefined;
+}
+
 function formatAllocations(
   allocations: BookingTableAllocation[] | undefined,
   tableSize?: number,
-): AllocationPill[] { 
+): AllocationPill[] {
   if (!allocations?.length) return [];
   return allocations.map((row) => {
     const capacity = row.capacity ?? tableSize ?? row.people;
@@ -527,18 +538,40 @@ export function buildPaymentBreakdown(
 
 /** Fallback subtitle when room name is not shown on date cards */
 export function buildDateSubtitle(date: BookingDateSource): string | undefined {
-  if (date.item_summary?.trim()) return date.item_summary.trim();
+  const tableLines = [
+    ...(date.tables ?? []),
+    ...(date.addons?.tables ?? []),
+  ];
+  const tableCount = tableLines.reduce(
+    (sum, table) => sum + Math.max(1, table.table_count ?? 1),
+    0,
+  );
 
-  const tables =
-    (date.tables?.length ?? 0) +
-    (date.addons?.tables?.length ?? 0);
-  const tickets =
-    (date.tickets?.reduce((s, t) => s + t.quantity, 0) ?? 0) +
-    (date.addons?.tickets?.reduce((s, t) => s + t.quantity, 0) ?? 0);
+  const ticketCount =
+    (date.tickets?.reduce((sum, ticket) => sum + (ticket.quantity ?? 0), 0) ??
+      0) +
+    (date.addons?.tickets?.reduce((sum, ticket) => sum + (ticket.quantity ?? 0), 0) ??
+      0);
+
+  const packageCount =
+    (date.packages?.reduce((sum, pkg) => sum + (pkg.quantity ?? 0), 0) ?? 0) +
+    (date.addons?.packages?.reduce((sum, pkg) => sum + (pkg.quantity ?? 0), 0) ??
+      0);
 
   const parts: string[] = [];
-  if (tables > 0) parts.push(`${tables} ${tables === 1 ? "table" : "tables"}`);
-  if (tickets > 0)
-    parts.push(`${tickets} ${tickets === 1 ? "ticket" : "tickets"}`);
-  return parts.length > 0 ? parts.join(" · ") : undefined;
+  if (ticketCount > 0) {
+    parts.push(`${ticketCount} ${ticketCount === 1 ? "ticket" : "tickets"}`);
+  }
+  if (tableCount > 0) {
+    parts.push(`${tableCount} ${tableCount === 1 ? "table" : "tables"}`);
+  }
+  if (packageCount > 0) {
+    parts.push(
+      `${packageCount} ${packageCount === 1 ? "package" : "packages"}`,
+    );
+  }
+
+  if (parts.length > 0) return parts.join(" · ");
+
+  return date.item_summary?.trim() || undefined;
 }

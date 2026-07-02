@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 import type { MenuCategory, PersistedMenuChoice } from "@/services/customer/bookings/type";
+import { getMenuCategorySelectionKey } from "./menu-category-utils";
 
 interface AttendeesSidebarProps {
   attendees: PersistedMenuChoice[];
@@ -25,13 +26,16 @@ function getMenuSummary(
   categories: MenuCategory[],
 ): string {
   const parts: string[] = [];
-  for (const cat of categories) {
-    const itemId = selections[cat.title];
-    if (itemId) {
-      const item = cat.items.find((i) => i.id.toString() === itemId);
-      if (item) parts.push(item.name);
-    }
-  }
+  const withItems = categories.filter((category) => category.items.length > 0);
+
+  withItems.forEach((category, index) => {
+    const selectionKey = getMenuCategorySelectionKey(category, index);
+    const itemId = selections[selectionKey] ?? selections[category.title];
+    if (!itemId) return;
+
+    const item = category.items.find((entry) => entry.id.toString() === itemId);
+    if (item) parts.push(item.name);
+  });
   return parts.join(" · ") || "No selections";
 }
 

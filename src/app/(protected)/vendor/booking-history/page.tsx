@@ -233,6 +233,7 @@ export default function BookingHistoryPage() {
                           placeholder="Filter by date range"
                           disabled={isFetching}
                           showClear={true}
+                          disableFutureDates={false}
                         />
                       </div>
                       {showRoomFilter && (

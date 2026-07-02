@@ -1,66 +1,83 @@
-/** Vendor booking payment status helpers (API codes 0–5). */
+/** Vendor booking payment status helpers — API is source of truth. */
 
-export function getPaymentStatusNumber(status: string): number {
-  const statusLower = status.toLowerCase();
-  if (statusLower.includes("paid") || statusLower.includes("full")) return 1;
-  if (statusLower.includes("failed")) return 2;
-  if (statusLower.includes("cancel")) return 3;
-  if (statusLower.includes("refund")) return 4;
-  if (statusLower.includes("partial")) return 5;
+export interface VendorStatusOptionLike {
+  value: number;
+  label: string;
+}
+
+/** Resolve status code from API fields (legacy bookings may lack `payment_status_code`). */
+export function resolvePaymentStatusCode(date: {
+  payment_status_code?: number;
+  payment_status_label?: string;
+}): number {
+  if (date.payment_status_code != null) return date.payment_status_code;
+
+  const status = date.payment_status_label?.toLowerCase().trim() ?? "";
+  if (status === "paid" || (status.includes("paid") && !status.includes("partial"))) {
+    return 2;
+  }
+  if (status.includes("partial")) return 1;
+  if (status.includes("cancel")) return 3;
+  if (status.includes("refund")) return 4;
+  if (status.includes("failed")) return 6;
   return 0;
 }
 
-export function getPaymentStatusLabel(statusNumber: number): string {
+export function getPaymentStatusNumber(status: string): number {
+  return resolvePaymentStatusCode({ payment_status_label: status });
+}
+
+/** Label for a status code — prefer API `vendor_status_options`, then `payment_status_label` fallbacks. */
+export function getPaymentStatusLabel(
+  statusNumber: number,
+  options?: VendorStatusOptionLike[],
+): string {
+  const fromApi = options?.find((option) => option.value === statusNumber);
+  if (fromApi?.label) return fromApi.label;
+
   switch (statusNumber) {
     case 0:
       return "Pending";
     case 1:
-      return "Paid";
+      return "Partial Payment";
     case 2:
-      return "Failed";
+      return "Paid";
     case 3:
       return "Cancelled";
     case 4:
       return "Refunded";
     case 5:
       return "Partial Payment";
+    case 6:
+      return "Failed";
     default:
       return "Unknown";
   }
 }
 
-export function getAllowedStatusOptions(currentStatusNum: number): number[] {
-  let options: number[];
-  switch (currentStatusNum) {
-    case 1:
-      options = [3, 4];
-      break;
-    case 5:
-      options = [1, 3, 4];
-      break;
-    case 0:
-    case 2:
-      options = [0, 1, 2, 3, 4];
-      break;
-    case 3:
-      options = [4];
-      break;
-    case 4:
-      options = [];
-      break;
-    default:
-      options = [0, 1, 2, 3, 4];
+/**
+ * Allowed status transitions for the vendor dropdown.
+ * When the API sends `vendor_status_options`, use them as-is — the backend defines valid targets.
+ */
+export function getAllowedStatusOptions(
+  _currentStatusCode: number,
+  apiOptions?: VendorStatusOptionLike[],
+): VendorStatusOptionLike[] {
+  if (apiOptions?.length) {
+    return apiOptions;
   }
-  return options.filter((num) => num !== currentStatusNum);
+
+  // Legacy fallback when API omits options (old bookings / transitional responses).
+  return [];
 }
 
 export function normalizeVendorPaymentStatus(
   status: string,
 ): "paid" | "pending" | "partial" | "refunded" | "cancelled" {
   const s = status?.toLowerCase().trim() ?? "";
-  if (s.includes("paid") && !s.includes("partial")) return "paid";
+  if (s === "paid" || (s.includes("paid") && !s.includes("partial"))) return "paid";
   if (s.includes("refund")) return "refunded";
   if (s.includes("cancel")) return "cancelled";
-  if (s.includes("partial")) return "partial";
+  if (s === "partial payment" || s.includes("partial")) return "partial";
   return "pending";
 }

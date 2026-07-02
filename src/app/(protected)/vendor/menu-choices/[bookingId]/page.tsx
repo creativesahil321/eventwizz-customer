@@ -39,6 +39,7 @@ import {
   useSaveVendorMenuChoice,
 } from "@/services/vendor/bookings/query";
 import { useVendorBookingById } from "@/services/vendor/bookings/hooks/useVendorBookingById";
+import { getVendorBookingDates } from "@/app/(protected)/vendor/booking-history/[id]/_components/map-vendor-booking-to-checkout";
 import { MenuTable, SaveMenuChoicePayload } from "@/services/customer/bookings/type";
 import { vendorBookingsService } from "@/services/vendor/bookings/bookings.service";
 import { PermissionRoute } from "@/components/permission";
@@ -90,7 +91,7 @@ function MenuChoicesContent({ params }: MenuChoicesPageProps) {
     if (!currentBooking) return null;
 
     // Transform event_dates to MenuBookingDate format
-    const dates: MenuBookingDate[] = currentBooking.event_dates
+    const dates: MenuBookingDate[] = getVendorBookingDates(currentBooking)
       .map((eventDate) => {
         // Get tables from menu items API if available, otherwise use booking data
         let tables: TableInfo[] = [];
@@ -109,28 +110,38 @@ function MenuChoicesContent({ params }: MenuChoicesPageProps) {
             }),
           );
         } else if (eventDate.tables && eventDate.tables.length > 0) {
-          // Use tables from vendor booking data
-          // Extract table IDs from allocation
           const firstTable = eventDate.tables[0];
-          if (firstTable.allocation) {
-            tables = Object.entries(firstTable.allocation).map(
-              ([tableId, people], index) => ({
-                table_id: tableId,
-                table_name: `Table ${index + 1}`,
-                seats: firstTable.table_size,
-                guests: people,
-              }),
-            );
+          if (firstTable.allocations?.length) {
+            tables = firstTable.allocations.map((allocation) => ({
+              table_id: String(allocation.id),
+              table_name: allocation.label,
+              seats: allocation.capacity ?? firstTable.table_size,
+              guests: allocation.people,
+            }));
+          } else {
+            const legacyAllocation = (
+              firstTable as { allocation?: Record<string, number | string> }
+            ).allocation;
+            if (legacyAllocation) {
+              tables = Object.entries(legacyAllocation).map(
+                ([tableId, people], index) => ({
+                  table_id: tableId,
+                  table_name: `Table ${index + 1}`,
+                  seats: firstTable.table_size,
+                  guests: Number(people) || 0,
+                }),
+              );
+            }
           }
         }
 
         return {
           date_key: eventDate.date_key,
-          date: eventDate.date,
+          date: eventDate.date_label,
           tables,
           tickets: 0,
           drinks: 0,
-          status: eventDate.payment_status.toLowerCase(),
+          status: eventDate.payment_status_label.toLowerCase(),
         };
       })
       // Filter out dates with no tables
@@ -226,18 +237,20 @@ function MenuChoicesContent({ params }: MenuChoicesPageProps) {
 
   // Initialize selected date to first date that has tables
   useEffect(() => {
-    if (currentBooking && currentBooking.event_dates.length > 0) {
-      // Find first date with tables
-      const firstDate = currentBooking.event_dates.find(
-        (d) => d.tables && d.tables.length > 0,
-      );
+    if (!currentBooking) return;
 
-      if (
-        firstDate &&
-        (!selectedDateKey || selectedDateKey !== firstDate.date_key)
-      ) {
-        setSelectedDateKey(firstDate.date_key);
-      }
+    const bookingDates = getVendorBookingDates(currentBooking);
+    if (bookingDates.length === 0) return;
+
+    const firstDate = bookingDates.find(
+      (date) => date.tables && date.tables.length > 0,
+    );
+
+    if (
+      firstDate &&
+      (!selectedDateKey || selectedDateKey !== firstDate.date_key)
+    ) {
+      setSelectedDateKey(firstDate.date_key);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentBooking]);
@@ -246,14 +259,25 @@ function MenuChoicesContent({ params }: MenuChoicesPageProps) {
   useEffect(() => {
     if (!selectedDateKey || !currentBooking) return;
 
-    const eventDate = currentBooking.event_dates.find(
-      (d) => d.date_key === selectedDateKey,
+    const eventDate = getVendorBookingDates(currentBooking).find(
+      (date) => date.date_key === selectedDateKey,
     );
 
     if (eventDate?.tables && eventDate.tables.length > 0) {
       const firstTable = eventDate.tables[0];
-      if (firstTable.allocation) {
-        const firstTableId = Object.keys(firstTable.allocation)[0];
+      if (firstTable.allocations?.length) {
+        const firstTableId = String(firstTable.allocations[0].id);
+        if (!selectedTableId && firstTableId) {
+          setSelectedTableId(firstTableId);
+        }
+        return;
+      }
+
+      const legacyAllocation = (
+        firstTable as { allocation?: Record<string, number | string> }
+      ).allocation;
+      if (legacyAllocation) {
+        const firstTableId = Object.keys(legacyAllocation)[0];
         if (!selectedTableId && firstTableId) {
           setSelectedTableId(firstTableId);
         }
