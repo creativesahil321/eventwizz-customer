@@ -219,16 +219,26 @@ export interface BookingDetailsAddonPackage {
   total_amount?: number;
 }
 
+/** Unpaid add-on table row — seat extensions vs new tables are separate lines. */
+export type BookingAddonTableItemType = "seat_extension" | "new_table";
+
 /** Saved add-on table on a booking date */
 export interface BookingDetailsAddonTable {
   id?: number;
   booking_date_table_id?: number;
+  /** Distinguishes extra seats on an existing table from a newly added table. */
+  item_type?: BookingAddonTableItemType;
   name?: string;
+  description?: string | null;
   unit_price: number;
+  /** Guest/seat count for pricing display. */
   quantity: number;
   total_amount: number;
-  table_size: number;
+  table_size?: number;
   table_count?: number;
+  parent_table_id?: number;
+  parent_table_label?: string;
+  guest_pricing_label?: string;
   allocations?: BookingTableAllocation[];
 }
 

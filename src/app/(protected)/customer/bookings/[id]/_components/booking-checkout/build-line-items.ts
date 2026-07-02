@@ -2,6 +2,7 @@ import type {
   BookingDetailsAddonBreakdown,
   BookingDetailsAddons,
   BookingDetailsAddonPackage,
+  BookingDetailsAddonTable,
   BookingDetailsPackage,
   BookingDetailsTable,
   BookingDetailsTicket,
@@ -112,11 +113,83 @@ function formatAllocations(
   });
 }
 
+function formatAddonTableLineMeta(
+  table: BookingDetailsAddonTable,
+  formatUnit: (amount: number) => string,
+): string {
+  const apiLabel = table.guest_pricing_label?.trim();
+  if (apiLabel) return apiLabel;
+  return formatTableLineMeta(table, formatUnit);
+}
+
+function buildAddonTableDisplay(table: BookingDetailsAddonTable): {
+  name: string;
+  description?: string;
+  allocation?: AllocationPill[];
+  quantityBadge?: number;
+} {
+  const itemType = table.item_type;
+  const seatCount = table.quantity ?? 0;
+  const parentLabel = table.parent_table_label?.trim();
+
+  if (itemType === "seat_extension") {
+    const name = table.name?.trim() || "Additional seats";
+    const description =
+      table.description?.trim() ||
+      (parentLabel
+        ? `+${seatCount} seat${seatCount === 1 ? "" : "s"} on ${parentLabel}`
+        : seatCount > 0
+          ? `+${seatCount} additional seat${seatCount === 1 ? "" : "s"}`
+          : undefined);
+
+    return { name, description };
+  }
+
+  if (itemType === "new_table") {
+    const name =
+      table.name?.trim() ||
+      (table.table_size ? `Table of ${table.table_size}` : "New table");
+    const allocation = formatAllocations(table.allocations, table.table_size);
+    const primaryAllocation = allocation[0];
+    const guests = seatCount || primaryAllocation?.occupied || 0;
+    const tableLabel = primaryAllocation?.label?.trim();
+    const description =
+      tableLabel && guests > 0
+        ? `New table — ${tableLabel} (${guests} guest${guests === 1 ? "" : "s"})`
+        : table.description?.trim() || "New add-on table";
+
+    return {
+      name,
+      description,
+      allocation,
+      quantityBadge:
+        table.table_count && table.table_count > 1 ? table.table_count : undefined,
+    };
+  }
+
+  const name = table.name?.trim() || `Table of ${table.table_size ?? seatCount}`;
+  return {
+    name,
+    description: table.description ?? undefined,
+    allocation: formatAllocations(table.allocations, table.table_size),
+    quantityBadge:
+      table.table_count && table.table_count > 1 ? table.table_count : undefined,
+  };
+}
+
+function countAddonTablesForSubtitle(tables: BookingDetailsAddonTable[]): number {
+  return tables.reduce((sum, table) => {
+    if (table.item_type === "seat_extension") return sum;
+    return sum + Math.max(1, table.table_count ?? 1);
+  }, 0);
+}
+
 function formatTableLineMeta(
-  table: Pick<
-    BookingDetailsTable,
-    "unit_price" | "quantity" | "guest_pricing_label"
-  >,
+  table: {
+    unit_price: number | string;
+    quantity: number;
+    guest_pricing_label?: string | null;
+  },
   formatUnit: (amount: number) => string,
 ): string {
   const unitPrice = parseUnitPrice(table.unit_price);
@@ -319,20 +392,29 @@ export function buildLineItemsForDate(
 
   date.addons?.tables?.forEach((table, idx) => {
     const unitPrice = parseUnitPrice(table.unit_price);
+    const display = buildAddonTableDisplay(table);
+    const lineId = table.booking_date_table_id ?? table.id ?? idx;
+
     items.push({
-      id: `addon-table-${date.id}-${idx}`,
+      id: `addon-table-${date.id}-${lineId}-${table.item_type ?? "legacy"}-${idx}`,
       kind: "table",
-      name: table.name || `Table of ${table.table_size}`,
-      meta: `${formatUnit(unitPrice)} × ${table.quantity}`,
+      name: display.name,
+      description: display.description,
+      meta: formatAddonTableLineMeta(table, formatUnit),
       amount: normalizeLineAmount(table.total_amount),
       unitPrice,
-      quantity: table.table_count && table.table_count > 1 ? table.table_count : undefined,
-      allocation: formatAllocations(table.allocations, table.table_size),
+      quantity: display.quantityBadge,
+      allocation: display.allocation,
       isSavedAddon: true,
       deletable: true,
       deletePayload: {
         type: "table",
-        keyword: table.booking_date_table_id ?? table.id ?? table.table_size,
+        keyword:
+          table.booking_date_table_id ??
+          table.id ??
+          table.parent_table_id ??
+          table.table_size ??
+          idx,
       },
     });
   });
@@ -538,14 +620,12 @@ export function buildPaymentBreakdown(
 
 /** Fallback subtitle when room name is not shown on date cards */
 export function buildDateSubtitle(date: BookingDateSource): string | undefined {
-  const tableLines = [
-    ...(date.tables ?? []),
-    ...(date.addons?.tables ?? []),
-  ];
-  const tableCount = tableLines.reduce(
+  const bookedTableCount = (date.tables ?? []).reduce(
     (sum, table) => sum + Math.max(1, table.table_count ?? 1),
     0,
   );
+  const addonTableCount = countAddonTablesForSubtitle(date.addons?.tables ?? []);
+  const tableCount = bookedTableCount + addonTableCount;
 
   const ticketCount =
     (date.tickets?.reduce((sum, ticket) => sum + (ticket.quantity ?? 0), 0) ??
