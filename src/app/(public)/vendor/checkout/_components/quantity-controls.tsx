@@ -118,8 +118,8 @@ export default function QuantityControls({
         )}
       </AnimatePresence>
 
-      {/* Capacity Warning */}
-      {maxQuantity && quantity >= maxQuantity && (
+      {/* Capacity Warning — use explicit > 0 check; `maxQuantity &&` would render "0" when sold out */}
+      {maxQuantity != null && maxQuantity > 0 && quantity >= maxQuantity && (
         <motion.div
           initial={{ opacity: 0, x: -6 }}
           animate={{ opacity: 1, x: 0 }}
