@@ -65,7 +65,6 @@ export default function MenuChoicesInline({
   const [editingAttendee, setEditingAttendee] = useState<PersistedMenuChoice | null>(null);
   const [duplicatingId, setDuplicatingId] = useState<number | null>(null);
   const isDuplicatingRef = useRef(false);
-  const [pendingSaveCount, setPendingSaveCount] = useState(0);
 
   const resolvedRoomId =
     roomId != null && roomId > 0 ? roomId : undefined;
@@ -137,7 +136,10 @@ export default function MenuChoicesInline({
     return Math.min(currentAttendees.length + 1, Math.max(totalSeats, 1));
   }, [editingAttendee, currentAttendees, totalSeats]);
 
-  const isTableFull = currentAttendees.length + pendingSaveCount >= totalSeats;
+  // Only count persisted attendees — optimistic pending saves caused a flash of
+  // "All menu choices added" before the query refetched the new row.
+  const isTableFull =
+    totalSeats > 0 && currentAttendees.length >= totalSeats;
 
   const completedCounts = useMemo(() => {
     const counts: Record<number, number> = {};
@@ -201,14 +203,11 @@ export default function MenuChoicesInline({
         additional_notes: data.additionalNotes,
       };
 
-      setPendingSaveCount((count) => count + 1);
       try {
         await saveMenuChoice.mutateAsync(payload);
         setEditingAttendee(null);
       } catch {
         // Error toast is shown by the API client interceptor.
-      } finally {
-        setPendingSaveCount((count) => Math.max(0, count - 1));
       }
     },
     [bookingId, activeTableId, roomId, totalSeats, editingAttendee, menuCategories, saveMenuChoice],
@@ -217,7 +216,7 @@ export default function MenuChoicesInline({
   const handleDuplicate = useCallback(
     async (attendee: PersistedMenuChoice) => {
       if (isDuplicatingRef.current) return;
-      if (currentAttendees.length + pendingSaveCount >= totalSeats) {
+      if (currentAttendees.length >= totalSeats || saveMenuChoice.isPending) {
         toast.error("Table is full", {
           description: "Cannot duplicate. Edit an existing attendee instead.",
         });
@@ -245,7 +244,7 @@ export default function MenuChoicesInline({
         setDuplicatingId(null);
       }
     },
-    [currentAttendees, totalSeats, pendingSaveCount, handleSave, menuCategories],
+    [currentAttendees, totalSeats, saveMenuChoice.isPending, handleSave, menuCategories],
   );
 
   return (

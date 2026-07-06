@@ -36,6 +36,7 @@ import type {
   RescheduleBookingPayload,
 } from "@/services/customer/bookings/type";
 import { toast } from "sonner";
+import { resolveBookingPayAllVisibility } from "./booking-payment-visibility";
 import { AddExtrasSection } from "./add-extras-panel";
 import {
   buildDateSubtitle,
@@ -364,13 +365,16 @@ export default function BookingCheckoutPage({
   const showPaymentFooter = bookingOutstanding > 0;
   const footerLabel = hasMultipleDates ? "Total Due (all dates)" : "Total Due";
   const footerAmount = bookingOutstanding;
-  const showFooterPayAll =
-    canPayNow &&
-    bookingOutstanding > 0 &&
-    payableDates.length > 0 &&
-    hasMultipleDates;
-  const showPayAll =
-    canPayNow && bookingOutstanding > 0 && payableDates.length > 0;
+  const payAllVisibility = useMemo(
+    () =>
+      resolveBookingPayAllVisibility({
+        canPayNow,
+        bookingOutstanding,
+        payableDateCount: payableDates.length,
+        hasMultipleDates,
+      }),
+    [canPayNow, bookingOutstanding, payableDates.length, hasMultipleDates],
+  );
 
   const canModifyAddOns = isBookingDateEligibleForAddOns(
     selectedDate?.addOnsPaymentStatus,
@@ -810,13 +814,13 @@ export default function BookingCheckoutPage({
                 <p className="mt-1 text-2xl font-extrabold tabular-nums tracking-tight text-card sm:text-[1.75rem]">
                   {formatCurrency(footerAmount)}
                 </p>
-                {showPayAll && payableDates.length > 1 && (
+                {payAllVisibility.showPayableDatesHint && (
                   <p className="mt-1 text-[11px] text-card/70">
                     {payableDates.length} dates with outstanding balance
                   </p>
                 )}
               </div>
-              {showFooterPayAll ? (
+              {payAllVisibility.showPayAllButton ? (
                 <Button
                   type="button"
                   size="lg"

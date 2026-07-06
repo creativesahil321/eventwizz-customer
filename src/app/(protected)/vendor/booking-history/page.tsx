@@ -285,9 +285,6 @@ export default function BookingHistoryPage() {
                           <SelectItem value="all">All Bookings</SelectItem>
                           <SelectItem value="confirmed">Confirmed</SelectItem>
                           <SelectItem value="cancelled">Cancelled</SelectItem>
-                          <SelectItem value="pending">
-                            Pending (Draft)
-                          </SelectItem>
                           <SelectItem value="partially_paid">
                             Partially Paid
                           </SelectItem>

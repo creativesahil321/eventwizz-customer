@@ -2,6 +2,7 @@ import {
   resolvePackageSectionTitle,
   type BookingDateSource,
 } from "@/app/(protected)/customer/bookings/[id]/_components/booking-checkout/build-line-items";
+import type { VendorAddonsPaymentMode } from "@/app/(protected)/vendor/booking-history/[id]/_components/vendor-addons-payment-mode-dialog";
 import { buildCartDateLookupKey } from "@/app/(public)/vendor/checkout/_lib/cart-calculations";
 import { normalizePaymentStatusForAddOnsDate } from "@/lib/booking-addons-eligibility";
 import type {
@@ -42,6 +43,8 @@ export interface VendorCheckoutDate extends BookingDateSource {
   paymentStatusCode: number;
   vendorStatusOptions: VendorStatusOption[];
   addOnsPaymentStatus: ReturnType<typeof normalizePaymentStatusForAddOnsDate>;
+  show_payment_mode_option?: boolean;
+  unpaid_addon_payment_mode?: VendorAddonsPaymentMode;
 }
 
 export interface MappedVendorBookingCheckout {
@@ -73,6 +76,16 @@ function parseAmount(value?: number | string | null): number {
     return Number.isNaN(parsed) ? 0 : parsed;
   }
   return 0;
+}
+
+function normalizeAddonPaymentMode(
+  value?: string | null,
+): VendorAddonsPaymentMode | undefined {
+  const normalized = value?.trim().toLowerCase();
+  if (normalized === "online" || normalized === "offline") {
+    return normalized;
+  }
+  return undefined;
 }
 
 function mapLegacyTicket(
@@ -247,6 +260,10 @@ function mapDetailDate(
     paymentStatusCode,
     vendorStatusOptions: date.vendor_status_options ?? [],
     addOnsPaymentStatus: normalizePaymentStatusForAddOnsDate(paymentStatusLabel),
+    show_payment_mode_option: date.show_payment_mode_option === true,
+    unpaid_addon_payment_mode: normalizeAddonPaymentMode(
+      date.unpaid_addon_payment_mode,
+    ),
     total: formatCurrency(totalAmount),
     totalAmount,
     paidAmount,

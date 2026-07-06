@@ -11,22 +11,13 @@ import {
 
 import { useOnboardingData } from "./_lib/hooks/useOnboardingData";
 import { ApiResponse } from "@/services/vendor/onboarding/type";
+import { coerceApiBooleanOrNull } from "@/lib/coerce-api-boolean";
 import ModeSelection from "./_components/mode-selection";
 import AIOnboardingFlow from "./_components/ai-onboarding";
 
 type OnboardingMode = "selecting" | "ai" | "manual";
 
 const MODE_STORAGE_KEY = "onboarding_mode";
-
-function coercePersistedBoolean(value: unknown): boolean | null {
-  if (value === true || value === 1 || value === "1" || value === "true") {
-    return true;
-  }
-  if (value === false || value === 0 || value === "0" || value === "false") {
-    return false;
-  }
-  return null;
-}
 
 /**
  * After the AI wizard applies, vendors continue in the manual stepper (steps 2–11).
@@ -86,7 +77,7 @@ export default function OnboardingClientWrapper() {
     const raw = safeData?.data ?? safeData;
     if (!raw || typeof raw !== "object") return null;
     const data = raw as Record<string, unknown>;
-    return coercePersistedBoolean(data.is_rooms);
+    return coerceApiBooleanOrNull(data.is_rooms);
   }, [safeData]);
 
   const persistedRoomNames = useMemo((): string[] => {

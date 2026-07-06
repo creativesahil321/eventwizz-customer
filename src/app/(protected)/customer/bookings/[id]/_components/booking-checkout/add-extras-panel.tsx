@@ -136,6 +136,10 @@ interface AddExtrasSectionProps {
   onSaveSuccess?: () => void;
   /** When `vendor`, uses vendor add-ons API (vendor booking dashboard). */
   addonApi?: "customer" | "vendor";
+  /** Vendor only — when true, prompt for online/offline before saving add-ons. */
+  showPaymentModeOption?: boolean;
+  /** Vendor only — applied when `showPaymentModeOption` is false. */
+  defaultAddonPaymentMode?: VendorAddonsPaymentMode;
 }
 
 function getNewTableStock(table: AddOnsTable): number {
@@ -665,6 +669,8 @@ export function AddExtrasSection({
   onPendingTotalChange,
   onSaveSuccess,
   addonApi = "customer",
+  showPaymentModeOption = false,
+  defaultAddonPaymentMode,
 }: AddExtrasSectionProps) {
   const eligible = isBookingDateEligibleForAddOns(paymentStatus);
   const packageSectionTitle = useMemo(
@@ -673,7 +679,8 @@ export function AddExtrasSection({
   );
   const useVendorApi = addonApi === "vendor";
   const { settings } = useDomain();
-  const { phone: venuePhone, email: venueEmail } = resolveVenueContact(settings);
+  const { phone: venuePhone, email: venueEmail, address: venueAddress } =
+    resolveVenueContact(settings);
 
   const customerAddonsQuery = useAddOnsDetails(
     bookingId,
@@ -1593,12 +1600,17 @@ export function AddExtrasSection({
     }
 
     if (useVendorApi) {
-      setPaymentModeDialogOpen(true);
+      if (showPaymentModeOption) {
+        setPaymentModeDialogOpen(true);
+        return;
+      }
+      submitSave(defaultAddonPaymentMode);
       return;
     }
 
     submitSave();
   }, [
+    defaultAddonPaymentMode,
     drinks,
     eligible,
     existingFill.totalAdded,
@@ -1615,6 +1627,7 @@ export function AddExtrasSection({
     totalFreeExistingSeats,
     useAddGuestsFlow,
     useVendorApi,
+    showPaymentModeOption,
   ]);
 
   const hasCatalog =
@@ -1747,9 +1760,10 @@ export function AddExtrasSection({
                   (!canUseExistingTables ? (
                     <VenueContactNotice
                       title={`New tables require at least ${tableConfig.min} guests.`}
-                      message={`Increase your group size to at least ${tableConfig.min} guests, or contact the venue for assistance with smaller groups.`}
+                      message={`Increase your group size to at least ${tableConfig.min} guests, or contact the venue using the details below for assistance with smaller groups.`}
                       phone={venuePhone}
                       email={venueEmail}
+                      address={venueAddress}
                     />
                   ) : (
                   <div
@@ -2019,7 +2033,7 @@ export function AddExtrasSection({
         </div>
       )}
 
-      {useVendorApi ? (
+      {useVendorApi && showPaymentModeOption ? (
         <VendorAddonsPaymentModeDialog
           open={paymentModeDialogOpen}
           onOpenChange={setPaymentModeDialogOpen}

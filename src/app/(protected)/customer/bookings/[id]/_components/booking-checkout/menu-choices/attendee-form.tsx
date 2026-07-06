@@ -168,7 +168,7 @@ export default function AttendeeForm({
 
   const isEditing = !!editingAttendee;
 
-  if (isTableFull && !isEditing) {
+  if (isTableFull && !isEditing && !isSaving) {
     return (
       <div
         className={cn(

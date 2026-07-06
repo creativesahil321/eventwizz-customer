@@ -2,6 +2,11 @@
  * Shared limits for event flows: vendor editor, onboarding, and AI review.
  * Keep Zod schemas and UI (maxLength / counters) aligned with these values.
  */
+import {
+  booleanFlagToFormDataValue,
+  coerceApiFlag,
+} from "@/lib/coerce-api-boolean";
+
 export { RICH_DESCRIPTION_MAX_CHARS } from "./plain-text-length";
 
 /** Main package block heading (vendor step 2 / onboarding step 4). */
@@ -57,15 +62,12 @@ export const EVENT_ROOM_MAX_COUNT = 3;
 export function parseEventIsRoomsFlag(
   value: boolean | number | string | null | undefined,
 ): 0 | 1 {
-  if (value === true || value === 1 || value === "1" || value === "true") {
-    return 1;
-  }
-  return 0;
+  return coerceApiFlag(value);
 }
 
 /** FormData value for Laravel `boolean` rules (multipart has no native bool type). */
 export function isRoomsToFormDataValue(flag: 0 | 1): "true" | "false" {
-  return flag === 1 ? "true" : "false";
+  return booleanFlagToFormDataValue(flag);
 }
 
 /** Vendor event editor: one room row in `stepTwo.rooms` (form array shape). */

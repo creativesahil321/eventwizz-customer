@@ -47,6 +47,7 @@ import {
 } from "@/components/ui/accordion";
 import { isLightUiBackground } from "@/lib/wcag-color-contrast";
 import { useSiteEssentialsUpdateGate } from "../../_lib/site-essentials-update-context";
+import { RestoreDefaultThemeControl } from "../restore-default-theme-control";
 
 type ThemePresetsTabProps = {
   onGoToColors: () => void;
@@ -432,12 +433,19 @@ export function ThemePresetsTab({
         ))}
       </Accordion>
 
+      <RestoreDefaultThemeControl
+        form={form}
+        presetCacheUserKey={presetCacheUserKey ?? "anonymous"}
+        readOnly={readOnly}
+      />
+
       <p className="text-[10px] leading-relaxed text-muted-foreground sm:text-[11px]">
         <span className="font-medium text-foreground/70">CDN font</span> presets
         add a stylesheet link (editable under Typography).{" "}
         <span className="text-foreground/60">
-          The highlighted preset is remembered in this browser (refresh / Reset)
-          until you apply another or the form exactly matches a different preset.
+          The highlighted preset is remembered in this browser (refresh / Discard
+          changes) until you apply another or the form exactly matches a different
+          preset.
         </span>
       </p>
     </div>

@@ -195,7 +195,8 @@ export default function TableRecommendations({
   const { format: formatMoney } = useCurrencyFormat();
   const { settings } = useDomain();
   const tablePriceHint = formatTablePriceHint(tables, formatMoney);
-  const { phone: venuePhone, email: venueEmail } = resolveVenueContact(settings);
+  const { phone: venuePhone, email: venueEmail, address: venueAddress } =
+    resolveVenueContact(settings);
 
   const dateData = getDateData(eventSlug, date);
   const peopleCount = dateData?.peopleCount || 20;
@@ -312,20 +313,22 @@ export default function TableRecommendations({
           <VenueContactNotice
             message={
               getLowestTableMinimum(tables)
-                ? `Tables start from ${getLowestTableMinimum(tables)} guests. Contact the venue for smaller groups.`
+                ? `Tables start from ${getLowestTableMinimum(tables)} guests. Contact the venue using the details below for smaller groups.`
                 : undefined
             }
             phone={venuePhone}
             email={venueEmail}
+            address={venueAddress}
           />
         </div>
       ) : (
         <div className="px-4 py-4">
           <VenueContactNotice
             title="No tables available for your group size."
-            message="Please contact the venue for assistance."
+            message="Please contact the venue using the details below for assistance."
             phone={venuePhone}
             email={venueEmail}
+            address={venueAddress}
           />
         </div>
       )}

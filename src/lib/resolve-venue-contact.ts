@@ -5,6 +5,7 @@ type VenueContactSource = Pick<ThemeSchema, "contactDetails"> | null | undefined
 type ExtendedContactDetails = ContactDetails & {
   phoneNumber?: string;
   alternativePhoneNumber?: string;
+  alternativeAddress?: string;
 };
 
 function pickContactValue(
@@ -17,10 +18,20 @@ function pickContactValue(
   return null;
 }
 
-/** Resolve venue phone/email from theme settings (supports API field variants). */
+function resolveVenueAddress(
+  contact: ExtendedContactDetails | undefined,
+): string | null {
+  const lineOne = pickContactValue(contact?.address);
+  const lineTwo = pickContactValue(contact?.alternativeAddress);
+  if (lineOne && lineTwo) return `${lineOne}, ${lineTwo}`;
+  return lineOne ?? lineTwo;
+}
+
+/** Resolve venue phone, email, and address from theme settings (supports API field variants). */
 export function resolveVenueContact(source: VenueContactSource): {
   phone: string | null;
   email: string | null;
+  address: string | null;
 } {
   const contact = source?.contactDetails as ExtendedContactDetails | undefined;
 
@@ -32,5 +43,6 @@ export function resolveVenueContact(source: VenueContactSource): {
       contact?.alternativePhoneNumber,
     ),
     email: pickContactValue(contact?.email, contact?.alternativeEmail),
+    address: resolveVenueAddress(contact),
   };
 }

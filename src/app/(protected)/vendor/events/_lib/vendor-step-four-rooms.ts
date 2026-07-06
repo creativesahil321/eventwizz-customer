@@ -1,4 +1,5 @@
 import type { StepFourType } from "@/app/(protected)/vendor/events/_components/tab-event-form/schema";
+import { coerceApiFlag } from "@/lib/coerce-api-boolean";
 
 export type VendorStepFourMenuItem = {
   title: string;
@@ -24,10 +25,9 @@ const hasNonEmpty = (value: unknown): boolean =>
   String(value ?? "").trim().length > 0;
 
 export function normalizeCateringOptionFlag(value: unknown): 0 | 1 {
-  if (value === true || value === 1 || value === "1" || value === "true") {
-    return 1;
-  }
-  return 0;
+  return coerceApiFlag(
+    value as boolean | number | string | null | undefined,
+  );
 }
 
 /** Resolve catering flag from API/onboarding payloads (boolean strings, missing flag + menu data). */

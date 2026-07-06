@@ -9,24 +9,12 @@ import {
   AlertCircle,
   Eye,
   RotateCcw,
-  Palette,
 } from "lucide-react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 import { useToast } from "@/components/ui/use-toast";
 import { useSiteEssentials } from "../_lib/hooks";
-import { useResetSiteEssentialsThemeMutation } from "../_lib/queries";
 import {
   resolveHasMultipleLocations,
   useHasMultipleLocations,
@@ -53,11 +41,6 @@ import {
   SiteEssentialsUpdateProvider,
   useSiteEssentialsUpdateGate,
 } from "../_lib/site-essentials-update-context";
-import {
-  applySiteEssentialsDefaultTheme,
-  SITE_ESSENTIALS_DEFAULT_PRESET_ID,
-} from "../_lib/default-site-theme";
-import { writeLastAppliedSiteThemePresetId } from "../_lib/site-theme-preset-local-cache";
 import { toMutableSiteEssentialsFormValues } from "../_lib/to-mutable-form-values";
 
 export function SiteEssentialsForm() {
@@ -72,10 +55,6 @@ function SiteEssentialsFormInner() {
   const { readOnly } = useSiteEssentialsUpdateGate();
   const { form, onSubmit, isLoading, siteEssentials, fetchSiteEssentials } =
     useSiteEssentials();
-  const {
-    mutateAsync: resetThemeToDefault,
-    isPending: isResettingThemeDefault,
-  } = useResetSiteEssentialsThemeMutation();
   const hasMultipleLocations = useHasMultipleLocations();
   const [submitting, setSubmitting] = useState(false);
   const [previewLoading, setPreviewLoading] = useState(false);
@@ -103,7 +82,6 @@ function SiteEssentialsFormInner() {
   );
   const [showErrorSummary, setShowErrorSummary] = useState(false);
   const [activeTab, setActiveTab] = useState("presets");
-  const [resetDefaultDialogOpen, setResetDefaultDialogOpen] = useState(false);
 
   // Load preview data into form if available
   // BUT never override File objects - form submission should use form's File objects, not preview store data
@@ -333,51 +311,7 @@ function SiteEssentialsFormInner() {
   // Count total errors for error summary
   const errorCount = Object.keys(tabsWithErrors).length;
 
-  const presetCacheUserKey =
-    session?.user?.uuid ?? session?.user?.email ?? "anonymous";
-
-  const handleResetAsDefault = async () => {
-    try {
-      const updated = await resetThemeToDefault();
-      form.reset(toMutableSiteEssentialsFormValues(updated), {
-        keepErrors: false,
-        keepDirty: false,
-        keepIsSubmitted: false,
-        keepTouched: false,
-        keepIsValid: false,
-        keepSubmitCount: false,
-      });
-      writeLastAppliedSiteThemePresetId(
-        presetCacheUserKey,
-        SITE_ESSENTIALS_DEFAULT_PRESET_ID,
-      );
-      setResetDefaultDialogOpen(false);
-      setShowErrorSummary(false);
-      toast({
-        title: "Theme reset to default",
-        description:
-          "Colors and fonts were restored to EventWizz defaults. Your logo, copy, and images are unchanged.",
-        variant: "default",
-      });
-    } catch {
-      applySiteEssentialsDefaultTheme(form.setValue, form.getValues);
-      writeLastAppliedSiteThemePresetId(
-        presetCacheUserKey,
-        SITE_ESSENTIALS_DEFAULT_PRESET_ID,
-      );
-      setResetDefaultDialogOpen(false);
-      setShowErrorSummary(false);
-      toast({
-        title: "Default theme applied locally",
-        description:
-          "The reset API is not available yet — changes are in the form only. Click Save after the backend ships POST …/reset-theme-default.",
-        variant: "default",
-      });
-    }
-  };
-
-  // Handle form reset
-  const handleReset = async () => {
+  const handleDiscardChanges = async () => {
     if (readOnly) return;
 
     try {
@@ -402,16 +336,16 @@ function SiteEssentialsFormInner() {
         setShowErrorSummary(false);
 
         toast({
-          title: "Form Reset",
-          description: "All changes have been reset to the last saved values",
+          title: "Changes discarded",
+          description: "The form was restored to your last saved values.",
           variant: "default",
         });
       }
     } catch (error) {
-      console.error("Error resetting form:", error);
+      console.error("Error discarding form changes:", error);
       toast({
         title: "Error",
-        description: "Failed to reset the form",
+        description: "Failed to discard your unsaved changes",
         variant: "destructive",
       });
     }
@@ -611,79 +545,12 @@ function SiteEssentialsFormInner() {
                 <Button
                   variant="outline"
                   type="button"
-                  onClick={handleReset}
+                  onClick={handleDiscardChanges}
                   disabled={readOnly || previewLoading || submitting}
                   className="flex items-center justify-center gap-2 border-slate-300 bg-white text-slate-900 hover:bg-slate-50"
                 >
-                  <RotateCcw className="h-4 w-4" /> Reset
+                  <RotateCcw className="h-4 w-4" /> Discard changes
                 </Button>
-                <Button
-                  variant="outline"
-                  type="button"
-                  onClick={() => setResetDefaultDialogOpen(true)}
-                  disabled={
-                    readOnly ||
-                    previewLoading ||
-                    submitting ||
-                    isResettingThemeDefault
-                  }
-                  className="flex items-center justify-center gap-2 border-slate-300 bg-white text-slate-900 hover:bg-slate-50"
-                >
-                  {isResettingThemeDefault ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <Palette className="h-4 w-4" />
-                  )}
-                  {isResettingThemeDefault ? "Resetting…" : "Reset as default"}
-                </Button>
-                <AlertDialog
-                  open={resetDefaultDialogOpen}
-                  onOpenChange={setResetDefaultDialogOpen}
-                >
-                  <AlertDialogContent className="text-foreground">
-                    <AlertDialogHeader>
-                      <AlertDialogTitle>
-                        Reset theme to defaults?
-                      </AlertDialogTitle>
-                      <AlertDialogDescription asChild>
-                        <div className="space-y-2 text-sm text-muted-foreground">
-                          <p>
-                            This will replace your current{" "}
-                            <span className="font-medium text-foreground">
-                              colors, fonts, and heading style
-                            </span>{" "}
-                            with the EventWizz default theme (Clean White).
-                          </p>
-                          <p>
-                            Your logo, page copy, images, social links, and SEO
-                            settings will{" "}
-                            <span className="font-medium text-foreground">
-                              not
-                            </span>{" "}
-                            be changed.
-                          </p>
-                          <p className="font-medium text-amber-700">
-                            This saves immediately on the server. Your live site
-                            will use the default theme after the reset
-                            completes.
-                          </p>
-                        </div>
-                      </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter className="gap-2 sm:gap-3 sm:space-x-0">
-                      <AlertDialogCancel>Cancel</AlertDialogCancel>
-                      <AlertDialogAction
-                        onClick={() => void handleResetAsDefault()}
-                        disabled={isResettingThemeDefault}
-                        className="bg-[var(--color-primary)] text-white hover:bg-[var(--color-primary-hover)]"
-                      >
-                        {isResettingThemeDefault
-                          ? "Resetting…"
-                          : "Yes, reset theme"}
-                      </AlertDialogAction>
-                    </AlertDialogFooter>
-                  </AlertDialogContent>
-                </AlertDialog>
                 <Button
                   type="submit"
                   disabled={

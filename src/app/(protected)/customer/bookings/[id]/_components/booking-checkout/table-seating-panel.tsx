@@ -124,7 +124,8 @@ export function TableSeatingPanel({
   minimumTotalGroupSize,
 }: TableSeatingPanelProps) {
   const { settings } = useDomain();
-  const { phone: venuePhone, email: venueEmail } = resolveVenueContact(settings);
+  const { phone: venuePhone, email: venueEmail, address: venueAddress } =
+    resolveVenueContact(settings);
 
   const minPersons = tableConfig.min;
   const maxPersons = tableConfig.max;
@@ -414,6 +415,7 @@ export function TableSeatingPanel({
               message="All tables for this date are sold out. Contact the venue for assistance."
               phone={venuePhone}
               email={venueEmail}
+              address={venueAddress}
             />
           ) : belowMinimum ? (
             <VenueContactNotice
@@ -423,27 +425,30 @@ export function TableSeatingPanel({
                 minimumTotalGroupSize != null &&
                 existingTableCapacity != null &&
                 minimumTotalGroupSize > existingTableCapacity
-                  ? `Increase your group size to at least ${minimumTotalGroupSize} guests (${existingTableCapacity} in existing tables + ${minPersons} for a new table), or contact the venue for smaller groups.`
+                  ? `Increase your group size to at least ${minimumTotalGroupSize} guests (${existingTableCapacity} in existing tables + ${minPersons} for a new table), or contact the venue using the details below for smaller groups.`
                   : isControlledGroupSize
-                    ? `Increase your group size to at least ${minPersons} guests for a new table, or contact the venue for smaller groups.`
-                    : "Contact the venue for smaller groups."
+                    ? `Increase your group size to at least ${minPersons} guests for a new table, or contact the venue using the details below for smaller groups.`
+                    : "Contact the venue using the details below for smaller groups."
               }
               phone={venuePhone}
               email={venueEmail}
+              address={venueAddress}
             />
           ) : exceedsAvailability ? (
             <VenueContactNotice
               title={`Only ${maxTables} table${maxTables === 1 ? "" : "s"} available.`}
-              message={`Your group of ${effectiveGroupSize} needs ${idealQty ?? tableQuantity} table${(idealQty ?? tableQuantity) === 1 ? "" : "s"}. Contact the venue for larger groups.`}
+              message={`Your group of ${effectiveGroupSize} needs ${idealQty ?? tableQuantity} table${(idealQty ?? tableQuantity) === 1 ? "" : "s"}. Contact the venue using the details below for larger groups.`}
               phone={venuePhone}
               email={venueEmail}
+              address={venueAddress}
             />
           ) : !hasViablePlan ? (
             <VenueContactNotice
               title="No tables available for your group size."
-              message="Please contact the venue for assistance."
+              message="Please contact the venue using the details below for assistance."
               phone={venuePhone}
               email={venueEmail}
+              address={venueAddress}
             />
           ) : (
             <>

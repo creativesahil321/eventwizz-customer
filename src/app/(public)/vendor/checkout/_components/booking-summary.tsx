@@ -62,6 +62,10 @@ import OrderViewBreakdown from "./order-view-breakdown";
 import PerDatePaymentSelection from "./per-date-payment-selection";
 import { cn } from "@/lib/utils";
 import { useDrinkSelectionStore } from "@/store/drink-selection.store";
+import {
+  assessCheckoutDatesReadiness,
+  resolveCheckoutCtaState,
+} from "../_lib/checkout-readiness";
 
 const checkoutPayButtonClass = (disabled: boolean) =>
   cn(
@@ -327,49 +331,27 @@ export default function BookingSummary({}: BookingSummaryProps) {
     return getAvailableDates(currentEventApiData);
   }, [currentEventApiData, roomMode]);
 
-  const { isPaymentBlocked, hasValidationErrors, validationErrorMessage } =
-    useMemo(() => {
-      if (!currentEventSlug) {
-        return {
-          isPaymentBlocked: false,
-          hasValidationErrors: false,
-          validationErrorMessage: undefined,
-        };
-      }
-
-      let hasUnsaved = false;
-      let hasValidationErrors = false;
-      let validationErrorMessage: string | undefined;
-
-      availableDates.forEach((date) => {
-        const dateData = getDateData(currentEventSlug, date);
-        if (dateData) {
-          if (hasUnsavedChanges(currentEventSlug, date)) {
-            hasUnsaved = true;
-          }
-          const validation = validateDateRequirements(currentEventSlug, date);
-          if (!validation.isValid) {
-            hasValidationErrors = true;
-            if (!validationErrorMessage && validation.errorMessage) {
-              validationErrorMessage = validation.errorMessage;
-            }
-          }
-        }
-      });
-
-      return {
-        isPaymentBlocked: hasUnsaved || hasValidationErrors,
-        hasValidationErrors,
-        validationErrorMessage,
-      };
-    }, [
+  const checkoutReadiness = useMemo(
+    () =>
+      assessCheckoutDatesReadiness({
+        eventSlug: currentEventSlug,
+        availableDates,
+        getDateData,
+        hasUnsavedChanges,
+        validateDateRequirements,
+      }),
+    [
       currentEventSlug,
       availableDates,
       editingData,
       getDateData,
       hasUnsavedChanges,
       validateDateRequirements,
-    ]);
+    ],
+  );
+
+  const { hasUnsavedEdits, hasValidationErrors, validationErrorMessage } =
+    checkoutReadiness;
 
   // Checkout handler
   const handleProceedToPayment = async () => {
@@ -965,31 +947,37 @@ export default function BookingSummary({}: BookingSummaryProps) {
     return rooms.find((r) => r.room_id === roomId)?.room_name ?? null;
   };
 
-  // CTA button state — NEVER show "Saving Changes..."
-  // Auto-save runs silently; we queue checkout if save is in progress
-  const isCtaLoading =
-    isProcessing ||
-    isPending ||
-    processCheckoutMutation.isPending ||
-    resumeCheckoutMutation.isPending;
-  const isCtaDisabled =
-    isCtaLoading ||
-    (!hasPendingStripePayment &&
-      (!hasPayableTotal ||
-        (hasValidationErrors && isPaymentBlocked) ||
-        !selectedGateway));
+  const ctaState = resolveCheckoutCtaState({
+    isLoading:
+      isProcessing ||
+      isPending ||
+      processCheckoutMutation.isPending ||
+      resumeCheckoutMutation.isPending,
+    hasPendingStripePayment,
+    stripePaymentAmount: stripePaymentSession?.amount ?? null,
+    hasPayableTotal,
+    hasValidationErrors,
+    hasUnsavedEdits,
+    hasSelectedGateway: Boolean(selectedGateway),
+    finalTotalWithFee,
+    formatMoney,
+  });
 
-  const ctaLabel = hasPendingStripePayment
-    ? `Complete payment · ${formatMoney(stripePaymentSession?.amount ?? 0)}`
-    : isCtaLoading
-      ? "Processing..."
-      : !hasPayableTotal
-        ? "Add items to continue"
-        : hasValidationErrors
-          ? "Complete selections"
-          : !selectedGateway
-            ? "Select payment method"
-            : `Pay ${formatMoney(finalTotalWithFee)} now`;
+  const handleCheckoutCtaClick = (e: React.MouseEvent<HTMLButtonElement>) => {
+    if (ctaState.loading || isCheckoutInProgressRef.current) {
+      e.preventDefault();
+      return;
+    }
+    if (hasValidationErrors) {
+      e.preventDefault();
+      toast.error(
+        validationErrorMessage ||
+          "Please select at least one table or ticket for each date",
+      );
+      return;
+    }
+    void handleProceedToPayment();
+  };
 
   // ──────────────────────────────────────────────
   // RENDER: ORDER SUMMARY CARD
@@ -1098,7 +1086,7 @@ export default function BookingSummary({}: BookingSummaryProps) {
               selectedGateway={selectedGateway}
               onGatewaySelect={setSelectedGateway}
               disabled={false}
-              showError={!selectedGateway && !isPaymentBlocked && !isProcessing}
+              showError={ctaState.showGatewayError}
             />
             <Separator className="bg-gray-100" />
           </>
@@ -1118,40 +1106,22 @@ export default function BookingSummary({}: BookingSummaryProps) {
         <div className="hidden lg:block">
           <Button
             size="lg"
-            onClick={(e) => {
-              if (
-                isProcessing ||
-                processCheckoutMutation.isPending ||
-                isCheckoutInProgressRef.current
-              ) {
-                e.preventDefault();
-                return;
-              }
-              if (hasValidationErrors) {
-                e.preventDefault();
-                toast.error(
-                  validationErrorMessage ||
-                    "Please select at least one table or ticket for each date",
-                );
-                return;
-              }
-              handleProceedToPayment();
-            }}
-            disabled={isCtaDisabled}
+            onClick={handleCheckoutCtaClick}
+            disabled={ctaState.disabled}
             className={cn(
               "h-12 w-full text-sm",
-              checkoutPayButtonClass(isCtaDisabled),
+              checkoutPayButtonClass(ctaState.disabled),
             )}
           >
-            {isCtaLoading ? (
+            {ctaState.loading ? (
               <div className="flex items-center gap-2">
                 <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                 <span>Processing...</span>
               </div>
             ) : (
               <div className="flex items-center gap-2">
-                {!isCtaDisabled && <Lock className="h-4 w-4" />}
-                <span>{ctaLabel}</span>
+                {!ctaState.disabled && <Lock className="h-4 w-4" />}
+                <span>{ctaState.label}</span>
               </div>
             )}
           </Button>
@@ -1271,28 +1241,14 @@ export default function BookingSummary({}: BookingSummaryProps) {
             </button>
 
             <Button
-              onClick={(e) => {
-                if (isCtaLoading || isCheckoutInProgressRef.current) {
-                  e.preventDefault();
-                  return;
-                }
-                if (hasValidationErrors) {
-                  e.preventDefault();
-                  toast.error(
-                    validationErrorMessage ||
-                      "Please select at least one table or ticket",
-                  );
-                  return;
-                }
-                handleProceedToPayment();
-              }}
-              disabled={isCtaDisabled}
+              onClick={handleCheckoutCtaClick}
+              disabled={ctaState.disabled}
               className={cn(
                 "h-11 max-w-[48%] shrink-0 px-3 text-xs font-semibold min-[400px]:max-w-none min-[400px]:px-4 min-[400px]:text-sm sm:px-6",
-                checkoutPayButtonClass(isCtaDisabled),
+                checkoutPayButtonClass(ctaState.disabled),
               )}
             >
-              {isCtaLoading ? (
+              {ctaState.loading ? (
                 <div className="flex items-center gap-1.5">
                   <div className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white/30 border-t-white" />
                   <span className="hidden min-[360px]:inline">
@@ -1301,8 +1257,8 @@ export default function BookingSummary({}: BookingSummaryProps) {
                 </div>
               ) : (
                 <div className="flex items-center gap-1.5">
-                  {!isCtaDisabled && <Lock className="h-3.5 w-3.5 shrink-0" />}
-                  <span className="truncate">{ctaLabel}</span>
+                  {!ctaState.disabled && <Lock className="h-3.5 w-3.5 shrink-0" />}
+                  <span className="truncate">{ctaState.label}</span>
                 </div>
               )}
             </Button>

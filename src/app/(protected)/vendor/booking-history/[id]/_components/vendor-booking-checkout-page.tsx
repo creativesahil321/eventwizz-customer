@@ -498,6 +498,8 @@ export function VendorBookingCheckoutPage({
                     formatCurrency={formatCurrency}
                     formatUnit={formatUnit}
                     addonApi="vendor"
+                    showPaymentModeOption={selectedDate.show_payment_mode_option === true}
+                    defaultAddonPaymentMode={selectedDate.unpaid_addon_payment_mode}
                     onSaveSuccess={onAddonsSaved}
                   />
                 ) : null}

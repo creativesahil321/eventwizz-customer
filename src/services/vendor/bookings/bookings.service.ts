@@ -177,6 +177,10 @@ export interface VendorStatusOption {
 
 export type VendorBookingDetailDate = BookingDetailsDate & {
   vendor_status_options?: VendorStatusOption[];
+  /** When true, vendor chooses online/offline when saving add-ons. */
+  show_payment_mode_option?: boolean;
+  /** Default payment mode when `show_payment_mode_option` is false. */
+  unpaid_addon_payment_mode?: "online" | "offline" | string;
 };
 
 export interface VendorBookingComment {

@@ -1,8 +1,7 @@
 "use client";
 
-import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import {
   AlertDialog,
@@ -30,14 +29,8 @@ import { eventsService } from "@/services/vendor/events/events.service";
 import { stepEightSchema } from "@/app/(protected)/vendor/events/_components/tab-event-form/schema";
 import { useSitePreviewStore } from "@/store/site-preview.store";
 import { PreviewProvider } from "@/contexts/preview-context";
-import {
-  siteEssentialsKeys,
-  useSiteEssentialsMutation,
-  useSiteEssentialsQuery,
-} from "@/app/(protected)/_shared/sites-essentials/_lib/queries";
+import { useSiteEssentialsQuery } from "@/app/(protected)/_shared/sites-essentials/_lib/queries";
 import { SiteEssentialsFormValues } from "@/app/(protected)/_shared/sites-essentials/_lib/schema";
-import { PreviewThemeCustomizer } from "@/components/preview/preview-theme-customizer";
-import { themeKeys } from "@/hooks/use-theme-query";
 import { useToast } from "@/components/ui/use-toast";
 
 function EventPreviewPageLoadingShell() {
@@ -59,10 +52,7 @@ export default function EventPreviewPage() {
 function EventPreviewPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const queryClient = useQueryClient();
   const { toast } = useToast();
-  const { mutateAsync: saveSiteEssentials, isPending: isSavingTheme } =
-    useSiteEssentialsMutation();
 
   const eventId = searchParams.get("id");
   const urlRoomsParam = searchParams.get("rooms");
@@ -133,8 +123,7 @@ function EventPreviewPageContent() {
   const [isPublishing, setIsPublishing] = useState(false);
 
   // Get site essentials from Zustand store (populated after save or preview click)
-  const { previewData: storeSiteEssentials, setPreviewData } =
-    useSitePreviewStore();
+  const { previewData: storeSiteEssentials } = useSitePreviewStore();
 
   // Fetch from API as a fallback for vendors who haven't interacted with the
   // site essentials form in the current session (store would be empty)
@@ -142,31 +131,10 @@ function EventPreviewPageContent() {
 
   // Prefer the store (reflects unsaved in-progress edits); fall back to the
   // API response so that already-saved colors always show in the preview
-  const baseSiteEssentials: SiteEssentialsFormValues | null =
+  const siteEssentials: SiteEssentialsFormValues | null =
     storeSiteEssentials ??
     (apiSiteEssentials as SiteEssentialsFormValues | null) ??
     null;
-
-  const [themeTweak, setThemeTweak] = useState<SiteEssentialsFormValues | null>(
-    null,
-  );
-
-  const siteEssentials: SiteEssentialsFormValues | null = useMemo(() => {
-    return themeTweak ?? baseSiteEssentials;
-  }, [themeTweak, baseSiteEssentials]);
-
-  useEffect(() => {
-    setThemeTweak(null);
-  }, [eventId]);
-
-  /** Match site preview: persist Try theme tweaks so Site Essentials / site preview stay in sync. */
-  const handleThemeValuesChange = useCallback(
-    (next: SiteEssentialsFormValues) => {
-      setThemeTweak(next);
-      setPreviewData(next);
-    },
-    [setPreviewData],
-  );
 
   const handleGoBack = () => {
     if (eventId && /^\d+$/.test(eventId)) {
@@ -174,40 +142,6 @@ function EventPreviewPageContent() {
       return;
     }
     router.back();
-  };
-
-  /** Persist current preview theme (colors, fonts, hero align) like Site Essentials → Save. */
-  const handleSaveTheme = async () => {
-    if (!siteEssentials) return;
-    try {
-      await saveSiteEssentials({
-        ...siteEssentials,
-        _method: "PATCH",
-      } as Partial<SiteEssentialsFormValues> & { _method: "PATCH" });
-      await queryClient.invalidateQueries({ queryKey: themeKeys.all });
-      await queryClient.invalidateQueries({
-        queryKey: siteEssentialsKeys.details(),
-      });
-      try {
-        setPreviewData(structuredClone(siteEssentials));
-      } catch {
-        setPreviewData(JSON.parse(JSON.stringify(siteEssentials)));
-      }
-      setThemeTweak(null);
-      router.refresh();
-      toast({
-        title: "Theme saved",
-        description:
-          "Site Essentials were updated. Live site and previews will use these colors and fonts.",
-      });
-    } catch {
-      toast({
-        title: "Could not save theme",
-        description:
-          "Open Site Essentials and use Save there, or try again in a moment.",
-        variant: "destructive",
-      });
-    }
   };
 
   const eventPayloadRoot = eventData?.data as EventDetailData | undefined;
@@ -378,17 +312,6 @@ function EventPreviewPageContent() {
           data={eventData.data as EventDetailData}
           siteEssentials={siteEssentials}
         />
-
-        {siteEssentials ? (
-          <PreviewThemeCustomizer
-            values={siteEssentials}
-            onValuesChange={handleThemeValuesChange}
-            brandName={siteEssentials.name?.trim() || "Event preview"}
-            sheetDescription="Open Try theme to adjust fonts, colors, and hero layout. Save theme in that panel writes Site Essentials. Use Publish event (top right) to go live — same as the Publish tab. Event copy still saves in the editor."
-            onSaveTheme={handleSaveTheme}
-            isSavingTheme={isSavingTheme}
-          />
-        ) : null}
 
         <AlertDialog
           open={publishDialogOpen}
