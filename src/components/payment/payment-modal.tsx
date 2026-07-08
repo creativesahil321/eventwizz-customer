@@ -6,7 +6,8 @@ import PaymentGatewaySelector, {
   PaymentGateway,
 } from "./payment-gateway-selector";
 import { toast } from "sonner";
-import { useCurrencySymbol } from "@/hooks/use-currency-format";
+import { useCurrencyFormat } from "@/hooks/use-currency-format";
+import { resolveTransactionCurrencyIso } from "@/lib/currency-format";
 
 interface PaymentModalProps {
   isOpen: boolean;
@@ -33,8 +34,12 @@ export default function PaymentModal({
   title = "Complete Payment",
   description = "Pay for your booking to secure your reservation",
 }: PaymentModalProps) {
-  const tenantSymbol = useCurrencySymbol();
+  const { format, symbol: tenantSymbol } = useCurrencyFormat();
   const displaySymbol = currency ?? tenantSymbol;
+  const paymentCurrencyIso = resolveTransactionCurrencyIso(
+    { currency },
+    tenantSymbol,
+  );
   const [selectedGateway, setSelectedGateway] = useState<PaymentGateway | null>(
     null,
   );
@@ -61,7 +66,7 @@ export default function PaymentModal({
         gateway_id: selectedGateway.id,
         gateway_name: selectedGateway.name,
         amount: totalAmount,
-        currency: "GBP",
+        currency: paymentCurrencyIso,
       };
 
       // Simulate API call to process payment
@@ -148,8 +153,7 @@ export default function PaymentModal({
                 <div className="text-right">
                   <p className="text-sm text-gray-600">Amount Due</p>
                   <p className="text-lg font-bold text-gray-900">
-                    {displaySymbol}
-                    {totalAmount.toFixed(2)}
+                    {format(totalAmount)}
                   </p>
                 </div>
               </div>
@@ -183,7 +187,7 @@ export default function PaymentModal({
                       <span>Processing Payment...</span>
                     </div>
                   ) : (
-                    `Pay ${displaySymbol}${totalAmount.toFixed(2)} with ${
+                    `Pay ${format(totalAmount)} with ${
                       selectedGateway.name
                     }`
                   )}

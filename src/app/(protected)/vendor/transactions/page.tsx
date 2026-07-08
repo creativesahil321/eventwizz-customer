@@ -2,7 +2,7 @@
 
 import React, { useState, useCallback, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { Search, Download, Loader2, RotateCcw } from "lucide-react";
+import { Search, Download, Loader2, RotateCcw, Building2 } from "lucide-react";
 import { Shell } from "@/components/shell";
 import { SearchParams } from "./_lib/types";
 import { Input } from "@/components/ui/input";
@@ -14,7 +14,10 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { TransactionsDataTable } from "./_components/transactions-data-table";
-import { useVendorTransactions, useExportAllReceiptsCSV } from "./_lib/queries";
+import {
+  useVendorTransactions,
+  useExportAllReceiptsCSV,
+} from "./_lib/queries";
 import { cn } from "@/lib/utils";
 import { TransactionsTableSkeleton } from "./_components/skeleton-loader";
 import { useDebounce } from "@/hooks/data-table/use-debounce";
@@ -30,6 +33,7 @@ export default function TransactionsPage() {
   const { format: formatMoney } = useCurrencyFormat();
   const [globalFilterValue, setGlobalFilterValue] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [roomFilter, setRoomFilter] = useState("all");
   const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
   const [earnings, setEarnings] = useState("0.00");
   const [, setPage] = useQueryState("page", parseAsInteger.withDefault(1));
@@ -43,21 +47,66 @@ export default function TransactionsPage() {
     ? format(dateRange.to, "yyyy-MM-dd")
     : undefined;
 
+  const selectedRoomId = roomFilter === "all" ? undefined : roomFilter;
+
+  const { data: transactionsData, isLoading, isFetching } = useVendorTransactions({
+    search: debouncedSearch,
+    status: statusFilter === "all" ? "" : statusFilter,
+    from_date: fromDate,
+    to_date: toDate,
+    room_id: selectedRoomId,
+    page: 1,
+    per_page: 30,
+  });
+
+  const filterMeta = transactionsData?.filter_meta;
+  const availableRooms = React.useMemo(
+    () => filterMeta?.available_rooms ?? [],
+    [filterMeta?.available_rooms],
+  );
+  const showRoomFilter =
+    !!fromDate &&
+    filterMeta?.has_room_bookings === true &&
+    availableRooms.length > 0;
+
   useEffect(() => {
     setPage(1);
-  }, [debouncedSearch, fromDate, toDate, statusFilter, setPage]);
+  }, [debouncedSearch, fromDate, toDate, statusFilter, roomFilter, setPage]);
+
+  useEffect(() => {
+    if (!fromDate) {
+      if (roomFilter !== "all") setRoomFilter("all");
+      return;
+    }
+
+    if (roomFilter === "all") return;
+
+    const isValidSelection = availableRooms.some(
+      (room) => String(room.room_id) === roomFilter,
+    );
+    if (!isValidSelection) {
+      setRoomFilter("all");
+    }
+  }, [fromDate, availableRooms, roomFilter]);
 
   const hasActiveFilters =
     !!debouncedSearch ||
     statusFilter !== "all" ||
+    roomFilter !== "all" ||
     !!dateRange?.from ||
     !!dateRange?.to;
 
   const handleResetAllFilters = () => {
     setGlobalFilterValue("");
     setStatusFilter("all");
+    setRoomFilter("all");
     setDateRange(undefined);
     setPage(1);
+  };
+
+  const handleDateRangeChange = (range: DateRange | undefined) => {
+    setDateRange(range);
+    setRoomFilter("all");
   };
 
   const searchParams: SearchParams = {
@@ -67,16 +116,8 @@ export default function TransactionsPage() {
     status: statusFilter === "all" ? "" : statusFilter,
     from_date: fromDate,
     to_date: toDate,
+    room_id: selectedRoomId,
   };
-
-  const { isLoading, isFetching } = useVendorTransactions({
-    search: debouncedSearch,
-    status: statusFilter === "all" ? "" : statusFilter,
-    from_date: fromDate,
-    to_date: toDate,
-    page: 1,
-    per_page: 30,
-  });
 
   const exportCSVMutation = useExportAllReceiptsCSV();
 
@@ -132,7 +173,7 @@ export default function TransactionsPage() {
                   <div className="w-full min-w-0 sm:w-auto sm:min-w-[280px] relative">
                     <DateRangePicker
                       date={dateRange}
-                      onDateChange={setDateRange}
+                      onDateChange={handleDateRangeChange}
                       placeholder="Filter by date range"
                       disabled={isFetching}
                       showClear={true}
@@ -143,6 +184,32 @@ export default function TransactionsPage() {
                       </div>
                     )}
                   </div>
+
+                  {showRoomFilter && (
+                    <Select
+                      value={roomFilter}
+                      onValueChange={setRoomFilter}
+                      disabled={isFetching}
+                    >
+                      <SelectTrigger className="w-full min-w-0 sm:w-[200px]">
+                        <div className="flex items-center gap-2 truncate">
+                          <Building2 className="h-4 w-4 shrink-0 text-muted-foreground" />
+                          <SelectValue placeholder="All halls" />
+                        </div>
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All halls</SelectItem>
+                        {availableRooms.map((room) => (
+                          <SelectItem
+                            key={room.room_id}
+                            value={String(room.room_id)}
+                          >
+                            {room.room_name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
 
                   {/* Status Filter */}
                   <div className="flex flex-col gap-1.5 min-w-0 max-w-full">

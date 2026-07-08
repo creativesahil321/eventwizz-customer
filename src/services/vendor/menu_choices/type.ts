@@ -6,6 +6,7 @@
 
 // Import the schema type from the component
 import { ApiResponse as BaseApiResponse } from "@/services/core/api-client";
+import type { VendorBookingFilterMeta } from "@/services/vendor/bookings/bookings.service";
 
 /**
  * Menu Choices Service Type Definitions
@@ -212,4 +213,5 @@ export interface CustomerMenuChoicesListResponse {
   errors: string[];
   /** Events that have menu choices, with their date keys for the filter dropdowns */
   events_with_dates?: EventWithDates[];
+  filter_meta?: VendorBookingFilterMeta;
 }

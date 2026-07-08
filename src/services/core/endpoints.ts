@@ -206,8 +206,7 @@ export const API_ENDPOINTS = {
       BULK_DELETE: "/vendor/email-logs/bulk-delete",
     },
     TRANSACTIONS: {
-      GET_ALL:
-        "/vendor/transactions?page={page}&per_page={per_page}&search={search}&status={status}&booking_date={booking_date}&from={from}&to={to}",
+      GET_ALL: "/vendor/transactions",
       GET_SINGLE_RECEIPT: "/vendor/transactions/{id}/receipt",
       EXPORT_ALL_RECEIPTS_CSV: "/vendor/transactions/export",
     },

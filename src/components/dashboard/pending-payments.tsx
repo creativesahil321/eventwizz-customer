@@ -12,6 +12,7 @@ import {
 import PaymentModal from "@/components/payment/payment-modal";
 import { PaymentGateway } from "@/components/payment/payment-gateway-selector";
 import { toast } from "sonner";
+import { useCurrencyFormat } from "@/hooks/use-currency-format";
 
 interface PendingPayment {
   id: number;
@@ -38,6 +39,7 @@ export default function PendingPayments({
   onPaymentSuccess,
   onPaymentError,
 }: PendingPaymentsProps) {
+  const { format } = useCurrencyFormat();
   const [selectedPayment, setSelectedPayment] = useState<PendingPayment | null>(
     null
   );
@@ -193,8 +195,7 @@ export default function PendingPayments({
                     <div className="text-right">
                       <p className="text-sm text-gray-600">Amount Due</p>
                       <p className="text-lg font-bold text-gray-900">
-                        {payment.currency}
-                        {payment.amount.toFixed(2)}
+                        {format(payment.amount)}
                       </p>
                     </div>
                   </div>

@@ -48,6 +48,16 @@ interface DateRangePickerProps {
    * Disable future dates (default: true)
    */
   disableFutureDates?: boolean;
+  /**
+   * When set, only these YYYY-MM-DD values are selectable on the calendar.
+   */
+  enabledDates?: string[];
+  /**
+   * When true, only enabledDates are selectable. While enabledDates is still
+   * empty (e.g. API loading), every day stays disabled to avoid a flash of
+   * all dates appearing clickable.
+   */
+  restrictToEnabledDates?: boolean;
 }
 
 export function DateRangePicker({
@@ -59,10 +69,29 @@ export function DateRangePicker({
   showClear = true,
   showApplyButton = false,
   disableFutureDates = true,
+  enabledDates,
+  restrictToEnabledDates = false,
 }: DateRangePickerProps) {
   const [open, setOpen] = React.useState(false);
   const [pendingRange, setPendingRange] = React.useState<DateRange | undefined>(date);
   const isSm = useMediaQuery("(min-width: 640px)");
+
+  const enabledDateSet = React.useMemo(
+    () => (enabledDates?.length ? new Set(enabledDates) : null),
+    [enabledDates],
+  );
+
+  const datesReady =
+    !restrictToEnabledDates || (enabledDates !== undefined && enabledDates.length > 0);
+
+  const defaultMonth = React.useMemo(() => {
+    if (date?.from) return date.from;
+    if (enabledDates?.[0]) {
+      const parsed = new Date(`${enabledDates[0]}T12:00:00`);
+      if (!Number.isNaN(parsed.getTime())) return parsed;
+    }
+    return new Date();
+  }, [date?.from, enabledDates]);
 
   React.useEffect(() => {
     if (open) setPendingRange(date);
@@ -94,13 +123,24 @@ export function DateRangePicker({
   const displayDate = date;
   const selectedInCalendar = showApplyButton ? pendingRange : date;
 
-  // Disable future dates if enabled
+  // Disable dates outside enabledDates and/or future dates
   const disabledDates = React.useMemo(() => {
-    if (!disableFutureDates) return undefined;
-    
     const today = endOfDay(new Date());
-    return (date: Date) => isAfter(date, today);
-  }, [disableFutureDates]);
+
+    return (day: Date) => {
+      if (restrictToEnabledDates) {
+        if (!enabledDateSet) return true;
+        return !enabledDateSet.has(format(day, "yyyy-MM-dd"));
+      }
+      if (enabledDateSet) {
+        return !enabledDateSet.has(format(day, "yyyy-MM-dd"));
+      }
+      if (disableFutureDates) {
+        return isAfter(day, today);
+      }
+      return false;
+    };
+  }, [enabledDateSet, disableFutureDates, restrictToEnabledDates]);
 
   return (
     <div className={cn("relative min-w-0", className)}>
@@ -132,19 +172,25 @@ export function DateRangePicker({
           </Button>
         </PopoverTrigger>
         <PopoverContent
-          className="w-auto p-0 max-w-[min(calc(100vw-2rem),22rem)] sm:max-w-none"
+          className="w-auto overflow-visible p-0 max-w-[min(calc(100vw-2rem),22rem)] sm:max-w-none"
           align="start"
         >
-          <Calendar
-            initialFocus
-            mode="range"
-            defaultMonth={selectedInCalendar?.from ?? date?.from}
-            selected={selectedInCalendar}
-            onSelect={handleSelect}
-            numberOfMonths={isSm ? 2 : 1}
-            disabled={disabledDates}
-          />
-          {showApplyButton && (
+          {!datesReady ? (
+            <div className="flex items-center justify-center p-8 text-sm text-muted-foreground min-w-[280px]">
+              Loading available dates…
+            </div>
+          ) : (
+            <Calendar
+              initialFocus
+              mode="range"
+              defaultMonth={defaultMonth}
+              selected={selectedInCalendar}
+              onSelect={handleSelect}
+              numberOfMonths={isSm ? 2 : 1}
+              disabled={disabledDates}
+            />
+          )}
+          {showApplyButton && datesReady && (
             <div className="flex justify-end gap-2 p-3 border-t">
               <Button
                 type="button"

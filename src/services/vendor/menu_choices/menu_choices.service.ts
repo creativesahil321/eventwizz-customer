@@ -65,6 +65,7 @@ export const menuChoicesService = {
     event_id?: number;
     event_date?: string;
     event_name?: string;
+    room_id?: number | string;
   }) => {
     const role = getCurrentUserRole();
     const endpoints = getEndpointsByRole<
@@ -79,6 +80,7 @@ export const menuChoicesService = {
         event_id: params?.event_id ?? undefined,
         event_date: params?.event_date || undefined,
         event_name: params?.event_name || undefined,
+        room_id: params?.room_id ?? undefined,
       },
       returnFullResponse: true,
     });
@@ -105,11 +107,16 @@ export const menuChoicesService = {
    */
   exportByDateCsv: async (
     eventId: number,
-    eventDate: string
+    eventDate: string,
+    roomId?: number | string,
   ): Promise<void> => {
     const endpoint = API_ENDPOINTS.VENDOR.MENU_CHOICES.EXPORT_BY_DATE;
     await fetchBlobAndDownload(`${env.NEXT_PUBLIC_API_URL}${endpoint}`, {
-      params: { event_id: eventId, event_date: eventDate },
+      params: {
+        event_id: eventId,
+        event_date: eventDate,
+        ...(roomId != null && roomId !== "" ? { room_id: roomId } : {}),
+      },
       defaultFilename: `menu-choices-${eventId}-${eventDate}.csv`,
     });
   },

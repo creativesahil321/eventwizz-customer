@@ -59,6 +59,10 @@ interface FillExistingTablesPanelProps {
   hideCapacityBanner?: boolean;
   /** @deprecated Hide per-section footer when parent shows a combined summary. */
   hideFooter?: boolean;
+  /** When true, full tables remain selectable for seat extensions. */
+  allowSeatExtension?: boolean;
+  /** Restore prior existing-table placements (e.g. from add-ons API selected_tables). */
+  restoredAdditionsBySlot?: Record<string, number>;
 }
 
 export function getExistingTableFreeSeats(slot: {
@@ -168,7 +172,9 @@ export function hasBookedTableAllocations(
 export function buildExistingTableSlots(
   dateSource: BookingDateSource | undefined,
   selectedTables: SelectedTable[],
+  options?: { allowSeatExtension?: boolean },
 ): ExistingTableSlot[] {
+  const allowSeatExtension = options?.allowSeatExtension ?? false;
   if (!dateSource?.tables?.length) return [];
 
   const slots: ExistingTableSlot[] = [];
@@ -190,7 +196,10 @@ export function buildExistingTableSlots(
     tableLine.allocations?.forEach((alloc) => {
       const capacity = alloc.capacity ?? tableLine.table_size;
       const occupied = alloc.people;
-      if (getExistingTableFreeSeats({ occupied, capacity }) <= 0) {
+      if (
+        !allowSeatExtension &&
+        getExistingTableFreeSeats({ occupied, capacity }) <= 0
+      ) {
         return;
       }
 
@@ -237,7 +246,12 @@ export function buildExistingTableSlots(
         : isAddonMarker
           ? capacity
           : seats;
-      if (getExistingTableFreeSeats({ occupied, capacity }) <= 0) return;
+      if (
+        !allowSeatExtension &&
+        getExistingTableFreeSeats({ occupied, capacity }) <= 0
+      ) {
+        return;
+      }
 
       const label =
         bookingAlloc?.label ||
@@ -297,9 +311,11 @@ function buildSaveGroups(
 export function buildAutoFillAdditions(
   slots: ExistingTableSlot[],
   guestsToAdd: number,
+  options?: { allowSeatExtension?: boolean },
 ): Record<string, number> {
   if (guestsToAdd <= 0) return {};
 
+  const allowSeatExtension = options?.allowSeatExtension ?? false;
   let remaining = guestsToAdd;
   const next: Record<string, number> = {};
 
@@ -309,12 +325,42 @@ export function buildAutoFillAdditions(
       return;
     }
     const free = getExistingTableFreeSeats(slot);
-    const assign = Math.min(free, remaining);
+    const assign = allowSeatExtension
+      ? Math.min(remaining, free > 0 ? free : remaining)
+      : Math.min(free, remaining);
     next[slot.key] = assign;
     remaining -= assign;
   });
 
   return next;
+}
+
+/** Map saved selected-table allocations onto fill-existing slot keys. */
+export function buildAdditionsFromSelectedTables(
+  slots: ExistingTableSlot[],
+  selectedTables: SelectedTable[],
+): Record<string, number> {
+  if (slots.length === 0 || selectedTables.length === 0) return {};
+
+  const slotKeyByParentId = new Map(
+    slots.map((slot) => [slot.parentId, slot.key] as const),
+  );
+  const additions: Record<string, number> = {};
+
+  selectedTables.forEach((selected) => {
+    iterSelectedTableAllocationEntries(
+      selected.allocation as SelectedTableAllocationInput,
+    ).forEach(({ parentId, seats }) => {
+      if (seats <= 0) return;
+
+      const slotKey = slotKeyByParentId.get(parentId);
+      if (!slotKey) return;
+
+      additions[slotKey] = (additions[slotKey] ?? 0) + seats;
+    });
+  });
+
+  return additions;
 }
 
 interface ExistingTablesPlacedSummaryProps {
@@ -435,11 +481,15 @@ export function FillExistingTablesPanel({
   onConfirmSeating,
   hideCapacityBanner = false,
   hideFooter = false,
+  allowSeatExtension = false,
+  restoredAdditionsBySlot,
 }: FillExistingTablesPanelProps) {
   const [additionsBySlot, setAdditionsBySlot] = useState<
     Record<string, number>
-  >({});
+  >(() => restoredAdditionsBySlot ?? {});
   const lastAutoFillSignalRef = useRef(0);
+  const prevGuestsToAddRef = useRef(guestsToAdd);
+  const restoredAdditionsRef = useRef(restoredAdditionsBySlot);
 
   const totalFreeSeats = useMemo(
     () =>
@@ -488,9 +538,11 @@ export function FillExistingTablesPanel({
       const free = getFreeSeats(slot);
       const otherAdded = totalAdded - (additionsBySlot[slot.key] ?? 0);
       const remainingGuests = Math.max(0, guestsToAdd - otherAdded);
-      return Math.min(free, remainingGuests);
+      const seatBudget =
+        allowSeatExtension && free <= 0 ? remainingGuests : Math.min(free, remainingGuests);
+      return seatBudget;
     },
-    [additionsBySlot, getFreeSeats, guestsToAdd, totalAdded],
+    [additionsBySlot, allowSeatExtension, getFreeSeats, guestsToAdd, totalAdded],
   );
 
   const setSlotAddition = (slotKey: string, next: number) => {
@@ -507,18 +559,61 @@ export function FillExistingTablesPanel({
   };
 
   const handleAutoFill = useCallback(() => {
-    setAdditionsBySlot(buildAutoFillAdditions(slots, guestsToAdd));
-  }, [guestsToAdd, slots]);
+    setAdditionsBySlot(
+      buildAutoFillAdditions(slots, guestsToAdd, { allowSeatExtension }),
+    );
+  }, [allowSeatExtension, guestsToAdd, slots]);
 
   useEffect(() => {
     if (autoFillSignal > lastAutoFillSignalRef.current) {
       lastAutoFillSignalRef.current = autoFillSignal;
       handleAutoFill();
+    }
+  }, [autoFillSignal, handleAutoFill]);
+
+  useEffect(() => {
+    if (prevGuestsToAddRef.current === guestsToAdd) return;
+
+    const prevGuests = prevGuestsToAddRef.current;
+    prevGuestsToAddRef.current = guestsToAdd;
+
+    if (guestsToAdd <= 0) {
+      setAdditionsBySlot({});
       return;
     }
 
-    setAdditionsBySlot({});
-  }, [autoFillSignal, guestsToAdd, handleAutoFill]);
+    setAdditionsBySlot((prev) => {
+      const prevTotal = Object.values(prev).reduce((sum, count) => sum + count, 0);
+      if (prevTotal <= 0) return prev;
+
+      if (guestsToAdd >= prevGuests) {
+        if (prevTotal <= guestsToAdd) return prev;
+      }
+
+      let remaining = guestsToAdd;
+      const next: Record<string, number> = {};
+      slots.forEach((slot) => {
+        const current = prev[slot.key] ?? 0;
+        const assign = Math.min(current, remaining);
+        next[slot.key] = assign;
+        remaining -= assign;
+      });
+      return next;
+    });
+  }, [guestsToAdd, slots]);
+
+  useEffect(() => {
+    const restored = restoredAdditionsBySlot;
+    if (!restored || Object.keys(restored).length === 0) return;
+    if (restoredAdditionsRef.current === restored) return;
+    restoredAdditionsRef.current = restored;
+
+    setAdditionsBySlot((prev) => {
+      const prevTotal = Object.values(prev).reduce((sum, count) => sum + count, 0);
+      if (prevTotal > 0) return prev;
+      return restored;
+    });
+  }, [restoredAdditionsBySlot]);
 
   const autoFillCapacity = Math.min(guestsToAdd, totalFreeSeats);
   const unplacedGuests = Math.max(
@@ -529,7 +624,7 @@ export function FillExistingTablesPanel({
     totalAdded > 0 && totalAdded === guestsToAdd;
   const canConfirmExistingPortion =
     totalAdded > 0 &&
-    unplacedGuests > 0 &&
+    totalAdded < guestsToAdd &&
     canPlaceRemainingOnNewTable;
   const showConfirmButton =
     !seatingConfirmed &&

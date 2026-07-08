@@ -50,7 +50,8 @@ import { useSiteEssentialsUpdateGate } from "../../_lib/site-essentials-update-c
 import { RestoreDefaultThemeControl } from "../restore-default-theme-control";
 
 type ThemePresetsTabProps = {
-  onGoToColors: () => void;
+  /** Omitted when the advanced Colors tab is hidden, so we don't surface a dead link. */
+  onGoToColors?: () => void;
   onGoToTypography: () => void;
   onGoToBranding: () => void;
 };
@@ -183,14 +184,18 @@ export function ThemePresetsTab({
 
       <p className="text-xs text-muted-foreground">
         <span className="text-foreground/70">More control:</span>{" "}
-        <button
-          type="button"
-          className="font-medium text-[color:var(--color-primary)] underline-offset-2 hover:underline"
-          onClick={onGoToColors}
-        >
-          Colors
-        </button>
-        <span className="mx-1 text-border">·</span>
+        {onGoToColors && (
+          <>
+            <button
+              type="button"
+              className="font-medium text-[color:var(--color-primary)] underline-offset-2 hover:underline"
+              onClick={onGoToColors}
+            >
+              Colors
+            </button>
+            <span className="mx-1 text-border">·</span>
+          </>
+        )}
         <button
           type="button"
           className="font-medium text-[color:var(--color-primary)] underline-offset-2 hover:underline"

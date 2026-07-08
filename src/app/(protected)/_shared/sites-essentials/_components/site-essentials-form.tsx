@@ -83,6 +83,25 @@ function SiteEssentialsFormInner() {
   const [showErrorSummary, setShowErrorSummary] = useState(false);
   const [activeTab, setActiveTab] = useState("presets");
 
+  // The Colors tab lets users fine-tune every theme token, which can easily break
+  // the palette. Keep it out of the normal tab bar and only reveal it when the URL
+  // carries the `?advanced=colors` flag (a deliberate, hard-to-stumble-into entry).
+  const [colorsUnlocked, setColorsUnlocked] = useState(false);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("advanced") === "colors") setColorsUnlocked(true);
+  }, []);
+
+  // Never leave the user stranded on a hidden tab (e.g. the flag is removed after
+  // navigation): fall back to Presets if Colors becomes unreachable.
+  useEffect(() => {
+    if (!colorsUnlocked && activeTab === "colors") {
+      setActiveTab("presets");
+    }
+  }, [colorsUnlocked, activeTab]);
+
   // Load preview data into form if available
   // BUT never override File objects - form submission should use form's File objects, not preview store data
   useEffect(() => {
@@ -391,17 +410,19 @@ function SiteEssentialsFormInner() {
                     </span>
                   )}
                 </TabsTrigger>
-                <TabsTrigger
-                  value="colors"
-                  className="px-3 sm:px-4 py-1 h-8 text-xs font-medium whitespace-nowrap relative rounded-md data-[state=active]:bg-[var(--color-primary)] data-[state=active]:text-white data-[state=active]:shadow-sm mx-0.5"
-                >
-                  Colors
-                  {tabsWithErrors.colors && (
-                    <span className="absolute -right-1 -top-1 flex h-2 w-2">
-                      <span className="relative inline-flex h-2 w-2 rounded-full bg-red-500"></span>
-                    </span>
-                  )}
-                </TabsTrigger>
+                {colorsUnlocked && (
+                  <TabsTrigger
+                    value="colors"
+                    className="px-3 sm:px-4 py-1 h-8 text-xs font-medium whitespace-nowrap relative rounded-md data-[state=active]:bg-[var(--color-primary)] data-[state=active]:text-white data-[state=active]:shadow-sm mx-0.5"
+                  >
+                    Colors
+                    {tabsWithErrors.colors && (
+                      <span className="absolute -right-1 -top-1 flex h-2 w-2">
+                        <span className="relative inline-flex h-2 w-2 rounded-full bg-red-500"></span>
+                      </span>
+                    )}
+                  </TabsTrigger>
+                )}
                 <TabsTrigger
                   value="typography"
                   className="px-3 sm:px-4 py-1 h-8 text-xs font-medium whitespace-nowrap relative rounded-md data-[state=active]:bg-[var(--color-primary)] data-[state=active]:text-white data-[state=active]:shadow-sm mx-0.5"
@@ -444,7 +465,10 @@ function SiteEssentialsFormInner() {
               <TabsContent value="presets" className="mt-0 w-full">
                 <div className="bg-white rounded-lg p-3 sm:p-6">
                   <ThemePresetsTab
-                    onGoToColors={() => setActiveTab("colors")}
+                    onGoToColors={() => {
+                      setColorsUnlocked(true);
+                      setActiveTab("colors");
+                    }}
                     onGoToTypography={() => setActiveTab("typography")}
                     onGoToBranding={() => setActiveTab("branding")}
                   />
@@ -480,16 +504,18 @@ function SiteEssentialsFormInner() {
                 </div>
               </TabsContent>
 
-              <TabsContent value="colors" className="mt-0 w-full">
-                {tabsWithErrors.colors && (
-                  <Badge variant="destructive" className="mb-3">
-                    Required fields missing
-                  </Badge>
-                )}
-                <div className="bg-white rounded-lg p-3 sm:p-6">
-                  <ColorsTab />
-                </div>
-              </TabsContent>
+              {colorsUnlocked && (
+                <TabsContent value="colors" className="mt-0 w-full">
+                  {tabsWithErrors.colors && (
+                    <Badge variant="destructive" className="mb-3">
+                      Required fields missing
+                    </Badge>
+                  )}
+                  <div className="bg-white rounded-lg p-3 sm:p-6">
+                    <ColorsTab />
+                  </div>
+                </TabsContent>
+              )}
 
               <TabsContent value="typography" className="mt-0 w-full">
                 {tabsWithErrors.typography && (

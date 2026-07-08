@@ -6,7 +6,7 @@ import CustomerMenuDataTable from "./_components/customer-menu-data-table";
 import { Suspense } from "react";
 import { DataTableSkeleton } from "@/components/data-table/data-table-skeleton";
 import { Input } from "@/components/ui/input";
-import { Download, RotateCcw, Search, Loader2 } from "lucide-react";
+import { Download, RotateCcw, Search, Loader2, Building2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -89,6 +89,7 @@ export default function Page() {
 
   const [selectedEventId, setSelectedEventId] = useState<string>("");
   const [selectedEventDate, setSelectedEventDate] = useState<string>("");
+  const [roomFilter, setRoomFilter] = useState("all");
   const [eventComboboxOpen, setEventComboboxOpen] = useState(false);
   const [eventSearchQuery, setEventSearchQuery] = useState("");
   const [dateCsvExporting, setDateCsvExporting] = useState(false);
@@ -111,11 +112,12 @@ export default function Page() {
       ? Number(selectedEventId)
       : undefined;
   const appliedEventDate = selectedEventDate || undefined;
+  const selectedRoomId = roomFilter === "all" ? undefined : roomFilter;
 
   const [, setPage] = useQueryState("page", parseAsInteger.withDefault(1));
   useEffect(() => {
     setPage(1);
-  }, [appliedEventId, appliedEventDate, eventNameInUrl, setPage]);
+  }, [appliedEventId, appliedEventDate, eventNameInUrl, roomFilter, setPage]);
 
   const menuSearch = {
     search: "",
@@ -124,6 +126,7 @@ export default function Page() {
     event_id: appliedEventId,
     event_date: appliedEventDate,
     event_name: eventNameInUrl?.trim() || undefined,
+    room_id: selectedRoomId,
   };
 
   const {
@@ -131,6 +134,16 @@ export default function Page() {
     isLoading: menuChoicesLoading,
     isError: menuChoicesError,
   } = useCustomerMenuChoicesList(menuSearch);
+
+  const filterMeta = menuChoicesResponse?.filter_meta;
+  const availableRooms = React.useMemo(
+    () => filterMeta?.available_rooms ?? [],
+    [filterMeta?.available_rooms],
+  );
+  const showRoomFilter =
+    !!appliedEventDate &&
+    filterMeta?.has_room_bookings === true &&
+    availableRooms.length > 0;
 
   const eventsWithDates = menuChoicesResponse?.events_with_dates ?? [];
   const events = getEventsFromApi(eventsWithDates);
@@ -142,8 +155,27 @@ export default function Page() {
   const eventsError = menuChoicesError;
 
   useEffect(() => {
-    if (!selectedEventId) setSelectedEventDate("");
+    if (!selectedEventId) {
+      setSelectedEventDate("");
+      setRoomFilter("all");
+    }
   }, [selectedEventId]);
+
+  useEffect(() => {
+    if (!appliedEventDate) {
+      if (roomFilter !== "all") setRoomFilter("all");
+      return;
+    }
+
+    if (roomFilter === "all") return;
+
+    const isValidSelection = availableRooms.some(
+      (room) => String(room.room_id) === roomFilter,
+    );
+    if (!isValidSelection) {
+      setRoomFilter("all");
+    }
+  }, [appliedEventDate, availableRooms, roomFilter]);
 
   const selectedEventName =
     events.find((e) => e.id === selectedEventId)?.name ?? "";
@@ -155,19 +187,29 @@ export default function Page() {
   };
   const handleSelectEvent = (ev: FilterEvent) => {
     setSelectedEventId(ev.id);
+    setSelectedEventDate("");
+    setRoomFilter("all");
     setEventSearchQuery(ev.name);
     setEventComboboxOpen(false);
   };
 
   const hasEventDateFilter =
-    appliedEventId != null || (appliedEventDate?.length ?? 0) > 0;
+    appliedEventId != null ||
+    (appliedEventDate?.length ?? 0) > 0 ||
+    roomFilter !== "all";
 
   const handleResetAllFilters = () => {
     setSelectedEventId("");
     setSelectedEventDate("");
+    setRoomFilter("all");
     setEventSearchQuery("");
     setEventNameInUrl("");
     setPage(1);
+  };
+
+  const handleEventDateChange = (value: string) => {
+    setSelectedEventDate(value);
+    setRoomFilter("all");
   };
 
   const handleDownloadAllCsvForDate = async () => {
@@ -176,7 +218,11 @@ export default function Page() {
     if (Number.isNaN(eventId)) return;
     setDateCsvExporting(true);
     try {
-      await menuChoicesService.exportByDateCsv(eventId, selectedEventDate);
+      await menuChoicesService.exportByDateCsv(
+        eventId,
+        selectedEventDate,
+        selectedRoomId,
+      );
       toast.success("CSV downloaded successfully");
     } catch {
       toast.error("Failed to download CSV. Please try again.");
@@ -295,7 +341,7 @@ export default function Page() {
                   </Popover>
                   <Select
                     value={selectedEventDate}
-                    onValueChange={setSelectedEventDate}
+                    onValueChange={handleEventDateChange}
                     disabled={!selectedEventId}
                   >
                     <SelectTrigger className="w-full sm:w-[200px]">
@@ -315,6 +361,31 @@ export default function Page() {
                       ))}
                     </SelectContent>
                   </Select>
+                  {showRoomFilter && (
+                    <Select
+                      value={roomFilter}
+                      onValueChange={setRoomFilter}
+                      disabled={menuChoicesLoading}
+                    >
+                      <SelectTrigger className="w-full sm:w-[200px]">
+                        <div className="flex items-center gap-2 truncate">
+                          <Building2 className="h-4 w-4 shrink-0 text-muted-foreground" />
+                          <SelectValue placeholder="All halls" />
+                        </div>
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All halls</SelectItem>
+                        {availableRooms.map((room) => (
+                          <SelectItem
+                            key={room.room_id}
+                            value={String(room.room_id)}
+                          >
+                            {room.room_name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
                   {hasEventDateFilter && (
                     <Button
                       variant="outline"

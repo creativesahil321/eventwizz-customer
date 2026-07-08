@@ -560,7 +560,8 @@ export function VendorBookingCheckoutPage({
               />
 
               <PaymentBreakdownTotals
-                subTotal={checkout.summary.subTotal + checkout.summary.addOns}
+                subTotal={checkout.summary.subTotal}
+                addOns={checkout.summary.addOns}
                 paid={checkout.summary.paid}
                 outstanding={checkout.summary.outstanding}
                 formatCurrency={formatCurrency}

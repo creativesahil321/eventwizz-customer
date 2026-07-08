@@ -1,13 +1,50 @@
-import { useQuery, useMutation, useQueryClient, keepPreviousData } from "@tanstack/react-query";
+import {
+  useQuery,
+  useMutation,
+  useQueryClient,
+  keepPreviousData,
+} from "@tanstack/react-query";
 import {
   fetchVendorTransactions,
   getSingleReceipt,
   exportAllReceiptsCSV,
   VendorTransactionsResponse,
 } from "@/services/vendor/transactions";
+import type {
+  VendorBookingFilterMeta,
+  VendorBookingRoomFilterOption,
+} from "@/services/vendor/bookings/bookings.service";
 import { TransactionsParams } from "./types";
 
 const VENDOR_TRANSACTIONS_KEY = "vendor-transactions";
+
+function normalizeAvailableRooms(
+  rooms: VendorBookingFilterMeta["available_rooms"],
+): VendorBookingRoomFilterOption[] {
+  if (!Array.isArray(rooms)) return [];
+
+  return rooms
+    .map((raw) => {
+      const roomId =
+        raw.room_id ??
+        (raw as { id?: number }).id;
+      const roomName =
+        raw.room_name ??
+        (raw as { name?: string }).name;
+
+      if (roomId == null || !roomName) return null;
+
+      return {
+        room_id: Number(roomId),
+        room_name: String(roomName),
+      };
+    })
+    .filter((room): room is VendorBookingRoomFilterOption => room != null);
+}
+
+export type VendorTransactionsQueryResult = VendorTransactionsResponse & {
+  filter_meta?: VendorBookingFilterMeta;
+};
 
 /**
  * Hook to fetch vendor transactions with pagination and filters (incl. date range)
@@ -21,10 +58,11 @@ export const useVendorTransactions = (params: TransactionsParams = {}) => {
     booking_date = "",
     from_date,
     to_date,
+    room_id,
     options = {},
   } = params;
 
-  return useQuery<VendorTransactionsResponse>({
+  return useQuery<VendorTransactionsQueryResult>({
     queryKey: [
       VENDOR_TRANSACTIONS_KEY,
       search,
@@ -34,6 +72,7 @@ export const useVendorTransactions = (params: TransactionsParams = {}) => {
       booking_date,
       from_date,
       to_date,
+      room_id,
     ],
     queryFn: async () => {
       const response = await fetchVendorTransactions({
@@ -44,8 +83,22 @@ export const useVendorTransactions = (params: TransactionsParams = {}) => {
         booking_date,
         from: from_date,
         to: to_date,
+        room_id,
       });
-      return response;
+
+      const filterMeta = response.filter_meta
+        ? {
+            ...response.filter_meta,
+            available_rooms: normalizeAvailableRooms(
+              response.filter_meta.available_rooms,
+            ),
+          }
+        : undefined;
+
+      return {
+        ...response,
+        filter_meta: filterMeta,
+      };
     },
     placeholderData: keepPreviousData,
     ...(options as Record<string, unknown>),

@@ -40,3 +40,9 @@ export const LOGO_DARK_MONOCHROME_RATIO = 0.5;
 /** Default header color when none is supplied with the upload. */
 export const LOGO_DEFAULT_HEADER_BACKGROUND = "#FFFFFF";
 
+/**
+ * Wide logos (icon + wordmark) are usually above this width/height ratio.
+ * remove.bg often keeps only the icon; we use Sharp edge cleanup instead.
+ */
+export const LOGO_WIDE_ASPECT_RATIO = 2;
+

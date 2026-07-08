@@ -10,6 +10,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Switch } from "@/components/ui/switch";
 import { adminVenuesService } from "@/services/admin/venues/venues.service";
 import { cn } from "@/lib/utils";
+import { useCurrencyFormat } from "@/hooks/use-currency-format";
 import type { VenueCommissionSettings } from "../_lib/types";
 
 type CommissionMode = "none" | "percentage" | "flat";
@@ -52,17 +53,19 @@ function modeFromSettings(c: VenueCommissionSettings): CommissionMode {
 const CUSTOM_FEE_ROWS: {
   mode: "percentage" | "flat";
   title: string;
-  description: string;
+  getDescription: (formatFlatRange: string) => string;
 }[] = [
   {
     mode: "percentage",
     title: "Percentage fee",
-    description: `Charge ${PCT_MIN}%–${PCT_MAX}% of each payment as platform fee.`,
+    getDescription: () =>
+      `Charge ${PCT_MIN}%–${PCT_MAX}% of each payment as platform fee.`,
   },
   {
     mode: "flat",
     title: "Flat fee",
-    description: `Charge a fixed £${FLAT_MIN}–£${FLAT_MAX} per booking payment (GBP).`,
+    getDescription: (formatFlatRange) =>
+      `Charge a fixed ${formatFlatRange} per booking payment.`,
   },
 ];
 
@@ -79,21 +82,26 @@ function pctFieldMessage(pctStr: string): string | null {
   return null;
 }
 
-function flatFieldMessage(flatStr: string): string | null {
+function flatFieldMessage(
+  flatStr: string,
+  formatFlatRange: string,
+): string | null {
   const raw = flatStr.trim();
   if (raw === "") return null;
   const flat = parseOptionalNumber(flatStr);
   if (flat == null) {
-    return `Enter a valid amount (£${FLAT_MIN}–£${FLAT_MAX}).`;
+    return `Enter a valid amount (${formatFlatRange}).`;
   }
   if (flat < FLAT_MIN || flat > FLAT_MAX) {
-    return `Flat fee must be between £${FLAT_MIN} and £${FLAT_MAX}.`;
+    return `Flat fee must be between ${formatFlatRange}.`;
   }
   return null;
 }
 
 export function VenueCommissionCard({ venue }: VenueCommissionCardProps) {
   const queryClient = useQueryClient();
+  const { format } = useCurrencyFormat();
+  const formatFlatRange = `${format(FLAT_MIN)}–${format(FLAT_MAX)}`;
   const c = venue.commissionSettings;
   const groupLabelId = `venue-commission-options-${venue.id}`;
   const switchId = `venue-commission-custom-toggle-${venue.id}`;
@@ -177,12 +185,12 @@ export function VenueCommissionCard({ venue }: VenueCommissionCardProps) {
         const flat = parseOptionalNumber(flatStr);
         if (flat == null) {
           return Promise.reject(
-            new Error(`Flat fee must be between £${FLAT_MIN} and £${FLAT_MAX}.`),
+            new Error(`Flat fee must be between ${formatFlatRange}.`),
           );
         }
         if (flat < FLAT_MIN || flat > FLAT_MAX) {
           return Promise.reject(
-            new Error(`Flat fee must be between £${FLAT_MIN} and £${FLAT_MAX}.`),
+            new Error(`Flat fee must be between ${formatFlatRange}.`),
           );
         }
         return adminVenuesService.updateVenueCommission(venue.id, {
@@ -234,9 +242,9 @@ export function VenueCommissionCard({ venue }: VenueCommissionCardProps) {
 
   const flatErrorShown: string | null =
     customEnabled && activeMode === "flat"
-      ? flatFieldMessage(flatStr) ??
+      ? flatFieldMessage(flatStr, formatFlatRange) ??
         (flatBlurred && flatStr.trim() === ""
-          ? `Enter a flat fee between £${FLAT_MIN} and £${FLAT_MAX}.`
+          ? `Enter a flat fee between ${formatFlatRange}.`
           : null)
       : null;
 
@@ -308,7 +316,7 @@ export function VenueCommissionCard({ venue }: VenueCommissionCardProps) {
                 onValueChange={(v) => setMode(v as "percentage" | "flat")}
                 aria-labelledby={groupLabelId}
               >
-                {CUSTOM_FEE_ROWS.map(({ mode: rowMode, title, description }) => {
+                {CUSTOM_FEE_ROWS.map(({ mode: rowMode, title, getDescription }) => {
                   const inputId = `venue-commission-${venue.id}-${rowMode}`;
                   const selected = activeMode === rowMode;
                   return (
@@ -332,7 +340,7 @@ export function VenueCommissionCard({ venue }: VenueCommissionCardProps) {
                           {title}
                         </span>
                         <span className="text-xs text-muted-foreground leading-relaxed block">
-                          {description}
+                          {getDescription(formatFlatRange)}
                         </span>
                       </div>
                     </label>
@@ -379,7 +387,7 @@ export function VenueCommissionCard({ venue }: VenueCommissionCardProps) {
                     htmlFor={`venue-commission-flat-${venue.id}`}
                     className="text-sm font-medium text-foreground"
                   >
-                    Flat amount (£)
+                    Flat amount
                   </Label>
                   <Input
                     id={`venue-commission-flat-${venue.id}`}
@@ -388,7 +396,7 @@ export function VenueCommissionCard({ venue }: VenueCommissionCardProps) {
                     min={FLAT_MIN}
                     max={FLAT_MAX}
                     step="0.01"
-                    placeholder={`£${FLAT_MIN}–${FLAT_MAX}`}
+                    placeholder={formatFlatRange}
                     aria-invalid={fieldErrorMessage != null}
                     className={cn(
                       "h-10 tabular-nums bg-white",
@@ -400,7 +408,7 @@ export function VenueCommissionCard({ venue }: VenueCommissionCardProps) {
                     onBlur={() => setFlatBlurred(true)}
                   />
                   <p className="text-xs text-muted-foreground">
-                    Allowed range: £{FLAT_MIN}–£{FLAT_MAX} (GBP).
+                    Allowed range: {formatFlatRange}.
                   </p>
                 </div>
               ) : null}

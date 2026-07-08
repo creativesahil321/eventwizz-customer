@@ -67,5 +67,6 @@ export interface UseMenuChoicesQueryParams {
   event_id?: number;
   event_date?: string;
   event_name?: string;
+  room_id?: number | string;
   options?: { enabled?: boolean };
 }

@@ -3,12 +3,14 @@ import {
   useQuery,
   useMutation,
   useQueryClient,
+  keepPreviousData,
 } from "@tanstack/react-query";
 import { eventsService } from "@/services/vendor/events/events.service";
 import {
   EventItem,
   EventsQueryParams,
   EventsResponse,
+  EventsListFilterMeta,
 } from "@/services/vendor/events/type";
 import { EventSchemaType } from "../_components/tab-event-form/schema";
 export const eventKeys = {
@@ -28,6 +30,7 @@ type EventsResult = {
     total: number;
     [key: string]: unknown;
   };
+  filter_meta?: EventsListFilterMeta;
 };
 
 /**
@@ -68,6 +71,7 @@ export const useEvents = (
         return {
           items: [],
           meta: { current_page: 1, last_page: 1, total: 0 },
+          filter_meta: undefined,
         };
       }
 
@@ -77,6 +81,7 @@ export const useEvents = (
         return {
           items: [],
           meta: { current_page: 1, last_page: 1, total: 0 },
+          filter_meta: undefined,
         };
       }
 
@@ -84,8 +89,10 @@ export const useEvents = (
       return {
         items: Array.isArray(data.data) ? data.data : [],
         meta: data.meta || { current_page: 1, last_page: 1, total: 0 },
+        filter_meta: data.filter_meta,
       };
     },
+    placeholderData: keepPreviousData,
     initialData:
       initialData && initialData.length > 0
         ? {

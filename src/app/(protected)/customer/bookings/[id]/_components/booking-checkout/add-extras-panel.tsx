@@ -299,6 +299,26 @@ function formatGuestPlacementIssueMessage(
   return `New tables require at least ${newTableMinGuests} guests. Increase your group size, or contact the venue for assistance.`;
 }
 
+function resolveNewTablePanelGuestCount(options: {
+  guestsToAdd: number;
+  guestsRemainingUnplaced: number;
+  existingFillTotal: number;
+  panelOpen: boolean;
+  scope: NewTablePanelScope;
+}): number {
+  const {
+    guestsToAdd,
+    guestsRemainingUnplaced,
+    existingFillTotal,
+    panelOpen,
+    scope,
+  } = options;
+
+  if (!panelOpen || guestsToAdd <= 0) return 0;
+  if (existingFillTotal > 0) return guestsRemainingUnplaced;
+  return scope === "all" ? guestsToAdd : guestsRemainingUnplaced;
+}
+
 function formatGuestAddPriceHintLabel(
   hint: { single: number | null; min: number | null; max: number | null },
   formatUnit: (amount: number) => string,
@@ -752,6 +772,15 @@ export function AddExtrasSection({
   const [isEditingSeating, setIsEditingSeating] = useState(true);
   const awaitingMixedAutoFillSignalRef = useRef<number | null>(null);
   const wasSeatingFullyConfirmedRef = useRef(false);
+  const prevExistingPlacedRef = useRef(0);
+  const seatingDraftRef = useRef({
+    guestsToAdd: 0,
+    existingFill: EMPTY_EXISTING_FILL,
+    existingSeatingConfirmed: false,
+    newTablePanelOpen: false,
+    newTablePanelScope: "all" as NewTablePanelScope,
+    tableSeating: EMPTY_TABLE_SEATING,
+  });
   const [existingFill, setExistingFill] = useState<ExistingTableFillSnapshot>(
     EMPTY_EXISTING_FILL,
   );
@@ -761,8 +790,13 @@ export function AddExtrasSection({
       buildExistingTableSlots(
         dateSource,
         addOnsData?.data?.selected_tables ?? [],
+        {
+          allowSeatExtension: canExtendExistingTables(
+            addOnsData?.data?.tables ?? [],
+          ),
+        },
       ),
-    [addOnsData?.data?.selected_tables, dateSource],
+    [addOnsData?.data?.selected_tables, addOnsData?.data?.tables, dateSource],
   );
 
   const selectedTables = addOnsData?.data?.selected_tables ?? [];
@@ -798,18 +832,23 @@ export function AddExtrasSection({
     [existingFill.totalAdded, totalFreeExistingSeats],
   );
 
-  const guestsForNewTablePanel = useMemo(() => {
-    if (!newTablePanelOpen || guestsToAdd <= 0) return 0;
-    if (newTablePanelScope === "all") {
-      return guestsToAdd;
-    }
-    return guestsRemainingUnplaced;
-  }, [
-    guestsRemainingUnplaced,
-    guestsToAdd,
-    newTablePanelOpen,
-    newTablePanelScope,
-  ]);
+  const guestsForNewTablePanel = useMemo(
+    () =>
+      resolveNewTablePanelGuestCount({
+        guestsToAdd,
+        guestsRemainingUnplaced,
+        existingFillTotal: existingFill.totalAdded,
+        panelOpen: newTablePanelOpen,
+        scope: newTablePanelScope,
+      }),
+    [
+      existingFill.totalAdded,
+      guestsRemainingUnplaced,
+      guestsToAdd,
+      newTablePanelOpen,
+      newTablePanelScope,
+    ],
+  );
 
   const tableConfig = useMemo(
     () =>
@@ -916,7 +955,32 @@ export function AddExtrasSection({
     existingFill.totalAdded > 0;
 
   useEffect(() => {
+    seatingDraftRef.current = {
+      guestsToAdd,
+      existingFill,
+      existingSeatingConfirmed,
+      newTablePanelOpen,
+      newTablePanelScope,
+      tableSeating,
+    };
+  }, [
+    existingFill,
+    existingSeatingConfirmed,
+    guestsToAdd,
+    newTablePanelOpen,
+    newTablePanelScope,
+    tableSeating,
+  ]);
+
+  useEffect(() => {
     if (!addOnsData?.data) return;
+
+    const draft = seatingDraftRef.current;
+    const shouldPreserveSeating =
+      draft.guestsToAdd > 0 &&
+      (draft.existingFill.totalAdded > 0 ||
+        draft.tableSeating.draftGuestTotal > 0 ||
+        draft.tableSeating.seatingConfirmed);
 
     setTickets((prev) =>
       addOnsData.data.tickets.map((t) => {
@@ -960,6 +1024,17 @@ export function AddExtrasSection({
         }),
     );
 
+    if (shouldPreserveSeating) {
+      setGuestsToAdd(draft.guestsToAdd);
+      setExistingFill(draft.existingFill);
+      setExistingSeatingConfirmed(draft.existingSeatingConfirmed);
+      setNewTablePanelOpen(draft.newTablePanelOpen);
+      setNewTablePanelScope(draft.newTablePanelScope);
+      setTableSeating(draft.tableSeating);
+      prevExistingPlacedRef.current = draft.existingFill.totalAdded;
+      return;
+    }
+
     setTableSeating({
       groupSize: 0,
       allocation: [],
@@ -971,6 +1046,7 @@ export function AddExtrasSection({
     setGuestsToAdd(0);
     setExistingFill(EMPTY_EXISTING_FILL);
     setExistingSeatingConfirmed(false);
+    prevExistingPlacedRef.current = 0;
     setNewTablePanelOpen(false);
     setNewTablePanelScope("all");
     setExistingFillPanelKey((key) => key + 1);
@@ -1284,20 +1360,70 @@ export function AddExtrasSection({
   useEffect(() => {
     if (!useAddGuestsFlow || guestsToAdd <= 0) return;
 
-    setNewTablePanelScope("all");
     resetNewTableSeating();
 
     if (!hasAvailableExistingTables && hasNewTablesAvailable) {
+      setNewTablePanelScope("all");
       setNewTablePanelOpen(canBookAllGuestsOnNewTable);
-    } else {
-      setNewTablePanelOpen(false);
+      return;
     }
+
+    setNewTablePanelScope("remaining");
+    setNewTablePanelOpen(false);
   }, [
     canBookAllGuestsOnNewTable,
     guestsToAdd,
     hasAvailableExistingTables,
     hasNewTablesAvailable,
     resetNewTableSeating,
+    useAddGuestsFlow,
+  ]);
+
+  useEffect(() => {
+    if (!useAddGuestsFlow || guestsToAdd <= 0) return;
+
+    const placed = existingFill.totalAdded;
+    const prev = prevExistingPlacedRef.current;
+    if (placed === prev) return;
+    prevExistingPlacedRef.current = placed;
+
+    if (placed <= 0) return;
+
+    setNewTablePanelScope("remaining");
+
+    const remaining = Math.max(0, guestsToAdd - placed);
+    if (remaining <= 0) {
+      closeNewTablePanel();
+      return;
+    }
+
+    const hasNewTableDraft =
+      newTablePanelOpen ||
+      newTableSeatingConfirmed ||
+      tableSeating.draftGuestTotal > 0;
+
+    if (!hasNewTableDraft) return;
+
+    resetNewTableSeating();
+    if (
+      hasNewTablesAvailable &&
+      tableConfig &&
+      isNewTableGroupViable(remaining, tableConfig)
+    ) {
+      setNewTablePanelOpen(true);
+    } else {
+      setNewTablePanelOpen(false);
+    }
+  }, [
+    closeNewTablePanel,
+    existingFill.totalAdded,
+    guestsToAdd,
+    hasNewTablesAvailable,
+    newTablePanelOpen,
+    newTableSeatingConfirmed,
+    resetNewTableSeating,
+    tableConfig,
+    tableSeating.draftGuestTotal,
     useAddGuestsFlow,
   ]);
 
@@ -1334,16 +1460,20 @@ export function AddExtrasSection({
   useEffect(() => {
     if (!newTablePanelOpen || !tableConfig) return;
 
-    const panelGuestCount =
-      newTablePanelScope === "all"
-        ? guestsToAdd
-        : guestsRemainingUnplaced;
+    const panelGuestCount = resolveNewTablePanelGuestCount({
+      guestsToAdd,
+      guestsRemainingUnplaced,
+      existingFillTotal: existingFill.totalAdded,
+      panelOpen: newTablePanelOpen,
+      scope: newTablePanelScope,
+    });
 
     if (!isNewTableGroupViable(panelGuestCount, tableConfig)) {
       closeNewTablePanel();
     }
   }, [
     closeNewTablePanel,
+    existingFill.totalAdded,
     guestsRemainingUnplaced,
     guestsToAdd,
     newTablePanelOpen,
@@ -1820,6 +1950,7 @@ export function AddExtrasSection({
                     remainingBelowNewTableMin={remainingBelowNewTableMinimum}
                     seatingConfirmed={existingSeatingConfirmed}
                     onConfirmSeating={handleConfirmExistingSeating}
+                    allowSeatExtension={canExtendExisting}
                     optional
                   />
                 )}

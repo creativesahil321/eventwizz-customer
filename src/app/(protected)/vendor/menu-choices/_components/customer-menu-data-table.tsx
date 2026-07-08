@@ -18,6 +18,7 @@ interface CustomerMenuSearchParams {
   event_id?: number;
   event_date?: string;
   event_name?: string;
+  room_id?: number | string;
 }
 
 interface CustomerMenuDataTableProps {
@@ -58,6 +59,7 @@ const CustomerMenuDataTable = forwardRef<
     event_id: search?.event_id,
     event_date: search?.event_date,
     event_name: search?.event_name,
+    room_id: search?.room_id,
   };
 
   const {

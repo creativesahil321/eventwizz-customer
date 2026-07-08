@@ -224,11 +224,14 @@ export function PaymentBreakdownDateAccordion({
 
 export function PaymentBreakdownTotals({
   subTotal,
+  addOns = 0,
   paid,
   outstanding,
   formatCurrency,
 }: {
   subTotal: number;
+  /** Unpaid pending add-ons — shown separately from booking subtotal. */
+  addOns?: number;
   paid: number;
   outstanding: number;
   formatCurrency: (amount: number) => string;
@@ -241,6 +244,14 @@ export function PaymentBreakdownTotals({
           {formatCurrency(subTotal)}
         </span>
       </div>
+      {addOns > 0 && (
+        <div className="flex justify-between text-sm">
+          <span className="text-muted-foreground">Extra add-ons</span>
+          <span className="font-semibold tabular-nums text-foreground">
+            {formatCurrency(addOns)}
+          </span>
+        </div>
+      )}
       {paid > 0 && (
         <div className="flex justify-between text-sm">
           <span className="text-muted-foreground">Paid</span>

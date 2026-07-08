@@ -790,7 +790,8 @@ export default function BookingCheckoutPage({
               />
 
               <PaymentBreakdownTotals
-                subTotal={summary.subTotal + summary.addOns}
+                subTotal={summary.subTotal}
+                addOns={summary.addOns}
                 paid={summary.paid}
                 outstanding={summary.outstanding}
                 formatCurrency={formatCurrency}
