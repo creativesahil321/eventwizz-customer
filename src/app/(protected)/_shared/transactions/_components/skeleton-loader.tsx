@@ -1,6 +1,7 @@
 "use client";
 
 import { Skeleton } from "@/components/ui/skeleton";
+import { pageCardClassName } from "@/app/(protected)/_components/page-header-card";
 
 export function TransactionsListSkeleton() {
   return (
@@ -29,15 +30,16 @@ export function TransactionsListSkeleton() {
 
 export function TransactionsTableSkeleton() {
   return (
-    <div className="w-full relative overflow-hidden text-black">
-      <div className="min-w-max bg-white p-4 sm:p-6 rounded-md shadow-sm">
-        <Skeleton className="h-8 w-48 mb-6" />
-        <div className="flex flex-col sm:flex-row gap-4 mb-6">
+    <div className="relative w-full overflow-hidden text-black">
+      <div className={pageCardClassName("min-w-0 max-w-full")}>
+        <Skeleton className="h-8 w-48" />
+        <Skeleton className="mt-2 h-4 w-72" />
+        <div className="mb-6 mt-6 flex flex-col gap-4 sm:flex-row">
           <Skeleton className="h-9 w-full sm:w-[180px]" />
           <Skeleton className="h-9 w-full sm:w-[180px]" />
           <Skeleton className="h-9 w-full sm:w-[180px]" />
         </div>
-        <div className="bg-white mt-2 rounded-md shadow-sm">
+        <div className={pageCardClassName("overflow-hidden !py-0")}>
           <TransactionsListSkeleton />
         </div>
       </div>

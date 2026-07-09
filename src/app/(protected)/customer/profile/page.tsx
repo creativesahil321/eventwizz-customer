@@ -23,6 +23,10 @@ import {
 import { ProfileSkeleton } from "@/app/(protected)/_shared/profile/_components/profile-skeleton";
 import { useProfileSync } from "@/components/shared/profile-update-sync";
 import { addCacheBusting } from "@/lib/image-utils";
+import {
+  ProtectedPageHeader,
+  pageCardClassName,
+} from "@/app/(protected)/_components/page-header-card";
 
 export default function ProfilePage() {
   const { data: session } = useSession();
@@ -175,13 +179,18 @@ export default function ProfilePage() {
   }
 
   return (
-    <section className="w-full relative flex flex-col space-y-8 text-black">
+    <section className="relative flex w-full flex-col space-y-4 text-black sm:space-y-6">
+      <ProtectedPageHeader
+        title="Profile"
+        description="Manage your personal information and account security."
+      />
+
       {/* Profile Section */}
-      <section className="w-full relative">
-        <div className="w-full relative bg-background p-6 rounded-md shadow-sm">
-          <header className="w-full mb-6">
-            <h2 className="text-2xl title-header font-bold text-black">
-              Profile
+      <section className="relative w-full">
+        <div className={pageCardClassName()}>
+          <header className="mb-6 w-full">
+            <h2 className="text-2xl font-bold text-black title-header">
+              Personal information
             </h2>
           </header>
 
@@ -334,10 +343,10 @@ export default function ProfilePage() {
       </section>
 
       {/* Account Section - Read-only display of username and email */}
-      <section className="w-full relative">
-        <div className="w-full relative bg-background p-6 rounded-md shadow-sm">
-          <header className="w-full mb-6">
-            <h2 className="text-2xl title-header font-bold text-black">
+      <section className="relative w-full">
+        <div className={pageCardClassName()}>
+          <header className="mb-6 w-full">
+            <h2 className="text-2xl font-bold text-black title-header">
               Account
             </h2>
           </header>
@@ -378,10 +387,10 @@ export default function ProfilePage() {
       </section>
 
       {/* Password Section */}
-      <section className="w-full relative">
-        <div className="w-full relative bg-background p-6 rounded-md shadow-sm">
-          <header className="w-full mb-6">
-            <h2 className="text-2xl title-header font-bold text-black">
+      <section className="relative w-full">
+        <div className={pageCardClassName()}>
+          <header className="mb-6 w-full">
+            <h2 className="text-2xl font-bold text-black title-header">
               Change Password
             </h2>
           </header>

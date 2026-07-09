@@ -1,15 +1,86 @@
-export type SupportTicket = {
-  id: string;
-  requested_by: string;
-  subject: string;
-  priority: "low" | "medium" | "high";
-  agent: string;
-  created_at: string;
-  status: "open" | "pending" | "closed";
+import type {
+  SupportAttachment,
+  SupportCategory,
+  SupportPriority,
+  SupportStatus,
+} from "@/app/(protected)/customer/support/_lib/types";
+
+export type {
+  SupportAttachment,
+  SupportCategory,
+  SupportPriority,
+  SupportStatus,
 };
 
-export type DataTableRowAction<T> =
-  | { type: "markAsSolved"; row: { original: T } }
-  | { type: "assignee"; row: { original: T } }
-  | { type: "archive"; row: { original: T } }
-  | { type: "delete"; row: { original: T } };
+export interface VendorSupportMessage {
+  id: string;
+  sender: "customer" | "agent" | "system";
+  senderName: string;
+  content: string;
+  createdAt: string;
+  attachments?: SupportAttachment[];
+  isInternal?: boolean;
+}
+
+export interface SupportAssignee {
+  id: string;
+  name: string;
+}
+
+export interface VendorSupportCustomer {
+  name: string;
+  email: string;
+  phone: string;
+  timezone: string;
+  customerSince: string;
+}
+
+export interface VendorSupportConversation {
+  id: string;
+  ref: string;
+  subject: string;
+  category: SupportCategory;
+  priority: SupportPriority;
+  status: SupportStatus;
+  bookingRef?: string;
+  bookingTitle?: string;
+  openedAt: string;
+  closedAt?: string;
+  lastMessage: string;
+  lastMessageAt: string;
+  unreadCount: number;
+  messages: VendorSupportMessage[];
+  customer: VendorSupportCustomer;
+  assignee: SupportAssignee | null;
+  isPinned: boolean;
+  needsAttention: boolean;
+}
+
+export type CloseTicketReason =
+  | "issue_resolved"
+  | "duplicate_ticket"
+  | "customer_no_response";
+
+export type TransferTicketReason = "technical_issue" | "other";
+
+export type DashboardDateRange = "today" | "7d" | "30d";
+
+export interface DashboardDateFilter {
+  preset: DashboardDateRange;
+  customRange?: {
+    from: Date;
+    to: Date;
+  };
+}
+
+export interface VendorSupportStats {
+  totalOpen: number;
+  totalResolved: number;
+  waiting: number;
+}
+
+export interface VendorSupportActivity {
+  id: string;
+  description: string;
+  timestamp: string;
+}

@@ -1,6 +1,5 @@
 "use client";
 
-import { Shell } from "@/components/shell";
 import { useNotificationSystem } from "./_lib/hooks";
 import {
   NotificationDetailsComponent,
@@ -36,30 +35,28 @@ export default function NotificationsPage() {
     : undefined;
 
   return (
-    <section className="page">
-      <Shell className="gap-2">
-        <NotificationsDataTable
-          notifications={notifications}
-          meta={formattedMeta}
-          stats={stats}
-          filters={filters}
-          isLoading={isLoading}
-          onFilterChange={handleFilterChange}
-          onPageChange={handlePageChange}
-          onViewDetails={handleViewDetails}
-          onMarkAsRead={handleMarkAsRead}
-          onMarkAsUnread={handleMarkAsUnread}
-          onMarkAllAsRead={handleMarkAllAsRead}
-        />
+    <section className="page max-w-full overflow-x-hidden">
+      <NotificationsDataTable
+        notifications={notifications}
+        meta={formattedMeta}
+        stats={stats}
+        filters={filters}
+        isLoading={isLoading}
+        onFilterChange={handleFilterChange}
+        onPageChange={handlePageChange}
+        onViewDetails={handleViewDetails}
+        onMarkAsRead={handleMarkAsRead}
+        onMarkAsUnread={handleMarkAsUnread}
+        onMarkAllAsRead={handleMarkAllAsRead}
+      />
 
-        <NotificationDetailsComponent
-          notification={selectedNotification}
-          isOpen={isDetailsOpen}
-          onClose={handleCloseDetails}
-          onMarkAsRead={handleMarkAsRead}
-          onMarkAsUnread={handleMarkAsUnread}
-        />
-      </Shell>
+      <NotificationDetailsComponent
+        notification={selectedNotification}
+        isOpen={isDetailsOpen}
+        onClose={handleCloseDetails}
+        onMarkAsRead={handleMarkAsRead}
+        onMarkAsUnread={handleMarkAsUnread}
+      />
     </section>
   );
 }

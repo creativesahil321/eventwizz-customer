@@ -292,6 +292,8 @@ export interface BookingDetailsDate {
   has_unbooked_event_dates?: boolean;
   /** API-driven — when false, reschedule must not be offered for this date */
   can_reschedule?: boolean;
+  /** Vendor has initiated a reschedule for this date — awaiting customer action */
+  reschedule_initiated?: boolean;
   reschedule_block_reason?: string;
   tickets: BookingDetailsTicket[];
   packages: BookingDetailsPackage[];

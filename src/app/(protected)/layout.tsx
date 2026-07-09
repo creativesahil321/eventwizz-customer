@@ -3,7 +3,7 @@ import Sidebar from "./_components/_sidebar";
 import { redirect } from "next/navigation";
 import { authOptions } from "@/lib/auth/authOptions";
 import { useMenus } from "@/hooks/useMenus";
-import Header from "./_components/_header";
+import ConditionalHeader from "./_components/conditional-header";
 import PageWrapper from "./_components/_page-wrapper";
 import Footer from "./_components/_footer";
 import { appConfig } from "@/config/app";
@@ -28,9 +28,9 @@ export default async function Layout({
   const menus = await menusPromise;
 
   return (
-    <section className="flex min-h-screen w-full min-w-0 flex-col bg-default-100 dark:bg-background overflow-hidden">
+    <section className="flex min-h-dvh w-full min-w-0 flex-col overflow-x-hidden bg-default-100 dark:bg-background">
       <ClientLayoutWrapper>
-        <Header menus={menus || []} />
+        <ConditionalHeader menus={menus || []} />
         <Sidebar menus={menus || []} />
         <PageWrapper>{children}</PageWrapper>
         <Footer

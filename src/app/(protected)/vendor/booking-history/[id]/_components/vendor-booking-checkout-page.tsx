@@ -57,6 +57,7 @@ import {
   getAllowedStatusOptions,
 } from "./vendor-booking-status";
 import { VendorBookingNotesPanel } from "./vendor-booking-notes-panel";
+import { VendorRescheduleInitiatedBanner } from "./vendor-reschedule-initiated-banner";
 import { canShowRescheduleButton } from "@/app/(protected)/customer/bookings/[id]/_components/booking-checkout/reschedule-eligibility";
 
 const FOOTER_STATUS_BADGE_CLASS: Record<StatusThemeKey, string> = {
@@ -315,6 +316,9 @@ export function VendorBookingCheckoutPage({
   const showRescheduleForSelectedDate =
     selectedDate != null && canShowRescheduleButton(selectedDate);
 
+  const selectedDateRescheduleInitiated =
+    selectedDate?.reschedule_initiated === true;
+
   const showPaymentFooter = checkout.summary.outstanding > 0;
   const footerLabel = hasMultipleDates
     ? "Total Due (all dates)"
@@ -376,6 +380,12 @@ export function VendorBookingCheckoutPage({
                         />
                       </>
                     ) : null}
+                    {checkout.rescheduleInitiated ? (
+                      <>
+                        <span className="text-muted-foreground/50">·</span>
+                        <VendorRescheduleInitiatedBanner compact />
+                      </>
+                    ) : null}
                   </div>
                   {checkout.location ? (
                     <div className="mt-1.5 flex items-center gap-1.5 text-sm font-normal text-muted-foreground">
@@ -391,6 +401,16 @@ export function VendorBookingCheckoutPage({
             </div>
           </div>
         </header>
+
+        {checkout.rescheduleInitiated ? (
+          <div className="border-b border-sky-200 bg-sky-50 px-4 py-3 sm:px-6 lg:px-8">
+            <p className="flex items-center gap-2 text-sm font-medium text-sky-900">
+              <RotateCcw className="h-4 w-4 shrink-0" />
+              Reschedule initiated — review the affected date below. The customer
+              may still need to confirm or complete payment.
+            </p>
+          </div>
+        ) : null}
 
         <div className="flex flex-wrap items-center gap-x-5 gap-y-2 border-b border-border bg-muted/30 px-4 py-3 text-sm sm:px-6 lg:px-8">
           <span className="inline-flex min-w-0 items-center gap-1.5">
@@ -457,6 +477,14 @@ export function VendorBookingCheckoutPage({
         {selectedDate ? (
           <section className="border-b border-border">
             <div className="p-4 sm:p-6 lg:p-8 pb-4 pt-3">
+              {selectedDateRescheduleInitiated ? (
+                <div className="mb-4">
+                  <VendorRescheduleInitiatedBanner
+                    dateLabel={selectedDate.date}
+                    previousDateLabel={selectedDate.previous_date_label}
+                  />
+                </div>
+              ) : null}
               <div className="overflow-hidden rounded-xl border border-border bg-card">
                 <div className="px-5 sm:px-6 lg:px-8">
                   <BookingLineItemsList

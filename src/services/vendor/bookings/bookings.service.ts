@@ -207,6 +207,8 @@ export interface VendorBookingDetail {
   payment_status_code?: number;
   payment_status_label: string;
   reschedule_status?: boolean;
+  /** True when a vendor-initiated reschedule is in progress on any date */
+  reschedule_initiated?: boolean;
   reschedule_count?: number;
   dates?: VendorBookingDetailDate[];
   payment_summary?: BookingPaymentSummary;

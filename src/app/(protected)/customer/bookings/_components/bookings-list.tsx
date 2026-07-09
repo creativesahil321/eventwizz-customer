@@ -4,6 +4,7 @@ import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import BookingCard from "./booking-card";
 import { Booking } from "../_lib/types";
+import { ProtectedPageHeader } from "@/app/(protected)/_components/page-header-card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -121,20 +122,11 @@ export default function BookingsList({
   return (
     <>
       <section className="w-full space-y-6">
-        {/* Header */}
-        <div className="bg-white rounded-lg border border-[var(--color-border)] shadow-md p-4 sm:p-6">
-          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-            <div className="min-w-0">
-              <h1 className="text-xl sm:text-2xl title-header font-bold text-black">
-                My Bookings
-              </h1>
-              <p className="text-sm sm:text-base text-muted-foreground mt-1">
-                View and manage your event bookings
-              </p>
-            </div>
-
-            {/* Filters */}
-            <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center w-full lg:w-auto">
+        <ProtectedPageHeader
+          title="My Bookings"
+          description="View and manage your event bookings"
+          actions={
+            <div className="flex w-full flex-col items-stretch gap-3 sm:flex-row sm:items-center lg:w-auto">
               {/* Search Input with Button */}
               <div className="relative flex-1 min-w-0 sm:min-w-[280px]">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground z-10" />
@@ -189,8 +181,8 @@ export default function BookingsList({
                 </Button>
               )}
             </div>
-          </div>
-        </div>
+          }
+        />
 
         {/* Bookings Grid */}
         <div

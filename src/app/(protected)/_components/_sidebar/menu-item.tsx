@@ -60,9 +60,15 @@ const isMenuActive = (
   const { path: menuPathFromUrl, query: menuQueryFromUrl } =
     getPathAndQuery(menuUrl);
 
-  // Check for exact path match first
-  const pathMatches =
-    pathname === menuPathFromHref || pathname === menuPathFromUrl;
+  const pathMatchesHref =
+    pathname === menuPathFromHref ||
+    (menuPathFromHref.length > 1 &&
+      pathname.startsWith(`${menuPathFromHref}/`));
+  const pathMatchesUrl =
+    pathname === menuPathFromUrl ||
+    (menuPathFromUrl.length > 1 &&
+      pathname.startsWith(`${menuPathFromUrl}/`));
+  const pathMatches = pathMatchesHref || pathMatchesUrl;
 
   // If path matches, check query parameters
   if (pathMatches) {

@@ -32,6 +32,7 @@ export interface VendorCheckoutDate extends BookingDateSource {
   is_menu_choice?: boolean;
   can_reschedule?: boolean;
   has_unbooked_event_dates?: boolean;
+  reschedule_initiated?: boolean;
   reschedule_block_reason?: string;
   total: string;
   totalAmount: number;
@@ -58,6 +59,8 @@ export interface MappedVendorBookingCheckout {
   isMenuChoice: boolean;
   isRoomSystem: boolean;
   drinkTitle?: string;
+  /** Any date on this booking has a vendor-initiated reschedule in progress */
+  rescheduleInitiated: boolean;
   summary: {
     subTotal: number;
     addOns: number;
@@ -249,6 +252,7 @@ function mapDetailDate(
     is_menu_choice: date.is_menu_choice ?? bookingIsMenuChoice,
     can_reschedule: date.can_reschedule === true,
     has_unbooked_event_dates: date.has_unbooked_event_dates === true,
+    reschedule_initiated: date.reschedule_initiated === true,
     reschedule_block_reason: date.reschedule_block_reason,
     date: date.date_label,
     previous_date_label: date.previous_date_label ?? null,
@@ -341,6 +345,10 @@ export function mapVendorBookingToCheckout(
     paymentStatus: date.addOnsPaymentStatus,
   }));
 
+  const rescheduleInitiated =
+    booking.reschedule_initiated === true ||
+    dates.some((date) => date.reschedule_initiated === true);
+
   return {
     bookingNumber: booking.booking_number || String(booking.booking_id),
     eventName: booking.event_name,
@@ -352,6 +360,7 @@ export function mapVendorBookingToCheckout(
     isRoomSystem,
     drinkTitle:
       sourceDates[0]?.package_title ?? booking.drink_title ?? undefined,
+    rescheduleInitiated,
     summary: {
       subTotal,
       addOns,

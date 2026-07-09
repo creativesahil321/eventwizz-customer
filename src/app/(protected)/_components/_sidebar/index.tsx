@@ -44,7 +44,7 @@ const Sidebar: React.FC<SidebarProps> = memo(({ menus }) => {
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
       className={cn(
-        "fixed z-50 h-full dark:border-r-1 start-0 bg-background shadow-base transition-all duration-300 ease-in-out hidden lg:block overflow-hidden", // Hidden below lg
+        "fixed z-50 h-full start-0 hidden overflow-hidden border-r border-[var(--color-border)] bg-white shadow-[2px_0_8px_-2px_rgba(0,0,0,0.06)] transition-all duration-300 ease-in-out lg:block",
         collapsed ? "w-[60px]" : "w-[264px]"
       )}
     >
