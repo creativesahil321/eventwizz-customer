@@ -9,19 +9,52 @@ export {
   groupMessagesByDate,
   isClosedTicketStatus,
   PRIORITY_LABELS,
-  STATUS_LABELS,
   SUPPORT_PRIORITIES,
   SUPPORT_STATUSES,
+  normalizeSupportStatus,
 } from "@/app/(protected)/customer/support/_lib/utils";
 
+import {
+  STATUS_LABELS as CUSTOMER_STATUS_LABELS,
+  normalizeSupportStatus,
+} from "@/app/(protected)/customer/support/_lib/utils";
+import type { SupportStatus } from "@/app/(protected)/customer/support/_lib/types";
 import { endOfDay, format, startOfDay } from "date-fns";
 import type { DateRange } from "react-day-picker";
 import type { SupportCategory } from "./types";
-import type { DashboardDateFilter, DashboardDateRange } from "./types";
+import type {
+  DashboardDateFilter,
+  DashboardDateRange,
+  VendorTicketDirection,
+} from "./types";
+
+/** Vendor filter labels (filters are FE-local). Badges use API `status_label`. */
+export const STATUS_LABELS: Record<SupportStatus, string> = {
+  ...CUSTOMER_STATUS_LABELS,
+  waiting_customer: "Waiting for Customer",
+  waiting_general_support: "Waiting for You",
+  waiting_platform_support: "Waiting for Platform Support",
+};
+
+export function getStatusLabel(
+  status: string | null | undefined,
+  fallbackLabel?: string | null
+): string {
+  if (fallbackLabel?.trim()) return fallbackLabel.trim();
+  return STATUS_LABELS[normalizeSupportStatus(status)];
+}
 
 export const VENDOR_CATEGORY_LABELS: Record<SupportCategory, string> = {
   general_support: "Event support",
   technical_support: "Technical support",
+};
+
+export const VENDOR_DIRECTION_LABELS: Record<
+  VendorTicketDirection,
+  string
+> = {
+  received: "Customer tickets",
+  sent: "Admin tickets",
 };
 
 export const CLOSE_TICKET_REASON_LABELS = {

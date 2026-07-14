@@ -13,17 +13,19 @@ import {
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import type { CloseTicketReason, SupportSource } from "../_lib/types";
+import type { CloseTicketReason, SupportSource, SupportStatus } from "../_lib/types";
 import {
   getCloseTicketReasonLabel,
   getCloseTicketReopenDescription,
 } from "../_lib/utils";
+import { useCloseAdminSupportTicket } from "@/services/admin/support";
+import { normalizeSupportStatus } from "@/app/(protected)/customer/support/_lib/utils";
 import { cn } from "@/lib/utils";
 
 const CLOSE_REASONS: CloseTicketReason[] = [
   "issue_resolved",
   "duplicate_ticket",
-  "customer_no_response",
+  "customer_didnt_respond",
 ];
 
 interface CloseTicketDialogProps {
@@ -31,7 +33,7 @@ interface CloseTicketDialogProps {
   onOpenChange: (open: boolean) => void;
   ticketRef: string;
   source: SupportSource;
-  onClosed?: () => void;
+  onClosed?: (status: SupportStatus) => void;
 }
 
 export default function CloseTicketDialog({
@@ -42,16 +44,29 @@ export default function CloseTicketDialog({
   onClosed,
 }: CloseTicketDialogProps) {
   const [reason, setReason] = useState<CloseTicketReason>("issue_resolved");
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const closeTicket = useCloseAdminSupportTicket();
 
-  const handleConfirm = async () => {
-    setIsSubmitting(true);
-    await new Promise((r) => setTimeout(r, 500));
-    setIsSubmitting(false);
-    onOpenChange(false);
-    onClosed?.();
-    toast.success(
-      `${ticketRef} closed — ${getCloseTicketReasonLabel(reason, source)}`
+  const handleConfirm = () => {
+    closeTicket.mutate(
+      {
+        ticketKey: ticketRef,
+        closed_reason: reason,
+      },
+      {
+        onSuccess: (response) => {
+          onOpenChange(false);
+          const nextStatus = normalizeSupportStatus(
+            typeof response.data?.status === "string"
+              ? response.data.status
+              : "resolved"
+          );
+          onClosed?.(nextStatus);
+          toast.success(
+            response.message?.trim() ||
+              `${ticketRef} closed — ${getCloseTicketReasonLabel(reason, source)}`
+          );
+        },
+      }
     );
   };
 
@@ -101,17 +116,18 @@ export default function CloseTicketDialog({
             variant="outline"
             className="w-full border-slate-300 bg-white text-slate-900 hover:bg-slate-50 hover:text-slate-900 sm:w-auto"
             onClick={() => onOpenChange(false)}
+            disabled={closeTicket.isPending}
           >
             Cancel
           </Button>
           <Button
             type="button"
             variant="event-primary"
-            disabled={isSubmitting}
+            disabled={closeTicket.isPending}
             onClick={handleConfirm}
             className="w-full sm:w-auto"
           >
-            {isSubmitting ? "Closing..." : "Close ticket"}
+            {closeTicket.isPending ? "Closing..." : "Close ticket"}
           </Button>
         </DialogFooter>
       </DialogContent>

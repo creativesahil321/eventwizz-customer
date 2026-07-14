@@ -412,7 +412,11 @@ apiClient.interceptors.response.use(
 
     // Show success toast for data modification operations only
     const method = response.config.method?.toUpperCase();
+    const suppressSuccessToast = (
+      response.config as RequestOptions | undefined
+    )?.suppressSuccessToast;
     if (
+      !suppressSuccessToast &&
       response.data.status === true &&
       response.data.message &&
       method &&

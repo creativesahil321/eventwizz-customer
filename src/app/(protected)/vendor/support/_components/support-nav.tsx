@@ -2,9 +2,9 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Inbox, LayoutDashboard } from "lucide-react";
+import { Inbox, LayoutDashboard, PlusCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { getUnreadVendorInboxCount } from "../_lib/mock-data";
+import { useVendorSupportTickets } from "@/services/vendor/support";
 
 const NAV_ITEMS = [
   {
@@ -20,6 +20,12 @@ const NAV_ITEMS = [
     exact: false,
     showBadge: true,
   },
+  {
+    title: "New enquiry",
+    href: "/vendor/support/new",
+    icon: PlusCircle,
+    exact: true,
+  },
 ] as const;
 
 function isNavActive(pathname: string, href: string, exact: boolean) {
@@ -29,7 +35,8 @@ function isNavActive(pathname: string, href: string, exact: boolean) {
 
 export default function VendorSupportNav() {
   const pathname = usePathname();
-  const unreadCount = getUnreadVendorInboxCount();
+  const { data } = useVendorSupportTickets({ sort: "newest" });
+  const badgeCount = data?.inbox_count ?? 0;
 
   return (
     <nav
@@ -40,8 +47,8 @@ export default function VendorSupportNav() {
         const active = isNavActive(pathname, item.href, item.exact);
         const Icon = item.icon;
         const badge =
-          "showBadge" in item && item.showBadge && unreadCount > 0
-            ? unreadCount
+          "showBadge" in item && item.showBadge && badgeCount > 0
+            ? badgeCount
             : null;
 
         return (

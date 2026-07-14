@@ -1,9 +1,9 @@
 import type { SupportPriority, SupportStatus } from "../_lib/types";
 import {
   PRIORITY_LABELS,
-  STATUS_LABELS,
   getPriorityClass,
   getStatusClass,
+  normalizeSupportStatus,
 } from "../_lib/utils";
 import { cn } from "@/lib/utils";
 
@@ -13,34 +13,44 @@ interface PriorityBadgeProps {
 }
 
 export function PriorityBadge({ priority, className }: PriorityBadgeProps) {
+  const safePriority = (["low", "medium", "high"] as const).includes(
+    priority as SupportPriority
+  )
+    ? priority
+    : "medium";
+
   return (
     <span
       className={cn(
-        "inline-flex max-w-full shrink-0 items-center truncate rounded-full border px-2 py-0.5 text-[10px] font-medium sm:text-xs",
-        getPriorityClass(priority),
+        "inline-flex max-w-full shrink-0 items-center truncate rounded-full border px-1.5 py-0.5 text-[9px] font-medium sm:text-[10px]",
+        getPriorityClass(safePriority),
         className
       )}
     >
-      {PRIORITY_LABELS[priority]}
+      {PRIORITY_LABELS[safePriority]}
     </span>
   );
 }
 
 interface StatusBadgeProps {
-  status: SupportStatus;
+  status: SupportStatus | string;
+  label?: string | null;
   className?: string;
 }
 
-export function StatusBadge({ status, className }: StatusBadgeProps) {
+export function StatusBadge({ status, label, className }: StatusBadgeProps) {
+  const safeStatus = normalizeSupportStatus(status);
+  const text = label?.trim();
+
   return (
     <span
       className={cn(
-        "inline-flex max-w-full shrink-0 items-center truncate rounded-full border px-2 py-0.5 text-[10px] font-medium sm:text-xs",
-        getStatusClass(status),
+        "inline-flex max-w-full shrink-0 items-center truncate rounded-full border px-1.5 py-0.5 text-[9px] font-medium sm:text-[10px]",
+        getStatusClass(safeStatus),
         className
       )}
     >
-      {STATUS_LABELS[status]}
+      {text || "—"}
     </span>
   );
 }

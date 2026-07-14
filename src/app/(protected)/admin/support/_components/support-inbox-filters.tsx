@@ -12,20 +12,18 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { ADMIN_SUPPORT_VENUES, SUPPORT_ASSIGNEES } from "../_lib/mock-data";
 import type {
-  SupportCategory,
+  AdminSupportVenue,
+  SupportAssignee,
   SupportPriority,
   SupportSource,
   SupportStatus,
 } from "../_lib/types";
 import {
-  ADMIN_CATEGORY_LABELS,
-  ADMIN_SOURCE_LABELS,
+  ADMIN_INBOX_STATUS_FILTERS,
   PRIORITY_LABELS,
   STATUS_LABELS,
   SUPPORT_PRIORITIES,
-  SUPPORT_STATUSES,
 } from "../_lib/utils";
 import { cn } from "@/lib/utils";
 
@@ -40,7 +38,6 @@ export interface AdminInboxFilters {
   status: InboxStatusFilter;
   priority: SupportPriority | "all";
   assignee: InboxAssigneeFilter;
-  category: SupportCategory | "all";
   source: InboxSourceFilter;
   venue: InboxVenueFilter;
   date: InboxDateFilter;
@@ -51,7 +48,6 @@ export const DEFAULT_ADMIN_INBOX_FILTERS: AdminInboxFilters = {
   status: "all",
   priority: "all",
   assignee: "all",
-  category: "all",
   source: "all",
   venue: "all",
   date: "all",
@@ -104,11 +100,6 @@ function FilterPill({
   );
 }
 
-const SHORT_CATEGORY_LABELS: Record<SupportCategory, string> = {
-  general_support: "General",
-  technical_support: "Technical",
-};
-
 function shortenVenueLabel(name: string): string {
   const firstWord = name.split(" ")[0] ?? name;
   return firstWord.length > 10 ? `${firstWord.slice(0, 9)}…` : firstWord;
@@ -116,12 +107,16 @@ function shortenVenueLabel(name: string): string {
 
 interface AdminSupportInboxFiltersProps {
   filters: AdminInboxFilters;
+  venues?: AdminSupportVenue[];
+  assignees?: SupportAssignee[];
   onChange: (filters: AdminInboxFilters) => void;
   onClear: () => void;
 }
 
 export default function AdminSupportInboxFilters({
   filters,
+  venues = [],
+  assignees = [],
   onChange,
   onClear,
 }: AdminSupportInboxFiltersProps) {
@@ -129,7 +124,6 @@ export default function AdminSupportInboxFilters({
     filters.status !== "all",
     filters.priority !== "all",
     filters.assignee !== "all",
-    filters.category !== "all",
     filters.source !== "all",
     filters.venue !== "all",
     filters.date !== "all",
@@ -141,20 +135,14 @@ export default function AdminSupportInboxFilters({
     filters.priority === "all" ? "Priority" : PRIORITY_LABELS[filters.priority];
   const assigneeLabel = (() => {
     if (filters.assignee === "all") return "Assignee";
-    const assignee = SUPPORT_ASSIGNEES.find((a) => a.id === filters.assignee);
+    if (filters.assignee === "unassigned") return "Unassigned";
+    const assignee = assignees.find((a) => a.id === filters.assignee);
     if (!assignee) return "Assignee";
-    if (assignee.id === "unassigned") return "Unassigned";
     return assignee.name.split(" ")[0];
   })();
-  const categoryLabel =
-    filters.category === "all"
-      ? "Category"
-      : SHORT_CATEGORY_LABELS[filters.category];
-  const sourceLabel =
-    filters.source === "all" ? "Source" : ADMIN_SOURCE_LABELS[filters.source];
   const venueLabel = (() => {
     if (filters.venue === "all") return "Venue";
-    const venue = ADMIN_SUPPORT_VENUES.find((v) => v.id === filters.venue);
+    const venue = venues.find((v) => v.id === filters.venue);
     if (!venue) return "Venue";
     return shortenVenueLabel(venue.name);
   })();
@@ -192,29 +180,18 @@ export default function AdminSupportInboxFilters({
             })
           }
         >
-          Vendor tickets only
+          Vendor tickets
         </DropdownMenuCheckboxItem>
         <DropdownMenuCheckboxItem
-          checked={filters.category === "technical_support"}
+          checked={filters.source === "customer"}
           onCheckedChange={(checked) =>
             onChange({
               ...filters,
-              category: checked ? "technical_support" : "all",
+              source: checked ? "customer" : "all",
             })
           }
         >
-          Technical support only
-        </DropdownMenuCheckboxItem>
-        <DropdownMenuCheckboxItem
-          checked={filters.assignee === "unassigned"}
-          onCheckedChange={(checked) =>
-            onChange({
-              ...filters,
-              assignee: checked ? "unassigned" : "all",
-            })
-          }
-        >
-          Unassigned only
+          Customer tickets
         </DropdownMenuCheckboxItem>
         <DropdownMenuSeparator />
         <Button
@@ -231,7 +208,7 @@ export default function AdminSupportInboxFilters({
 
   return (
     <div className="min-w-0">
-      <div className="grid min-w-0 grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-4">
+      <div className="grid min-w-0 grid-cols-2 gap-2 sm:grid-cols-3">
         <div className="min-w-0">{filtersButton}</div>
 
         <FilterPill label={venueLabel} active={filters.venue !== "all"}>
@@ -243,7 +220,7 @@ export default function AdminSupportInboxFilters({
               }
             >
               <DropdownMenuRadioItem value="all">All venues</DropdownMenuRadioItem>
-              {ADMIN_SUPPORT_VENUES.map((venue) => (
+              {venues.map((venue) => (
                 <DropdownMenuRadioItem key={venue.id} value={venue.id}>
                   {venue.name}
                 </DropdownMenuRadioItem>
@@ -264,7 +241,7 @@ export default function AdminSupportInboxFilters({
               }
             >
               <DropdownMenuRadioItem value="all">All statuses</DropdownMenuRadioItem>
-              {SUPPORT_STATUSES.map((status) => (
+              {ADMIN_INBOX_STATUS_FILTERS.map((status) => (
                 <DropdownMenuRadioItem key={status} value={status}>
                   {STATUS_LABELS[status]}
                 </DropdownMenuRadioItem>
@@ -294,24 +271,6 @@ export default function AdminSupportInboxFilters({
           </DropdownMenuContent>
         </FilterPill>
 
-        <FilterPill label={sourceLabel} active={filters.source !== "all"}>
-          <DropdownMenuContent align="start" className="w-44">
-            <DropdownMenuRadioGroup
-              value={filters.source}
-              onValueChange={(value) =>
-                onChange({
-                  ...filters,
-                  source: value as InboxSourceFilter,
-                })
-              }
-            >
-              <DropdownMenuRadioItem value="all">All sources</DropdownMenuRadioItem>
-              <DropdownMenuRadioItem value="customer">Customer</DropdownMenuRadioItem>
-              <DropdownMenuRadioItem value="vendor">Vendor</DropdownMenuRadioItem>
-            </DropdownMenuRadioGroup>
-          </DropdownMenuContent>
-        </FilterPill>
-
         <FilterPill label={assigneeLabel} active={filters.assignee !== "all"}>
           <DropdownMenuContent align="start" className="w-52">
             <DropdownMenuRadioGroup
@@ -324,33 +283,14 @@ export default function AdminSupportInboxFilters({
               }
             >
               <DropdownMenuRadioItem value="all">All assignees</DropdownMenuRadioItem>
-              {SUPPORT_ASSIGNEES.map((assignee) => (
+              <DropdownMenuRadioItem value="unassigned">
+                Unassigned
+              </DropdownMenuRadioItem>
+              {assignees.map((assignee) => (
                 <DropdownMenuRadioItem key={assignee.id} value={assignee.id}>
                   {assignee.name}
                 </DropdownMenuRadioItem>
               ))}
-            </DropdownMenuRadioGroup>
-          </DropdownMenuContent>
-        </FilterPill>
-
-        <FilterPill label={categoryLabel} active={filters.category !== "all"}>
-          <DropdownMenuContent align="start" className="w-48">
-            <DropdownMenuRadioGroup
-              value={filters.category}
-              onValueChange={(value) =>
-                onChange({
-                  ...filters,
-                  category: value as SupportCategory | "all",
-                })
-              }
-            >
-              <DropdownMenuRadioItem value="all">All categories</DropdownMenuRadioItem>
-              <DropdownMenuRadioItem value="general_support">
-                {ADMIN_CATEGORY_LABELS.general_support}
-              </DropdownMenuRadioItem>
-              <DropdownMenuRadioItem value="technical_support">
-                {ADMIN_CATEGORY_LABELS.technical_support}
-              </DropdownMenuRadioItem>
             </DropdownMenuRadioGroup>
           </DropdownMenuContent>
         </FilterPill>

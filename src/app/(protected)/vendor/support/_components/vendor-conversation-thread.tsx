@@ -1,18 +1,29 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
-  FileText,
-  Image as ImageIcon,
   Lock,
   Paperclip,
   Send,
   StickyNote,
+  X,
+  Image as ImageIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
-import type { SupportAttachment, VendorSupportMessage } from "../_lib/types";
+import { getModKeyLabel } from "@/app/(protected)/_shared/support/mod-key";
+import {
+  SUPPORT_ATTACHMENT_ACCEPT,
+  SUPPORT_IMAGE_ATTACHMENT_ACCEPT,
+  MAX_SUPPORT_ATTACHMENTS,
+  collectSupportAttachments,
+  formatSupportFileSize,
+} from "@/app/(protected)/_shared/support/message-attachments";
+import SupportAttachmentCards from "@/app/(protected)/_shared/support/support-attachment-cards";
+import SupportMessageScroller from "@/app/(protected)/_shared/support/support-message-scroller";
+import { useStoreVendorSupportMessage } from "@/services/vendor/support";
+import type { VendorSupportMessage } from "../_lib/types";
 import {
   formatSupportMessageTimestamp,
   groupMessagesByDate,
@@ -30,7 +41,7 @@ function MessageAvatar({
   return (
     <div
       className={cn(
-        "flex size-9 shrink-0 items-center justify-center rounded-full text-xs font-semibold shadow-sm ring-2 ring-white",
+        "flex size-7 shrink-0 items-center justify-center rounded-full text-[10px] font-semibold shadow-sm ring-1 ring-white",
         variant === "customer" && "bg-slate-200 text-slate-700",
         variant === "agent" && "bg-[var(--color-primary)] text-white",
         variant === "internal" && "bg-amber-200 text-amber-900"
@@ -41,58 +52,12 @@ function MessageAvatar({
   );
 }
 
-function AttachmentCards({
-  attachments,
-  align,
-}: {
-  attachments: SupportAttachment[];
-  align: "left" | "right";
-}) {
-  return (
-    <div
-      className={cn(
-        "mt-2 flex max-w-full flex-wrap gap-2",
-        align === "right" ? "justify-end" : "justify-start"
-      )}
-    >
-      {attachments.map((file) => {
-        const isImage = /\.(png|jpe?g|gif|webp)$/i.test(file.name);
-        return (
-          <div
-            key={file.name}
-            className="flex min-w-[148px] max-w-[200px] flex-1 items-center gap-2.5 rounded-xl border border-slate-200 bg-white px-3 py-2.5 shadow-sm"
-          >
-            <div
-              className={cn(
-                "flex size-8 shrink-0 items-center justify-center rounded-lg",
-                isImage ? "bg-blue-50" : "bg-red-50"
-              )}
-            >
-              {isImage ? (
-                <ImageIcon className="size-4 text-blue-600" />
-              ) : (
-                <FileText className="size-4 text-red-600" />
-              )}
-            </div>
-            <div className="min-w-0">
-              <p className="truncate text-xs font-medium text-foreground">
-                {file.name}
-              </p>
-              <p className="text-[11px] text-muted-foreground">{file.size}</p>
-            </div>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
 function SystemMessagePill({ message }: { message: VendorSupportMessage }) {
   return (
-    <div className="flex justify-center py-3">
-      <p className="max-w-[92%] rounded-full bg-slate-100 px-4 py-2 text-center text-[11px] leading-relaxed text-muted-foreground sm:text-xs">
+    <div className="flex justify-center py-1">
+      <p className="max-w-[92%] rounded-full bg-slate-100 px-3 py-1 text-center text-[10px] leading-snug text-muted-foreground">
         {message.content}
-        <span className="mx-1.5 text-slate-300">•</span>
+        <span className="mx-1 text-slate-300">•</span>
         {formatSupportMessageTimestamp(message.createdAt)}
       </p>
     </div>
@@ -101,25 +66,30 @@ function SystemMessagePill({ message }: { message: VendorSupportMessage }) {
 
 function CustomerMessage({ message }: { message: VendorSupportMessage }) {
   return (
-    <div className="flex flex-col items-start gap-2">
-      <div className="flex max-w-full items-center gap-2.5">
+    <div className="flex flex-col items-start gap-1">
+      <div className="flex max-w-full items-center gap-1.5">
         <MessageAvatar name={message.senderName} variant="customer" />
         <div className="min-w-0">
-          <p className="text-sm font-semibold text-foreground">
+          <p className="text-xs font-semibold text-foreground">
             {message.senderName}
           </p>
-          <p className="text-[11px] text-muted-foreground">
+          <p className="text-[10px] text-muted-foreground">
             {formatSupportMessageTimestamp(message.createdAt)}
           </p>
         </div>
       </div>
-      <div className="max-w-[min(100%,42rem)] rounded-3xl rounded-tl-md border border-slate-200 bg-white px-4 py-3.5 text-sm leading-relaxed text-foreground shadow-sm">
-        <p className="whitespace-pre-wrap break-words [overflow-wrap:anywhere]">
-          {message.content}
-        </p>
-      </div>
+      {message.content?.trim() ? (
+        <div className="max-w-[min(100%,36rem)] rounded-2xl rounded-tl-md border border-slate-200 bg-white px-3 py-2 text-[13px] leading-snug text-foreground shadow-sm">
+          <p className="whitespace-pre-wrap break-words [overflow-wrap:anywhere]">
+            {message.content}
+          </p>
+        </div>
+      ) : null}
       {message.attachments?.length ? (
-        <AttachmentCards attachments={message.attachments} align="left" />
+        <SupportAttachmentCards
+          attachments={message.attachments}
+          align="left"
+        />
       ) : null}
     </div>
   );
@@ -127,25 +97,30 @@ function CustomerMessage({ message }: { message: VendorSupportMessage }) {
 
 function AgentMessage({ message }: { message: VendorSupportMessage }) {
   return (
-    <div className="flex flex-col items-end gap-2">
-      <div className="flex max-w-full flex-row-reverse items-center gap-2.5">
+    <div className="flex flex-col items-end gap-1">
+      <div className="flex max-w-full flex-row-reverse items-center gap-1.5">
         <MessageAvatar name={message.senderName} variant="agent" />
         <div className="min-w-0 text-right">
-          <p className="text-sm font-semibold text-foreground">
+          <p className="text-xs font-semibold text-foreground">
             {message.senderName}
           </p>
-          <p className="text-[11px] text-muted-foreground">
+          <p className="text-[10px] text-muted-foreground">
             {formatSupportMessageTimestamp(message.createdAt)}
           </p>
         </div>
       </div>
-      <div className="max-w-[min(100%,42rem)] rounded-3xl rounded-tr-md bg-[var(--color-primary)] px-4 py-3.5 text-sm leading-relaxed text-white shadow-md">
-        <p className="whitespace-pre-wrap break-words [overflow-wrap:anywhere]">
-          {message.content}
-        </p>
-      </div>
+      {message.content?.trim() ? (
+        <div className="max-w-[min(100%,36rem)] rounded-2xl rounded-tr-md bg-[var(--color-primary)] px-3 py-2 text-[13px] leading-snug text-white shadow-sm">
+          <p className="whitespace-pre-wrap break-words [overflow-wrap:anywhere]">
+            {message.content}
+          </p>
+        </div>
+      ) : null}
       {message.attachments?.length ? (
-        <AttachmentCards attachments={message.attachments} align="right" />
+        <SupportAttachmentCards
+          attachments={message.attachments}
+          align="right"
+        />
       ) : null}
     </div>
   );
@@ -153,38 +128,46 @@ function AgentMessage({ message }: { message: VendorSupportMessage }) {
 
 function InternalNoteMessage({ message }: { message: VendorSupportMessage }) {
   return (
-    <div className="flex flex-col items-end gap-2">
-      <div className="flex max-w-full flex-row-reverse items-center gap-2.5">
+    <div className="flex flex-col items-end gap-1">
+      <div className="flex max-w-full flex-row-reverse items-center gap-1.5">
         <MessageAvatar name={message.senderName} variant="internal" />
         <div className="min-w-0 text-right">
-          <div className="flex items-center justify-end gap-2">
-            <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-800">
-              <StickyNote className="size-3" />
+          <div className="flex items-center justify-end gap-1.5">
+            <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-amber-800">
+              <StickyNote className="size-2.5" />
               Internal note
             </span>
-            <p className="text-sm font-semibold text-foreground">
+            <p className="text-xs font-semibold text-foreground">
               {message.senderName}
             </p>
           </div>
-          <p className="text-[11px] text-muted-foreground">
+          <p className="text-[10px] text-muted-foreground">
             {formatSupportMessageTimestamp(message.createdAt)}
           </p>
         </div>
       </div>
-      <div className="max-w-[min(100%,42rem)] rounded-3xl rounded-tr-md border border-amber-200 bg-amber-50 px-4 py-3.5 text-sm leading-relaxed text-amber-950 shadow-sm">
-        <p className="whitespace-pre-wrap break-words [overflow-wrap:anywhere]">
-          {message.content}
-        </p>
-      </div>
+      {message.content?.trim() ? (
+        <div className="max-w-[min(100%,36rem)] rounded-2xl rounded-tr-md border border-amber-200 bg-amber-50 px-3 py-2 text-[13px] leading-snug text-amber-950 shadow-sm">
+          <p className="whitespace-pre-wrap break-words [overflow-wrap:anywhere]">
+            {message.content}
+          </p>
+        </div>
+      ) : null}
+      {message.attachments?.length ? (
+        <SupportAttachmentCards
+          attachments={message.attachments}
+          align="right"
+        />
+      ) : null}
     </div>
   );
 }
 
 function DateSeparator({ label }: { label: string }) {
   return (
-    <div className="flex items-center gap-3 py-2">
+    <div className="flex items-center gap-2 py-1">
       <div className="h-px flex-1 bg-slate-200" />
-      <span className="shrink-0 text-[11px] font-semibold tracking-[0.12em] text-muted-foreground">
+      <span className="shrink-0 text-[10px] font-semibold tracking-[0.12em] text-muted-foreground">
         {label}
       </span>
       <div className="h-px flex-1 bg-slate-200" />
@@ -193,56 +176,119 @@ function DateSeparator({ label }: { label: string }) {
 }
 
 interface VendorConversationThreadProps {
+  ticketKey: string;
   messages: VendorSupportMessage[];
   isComposerDisabled?: boolean;
+  disabledMessage?: string;
+  hasMore?: boolean;
+  isLoadingMore?: boolean;
+  onLoadMore?: () => void;
 }
 
 export default function VendorConversationThread({
+  ticketKey,
   messages,
   isComposerDisabled = false,
+  disabledMessage = "This ticket is closed.",
+  hasMore = false,
+  isLoadingMore = false,
+  onLoadMore,
 }: VendorConversationThreadProps) {
   const [composerMode, setComposerMode] = useState<ComposerMode>("reply");
   const [draft, setDraft] = useState("");
-  const [localMessages, setLocalMessages] = useState<VendorSupportMessage[]>(
-    []
-  );
+  const [attachments, setAttachments] = useState<File[]>([]);
+  const [stickToBottomKey, setStickToBottomKey] = useState(0);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const imageInputRef = useRef<HTMLInputElement>(null);
+  const storeMessage = useStoreVendorSupportMessage();
+  const isSending = storeMessage.isPending;
 
-  const allMessages = useMemo(
-    () => [...messages, ...localMessages],
-    [messages, localMessages]
-  );
-  const groupedMessages = groupMessagesByDate(allMessages);
+  useEffect(() => {
+    setDraft("");
+    setAttachments([]);
+    setComposerMode("reply");
+  }, [ticketKey]);
+
+  const groupedMessages = groupMessagesByDate(messages);
 
   const isInternal = composerMode === "internal_note";
 
-  const handleSend = useCallback(() => {
-    if (isComposerDisabled || !draft.trim()) return;
+  const handleFilesSelected = (
+    fileList: FileList | null,
+    imagesOnly = false
+  ) => {
+    const next = collectSupportAttachments(fileList, {
+      imagesOnly,
+      currentCount: attachments.length,
+    });
+    if (next.length) {
+      setAttachments((prev) => [...prev, ...next]);
+    }
+    if (fileInputRef.current) fileInputRef.current.value = "";
+    if (imageInputRef.current) imageInputRef.current.value = "";
+  };
 
-    const newMessage: VendorSupportMessage = {
-      id: `local-${Date.now()}`,
-      sender: "agent",
-      senderName: "You",
-      content: draft.trim(),
-      createdAt: new Date().toISOString(),
-      isInternal,
-    };
+  const removeAttachment = (index: number) => {
+    setAttachments((prev) => prev.filter((_, i) => i !== index));
+  };
 
-    setLocalMessages((prev) => [...prev, newMessage]);
-    setDraft("");
-  }, [draft, isComposerDisabled, isInternal]);
+  const handleSend = useCallback(async () => {
+    if (isComposerDisabled || isSending) return;
+    const message = draft.trim();
+    if (!message && attachments.length === 0) return;
+
+    try {
+      await storeMessage.mutateAsync({
+        ticketKey,
+        message,
+        is_internal: isInternal || undefined,
+        attachments,
+      });
+      setDraft("");
+      setAttachments([]);
+      setStickToBottomKey((key) => key + 1);
+    } catch {
+      // API client already surfaces validation / network toasts
+    }
+  }, [
+    attachments,
+    draft,
+    isComposerDisabled,
+    isInternal,
+    isSending,
+    storeMessage,
+    ticketKey,
+  ]);
 
   const handleKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
       event.preventDefault();
-      handleSend();
+      void handleSend();
     }
   };
 
+  const canSend =
+    !isSending && (Boolean(draft.trim()) || attachments.length > 0);
+  const canAddAttachments = attachments.length < MAX_SUPPORT_ATTACHMENTS;
+
   return (
-    <>
-      <div className="flex-1 space-y-5 overflow-y-auto bg-slate-50/60 px-4 py-5 sm:px-6 sm:py-6">
+    <div className="flex h-full min-h-0 flex-1 flex-col overflow-hidden">
+      <SupportMessageScroller
+        resetKey={ticketKey}
+        stickToBottomKey={stickToBottomKey}
+        hasMore={hasMore}
+        isLoadingMore={isLoadingMore}
+        onLoadMore={onLoadMore}
+        emptyState={
+          messages.length === 0 ? (
+            <p className="py-8 text-center text-sm text-muted-foreground">
+              No messages in this conversation yet.
+            </p>
+          ) : null
+        }
+      >
         {groupedMessages.map((group) => (
-          <div key={group.date} className="space-y-5">
+          <div key={group.date} className="space-y-2.5">
             <DateSeparator label={group.date} />
             {group.messages.map((message) => {
               const vendorMessage = message as VendorSupportMessage;
@@ -260,7 +306,7 @@ export default function VendorConversationThread({
                   />
                 );
               }
-              if (vendorMessage.sender === "customer") {
+              if (vendorMessage.sender === "customer" || vendorMessage.sender === "admin") {
                 return (
                   <CustomerMessage key={vendorMessage.id} message={vendorMessage} />
                 );
@@ -271,15 +317,15 @@ export default function VendorConversationThread({
             })}
           </div>
         ))}
-      </div>
+      </SupportMessageScroller>
 
-      <div className="border-t border-slate-200 bg-white p-3 pb-4 sm:p-5 sm:pb-5">
+      <div className="shrink-0 border-t border-slate-200 bg-white p-3 pb-4 sm:p-5 sm:pb-5">
         {isComposerDisabled ? (
           <div className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm text-muted-foreground sm:px-5">
             <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-slate-200 text-slate-600">
               <Lock className="size-4" />
             </div>
-            <p>This ticket is closed.</p>
+            <p>{disabledMessage}</p>
           </div>
         ) : (
           <div
@@ -294,6 +340,7 @@ export default function VendorConversationThread({
               <button
                 type="button"
                 onClick={() => setComposerMode("reply")}
+                disabled={isSending}
                 className={cn(
                   "flex-1 px-3 py-2.5 text-sm font-medium transition-colors sm:flex-none sm:px-4",
                   composerMode === "reply"
@@ -306,6 +353,7 @@ export default function VendorConversationThread({
               <button
                 type="button"
                 onClick={() => setComposerMode("internal_note")}
+                disabled={isSending}
                 className={cn(
                   "flex-1 px-3 py-2.5 text-sm font-medium transition-colors sm:flex-none sm:px-4",
                   composerMode === "internal_note"
@@ -327,20 +375,70 @@ export default function VendorConversationThread({
               value={draft}
               onChange={(event) => setDraft(event.target.value)}
               onKeyDown={handleKeyDown}
+              disabled={isSending}
               className={cn(
-                "min-h-[108px] resize-none rounded-none border-0 px-4 py-4 text-sm shadow-none focus-visible:ring-0",
+                "min-h-[96px] max-h-[160px] resize-none rounded-none border-0 px-4 py-4 text-sm shadow-none focus-visible:ring-0",
                 isInternal ? "bg-amber-50" : "bg-white"
               )}
             />
 
+            {attachments.length > 0 ? (
+              <ul className="space-y-2 border-t border-slate-100 px-3 py-3">
+                {attachments.map((file, index) => (
+                  <li
+                    key={`${file.name}-${file.size}-${index}`}
+                    className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2"
+                  >
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-medium text-foreground">
+                        {file.name}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {formatSupportFileSize(file.size)}
+                      </p>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="size-8 shrink-0"
+                      disabled={isSending}
+                      onClick={() => removeAttachment(index)}
+                      aria-label={`Remove ${file.name}`}
+                    >
+                      <X className="size-4" />
+                    </Button>
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+
             <div className="flex flex-col gap-3 border-t border-slate-100 px-3 py-3 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex items-center gap-0.5">
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept={SUPPORT_ATTACHMENT_ACCEPT}
+                  multiple
+                  className="hidden"
+                  onChange={(e) => handleFilesSelected(e.target.files)}
+                />
+                <input
+                  ref={imageInputRef}
+                  type="file"
+                  accept={SUPPORT_IMAGE_ATTACHMENT_ACCEPT}
+                  multiple
+                  className="hidden"
+                  onChange={(e) => handleFilesSelected(e.target.files, true)}
+                />
                 <Button
                   type="button"
                   variant="ghost"
                   size="icon"
                   className="size-9 rounded-full text-muted-foreground hover:bg-slate-100"
                   aria-label="Attach file"
+                  disabled={isSending || !canAddAttachments}
+                  onClick={() => fileInputRef.current?.click()}
                 >
                   <Paperclip className="size-4" />
                 </Button>
@@ -350,19 +448,21 @@ export default function VendorConversationThread({
                   size="icon"
                   className="size-9 rounded-full text-muted-foreground hover:bg-slate-100"
                   aria-label="Attach image"
+                  disabled={isSending || !canAddAttachments}
+                  onClick={() => imageInputRef.current?.click()}
                 >
                   <ImageIcon className="size-4" />
                 </Button>
               </div>
               <div className="flex flex-col-reverse items-stretch gap-2 sm:flex-row sm:items-center sm:gap-3">
                 <span className="hidden text-xs text-muted-foreground sm:inline">
-                  Cmd + Enter to send
+                  {getModKeyLabel()} + Enter to send
                 </span>
                 <Button
                   type="button"
                   variant={isInternal ? "default" : "event-primary"}
-                  disabled={!draft.trim()}
-                  onClick={handleSend}
+                  disabled={!canSend}
+                  onClick={() => void handleSend()}
                   className={cn(
                     "w-full rounded-full px-5 sm:w-auto",
                     isInternal &&
@@ -374,13 +474,17 @@ export default function VendorConversationThread({
                   ) : (
                     <Send className="size-4" />
                   )}
-                  {isInternal ? "Add note" : "Send reply"}
+                  {isSending
+                    ? "Sending..."
+                    : isInternal
+                      ? "Add note"
+                      : "Send reply"}
                 </Button>
               </div>
             </div>
           </div>
         )}
       </div>
-    </>
+    </div>
   );
 }

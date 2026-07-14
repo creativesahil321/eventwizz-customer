@@ -11,6 +11,10 @@ const PAGE_CONFIG: Record<string, { title: string; description: string }> = {
     title: "Inbox",
     description: "View and manage customer support conversations.",
   },
+  "/vendor/support/new": {
+    title: "New enquiry",
+    description: "Send a support ticket to EventWizz admin for help.",
+  },
 };
 
 function getPageConfig(pathname: string) {

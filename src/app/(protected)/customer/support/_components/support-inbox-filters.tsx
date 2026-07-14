@@ -15,10 +15,10 @@ import {
 import type { SupportCategory, SupportPriority, SupportStatus } from "../_lib/types";
 import {
   CATEGORY_LABELS,
+  CUSTOMER_INBOX_STATUS_FILTERS,
   PRIORITY_LABELS,
   STATUS_LABELS,
   SUPPORT_PRIORITIES,
-  SUPPORT_STATUSES,
 } from "../_lib/utils";
 import { cn } from "@/lib/utils";
 
@@ -112,8 +112,8 @@ export default function SupportInboxFilters({
   const dateLabel = DATE_LABELS[filters.date];
 
   return (
-    <div className="space-y-2">
-      <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+    <div className="space-y-0">
+      <div className="flex min-w-0 flex-wrap gap-2">
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button
@@ -182,7 +182,7 @@ export default function SupportInboxFilters({
               }
             >
               <DropdownMenuRadioItem value="all">All statuses</DropdownMenuRadioItem>
-              {SUPPORT_STATUSES.map((status) => (
+              {CUSTOMER_INBOX_STATUS_FILTERS.map((status) => (
                 <DropdownMenuRadioItem key={status} value={status}>
                   {STATUS_LABELS[status]}
                 </DropdownMenuRadioItem>
@@ -211,9 +211,7 @@ export default function SupportInboxFilters({
             </DropdownMenuRadioGroup>
           </DropdownMenuContent>
         </FilterPill>
-      </div>
 
-      <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         <FilterPill label={categoryLabel} active={filters.category !== "all"}>
           <DropdownMenuContent align="start" className="w-48">
             <DropdownMenuRadioGroup

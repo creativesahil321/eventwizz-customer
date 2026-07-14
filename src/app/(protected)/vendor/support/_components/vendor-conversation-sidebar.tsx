@@ -1,102 +1,180 @@
 "use client";
 
 import Link from "next/link";
-import { Calendar, Mail, Phone, User } from "lucide-react";
+import { Calendar, Loader2, Mail, Phone, User } from "lucide-react";
 import { StatusBadge } from "./support-badges";
 import {
-  VENDOR_BOOKING_DETAILS,
-  VENDOR_CONVERSATIONS,
-} from "../_lib/mock-data";
-import type { VendorSupportConversation } from "../_lib/types";
+  mapVendorRecentTicketToConversation,
+  getVendorMessagesPayload,
+  useVendorSupportTicketMessages,
+} from "@/services/vendor/support";
+import type { SupportAssignee } from "../_lib/types";
 
 interface VendorConversationSidebarProps {
-  conversation: VendorSupportConversation;
+  ticketKey: string;
+  assignee: SupportAssignee | null;
+  onAssignClick?: () => void;
 }
 
 export default function VendorConversationSidebar({
-  conversation,
+  ticketKey,
+  assignee,
+  onAssignClick,
 }: VendorConversationSidebarProps) {
-  const { customer } = conversation;
-  const booking =
-    conversation.bookingRef &&
-    VENDOR_BOOKING_DETAILS[conversation.bookingRef];
+  const { data, isLoading } = useVendorSupportTicketMessages(ticketKey, {
+    page: 1,
+    per_page: 30,
+  });
 
-  const recentTickets = VENDOR_CONVERSATIONS.filter(
-    (c) => c.id !== conversation.id && c.customer.email === customer.email
-  ).slice(0, 3);
+  const payload = getVendorMessagesPayload(data);
+  const customer = payload.customer;
+  const booking = payload.ticket?.booking;
+  const directionLabel = payload.ticket?.direction_label?.toLowerCase() ?? "";
+  const isSentToAdmin =
+    directionLabel.includes("admin") ||
+    String(payload.ticket?.direction ?? "").toLowerCase() === "admin";
+  const contactLabel = isSentToAdmin ? "Admin" : "Customer";
+
+  const recentTickets = (payload.recent_tickets ?? []).map(
+    mapVendorRecentTicketToConversation,
+  );
+
+  const bookingTitle =
+    (typeof booking?.event_name === "string" && booking.event_name) ||
+    (typeof booking?.title === "string" && booking.title) ||
+    null;
+  const bookingRef =
+    (typeof booking?.booking_number === "string" && booking.booking_number) ||
+    (booking?.booking_id != null ? String(booking.booking_id) : null) ||
+    (booking?.id != null ? String(booking.id) : null);
+  const bookingDate = typeof booking?.date === "string" ? booking.date : null;
+
+  const displayName = customer?.full_name?.trim() || "Unknown";
+  const initials =
+    displayName.charAt(0).toUpperCase() ||
+    customer?.email?.charAt(0).toUpperCase() ||
+    "?";
 
   return (
-    <aside className="flex w-full min-w-0 shrink-0 flex-col gap-5 border-t border-slate-200 bg-slate-50/50 p-4 lg:max-h-none xl:w-[280px] xl:border-l xl:border-t-0 xl:p-5">
+    <aside className="flex w-full min-w-0 flex-col gap-5 bg-slate-50/50 p-4 2xl:p-5">
       <section>
         <h3 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-          Customer
+          {contactLabel}
         </h3>
-        <div className="mt-3 flex items-center gap-3">
-          <div className="flex size-10 items-center justify-center rounded-full bg-[var(--color-primary)]/10 text-sm font-semibold text-[var(--color-primary)]">
-            {customer.name.charAt(0)}
+        {isLoading && !customer ? (
+          <div className="mt-3 flex items-center gap-2 text-sm text-muted-foreground">
+            <Loader2 className="size-4 animate-spin" />
+            Loading…
           </div>
-          <div className="min-w-0">
-            <p className="truncate text-sm font-semibold text-foreground">
-              {customer.name}
-            </p>
-            <p className="truncate text-xs text-muted-foreground">
-              {customer.email}
-            </p>
-          </div>
-        </div>
-        <dl className="mt-4 space-y-2 text-xs">
-          <div className="flex items-center gap-2 text-muted-foreground">
-            <Phone className="size-3.5 shrink-0" />
-            <span className="break-all">{customer.phone}</span>
-          </div>
-          <div className="flex items-center gap-2 text-muted-foreground">
-            <User className="size-3.5 shrink-0" />
-            <span className="break-words">{customer.timezone}</span>
-          </div>
-          <div className="flex items-center gap-2 text-muted-foreground">
-            <Mail className="size-3.5 shrink-0" />
-            <span>Customer since {customer.customerSince}</span>
-          </div>
-        </dl>
+        ) : (
+          <>
+            <div className="mt-3 flex items-center gap-3">
+              <div className="flex size-10 items-center justify-center rounded-full bg-[var(--color-primary)]/10 text-sm font-semibold text-[var(--color-primary)]">
+                {initials}
+              </div>
+              <div className="min-w-0">
+                <p className="truncate text-sm font-semibold text-foreground">
+                  {displayName}
+                </p>
+                {customer?.email ? (
+                  <p className="truncate text-xs text-muted-foreground">
+                    {customer.email}
+                  </p>
+                ) : null}
+              </div>
+            </div>
+            <dl className="mt-4 space-y-2 text-xs">
+              {customer?.phone ? (
+                <div className="flex items-center gap-2 text-muted-foreground">
+                  <Phone className="size-3.5 shrink-0" />
+                  <span className="break-all">{customer.phone}</span>
+                </div>
+              ) : null}
+              <div className="flex items-center gap-2 text-muted-foreground">
+                <Mail className="size-3.5 shrink-0" />
+                <span>
+                  {isSentToAdmin ? "Technical support" : "Customer contact"}
+                </span>
+              </div>
+            </dl>
+          </>
+        )}
       </section>
 
-      {booking && (
+      {booking ? (
         <section>
           <h3 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
             Booking
           </h3>
           <div className="mt-3 rounded-xl border border-[var(--color-border)] bg-white p-4 shadow-sm">
-            <p className="text-sm font-semibold text-foreground">
-              {booking.title}
-            </p>
-            <div className="mt-2 flex items-center gap-2 text-xs text-muted-foreground">
-              <Calendar className="size-3.5" />
-              {booking.date}
-            </div>
-            <p className="mt-3 text-base font-bold text-foreground">
-              {booking.price}
-            </p>
+            {bookingTitle ? (
+              <p className="text-sm font-semibold text-foreground">
+                {bookingTitle}
+              </p>
+            ) : null}
+            {bookingRef || bookingDate ? (
+              <div className="mt-2 flex items-center gap-2 text-xs text-muted-foreground">
+                <Calendar className="size-3.5" />
+                <span>
+                  {[bookingRef, bookingDate].filter(Boolean).join(" · ")}
+                </span>
+              </div>
+            ) : (
+              <div className="mt-2 flex items-center gap-2 text-xs text-muted-foreground">
+                <User className="size-3.5" />
+                Linked booking
+              </div>
+            )}
           </div>
         </section>
-      )}
+      ) : null}
 
-      {conversation.assignee && (
-        <section>
-          <h3 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-            Assignee
-          </h3>
-          <p className="mt-2 text-sm font-medium text-foreground">
-            {conversation.assignee.name}
-          </p>
-        </section>
-      )}
+      <section>
+        <h3 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+          Assignee
+        </h3>
+        {isSentToAdmin ? (
+          <>
+            <p className="mt-2 text-sm font-medium text-foreground">
+              All staff
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Admin tickets are shared — any staff member can access them.
+            </p>
+          </>
+        ) : (
+          <>
+            {assignee ? (
+              <p className="mt-2 text-sm font-medium text-foreground">
+                {assignee.name}
+              </p>
+            ) : (
+              <p className="mt-2 text-sm text-muted-foreground">Unassigned</p>
+            )}
+            {onAssignClick ? (
+              <button
+                type="button"
+                onClick={onAssignClick}
+                className="mt-2 text-xs font-medium text-[var(--color-primary)] hover:underline"
+              >
+                {assignee ? "Change assignee" : "Assign to staff"}
+              </button>
+            ) : null}
+          </>
+        )}
+      </section>
 
       <section>
         <h3 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
           Recent tickets
         </h3>
         <ul className="mt-3 space-y-2">
-          {recentTickets.length === 0 ? (
+          {isLoading && recentTickets.length === 0 ? (
+            <li className="flex items-center gap-2 text-xs text-muted-foreground">
+              <Loader2 className="size-3.5 animate-spin" />
+              Loading…
+            </li>
+          ) : recentTickets.length === 0 ? (
             <li className="text-xs text-muted-foreground">No other tickets.</li>
           ) : (
             recentTickets.map((ticket) => (
@@ -109,7 +187,10 @@ export default function VendorConversationSidebar({
                     {ticket.subject}
                   </p>
                   <div className="mt-1.5">
-                    <StatusBadge status={ticket.status} />
+                    <StatusBadge
+                      status={ticket.status}
+                      label={ticket.statusLabel}
+                    />
                   </div>
                 </Link>
               </li>

@@ -2,29 +2,36 @@
 
 import Link from "next/link";
 import { Building2, Calendar, Mail, Phone, User } from "lucide-react";
-import { StatusBadge } from "./support-badges";
-import {
-  ADMIN_BOOKING_DETAILS,
-  ADMIN_CONVERSATIONS,
-} from "../_lib/mock-data";
-import type { AdminSupportConversation } from "../_lib/types";
-import { ADMIN_SOURCE_LABELS } from "../_lib/utils";
+import { SourceBadge, StatusBadge } from "./support-badges";
+import { ADMIN_BOOKING_DETAILS } from "../_lib/mock-data";
+import type { AdminSupportConversation, SupportStatus } from "../_lib/types";
+
+export interface AdminRecentTicketItem {
+  id: string;
+  subject: string;
+  status: SupportStatus;
+  statusLabel?: string;
+}
 
 interface AdminConversationSidebarProps {
   conversation: AdminSupportConversation;
+  assignee: AdminSupportConversation["assignee"];
+  onAssignClick?: () => void;
+  recentTickets?: AdminRecentTicketItem[];
+  isLoadingRecent?: boolean;
 }
 
 export default function AdminConversationSidebar({
   conversation,
+  assignee,
+  onAssignClick,
+  recentTickets = [],
+  isLoadingRecent = false,
 }: AdminConversationSidebarProps) {
   const { contact, venue } = conversation;
   const booking =
     conversation.bookingRef &&
     ADMIN_BOOKING_DETAILS[conversation.bookingRef];
-
-  const recentTickets = ADMIN_CONVERSATIONS.filter(
-    (c) => c.id !== conversation.id && c.contact.email === contact.email
-  ).slice(0, 3);
 
   return (
     <aside className="flex w-full min-w-0 shrink-0 flex-col gap-5 border-t border-slate-200 bg-slate-50/50 p-4 lg:max-h-none xl:w-[280px] xl:border-l xl:border-t-0 xl:p-5">
@@ -40,8 +47,11 @@ export default function AdminConversationSidebar({
 
       <section>
         <h3 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-          {ADMIN_SOURCE_LABELS[conversation.source]}
+          Contact
         </h3>
+        <div className="mt-2">
+          <SourceBadge source={conversation.source} />
+        </div>
         <div className="mt-3 flex items-center gap-3">
           <div className="flex size-10 items-center justify-center rounded-full bg-[var(--color-primary)]/10 text-sm font-semibold text-[var(--color-primary)]">
             {contact.name.charAt(0)}
@@ -62,17 +72,18 @@ export default function AdminConversationSidebar({
               <span>{contact.role}</span>
             </div>
           ) : null}
-          <div className="flex items-center gap-2 text-muted-foreground">
-            <Phone className="size-3.5 shrink-0" />
-            <span className="break-all">{contact.phone}</span>
-          </div>
-          <div className="flex items-center gap-2 text-muted-foreground">
-            <Mail className="size-3.5 shrink-0" />
-            <span>
-              {conversation.source === "vendor" ? "Member" : "Customer"} since{" "}
-              {contact.customerSince}
-            </span>
-          </div>
+          {contact.phone ? (
+            <div className="flex items-center gap-2 text-muted-foreground">
+              <Phone className="size-3.5 shrink-0" />
+              <span className="break-all">{contact.phone}</span>
+            </div>
+          ) : null}
+          {contact.email ? (
+            <div className="flex items-center gap-2 text-muted-foreground">
+              <Mail className="size-3.5 shrink-0" />
+              <span className="break-all">{contact.email}</span>
+            </div>
+          ) : null}
         </dl>
       </section>
 
@@ -96,23 +107,36 @@ export default function AdminConversationSidebar({
         </section>
       )}
 
-      {conversation.assignee && (
-        <section>
-          <h3 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-            Assignee
-          </h3>
+      <section>
+        <h3 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+          Assignee
+        </h3>
+        {assignee ? (
           <p className="mt-2 text-sm font-medium text-foreground">
-            {conversation.assignee.name}
+            {assignee.name}
           </p>
-        </section>
-      )}
+        ) : (
+          <p className="mt-2 text-sm text-muted-foreground">Unassigned</p>
+        )}
+        {onAssignClick ? (
+          <button
+            type="button"
+            onClick={onAssignClick}
+            className="mt-2 text-xs font-medium text-[var(--color-primary)] hover:underline"
+          >
+            {assignee ? "Change assignee" : "Assign to staff"}
+          </button>
+        ) : null}
+      </section>
 
       <section>
         <h3 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
           Recent tickets
         </h3>
         <ul className="mt-3 space-y-2">
-          {recentTickets.length === 0 ? (
+          {isLoadingRecent && recentTickets.length === 0 ? (
+            <li className="text-xs text-muted-foreground">Loading…</li>
+          ) : recentTickets.length === 0 ? (
             <li className="text-xs text-muted-foreground">No other tickets.</li>
           ) : (
             recentTickets.map((ticket) => (

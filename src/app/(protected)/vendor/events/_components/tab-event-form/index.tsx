@@ -697,47 +697,47 @@ export default function TabEventForm() {
           <Tabs
             value={activeTab}
             onValueChange={handleTabChange}
-            className="w-full"
+            className="w-full gap-0"
           >
-            <div className="flex justify-between items-center mb-4">
-              <div className="w-full overflow-x-auto pb-2 scrollbar-thin scrollbar-thumb-gray-400 scrollbar-track-gray-100 hover:scrollbar-thumb-gray-500 -mx-1 px-1 md:overflow-x-visible">
-                <TabsList className="inline-flex md:flex w-max md:w-full bg-background p-1 h-auto rounded-lg gap-1.5 md:gap-2">
-                  {steps.map((step) => {
-                    // Disable tabs that are beyond the current step
-                    const isDisabled = currentStep
-                      ? step.id > currentStep
-                      : false;
+            <Card className="shadow-sm overflow-hidden gap-0 py-0">
+              <div className="border-b bg-card px-2 sm:px-3 md:px-4 pt-3 pb-3">
+                <div className="w-full overflow-x-auto scrollbar-thin scrollbar-thumb-gray-400 scrollbar-track-gray-100 hover:scrollbar-thumb-gray-500 md:overflow-x-visible">
+                  <TabsList className="inline-flex md:flex w-max md:w-full bg-muted/60 p-1 h-auto rounded-lg gap-1.5 md:gap-2">
+                    {steps.map((step) => {
+                      // Disable tabs that are beyond the current step
+                      const isDisabled = currentStep
+                        ? step.id > currentStep
+                        : false;
 
-                    return (
-                      <TabsTrigger
-                        key={step.id}
-                        value={step.value}
-                        disabled={isDisabled}
-                        className={`px-2 sm:px-3 md:px-4 lg:px-5 py-1.5 h-auto text-xs sm:text-sm font-medium whitespace-nowrap rounded-md data-[state=active]:bg-[var(--color-primary)] data-[state=active]:text-white data-[state=active]:shadow-sm flex items-center justify-center gap-1 sm:gap-1.5 flex-shrink-0 md:flex-1 md:min-w-0 transition-all duration-300 ease-in-out ${
-                          isDisabled ? "opacity-50 cursor-not-allowed" : ""
-                        } ${
-                          currentStep && step.id === currentStep
-                            ? "ring-2 ring-blue-500"
-                            : ""
-                        }`}
-                      >
-                        {step.icon}
-                        <span className="whitespace-nowrap truncate">
-                          {step.label}
-                        </span>
-                        {currentStep && step.id === currentStep && (
-                          <span className="ml-1 text-xs bg-blue-100 text-blue-800 px-1 sm:px-1.5 py-0.5 rounded-full hidden sm:inline whitespace-nowrap flex-shrink-0">
-                            Current
+                      return (
+                        <TabsTrigger
+                          key={step.id}
+                          value={step.value}
+                          disabled={isDisabled}
+                          className={`px-2 sm:px-3 md:px-4 lg:px-5 py-1.5 h-auto text-xs sm:text-sm font-medium whitespace-nowrap rounded-md data-[state=active]:bg-[var(--color-primary)] data-[state=active]:text-white data-[state=active]:shadow-sm flex items-center justify-center gap-1 sm:gap-1.5 flex-shrink-0 md:flex-1 md:min-w-0 transition-all duration-300 ease-in-out ${
+                            isDisabled ? "opacity-50 cursor-not-allowed" : ""
+                          } ${
+                            currentStep && step.id === currentStep
+                              ? "ring-2 ring-blue-500"
+                              : ""
+                          }`}
+                        >
+                          {step.icon}
+                          <span className="whitespace-nowrap truncate">
+                            {step.label}
                           </span>
-                        )}
-                      </TabsTrigger>
-                    );
-                  })}
-                </TabsList>
+                          {currentStep && step.id === currentStep && (
+                            <span className="ml-1 text-xs bg-blue-100 text-blue-800 px-1 sm:px-1.5 py-0.5 rounded-full hidden sm:inline whitespace-nowrap flex-shrink-0">
+                              Current
+                            </span>
+                          )}
+                        </TabsTrigger>
+                      );
+                    })}
+                  </TabsList>
+                </div>
               </div>
-            </div>
 
-            <Card className="shadow-sm overflow-hidden">
               <div
                 className={`${
                   showRoomSidebar

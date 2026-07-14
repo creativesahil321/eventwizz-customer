@@ -179,7 +179,6 @@ export const vendorMenus: MenuItemProps[] = [
     href: createVendorUrl("/vendor/support/dashboard"),
     url: createVendorUrl("/vendor/support/dashboard"),
     type: "title",
-    permissions: "read-ticket",
     menu: [],
   },
   {

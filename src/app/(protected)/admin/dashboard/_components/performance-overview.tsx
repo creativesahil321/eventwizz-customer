@@ -3,7 +3,7 @@
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useCallback } from "react";
 import { Banknote, PieChart, UserPlus, Wallet } from "lucide-react";
-import { Card, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardTitle } from "@/components/ui/card";
 
 const PERIODS = ["daily", "weekly", "monthly"] as const;
 
@@ -77,46 +77,48 @@ export default function PerformanceOverview({
   ];
 
   return (
-    <div className="w-full bg-white p-6 rounded-lg">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4">
-        <CardTitle className="text-2xl mb-0 title-header font-medium">
-          {title}
-        </CardTitle>
+    <Card className="w-full border shadow-sm">
+      <CardContent className="p-6 space-y-4">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+          <CardTitle className="text-2xl mb-0 title-header font-medium">
+            {title}
+          </CardTitle>
 
-        <div className="flex gap-2">
-          {PERIODS.map((p) => (
-            <button
-              key={p}
-              type="button"
-              onClick={() => applyPeriod(p)}
-              className={`px-4 py-2 text-sm font-medium rounded-md transition-all duration-200 cursor-pointer ${
-                period === p
-                  ? "bg-[var(--color-primary)] text-[var(--color-primary-foreground,white)] hover:bg-[var(--color-primary-hover)] shadow-sm"
-                  : "border border-[var(--color-primary)] bg-white text-[var(--color-primary)] hover:bg-[#f0fafa] hover:border-[var(--color-primary-hover)]"
-              }`}
+          <div className="flex gap-2">
+            {PERIODS.map((p) => (
+              <button
+                key={p}
+                type="button"
+                onClick={() => applyPeriod(p)}
+                className={`px-4 py-2 text-sm font-medium rounded-md transition-all duration-200 cursor-pointer ${
+                  period === p
+                    ? "bg-[var(--color-primary)] text-[var(--color-primary-foreground,white)] hover:bg-[var(--color-primary-hover)] shadow-sm"
+                    : "border border-[var(--color-primary)] bg-white text-[var(--color-primary)] hover:bg-[#f0fafa] hover:border-[var(--color-primary-hover)]"
+                }`}
+              >
+                {p.charAt(0).toUpperCase() + p.slice(1)}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          {metrics.map((metric) => (
+            <Card
+              key={metric.id}
+              className={`border-none shadow-sm ${metric.bgColor} rounded-lg p-4`}
             >
-              {p.charAt(0).toUpperCase() + p.slice(1)}
-            </button>
+              <div className="flex items-center justify-between">
+                <div className="bg-white/20 rounded-full p-3">{metric.icon}</div>
+                <div className="text-right">
+                  <p className="text-white text-sm mb-1">{metric.displayLabel}</p>
+                  <p className="text-white text-3xl font-bold">{metric.value}</p>
+                </div>
+              </div>
+            </Card>
           ))}
         </div>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        {metrics.map((metric) => (
-          <Card
-            key={metric.id}
-            className={`border-none shadow-sm ${metric.bgColor} rounded-lg p-4`}
-          >
-            <div className="flex items-center justify-between">
-              <div className="bg-white/20 rounded-full p-3">{metric.icon}</div>
-              <div className="text-right">
-                <p className="text-white text-sm mb-1">{metric.displayLabel}</p>
-                <p className="text-white text-3xl font-bold">{metric.value}</p>
-              </div>
-            </div>
-          </Card>
-        ))}
-      </div>
-    </div>
+      </CardContent>
+    </Card>
   );
 }

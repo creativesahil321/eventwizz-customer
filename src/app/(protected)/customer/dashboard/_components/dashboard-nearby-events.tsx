@@ -113,7 +113,7 @@ export default function DashboardNearbyEvents() {
   }
 
   return (
-    <section className="w-full relative bg-background dark:border p-4 sm:p-6 rounded-md">
+    <section className="w-full relative bg-background border shadow-sm p-4 sm:p-6 rounded-lg">
       <header className="w-full mb-4 sm:mb-6">
         <div className="flex items-center gap-2">
           <h2 className="text-xl sm:text-2xl title-header font-bold">

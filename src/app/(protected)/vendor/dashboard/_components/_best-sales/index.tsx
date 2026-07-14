@@ -67,7 +67,7 @@ export default function BestSales({
   }, [sales, sortBy, sortOrder]);
 
   return (
-    <Card className="shadow-none border-none">
+    <Card className="border shadow-sm">
       <CardHeader className="relative">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <CardTitle className="text-2xl mb-0 title-header font-bold">

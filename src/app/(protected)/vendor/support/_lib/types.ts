@@ -12,9 +12,11 @@ export type {
   SupportStatus,
 };
 
+export type VendorTicketDirection = "received" | "sent";
+
 export interface VendorSupportMessage {
   id: string;
-  sender: "customer" | "agent" | "system";
+  sender: "customer" | "agent" | "admin" | "system";
   senderName: string;
   content: string;
   createdAt: string;
@@ -42,12 +44,16 @@ export interface VendorSupportConversation {
   category: SupportCategory;
   priority: SupportPriority;
   status: SupportStatus;
+  statusLabel?: string;
+  /** received = customer → vendor; sent = vendor → admin */
+  direction: VendorTicketDirection;
   bookingRef?: string;
   bookingTitle?: string;
   openedAt: string;
   closedAt?: string;
   lastMessage: string;
   lastMessageAt: string;
+  lastSenderName?: string;
   unreadCount: number;
   messages: VendorSupportMessage[];
   customer: VendorSupportCustomer;

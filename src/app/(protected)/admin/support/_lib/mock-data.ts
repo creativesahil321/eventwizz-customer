@@ -7,7 +7,7 @@ import type {
   DashboardDateFilter,
   SupportAssignee,
 } from "./types";
-import { getConversationQueue, matchesDashboardDateFilter } from "./utils";
+import { matchesDashboardDateFilter } from "./utils";
 
 const now = Date.now();
 const minutesAgo = (m: number) => new Date(now - m * 60_000).toISOString();
@@ -394,54 +394,32 @@ export function getAdminStats(filter: DashboardDateFilter): AdminSupportStats {
       inRange(c.closedAt ?? c.lastMessageAt)
   );
 
-  const waitingCustomer = ADMIN_CONVERSATIONS.filter(
-    (c) =>
-      isOpenConversation(c) &&
-      c.waitingOn === "customer" &&
-      (inRange(c.lastMessageAt) || inRange(c.openedAt))
-  ).length;
-
-  const waitingVendor = ADMIN_CONVERSATIONS.filter(
-    (c) =>
-      isOpenConversation(c) &&
-      c.waitingOn === "vendor" &&
-      (inRange(c.lastMessageAt) || inRange(c.openedAt))
-  ).length;
+  const customerTickets = open.filter((c) => c.source === "customer").length;
+  const vendorTickets = open.filter((c) => c.source === "vendor").length;
 
   return {
     totalOpen: open.length || 4,
     totalResolved: resolved.length || 8,
-    waitingCustomer: waitingCustomer || 5,
-    waitingVendor: waitingVendor || 3,
+    customerTickets: customerTickets || 3,
+    vendorTickets: vendorTickets || 2,
   };
 }
 
 export function getAdminQueueStats(): AdminSupportQueueStats[] {
-  const general = ADMIN_CONVERSATIONS.filter(
-    (c) => getConversationQueue(c) === "general_support" && isOpenConversation(c)
-  );
-  const technical = ADMIN_CONVERSATIONS.filter(
-    (c) => getConversationQueue(c) === "technical_support" && isOpenConversation(c)
-  );
-  const waiting = ADMIN_CONVERSATIONS.filter(
-    (c) => getConversationQueue(c) === "waiting" && isOpenConversation(c)
-  );
+  const open = ADMIN_CONVERSATIONS.filter((c) => isOpenConversation(c));
 
   return [
     {
       queue: "general_support",
-      open: general.length,
-      waiting: general.filter((c) => c.waitingOn).length,
+      open: open.filter((c) => c.category === "general_support").length,
     },
     {
-      queue: "technical_support",
-      open: technical.length,
-      waiting: technical.filter((c) => c.waitingOn).length,
+      queue: "customer",
+      open: open.filter((c) => c.source === "customer").length,
     },
     {
-      queue: "waiting",
-      open: waiting.length,
-      waiting: waiting.length,
+      queue: "vendor",
+      open: open.filter((c) => c.source === "vendor").length,
     },
   ];
 }

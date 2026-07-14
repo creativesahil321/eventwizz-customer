@@ -20,8 +20,7 @@ export function getFirstAccessibleVendorPath(
     const path = item.href ?? item.url;
     if (!path || exclude.has(path)) continue;
     const key = item.permissions?.trim();
-    if (!key) continue;
-    if (granted.has(key)) return path;
+    if (!key || granted.has(key)) return path;
   }
 
   return "/unauthorized";

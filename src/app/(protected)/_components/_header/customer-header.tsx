@@ -35,8 +35,10 @@ import MobileSidebar from "./_components/mobile-sidebar";
 import LayoutToggle from "./_components/layout-toggle";
 import { notificationService } from "@/services/common/notification";
 import {
-  SUPPORT_CONVERSATIONS,
-} from "@/app/(protected)/customer/support/_lib/mock-data";
+  mapCustomerSupportTicketToConversation,
+  useCustomerSupportTickets,
+} from "@/services/customer/support";
+import { useDebounce } from "@/hooks/data-table/use-debounce";
 
 const CUSTOMER_QUICK_LINKS = [
   {
@@ -88,19 +90,19 @@ function CustomerHeaderSearch() {
   const router = useRouter();
   const pathname = usePathname();
   const isSupportWorkspace = pathname.startsWith("/customer/support");
+  const debouncedQuery = useDebounce(query, 400);
+  const { data: supportTicketsResponse } = useCustomerSupportTickets(
+    { sort: "newest", search: debouncedQuery.trim() || undefined },
+    { enabled: isSupportWorkspace && debouncedQuery.trim().length > 0 }
+  );
 
   const results = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return [];
 
     if (isSupportWorkspace) {
-      return SUPPORT_CONVERSATIONS.filter(
-        (conversation) =>
-          conversation.subject.toLowerCase().includes(q) ||
-          conversation.ref.toLowerCase().includes(q) ||
-          conversation.bookingTitle?.toLowerCase().includes(q) ||
-          conversation.lastMessage.toLowerCase().includes(q)
-      )
+      return (supportTicketsResponse?.data ?? [])
+        .map(mapCustomerSupportTicketToConversation)
         .slice(0, 6)
         .map((conversation) => ({
           title: conversation.subject,
@@ -120,7 +122,7 @@ function CustomerHeaderSearch() {
         subtitle: "Open page",
         href: item.href,
       }));
-  }, [isSupportWorkspace, query]);
+  }, [isSupportWorkspace, query, supportTicketsResponse?.data]);
 
   const openSearch = useCallback(() => {
     setIsOpen(true);

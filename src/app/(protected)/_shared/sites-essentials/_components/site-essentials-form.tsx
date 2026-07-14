@@ -330,6 +330,9 @@ function SiteEssentialsFormInner() {
   // Count total errors for error summary
   const errorCount = Object.keys(tabsWithErrors).length;
 
+  // Subscribe so the Discard button re-renders when the form becomes dirty
+  const { isDirty } = form.formState;
+
   const handleDiscardChanges = async () => {
     if (readOnly) return;
 
@@ -389,78 +392,82 @@ function SiteEssentialsFormInner() {
           </Alert>
         )}
 
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <div className="flex justify-between items-center mb-4">
-            <div className="w-full overflow-x-auto pb-2 no-scrollbar">
-              <TabsList className="flex w-max min-w-full bg-background p-1 h-auto rounded-lg gap-1">
-                <TabsTrigger
-                  value="presets"
-                  className="px-3 sm:px-4 py-1 h-8 text-xs font-medium whitespace-nowrap relative rounded-md data-[state=active]:bg-[var(--color-primary)] data-[state=active]:text-white data-[state=active]:shadow-sm mx-0.5"
-                >
-                  Presets
-                </TabsTrigger>
-                <TabsTrigger
-                  value="branding"
-                  className="px-3 sm:px-4 py-1 h-8 text-xs font-medium whitespace-nowrap relative rounded-md data-[state=active]:bg-[var(--color-primary)] data-[state=active]:text-white data-[state=active]:shadow-sm mx-0.5"
-                >
-                  Branding
-                  {tabsWithErrors.branding && (
-                    <span className="absolute -right-1 -top-1 flex h-2 w-2">
-                      <span className="relative inline-flex h-2 w-2 rounded-full bg-red-500"></span>
-                    </span>
-                  )}
-                </TabsTrigger>
-                {colorsUnlocked && (
+        <Tabs
+          value={activeTab}
+          onValueChange={setActiveTab}
+          className="w-full gap-0"
+        >
+          <Card className="shadow-sm overflow-hidden p-0 gap-0 py-0">
+            <div className="border-b bg-card px-2 sm:px-3 md:px-4 pt-3 pb-3">
+              <div className="w-full overflow-x-auto no-scrollbar">
+                <TabsList className="flex w-max min-w-full bg-muted/60 p-1 h-auto rounded-lg gap-1">
                   <TabsTrigger
-                    value="colors"
+                    value="presets"
                     className="px-3 sm:px-4 py-1 h-8 text-xs font-medium whitespace-nowrap relative rounded-md data-[state=active]:bg-[var(--color-primary)] data-[state=active]:text-white data-[state=active]:shadow-sm mx-0.5"
                   >
-                    Colors
-                    {tabsWithErrors.colors && (
+                    Presets
+                  </TabsTrigger>
+                  <TabsTrigger
+                    value="branding"
+                    className="px-3 sm:px-4 py-1 h-8 text-xs font-medium whitespace-nowrap relative rounded-md data-[state=active]:bg-[var(--color-primary)] data-[state=active]:text-white data-[state=active]:shadow-sm mx-0.5"
+                  >
+                    Branding
+                    {tabsWithErrors.branding && (
                       <span className="absolute -right-1 -top-1 flex h-2 w-2">
                         <span className="relative inline-flex h-2 w-2 rounded-full bg-red-500"></span>
                       </span>
                     )}
                   </TabsTrigger>
-                )}
-                <TabsTrigger
-                  value="typography"
-                  className="px-3 sm:px-4 py-1 h-8 text-xs font-medium whitespace-nowrap relative rounded-md data-[state=active]:bg-[var(--color-primary)] data-[state=active]:text-white data-[state=active]:shadow-sm mx-0.5"
-                >
-                  Typography
-                  {tabsWithErrors.typography && (
-                    <span className="absolute -right-1 -top-1 flex h-2 w-2">
-                      <span className="relative inline-flex h-2 w-2 rounded-full bg-red-500"></span>
-                    </span>
+                  {colorsUnlocked && (
+                    <TabsTrigger
+                      value="colors"
+                      className="px-3 sm:px-4 py-1 h-8 text-xs font-medium whitespace-nowrap relative rounded-md data-[state=active]:bg-[var(--color-primary)] data-[state=active]:text-white data-[state=active]:shadow-sm mx-0.5"
+                    >
+                      Colors
+                      {tabsWithErrors.colors && (
+                        <span className="absolute -right-1 -top-1 flex h-2 w-2">
+                          <span className="relative inline-flex h-2 w-2 rounded-full bg-red-500"></span>
+                        </span>
+                      )}
+                    </TabsTrigger>
                   )}
-                </TabsTrigger>
-                <TabsTrigger
-                  value="social-media"
-                  className="px-3 sm:px-4 py-1 h-8 text-xs font-medium whitespace-nowrap relative rounded-md data-[state=active]:bg-[var(--color-primary)] data-[state=active]:text-white data-[state=active]:shadow-sm mx-0.5"
-                >
-                  Social Media
-                  {tabsWithErrors.socialMedia && (
-                    <span className="absolute -right-1 -top-1 flex h-2 w-2">
-                      <span className="relative inline-flex h-2 w-2 rounded-full bg-red-500"></span>
-                    </span>
-                  )}
-                </TabsTrigger>
-                <TabsTrigger
-                  value="seo"
-                  className="px-3 sm:px-4 py-1 h-8 text-xs font-medium whitespace-nowrap relative rounded-md data-[state=active]:bg-[var(--color-primary)] data-[state=active]:text-white data-[state=active]:shadow-sm mx-0.5"
-                >
-                  SEO
-                  {tabsWithErrors.seo && (
-                    <span className="absolute -right-1 -top-1 flex h-2 w-2">
-                      <span className="relative inline-flex h-2 w-2 rounded-full bg-red-500"></span>
-                    </span>
-                  )}
-                </TabsTrigger>
-              </TabsList>
+                  <TabsTrigger
+                    value="typography"
+                    className="px-3 sm:px-4 py-1 h-8 text-xs font-medium whitespace-nowrap relative rounded-md data-[state=active]:bg-[var(--color-primary)] data-[state=active]:text-white data-[state=active]:shadow-sm mx-0.5"
+                  >
+                    Typography
+                    {tabsWithErrors.typography && (
+                      <span className="absolute -right-1 -top-1 flex h-2 w-2">
+                        <span className="relative inline-flex h-2 w-2 rounded-full bg-red-500"></span>
+                      </span>
+                    )}
+                  </TabsTrigger>
+                  <TabsTrigger
+                    value="social-media"
+                    className="px-3 sm:px-4 py-1 h-8 text-xs font-medium whitespace-nowrap relative rounded-md data-[state=active]:bg-[var(--color-primary)] data-[state=active]:text-white data-[state=active]:shadow-sm mx-0.5"
+                  >
+                    Social Media
+                    {tabsWithErrors.socialMedia && (
+                      <span className="absolute -right-1 -top-1 flex h-2 w-2">
+                        <span className="relative inline-flex h-2 w-2 rounded-full bg-red-500"></span>
+                      </span>
+                    )}
+                  </TabsTrigger>
+                  <TabsTrigger
+                    value="seo"
+                    className="px-3 sm:px-4 py-1 h-8 text-xs font-medium whitespace-nowrap relative rounded-md data-[state=active]:bg-[var(--color-primary)] data-[state=active]:text-white data-[state=active]:shadow-sm mx-0.5"
+                  >
+                    SEO
+                    {tabsWithErrors.seo && (
+                      <span className="absolute -right-1 -top-1 flex h-2 w-2">
+                        <span className="relative inline-flex h-2 w-2 rounded-full bg-red-500"></span>
+                      </span>
+                    )}
+                  </TabsTrigger>
+                </TabsList>
+              </div>
             </div>
-          </div>
 
-          <Card className="shadow-sm overflow-hidden p-0 gap-0 py-0">
             <div className="space-y-6 p-6 pb-6">
               <TabsContent value="presets" className="mt-0 w-full">
                 <div className="bg-white rounded-lg p-3 sm:p-6">
@@ -568,15 +575,17 @@ function SiteEssentialsFormInner() {
                   )}
                   {previewLoading ? "Loading..." : "Preview"}
                 </Button>
-                <Button
-                  variant="outline"
-                  type="button"
-                  onClick={handleDiscardChanges}
-                  disabled={readOnly || previewLoading || submitting}
-                  className="flex items-center justify-center gap-2 border-slate-300 bg-white text-slate-900 hover:bg-slate-50"
-                >
-                  <RotateCcw className="h-4 w-4" /> Discard changes
-                </Button>
+                {isDirty && !readOnly && (
+                  <Button
+                    variant="outline"
+                    type="button"
+                    onClick={handleDiscardChanges}
+                    disabled={previewLoading || submitting}
+                    className="flex items-center justify-center gap-2 border-slate-300 bg-white text-slate-900 hover:bg-slate-50"
+                  >
+                    <RotateCcw className="h-4 w-4" /> Discard changes
+                  </Button>
+                )}
                 <Button
                   type="submit"
                   disabled={

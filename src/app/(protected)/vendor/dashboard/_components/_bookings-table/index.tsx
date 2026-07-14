@@ -75,7 +75,7 @@ export default function DashboardBookingsTable({
       ) : (
         <DataTable table={table} showPagination={false} stickyHeader>
           <DataTableToolbar
-            className="bg-background p-6 border rounded-lg"
+            className="bg-background p-6 border shadow-sm rounded-lg"
             table={table}
             title={title}
           />

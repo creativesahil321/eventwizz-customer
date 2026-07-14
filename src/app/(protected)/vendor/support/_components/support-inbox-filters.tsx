@@ -12,50 +12,53 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { SUPPORT_ASSIGNEES } from "../_lib/mock-data";
 import type {
-  SupportCategory,
+  SupportAssignee,
   SupportPriority,
   SupportStatus,
+  VendorTicketDirection,
 } from "../_lib/types";
 import {
-  CATEGORY_LABELS,
   PRIORITY_LABELS,
   STATUS_LABELS,
   SUPPORT_PRIORITIES,
   SUPPORT_STATUSES,
-  VENDOR_CATEGORY_LABELS,
+  VENDOR_DIRECTION_LABELS,
 } from "../_lib/utils";
+import type { VendorSupportQuickFilter } from "@/services/vendor/support";
 import { cn } from "@/lib/utils";
 
 export type InboxSort = "newest" | "oldest";
 export type InboxDateFilter = "all" | "today" | "week" | "month";
 export type InboxStatusFilter = SupportStatus | "all";
 export type InboxAssigneeFilter = string | "all";
+export type InboxDirectionFilter = VendorTicketDirection | "all";
 
 export interface VendorInboxFilters {
   status: InboxStatusFilter;
   priority: SupportPriority | "all";
   assignee: InboxAssigneeFilter;
-  category: SupportCategory | "all";
+  direction: InboxDirectionFilter;
   date: InboxDateFilter;
   sort: InboxSort;
+  quickFilters: VendorSupportQuickFilter[];
 }
 
 export const DEFAULT_VENDOR_INBOX_FILTERS: VendorInboxFilters = {
   status: "all",
   priority: "all",
   assignee: "all",
-  category: "all",
+  direction: "all",
   date: "all",
   sort: "newest",
+  quickFilters: [],
 };
 
 const DATE_LABELS: Record<InboxDateFilter, string> = {
   all: "All time",
   today: "Today",
-  week: "This week",
-  month: "This month",
+  week: "Last 7 days",
+  month: "Last 30 days",
 };
 
 const SORT_LABELS: Record<InboxSort, string> = {
@@ -63,7 +66,32 @@ const SORT_LABELS: Record<InboxSort, string> = {
   oldest: "Oldest first",
 };
 
-function FilterPill({ label, active, children }: {
+const QUICK_FILTER_ITEMS: Array<{
+  key: VendorSupportQuickFilter;
+  label: string;
+}> = [
+  { key: "closed_only", label: "Closed only" },
+  { key: "high_priority_only", label: "High priority only" },
+  { key: "admin_tickets_only", label: "Admin tickets only" },
+  { key: "unassigned_only", label: "Unassigned only" },
+];
+
+function toggleQuickFilter(
+  filters: VendorInboxFilters,
+  key: VendorSupportQuickFilter,
+  checked: boolean
+): VendorInboxFilters {
+  const set = new Set(filters.quickFilters);
+  if (checked) set.add(key);
+  else set.delete(key);
+  return { ...filters, quickFilters: Array.from(set) };
+}
+
+function FilterPill({
+  label,
+  active,
+  children,
+}: {
   label: string;
   active?: boolean;
   children: React.ReactNode;
@@ -75,7 +103,7 @@ function FilterPill({ label, active, children }: {
           variant="outline"
           size="sm"
           className={cn(
-            "inline-flex h-9 min-h-9 shrink-0 items-center gap-1.5 rounded-full border-slate-200 bg-white px-3 text-xs font-medium leading-none text-slate-900 shadow-none hover:bg-slate-50",
+            "inline-flex h-8 min-h-8 shrink-0 items-center gap-1.5 rounded-full border-slate-200 bg-white px-2.5 text-xs font-medium leading-none text-slate-900 shadow-none hover:bg-slate-50",
             active && "border-[var(--color-primary)]/40 bg-[var(--color-primary)]/5"
           )}
         >
@@ -90,12 +118,14 @@ function FilterPill({ label, active, children }: {
 
 interface VendorSupportInboxFiltersProps {
   filters: VendorInboxFilters;
+  assignees: SupportAssignee[];
   onChange: (filters: VendorInboxFilters) => void;
   onClear: () => void;
 }
 
 export default function VendorSupportInboxFilters({
   filters,
+  assignees,
   onChange,
   onClear,
 }: VendorSupportInboxFiltersProps) {
@@ -103,8 +133,9 @@ export default function VendorSupportInboxFilters({
     filters.status !== "all",
     filters.priority !== "all",
     filters.assignee !== "all",
-    filters.category !== "all",
+    filters.direction !== "all",
     filters.date !== "all",
+    filters.quickFilters.length > 0,
   ].filter(Boolean).length;
 
   const statusLabel =
@@ -113,15 +144,15 @@ export default function VendorSupportInboxFilters({
     filters.priority === "all" ? "Priority" : PRIORITY_LABELS[filters.priority];
   const assigneeLabel = (() => {
     if (filters.assignee === "all") return "Assignee";
-    const assignee = SUPPORT_ASSIGNEES.find((a) => a.id === filters.assignee);
+    const assignee = assignees.find((a) => a.id === filters.assignee);
     if (!assignee) return "Assignee";
     if (assignee.id === "unassigned") return "Unassigned";
     return assignee.name.split(" ")[0];
   })();
-  const categoryLabel =
-    filters.category === "all"
-      ? "Category"
-      : VENDOR_CATEGORY_LABELS[filters.category];
+  const directionLabel =
+    filters.direction === "all"
+      ? "Direction"
+      : VENDOR_DIRECTION_LABELS[filters.direction];
   const dateLabel = DATE_LABELS[filters.date];
 
   return (
@@ -133,7 +164,7 @@ export default function VendorSupportInboxFilters({
               variant="outline"
               size="sm"
               className={cn(
-                "inline-flex h-9 min-h-9 shrink-0 items-center gap-1.5 rounded-full border-slate-200 bg-white px-3 text-xs font-medium leading-none text-slate-900 shadow-none hover:bg-slate-50",
+                "inline-flex h-8 min-h-8 shrink-0 items-center gap-1.5 rounded-full border-slate-200 bg-white px-2.5 text-xs font-medium leading-none text-slate-900 shadow-none hover:bg-slate-50",
                 activeCount > 0 &&
                   "border-[var(--color-primary)]/40 bg-[var(--color-primary)]/5"
               )}
@@ -147,41 +178,19 @@ export default function VendorSupportInboxFilters({
               )}
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="start" className="w-48">
+          <DropdownMenuContent align="start" className="w-52">
             <DropdownMenuLabel>Quick filters</DropdownMenuLabel>
-            <DropdownMenuCheckboxItem
-              checked={filters.status === "closed"}
-              onCheckedChange={(checked) =>
-                onChange({
-                  ...filters,
-                  status: checked ? "closed" : "all",
-                })
-              }
-            >
-              Closed only
-            </DropdownMenuCheckboxItem>
-            <DropdownMenuCheckboxItem
-              checked={filters.priority === "high"}
-              onCheckedChange={(checked) =>
-                onChange({
-                  ...filters,
-                  priority: checked ? "high" : "all",
-                })
-              }
-            >
-              High priority only
-            </DropdownMenuCheckboxItem>
-            <DropdownMenuCheckboxItem
-              checked={filters.assignee === "unassigned"}
-              onCheckedChange={(checked) =>
-                onChange({
-                  ...filters,
-                  assignee: checked ? "unassigned" : "all",
-                })
-              }
-            >
-              Unassigned only
-            </DropdownMenuCheckboxItem>
+            {QUICK_FILTER_ITEMS.map((item) => (
+              <DropdownMenuCheckboxItem
+                key={item.key}
+                checked={filters.quickFilters.includes(item.key)}
+                onCheckedChange={(checked) =>
+                  onChange(toggleQuickFilter(filters, item.key, Boolean(checked)))
+                }
+              >
+                {item.label}
+              </DropdownMenuCheckboxItem>
+            ))}
             <DropdownMenuSeparator />
             <Button
               variant="ghost"
@@ -194,8 +203,30 @@ export default function VendorSupportInboxFilters({
           </DropdownMenuContent>
         </DropdownMenu>
 
+        <FilterPill label={directionLabel} active={filters.direction !== "all"}>
+          <DropdownMenuContent align="start" className="w-48">
+            <DropdownMenuRadioGroup
+              value={filters.direction}
+              onValueChange={(value) =>
+                onChange({
+                  ...filters,
+                  direction: value as InboxDirectionFilter,
+                })
+              }
+            >
+              <DropdownMenuRadioItem value="all">All tickets</DropdownMenuRadioItem>
+              <DropdownMenuRadioItem value="received">
+                {VENDOR_DIRECTION_LABELS.received}
+              </DropdownMenuRadioItem>
+              <DropdownMenuRadioItem value="sent">
+                {VENDOR_DIRECTION_LABELS.sent}
+              </DropdownMenuRadioItem>
+            </DropdownMenuRadioGroup>
+          </DropdownMenuContent>
+        </FilterPill>
+
         <FilterPill label={statusLabel} active={filters.status !== "all"}>
-          <DropdownMenuContent align="start" className="w-44">
+          <DropdownMenuContent align="start" className="w-56">
             <DropdownMenuRadioGroup
               value={filters.status}
               onValueChange={(value) =>
@@ -235,9 +266,7 @@ export default function VendorSupportInboxFilters({
             </DropdownMenuRadioGroup>
           </DropdownMenuContent>
         </FilterPill>
-      </div>
 
-      <div className="flex min-w-0 flex-wrap gap-2">
         <FilterPill label={assigneeLabel} active={filters.assignee !== "all"}>
           <DropdownMenuContent align="start" className="w-48">
             <DropdownMenuRadioGroup
@@ -250,34 +279,11 @@ export default function VendorSupportInboxFilters({
               }
             >
               <DropdownMenuRadioItem value="all">All assignees</DropdownMenuRadioItem>
-              {SUPPORT_ASSIGNEES.map((assignee) => (
+              {assignees.map((assignee) => (
                 <DropdownMenuRadioItem key={assignee.id} value={assignee.id}>
                   {assignee.name}
                 </DropdownMenuRadioItem>
               ))}
-            </DropdownMenuRadioGroup>
-          </DropdownMenuContent>
-        </FilterPill>
-
-        <FilterPill label={categoryLabel} active={filters.category !== "all"}>
-          <DropdownMenuContent align="start" className="w-48">
-            <DropdownMenuRadioGroup
-              value={filters.category}
-              onValueChange={(value) =>
-                onChange({
-                  ...filters,
-                  category: value as SupportCategory | "all",
-                })
-              }
-            >
-              <DropdownMenuRadioItem value="all">All categories</DropdownMenuRadioItem>
-              {(Object.keys(CATEGORY_LABELS) as SupportCategory[]).map(
-                (category) => (
-                  <DropdownMenuRadioItem key={category} value={category}>
-                    {VENDOR_CATEGORY_LABELS[category]}
-                  </DropdownMenuRadioItem>
-                )
-              )}
             </DropdownMenuRadioGroup>
           </DropdownMenuContent>
         </FilterPill>
@@ -336,17 +342,4 @@ export function VendorInboxSortSelect({
       </DropdownMenuContent>
     </DropdownMenu>
   );
-}
-
-export function matchesDateFilter(
-  iso: string,
-  dateFilter: InboxDateFilter
-): boolean {
-  if (dateFilter === "all") return true;
-  const diff = Date.now() - new Date(iso).getTime();
-  const day = 86_400_000;
-  if (dateFilter === "today") return diff <= day;
-  if (dateFilter === "week") return diff <= day * 7;
-  if (dateFilter === "month") return diff <= day * 30;
-  return true;
 }

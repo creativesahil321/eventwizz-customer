@@ -23,7 +23,7 @@ export default function VenuesCommission({
   const lastUpdated = venuesList[0]?.lastUpdated;
 
   return (
-    <Card className="border-none shadow-sm bg-white h-full">
+    <Card className="border shadow-sm bg-white h-full">
       <CardContent className="p-6 flex flex-col h-full">
         <div>
           <CardTitle className="text-2xl mb-0 title-header font-medium">

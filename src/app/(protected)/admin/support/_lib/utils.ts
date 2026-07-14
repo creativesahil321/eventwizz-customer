@@ -9,11 +9,16 @@ export {
   groupMessagesByDate,
   isClosedTicketStatus,
   PRIORITY_LABELS,
-  STATUS_LABELS,
   SUPPORT_PRIORITIES,
   SUPPORT_STATUSES,
+  normalizeSupportStatus,
 } from "@/app/(protected)/customer/support/_lib/utils";
 
+import {
+  STATUS_LABELS as CUSTOMER_STATUS_LABELS,
+  normalizeSupportStatus,
+} from "@/app/(protected)/customer/support/_lib/utils";
+import type { SupportStatus } from "@/app/(protected)/customer/support/_lib/types";
 import { endOfDay, format, startOfDay } from "date-fns";
 import type { DateRange } from "react-day-picker";
 import type {
@@ -25,6 +30,34 @@ import type {
   WaitingParty,
 } from "./types";
 
+/** Admin badge/filter labels — platform team copy (not customer/vendor wording). */
+export const STATUS_LABELS: Record<SupportStatus, string> = {
+  ...CUSTOMER_STATUS_LABELS,
+  waiting_customer: "Waiting for Customer",
+  waiting_general_support: "Waiting for Vendor",
+  waiting_platform_support: "Waiting for You",
+};
+
+/** Admin inbox status filter — excludes non-admin waiting queues wording. */
+export const ADMIN_INBOX_STATUS_FILTERS: SupportStatus[] = [
+  "new",
+  "open",
+  "reopen",
+  "waiting_customer",
+  "waiting_platform_support",
+  "waiting_general_support",
+  "resolved",
+  "closed",
+];
+
+export function getStatusLabel(
+  status: string | null | undefined,
+  fallbackLabel?: string | null
+): string {
+  if (fallbackLabel?.trim()) return fallbackLabel.trim();
+  return STATUS_LABELS[normalizeSupportStatus(status)];
+}
+
 export const ADMIN_CATEGORY_LABELS = {
   general_support: "General support",
   technical_support: "Technical support",
@@ -33,7 +66,8 @@ export const ADMIN_CATEGORY_LABELS = {
 export const ADMIN_QUEUE_LABELS: Record<AdminSupportQueue, string> = {
   general_support: "General support",
   technical_support: "Technical support",
-  waiting: "Waiting",
+  customer: "Customer tickets",
+  vendor: "Vendor tickets",
 };
 
 export const ADMIN_SOURCE_LABELS: Record<SupportSource, string> = {
@@ -49,14 +83,14 @@ export const WAITING_PARTY_LABELS: Record<WaitingParty, string> = {
 export const CLOSE_TICKET_REASON_LABELS = {
   issue_resolved: "Issue resolved",
   duplicate_ticket: "Duplicate ticket",
-  customer_no_response: "Customer didn't respond",
+  customer_didnt_respond: "Customer didn't respond",
 } as const;
 
 export function getCloseTicketReasonLabel(
   reason: keyof typeof CLOSE_TICKET_REASON_LABELS,
   source: SupportSource
 ): string {
-  if (reason === "customer_no_response" && source === "vendor") {
+  if (reason === "customer_didnt_respond" && source === "vendor") {
     return "Vendor didn't respond";
   }
   return CLOSE_TICKET_REASON_LABELS[reason];
@@ -136,6 +170,7 @@ export function isWaitingConversation(
 export function getConversationQueue(
   conversation: AdminSupportConversation
 ): AdminSupportQueue {
-  if (conversation.waitingOn) return "waiting";
-  return conversation.category;
+  if (conversation.source === "vendor") return "vendor";
+  if (conversation.category === "technical_support") return "technical_support";
+  return "general_support";
 }

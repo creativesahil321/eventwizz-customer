@@ -15,6 +15,7 @@ import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import type { CloseTicketReason } from "../_lib/types";
 import { CLOSE_TICKET_REASON_LABELS } from "../_lib/utils";
+import { useCloseVendorSupportTicket } from "@/services/vendor/support";
 import { cn } from "@/lib/utils";
 
 const CLOSE_REASONS = Object.keys(
@@ -35,15 +36,25 @@ export default function CloseTicketDialog({
   onClosed,
 }: CloseTicketDialogProps) {
   const [reason, setReason] = useState<CloseTicketReason>("issue_resolved");
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const closeTicket = useCloseVendorSupportTicket();
 
-  const handleConfirm = async () => {
-    setIsSubmitting(true);
-    await new Promise((r) => setTimeout(r, 500));
-    setIsSubmitting(false);
-    onOpenChange(false);
-    onClosed?.();
-    toast.success(`${ticketRef} closed — ${CLOSE_TICKET_REASON_LABELS[reason]}`);
+  const handleConfirm = () => {
+    closeTicket.mutate(
+      {
+        ticketKey: ticketRef,
+        closed_reason: reason,
+      },
+      {
+        onSuccess: (response) => {
+          onOpenChange(false);
+          onClosed?.();
+          toast.success(
+            response.message?.trim() ||
+              `${ticketRef} closed — ${CLOSE_TICKET_REASON_LABELS[reason]}`
+          );
+        },
+      }
+    );
   };
 
   return (
@@ -93,17 +104,18 @@ export default function CloseTicketDialog({
             variant="outline"
             className="w-full border-slate-300 bg-white text-slate-900 hover:bg-slate-50 hover:text-slate-900 sm:w-auto"
             onClick={() => onOpenChange(false)}
+            disabled={closeTicket.isPending}
           >
             Cancel
           </Button>
           <Button
             type="button"
             variant="event-primary"
-            disabled={isSubmitting}
+            disabled={closeTicket.isPending}
             onClick={handleConfirm}
             className="w-full sm:w-auto"
           >
-            {isSubmitting ? "Closing..." : "Close ticket"}
+            {closeTicket.isPending ? "Closing..." : "Close ticket"}
           </Button>
         </DialogFooter>
       </DialogContent>

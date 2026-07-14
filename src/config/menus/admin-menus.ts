@@ -122,7 +122,6 @@ export const adminMenus: MenuItemProps[] = [
     href: createAdminUrl("/admin/support/dashboard"),
     url: createAdminUrl("/admin/support/dashboard"),
     type: "item",
-    permissions: "read-ticket",
     menu: [],
   },
   {

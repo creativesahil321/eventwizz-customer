@@ -16,7 +16,11 @@ export type SupportSource = "customer" | "vendor";
 
 export type WaitingParty = "customer" | "vendor";
 
-export type AdminSupportQueue = "general_support" | "technical_support" | "waiting";
+export type AdminSupportQueue =
+  | "general_support"
+  | "technical_support"
+  | "customer"
+  | "vendor";
 
 export interface AdminSupportMessage {
   id: string;
@@ -54,6 +58,8 @@ export interface AdminSupportConversation {
   category: SupportCategory;
   priority: SupportPriority;
   status: SupportStatus;
+  /** Optional display label from API (`status_label`) */
+  statusLabel?: string;
   source: SupportSource;
   venue: AdminSupportVenue;
   bookingRef?: string;
@@ -74,7 +80,7 @@ export interface AdminSupportConversation {
 export type CloseTicketReason =
   | "issue_resolved"
   | "duplicate_ticket"
-  | "customer_no_response";
+  | "customer_didnt_respond";
 
 export type DashboardDateRange = "today" | "7d" | "30d";
 
@@ -89,14 +95,13 @@ export interface DashboardDateFilter {
 export interface AdminSupportStats {
   totalOpen: number;
   totalResolved: number;
-  waitingCustomer: number;
-  waitingVendor: number;
+  customerTickets: number;
+  vendorTickets: number;
 }
 
 export interface AdminSupportQueueStats {
   queue: AdminSupportQueue;
   open: number;
-  waiting: number;
 }
 
 export interface AdminSupportActivity {

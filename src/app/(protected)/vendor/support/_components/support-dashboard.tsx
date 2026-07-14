@@ -9,15 +9,11 @@ import {
   CheckCircle2,
   Clock,
   Inbox,
+  Loader2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
 import { PriorityBadge, StatusBadge } from "./support-badges";
-import {
-  getNeedsAttentionConversations,
-  getRecentActivities,
-  getVendorStats,
-} from "../_lib/mock-data";
 import type { DashboardDateRange } from "../_lib/types";
 import {
   DASHBOARD_DATE_LABELS,
@@ -25,6 +21,12 @@ import {
   formatRelativeTime,
   toDashboardDateFilter,
 } from "../_lib/utils";
+import {
+  mapVendorSupportDashboardStats,
+  mapVendorSupportNeedsAttention,
+  mapVendorSupportRecentActivity,
+  useVendorSupportDashboard,
+} from "@/services/vendor/support";
 import { cn } from "@/lib/utils";
 
 const DATE_RANGES: DashboardDateRange[] = ["today", "7d", "30d"];
@@ -66,7 +68,7 @@ function StatCard({
 }
 
 export default function VendorSupportDashboard() {
-  const [presetRange, setPresetRange] = useState<DashboardDateRange>("7d");
+  const [presetRange, setPresetRange] = useState<DashboardDateRange>("today");
   const [customRange, setCustomRange] = useState<DateRange | undefined>();
 
   const dateFilter = useMemo(
@@ -79,11 +81,23 @@ export default function VendorSupportDashboard() {
   );
   const hasCustomRange = Boolean(customRange?.from && customRange?.to);
 
-  const stats = useMemo(() => getVendorStats(dateFilter), [dateFilter]);
-  const needsAttention = useMemo(() => getNeedsAttentionConversations(), []);
+  const { data, isLoading, isFetching, isError, refetch } =
+    useVendorSupportDashboard(dateFilter);
+
+  const stats = useMemo(
+    () =>
+      data?.data
+        ? mapVendorSupportDashboardStats(data.data)
+        : { totalOpen: 0, totalResolved: 0, waiting: 0 },
+    [data?.data]
+  );
+  const needsAttention = useMemo(
+    () => mapVendorSupportNeedsAttention(data?.data?.needs_attention ?? []),
+    [data?.data?.needs_attention]
+  );
   const activities = useMemo(
-    () => getRecentActivities(dateFilter),
-    [dateFilter]
+    () => mapVendorSupportRecentActivity(data?.data?.recent_activity ?? []),
+    [data?.data?.recent_activity]
   );
 
   const handlePresetChange = (range: DashboardDateRange) => {
@@ -103,8 +117,9 @@ export default function VendorSupportDashboard() {
             Overview
           </p>
           <p className="mt-1 text-sm text-muted-foreground">
-            {stats.totalOpen} conversations are open. {needsAttention.length}{" "}
-            need attention.
+            {isLoading
+              ? "Loading support overview…"
+              : `${stats.totalOpen} conversations are open. ${needsAttention.length} need attention.`}
           </p>
         </div>
         <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end">
@@ -142,119 +157,152 @@ export default function VendorSupportDashboard() {
         </div>
       </div>
 
-      <div className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-3">
-        <StatCard
-          label="Total open"
-          value={stats.totalOpen}
-          hint="Active conversations"
-          icon={Inbox}
-          iconClassName="bg-[var(--color-primary)]/10 text-[var(--color-primary)]"
-        />
-        <StatCard
-          label="Total resolved"
-          value={stats.totalResolved}
-          hint={`In ${periodLabel.toLowerCase()}`}
-          icon={CheckCircle2}
-          iconClassName="bg-emerald-50 text-emerald-600"
-        />
-        <StatCard
-          label="Waiting"
-          value={stats.waiting}
-          hint="Customer"
-          icon={Clock}
-          iconClassName="bg-amber-50 text-amber-600"
-        />
-      </div>
-
-      <div className="grid min-w-0 gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,320px)]">
-        <section className="min-w-0 overflow-hidden rounded-xl border border-[var(--color-border)] bg-white shadow-sm">
-          <div className="flex min-w-0 items-center justify-between gap-2 border-b border-[var(--color-border)] px-4 py-4 sm:gap-3 sm:px-5">
-            <div className="min-w-0">
-              <h3 className="font-semibold text-foreground">Needs attention</h3>
-              <p className="text-xs text-muted-foreground">
-                Sorted by priority — SLA at risk
-              </p>
-            </div>
-            <Button variant="ghost" size="sm" asChild className="shrink-0 px-2 sm:px-3">
-              <Link href="/vendor/support/inbox">
-                Full inbox
-                <ArrowRight className="size-4" />
-              </Link>
-            </Button>
+      {isError ? (
+        <div className="flex flex-col items-center justify-center gap-3 rounded-xl border border-[var(--color-border)] bg-white px-4 py-10 text-center shadow-sm">
+          <p className="text-sm text-muted-foreground">
+            Couldn’t load support dashboard.
+          </p>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="rounded-full"
+            onClick={() => refetch()}
+          >
+            Try again
+          </Button>
+        </div>
+      ) : (
+        <>
+          <div className="relative grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-3">
+            {isFetching && !isLoading ? (
+              <Loader2 className="absolute right-0 top-0 size-3.5 animate-spin text-muted-foreground" />
+            ) : null}
+            <StatCard
+              label="Total open"
+              value={stats.totalOpen}
+              hint="Active conversations"
+              icon={Inbox}
+              iconClassName="bg-[var(--color-primary)]/10 text-[var(--color-primary)]"
+            />
+            <StatCard
+              label="Total resolved"
+              value={stats.totalResolved}
+              hint={`In ${periodLabel.toLowerCase()}`}
+              icon={CheckCircle2}
+              iconClassName="bg-emerald-50 text-emerald-600"
+            />
+            <StatCard
+              label="Waiting"
+              value={stats.waiting}
+              hint="Customer"
+              icon={Clock}
+              iconClassName="bg-amber-50 text-amber-600"
+            />
           </div>
-          <ul className="divide-y divide-slate-100">
-            {needsAttention.length === 0 ? (
-              <li className="px-4 py-8 text-center text-sm text-muted-foreground sm:px-5">
-                No conversations need attention right now.
-              </li>
-            ) : (
-              needsAttention.map((conversation) => (
-                <li key={conversation.id}>
-                  <Link
-                    href={`/vendor/support/inbox/${conversation.id}`}
-                    className="flex gap-3 px-4 py-4 transition-colors hover:bg-slate-50 sm:px-5"
-                  >
-                    <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-slate-100 text-xs font-semibold text-slate-600">
-                      {conversation.customer.name.charAt(0)}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-start justify-between gap-2">
-                        <p className="line-clamp-1 text-sm font-semibold text-foreground">
-                          {conversation.subject}
-                        </p>
-                        <span className="shrink-0 text-[11px] text-muted-foreground">
-                          {formatRelativeTime(conversation.lastMessageAt)}
-                        </span>
-                      </div>
-                      <p className="mt-0.5 text-xs text-muted-foreground">
-                        {conversation.customer.name}
-                        {conversation.bookingTitle
-                          ? ` · ${conversation.bookingTitle}`
-                          : ""}
-                      </p>
-                      <div className="mt-2 flex flex-wrap items-center gap-1.5">
-                        <StatusBadge status={conversation.status} />
-                        <PriorityBadge priority={conversation.priority} />
-                        <span className="text-[11px] text-muted-foreground">
-                          {conversation.ref}
-                        </span>
-                      </div>
-                    </div>
-                    {conversation.needsAttention && (
-                      <AlertTriangle className="mt-1 size-4 shrink-0 text-red-500" />
-                    )}
-                  </Link>
-                </li>
-              ))
-            )}
-          </ul>
-        </section>
 
-        <section className="min-w-0 overflow-hidden rounded-xl border border-[var(--color-border)] bg-white shadow-sm">
-          <div className="border-b border-[var(--color-border)] px-4 py-4 sm:px-5">
-            <h3 className="font-semibold text-foreground">Recent activity</h3>
-          </div>
-          <ul className="divide-y divide-slate-100">
-            {activities.length === 0 ? (
-              <li className="px-4 py-8 text-center text-sm text-muted-foreground sm:px-5">
-                No recent activity in this period.
-              </li>
-            ) : (
-              activities.map((activity) => (
-                <li
-                  key={activity.id}
-                  className="px-4 py-3.5 text-sm sm:px-5"
+          <div className="grid min-w-0 gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,320px)]">
+            <section className="min-w-0 overflow-hidden rounded-xl border border-[var(--color-border)] bg-white shadow-sm">
+              <div className="flex min-w-0 items-center justify-between gap-2 border-b border-[var(--color-border)] px-4 py-4 sm:gap-3 sm:px-5">
+                <div className="min-w-0">
+                  <h3 className="font-semibold text-foreground">
+                    Needs attention
+                  </h3>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  asChild
+                  className="shrink-0 px-2 sm:px-3"
                 >
-                  <p className="text-foreground">{activity.description}</p>
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    {formatRelativeTime(activity.timestamp)}
-                  </p>
-                </li>
-              ))
-            )}
-          </ul>
-        </section>
-      </div>
+                  <Link href="/vendor/support/inbox">
+                    Full inbox
+                    <ArrowRight className="size-4" />
+                  </Link>
+                </Button>
+              </div>
+              <ul className="divide-y divide-slate-100">
+                {isLoading ? (
+                  <li className="flex items-center justify-center gap-2 px-4 py-8 text-sm text-muted-foreground sm:px-5">
+                    <Loader2 className="size-4 animate-spin" />
+                    Loading…
+                  </li>
+                ) : needsAttention.length === 0 ? (
+                  <li className="px-4 py-8 text-center text-sm text-muted-foreground sm:px-5">
+                    No conversations need attention right now.
+                  </li>
+                ) : (
+                  needsAttention.map((conversation) => (
+                    <li key={conversation.id}>
+                      <Link
+                        href={`/vendor/support/inbox/${conversation.id}`}
+                        className="flex gap-3 px-4 py-4 transition-colors hover:bg-slate-50 sm:px-5"
+                      >
+                        <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-slate-100 text-xs font-semibold text-slate-600">
+                          {conversation.customerName.charAt(0)}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-start justify-between gap-2">
+                            <p className="line-clamp-1 text-sm font-semibold text-foreground">
+                              {conversation.subject}
+                            </p>
+                            <span className="shrink-0 text-[11px] text-muted-foreground">
+                              {formatRelativeTime(conversation.date)}
+                            </span>
+                          </div>
+                          <p className="mt-0.5 text-xs text-muted-foreground">
+                            {conversation.customerName}
+                          </p>
+                          <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                            <StatusBadge status={conversation.status} />
+                            <PriorityBadge priority={conversation.priority} />
+                            <span className="text-[11px] text-muted-foreground">
+                              {conversation.ref}
+                            </span>
+                          </div>
+                        </div>
+                        <AlertTriangle className="mt-1 size-4 shrink-0 text-red-500" />
+                      </Link>
+                    </li>
+                  ))
+                )}
+              </ul>
+            </section>
+
+            <section className="min-w-0 overflow-hidden rounded-xl border border-[var(--color-border)] bg-white shadow-sm">
+              <div className="border-b border-[var(--color-border)] px-4 py-4 sm:px-5">
+                <h3 className="font-semibold text-foreground">
+                  Recent activity
+                </h3>
+              </div>
+              <ul className="divide-y divide-slate-100">
+                {isLoading ? (
+                  <li className="flex items-center justify-center gap-2 px-4 py-8 text-sm text-muted-foreground sm:px-5">
+                    <Loader2 className="size-4 animate-spin" />
+                    Loading…
+                  </li>
+                ) : activities.length === 0 ? (
+                  <li className="px-4 py-8 text-center text-sm text-muted-foreground sm:px-5">
+                    No recent activity in this period.
+                  </li>
+                ) : (
+                  activities.map((activity) => (
+                    <li
+                      key={activity.id}
+                      className="px-4 py-3.5 text-sm sm:px-5"
+                    >
+                      <p className="text-foreground">{activity.description}</p>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        {formatRelativeTime(activity.timestamp)}
+                      </p>
+                    </li>
+                  ))
+                )}
+              </ul>
+            </section>
+          </div>
+        </>
+      )}
     </div>
   );
 }

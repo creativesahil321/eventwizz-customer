@@ -39,7 +39,7 @@ export default function SalesHistory({
   const periodLabel = period === "monthly" ? "Monthly" : "Yearly";
 
   return (
-    <Card className="shadow-none border-none bg-white">
+    <Card className="border shadow-sm bg-white">
       <CardHeader className="relative">
         <CardTitle className="text-2xl mb-0 title-header font-bold">
           Sales History ({periodLabel})

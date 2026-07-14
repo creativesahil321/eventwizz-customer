@@ -1,12 +1,22 @@
 export type SupportPriority = "low" | "medium" | "high";
 
-export type SupportStatus = "new" | "reopen" | "resolved" | "closed";
+export type SupportStatus =
+  | "new"
+  | "open"
+  | "reopen"
+  | "waiting_customer"
+  | "waiting_general_support"
+  | "waiting_platform_support"
+  | "resolved"
+  | "closed";
 
 export type SupportCategory = "general_support" | "technical_support";
 
 export interface SupportAttachment {
   name: string;
   size: string;
+  url?: string;
+  mimeType?: string;
 }
 
 export interface SupportMessage {
@@ -25,51 +35,16 @@ export interface SupportConversation {
   category: SupportCategory;
   priority: SupportPriority;
   status: SupportStatus;
+  /** Optional display label from API (`status_label`) */
+  statusLabel?: string;
   bookingRef?: string;
   bookingTitle?: string;
   openedAt: string;
   closedAt?: string;
   lastMessage: string;
   lastMessageAt: string;
+  /** Display name of the last message sender (from list API) */
+  lastSenderName?: string;
   unreadCount: number;
   messages: SupportMessage[];
-}
-
-export interface SupportStats {
-  openConversations: number;
-  openChangeSinceLastWeek: number;
-  resolvedLast30Days: number;
-  closedAllTime: number;
-  unreadReplies: number;
-}
-
-export interface SupportActivity {
-  id: string;
-  description: string;
-  timestamp: string;
-}
-
-export interface SupportBookingLocation {
-  id: string;
-  name: string;
-}
-
-export interface SupportBookingOption {
-  ref: string;
-  label: string;
-  locationId: string;
-}
-
-export interface SupportBookingDetail {
-  title: string;
-  date: string;
-  price: string;
-}
-
-export interface SupportCustomerProfile {
-  name: string;
-  email: string;
-  phone: string;
-  timezone: string;
-  customerSince: string;
 }

@@ -72,19 +72,74 @@ export const PRIORITY_LABELS: Record<SupportPriority, string> = {
 
 export const SUPPORT_STATUSES: SupportStatus[] = [
   "new",
+  "open",
   "reopen",
+  "waiting_customer",
+  "waiting_general_support",
+  "waiting_platform_support",
+  "resolved",
+  "closed",
+];
+
+/** Customer inbox status filter — excludes internal waiting queues. */
+export const CUSTOMER_INBOX_STATUS_FILTERS: SupportStatus[] = [
+  "new",
+  "open",
+  "reopen",
+  "waiting_customer",
   "resolved",
   "closed",
 ];
 
 export const STATUS_LABELS: Record<SupportStatus, string> = {
   new: "New",
+  open: "Open",
   reopen: "Reopen",
+  waiting_customer: "Waiting for You",
+  waiting_general_support: "Waiting for General Support",
+  waiting_platform_support: "Waiting for Technical Support",
   resolved: "Resolved",
   closed: "Closed",
 };
 
 export const CLOSED_TICKET_STATUSES: SupportStatus[] = ["closed", "resolved"];
+
+export function normalizeSupportStatus(
+  status: string | null | undefined
+): SupportStatus {
+  const normalized = (status ?? "").trim().toLowerCase().replace(/\s+/g, "_");
+  if (normalized === "reopened") return "reopen";
+  // Legacy / alias keys → current API contract
+  if (
+    normalized === "waiting_event_admin" ||
+    normalized === "waiting_you"
+  ) {
+    return "waiting_general_support";
+  }
+  if (normalized === "waiting_vendor") {
+    return "waiting_general_support";
+  }
+  if (
+    normalized === "waiting_platform" ||
+    normalized === "waiting_from_you" ||
+    normalized === "waiting_technical_support"
+  ) {
+    return "waiting_platform_support";
+  }
+  if ((SUPPORT_STATUSES as string[]).includes(normalized)) {
+    return normalized as SupportStatus;
+  }
+  return "new";
+}
+
+export function getStatusLabel(
+  status: string | null | undefined,
+  fallbackLabel?: string | null
+): string {
+  // Badge text should come from API `status_label`. This is only a last-resort for status keys.
+  if (fallbackLabel?.trim()) return fallbackLabel.trim();
+  return STATUS_LABELS[normalizeSupportStatus(status)];
+}
 
 export function isClosedTicketStatus(status: SupportStatus): boolean {
   return CLOSED_TICKET_STATUSES.includes(status);
@@ -96,15 +151,19 @@ export function getPriorityClass(priority: SupportPriority): string {
     medium: "bg-blue-50 text-blue-700 border-blue-200",
     high: "bg-red-50 text-red-700 border-red-200",
   };
-  return map[priority];
+  return map[priority] ?? map.medium;
 }
 
 export function getStatusClass(status: SupportStatus): string {
   const map: Record<SupportStatus, string> = {
     new: "bg-violet-50 text-violet-700 border-violet-200",
+    open: "bg-sky-50 text-sky-700 border-sky-200",
     reopen: "bg-blue-50 text-blue-700 border-blue-200",
+    waiting_customer: "bg-orange-50 text-orange-700 border-orange-200",
+    waiting_general_support: "bg-indigo-50 text-indigo-700 border-indigo-200",
+    waiting_platform_support: "bg-amber-50 text-amber-700 border-amber-200",
     resolved: "bg-emerald-50 text-emerald-700 border-emerald-200",
     closed: "bg-slate-100 text-slate-600 border-slate-200",
   };
-  return map[status];
+  return map[status] ?? map.new;
 }
