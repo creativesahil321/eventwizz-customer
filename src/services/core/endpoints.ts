@@ -271,6 +271,7 @@ export const API_ENDPOINTS = {
     BOOK_EVENT: {
       STORE_CART_DATA: "/customer/event/store", // This is for to store the cart data and event booking data in database
       GET_CART_DATA: "/customer/event", // This is for to get the cart data from database and show in the cart page
+      DELETE_ALL_CART_DATA: "/customer/event/delete",
       DELETE_CART_DATA: "/customer/event/delete/{date}", // Non-room events: delete one date from cart
       DELETE_CART_DATA_ROOM:
         "/customer/event/delete/{room_id}/{date}", // Room events: delete one date for a specific room
@@ -287,6 +288,7 @@ export const API_ENDPOINTS = {
     SUPPORT_TICKETS: {
       LIST: "/customer/support-tickets",
       STORE: "/customer/support-tickets/store",
+      LOCATIONS: "/customer/support-tickets/locations",
       MESSAGES: "/customer/support-tickets/{ticketKey}/messages",
       STORE_MESSAGE: "/customer/support-tickets/{ticketKey}/messages/store",
       MARK_MESSAGES_READ:
@@ -345,6 +347,8 @@ export const API_ENDPOINTS = {
       DASHBOARD: "/admin/support-tickets/dashboard",
       LIST: "/admin/support-tickets",
       MESSAGES: "/admin/support-tickets/{ticketKey}/messages",
+      MARK_MESSAGES_READ:
+        "/admin/support-tickets/{ticketKey}/messages/read",
       PIN: "/admin/support-tickets/pin/{ticketKey}",
       ASSIGN: "/admin/support-tickets/assign/{ticketKey}",
       CLOSE: "/admin/support-tickets/close/{ticketKey}",

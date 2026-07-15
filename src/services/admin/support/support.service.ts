@@ -4,6 +4,7 @@
  * GET  /api/v1/admin/support-tickets/dashboard
  * GET  /api/v1/admin/support-tickets
  * GET  /api/v1/admin/support-tickets/{ticketKey}/messages
+ * POST /api/v1/admin/support-tickets/{ticketKey}/messages/read
  * POST /api/v1/admin/support-tickets/pin/{ticketKey}
  * POST /api/v1/admin/support-tickets/assign/{ticketKey}
  * POST /api/v1/admin/support-tickets/close/{ticketKey}
@@ -29,6 +30,7 @@ import type {
   AssignAdminSupportTicketResponse,
   CloseAdminSupportTicketPayload,
   CloseAdminSupportTicketResponse,
+  MarkAdminSupportMessagesReadResponse,
   PinAdminSupportTicketPayload,
   PinAdminSupportTicketResponse,
   StoreAdminSupportMessagePayload,
@@ -193,6 +195,26 @@ export const adminSupportService = {
       params: Object.keys(query).length ? query : { page: 1, per_page: 30 },
       returnFullResponse: true,
     });
+  },
+
+  markMessagesRead: async (
+    ticketKey: string
+  ): Promise<MarkAdminSupportMessagesReadResponse> => {
+    const endpoint =
+      API_ENDPOINTS.ADMIN.SUPPORT_TICKETS.MARK_MESSAGES_READ.replace(
+        "{ticketKey}",
+        encodeURIComponent(ticketKey)
+      );
+
+    return api.post<MarkAdminSupportMessagesReadResponse>(
+      endpoint,
+      undefined,
+      {
+        returnFullResponse: true,
+        suppressSuccessToast: true,
+        suppressErrorToast: true,
+      }
+    );
   },
 
   pinTicket: async (

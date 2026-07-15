@@ -17,11 +17,12 @@ import { getModKeyLabel } from "@/app/(protected)/_shared/support/mod-key";
 import {
   MAX_SUPPORT_ATTACHMENTS,
   SUPPORT_ATTACHMENT_ACCEPT,
+  SUPPORT_IMAGE_ATTACHMENT_ACCEPT,
   collectSupportAttachments,
   formatSupportFileSize,
 } from "@/app/(protected)/_shared/support/message-attachments";
+import SupportMessageAvatar from "@/app/(protected)/_shared/support/support-message-avatar";
 import SupportMessageScroller from "@/app/(protected)/_shared/support/support-message-scroller";
-import { addCacheBusting } from "@/lib/image-utils";
 import { useSession } from "next-auth/react";
 import { useAuthStore } from "@/store/auth.store";
 import type { SupportAttachment, SupportMessage } from "../_lib/types";
@@ -30,50 +31,6 @@ import {
   groupMessagesByDate,
 } from "../_lib/utils";
 import { useStoreCustomerSupportMessage } from "@/services/customer/support";
-
-
-function isValidUrl(url: string | null | undefined): boolean {
-  if (!url) return false;
-  try {
-    new URL(url);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-function MessageAvatar({
-  name,
-  image,
-  variant,
-}: {
-  name: string;
-  image?: string | null;
-  variant: "customer" | "agent";
-}) {
-  if (isValidUrl(image)) {
-    return (
-      <img
-        src={addCacheBusting(image as string)}
-        alt={name}
-        className="size-7 shrink-0 rounded-full object-cover ring-1 ring-white shadow-sm"
-      />
-    );
-  }
-
-  return (
-    <div
-      className={cn(
-        "flex size-7 shrink-0 items-center justify-center rounded-full text-[10px] font-semibold shadow-sm ring-1 ring-white",
-        variant === "customer"
-          ? "bg-[var(--color-primary)] text-white"
-          : "bg-slate-200 text-slate-700"
-      )}
-    >
-      {name.charAt(0).toUpperCase()}
-    </div>
-  );
-}
 
 function AttachmentCards({
   attachments,
@@ -170,10 +127,10 @@ function CustomerMessage({
   return (
     <div className="flex flex-col items-end gap-1">
       <div className="flex max-w-full flex-row-reverse items-center gap-1.5">
-        <MessageAvatar
+        <SupportMessageAvatar
           name={displayName}
           image={customerImage}
-          variant="customer"
+          variant="self"
         />
         <div className="min-w-0 text-right">
           <p className="text-xs font-semibold text-foreground">{displayName}</p>
@@ -200,7 +157,7 @@ function AgentMessage({ message }: { message: SupportMessage }) {
   return (
     <div className="flex flex-col items-start gap-1">
       <div className="flex max-w-full items-center gap-1.5">
-        <MessageAvatar name={message.senderName} variant="agent" />
+        <SupportMessageAvatar name={message.senderName} variant="other" />
         <div className="min-w-0">
           <p className="text-xs font-semibold text-foreground">
             {message.senderName}
@@ -241,6 +198,10 @@ interface SupportConversationThreadProps {
   messages: SupportMessage[];
   isComposerDisabled?: boolean;
   onReopen?: () => void;
+  closedReopenMessage?: string;
+  showReopenHint?: boolean;
+  reopenHintMessage?: string;
+  onMessageSent?: () => void;
   hasMore?: boolean;
   isLoadingMore?: boolean;
   onLoadMore?: () => void;
@@ -251,6 +212,10 @@ export default function SupportConversationThread({
   messages,
   isComposerDisabled = false,
   onReopen,
+  closedReopenMessage = "This ticket is closed. Reopen it to continue the conversation.",
+  showReopenHint = false,
+  reopenHintMessage = "Send a message to reopen this ticket.",
+  onMessageSent,
   hasMore = false,
   isLoadingMore = false,
   onLoadMore,
@@ -259,6 +224,7 @@ export default function SupportConversationThread({
   const [attachments, setAttachments] = useState<File[]>([]);
   const [stickToBottomKey, setStickToBottomKey] = useState(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const imageInputRef = useRef<HTMLInputElement>(null);
   const storeMessage = useStoreCustomerSupportMessage();
   const { data: session } = useSession();
   const user = useAuthStore((state) => state.user);
@@ -266,17 +232,20 @@ export default function SupportConversationThread({
   const groupedMessages = groupMessagesByDate(messages);
   const isSending = storeMessage.isPending;
 
-  const handleFilesSelected = (fileList: FileList | null) => {
+  const handleFilesSelected = (
+    fileList: FileList | null,
+    imagesOnly = false
+  ) => {
     const next = collectSupportAttachments(fileList, {
+      imagesOnly,
       currentCount: attachments.length,
     });
     if (next.length) {
       setAttachments((prev) => [...prev, ...next]);
     }
 
-    if (fileInputRef.current) {
-      fileInputRef.current.value = "";
-    }
+    if (fileInputRef.current) fileInputRef.current.value = "";
+    if (imageInputRef.current) imageInputRef.current.value = "";
   };
 
   const removeAttachment = (index: number) => {
@@ -296,6 +265,7 @@ export default function SupportConversationThread({
       setReply("");
       setAttachments([]);
       setStickToBottomKey((key) => key + 1);
+      onMessageSent?.();
     } catch {
       // API client already surfaces validation / network toasts
     }
@@ -303,6 +273,7 @@ export default function SupportConversationThread({
     attachments,
     isComposerDisabled,
     isSending,
+    onMessageSent,
     reply,
     storeMessage,
     ticketKey,
@@ -362,16 +333,14 @@ export default function SupportConversationThread({
         ))}
       </SupportMessageScroller>
 
-      <div className="shrink-0 border-t border-slate-200 bg-white p-4 sm:p-5">
+      <div className="shrink-0 border-t border-slate-200 bg-white p-2 sm:p-2.5">
         {isComposerDisabled ? (
           <div className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
             <div className="flex items-center gap-3 text-sm text-muted-foreground">
               <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-slate-200 text-slate-600">
                 <Lock className="size-4" />
               </div>
-              <p>
-                This ticket is closed. Reopen it to continue the conversation.
-              </p>
+              <p>{closedReopenMessage}</p>
             </div>
             {onReopen ? (
               <Button
@@ -387,14 +356,20 @@ export default function SupportConversationThread({
             ) : null}
           </div>
         ) : (
-          <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+          <div className="space-y-2">
+            {showReopenHint ? (
+              <p className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900 sm:text-sm">
+                {reopenHintMessage}
+              </p>
+            ) : null}
+            <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
             <Textarea
               placeholder="Type your reply…"
               value={reply}
               onChange={(event) => setReply(event.target.value)}
               onKeyDown={handleKeyDown}
               disabled={isSending}
-              className="min-h-[96px] max-h-[160px] resize-none rounded-none border-0 bg-white px-4 py-4 text-sm shadow-none focus-visible:ring-0"
+              className="min-h-[40px] max-h-[120px] resize-none rounded-none border-0 bg-white px-3.5 py-2.5 text-sm shadow-none focus-visible:ring-0 sm:min-h-[48px]"
             />
 
             {attachments.length > 0 ? (
@@ -428,7 +403,7 @@ export default function SupportConversationThread({
               </ul>
             ) : null}
 
-            <div className="flex flex-col gap-3 border-t border-slate-100 px-3 py-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex flex-col gap-2 border-t border-slate-100 px-2.5 py-1.5 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex items-center gap-0.5">
                 <input
                   ref={fileInputRef}
@@ -438,11 +413,19 @@ export default function SupportConversationThread({
                   className="hidden"
                   onChange={(e) => handleFilesSelected(e.target.files)}
                 />
+                <input
+                  ref={imageInputRef}
+                  type="file"
+                  accept={SUPPORT_IMAGE_ATTACHMENT_ACCEPT}
+                  multiple
+                  className="hidden"
+                  onChange={(e) => handleFilesSelected(e.target.files, true)}
+                />
                 <Button
                   type="button"
                   variant="ghost"
                   size="icon"
-                  className="size-9 rounded-full text-muted-foreground hover:bg-slate-100"
+                  className="size-8 rounded-full text-muted-foreground hover:bg-slate-100"
                   aria-label="Attach file"
                   disabled={isSending || !canAddAttachments}
                   onClick={() => fileInputRef.current?.click()}
@@ -453,10 +436,10 @@ export default function SupportConversationThread({
                   type="button"
                   variant="ghost"
                   size="icon"
-                  className="size-9 rounded-full text-muted-foreground hover:bg-slate-100"
+                  className="size-8 rounded-full text-muted-foreground hover:bg-slate-100"
                   aria-label="Attach image"
                   disabled={isSending || !canAddAttachments}
-                  onClick={() => fileInputRef.current?.click()}
+                  onClick={() => imageInputRef.current?.click()}
                 >
                   <ImageIcon className="size-4" />
                 </Button>
@@ -469,14 +452,16 @@ export default function SupportConversationThread({
                 <Button
                   type="button"
                   variant="event-primary"
+                  size="sm"
                   disabled={!canSend}
                   onClick={() => void handleSend()}
-                  className="rounded-full px-5"
+                  className="h-8 rounded-full px-5"
                 >
                   <Send className="size-4" />
                   {isSending ? "Sending..." : "Send reply"}
                 </Button>
               </div>
+            </div>
             </div>
           </div>
         )}

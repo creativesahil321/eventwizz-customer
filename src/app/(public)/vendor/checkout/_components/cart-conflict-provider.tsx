@@ -12,6 +12,7 @@ import {
   useCartConflict,
   UseCartConflictReturn,
   EventInfo,
+  CartReplaceAction,
 } from "../_lib/hooks/useCartConflict";
 import CartConflictModal from "./cart-conflict-modal";
 
@@ -53,7 +54,7 @@ export function useCartConflictContext(): UseCartConflictReturn {
 
   if (!context) {
     throw new Error(
-      "useCartConflictContext must be used within a CartConflictProvider"
+      "useCartConflictContext must be used within a CartConflictProvider",
     );
   }
 
@@ -68,14 +69,21 @@ export function useCartConflictCheck() {
   const { checkForConflict } = useCartConflictContext();
 
   /**
-   * Check for conflicts and show modal if needed
-   * Returns true if safe to proceed, false if conflict detected
+   * Check for conflicts and show modal if needed.
+   * Pass `onConfirmReplace` (typically the blocked store/add) so Replace
+   * runs store-only — backend removes other events; no delete first.
+   * Returns true if safe to proceed, false if conflict detected.
    */
   const checkAndHandleConflict = (
     newEventSlug: string,
-    newEventInfo: EventInfo
+    newEventInfo: EventInfo,
+    onConfirmReplace?: CartReplaceAction,
   ): boolean => {
-    const hasConflict = checkForConflict(newEventSlug, newEventInfo);
+    const hasConflict = checkForConflict(
+      newEventSlug,
+      newEventInfo,
+      onConfirmReplace,
+    );
 
     if (hasConflict) {
       // Conflict detected - modal will be shown automatically by the hook

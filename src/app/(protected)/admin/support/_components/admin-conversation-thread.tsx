@@ -21,6 +21,7 @@ import {
   formatSupportFileSize,
 } from "@/app/(protected)/_shared/support/message-attachments";
 import SupportAttachmentCards from "@/app/(protected)/_shared/support/support-attachment-cards";
+import SupportMessageAvatar from "@/app/(protected)/_shared/support/support-message-avatar";
 import SupportMessageScroller from "@/app/(protected)/_shared/support/support-message-scroller";
 import { useStoreAdminSupportMessage } from "@/services/admin/support";
 import type { AdminSupportMessage } from "../_lib/types";
@@ -30,27 +31,6 @@ import {
 } from "../_lib/utils";
 
 type ComposerMode = "reply" | "internal_note";
-
-function MessageAvatar({
-  name,
-  variant,
-}: {
-  name: string;
-  variant: "external" | "agent" | "internal";
-}) {
-  return (
-    <div
-      className={cn(
-        "flex size-7 shrink-0 items-center justify-center rounded-full text-[10px] font-semibold shadow-sm ring-1 ring-white",
-        variant === "external" && "bg-slate-200 text-slate-700",
-        variant === "agent" && "bg-[var(--color-primary)] text-white",
-        variant === "internal" && "bg-amber-200 text-amber-900"
-      )}
-    >
-      {name.charAt(0).toUpperCase()}
-    </div>
-  );
-}
 
 function SystemMessagePill({ message }: { message: AdminSupportMessage }) {
   return (
@@ -68,7 +48,7 @@ function ExternalMessage({ message }: { message: AdminSupportMessage }) {
   return (
     <div className="flex flex-col items-start gap-1">
       <div className="flex max-w-full items-center gap-1.5">
-        <MessageAvatar name={message.senderName} variant="external" />
+        <SupportMessageAvatar name={message.senderName} variant="other" />
         <div className="min-w-0">
           <p className="text-xs font-semibold text-foreground">
             {message.senderName}
@@ -99,7 +79,7 @@ function AgentMessage({ message }: { message: AdminSupportMessage }) {
   return (
     <div className="flex flex-col items-end gap-1">
       <div className="flex max-w-full flex-row-reverse items-center gap-1.5">
-        <MessageAvatar name={message.senderName} variant="agent" />
+        <SupportMessageAvatar name={message.senderName} variant="self" />
         <div className="min-w-0 text-right">
           <p className="text-xs font-semibold text-foreground">
             {message.senderName}
@@ -130,7 +110,7 @@ function InternalNoteMessage({ message }: { message: AdminSupportMessage }) {
   return (
     <div className="flex flex-col items-end gap-1">
       <div className="flex max-w-full flex-row-reverse items-center gap-1.5">
-        <MessageAvatar name={message.senderName} variant="internal" />
+        <SupportMessageAvatar name={message.senderName} variant="internal" />
         <div className="min-w-0 text-right">
           <div className="flex items-center justify-end gap-1.5">
             <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-amber-800">
@@ -321,9 +301,9 @@ export default function AdminConversationThread({
         ))}
       </SupportMessageScroller>
 
-      <div className="shrink-0 border-t border-slate-200 bg-white p-3 pb-4 sm:p-5 sm:pb-5">
+      <div className="shrink-0 border-t border-slate-200 bg-white p-2 sm:p-2.5">
         {isComposerDisabled ? (
-          <div className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm text-muted-foreground sm:px-5">
+          <div className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-muted-foreground sm:px-5">
             <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-slate-200 text-slate-600">
               <Lock className="size-4" />
             </div>
@@ -344,7 +324,7 @@ export default function AdminConversationThread({
                 onClick={() => setComposerMode("reply")}
                 disabled={isSending}
                 className={cn(
-                  "flex-1 px-3 py-2.5 text-sm font-medium transition-colors sm:flex-none sm:px-4",
+                  "flex-1 px-3 py-2 text-sm font-medium transition-colors sm:flex-none sm:px-4",
                   composerMode === "reply"
                     ? "border-b-2 border-[var(--color-primary)] text-[var(--color-primary)]"
                     : "text-muted-foreground hover:text-foreground"
@@ -357,7 +337,7 @@ export default function AdminConversationThread({
                 onClick={() => setComposerMode("internal_note")}
                 disabled={isSending}
                 className={cn(
-                  "flex-1 px-3 py-2.5 text-sm font-medium transition-colors sm:flex-none sm:px-4",
+                  "flex-1 px-3 py-2 text-sm font-medium transition-colors sm:flex-none sm:px-4",
                   composerMode === "internal_note"
                     ? "border-b-2 border-amber-500 text-amber-800"
                     : "text-muted-foreground hover:text-foreground"
@@ -379,7 +359,7 @@ export default function AdminConversationThread({
               onKeyDown={handleKeyDown}
               disabled={isSending}
               className={cn(
-                "min-h-[96px] max-h-[160px] resize-none rounded-none border-0 px-4 py-4 text-sm shadow-none focus-visible:ring-0",
+                "min-h-[40px] max-h-[120px] resize-none rounded-none border-0 px-3.5 py-2.5 text-sm shadow-none focus-visible:ring-0 sm:min-h-[48px]",
                 isInternal ? "bg-amber-50" : "bg-white"
               )}
             />
@@ -415,7 +395,7 @@ export default function AdminConversationThread({
               </ul>
             ) : null}
 
-            <div className="flex flex-col gap-3 border-t border-slate-100 px-3 py-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex flex-col gap-2 border-t border-slate-100 px-3 py-2 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex items-center gap-0.5">
                 <input
                   ref={fileInputRef}
@@ -437,7 +417,7 @@ export default function AdminConversationThread({
                   type="button"
                   variant="ghost"
                   size="icon"
-                  className="size-9 rounded-full text-muted-foreground hover:bg-slate-100"
+                  className="size-8 rounded-full text-muted-foreground hover:bg-slate-100"
                   aria-label="Attach file"
                   disabled={isSending || !canAddAttachments}
                   onClick={() => fileInputRef.current?.click()}
@@ -448,7 +428,7 @@ export default function AdminConversationThread({
                   type="button"
                   variant="ghost"
                   size="icon"
-                  className="size-9 rounded-full text-muted-foreground hover:bg-slate-100"
+                  className="size-8 rounded-full text-muted-foreground hover:bg-slate-100"
                   aria-label="Attach image"
                   disabled={isSending || !canAddAttachments}
                   onClick={() => imageInputRef.current?.click()}
@@ -463,10 +443,11 @@ export default function AdminConversationThread({
                 <Button
                   type="button"
                   variant={isInternal ? "default" : "event-primary"}
+                  size="sm"
                   disabled={!canSend}
                   onClick={() => void handleSend()}
                   className={cn(
-                    "w-full rounded-full px-5 sm:w-auto",
+                    "h-8 w-full rounded-full px-5 sm:w-auto",
                     isInternal &&
                       "bg-amber-600 text-white hover:bg-amber-700"
                   )}

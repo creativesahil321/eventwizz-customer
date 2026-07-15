@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Lock,
   Paperclip,
+  RotateCcw,
   Send,
   StickyNote,
   X,
@@ -21,6 +22,7 @@ import {
   formatSupportFileSize,
 } from "@/app/(protected)/_shared/support/message-attachments";
 import SupportAttachmentCards from "@/app/(protected)/_shared/support/support-attachment-cards";
+import SupportMessageAvatar from "@/app/(protected)/_shared/support/support-message-avatar";
 import SupportMessageScroller from "@/app/(protected)/_shared/support/support-message-scroller";
 import { useStoreVendorSupportMessage } from "@/services/vendor/support";
 import type { VendorSupportMessage } from "../_lib/types";
@@ -30,27 +32,6 @@ import {
 } from "../_lib/utils";
 
 type ComposerMode = "reply" | "internal_note";
-
-function MessageAvatar({
-  name,
-  variant,
-}: {
-  name: string;
-  variant: "customer" | "agent" | "internal";
-}) {
-  return (
-    <div
-      className={cn(
-        "flex size-7 shrink-0 items-center justify-center rounded-full text-[10px] font-semibold shadow-sm ring-1 ring-white",
-        variant === "customer" && "bg-slate-200 text-slate-700",
-        variant === "agent" && "bg-[var(--color-primary)] text-white",
-        variant === "internal" && "bg-amber-200 text-amber-900"
-      )}
-    >
-      {name.charAt(0).toUpperCase()}
-    </div>
-  );
-}
 
 function SystemMessagePill({ message }: { message: VendorSupportMessage }) {
   return (
@@ -68,7 +49,7 @@ function CustomerMessage({ message }: { message: VendorSupportMessage }) {
   return (
     <div className="flex flex-col items-start gap-1">
       <div className="flex max-w-full items-center gap-1.5">
-        <MessageAvatar name={message.senderName} variant="customer" />
+        <SupportMessageAvatar name={message.senderName} variant="other" />
         <div className="min-w-0">
           <p className="text-xs font-semibold text-foreground">
             {message.senderName}
@@ -99,7 +80,7 @@ function AgentMessage({ message }: { message: VendorSupportMessage }) {
   return (
     <div className="flex flex-col items-end gap-1">
       <div className="flex max-w-full flex-row-reverse items-center gap-1.5">
-        <MessageAvatar name={message.senderName} variant="agent" />
+        <SupportMessageAvatar name={message.senderName} variant="self" />
         <div className="min-w-0 text-right">
           <p className="text-xs font-semibold text-foreground">
             {message.senderName}
@@ -130,7 +111,7 @@ function InternalNoteMessage({ message }: { message: VendorSupportMessage }) {
   return (
     <div className="flex flex-col items-end gap-1">
       <div className="flex max-w-full flex-row-reverse items-center gap-1.5">
-        <MessageAvatar name={message.senderName} variant="internal" />
+        <SupportMessageAvatar name={message.senderName} variant="internal" />
         <div className="min-w-0 text-right">
           <div className="flex items-center justify-end gap-1.5">
             <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-amber-800">
@@ -180,6 +161,11 @@ interface VendorConversationThreadProps {
   messages: VendorSupportMessage[];
   isComposerDisabled?: boolean;
   disabledMessage?: string;
+  onReopen?: () => void;
+  closedReopenMessage?: string;
+  showReopenHint?: boolean;
+  reopenHintMessage?: string;
+  onMessageSent?: () => void;
   hasMore?: boolean;
   isLoadingMore?: boolean;
   onLoadMore?: () => void;
@@ -190,6 +176,11 @@ export default function VendorConversationThread({
   messages,
   isComposerDisabled = false,
   disabledMessage = "This ticket is closed.",
+  onReopen,
+  closedReopenMessage = "This ticket is closed. Reopen it to continue the conversation with EventWizz Support.",
+  showReopenHint = false,
+  reopenHintMessage = "Send a message to reopen this ticket.",
+  onMessageSent,
   hasMore = false,
   isLoadingMore = false,
   onLoadMore,
@@ -247,6 +238,7 @@ export default function VendorConversationThread({
       setDraft("");
       setAttachments([]);
       setStickToBottomKey((key) => key + 1);
+      onMessageSent?.();
     } catch {
       // API client already surfaces validation / network toasts
     }
@@ -256,6 +248,7 @@ export default function VendorConversationThread({
     isComposerDisabled,
     isInternal,
     isSending,
+    onMessageSent,
     storeMessage,
     ticketKey,
   ]);
@@ -319,16 +312,43 @@ export default function VendorConversationThread({
         ))}
       </SupportMessageScroller>
 
-      <div className="shrink-0 border-t border-slate-200 bg-white p-3 pb-4 sm:p-5 sm:pb-5">
+      <div className="shrink-0 border-t border-slate-200 bg-white p-2 sm:p-2.5">
         {isComposerDisabled ? (
-          <div className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm text-muted-foreground sm:px-5">
-            <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-slate-200 text-slate-600">
-              <Lock className="size-4" />
+          onReopen ? (
+            <div className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
+              <div className="flex items-center gap-3 text-sm text-muted-foreground">
+                <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-slate-200 text-slate-600">
+                  <Lock className="size-4" />
+                </div>
+                <p>{closedReopenMessage}</p>
+              </div>
+              <Button
+                type="button"
+                variant="event-primary"
+                size="sm"
+                className="w-full shrink-0 rounded-full px-4 sm:w-auto"
+                onClick={onReopen}
+              >
+                <RotateCcw className="size-4" />
+                Reopen ticket
+              </Button>
             </div>
-            <p>{disabledMessage}</p>
-          </div>
+          ) : (
+            <div className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-muted-foreground sm:px-5">
+              <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-slate-200 text-slate-600">
+                <Lock className="size-4" />
+              </div>
+              <p>{disabledMessage}</p>
+            </div>
+          )
         ) : (
-          <div
+          <div className="space-y-2">
+            {showReopenHint ? (
+              <p className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900 sm:text-sm">
+                {reopenHintMessage}
+              </p>
+            ) : null}
+            <div
             className={cn(
               "overflow-hidden rounded-2xl border shadow-sm",
               isInternal
@@ -342,7 +362,7 @@ export default function VendorConversationThread({
                 onClick={() => setComposerMode("reply")}
                 disabled={isSending}
                 className={cn(
-                  "flex-1 px-3 py-2.5 text-sm font-medium transition-colors sm:flex-none sm:px-4",
+                  "flex-1 px-3 py-2 text-sm font-medium transition-colors sm:flex-none sm:px-4",
                   composerMode === "reply"
                     ? "border-b-2 border-[var(--color-primary)] text-[var(--color-primary)]"
                     : "text-muted-foreground hover:text-foreground"
@@ -355,7 +375,7 @@ export default function VendorConversationThread({
                 onClick={() => setComposerMode("internal_note")}
                 disabled={isSending}
                 className={cn(
-                  "flex-1 px-3 py-2.5 text-sm font-medium transition-colors sm:flex-none sm:px-4",
+                  "flex-1 px-3 py-2 text-sm font-medium transition-colors sm:flex-none sm:px-4",
                   composerMode === "internal_note"
                     ? "border-b-2 border-amber-500 text-amber-800"
                     : "text-muted-foreground hover:text-foreground"
@@ -377,7 +397,7 @@ export default function VendorConversationThread({
               onKeyDown={handleKeyDown}
               disabled={isSending}
               className={cn(
-                "min-h-[96px] max-h-[160px] resize-none rounded-none border-0 px-4 py-4 text-sm shadow-none focus-visible:ring-0",
+                "min-h-[40px] max-h-[120px] resize-none rounded-none border-0 px-3.5 py-2.5 text-sm shadow-none focus-visible:ring-0 sm:min-h-[48px]",
                 isInternal ? "bg-amber-50" : "bg-white"
               )}
             />
@@ -413,7 +433,7 @@ export default function VendorConversationThread({
               </ul>
             ) : null}
 
-            <div className="flex flex-col gap-3 border-t border-slate-100 px-3 py-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex flex-col gap-2 border-t border-slate-100 px-3 py-2 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex items-center gap-0.5">
                 <input
                   ref={fileInputRef}
@@ -435,7 +455,7 @@ export default function VendorConversationThread({
                   type="button"
                   variant="ghost"
                   size="icon"
-                  className="size-9 rounded-full text-muted-foreground hover:bg-slate-100"
+                  className="size-8 rounded-full text-muted-foreground hover:bg-slate-100"
                   aria-label="Attach file"
                   disabled={isSending || !canAddAttachments}
                   onClick={() => fileInputRef.current?.click()}
@@ -446,7 +466,7 @@ export default function VendorConversationThread({
                   type="button"
                   variant="ghost"
                   size="icon"
-                  className="size-9 rounded-full text-muted-foreground hover:bg-slate-100"
+                  className="size-8 rounded-full text-muted-foreground hover:bg-slate-100"
                   aria-label="Attach image"
                   disabled={isSending || !canAddAttachments}
                   onClick={() => imageInputRef.current?.click()}
@@ -461,10 +481,11 @@ export default function VendorConversationThread({
                 <Button
                   type="button"
                   variant={isInternal ? "default" : "event-primary"}
+                  size="sm"
                   disabled={!canSend}
                   onClick={() => void handleSend()}
                   className={cn(
-                    "w-full rounded-full px-5 sm:w-auto",
+                    "h-8 w-full rounded-full px-5 sm:w-auto",
                     isInternal &&
                       "bg-amber-600 text-white hover:bg-amber-700"
                   )}
@@ -482,6 +503,7 @@ export default function VendorConversationThread({
                 </Button>
               </div>
             </div>
+          </div>
           </div>
         )}
       </div>

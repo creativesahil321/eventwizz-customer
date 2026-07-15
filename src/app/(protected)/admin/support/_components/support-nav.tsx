@@ -4,7 +4,7 @@ import { usePathname } from "next/navigation";
 import Link from "next/link";
 import { Inbox, LayoutDashboard } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { getUnreadAdminInboxCount } from "../_lib/mock-data";
+import { useAdminSupportTickets } from "@/services/admin/support";
 
 const NAV_ITEMS = [
   {
@@ -29,7 +29,8 @@ function isNavActive(pathname: string, href: string, exact: boolean) {
 
 export default function AdminSupportNav() {
   const pathname = usePathname();
-  const unreadCount = getUnreadAdminInboxCount();
+  const { data } = useAdminSupportTickets({ sort: "newest" });
+  const badgeCount = data?.inbox_count ?? 0;
 
   return (
     <nav
@@ -40,8 +41,8 @@ export default function AdminSupportNav() {
         const active = isNavActive(pathname, item.href, item.exact);
         const Icon = item.icon;
         const badge =
-          "showBadge" in item && item.showBadge && unreadCount > 0
-            ? unreadCount
+          "showBadge" in item && item.showBadge && badgeCount > 0
+            ? badgeCount
             : null;
 
         return (

@@ -3,6 +3,8 @@
  *
  * GET  /api/v1/customer/support-tickets
  * POST /api/v1/customer/support-tickets/store
+ * GET  /api/v1/customer/support-tickets/locations
+ * GET  /api/v1/customer/support-tickets/locations?location_id=
  * GET  /api/v1/customer/support-tickets/{ticketKey}/messages
  * POST /api/v1/customer/support-tickets/{ticketKey}/messages/store
  * POST /api/v1/customer/support-tickets/{ticketKey}/messages/read
@@ -15,6 +17,8 @@ import type {
   CreateCustomerSupportTicketResponse,
   CustomerSupportApiCategory,
   CustomerSupportCategoryFilter,
+  CustomerSupportLocationBookingsResponse,
+  CustomerSupportLocationsResponse,
   CustomerSupportMessagesParams,
   CustomerSupportMessagesResponse,
   CustomerSupportTicketsParams,
@@ -150,6 +154,31 @@ export const customerSupportService = {
     );
   },
 
+  getLocations: async (): Promise<CustomerSupportLocationsResponse> => {
+    return api.get<CustomerSupportLocationsResponse>(
+      API_ENDPOINTS.CUSTOMER.SUPPORT_TICKETS.LOCATIONS,
+      {
+        returnFullResponse: true,
+        suppressSuccessToast: true,
+        suppressErrorToast: true,
+      }
+    );
+  },
+
+  getLocationBookings: async (
+    locationId: number | string
+  ): Promise<CustomerSupportLocationBookingsResponse> => {
+    return api.get<CustomerSupportLocationBookingsResponse>(
+      API_ENDPOINTS.CUSTOMER.SUPPORT_TICKETS.LOCATIONS,
+      {
+        params: { location_id: locationId },
+        returnFullResponse: true,
+        suppressSuccessToast: true,
+        suppressErrorToast: true,
+      }
+    );
+  },
+
   getMessages: async (
     ticketKey: string,
     params: CustomerSupportMessagesParams = {}
@@ -188,6 +217,7 @@ export const customerSupportService = {
     return api.post<StoreCustomerSupportMessageResponse>(endpoint, formData, {
       headers: { "Content-Type": "multipart/form-data" },
       returnFullResponse: true,
+      suppressSuccessToast: true,
     });
   },
 

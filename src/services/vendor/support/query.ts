@@ -364,12 +364,20 @@ export function useMarkVendorSupportMessagesRead() {
   >({
     mutationFn: (ticketKey) =>
       vendorSupportService.markMessagesRead(ticketKey),
+    onMutate: (ticketKey) => {
+      markTicketReadInLists(queryClient, ticketKey, false);
+    },
     onSuccess: (response, ticketKey) => {
       markTicketReadInLists(
         queryClient,
         ticketKey,
         Boolean(response.data?.is_unread)
       );
+    },
+    onError: () => {
+      void queryClient.invalidateQueries({
+        queryKey: vendorSupportKeys.lists(),
+      });
     },
   });
 }

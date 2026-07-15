@@ -45,7 +45,7 @@ export function getStatusLabel(
 }
 
 export const VENDOR_CATEGORY_LABELS: Record<SupportCategory, string> = {
-  general_support: "Event support",
+  general_support: "General support",
   technical_support: "Technical support",
 };
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { ArrowLeft, Inbox, Loader2, Mail, Pin, Search } from "lucide-react";
@@ -51,6 +51,7 @@ import {
   useAdminSupportTicketMessagesInfinite,
   useAdminSupportTickets,
   useAssignAdminSupportTicket,
+  useMarkAdminSupportMessagesRead,
   usePinAdminSupportTicket,
   type AdminSupportTicketsParams,
 } from "@/services/admin/support";
@@ -87,45 +88,84 @@ function ConversationListItem({
     <Link
       href={`/admin/support/inbox/${conversation.id}`}
       className={cn(
-        "block border-b border-slate-100 px-3 py-2.5 transition-colors hover:bg-slate-50 sm:px-4",
-        isSelected && "bg-[var(--color-primary)]/[0.06]"
+        "block border-b border-slate-200 px-3 py-2.5 transition-colors hover:bg-slate-50 sm:px-4",
+        isSelected && "bg-[var(--color-primary)]/[0.06]",
+        hasUnread &&
+          !isSelected &&
+          "border-l-[3px] border-l-[var(--color-primary)] bg-[var(--color-primary)]/[0.08]",
+        hasUnread &&
+          isSelected &&
+          "border-l-[3px] border-l-[var(--color-primary)]"
       )}
     >
-      <div className="flex min-w-0 items-start gap-2.5">
-        <div
-          className={cn(
-            "mt-1.5 size-2 shrink-0 rounded-full",
-            hasUnread ? "bg-[var(--color-primary)]" : "bg-transparent"
-          )}
-        />
+      <div className="flex min-w-0 items-start gap-2">
+        <div className="relative shrink-0">
+          <div
+            className={cn(
+              "flex size-7 items-center justify-center rounded-full text-[10px] font-semibold ring-1 ring-white",
+              hasUnread
+                ? "bg-[var(--color-primary)]/15 text-[var(--color-primary)]"
+                : "bg-slate-100 text-slate-600"
+            )}
+          >
+            {conversation.contact.name.charAt(0).toUpperCase()}
+          </div>
+          {hasUnread ? (
+            <span
+              className="absolute -right-0.5 -top-0.5 size-2 rounded-full bg-[var(--color-primary)] ring-2 ring-white"
+              aria-label={`${conversation.unreadCount} unread`}
+            />
+          ) : null}
+        </div>
         <div className="min-w-0 flex-1">
-          <div className="flex min-w-0 items-center gap-2">
-            <p
+          <div className="flex min-w-0 items-start justify-between gap-2">
+            <div className="flex min-w-0 items-center gap-1.5">
+              <p
+                className={cn(
+                  "truncate text-xs text-foreground",
+                  hasUnread ? "font-bold" : "font-semibold"
+                )}
+              >
+                {conversation.contact.name}
+              </p>
+              {hasUnread ? (
+                <span className="shrink-0 rounded-full bg-[var(--color-primary)] px-1.5 py-0.5 text-[9px] font-semibold leading-none text-white">
+                  Unread
+                </span>
+              ) : null}
+              {isPinned ? (
+                <Pin className="size-3 shrink-0 fill-[var(--color-primary)] text-[var(--color-primary)]" />
+              ) : null}
+            </div>
+            <span
               className={cn(
-                "truncate text-sm text-foreground",
-                hasUnread ? "font-semibold" : "font-medium"
+                "shrink-0 text-[10px]",
+                hasUnread
+                  ? "font-semibold text-[var(--color-primary)]"
+                  : "text-muted-foreground"
               )}
             >
-              {conversation.contact.name}
-            </p>
-            {isPinned ? (
-              <Pin className="size-3 shrink-0 fill-[var(--color-primary)] text-[var(--color-primary)]" />
-            ) : null}
-            <span className="ml-auto shrink-0 text-[10px] text-muted-foreground">
               {formatRelativeTime(conversation.lastMessageAt)}
             </span>
           </div>
           <p
             className={cn(
-              "mt-0.5 truncate text-sm",
+              "mt-0.5 line-clamp-1 text-xs",
               hasUnread
-                ? "font-medium text-foreground"
-                : "text-muted-foreground"
+                ? "font-semibold text-foreground"
+                : "font-medium text-foreground"
             )}
           >
             {conversation.subject}
           </p>
-          <p className="mt-0.5 line-clamp-1 text-xs text-muted-foreground">
+          <p
+            className={cn(
+              "mt-0.5 line-clamp-1 text-[11px] leading-snug",
+              hasUnread
+                ? "font-medium text-slate-700"
+                : "text-muted-foreground"
+            )}
+          >
             {conversation.lastMessage}
           </p>
           <div className="mt-1.5 flex min-w-0 flex-wrap items-center gap-1.5">
@@ -167,9 +207,11 @@ function ConversationDetail({
   assigneeOverrides: Record<string, SupportAssignee | null>;
   onAssigneeChange: (assignee: SupportAssignee | null) => void;
 }) {
+  const markedReadRef = useRef<string | null>(null);
   const [assignOpen, setAssignOpen] = useState(false);
   const pinTicket = usePinAdminSupportTicket();
   const assignTicket = useAssignAdminSupportTicket();
+  const markMessagesRead = useMarkAdminSupportMessagesRead();
   const {
     data,
     isLoading,
@@ -241,6 +283,14 @@ function ConversationDetail({
       setStatus(conversation.status);
     }
   }, [ticketKey, conversation?.status]);
+
+  // Mark read from the tickets-list unread state as soon as a thread is opened.
+  // Do not wait for the messages API — that was clearing/hiding unread UX.
+  useEffect(() => {
+    if (!ticketKey || markedReadRef.current === ticketKey) return;
+    markedReadRef.current = ticketKey;
+    markMessagesRead.mutate(ticketKey);
+  }, [ticketKey, markMessagesRead]);
 
   const staffAssignees = useMemo(() => {
     const fromDetail = mapAdminSupportStaff(latestPayload.staff ?? []);
@@ -532,7 +582,7 @@ export default function AdminSupportInbox({
 
   return (
     <div className="-mx-4 -mb-4 min-w-0 rounded-b-lg border-t border-[var(--color-border)] sm:-mx-6 sm:-mb-6">
-      <div className="flex h-[min(78dvh,820px)] min-h-[520px] min-w-0 flex-col overflow-hidden xl:flex-row xl:divide-x xl:divide-slate-200">
+      <div className="flex h-[calc(100dvh-8rem)] min-h-[500px] min-w-0 flex-col overflow-hidden xl:flex-row xl:divide-x xl:divide-slate-200">
         <div
           className={cn(
             "flex h-full min-h-0 w-full min-w-0 flex-col overflow-hidden bg-white xl:w-[320px] xl:max-w-[320px] xl:shrink-0",

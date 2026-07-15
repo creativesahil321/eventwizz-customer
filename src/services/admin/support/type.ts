@@ -364,3 +364,16 @@ export interface AdminSupportMessagesResponse {
   recent_tickets?: AdminSupportRecentTicket[];
   errors?: string[] | Record<string, string[]>;
 }
+
+export interface MarkAdminSupportMessagesReadData {
+  ticket_key: string;
+  is_unread: boolean;
+  unread_count: number;
+}
+
+export interface MarkAdminSupportMessagesReadResponse {
+  status: boolean;
+  message: string;
+  data: MarkAdminSupportMessagesReadData;
+  errors?: string[] | Record<string, string[]>;
+}

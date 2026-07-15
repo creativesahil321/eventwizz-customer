@@ -49,22 +49,25 @@ export default function AddToCartButton({
     setIsAdding(true);
 
     try {
-      // Check for cart conflicts first
-      const canProceed = checkAndHandleConflict(event.slug, event);
+      const addToCart = async () => {
+        if (onAddToCart) {
+          await onAddToCart();
+        } else {
+          router.push("/vendor/checkout");
+        }
+      };
+
+      // Check for cart conflicts first. On Replace, resume add/store only
+      // (backend removes other events — no delete API).
+      const canProceed = checkAndHandleConflict(event.slug, event, addToCart);
 
       if (!canProceed) {
-        // Conflict detected - modal will be shown, don't proceed
+        // Conflict detected - modal will be shown; Replace resumes store-only
         setIsAdding(false);
         return;
       }
 
-      // No conflict - safe to add to cart
-      if (onAddToCart) {
-        await onAddToCart();
-      } else {
-        // Default behavior - redirect to simple checkout page
-        router.push("/vendor/checkout");
-      }
+      await addToCart();
     } catch (error) {
       console.error("Error adding to cart:", error);
       toast.error("Failed to add to cart. Please try again.");

@@ -11,7 +11,6 @@ import {
   RotateCcw,
   Search,
 } from "lucide-react";
-import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { PriorityBadge, StatusBadge } from "./support-badges";
@@ -227,6 +226,11 @@ function ConversationDetail({
   const [status, setStatus] = useState<SupportStatus>(
     conversation?.status ?? fallback?.status ?? "new"
   );
+  const [composerUnlocked, setComposerUnlocked] = useState(false);
+
+  useEffect(() => {
+    setComposerUnlocked(false);
+  }, [ticketKey]);
 
   useEffect(() => {
     if (conversation?.status) {
@@ -234,17 +238,24 @@ function ConversationDetail({
     }
   }, [ticketKey, conversation?.status]);
 
+  // Mark read from tickets-list unread state as soon as a thread is opened.
+  // Do not wait for the messages API.
   useEffect(() => {
-    if (!latestPage || markedReadRef.current === ticketKey) return;
+    if (!ticketKey || markedReadRef.current === ticketKey) return;
     markedReadRef.current = ticketKey;
     markMessagesRead.mutate(ticketKey);
-  }, [latestPage, ticketKey, markMessagesRead]);
+  }, [ticketKey, markMessagesRead]);
 
   const isClosed = isClosedTicketStatus(status);
+  const showReopenButtons = isClosed && !composerUnlocked;
+  const showComposer = !isClosed || composerUnlocked;
 
-  const handleReopen = () => {
-    setStatus("reopen");
-    toast.success(`${ticketKey} reopened`);
+  const handleReopenClick = () => {
+    setComposerUnlocked(true);
+  };
+
+  const handleMessageSent = () => {
+    setComposerUnlocked(false);
   };
 
   if (isLoading && !conversation) {
@@ -286,10 +297,10 @@ function ConversationDetail({
         <ArrowLeft className="size-4" />
         Back to inbox
       </Link>
-      <div className="min-w-0 shrink-0 border-b border-slate-200 bg-white px-3 py-3 sm:px-5 sm:py-4">
-        <div className="flex min-w-0 flex-col gap-3">
-          <div className="min-w-0">
-            <div className="flex flex-wrap items-center gap-2">
+      <div className="min-w-0 shrink-0 border-b border-slate-200 bg-white px-3 py-1.5 sm:px-5 sm:py-2">
+        <div className="flex min-w-0 items-start justify-between gap-2">
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-1.5">
               <span className="text-sm font-bold text-foreground">
                 {conversation.ref}
               </span>
@@ -302,11 +313,11 @@ function ConversationDetail({
                 {CATEGORY_LABELS[conversation.category]}
               </span>
             </div>
-            <h2 className="mt-2 max-w-full text-base font-semibold leading-snug break-words [overflow-wrap:anywhere] text-foreground sm:text-lg">
+            <h2 className="mt-0.5 max-w-full text-sm font-semibold leading-snug break-words [overflow-wrap:anywhere] text-foreground sm:text-base">
               {conversation.subject}
             </h2>
             {conversation.bookingTitle || conversation.bookingRef ? (
-              <p className="mt-1 truncate text-sm text-muted-foreground">
+              <p className="mt-0.5 truncate text-xs text-muted-foreground">
                 Booking:{" "}
                 {[conversation.bookingRef, conversation.bookingTitle]
                   .filter(Boolean)
@@ -314,13 +325,13 @@ function ConversationDetail({
               </p>
             ) : null}
           </div>
-          {isClosed ? (
+          {showReopenButtons ? (
             <Button
               type="button"
               variant="event-primary"
               size="sm"
-              className="w-fit shrink-0 rounded-full px-3"
-              onClick={handleReopen}
+              className="h-8 shrink-0 rounded-full px-3"
+              onClick={handleReopenClick}
             >
               <RotateCcw className="size-4 shrink-0" />
               Reopen
@@ -338,8 +349,10 @@ function ConversationDetail({
         <SupportConversationThread
           ticketKey={ticketKey}
           messages={messages}
-          isComposerDisabled={isClosed}
-          onReopen={handleReopen}
+          isComposerDisabled={!showComposer}
+          onReopen={showReopenButtons ? handleReopenClick : undefined}
+          showReopenHint={showComposer && composerUnlocked && isClosed}
+          onMessageSent={handleMessageSent}
           hasMore={Boolean(hasNextPage)}
           isLoadingMore={isFetchingNextPage}
           onLoadMore={() => {
@@ -441,7 +454,7 @@ export default function SupportInbox({ selectedId }: SupportInboxProps) {
 
   return (
     <div className="-mx-4 -mb-4 min-w-0 overflow-x-hidden rounded-b-lg border-t border-[var(--color-border)] sm:-mx-6 sm:-mb-6">
-      <div className="flex h-[min(78dvh,820px)] min-h-[520px] min-w-0 flex-col overflow-hidden xl:flex-row xl:divide-x xl:divide-slate-200">
+      <div className="flex h-[calc(100dvh-8rem)] min-h-[500px] min-w-0 flex-col overflow-hidden xl:flex-row xl:divide-x xl:divide-slate-200">
         <div
           className={cn(
             "flex h-full min-h-0 w-full min-w-0 flex-col overflow-hidden bg-white xl:w-[320px] xl:max-w-[320px] xl:shrink-0",

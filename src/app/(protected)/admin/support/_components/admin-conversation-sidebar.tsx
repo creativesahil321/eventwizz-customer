@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { Building2, Calendar, Mail, Phone, User } from "lucide-react";
 import { SourceBadge, StatusBadge } from "./support-badges";
-import { ADMIN_BOOKING_DETAILS } from "../_lib/mock-data";
 import type { AdminSupportConversation, SupportStatus } from "../_lib/types";
 
 export interface AdminRecentTicketItem {
@@ -29,9 +28,9 @@ export default function AdminConversationSidebar({
   isLoadingRecent = false,
 }: AdminConversationSidebarProps) {
   const { contact, venue } = conversation;
-  const booking =
-    conversation.bookingRef &&
-    ADMIN_BOOKING_DETAILS[conversation.bookingRef];
+  const hasBooking = Boolean(
+    conversation.bookingRef || conversation.bookingTitle
+  );
 
   return (
     <aside className="flex w-full min-w-0 shrink-0 flex-col gap-5 border-t border-slate-200 bg-slate-50/50 p-4 lg:max-h-none xl:w-[280px] xl:border-l xl:border-t-0 xl:p-5">
@@ -87,25 +86,31 @@ export default function AdminConversationSidebar({
         </dl>
       </section>
 
-      {booking && (
+      {hasBooking ? (
         <section>
           <h3 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
             Booking
           </h3>
           <div className="mt-3 rounded-xl border border-[var(--color-border)] bg-white p-4 shadow-sm">
-            <p className="text-sm font-semibold text-foreground">
-              {booking.title}
-            </p>
-            <div className="mt-2 flex items-center gap-2 text-xs text-muted-foreground">
-              <Calendar className="size-3.5" />
-              {booking.date}
-            </div>
-            <p className="mt-3 text-base font-bold text-foreground">
-              {booking.price}
-            </p>
+            {conversation.bookingTitle ? (
+              <p className="text-sm font-semibold text-foreground">
+                {conversation.bookingTitle}
+              </p>
+            ) : null}
+            {conversation.bookingRef ? (
+              <div className="mt-2 flex items-center gap-2 text-xs text-muted-foreground">
+                <Calendar className="size-3.5" />
+                <span>{conversation.bookingRef}</span>
+              </div>
+            ) : (
+              <div className="mt-2 flex items-center gap-2 text-xs text-muted-foreground">
+                <User className="size-3.5" />
+                Linked booking
+              </div>
+            )}
           </div>
         </section>
-      )}
+      ) : null}
 
       <section>
         <h3 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
@@ -149,7 +154,10 @@ export default function AdminConversationSidebar({
                     {ticket.subject}
                   </p>
                   <div className="mt-1.5">
-                    <StatusBadge status={ticket.status} />
+                    <StatusBadge
+                      status={ticket.status}
+                      label={ticket.statusLabel}
+                    />
                   </div>
                 </Link>
               </li>

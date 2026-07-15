@@ -34,7 +34,7 @@ export const cartService = {
   ): Promise<void> => {
     if (params === "all") {
       return api.delete<void>(
-        API_ENDPOINTS.CUSTOMER.BOOK_EVENT.DELETE_CART_DATA.replace("{date}", ""),
+        API_ENDPOINTS.CUSTOMER.BOOK_EVENT.DELETE_ALL_CART_DATA,
       );
     }
 

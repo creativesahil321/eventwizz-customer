@@ -137,15 +137,21 @@ export default function CartManager({}: CartManagerProps) {
     [locationSlug, currentEventSlug],
   );
 
-  // Initialize active room to first room
+  // Keep active room valid for the current cart event (reset after event replace).
   useEffect(() => {
-    if (roomMode && rooms.length > 0 && activeRoomId === null) {
-      setActiveRoomId(rooms[0].room_id);
-    }
     if (!roomMode) {
       setActiveRoomId(null);
+      return;
     }
-  }, [roomMode, rooms, activeRoomId]);
+    if (rooms.length === 0) {
+      setActiveRoomId(null);
+      return;
+    }
+    const activeStillValid = rooms.some((room) => room.room_id === activeRoomId);
+    if (activeRoomId == null || !activeStillValid) {
+      setActiveRoomId(rooms[0].room_id);
+    }
+  }, [roomMode, rooms, activeRoomId, currentEventSlug]);
 
   useEffect(() => {
     if (currentEventSlug) {
@@ -157,6 +163,12 @@ export default function CartManager({}: CartManagerProps) {
   }, [currentEventSlug, roomMode, activeRoomId, setCurrentEvent]);
 
   // Room mode: dates collapsed by default. Flat mode: all expanded.
+  // Reset when the cart event changes (e.g. store-only replace).
+  useEffect(() => {
+    hasInitializedExpanded.current = false;
+    setExpandedDates(new Set());
+  }, [currentEventSlug]);
+
   useEffect(() => {
     if (firstDate && !hasInitializedExpanded.current) {
       if (roomMode) {
@@ -174,9 +186,13 @@ export default function CartManager({}: CartManagerProps) {
     }
   }, [firstDate, currentEventApiData, roomMode, rooms]);
 
-  // Cart synchronization check
+  // Cart synchronization check — never treat "Zustand not hydrated yet" as a wipe.
   useEffect(() => {
     if (!currentEventSlug || !currentEventApiData) return;
+    const localEventData = useCartEditStore.getState().editingData[currentEventSlug];
+    if (!localEventData || Object.keys(localEventData).length === 0) {
+      return;
+    }
     syncCart(currentEventSlug).then((wasCleared) => {
       if (wasCleared) {
         setTimeout(() => {
@@ -268,10 +284,17 @@ export default function CartManager({}: CartManagerProps) {
   ]);
 
   const availableDates = useMemo(() => {
-    if (roomMode && activeRoomId != null) {
-      return getRoomDates(currentEventApiData, activeRoomId).map((d) =>
-        buildRoomDateKey(activeRoomId, d),
-      );
+    if (!currentEventApiData) return [];
+    if (roomMode) {
+      // Prefer the active room; fall back to all room dates so event-replace
+      // never flashes an empty cart before activeRoomId is reconciled.
+      if (activeRoomId != null) {
+        const roomDates = getRoomDates(currentEventApiData, activeRoomId);
+        if (roomDates.length > 0) {
+          return roomDates.map((d) => buildRoomDateKey(activeRoomId, d));
+        }
+      }
+      return getAllRoomDateKeys(currentEventApiData);
     }
     return getAvailableDates(currentEventApiData);
   }, [currentEventApiData, roomMode, activeRoomId]);
@@ -428,8 +451,16 @@ export default function CartManager({}: CartManagerProps) {
     );
   }
 
-  // Empty cart
-  if (!isLoadingCartData && !isFetchingCartData && availableDates.length === 0) {
+  const hasRoomCartSessions = roomMode && rooms.length > 0;
+  const isCartEmpty =
+    !isLoadingCartData &&
+    !isFetchingCartData &&
+    availableDates.length === 0 &&
+    !hasRoomCartSessions;
+
+  // Empty cart — require no API rooms either (room carts can briefly have
+  // availableDates=[] while activeRoomId is reconciled after an event switch).
+  if (isCartEmpty) {
     return (
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-10 text-center">
         <div className="w-16 h-16 mx-auto bg-gray-50 rounded-2xl flex items-center justify-center mb-5">

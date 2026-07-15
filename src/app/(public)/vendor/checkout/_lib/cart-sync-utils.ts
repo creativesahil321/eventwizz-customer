@@ -113,14 +113,19 @@ export class CartSyncDetector {
   ): CartMismatchInfo {
     const mismatches: CartMismatchInfo["mismatches"] = [];
 
-    // If either is null/empty, consider it a mismatch
-    if (!apiData || !zustandData) {
+    // Missing local data after store/replace is expected — hydrate, don't wipe.
+    // Only treat as critical when API is gone but local still has data.
+    if (!apiData && zustandData) {
       mismatches.push({
         type: "structure",
         location: "root",
-        description: "API data or Zustand data is missing",
+        description: "API cart is empty but Zustand still has data",
       });
       return { hasMismatch: true, mismatches };
+    }
+
+    if (!apiData || !zustandData) {
+      return { hasMismatch: false, mismatches };
     }
 
     // Get date keys from both sources

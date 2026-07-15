@@ -8,7 +8,6 @@ import {
   RotateCcw,
   UserPlus,
 } from "lucide-react";
-import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { PriorityBadge, StatusBadge } from "./support-badges";
 import CloseTicketDialog from "./close-ticket-dialog";
@@ -20,7 +19,6 @@ import type {
 } from "../_lib/types";
 import {
   formatOpenedAt,
-  isClosedTicketStatus,
   VENDOR_CATEGORY_LABELS,
   VENDOR_DIRECTION_LABELS,
 } from "../_lib/utils";
@@ -49,6 +47,7 @@ interface VendorConversationHeaderProps {
   onEscalated?: (result: { status: SupportStatus; canReply: boolean }) => void;
   canPin?: boolean;
   canManage?: boolean;
+  onReopen?: () => void;
 }
 
 export default function VendorConversationHeader({
@@ -62,12 +61,12 @@ export default function VendorConversationHeader({
   onEscalated,
   canPin: canPinProp,
   canManage = false,
+  onReopen,
 }: VendorConversationHeaderProps) {
   const [closeOpen, setCloseOpen] = useState(false);
   const [transferOpen, setTransferOpen] = useState(false);
   const activeRole = useAuthStore((s) => s.active_role);
 
-  const isClosed = isClosedTicketStatus(status);
   const isSentToAdmin = conversation.direction === "sent";
   // Assign / Transfer / Close visibility from can_manage (API).
   const canTransfer = canManage && !isSentToAdmin;
@@ -77,32 +76,23 @@ export default function VendorConversationHeader({
   const canClose =
     canManage && (!isSentToAdmin || isMainVendorRole(activeRole));
 
-  const handleReopen = () => {
-    onStatusChange("reopen");
-    toast.success(`${conversation.ref} reopened`);
-  };
-
   const handleClosed = () => {
     onStatusChange("closed");
   };
 
-  /** Vendors cannot reopen customer-raised tickets; only the customer can. */
-  const canReopen = isClosed && isSentToAdmin;
-
   return (
     <>
-      <div className="min-w-0 border-b border-slate-200 bg-white px-3 py-3 sm:px-5 sm:py-4">
-        <p className="truncate text-[11px] leading-relaxed text-muted-foreground sm:text-xs">
-          {conversation.ref}
-          {conversation.bookingRef
-            ? ` · Booking ${conversation.bookingRef}`
-            : ""}{" "}
-          · Opened {formatOpenedAt(conversation.openedAt)}
-        </p>
-
-        <div className="mt-3 flex min-w-0 flex-col gap-3">
-          <div className="min-w-0">
-            <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
+      <div className="min-w-0 border-b border-slate-200 bg-white px-3 py-1.5 sm:px-5 sm:py-2">
+        <div className="flex min-w-0 items-start justify-between gap-2">
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-[11px] leading-relaxed text-muted-foreground sm:text-xs">
+              {conversation.ref}
+              {conversation.bookingRef
+                ? ` · Booking ${conversation.bookingRef}`
+                : ""}{" "}
+              · Opened {formatOpenedAt(conversation.openedAt)}
+            </p>
+            <div className="mt-1 flex flex-wrap items-center gap-1.5 sm:gap-2">
               <span
                 className={cn(
                   "rounded-full px-2.5 py-0.5 text-[11px] font-semibold",
@@ -132,19 +122,19 @@ export default function VendorConversationHeader({
                 </span>
               ) : null}
             </div>
-            <h2 className="mt-2 max-w-full text-base font-semibold leading-snug break-words [overflow-wrap:anywhere] text-foreground sm:text-lg">
+            <h2 className="mt-0.5 max-w-full text-sm font-semibold leading-snug break-words [overflow-wrap:anywhere] text-foreground sm:text-base">
               {conversation.subject}
             </h2>
           </div>
 
-          <div className="flex min-w-0 flex-wrap items-center gap-2">
+          <div className="flex shrink-0 items-center gap-1.5">
             {canPin ? (
               <Button
                 type="button"
                 variant="outline"
                 size="icon"
                 className={cn(
-                  "size-9 shrink-0 rounded-full border-slate-300 bg-white text-slate-900 hover:bg-slate-50",
+                  "size-8 shrink-0 rounded-full border-slate-300 bg-white text-slate-900 hover:bg-slate-50",
                   isPinned &&
                     "border-[var(--color-primary)] bg-[var(--color-primary)]/10 text-[var(--color-primary)]"
                 )}
@@ -159,11 +149,11 @@ export default function VendorConversationHeader({
                 type="button"
                 variant="outline"
                 size="sm"
-                className="shrink-0 rounded-full border-slate-300 bg-white px-2.5 text-slate-900 hover:bg-slate-50 sm:px-3"
+                className="h-8 shrink-0 rounded-full border-slate-300 bg-white px-2.5 text-slate-900 hover:bg-slate-50 sm:px-3"
                 onClick={onAssignClick}
               >
                 <UserPlus className="size-4 shrink-0" />
-                <span className="truncate">
+                <span className="hidden truncate sm:inline">
                   {assignee ? "Reassign" : "Assign"}
                 </span>
               </Button>
@@ -173,11 +163,11 @@ export default function VendorConversationHeader({
                 type="button"
                 variant="outline"
                 size="sm"
-                className="shrink-0 rounded-full border-slate-300 bg-white px-2.5 text-slate-900 hover:bg-slate-50 sm:px-3"
+                className="h-8 shrink-0 rounded-full border-slate-300 bg-white px-2.5 text-slate-900 hover:bg-slate-50 sm:px-3"
                 onClick={() => setTransferOpen(true)}
               >
                 <ArrowLeftRight className="size-4 shrink-0" />
-                <span className="truncate">Transfer</span>
+                <span className="hidden truncate sm:inline">Transfer</span>
               </Button>
             ) : null}
             {canClose ? (
@@ -185,22 +175,22 @@ export default function VendorConversationHeader({
                 type="button"
                 variant="event-primary"
                 size="sm"
-                className="shrink-0 rounded-full px-2.5 sm:px-3"
+                className="h-8 shrink-0 rounded-full px-2.5 sm:px-3"
                 onClick={() => setCloseOpen(true)}
               >
                 <CheckCircle2 className="size-4 shrink-0" />
-                <span className="truncate">Close ticket</span>
+                <span className="hidden truncate sm:inline">Close ticket</span>
               </Button>
-            ) : canReopen ? (
+            ) : onReopen ? (
               <Button
                 type="button"
                 variant="event-primary"
                 size="sm"
-                className="shrink-0 rounded-full px-2.5 sm:px-3"
-                onClick={handleReopen}
+                className="h-8 shrink-0 rounded-full px-2.5 sm:px-3"
+                onClick={onReopen}
               >
                 <RotateCcw className="size-4 shrink-0" />
-                <span className="truncate">Reopen</span>
+                <span className="hidden truncate sm:inline">Reopen</span>
               </Button>
             ) : null}
           </div>

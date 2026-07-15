@@ -111,10 +111,6 @@ export default function CartConflictModal({
                 <p className="text-sm font-medium text-gray-900">
                   {currentEvent.name}
                 </p>
-                <p className="text-xs text-gray-500">
-                  {currentEvent.dateCount} date
-                  {currentEvent.dateCount !== 1 ? "s" : ""}
-                </p>
               </div>
             </div>
 
@@ -150,7 +146,7 @@ export default function CartConflictModal({
               {isProcessing && selectedAction === "replace" ? (
                 <>
                   <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                  Replacing Cart...
+                  Switching events...
                 </>
               ) : (
                 <>

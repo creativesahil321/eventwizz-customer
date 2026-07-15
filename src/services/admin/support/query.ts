@@ -25,6 +25,7 @@ import type {
   AssignAdminSupportTicketResponse,
   CloseAdminSupportTicketPayload,
   CloseAdminSupportTicketResponse,
+  MarkAdminSupportMessagesReadResponse,
   PinAdminSupportTicketPayload,
   PinAdminSupportTicketResponse,
   StoreAdminSupportMessagePayload,
@@ -109,6 +110,33 @@ function setTicketPinnedInCaches(
       },
     };
   });
+}
+
+function setTicketUnreadInLists(
+  queryClient: ReturnType<typeof useQueryClient>,
+  ticketKey: string,
+  isUnread: boolean
+) {
+  queryClient.setQueriesData<AdminSupportTicketsResponse>(
+    { queryKey: adminSupportKeys.lists() },
+    (current) => {
+      if (!current?.data) return current;
+
+      const ticket = current.data.find(
+        (item) => item.ticket_key === ticketKey
+      );
+      if (!ticket || ticket.is_unread === isUnread) return current;
+
+      return {
+        ...current,
+        data: current.data.map((item) =>
+          item.ticket_key === ticketKey
+            ? { ...item, is_unread: isUnread }
+            : item
+        ),
+      };
+    }
+  );
 }
 
 function setTicketAssigneeInCaches(
@@ -282,6 +310,34 @@ export function useAdminSupportTicketMessagesInfinite(
     gcTime: 10 * 60 * 1000,
     refetchInterval: ADMIN_SUPPORT_THREAD_POLL_MS,
     refetchOnWindowFocus: true,
+  });
+}
+
+export function useMarkAdminSupportMessagesRead() {
+  const queryClient = useQueryClient();
+
+  return useMutation<
+    MarkAdminSupportMessagesReadResponse,
+    Error,
+    string
+  >({
+    mutationFn: (ticketKey) =>
+      adminSupportService.markMessagesRead(ticketKey),
+    onMutate: (ticketKey) => {
+      setTicketUnreadInLists(queryClient, ticketKey, false);
+    },
+    onSuccess: (response, ticketKey) => {
+      setTicketUnreadInLists(
+        queryClient,
+        ticketKey,
+        Boolean(response.data?.is_unread)
+      );
+    },
+    onError: () => {
+      void queryClient.invalidateQueries({
+        queryKey: adminSupportKeys.lists(),
+      });
+    },
   });
 }
 

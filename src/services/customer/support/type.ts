@@ -112,6 +112,33 @@ export interface CreateCustomerSupportTicketResponse {
   errors?: string[] | Record<string, string[]>;
 }
 
+/** Item from GET /customer/support-tickets/locations */
+export interface CustomerSupportLocationOption {
+  location_id: number;
+  location_name: string;
+}
+
+/** Item from GET /customer/support-tickets/locations?location_id= */
+export interface CustomerSupportLocationBookingOption {
+  booking_id: number;
+  booking_number: string;
+  event_name: string;
+}
+
+export interface CustomerSupportLocationsResponse {
+  status: boolean;
+  message: string;
+  data: CustomerSupportLocationOption[];
+  errors?: string[];
+}
+
+export interface CustomerSupportLocationBookingsResponse {
+  status: boolean;
+  message: string;
+  data: CustomerSupportLocationBookingOption[];
+  errors?: string[];
+}
+
 /** Attachment on a ticket message */
 export interface CustomerSupportMessageAttachment {
   name: string;

@@ -8,6 +8,8 @@ import { customerSupportService } from "./support.service";
 import type {
   CreateCustomerSupportTicketPayload,
   CreateCustomerSupportTicketResponse,
+  CustomerSupportLocationBookingsResponse,
+  CustomerSupportLocationsResponse,
   CustomerSupportMessagesParams,
   CustomerSupportMessagesResponse,
   CustomerSupportTicketsParams,
@@ -27,6 +29,9 @@ export const customerSupportKeys = {
   lists: () => [...customerSupportKeys.all, "list"] as const,
   list: (params: CustomerSupportTicketsParams) =>
     [...customerSupportKeys.lists(), params] as const,
+  locations: () => [...customerSupportKeys.all, "locations"] as const,
+  locationBookings: (locationId: number | string) =>
+    [...customerSupportKeys.all, "location-bookings", String(locationId)] as const,
   messages: (ticketKey: string, params: CustomerSupportMessagesParams = {}) =>
     [...customerSupportKeys.all, "messages", ticketKey, params] as const,
   messagesInfinite: (ticketKey: string, perPage: number = 30) =>
@@ -115,6 +120,34 @@ export function useCustomerSupportTicketMessagesInfinite(
   });
 }
 
+export function useCustomerSupportLocations(options?: { enabled?: boolean }) {
+  return useQuery<CustomerSupportLocationsResponse>({
+    queryKey: customerSupportKeys.locations(),
+    queryFn: () => customerSupportService.getLocations(),
+    enabled: options?.enabled ?? true,
+    staleTime: 5 * 60 * 1000,
+    gcTime: 15 * 60 * 1000,
+  });
+}
+
+export function useCustomerSupportLocationBookings(
+  locationId: number | string | null | undefined,
+  options?: { enabled?: boolean }
+) {
+  const hasLocation =
+    locationId != null &&
+    locationId !== "" &&
+    Number(locationId) > 0;
+
+  return useQuery<CustomerSupportLocationBookingsResponse>({
+    queryKey: customerSupportKeys.locationBookings(locationId ?? ""),
+    queryFn: () => customerSupportService.getLocationBookings(locationId!),
+    enabled: (options?.enabled ?? true) && hasLocation,
+    staleTime: 60 * 1000,
+    gcTime: 10 * 60 * 1000,
+  });
+}
+
 export function useCreateCustomerSupportTicket() {
   const queryClient = useQueryClient();
 
@@ -173,12 +206,20 @@ export function useMarkCustomerSupportMessagesRead() {
   >({
     mutationFn: (ticketKey) =>
       customerSupportService.markMessagesRead(ticketKey),
+    onMutate: (ticketKey) => {
+      markTicketReadInLists(queryClient, ticketKey, false);
+    },
     onSuccess: (response, ticketKey) => {
       markTicketReadInLists(
         queryClient,
         ticketKey,
         Boolean(response.data?.is_unread)
       );
+    },
+    onError: () => {
+      void queryClient.invalidateQueries({
+        queryKey: customerSupportKeys.lists(),
+      });
     },
   });
 }

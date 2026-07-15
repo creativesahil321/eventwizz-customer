@@ -269,6 +269,7 @@ export default function DatesSection({
     | ((
         eventSlug: string,
         eventInfo: { name: string; slug: string; image: string },
+        onConfirmReplace?: () => void | Promise<void>,
       ) => boolean)
     | null = null;
 
@@ -425,28 +426,35 @@ export default function DatesSection({
       eventImage ||
       "http://192.168.1.100:8000/storage/uploads/vendor/events/event_banner_image68bab4bb983bd.jpg";
 
-    // Check for cart conflicts BEFORE making API call (only if available)
+    const eventPayload = {
+      event_slug: actualEventSlug,
+      event_name: actualEventName,
+      event_image: actualEventImage,
+      event_date: eventDate,
+    };
+
+    // Check for cart conflicts BEFORE making API call (only if available).
+    // On Replace, run the same store — backend removes other events (no delete).
     if (checkAndHandleConflict) {
-      const canProceed = checkAndHandleConflict(actualEventSlug, {
-        name: actualEventName,
-        slug: actualEventSlug,
-        image: actualEventImage,
-      });
+      const canProceed = checkAndHandleConflict(
+        actualEventSlug,
+        {
+          name: actualEventName,
+          slug: actualEventSlug,
+          image: actualEventImage,
+        },
+        () => proceedWithEvent(eventPayload),
+      );
 
       if (!canProceed) {
-        // Conflict detected - modal will be shown, don't proceed with API call
+        // Conflict detected - modal will be shown; Replace resumes store-only
         clearDateSelection();
         return;
       }
     }
 
     // No conflict, proceed with adding to cart
-    proceedWithEvent({
-      event_slug: actualEventSlug,
-      event_name: actualEventName,
-      event_image: actualEventImage,
-      event_date: eventDate,
-    });
+    proceedWithEvent(eventPayload);
   };
 
   // Proceed with adding event to cart and navigation

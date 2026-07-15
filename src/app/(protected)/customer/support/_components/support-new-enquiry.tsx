@@ -17,10 +17,11 @@ import {
 } from "@/components/ui/select";
 import type { SupportCategory, SupportPriority } from "../_lib/types";
 import { useSupportCustomerProfile } from "../_lib/use-support-customer-profile";
-import { useCreateCustomerSupportTicket } from "@/services/customer/support";
-import { useBookings } from "@/services/customer/bookings/query";
-import { useLocationStore } from "@/store/location.store";
-import { useAuthStore } from "@/store/auth.store";
+import {
+  useCreateCustomerSupportTicket,
+  useCustomerSupportLocationBookings,
+  useCustomerSupportLocations,
+} from "@/services/customer/support";
 import {
   MAX_SUPPORT_ATTACHMENTS,
   SUPPORT_ATTACHMENT_ACCEPT,
@@ -39,47 +40,46 @@ export default function SupportNewEnquiry() {
   const customer = useSupportCustomerProfile();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const createTicket = useCreateCustomerSupportTicket();
-  const { data: bookingsResponse } = useBookings({ per_page: 50 });
-  const locations = useLocationStore((state) => state.allLocations);
-  const selectedLocationId = useLocationStore((state) => state.getLocationId());
-  const authLocationId = useAuthStore((state) => state.vendor_location_id);
-
-  const defaultLocationId = useMemo(() => {
-    if (selectedLocationId) return String(selectedLocationId);
-    if (authLocationId) return String(authLocationId);
-    if (locations[0]?.id) return String(locations[0].id);
-    return NONE_LOCATION;
-  }, [selectedLocationId, authLocationId, locations]);
 
   const [subject, setSubject] = useState("");
   const [category, setCategory] = useState<SupportCategory>("general_support");
   const [contactNumber, setContactNumber] = useState("");
-  const [bookingLocation, setBookingLocation] = useState<string | null>(null);
+  const [bookingLocation, setBookingLocation] = useState(NONE_LOCATION);
   const [booking, setBooking] = useState(NONE_BOOKING);
   const [priority, setPriority] = useState<SupportPriority>("medium");
   const [description, setDescription] = useState("");
   const [attachments, setAttachments] = useState<File[]>([]);
 
+  const { data: locationsResponse, isLoading: isLoadingLocations } =
+    useCustomerSupportLocations();
+  const { data: bookingsResponse, isLoading: isLoadingBookings } =
+    useCustomerSupportLocationBookings(
+      bookingLocation !== NONE_LOCATION ? bookingLocation : null
+    );
+
   const contactNumberValue = contactNumber || customer.phone || "";
-  const bookings = bookingsResponse?.data ?? [];
-  const locationOptions = locations.map((location) => ({
-    id: String(location.id),
-    name: location.name,
-  }));
-  const resolvedLocationValue =
-    bookingLocation === null ? defaultLocationId : bookingLocation;
+
+  const locationOptions = useMemo(
+    () =>
+      (locationsResponse?.data ?? []).map((location) => ({
+        id: String(location.location_id),
+        name: location.location_name,
+      })),
+    [locationsResponse?.data]
+  );
 
   const bookingOptions = useMemo(
     () =>
-      bookings.map((item) => ({
+      (bookingsResponse?.data ?? []).map((item) => ({
         id: String(item.booking_id),
         label: `${item.booking_number} — ${item.event_name}`,
       })),
-    [bookings]
+    [bookingsResponse?.data]
   );
 
   const handleLocationChange = (locationId: string) => {
     setBookingLocation(locationId);
+    setBooking(NONE_BOOKING);
   };
 
   const handleFilesSelected = (fileList: FileList | null) => {
@@ -111,8 +111,8 @@ export default function SupportNewEnquiry() {
     }
 
     const vendorLocationId =
-      resolvedLocationValue !== NONE_LOCATION
-        ? Number.parseInt(resolvedLocationValue, 10)
+      bookingLocation !== NONE_LOCATION
+        ? Number.parseInt(bookingLocation, 10)
         : null;
     const bookingId =
       booking !== NONE_BOOKING ? Number.parseInt(booking, 10) : null;
@@ -146,6 +146,8 @@ export default function SupportNewEnquiry() {
   };
 
   const isSubmitting = createTicket.isPending;
+  const bookingSelectDisabled =
+    bookingLocation === NONE_LOCATION || isLoadingBookings;
 
   return (
     <div className="min-w-0 max-w-full">
@@ -226,11 +228,18 @@ export default function SupportNewEnquiry() {
                 <div className="min-w-0 space-y-2">
                   <Label>Booking location</Label>
                   <Select
-                    value={resolvedLocationValue}
+                    value={bookingLocation}
                     onValueChange={handleLocationChange}
+                    disabled={isLoadingLocations}
                   >
                     <SelectTrigger className="h-11 bg-gray-50">
-                      <SelectValue placeholder="Optional — select a venue" />
+                      <SelectValue
+                        placeholder={
+                          isLoadingLocations
+                            ? "Loading venues…"
+                            : "Optional — select a venue"
+                        }
+                      />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value={NONE_LOCATION}>
@@ -246,9 +255,21 @@ export default function SupportNewEnquiry() {
                 </div>
                 <div className="min-w-0 space-y-2">
                   <Label>Related booking</Label>
-                  <Select value={booking} onValueChange={setBooking}>
+                  <Select
+                    value={booking}
+                    onValueChange={setBooking}
+                    disabled={bookingSelectDisabled}
+                  >
                     <SelectTrigger className="h-11 bg-gray-50">
-                      <SelectValue placeholder="Optional — link a booking" />
+                      <SelectValue
+                        placeholder={
+                          bookingLocation === NONE_LOCATION
+                            ? "Select a venue first"
+                            : isLoadingBookings
+                              ? "Loading bookings…"
+                              : "Optional — link a booking"
+                        }
+                      />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value={NONE_BOOKING}>None</SelectItem>

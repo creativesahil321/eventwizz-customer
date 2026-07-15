@@ -51,7 +51,6 @@ export const useGetCartData = (enabled: boolean = true) => {
  */
 export const useStoreEventBooking = () => {
   const queryClient = useQueryClient();
-  const { clearDrinks } = useDrinkSelectionStore();
 
   return useMutation({
     mutationFn: (input: StoreEventBookingInput | CartRequest) => {
@@ -64,10 +63,20 @@ export const useStoreEventBooking = () => {
       const skipInvalidation =
         "data" in input ? Boolean(input.skipInvalidation) : false;
       const variables: CartRequest = "data" in input ? input.data : input;
+      const storedSlug = decodeURIComponent(variables.slug);
 
-      clearDrinks({
+      useDrinkSelectionStore.getState().clearDrinks({
         eventSlug: variables.slug,
         roomId: variables.room_id,
+      });
+
+      // Backend store replaces other events — drop stale local carts immediately
+      // so checkout doesn't keep the previous event's active room / dates.
+      const { editingData, removeAllDates } = useCartEditStore.getState();
+      Object.keys(editingData).forEach((eventSlug) => {
+        if (decodeURIComponent(eventSlug) !== storedSlug) {
+          removeAllDates(eventSlug);
+        }
       });
 
       if (!skipInvalidation) {
