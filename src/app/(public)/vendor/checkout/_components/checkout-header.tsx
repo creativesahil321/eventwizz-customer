@@ -1,12 +1,31 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, ShieldCheck } from "lucide-react";
+import { addCacheBusting } from "@/lib/image-utils";
 import { CheckoutHeaderProps } from "../_lib/types";
+
+const DEFAULT_LOGO = "/assets/images/logos/eventwizz-logo.png";
+
+function resolveSiteLogo(logo?: string | null): string {
+  if (
+    logo &&
+    (logo.startsWith("/") ||
+      logo.startsWith("data:") ||
+      logo.startsWith("http") ||
+      logo.startsWith("https") ||
+      logo.startsWith("blob"))
+  ) {
+    return logo;
+  }
+  return DEFAULT_LOGO;
+}
 
 export default function CheckoutHeader({ settings }: CheckoutHeaderProps) {
   const router = useRouter();
-  const venueName = settings?.name || "EventWizz";
+  const logoPath = resolveSiteLogo(settings?.logo);
+  const brandName = settings?.name || "EventWizz";
 
   return (
     <header className="sticky top-0 z-40 border-b border-[color:var(--checkout-border)] bg-white/80 backdrop-blur-md">
@@ -20,14 +39,20 @@ export default function CheckoutHeader({ settings }: CheckoutHeaderProps) {
           >
             <ArrowLeft className="h-4 w-4" />
           </button>
-          <div className="min-w-0">
-            <p className="truncate text-base font-bold uppercase tracking-tight text-[color:var(--checkout-brand-primary)]">
-              {venueName}
-            </p>
-            <p className="text-[11px] font-medium tracking-wider text-[color:var(--checkout-muted-foreground)]">
-              EVENT CHECKOUT
-            </p>
-          </div>
+
+          <Link
+            href="/"
+            aria-label={`${brandName} home`}
+            className="flex min-w-0 items-center"
+          >
+            <img
+              src={addCacheBusting(logoPath)}
+              alt={brandName}
+              width={200}
+              height={56}
+              className="max-h-10 w-auto object-contain sm:max-h-11"
+            />
+          </Link>
         </div>
 
         <div className="flex shrink-0 items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700 ring-1 ring-emerald-600/10">
