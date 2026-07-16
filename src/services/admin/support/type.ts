@@ -6,6 +6,7 @@
  * Messages:  GET /admin/support-tickets/{ticketKey}/messages
  * Pin:       POST /admin/support-tickets/pin/{ticketKey}
  * Assign:    POST /admin/support-tickets/assign/{ticketKey}
+ * Assign:    POST /admin/support-tickets/assign/{ticketKey}
  * Close:     POST /admin/support-tickets/close/{ticketKey}
  * Store msg: POST /admin/support-tickets/{ticketKey}/messages/store
  */
@@ -364,6 +365,7 @@ export interface AdminSupportMessagesResponse {
   can_reply?: boolean;
   can_manage?: boolean;
   can_pin?: boolean;
+  can_escalate?: boolean;
   recent_tickets?: AdminSupportRecentTicket[];
   errors?: string[] | Record<string, string[]>;
 }

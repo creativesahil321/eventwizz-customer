@@ -151,16 +151,18 @@ function CustomerMessage({
         </div>
       </div>
 
-      <div
-        className={cn(
-          "max-w-[min(100%,42rem)] rounded-2xl rounded-tr-md bg-[var(--color-primary)] px-3 py-2 text-[13px] leading-snug text-white shadow-sm transition-opacity",
-          isSending && "opacity-70"
-        )}
-      >
-        <p className="whitespace-pre-wrap break-words [overflow-wrap:anywhere]">
-          {message.content}
-        </p>
-      </div>
+      {message.content?.trim() ? (
+        <div
+          className={cn(
+            "max-w-[min(100%,42rem)] rounded-2xl rounded-tr-md bg-[var(--color-primary)] px-3 py-2 text-[13px] leading-snug text-white shadow-sm transition-opacity",
+            isSending && "opacity-70"
+          )}
+        >
+          <p className="whitespace-pre-wrap break-words [overflow-wrap:anywhere]">
+            {message.content}
+          </p>
+        </div>
+      ) : null}
 
       {message.attachments && message.attachments.length > 0 ? (
         <AttachmentCards attachments={message.attachments} align="right" />
@@ -184,11 +186,13 @@ function AgentMessage({ message }: { message: SupportMessage }) {
         </div>
       </div>
 
-      <div className="max-w-[min(100%,42rem)] rounded-2xl rounded-tl-md border border-slate-200 bg-white px-3 py-2 text-[13px] leading-snug text-foreground shadow-sm">
-        <p className="whitespace-pre-wrap break-words [overflow-wrap:anywhere]">
-          {message.content}
-        </p>
-      </div>
+      {message.content?.trim() ? (
+        <div className="max-w-[min(100%,42rem)] rounded-2xl rounded-tl-md border border-slate-200 bg-white px-3 py-2 text-[13px] leading-snug text-foreground shadow-sm">
+          <p className="whitespace-pre-wrap break-words [overflow-wrap:anywhere]">
+            {message.content}
+          </p>
+        </div>
+      ) : null}
 
       {message.attachments && message.attachments.length > 0 ? (
         <AttachmentCards attachments={message.attachments} align="left" />

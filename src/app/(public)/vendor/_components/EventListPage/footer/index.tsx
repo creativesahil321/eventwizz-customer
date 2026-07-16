@@ -21,6 +21,7 @@ import {
   type ResolvedVenueContact,
   type VenueContactOverride,
 } from "@/lib/resolve-venue-contact";
+import { VENDOR_FOOTER_PAGE_LINKS } from "@/lib/vendor-cms-content";
 
 interface FooterSectionProps {
   copyright?: string | null;
@@ -118,6 +119,25 @@ function ContactColumn({
     >
       {body}
     </Link>
+  );
+}
+
+function FooterPageLinks({ centered }: { centered?: boolean }) {
+  return (
+    <nav
+      aria-label="Footer pages"
+      className={`flex flex-wrap gap-x-5 gap-y-2 ${centered ? "justify-center" : ""}`}
+    >
+      {VENDOR_FOOTER_PAGE_LINKS.map((link) => (
+        <Link
+          key={link.href}
+          href={link.href}
+          className="text-sm text-[var(--color-on-footer)]/70 transition-colors hover:text-[color:var(--color-primary)]"
+        >
+          {link.label}
+        </Link>
+      ))}
+    </nav>
   );
 }
 
@@ -279,6 +299,10 @@ export default function FooterSection({
                 ) : null}
               </div>
             ) : null}
+
+            <div className="mt-10">
+              <FooterPageLinks centered />
+            </div>
           </div>
         </div>
       ) : (
@@ -318,6 +342,10 @@ export default function FooterSection({
                 </div>
               </div>
             )}
+          </div>
+
+          <div className="mt-8 md:col-span-12">
+            <FooterPageLinks />
           </div>
         </div>
       )}

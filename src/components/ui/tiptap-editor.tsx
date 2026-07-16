@@ -49,6 +49,9 @@ interface TiptapEditorProps {
     event_category_name?: string;
     banner_heading?: string;
     banner_sub_heading?: string;
+    /** When set, generates policy/legal copy instead of short About text */
+    contentType?: "about" | "policy" | "contact";
+    policySection?: string;
   };
   showAIButton?: boolean;
   wrapText?: boolean;
@@ -164,6 +167,9 @@ export function TiptapEditor({
           event_category_name: aiContext?.event_category_name,
           banner_heading: aiContext?.banner_heading,
           banner_sub_heading: aiContext?.banner_sub_heading,
+          contentType: aiContext?.contentType,
+          policySection: aiContext?.policySection,
+          maxLength,
         }),
       });
 

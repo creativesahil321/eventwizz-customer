@@ -111,6 +111,37 @@ export function mergeSiteEssentialsPreviewWithApi(
       api.about_link_title,
     ),
     about_cta_link: coalesceText(formData.about_cta_link, api.about_cta_link),
+    terms_and_conditions: coalesceText(
+      formData.terms_and_conditions,
+      api.terms_and_conditions,
+    ),
+    privacy_policy: coalesceText(formData.privacy_policy, api.privacy_policy),
+    refund_policy: coalesceText(formData.refund_policy, api.refund_policy),
+    cookie_policy: coalesceText(formData.cookie_policy, api.cookie_policy),
+    vendor_terms: coalesceText(formData.vendor_terms, api.vendor_terms),
+    about_page_content: coalesceText(
+      formData.about_page_content,
+      api.about_page_content,
+    ),
+    how_it_works_page_content: coalesceText(
+      formData.how_it_works_page_content,
+      api.how_it_works_page_content,
+    ),
+    contact_page_content: coalesceText(
+      formData.contact_page_content,
+      api.contact_page_content,
+    ),
+    company_legal_name: coalesceText(
+      formData.company_legal_name,
+      api.company_legal_name,
+    ),
+    company_number: coalesceText(formData.company_number, api.company_number),
+    company_registered_office: coalesceText(
+      formData.company_registered_office,
+      api.company_registered_office,
+    ),
+    company_phone: coalesceText(formData.company_phone, api.company_phone),
+    company_email: coalesceText(formData.company_email, api.company_email),
     event_title_1: coalesceText(formData.event_title_1, api.event_title_1),
     event_title_2: coalesceText(formData.event_title_2, api.event_title_2),
     event_gallery_title: coalesceText(

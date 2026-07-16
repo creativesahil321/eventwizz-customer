@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
-  ProfileFormValues,
+  UpdateProfilePayload,
   ProfileResponse,
   PasswordUpdateFormValues,
   PasswordUpdateResponse,
@@ -68,7 +68,7 @@ export const fetchProfileData = async (): Promise<
  * @returns Promise with API response
  */
 export const updateProfile = async (
-  data: ProfileFormValues
+  data: UpdateProfilePayload
 ): Promise<ApiResponse<ProfileResponse["data"]>> => {
   try {
     // Create FormData for file upload
@@ -77,6 +77,29 @@ export const updateProfile = async (
     // Add text fields
     formData.append("first_name", data.firstName);
     formData.append("last_name", data.lastName);
+
+    if (data.phone?.trim()) {
+      formData.append("phone", data.phone.trim());
+    }
+    if (data.address?.trim()) {
+      formData.append("address", data.address.trim());
+    }
+    if (data.city?.trim()) {
+      formData.append("city", data.city.trim());
+    }
+    if (data.postcode?.trim()) {
+      formData.append("post_code", data.postcode.trim());
+    }
+
+    if (data.company_number?.trim()) {
+      formData.append("company_number", data.company_number.trim());
+    }
+    if (data.company_registered_office?.trim()) {
+      formData.append(
+        "company_registered_office",
+        data.company_registered_office.trim(),
+      );
+    }
 
     // Add file if available
     if (data.avatar && data.avatar instanceof File) {

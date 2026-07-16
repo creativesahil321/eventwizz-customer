@@ -11,6 +11,7 @@ export const API_ENDPOINTS = {
     THEME: {
       SETTINGS: "/theme/settings",
     },
+    CONTACT_STORE: "/contact/store",
     PERMISSIONS: {
       GET: "/auth/user/permissions",
     },

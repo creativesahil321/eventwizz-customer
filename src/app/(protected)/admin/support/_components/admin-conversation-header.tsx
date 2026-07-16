@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { CheckCircle2, Pin, UserPlus } from "lucide-react";
+import { ArrowLeftRight, CheckCircle2, Pin, UserPlus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   BookingBadge,
@@ -33,6 +33,7 @@ interface AdminConversationHeaderProps {
   onAssignClick: () => void;
   canPin?: boolean;
   canManage?: boolean;
+  canEscalate?: boolean;
 }
 
 export default function AdminConversationHeader({
@@ -45,12 +46,14 @@ export default function AdminConversationHeader({
   onAssignClick,
   canPin = false,
   canManage = false,
+  canEscalate = false,
 }: AdminConversationHeaderProps) {
   const [closeOpen, setCloseOpen] = useState(false);
 
   const isClosed = isClosedTicketStatus(status);
-  const canAssign = canManage && !isClosed;
+  const canAssign = canManage && !isClosed && !assignee;
   const canClose = canManage && !isClosed;
+  const canTransfer = canEscalate && !isClosed;
 
   const handleClosed = (nextStatus: SupportStatus) => {
     onStatusChange(nextStatus);
@@ -113,9 +116,18 @@ export default function AdminConversationHeader({
                 disabled={isClosed}
               >
                 <UserPlus className="size-4 shrink-0" />
-                <span className="hidden truncate sm:inline">
-                  {assignee ? "Reassign" : "Assign"}
-                </span>
+                <span className="hidden truncate sm:inline">Assign</span>
+              </Button>
+            ) : null}
+            {canTransfer ? (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-8 shrink-0 rounded-full border-slate-300 bg-white px-2.5 text-slate-900 hover:bg-slate-50 sm:px-3"
+              >
+                <ArrowLeftRight className="size-4 shrink-0" />
+                <span className="hidden truncate sm:inline">Transfer</span>
               </Button>
             ) : null}
             {canClose ? (

@@ -6,6 +6,7 @@ import {
 
 /** Hero subline; was 80 — too short for full sentences (often cut mid-word in CMS). */
 export const BANNER_SUB_HEADING_MAX_CHARS = 220;
+export const COPYRIGHT_MAX_CHARS = 200;
 import { HEADING_EMPHASIS_VALUES } from "@/lib/heading-emphasis";
 import {
   BANNER_HEADING_ALIGN_VALUES,
@@ -166,7 +167,10 @@ export const siteEssentialsFormSchema = z.object({
   copyright: z
     .string()
     .min(1, "Copyright text is required")
-    .max(100, "Copyright text must not exceed 100 characters"),
+    .max(
+      COPYRIGHT_MAX_CHARS,
+      `Copyright text must not exceed ${COPYRIGHT_MAX_CHARS} characters`,
+    ),
   logo: z.any().optional(),
   favicon: z.any().optional(),
   domain: z.string().nullable().optional(),
@@ -211,6 +215,19 @@ export const siteEssentialsFormSchema = z.object({
     .nullable()
     .optional(),
   about_cta_link: z.string().nullable().optional(),
+  terms_and_conditions: z.string().nullable().optional(),
+  privacy_policy: z.string().nullable().optional(),
+  refund_policy: z.string().nullable().optional(),
+  cookie_policy: z.string().nullable().optional(),
+  vendor_terms: z.string().nullable().optional(),
+  about_page_content: z.string().nullable().optional(),
+  how_it_works_page_content: z.string().nullable().optional(),
+  contact_page_content: z.string().nullable().optional(),
+  company_legal_name: z.string().nullable().optional(),
+  company_number: z.string().nullable().optional(),
+  company_registered_office: z.string().nullable().optional(),
+  company_phone: z.string().nullable().optional(),
+  company_email: z.string().nullable().optional(),
   event_title_1: z
     .string()
     .max(40, "Event title must not exceed 40 characters")

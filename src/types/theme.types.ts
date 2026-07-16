@@ -170,6 +170,21 @@ export interface ThemeSchema {
   about_link_title?: string;
   about_cta_link?: string;
 
+  // Public CMS pages (global)
+  terms_and_conditions?: string;
+  privacy_policy?: string;
+  refund_policy?: string;
+  cookie_policy?: string;
+  vendor_terms?: string;
+  about_page_content?: string;
+  how_it_works_page_content?: string;
+  contact_page_content?: string;
+  company_legal_name?: string;
+  company_number?: string;
+  company_registered_office?: string;
+  company_phone?: string;
+  company_email?: string;
+
   // Event section fields
   event_title_1?: string;
   event_title_2?: string;

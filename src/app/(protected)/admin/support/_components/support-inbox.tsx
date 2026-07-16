@@ -369,6 +369,7 @@ function ConversationDetail({
     !permissionsReady || latestPayload.can_reply === false;
   const canManage = permissionsReady && latestPayload.can_manage !== false;
   const canPin = permissionsReady && latestPayload.can_pin !== false;
+  const canEscalate = permissionsReady && latestPayload.can_escalate === true;
 
   const composerDisabledMessage = isClosedTicketStatus(status)
     ? "This ticket is closed."
@@ -394,6 +395,7 @@ function ConversationDetail({
             onTogglePin={canPin ? handleTogglePin : () => undefined}
             canPin={canPin}
             canManage={canManage}
+            canEscalate={canEscalate}
             onAssignClick={() => setAssignOpen(true)}
           />
         </div>
@@ -417,7 +419,7 @@ function ConversationDetail({
             }}
           />
         )}
-        {canManage ? (
+        {canManage && !assignee ? (
           <AssignTicketDialog
             open={assignOpen}
             onOpenChange={setAssignOpen}
@@ -443,7 +445,7 @@ function ConversationDetail({
         <AdminConversationSidebar
           conversation={conversation}
           assignee={assignee}
-          onAssignClick={canManage ? () => setAssignOpen(true) : undefined}
+          onAssignClick={canManage && !assignee ? () => setAssignOpen(true) : undefined}
           recentTickets={recentTickets}
           isLoadingRecent={isLoading && recentTickets.length === 0}
         />

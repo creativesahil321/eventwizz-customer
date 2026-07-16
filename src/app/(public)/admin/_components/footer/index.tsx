@@ -1,26 +1,54 @@
 "use client";
 
-import React, { useContext } from "react";
+import { useContext } from "react";
 import Link from "next/link";
+import {
+  Facebook,
+  Instagram,
+  Linkedin,
+  Twitter,
+  Youtube,
+} from "lucide-react";
 import { ServerContext } from "@/lib/server-context";
 import { addCacheBusting } from "@/lib/image-utils";
+import {
+  ADMIN_FOOTER_BRAND_DESCRIPTION,
+  ADMIN_FOOTER_DISCLAIMER,
+  ADMIN_FOOTER_NAV_LINKS,
+  resolveAdminCompanyInfo,
+} from "@/lib/admin-cms-content";
+import { ThemeSchema } from "@/types/theme.types";
 
-const NAV_LINKS = [
-  { href: "/", label: "Home" },
-  { href: "/about", label: "About Us" },
-  { href: "/how-it-works", label: "How It Works" },
-];
+function SocialRow({
+  links,
+}: {
+  links: Array<{ icon: typeof Facebook; href: string; id: string }>;
+}) {
+  if (links.length === 0) return null;
 
-const LEGAL_LINKS = [
-  { href: "/terms", label: "Terms" },
-  { href: "/privacy", label: "Privacy" },
-];
-
-const SERVICES = ["Event Planning", "Event Management", "Custom Solutions"];
+  return (
+    <div className="mt-5 flex flex-wrap items-center gap-2.5">
+      {links.map(({ icon: Icon, href, id }) => (
+        <Link
+          key={id}
+          href={href}
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label={id}
+          className="flex h-8 w-8 items-center justify-center rounded-full border border-[color:color-mix(in_srgb,var(--color-on-footer)_15%,transparent)] text-[var(--color-on-footer)]/70 transition-colors hover:border-[color:var(--color-primary)] hover:text-[color:var(--color-primary)]"
+        >
+          <Icon size={14} />
+        </Link>
+      ))}
+    </div>
+  );
+}
 
 export default function AdminFooter() {
   const { theme } = useContext(ServerContext);
+  const adminTheme = theme as ThemeSchema;
   const currentYear = new Date().getFullYear();
+  const companyInfo = resolveAdminCompanyInfo(adminTheme);
 
   const logoPath =
     theme?.logo?.startsWith("/") ||
@@ -31,82 +59,116 @@ export default function AdminFooter() {
       ? theme.logo
       : "/assets/images/logos/eventwizz-logo.png";
 
+  const socialIcons = {
+    facebook: Facebook,
+    twitter: Twitter,
+    instagram: Instagram,
+    linkedin: Linkedin,
+    youtube: Youtube,
+  } as const;
+
+  const socialLinks = Object.entries(adminTheme?.socialLinks || {})
+    .filter(([, url]) => Boolean(url && url.trim() !== ""))
+    .map(([platform, url]) => {
+      const IconComponent = socialIcons[platform as keyof typeof socialIcons];
+      if (!IconComponent || !url) return null;
+      return { icon: IconComponent, href: url, id: platform };
+    })
+    .filter(
+      (link): link is { icon: typeof Facebook; href: string; id: string } =>
+        link !== null,
+    );
+
   return (
-    <footer className="bg-[color:var(--color-footer)] text-[var(--color-on-footer)] py-12">
-      <div className="container mx-auto px-4">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-10 mb-10">
+    <footer className="bg-[color:var(--color-footer)] text-[var(--color-on-footer)]">
+      <div className="container mx-auto px-4 py-12 md:py-14">
+        <div className="grid grid-cols-1 gap-10 md:grid-cols-2 lg:grid-cols-12 lg:gap-8">
           {/* Brand */}
-          <div>
+          <div className="lg:col-span-4">
             <img
               src={addCacheBusting(logoPath)}
               alt="EventWizz"
-              className="h-10 w-auto mb-4"
+              className="h-9 w-auto"
             />
-            <p className="text-sm text-[var(--color-on-footer)]/80 leading-relaxed">
-              Creating unforgettable events with professional planning and
-              management services.
+            <p className="mt-4 max-w-sm text-sm leading-relaxed text-[var(--color-on-footer)]/75">
+              {ADMIN_FOOTER_BRAND_DESCRIPTION}
             </p>
+            <SocialRow links={socialLinks} />
           </div>
 
-          {/* Navigation */}
-          <div>
-            <h3 className="text-sm font-semibold mb-4 uppercase tracking-wider">
-              Navigation
+          {/* Company information — legal entity, not duplicate policy links */}
+          <div className="lg:col-span-4">
+            <h3
+              className="text-base font-bold text-[var(--color-on-footer)]"
+              style={{ fontFamily: "var(--font-heading)" }}
+            >
+              Company Information
             </h3>
-            <ul className="space-y-2">
-              {NAV_LINKS.map((link) => (
-                <li key={link.href}>
-                  <Link
-                    href={link.href}
-                    className="text-sm text-[var(--color-on-footer)]/80 hover:text-[color:var(--color-primary)] transition-colors"
-                  >
-                    {link.label}
-                  </Link>
-                </li>
-              ))}
-            </ul>
+            <address className="mt-4 space-y-2 text-sm not-italic leading-relaxed text-[var(--color-on-footer)]/80">
+              <p>{companyInfo.legalName}</p>
+              <p>Company Number: {companyInfo.companyNumber}</p>
+              <p>
+                Registered Office:
+                <br />
+                {companyInfo.registeredOffice}
+              </p>
+              <p>
+                Phone:{" "}
+                <Link
+                  href={`tel:${companyInfo.phoneHref}`}
+                  className="transition-colors hover:text-[color:var(--color-primary)]"
+                >
+                  {companyInfo.phone}
+                </Link>
+              </p>
+              <p>
+                Email:{" "}
+                <Link
+                  href={`mailto:${companyInfo.email}`}
+                  className="transition-colors hover:text-[color:var(--color-primary)]"
+                >
+                  {companyInfo.email}
+                </Link>
+              </p>
+            </address>
           </div>
 
-          {/* Legal */}
-          <div>
-            <h3 className="text-sm font-semibold mb-4 uppercase tracking-wider">
-              Legal
+          {/* Main navigation only — policy sub-pages live under Terms & Privacy */}
+          <div className="lg:col-span-4">
+            <h3
+              className="text-base font-bold text-[var(--color-on-footer)]"
+              style={{ fontFamily: "var(--font-heading)" }}
+            >
+              Links
             </h3>
-            <ul className="space-y-2">
-              {LEGAL_LINKS.map((link) => (
-                <li key={link.href}>
-                  <Link
-                    href={link.href}
-                    className="text-sm text-[var(--color-on-footer)]/80 hover:text-[color:var(--color-primary)] transition-colors"
-                  >
-                    {link.label}
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </div>
-
-          {/* Services */}
-          <div>
-            <h3 className="text-sm font-semibold mb-4 uppercase tracking-wider">
-              Services
-            </h3>
-            <ul className="space-y-2">
-              {SERVICES.map((service) => (
-                <li key={service}>
-                  <span className="text-sm text-[var(--color-on-footer)]/80">
-                    {service}
-                  </span>
-                </li>
-              ))}
-            </ul>
+            <nav aria-label="Footer navigation" className="mt-4">
+              <ul className="space-y-2.5">
+                {ADMIN_FOOTER_NAV_LINKS.map((link) => (
+                  <li key={link.href}>
+                    <Link
+                      href={link.href}
+                      className="text-sm text-[var(--color-on-footer)]/80 transition-colors hover:text-[color:var(--color-primary)]"
+                    >
+                      {link.label}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </nav>
+            <p className="mt-4 text-xs leading-relaxed text-[var(--color-on-footer)]/55">
+              Privacy, terms, cookies, refunds, and vendor policies are available
+              on the Terms &amp; Privacy page.
+            </p>
           </div>
         </div>
 
-        {/* Copyright */}
-        <div className="border-t border-[var(--color-on-footer)]/25 pt-6 text-center">
-          <p className="text-xs text-[var(--color-on-footer)]/70">
-            &copy; {currentYear} EventWizz. All rights reserved.
+        <div className="mt-10 border-t border-[var(--color-on-footer)]/20 pt-8">
+          <p className="mx-auto max-w-4xl text-center text-xs leading-relaxed text-[var(--color-on-footer)]/60">
+            {ADMIN_FOOTER_DISCLAIMER}
+          </p>
+          <p className="mt-4 text-center text-xs text-[var(--color-on-footer)]/70">
+            &copy; {currentYear} {companyInfo.legalName}. All rights
+            reserved.
           </p>
         </div>
       </div>

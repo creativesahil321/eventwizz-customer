@@ -1,18 +1,24 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useSession } from "next-auth/react";
+import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { PasswordInput } from "@/components/ui/password-input";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Form, FormLabel } from "@/components/ui/form";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
 import { FileUploader } from "@/components/ui/file-uploader";
 import {
-  profileSchema,
   passwordUpdateSchema,
-  ProfileFormValues,
   PasswordUpdateFormValues,
   useUpdateProfile,
   useUpdatePassword,
@@ -20,33 +26,44 @@ import {
   validateAvatarFile,
   AVATAR_MAX_FILE_SIZE,
 } from "@/app/(protected)/_shared/profile/_lib";
+import {
+  useSiteEssentialsQuery,
+} from "@/app/(protected)/_shared/sites-essentials/_lib/queries";
 import { ProfileSkeleton } from "@/app/(protected)/_shared/profile/_components/profile-skeleton";
 import { useProfileSync } from "@/components/shared/profile-update-sync";
 import { addCacheBusting } from "@/lib/image-utils";
+import GoogleLocationSearch from "@/app/(on-boarding)/on-boarding/_components/steps/step-11/google-location-search";
+import { env } from "@/env";
+import { themeKeys } from "@/hooks/use-theme-query";
+import { toast } from "sonner";
+import {
+  ADMIN_COMPANY_INFO_DEFAULTS,
+  adminProfileFormSchema,
+  type AdminProfileFormValues,
+} from "./_lib/company-info-schema";
+import { fetchCompanyOfficeDetails } from "./_lib/google-company-office";
 
 export default function ProfilePage() {
   const { data: session } = useSession();
   const { syncProfileUpdate } = useProfileSync();
+  const queryClient = useQueryClient();
   const user = session?.user;
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
   const [avatarFiles, setAvatarFiles] = useState<File[]>([]);
+  const officePlaceIdRef = useRef<string | null>(null);
+  const initialOfficeRef = useRef("");
 
-  // Profile form
-  const profileForm = useForm<ProfileFormValues>({
-    resolver: zodResolver(profileSchema),
+  const form = useForm<AdminProfileFormValues>({
+    resolver: zodResolver(adminProfileFormSchema),
     mode: "onChange",
     defaultValues: {
       firstName: "",
       lastName: "",
-      phone: "",
-      address: "",
-      city: "",
-      postcode: "",
       avatar: undefined,
+      ...ADMIN_COMPANY_INFO_DEFAULTS,
     },
   });
 
-  // Password form (admin always has password set → is_password_set: true)
   const passwordForm = useForm<PasswordUpdateFormValues>({
     resolver: zodResolver(passwordUpdateSchema),
     defaultValues: {
@@ -58,26 +75,37 @@ export default function ProfilePage() {
     },
   });
 
-  // Get profile data from API
   const { data, isLoading: profileDataLoading } = useProfileData({}, "admin");
-
-  // Extract profile data from API response
+  const { data: siteEssentials, isLoading: siteEssentialsLoading } =
+    useSiteEssentialsQuery();
   const profileData = data?.data;
 
-  // Use useEffect to populate the forms when profile data is available
   useEffect(() => {
+    if (!profileData && !siteEssentials) return;
+
+    const phone =
+      siteEssentials?.company_phone?.trim() ||
+      profileData?.phone?.trim() ||
+      ADMIN_COMPANY_INFO_DEFAULTS.company_phone;
+
+    const companyValues = {
+      company_number:
+        siteEssentials?.company_number?.trim() ||
+        ADMIN_COMPANY_INFO_DEFAULTS.company_number,
+      company_registered_office:
+        siteEssentials?.company_registered_office?.trim() ||
+        ADMIN_COMPANY_INFO_DEFAULTS.company_registered_office,
+      company_phone: phone,
+    };
+
     if (profileData) {
-      // Initialize profile form
-      profileForm.reset({
+      form.reset({
         firstName: profileData.first_name || "",
         lastName: profileData.last_name || "",
-        phone: profileData.phone || "",
-        address: profileData.address || "",
-        city: profileData.city || "",
-        postcode: profileData.post_code || "",
+        avatar: undefined,
+        ...companyValues,
       });
 
-      // Set username and is_password_set in password form from profile data
       if (profileData._key) {
         passwordForm.setValue("username", profileData._key);
       }
@@ -87,29 +115,37 @@ export default function ProfilePage() {
         passwordForm.setValue("is_password_set", true);
       }
 
-      // Set avatar preview if available
       if (profileData.avatar) {
         setAvatarPreview(profileData.avatar);
       }
+    } else if (siteEssentials) {
+      form.reset({
+        firstName: "",
+        lastName: "",
+        avatar: undefined,
+        ...companyValues,
+      });
     }
-  }, [profileData, profileForm, passwordForm]);
 
-  // Mutation hooks for updating profile and password
+    initialOfficeRef.current = companyValues.company_registered_office;
+    officePlaceIdRef.current = companyValues.company_registered_office
+      ? "existing"
+      : null;
+  }, [profileData, siteEssentials, form, passwordForm]);
+
   const updateProfileMutation = useUpdateProfile("admin");
   const updatePasswordMutation = useUpdatePassword("admin");
 
-  // Handle avatar files change from FileUploader
   const handleAvatarFilesChange = async (files: File[]) => {
     setAvatarFiles(files);
 
     if (files.length > 0) {
       const file = files[0];
-      profileForm.clearErrors("avatar");
+      form.clearErrors("avatar");
 
-      // Validate avatar file including dimensions
       const validation = await validateAvatarFile(file);
       if (!validation.valid) {
-        profileForm.setError("avatar", {
+        form.setError("avatar", {
           type: "manual",
           message: validation.error || "Invalid avatar file",
         });
@@ -117,41 +153,66 @@ export default function ProfilePage() {
         return;
       }
 
-      profileForm.setValue("avatar", file, { shouldValidate: true });
+      form.setValue("avatar", file, { shouldValidate: true });
 
-      // Create preview URL
       const reader = new FileReader();
       reader.onloadend = () => {
         setAvatarPreview(reader.result as string);
       };
       reader.readAsDataURL(file);
     } else {
-      // Clear avatar when no files
       setAvatarPreview(profileData?.avatar || null);
-      profileForm.setValue("avatar", undefined);
+      form.setValue("avatar", undefined);
     }
   };
 
-  // Handle profile form submission
-  const onProfileSubmit = async (data: ProfileFormValues) => {
+  const handleOfficeClear = useCallback(() => {
+    form.setValue("company_registered_office", "");
+    officePlaceIdRef.current = null;
+  }, [form]);
+
+  const onProfileSubmit = async (data: AdminProfileFormValues) => {
+    const office = data.company_registered_office.trim();
+    const initialOffice = initialOfficeRef.current.trim();
+    const officeChanged = office !== initialOffice;
+
+    if (office && officeChanged && !officePlaceIdRef.current) {
+      toast.error("Please select a location from the suggestions", {
+        description:
+          "Google didn't find that location. Type to search and choose a suggested UK address.",
+        duration: 5000,
+      });
+      return;
+    }
+
     try {
-      // Use the mutation hook to update profile
-      const response = await updateProfileMutation.mutateAsync(data);
+      const profileResponse = await updateProfileMutation.mutateAsync({
+        firstName: data.firstName,
+        lastName: data.lastName,
+        phone: data.company_phone,
+        avatar: data.avatar,
+        company_number: data.company_number,
+        company_registered_office: data.company_registered_office,
+      });
 
-      if (response.status && response.data) {
-        // Sync profile update across session and auth store
-        await syncProfileUpdate(response);
+      await queryClient.invalidateQueries({ queryKey: themeKeys.all });
+      initialOfficeRef.current = office;
+      officePlaceIdRef.current = office ? "existing" : null;
+
+      if (profileResponse.status && profileResponse.data) {
+        await syncProfileUpdate(profileResponse);
       }
+
+      toast.success("Profile saved", {
+        description: "Your profile has been updated.",
+      });
     } catch (error) {
-      // Error handling is done by the interceptor
-      console.error("Failed to update profile:", error);
+      console.error("Failed to save profile:", error);
     }
   };
 
-  // Handle password form submission
   const onPasswordSubmit = async (data: PasswordUpdateFormValues) => {
     try {
-      // Use the mutation hook to update password
       const response = await updatePasswordMutation.mutateAsync(data);
 
       if (response.status) {
@@ -165,51 +226,53 @@ export default function ProfilePage() {
         });
       }
     } catch (error) {
-      // Error handling is done by the interceptor
       console.error("Failed to update password:", error);
     }
   };
 
-  const isProfileLoading = updateProfileMutation.isPending;
+  const isSaving = updateProfileMutation.isPending;
   const isPasswordLoading = updatePasswordMutation.isPending;
+  const isPageLoading = profileDataLoading || siteEssentialsLoading;
 
-  // Show loading state while fetching profile data
-  if (profileDataLoading) {
+  if (isPageLoading) {
     return <ProfileSkeleton />;
   }
 
   return (
-    <section className="w-full relative flex flex-col space-y-8 text-black">
-      {/* Profile Section */}
-      <section className="w-full relative">
-        <div className="w-full relative bg-background p-6 rounded-md shadow-sm">
-          <header className="w-full mb-6">
-            <h2 className="text-2xl title-header font-bold">Profile</h2>
+    <section className="relative flex w-full flex-col space-y-8 text-black">
+      <section className="relative w-full">
+        <div className="relative w-full rounded-md bg-background p-6 shadow-sm">
+          <header className="mb-6 w-full">
+            <h2 className="text-2xl font-bold title-header">Profile</h2>
+            <p className="mt-2 max-w-3xl text-sm text-muted-foreground">
+              Your account and company details shown on the public EventWizz
+              site.
+            </p>
           </header>
 
-          <Form {...profileForm}>
+          <Form {...form}>
             <form
-              onSubmit={profileForm.handleSubmit(onProfileSubmit)}
-              className="space-y-6"
+              onSubmit={form.handleSubmit(onProfileSubmit)}
+              className="space-y-8"
+              noValidate
             >
               <div>
-                <FormLabel className="block mb-3 font-medium">
-                  Profile Picture
+                <FormLabel className="mb-3 block font-medium">
+                  Profile picture
                 </FormLabel>
                 <div className="flex items-center gap-6">
-                  {/* Avatar Preview */}
                   <div className="relative">
-                    <div className="w-32 h-32 rounded-full overflow-hidden border-4 border-gray-100 shadow-lg bg-gray-50">
+                    <div className="h-32 w-32 overflow-hidden rounded-full border-4 border-gray-100 bg-gray-50 shadow-lg">
                       {avatarPreview ? (
                         <img
-                          src={addCacheBusting(avatarPreview, profileData?.updated_at)}
+                          src={addCacheBusting(avatarPreview)}
                           alt="Profile picture"
-                          className="w-full h-full object-cover"
+                          className="h-full w-full object-cover"
                         />
                       ) : (
-                        <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-blue-100 to-purple-100">
+                        <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-blue-100 to-purple-100">
                           <svg
-                            className="w-16 h-16 text-gray-400"
+                            className="h-16 w-16 text-gray-400"
                             fill="currentColor"
                             viewBox="0 0 24 24"
                           >
@@ -220,7 +283,6 @@ export default function ProfilePage() {
                     </div>
                   </div>
 
-                  {/* Upload Section */}
                   <div className="flex-1">
                     <FileUploader
                       value={avatarFiles}
@@ -239,122 +301,129 @@ export default function ProfilePage() {
                         maxHeight: 800,
                       }}
                     />
-                    <p className="text-xs text-gray-500 mt-2">
-                      Recommended: Square image, at least 200x200px
+                    <p className="mt-2 text-xs text-gray-500">
+                      Recommended: square image, at least 200×200px
                     </p>
                   </div>
                 </div>
-                {profileForm.formState.errors.avatar && (
-                  <p className="text-sm text-red-500 mt-2">
-                    {profileForm.formState.errors.avatar.message}
+                {form.formState.errors.avatar && (
+                  <p className="mt-2 text-sm text-red-500">
+                    {form.formState.errors.avatar.message}
                   </p>
                 )}
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
-                <div>
-                  <FormLabel htmlFor="firstName" className="block mb-2">
-                    First Name
-                  </FormLabel>
-                  <Input
-                    id="firstName"
-                    {...profileForm.register("firstName")}
-                    className="bg-gray-50 h-11 w-full"
-                  />
-                  {profileForm.formState.errors.firstName && (
-                    <p className="text-sm text-red-500 mt-1">
-                      {profileForm.formState.errors.firstName.message}
-                    </p>
+              <div className="grid grid-cols-1 items-start gap-x-6 gap-y-5 md:grid-cols-2">
+                <FormField
+                  control={form.control}
+                  name="firstName"
+                  render={({ field }) => (
+                    <FormItem className="space-y-2">
+                      <FormLabel>First name</FormLabel>
+                      <FormControl>
+                        <Input className="h-11 bg-gray-50" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
                   )}
-                </div>
+                />
 
-                <div>
-                  <FormLabel htmlFor="lastName" className="block mb-2">
-                    Last Name
-                  </FormLabel>
-                  <Input
-                    id="lastName"
-                    {...profileForm.register("lastName")}
-                    className="bg-gray-50 h-11 w-full"
-                  />
-                  {profileForm.formState.errors.lastName && (
-                    <p className="text-sm text-red-500 mt-1">
-                      {profileForm.formState.errors.lastName.message}
-                    </p>
+                <FormField
+                  control={form.control}
+                  name="lastName"
+                  render={({ field }) => (
+                    <FormItem className="space-y-2">
+                      <FormLabel>Last name</FormLabel>
+                      <FormControl>
+                        <Input className="h-11 bg-gray-50" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
                   )}
-                </div>
+                />
 
-                <div>
-                  <FormLabel htmlFor="phone" className="block mb-2">
-                    Phone
-                  </FormLabel>
-                  <Input
-                    id="phone"
-                    type="tel"
-                    {...profileForm.register("phone", {
-                      onChange: (e) => {
-                        // Only allow numbers, spaces, dashes, plus signs, and parentheses
-                        const value = e.target.value.replace(
-                          /[^\d\s\-+()]/g,
-                          ""
-                        );
-                        e.target.value = value;
-                        profileForm.setValue("phone", value);
-                      },
-                    })}
-                    className={`bg-gray-50 h-11 w-full ${
-                      profileForm.formState.errors.phone ? "border-red-500" : ""
-                    }`}
-                    onBlur={() => profileForm.trigger("phone")}
-                  />
-                  {profileForm.formState.errors.phone && (
-                    <p className="text-sm text-red-500 mt-1 font-medium">
-                      {profileForm.formState.errors.phone.message}
-                    </p>
+                <FormField
+                  control={form.control}
+                  name="company_number"
+                  render={({ field }) => (
+                    <FormItem className="space-y-2">
+                      <FormLabel>Company number</FormLabel>
+                      <FormControl>
+                        <Input
+                          placeholder="11555643"
+                          className="h-11 bg-gray-50"
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
                   )}
-                </div>
+                />
 
-                <div>
-                  <FormLabel htmlFor="address" className="block mb-2">
-                    Address
-                  </FormLabel>
-                  <Input
-                    id="address"
-                    {...profileForm.register("address")}
-                    className="bg-gray-50 h-11 w-full"
-                  />
-                </div>
+                <FormField
+                  control={form.control}
+                  name="company_phone"
+                  render={({ field }) => (
+                    <FormItem className="space-y-2">
+                      <FormLabel>Phone</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="tel"
+                          placeholder="+44 (0)20 3925 0350"
+                          className="h-11 bg-gray-50"
+                          {...field}
+                          onChange={(e) => {
+                            const value = e.target.value.replace(
+                              /[^\d\s\-+()]/g,
+                              "",
+                            );
+                            e.target.value = value;
+                            field.onChange(value);
+                          }}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
 
-                <div>
-                  <FormLabel htmlFor="city" className="block mb-2">
-                    City
-                  </FormLabel>
-                  <Input
-                    id="city"
-                    {...profileForm.register("city")}
-                    className="bg-gray-50 h-11 w-full"
-                  />
-                </div>
-
-                <div>
-                  <FormLabel htmlFor="postcode" className="block mb-2">
-                    Postcode
-                  </FormLabel>
-                  <Input
-                    id="postcode"
-                    {...profileForm.register("postcode")}
-                    className="bg-gray-50 h-11 w-full"
-                  />
-                </div>
+                <FormField
+                  control={form.control}
+                  name="company_registered_office"
+                  render={({ field }) => (
+                    <FormItem className="space-y-2 md:col-span-2">
+                      <FormLabel>Registered office</FormLabel>
+                      <FormControl>
+                        <div className="[&_input]:h-11 [&_input]:border-gray-200 [&_input]:bg-gray-50 [&_input]:text-black">
+                          <GoogleLocationSearch
+                            apiKey={env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}
+                            value={field.value || ""}
+                            onChange={(value) => {
+                              field.onChange(value);
+                              officePlaceIdRef.current = null;
+                            }}
+                            onSelect={(placeId) => {
+                              officePlaceIdRef.current = placeId;
+                              fetchCompanyOfficeDetails(form, placeId);
+                            }}
+                            onClear={handleOfficeClear}
+                            placeholder="Search for a UK registered office address..."
+                          />
+                        </div>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
               </div>
 
               <div className="flex justify-end">
                 <Button
                   variant="event-primary"
                   type="submit"
-                  disabled={isProfileLoading}
+                  disabled={isSaving}
                 >
-                  {isProfileLoading ? "Saving..." : "Save Changes"}
+                  {isSaving ? "Saving..." : "Save changes"}
                 </Button>
               </div>
             </form>
@@ -362,35 +431,34 @@ export default function ProfilePage() {
         </div>
       </section>
 
-      {/* Account Section - Read-only display of username and email */}
-      <section className="w-full relative">
-        <div className="w-full relative bg-background p-6 rounded-md shadow-sm">
-          <header className="w-full mb-6">
-            <h2 className="text-2xl title-header font-bold">Account</h2>
+      <section className="relative w-full">
+        <div className="relative w-full rounded-md bg-background p-6 shadow-sm">
+          <header className="mb-6 w-full">
+            <h2 className="text-2xl font-bold title-header">Account</h2>
           </header>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
+          <div className="grid grid-cols-1 gap-x-6 gap-y-4 md:grid-cols-2">
             <div>
-              <label htmlFor="username" className="block mb-2 font-medium">
-                User Name
+              <label htmlFor="username" className="mb-2 block font-medium">
+                User name
               </label>
               <Input
                 id="username"
                 value={profileData?._key || user?.name || ""}
-                className="bg-gray-50 h-11 w-full"
+                className="h-11 w-full bg-gray-50"
                 disabled
               />
             </div>
 
             <div>
-              <label htmlFor="email" className="block mb-2 font-medium">
+              <label htmlFor="email" className="mb-2 block font-medium">
                 Email
               </label>
               <Input
                 id="email"
                 type="email"
                 value={profileData?.email || user?.email || ""}
-                className="bg-gray-50 h-11 w-full"
+                className="h-11 w-full bg-gray-50"
                 disabled
               />
             </div>
@@ -398,11 +466,10 @@ export default function ProfilePage() {
         </div>
       </section>
 
-      {/* Password Section */}
-      <section className="w-full relative">
-        <div className="w-full relative bg-background p-6 rounded-md shadow-sm">
-          <header className="w-full mb-6">
-            <h2 className="text-2xl title-header font-bold">Change Password</h2>
+      <section className="relative w-full">
+        <div className="relative w-full rounded-md bg-background p-6 shadow-sm">
+          <header className="mb-6 w-full">
+            <h2 className="text-2xl font-bold title-header">Change password</h2>
           </header>
 
           <Form {...passwordForm}>
@@ -410,71 +477,68 @@ export default function ProfilePage() {
               onSubmit={passwordForm.handleSubmit(onPasswordSubmit)}
               className="space-y-6"
             >
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
+              <div className="grid grid-cols-1 gap-x-6 gap-y-4 md:grid-cols-2">
                 <div className="hidden">
                   <Input
-                    id="username"
+                    id="username-hidden"
                     {...passwordForm.register("username")}
                     type="hidden"
                   />
                 </div>
 
-                <div>
-                  <FormLabel htmlFor="currentPassword" className="block mb-2">
-                    Current Password
-                  </FormLabel>
-                  <PasswordInput
-                    id="currentPassword"
-                    ariaPasswordField="current password"
-                    {...passwordForm.register("currentPassword")}
-                    className="bg-gray-50 h-11 w-full"
-                  />
-                  {passwordForm.formState.errors.currentPassword && (
-                    <p className="text-sm text-red-500 mt-1">
-                      {passwordForm.formState.errors.currentPassword.message}
-                    </p>
+                <FormField
+                  control={passwordForm.control}
+                  name="currentPassword"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Current password</FormLabel>
+                      <FormControl>
+                        <PasswordInput
+                          ariaPasswordField="current password"
+                          className="h-11 bg-gray-50"
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
                   )}
-                </div>
+                />
 
-                <div>
-                  <FormLabel htmlFor="password" className="block mb-2">
-                    New Password
-                  </FormLabel>
-                  <PasswordInput
-                    id="password"
-                    ariaPasswordField="new password"
-                    {...passwordForm.register("password")}
-                    className="bg-gray-50 h-11 w-full"
-                  />
-                  {passwordForm.formState.errors.password && (
-                    <p className="text-sm text-red-500 mt-1">
-                      {passwordForm.formState.errors.password.message}
-                    </p>
+                <FormField
+                  control={passwordForm.control}
+                  name="password"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>New password</FormLabel>
+                      <FormControl>
+                        <PasswordInput
+                          ariaPasswordField="new password"
+                          className="h-11 bg-gray-50"
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
                   )}
-                </div>
+                />
 
-                <div>
-                  <FormLabel
-                    htmlFor="password_confirmation"
-                    className="block mb-2"
-                  >
-                    Confirm New Password
-                  </FormLabel>
-                  <PasswordInput
-                    id="password_confirmation"
-                    ariaPasswordField="confirm new password"
-                    {...passwordForm.register("password_confirmation")}
-                    className="bg-gray-50 h-11 w-full"
-                  />
-                  {passwordForm.formState.errors.password_confirmation && (
-                    <p className="text-sm text-red-500 mt-1">
-                      {
-                        passwordForm.formState.errors.password_confirmation
-                          .message
-                      }
-                    </p>
+                <FormField
+                  control={passwordForm.control}
+                  name="password_confirmation"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Confirm new password</FormLabel>
+                      <FormControl>
+                        <PasswordInput
+                          ariaPasswordField="confirm new password"
+                          className="h-11 bg-gray-50"
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
                   )}
-                </div>
+                />
               </div>
 
               <div className="flex justify-end">
@@ -483,7 +547,7 @@ export default function ProfilePage() {
                   type="submit"
                   disabled={isPasswordLoading}
                 >
-                  {isPasswordLoading ? "Updating..." : "Update Password"}
+                  {isPasswordLoading ? "Updating..." : "Update password"}
                 </Button>
               </div>
             </form>

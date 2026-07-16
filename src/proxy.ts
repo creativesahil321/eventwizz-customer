@@ -242,6 +242,11 @@ export async function proxy(req: NextRequest) {
     // Allow direct access to location pages without authentication
     pathname.match(/^\/[^\/]+\/?$/) || // Matches /{locationSlug} pattern
     pathname === "/" ||
+    pathname === "/about" ||
+    pathname === "/policies" ||
+    pathname === "/terms" ||
+    pathname === "/privacy" ||
+    pathname === "/contact" ||
     // Allow direct access to event detail pages
     pathname.match(/^\/[^\/]+\/events\/[^\/]+\/?$/) || // Matches /{locationSlug}/events/{eventSlug} pattern
     // Allow checkout and payment page access

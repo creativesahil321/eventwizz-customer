@@ -4,6 +4,14 @@ import { profileSchema, passwordUpdateSchema } from "./schema";
 export type ProfileFormValues = z.infer<typeof profileSchema>;
 export type PasswordUpdateFormValues = z.infer<typeof passwordUpdateSchema>;
 
+/** Optional company fields sent with admin profile update in the same request. */
+export type ProfileCompanyFields = {
+  company_number?: string;
+  company_registered_office?: string;
+};
+
+export type UpdateProfilePayload = ProfileFormValues & ProfileCompanyFields;
+
 export type ProfileResponse = {
   status: boolean;
   message: string;

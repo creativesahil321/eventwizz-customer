@@ -36,6 +36,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { useSitePreviewStore } from "@/store/site-preview.store";
 import { SocialMediaTab } from "./tabs/social-media-tab";
+import { InfoPagesTab } from "./tabs/info-pages-tab";
 import { ThemePresetsTab } from "./tabs/theme-presets-tab";
 import {
   SiteEssentialsUpdateProvider,
@@ -464,6 +465,12 @@ function SiteEssentialsFormInner() {
                       </span>
                     )}
                   </TabsTrigger>
+                  <TabsTrigger
+                    value="info-pages"
+                    className="px-3 sm:px-4 py-1 h-8 text-xs font-medium whitespace-nowrap relative rounded-md data-[state=active]:bg-[var(--color-primary)] data-[state=active]:text-white data-[state=active]:shadow-sm mx-0.5"
+                  >
+                    Info Pages
+                  </TabsTrigger>
                 </TabsList>
               </div>
             </div>
@@ -554,6 +561,12 @@ function SiteEssentialsFormInner() {
                 )}
                 <div className="bg-white rounded-lg p-3 sm:p-6">
                   <SeoTab />
+                </div>
+              </TabsContent>
+
+              <TabsContent value="info-pages" className="mt-0 w-full">
+                <div className="bg-white rounded-lg p-3 sm:p-6">
+                  <InfoPagesTab />
                 </div>
               </TabsContent>
             </div>

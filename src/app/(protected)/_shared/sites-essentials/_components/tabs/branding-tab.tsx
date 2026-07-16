@@ -3,7 +3,10 @@
 import { useEffect, useState } from "react";
 import { useFormContext, useWatch } from "react-hook-form";
 import { SiteEssentialsFormValues } from "../../_lib/hooks";
-import { BANNER_SUB_HEADING_MAX_CHARS } from "../../_lib/schema";
+import {
+  BANNER_SUB_HEADING_MAX_CHARS,
+  COPYRIGHT_MAX_CHARS,
+} from "../../_lib/schema";
 import {
   FormField,
   FormItem,
@@ -447,9 +450,13 @@ export function BrandingTab({
                   <Input
                     placeholder="© 2023 EventWizz, All Rights Reserved"
                     disabled={readOnly}
+                    maxLength={COPYRIGHT_MAX_CHARS}
                     {...field}
                   />
                 </FormControl>
+                <FormDescription>
+                  Up to {COPYRIGHT_MAX_CHARS} characters for legal/disclaimer text.
+                </FormDescription>
                 <FormMessage />
               </FormItem>
             )}

@@ -119,10 +119,9 @@ export const updateSiteEssentials = async (
       );
       return response.data;
     } else {
-      // No files, send as regular JSON
-      const response = await api.post<SiteEssentialsResponse>(
+      const response = await api.patch<SiteEssentialsResponse>(
         endpoints.UPDATE,
-        data as unknown as SiteEssentialsFormValues, // Type assertion to bypass strict type checking for mixed data types
+        data as unknown as SiteEssentialsFormValues,
         { returnFullResponse: true }
       );
       return response.data;

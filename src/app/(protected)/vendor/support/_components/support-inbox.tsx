@@ -391,7 +391,7 @@ function ConversationDetail({
   const canManage =
     permissionsReady && latestPayload.can_manage !== false;
   const canPin = permissionsReady && latestPayload.can_pin !== false;
-  const canAssign = canManage && !isSentToAdmin;
+  const canAssign = canManage && !isSentToAdmin && !assignee;
 
   const handleReopenClick = () => {
     setComposerUnlocked(true);
