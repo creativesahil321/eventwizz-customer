@@ -348,7 +348,14 @@ export default function EventDetailClient({
           </div>
         )}
 
-        <FooterSection />
+        <FooterSection
+          locationSlug={locationSlug}
+          contactOverride={{
+            address: eventData.address,
+            email: eventData.email,
+            phone: eventData.phone,
+          }}
+        />
       </div>
     </CartConflictProvider>
   );

@@ -40,6 +40,9 @@ export interface LocationData {
   latitude: string;
   longitude: string;
   address: string;
+  email?: string | null;
+  phone?: string | null;
+  phone_number?: string | null;
   slug: string;
   city?: string;
   cover_image: string | null;

@@ -16,6 +16,8 @@ import {
   X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useCurrencyFormat } from "@/hooks/use-currency-format";
+import { parseFormattedMoney } from "@/lib/currency-format";
 
 interface TransactionItemProps {
   transaction: Transaction;
@@ -69,6 +71,7 @@ export function TransactionItemComponent({
   transaction,
   onViewDetails,
 }: TransactionItemProps) {
+  const { formatLocale } = useCurrencyFormat();
   const {
     transaction_id,
     amount,
@@ -96,7 +99,9 @@ export function TransactionItemComponent({
   });
 
   // Format amount
-  const formattedAmount = `${currency}${parseFloat(amount).toFixed(2)}`;
+  const formattedAmount = formatLocale(
+    parseFormattedMoney(amount, currency),
+  );
 
   return (
     <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-3 sm:p-4 border-b border-border last:border-0 hover:bg-accent/5 transition-colors gap-3 sm:gap-4">

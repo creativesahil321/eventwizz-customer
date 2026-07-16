@@ -7,6 +7,7 @@ import {
   LOGO_BLACK_FUZZ,
   LOGO_BLACK_THRESHOLD,
   LOGO_DEFAULT_HEADER_BACKGROUND,
+  LOGO_WIDE_ASPECT_RATIO,
   LOGO_LIGHT_AVG_LUMINANCE,
   LOGO_LIGHT_MONOCHROME_RATIO,
   LOGO_LIGHT_PIXEL_RATIO,
@@ -48,65 +49,118 @@ function hasSignificantTransparency(
   return transparent / total > 0.12;
 }
 
-function removeNearWhiteBackground(
-  data: Buffer,
-  channels: number,
-): void {
-  if (channels < 4) return;
-
-  for (let i = 0; i < data.length; i += channels) {
-    const r = data[i]!;
-    const g = data[i + 1]!;
-    const b = data[i + 2]!;
-
-    const threshold = LOGO_WHITE_THRESHOLD - LOGO_WHITE_FUZZ;
-    const isBright = r >= threshold && g >= threshold && b >= threshold;
-    const maxDiff = Math.max(
-      Math.abs(r - g),
-      Math.abs(g - b),
-      Math.abs(r - b),
-    );
-    const isFlatBright = maxDiff < 24 && r > 210 && g > 210 && b > 210;
-
-    if (isBright || isFlatBright) {
-      data[i + 3] = 0;
-    }
-  }
+function isNearWhitePixel(r: number, g: number, b: number): boolean {
+  const threshold = LOGO_WHITE_THRESHOLD - LOGO_WHITE_FUZZ;
+  const isBright = r >= threshold && g >= threshold && b >= threshold;
+  const maxDiff = Math.max(
+    Math.abs(r - g),
+    Math.abs(g - b),
+    Math.abs(r - b),
+  );
+  const isFlatBright = maxDiff < 24 && r > 210 && g > 210 && b > 210;
+  return isBright || isFlatBright;
 }
 
-function removeNearDarkBackground(data: Buffer, channels: number): void {
-  if (channels < 4) return;
+function isNearDarkPixel(r: number, g: number, b: number): boolean {
+  const threshold = LOGO_BLACK_THRESHOLD + LOGO_BLACK_FUZZ;
+  const isDark = r <= threshold && g <= threshold && b <= threshold;
+  const maxDiff = Math.max(
+    Math.abs(r - g),
+    Math.abs(g - b),
+    Math.abs(r - b),
+  );
+  const isFlatDark = maxDiff < 24 && r < 45 && g < 45 && b < 45;
+  return isDark || isFlatDark;
+}
 
-  for (let i = 0; i < data.length; i += channels) {
-    const r = data[i]!;
-    const g = data[i + 1]!;
-    const b = data[i + 2]!;
+/**
+ * Only removes background pixels connected to the image border.
+ * Preserves interior dark text / marks that are not part of the outer background.
+ */
+function removeEdgeConnectedBackground(
+  data: Buffer,
+  channels: number,
+  width: number,
+  height: number,
+  isBackgroundPixel: (r: number, g: number, b: number) => boolean,
+): void {
+  if (channels < 4 || width < 1 || height < 1) return;
 
-    const threshold = LOGO_BLACK_THRESHOLD + LOGO_BLACK_FUZZ;
-    const isDark = r <= threshold && g <= threshold && b <= threshold;
-    const maxDiff = Math.max(
-      Math.abs(r - g),
-      Math.abs(g - b),
-      Math.abs(r - b),
-    );
-    const isFlatDark = maxDiff < 24 && r < 45 && g < 45 && b < 45;
+  const total = width * height;
+  const visited = new Uint8Array(total);
+  const queue: number[] = [];
 
-    if (isDark || isFlatDark) {
-      data[i + 3] = 0;
-    }
+  const indexAt = (x: number, y: number) => y * width + x;
+  const offsetAt = (pixelIndex: number) => pixelIndex * channels;
+
+  const tryEnqueue = (x: number, y: number) => {
+    const pixelIndex = indexAt(x, y);
+    if (visited[pixelIndex]) return;
+
+    const offset = offsetAt(pixelIndex);
+    const r = data[offset]!;
+    const g = data[offset + 1]!;
+    const b = data[offset + 2]!;
+    if (!isBackgroundPixel(r, g, b)) return;
+
+    visited[pixelIndex] = 1;
+    queue.push(pixelIndex);
+  };
+
+  for (let x = 0; x < width; x++) {
+    tryEnqueue(x, 0);
+    tryEnqueue(x, height - 1);
+  }
+  for (let y = 0; y < height; y++) {
+    tryEnqueue(0, y);
+    tryEnqueue(width - 1, y);
+  }
+
+  while (queue.length > 0) {
+    const pixelIndex = queue.pop()!;
+    const offset = offsetAt(pixelIndex);
+    data[offset + 3] = 0;
+
+    const x = pixelIndex % width;
+    const y = Math.floor(pixelIndex / width);
+
+    if (x > 0) tryEnqueue(x - 1, y);
+    if (x < width - 1) tryEnqueue(x + 1, y);
+    if (y > 0) tryEnqueue(x, y - 1);
+    if (y < height - 1) tryEnqueue(x, y + 1);
   }
 }
 
 function removeSolidBackgroundsForHeader(
   data: Buffer,
   channels: number,
+  width: number,
+  height: number,
   headerBackgroundColor: string,
 ): void {
   if (isLightHeaderBackground(headerBackgroundColor)) {
-    removeNearWhiteBackground(data, channels);
-    removeNearDarkBackground(data, channels);
+    removeEdgeConnectedBackground(
+      data,
+      channels,
+      width,
+      height,
+      isNearWhitePixel,
+    );
+    removeEdgeConnectedBackground(
+      data,
+      channels,
+      width,
+      height,
+      isNearDarkPixel,
+    );
   } else {
-    removeNearWhiteBackground(data, channels);
+    removeEdgeConnectedBackground(
+      data,
+      channels,
+      width,
+      height,
+      isNearWhitePixel,
+    );
   }
 }
 
@@ -265,6 +319,8 @@ async function normalizeLogoBuffer(
     removeSolidBackgroundsForHeader(
       pixelData,
       info.channels,
+      info.width,
+      info.height,
       headerBackgroundColor,
     );
   }
@@ -299,7 +355,8 @@ async function removeBackgroundWithApi(
   );
   formData.append("format", "png");
   formData.append("size", "auto");
-  formData.append("type", "auto");
+  formData.append("type", "graphic");
+  formData.append("crop", "false");
 
   const response = await fetch("https://api.remove.bg/v1.0/removebg", {
     method: "POST",
@@ -346,7 +403,11 @@ export async function processLogoBuffer(
     };
   }
 
-  if (options?.removeBgApiKey) {
+  const aspectRatio =
+    meta.width && meta.height ? meta.width / meta.height : 1;
+  const isWideWordmarkLogo = aspectRatio >= LOGO_WIDE_ASPECT_RATIO;
+
+  if (options?.removeBgApiKey && !isWideWordmarkLogo) {
     try {
       const removed = await removeBackgroundWithApi(input, options.removeBgApiKey);
       const { buffer, invertedForContrast } = await normalizeLogoBuffer(

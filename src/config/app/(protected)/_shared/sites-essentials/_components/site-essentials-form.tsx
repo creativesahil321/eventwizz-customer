@@ -9,24 +9,12 @@ import {
   AlertCircle,
   Eye,
   RotateCcw,
-  Palette,
 } from "lucide-react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 import { useToast } from "@/components/ui/use-toast";
 import { useSiteEssentials } from "../_lib/hooks";
-import { useResetSiteEssentialsThemeMutation } from "../_lib/queries";
 import {
   resolveHasMultipleLocations,
   useHasMultipleLocations,
@@ -53,11 +41,6 @@ import {
   SiteEssentialsUpdateProvider,
   useSiteEssentialsUpdateGate,
 } from "../_lib/site-essentials-update-context";
-import {
-  applySiteEssentialsDefaultTheme,
-  SITE_ESSENTIALS_DEFAULT_PRESET_ID,
-} from "../_lib/default-site-theme";
-import { writeLastAppliedSiteThemePresetId } from "../_lib/site-theme-preset-local-cache";
 import { toMutableSiteEssentialsFormValues } from "../_lib/to-mutable-form-values";
 
 export function SiteEssentialsForm() {
@@ -72,10 +55,6 @@ function SiteEssentialsFormInner() {
   const { readOnly } = useSiteEssentialsUpdateGate();
   const { form, onSubmit, isLoading, siteEssentials, fetchSiteEssentials } =
     useSiteEssentials();
-  const {
-    mutateAsync: resetThemeToDefault,
-    isPending: isResettingThemeDefault,
-  } = useResetSiteEssentialsThemeMutation();
   const hasMultipleLocations = useHasMultipleLocations();
   const [submitting, setSubmitting] = useState(false);
   const [previewLoading, setPreviewLoading] = useState(false);
@@ -103,7 +82,25 @@ function SiteEssentialsFormInner() {
   );
   const [showErrorSummary, setShowErrorSummary] = useState(false);
   const [activeTab, setActiveTab] = useState("presets");
-  const [resetDefaultDialogOpen, setResetDefaultDialogOpen] = useState(false);
+
+  // The Colors tab lets users fine-tune every theme token, which can easily break
+  // the palette. Keep it out of the normal tab bar and only reveal it when the URL
+  // carries the `?advanced=colors` flag (a deliberate, hard-to-stumble-into entry).
+  const [colorsUnlocked, setColorsUnlocked] = useState(false);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("advanced") === "colors") setColorsUnlocked(true);
+  }, []);
+
+  // Never leave the user stranded on a hidden tab (e.g. the flag is removed after
+  // navigation): fall back to Presets if Colors becomes unreachable.
+  useEffect(() => {
+    if (!colorsUnlocked && activeTab === "colors") {
+      setActiveTab("presets");
+    }
+  }, [colorsUnlocked, activeTab]);
 
   // Load preview data into form if available
   // BUT never override File objects - form submission should use form's File objects, not preview store data
@@ -333,51 +330,10 @@ function SiteEssentialsFormInner() {
   // Count total errors for error summary
   const errorCount = Object.keys(tabsWithErrors).length;
 
-  const presetCacheUserKey =
-    session?.user?.uuid ?? session?.user?.email ?? "anonymous";
+  // Subscribe so the Discard button re-renders when the form becomes dirty
+  const { isDirty } = form.formState;
 
-  const handleResetAsDefault = async () => {
-    try {
-      const updated = await resetThemeToDefault();
-      form.reset(toMutableSiteEssentialsFormValues(updated), {
-        keepErrors: false,
-        keepDirty: false,
-        keepIsSubmitted: false,
-        keepTouched: false,
-        keepIsValid: false,
-        keepSubmitCount: false,
-      });
-      writeLastAppliedSiteThemePresetId(
-        presetCacheUserKey,
-        SITE_ESSENTIALS_DEFAULT_PRESET_ID,
-      );
-      setResetDefaultDialogOpen(false);
-      setShowErrorSummary(false);
-      toast({
-        title: "Theme reset to default",
-        description:
-          "Colors and fonts were restored to EventWizz defaults. Your logo, copy, and images are unchanged.",
-        variant: "default",
-      });
-    } catch {
-      applySiteEssentialsDefaultTheme(form.setValue, form.getValues);
-      writeLastAppliedSiteThemePresetId(
-        presetCacheUserKey,
-        SITE_ESSENTIALS_DEFAULT_PRESET_ID,
-      );
-      setResetDefaultDialogOpen(false);
-      setShowErrorSummary(false);
-      toast({
-        title: "Default theme applied locally",
-        description:
-          "The reset API is not available yet — changes are in the form only. Click Save after the backend ships POST …/reset-theme-default.",
-        variant: "default",
-      });
-    }
-  };
-
-  // Handle form reset
-  const handleReset = async () => {
+  const handleDiscardChanges = async () => {
     if (readOnly) return;
 
     try {
@@ -402,16 +358,16 @@ function SiteEssentialsFormInner() {
         setShowErrorSummary(false);
 
         toast({
-          title: "Form Reset",
-          description: "All changes have been reset to the last saved values",
+          title: "Changes discarded",
+          description: "The form was restored to your last saved values.",
           variant: "default",
         });
       }
     } catch (error) {
-      console.error("Error resetting form:", error);
+      console.error("Error discarding form changes:", error);
       toast({
         title: "Error",
-        description: "Failed to reset the form",
+        description: "Failed to discard your unsaved changes",
         variant: "destructive",
       });
     }
@@ -436,81 +392,90 @@ function SiteEssentialsFormInner() {
           </Alert>
         )}
 
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <div className="flex justify-between items-center mb-4">
-            <div className="w-full overflow-x-auto pb-2 no-scrollbar">
-              <TabsList className="flex w-max min-w-full bg-background p-1 h-auto rounded-lg gap-1">
-                <TabsTrigger
-                  value="presets"
-                  className="px-3 sm:px-4 py-1 h-8 text-xs font-medium whitespace-nowrap relative rounded-md data-[state=active]:bg-[var(--color-primary)] data-[state=active]:text-white data-[state=active]:shadow-sm mx-0.5"
-                >
-                  Presets
-                </TabsTrigger>
-                <TabsTrigger
-                  value="branding"
-                  className="px-3 sm:px-4 py-1 h-8 text-xs font-medium whitespace-nowrap relative rounded-md data-[state=active]:bg-[var(--color-primary)] data-[state=active]:text-white data-[state=active]:shadow-sm mx-0.5"
-                >
-                  Branding
-                  {tabsWithErrors.branding && (
-                    <span className="absolute -right-1 -top-1 flex h-2 w-2">
-                      <span className="relative inline-flex h-2 w-2 rounded-full bg-red-500"></span>
-                    </span>
-                  )}
-                </TabsTrigger>
-                <TabsTrigger
-                  value="colors"
-                  className="px-3 sm:px-4 py-1 h-8 text-xs font-medium whitespace-nowrap relative rounded-md data-[state=active]:bg-[var(--color-primary)] data-[state=active]:text-white data-[state=active]:shadow-sm mx-0.5"
-                >
-                  Colors
-                  {tabsWithErrors.colors && (
-                    <span className="absolute -right-1 -top-1 flex h-2 w-2">
-                      <span className="relative inline-flex h-2 w-2 rounded-full bg-red-500"></span>
-                    </span>
-                  )}
-                </TabsTrigger>
-                <TabsTrigger
-                  value="typography"
-                  className="px-3 sm:px-4 py-1 h-8 text-xs font-medium whitespace-nowrap relative rounded-md data-[state=active]:bg-[var(--color-primary)] data-[state=active]:text-white data-[state=active]:shadow-sm mx-0.5"
-                >
-                  Typography
-                  {tabsWithErrors.typography && (
-                    <span className="absolute -right-1 -top-1 flex h-2 w-2">
-                      <span className="relative inline-flex h-2 w-2 rounded-full bg-red-500"></span>
-                    </span>
-                  )}
-                </TabsTrigger>
-                <TabsTrigger
-                  value="social-media"
-                  className="px-3 sm:px-4 py-1 h-8 text-xs font-medium whitespace-nowrap relative rounded-md data-[state=active]:bg-[var(--color-primary)] data-[state=active]:text-white data-[state=active]:shadow-sm mx-0.5"
-                >
-                  Social Media
-                  {tabsWithErrors.socialMedia && (
-                    <span className="absolute -right-1 -top-1 flex h-2 w-2">
-                      <span className="relative inline-flex h-2 w-2 rounded-full bg-red-500"></span>
-                    </span>
-                  )}
-                </TabsTrigger>
-                <TabsTrigger
-                  value="seo"
-                  className="px-3 sm:px-4 py-1 h-8 text-xs font-medium whitespace-nowrap relative rounded-md data-[state=active]:bg-[var(--color-primary)] data-[state=active]:text-white data-[state=active]:shadow-sm mx-0.5"
-                >
-                  SEO
-                  {tabsWithErrors.seo && (
-                    <span className="absolute -right-1 -top-1 flex h-2 w-2">
-                      <span className="relative inline-flex h-2 w-2 rounded-full bg-red-500"></span>
-                    </span>
-                  )}
-                </TabsTrigger>
-              </TabsList>
-            </div>
-          </div>
-
+        <Tabs
+          value={activeTab}
+          onValueChange={setActiveTab}
+          className="w-full gap-0"
+        >
           <Card className="shadow-sm overflow-hidden p-0 gap-0 py-0">
+            <div className="border-b bg-card px-2 sm:px-3 md:px-4 pt-3 pb-3">
+              <div className="w-full overflow-x-auto no-scrollbar">
+                <TabsList className="flex w-max min-w-full bg-muted/60 p-1 h-auto rounded-lg gap-1">
+                  <TabsTrigger
+                    value="presets"
+                    className="px-3 sm:px-4 py-1 h-8 text-xs font-medium whitespace-nowrap relative rounded-md data-[state=active]:bg-[var(--color-primary)] data-[state=active]:text-white data-[state=active]:shadow-sm mx-0.5"
+                  >
+                    Presets
+                  </TabsTrigger>
+                  <TabsTrigger
+                    value="branding"
+                    className="px-3 sm:px-4 py-1 h-8 text-xs font-medium whitespace-nowrap relative rounded-md data-[state=active]:bg-[var(--color-primary)] data-[state=active]:text-white data-[state=active]:shadow-sm mx-0.5"
+                  >
+                    Branding
+                    {tabsWithErrors.branding && (
+                      <span className="absolute -right-1 -top-1 flex h-2 w-2">
+                        <span className="relative inline-flex h-2 w-2 rounded-full bg-red-500"></span>
+                      </span>
+                    )}
+                  </TabsTrigger>
+                  {colorsUnlocked && (
+                    <TabsTrigger
+                      value="colors"
+                      className="px-3 sm:px-4 py-1 h-8 text-xs font-medium whitespace-nowrap relative rounded-md data-[state=active]:bg-[var(--color-primary)] data-[state=active]:text-white data-[state=active]:shadow-sm mx-0.5"
+                    >
+                      Colors
+                      {tabsWithErrors.colors && (
+                        <span className="absolute -right-1 -top-1 flex h-2 w-2">
+                          <span className="relative inline-flex h-2 w-2 rounded-full bg-red-500"></span>
+                        </span>
+                      )}
+                    </TabsTrigger>
+                  )}
+                  <TabsTrigger
+                    value="typography"
+                    className="px-3 sm:px-4 py-1 h-8 text-xs font-medium whitespace-nowrap relative rounded-md data-[state=active]:bg-[var(--color-primary)] data-[state=active]:text-white data-[state=active]:shadow-sm mx-0.5"
+                  >
+                    Typography
+                    {tabsWithErrors.typography && (
+                      <span className="absolute -right-1 -top-1 flex h-2 w-2">
+                        <span className="relative inline-flex h-2 w-2 rounded-full bg-red-500"></span>
+                      </span>
+                    )}
+                  </TabsTrigger>
+                  <TabsTrigger
+                    value="social-media"
+                    className="px-3 sm:px-4 py-1 h-8 text-xs font-medium whitespace-nowrap relative rounded-md data-[state=active]:bg-[var(--color-primary)] data-[state=active]:text-white data-[state=active]:shadow-sm mx-0.5"
+                  >
+                    Social Media
+                    {tabsWithErrors.socialMedia && (
+                      <span className="absolute -right-1 -top-1 flex h-2 w-2">
+                        <span className="relative inline-flex h-2 w-2 rounded-full bg-red-500"></span>
+                      </span>
+                    )}
+                  </TabsTrigger>
+                  <TabsTrigger
+                    value="seo"
+                    className="px-3 sm:px-4 py-1 h-8 text-xs font-medium whitespace-nowrap relative rounded-md data-[state=active]:bg-[var(--color-primary)] data-[state=active]:text-white data-[state=active]:shadow-sm mx-0.5"
+                  >
+                    SEO
+                    {tabsWithErrors.seo && (
+                      <span className="absolute -right-1 -top-1 flex h-2 w-2">
+                        <span className="relative inline-flex h-2 w-2 rounded-full bg-red-500"></span>
+                      </span>
+                    )}
+                  </TabsTrigger>
+                </TabsList>
+              </div>
+            </div>
+
             <div className="space-y-6 p-6 pb-6">
               <TabsContent value="presets" className="mt-0 w-full">
                 <div className="bg-white rounded-lg p-3 sm:p-6">
                   <ThemePresetsTab
-                    onGoToColors={() => setActiveTab("colors")}
+                    onGoToColors={() => {
+                      setColorsUnlocked(true);
+                      setActiveTab("colors");
+                    }}
                     onGoToTypography={() => setActiveTab("typography")}
                     onGoToBranding={() => setActiveTab("branding")}
                   />
@@ -546,16 +511,18 @@ function SiteEssentialsFormInner() {
                 </div>
               </TabsContent>
 
-              <TabsContent value="colors" className="mt-0 w-full">
-                {tabsWithErrors.colors && (
-                  <Badge variant="destructive" className="mb-3">
-                    Required fields missing
-                  </Badge>
-                )}
-                <div className="bg-white rounded-lg p-3 sm:p-6">
-                  <ColorsTab />
-                </div>
-              </TabsContent>
+              {colorsUnlocked && (
+                <TabsContent value="colors" className="mt-0 w-full">
+                  {tabsWithErrors.colors && (
+                    <Badge variant="destructive" className="mb-3">
+                      Required fields missing
+                    </Badge>
+                  )}
+                  <div className="bg-white rounded-lg p-3 sm:p-6">
+                    <ColorsTab />
+                  </div>
+                </TabsContent>
+              )}
 
               <TabsContent value="typography" className="mt-0 w-full">
                 {tabsWithErrors.typography && (
@@ -608,82 +575,17 @@ function SiteEssentialsFormInner() {
                   )}
                   {previewLoading ? "Loading..." : "Preview"}
                 </Button>
-                <Button
-                  variant="outline"
-                  type="button"
-                  onClick={handleReset}
-                  disabled={readOnly || previewLoading || submitting}
-                  className="flex items-center justify-center gap-2 border-slate-300 bg-white text-slate-900 hover:bg-slate-50"
-                >
-                  <RotateCcw className="h-4 w-4" /> Reset
-                </Button>
-                <Button
-                  variant="outline"
-                  type="button"
-                  onClick={() => setResetDefaultDialogOpen(true)}
-                  disabled={
-                    readOnly ||
-                    previewLoading ||
-                    submitting ||
-                    isResettingThemeDefault
-                  }
-                  className="flex items-center justify-center gap-2 border-slate-300 bg-white text-slate-900 hover:bg-slate-50"
-                >
-                  {isResettingThemeDefault ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <Palette className="h-4 w-4" />
-                  )}
-                  {isResettingThemeDefault ? "Resetting…" : "Reset as default"}
-                </Button>
-                <AlertDialog
-                  open={resetDefaultDialogOpen}
-                  onOpenChange={setResetDefaultDialogOpen}
-                >
-                  <AlertDialogContent className="text-foreground">
-                    <AlertDialogHeader>
-                      <AlertDialogTitle>
-                        Reset theme to defaults?
-                      </AlertDialogTitle>
-                      <AlertDialogDescription asChild>
-                        <div className="space-y-2 text-sm text-muted-foreground">
-                          <p>
-                            This will replace your current{" "}
-                            <span className="font-medium text-foreground">
-                              colors, fonts, and heading style
-                            </span>{" "}
-                            with the EventWizz default theme (Clean White).
-                          </p>
-                          <p>
-                            Your logo, page copy, images, social links, and SEO
-                            settings will{" "}
-                            <span className="font-medium text-foreground">
-                              not
-                            </span>{" "}
-                            be changed.
-                          </p>
-                          <p className="font-medium text-amber-700">
-                            This saves immediately on the server. Your live site
-                            will use the default theme after the reset
-                            completes.
-                          </p>
-                        </div>
-                      </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter className="gap-2 sm:gap-3 sm:space-x-0">
-                      <AlertDialogCancel>Cancel</AlertDialogCancel>
-                      <AlertDialogAction
-                        onClick={() => void handleResetAsDefault()}
-                        disabled={isResettingThemeDefault}
-                        className="bg-[var(--color-primary)] text-white hover:bg-[var(--color-primary-hover)]"
-                      >
-                        {isResettingThemeDefault
-                          ? "Resetting…"
-                          : "Yes, reset theme"}
-                      </AlertDialogAction>
-                    </AlertDialogFooter>
-                  </AlertDialogContent>
-                </AlertDialog>
+                {isDirty && !readOnly && (
+                  <Button
+                    variant="outline"
+                    type="button"
+                    onClick={handleDiscardChanges}
+                    disabled={previewLoading || submitting}
+                    className="flex items-center justify-center gap-2 border-slate-300 bg-white text-slate-900 hover:bg-slate-50"
+                  >
+                    <RotateCcw className="h-4 w-4" /> Discard changes
+                  </Button>
+                )}
                 <Button
                   type="submit"
                   disabled={

@@ -20,10 +20,13 @@ export type CheckoutPaymentAction =
  */
 function normalizeExpiresAt(raw: number | undefined | null): number | undefined {
   if (!raw || raw <= 0) return undefined;
-  // Already an absolute Unix timestamp
+  const now = Math.floor(Date.now() / 1000);
+  // Absolute Unix timestamp (seconds)
   if (raw > 1_000_000_000) return raw;
-  // Duration in seconds → convert to absolute timestamp
-  return Math.floor(Date.now() / 1000) + raw;
+  // Duration in seconds (typical hold windows: 900–3600)
+  if (raw >= 60) return now + raw;
+  // Small values are treated as minutes (e.g. 29 → 29 minutes)
+  return now + raw * 60;
 }
 
 export function buildCheckoutStripeSession(

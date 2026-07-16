@@ -9,6 +9,7 @@ import { useSession } from "next-auth/react";
 import { ThemeSchema } from "@/types/theme.types";
 import { addCacheBusting } from "@/lib/image-utils";
 import { cn } from "@/lib/utils";
+import { resolveVenueContact } from "@/lib/resolve-venue-contact";
 
 // Define icon mapping with proper typing
 type IconKey = "phone" | "bookmarks";
@@ -63,12 +64,11 @@ export default function HeadersSec({
       ? logoToUse
       : "/assets/images/logos/eventwizz-logo.png";
 
-  // Extract phone number from props, theme, or use default
+  // Prefer explicit prop → main contactDetails (no fake placeholders)
   const phoneNumber =
-    contact_number ||
-    (vendorTheme as ThemeSchema & { contactDetails?: { phoneNumber?: string } })
-      ?.contactDetails?.phoneNumber ||
-    "+1 (123) 456-7890";
+    contact_number?.trim() ||
+    resolveVenueContact(vendorTheme).phone ||
+    "";
 
   // Define header data using theme
   const headerData = {
@@ -77,11 +77,15 @@ export default function HeadersSec({
       linkText: "Browse Events",
     },
     navLinks: [
-      {
-        icon: "phone" as IconKey,
-        link: `tel:${phoneNumber}`,
-        linkText: phoneNumber,
-      },
+      ...(phoneNumber
+        ? [
+            {
+              icon: "phone" as IconKey,
+              link: `tel:${phoneNumber}`,
+              linkText: phoneNumber,
+            },
+          ]
+        : []),
       // Only show login button if not authenticated
       ...(isAuthenticated
         ? []

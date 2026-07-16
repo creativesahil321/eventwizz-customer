@@ -7,6 +7,7 @@
 import { useQuery, useMutation, useQueryClient, type QueryClient } from "@tanstack/react-query";
 import { bookingsService } from "./bookings.service";
 import { resolveBookingPaymentAction } from "./booking-payment";
+import { resolveReschedulePaymentAction } from "./reschedule-payment";
 import {
   BookingsQueryParams,
   BookingsResponse,
@@ -255,40 +256,33 @@ export const useRescheduleBooking = () => {
   >({
     mutationFn: (payload) => bookingsService.rescheduleBooking(payload),
     onSuccess: (response, variables) => {
-      if (response.status) {
-        // Check if payment gateway redirect is required
-        if (response.data?.payment?.redirect_url) {
-          console.log("🔄 Redirecting to payment gateway for reschedule:", {
-            gateway: response.data.payment_gateway,
-            rescheduleRequestId: response.data.reschedule_request_id,
-            unpaidAmount: response.data.unpaid_amount,
-            redirectUrl: response.data.payment.redirect_url,
-          });
+      if (!response.status || !response.data) return;
 
-          // Redirect to the payment gateway URL provided by backend
-          window.location.href = response.data.payment.redirect_url;
-          return;
-        }
-
-        // If no payment required, invalidate and refetch booking data
-        // Invalidate booking details to refetch updated data
-        queryClient.invalidateQueries({
-          queryKey: bookingsKeys.bookingDetail(variables.booking_id),
-        });
-        // Refetch active booking details immediately
-        queryClient.refetchQueries({
-          queryKey: bookingsKeys.bookingDetail(variables.booking_id),
-          type: "active",
-        });
-        // Invalidate reschedule dates cache for this booking
-        queryClient.invalidateQueries({
-          queryKey: bookingsKeys.rescheduleDates(),
-        });
-        // Invalidate bookings list to update status
-        queryClient.invalidateQueries({
-          queryKey: bookingsKeys.lists(),
-        });
+      const action = resolveReschedulePaymentAction(response.data);
+      if (action?.type === "redirect") {
+        window.location.href = action.url;
+        return;
       }
+
+      // Stripe modal is opened by the caller when action.type === "stripe"
+      if (action?.type === "stripe") {
+        return;
+      }
+
+      // Immediate reschedule — no payment required
+      queryClient.invalidateQueries({
+        queryKey: bookingsKeys.bookingDetail(variables.booking_id),
+      });
+      queryClient.refetchQueries({
+        queryKey: bookingsKeys.bookingDetail(variables.booking_id),
+        type: "active",
+      });
+      queryClient.invalidateQueries({
+        queryKey: bookingsKeys.rescheduleDates(),
+      });
+      queryClient.invalidateQueries({
+        queryKey: bookingsKeys.lists(),
+      });
     },
   });
 };

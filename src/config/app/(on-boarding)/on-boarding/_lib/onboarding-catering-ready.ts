@@ -1,10 +1,10 @@
 import type { StepSixType } from "../_components/form-provider/schema";
+import { coerceApiFlag } from "@/lib/coerce-api-boolean";
 
 export function normalizeOnboardingCateringOption(value: unknown): 0 | 1 {
-  if (value === 1 || value === "1" || value === true || value === "true") {
-    return 1;
-  }
-  return 0;
+  return coerceApiFlag(
+    value as boolean | number | string | null | undefined,
+  );
 }
 
 /**

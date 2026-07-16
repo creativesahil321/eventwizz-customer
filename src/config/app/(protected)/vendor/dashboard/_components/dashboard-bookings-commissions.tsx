@@ -91,8 +91,8 @@ export default function DashboardBookingsCommissions({
   );
 
   return (
-    <section className="w-full flex items-center justify-between relative text-black">
-      <section className="w-full relative bg-background dark:border p-6 rounded-md">
+    <section className="w-full relative text-black">
+      <section className="w-full relative bg-background border shadow-sm p-6 rounded-lg">
         <Tabs
             value={activeTab}
             onValueChange={(v) => setActiveTab(v as BookingsCommissionsTab)}

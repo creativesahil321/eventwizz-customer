@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useMemo, useEffect } from "react";
+import React, { useCallback, useMemo, useEffect } from "react";
 import {
   useReactTable,
   getCoreRowModel,
@@ -20,7 +20,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { DataTableRowAction, SearchParams, Transaction } from "../_lib/types";
+import { SearchParams, Transaction } from "../_lib/types";
 import { getTransactionColumns } from "./columns";
 import { useVendorTransactions, useDownloadSingleReceipt } from "../_lib/queries";
 import { DataTablePagination } from "@/components/data-table/data-table-pagination";
@@ -37,8 +37,6 @@ export function TransactionsDataTable({
   onEarningsUpdate,
 }: TransactionsDataTableProps) {
   const { formatLocale: formatMoneyLocale } = useCurrencyFormat();
-  const [rowAction, setRowAction] =
-    React.useState<DataTableRowAction<Transaction> | null>(null);
   const [sorting, setSorting] = React.useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>(
     []
@@ -48,23 +46,40 @@ export function TransactionsDataTable({
     pageSize: 30,
   });
 
-  const columns = useMemo(
-    () => getTransactionColumns({ setRowAction, formatMoneyLocale }),
-    [formatMoneyLocale],
+  const downloadReceiptMutation = useDownloadSingleReceipt();
+
+  const handleDownloadReceipt = useCallback(
+    (paymentId: number) => {
+      downloadReceiptMutation.mutate(paymentId);
+    },
+    [downloadReceiptMutation],
   );
 
+  const downloadingPaymentId =
+    downloadReceiptMutation.isPending &&
+    downloadReceiptMutation.variables != null
+      ? Number(downloadReceiptMutation.variables)
+      : null;
+
+  const columns = useMemo(
+    () =>
+      getTransactionColumns({
+        onDownloadReceipt: handleDownloadReceipt,
+        downloadingPaymentId,
+        formatMoneyLocale,
+      }),
+    [downloadingPaymentId, formatMoneyLocale, handleDownloadReceipt],
+  );
   const { data, isLoading, isError } = useVendorTransactions({
     search: search.search,
     status: search.status,
     from_date: search.from_date,
     to_date: search.to_date,
+    room_id: search.room_id,
     page: Number(search.page) || 1,
     per_page: Number(search.per_page) || 30,
   });
 
-  const downloadReceiptMutation = useDownloadSingleReceipt();
-
-  // Update earnings when data changes
   useEffect(() => {
     if (data && "earnings" in data && onEarningsUpdate) {
       onEarningsUpdate(data.earnings as string);
@@ -89,14 +104,6 @@ export function TransactionsDataTable({
       pagination,
     },
   });
-
-  useEffect(() => {
-    if (rowAction?.type !== "download") return;
-    const transaction = rowAction.row.original;
-    const id = transaction.payment_id;
-    setRowAction(null);
-    downloadReceiptMutation.mutate(id);
-  }, [rowAction]);
 
   if (isLoading) {
     return <TransactionsTableSkeleton className="animate-pulse" />;

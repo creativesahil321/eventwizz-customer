@@ -1,4 +1,5 @@
 import * as z from "zod";
+import { coerceApiBoolean } from "@/lib/coerce-api-boolean";
 import { STEP_NINE_MAX_FAQS } from "@/app/(on-boarding)/on-boarding/_components/form-provider/schema";
 import {
   DRINK_PACKAGE_ITEM_TITLE_MAX_CHARS,
@@ -329,16 +330,7 @@ const depositDueDateMessage = {
   path: ["deposit_due_date"],
 };
 
-const normalizeBoolean = (value: unknown) => {
-  if (typeof value === "boolean") return value;
-  if (typeof value === "number") return value === 1;
-  if (typeof value === "string") {
-    const trimmed = value.trim().toLowerCase();
-    if (["true", "1", "yes", "on"].includes(trimmed)) return true;
-    if (["false", "0", "no", "off", ""].includes(trimmed)) return false;
-  }
-  return undefined;
-};
+const normalizeBoolean = (value: unknown) => coerceApiBoolean(value);
 
 /** Laravel / RHF often provide numeric IDs and counts as strings. */
 const coerceFiniteNumber = (value: unknown): number | undefined => {

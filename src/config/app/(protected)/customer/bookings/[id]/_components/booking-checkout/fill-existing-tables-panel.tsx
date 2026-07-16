@@ -1,8 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { toast } from "sonner";
 import type { SelectedTable } from "@/services/customer/bookings/type";
 import type { BookingDateSource } from "./build-line-items";
 import { QuantityStepper } from "./quantity-stepper";
@@ -44,10 +45,24 @@ interface FillExistingTablesPanelProps {
   guestsPlacedOnNewTable?: number;
   /** When true, section is optional — customer may skip and book a new table instead. */
   optional?: boolean;
+  /** Increment to trigger auto-fill from parent (e.g. "seat all on existing"). */
+  autoFillSignal?: number;
+  /** When true, footer hints that remaining guests can use a new table. */
+  canPlaceRemainingOnNewTable?: boolean;
+  /** New-table minimum — for remaining-guest messaging in fill-existing footer. */
+  newTableMinGuests?: number;
+  /** Remaining count is below new-table minimum. */
+  remainingBelowNewTableMin?: boolean;
+  seatingConfirmed?: boolean;
+  onConfirmSeating?: () => void;
   /** @deprecated Use optional — hide duplicate capacity banner when parent explains constraints. */
   hideCapacityBanner?: boolean;
   /** @deprecated Hide per-section footer when parent shows a combined summary. */
   hideFooter?: boolean;
+  /** When true, full tables remain selectable for seat extensions. */
+  allowSeatExtension?: boolean;
+  /** Restore prior existing-table placements (e.g. from add-ons API selected_tables). */
+  restoredAdditionsBySlot?: Record<string, number>;
 }
 
 export function getExistingTableFreeSeats(slot: {
@@ -57,7 +72,60 @@ export function getExistingTableFreeSeats(slot: {
   return Math.max(0, slot.capacity - slot.occupied);
 }
 
-export function hasBookedTableAllocations(
+type SelectedTableAllocationInput =
+  | SelectedTable["allocation"]
+  | Array<{
+      parent_id?: number;
+      booking_date_table_id?: number;
+      seats?: number;
+    }>
+  | null
+  | undefined;
+
+/** Supports add-ons array `[{ parent_id, seats }]` and record `{"1113": 6}` / `{"1113": "+2"}`. */
+export function iterSelectedTableAllocationEntries(
+  allocation: SelectedTableAllocationInput,
+): Array<{ parentId: number; seats: number; isAddonMarker: boolean }> {
+  if (allocation == null) return [];
+
+  if (Array.isArray(allocation)) {
+    return allocation
+      .map((entry) => {
+        if (entry == null || typeof entry !== "object") return null;
+        const parentId = Number(
+          entry.parent_id ?? entry.booking_date_table_id ?? NaN,
+        );
+        const seats = Number(entry.seats ?? 0) || 0;
+        if (!Number.isFinite(parentId) || parentId <= 0) return null;
+        return { parentId, seats, isAddonMarker: false };
+      })
+      .filter(
+        (
+          entry,
+        ): entry is { parentId: number; seats: number; isAddonMarker: boolean } =>
+          entry != null,
+      );
+  }
+
+  if (typeof allocation === "object") {
+    return Object.entries(allocation).flatMap(([parentKey, seatValue]) => {
+      const parentId = Number.parseInt(parentKey, 10);
+      if (!Number.isFinite(parentId) || parentId <= 0) return [];
+
+      const seatLabel = String(seatValue);
+      const isAddonMarker = seatLabel.startsWith("+");
+      const seats = isAddonMarker
+        ? Number.parseInt(seatLabel.slice(1), 10) || 0
+        : Number(seatValue) || 0;
+
+      return [{ parentId, seats, isAddonMarker }];
+    });
+  }
+
+  return [];
+}
+
+function bookingDetailHasAllocations(
   dateSource: BookingDateSource | undefined,
 ): boolean {
   return (
@@ -66,10 +134,47 @@ export function hasBookedTableAllocations(
   );
 }
 
+function findBookingAllocation(
+  dateSource: BookingDateSource | undefined,
+  parentId: number,
+  tableSize?: number,
+) {
+  for (const tableLine of dateSource?.tables ?? []) {
+    if (tableSize != null && tableLine.table_size !== tableSize) continue;
+    const match = tableLine.allocations?.find((alloc) => alloc.id === parentId);
+    if (match) return { tableLine, alloc: match };
+  }
+  return null;
+}
+
+export function hasBookedTableAllocations(
+  dateSource: BookingDateSource | undefined,
+  selectedTables: SelectedTable[] = [],
+): boolean {
+  if (
+    dateSource?.tables?.some((table) => (table.allocations?.length ?? 0) > 0)
+  ) {
+    return true;
+  }
+
+  if ((dateSource?.tables?.length ?? 0) === 0) {
+    return false;
+  }
+
+  return selectedTables.some(
+    (table) =>
+      iterSelectedTableAllocationEntries(
+        table.allocation as SelectedTableAllocationInput,
+      ).length > 0,
+  );
+}
+
 export function buildExistingTableSlots(
   dateSource: BookingDateSource | undefined,
   selectedTables: SelectedTable[],
+  options?: { allowSeatExtension?: boolean },
 ): ExistingTableSlot[] {
+  const allowSeatExtension = options?.allowSeatExtension ?? false;
   if (!dateSource?.tables?.length) return [];
 
   const slots: ExistingTableSlot[] = [];
@@ -82,12 +187,19 @@ export function buildExistingTableSlots(
     const pricePerPerson = matchedSelected
       ? parseFloat(matchedSelected.price) || tableLine.unit_price
       : tableLine.unit_price;
-    const tableCount = tableLine.table_count || tableLine.allocations?.length || 1;
+    const tableCount =
+      matchedSelected?.no_tables ||
+      tableLine.table_count ||
+      tableLine.allocations?.length ||
+      1;
 
     tableLine.allocations?.forEach((alloc) => {
       const capacity = alloc.capacity ?? tableLine.table_size;
       const occupied = alloc.people;
-      if (getExistingTableFreeSeats({ occupied, capacity }) <= 0) {
+      if (
+        !allowSeatExtension &&
+        getExistingTableFreeSeats({ occupied, capacity }) <= 0
+      ) {
         return;
       }
 
@@ -102,6 +214,62 @@ export function buildExistingTableSlots(
         tableSize: tableLine.table_size,
         tableCount,
         parentId: alloc.id,
+      });
+    });
+  });
+
+  if (slots.length > 0 || bookingDetailHasAllocations(dateSource)) {
+    return slots;
+  }
+
+  selectedTables.forEach((selected) => {
+    const tableLine = dateSource.tables?.find(
+      (table) => table.table_size === selected.table_size,
+    );
+    const pricePerPerson =
+      parseFloat(selected.price) || tableLine?.unit_price || 0;
+    const tableCount = selected.no_tables || tableLine?.table_count || 1;
+    const defaultCapacity = selected.table_size;
+
+    iterSelectedTableAllocationEntries(
+      selected.allocation as SelectedTableAllocationInput,
+    ).forEach(({ parentId, seats, isAddonMarker }) => {
+      const bookingMatch = findBookingAllocation(
+        dateSource,
+        parentId,
+        selected.table_size,
+      );
+      const bookingAlloc = bookingMatch?.alloc;
+      const capacity = bookingAlloc?.capacity ?? defaultCapacity;
+      const occupied = bookingAlloc
+        ? bookingAlloc.people
+        : isAddonMarker
+          ? capacity
+          : seats;
+      if (
+        !allowSeatExtension &&
+        getExistingTableFreeSeats({ occupied, capacity }) <= 0
+      ) {
+        return;
+      }
+
+      const label =
+        bookingAlloc?.label ||
+        (bookingAlloc?.table_number != null
+          ? `Table ${bookingAlloc.table_number}`
+          : `Table ${parentId}`);
+
+      slots.push({
+        key: `${selected.id}-${parentId}`,
+        allocationId: parentId,
+        label,
+        occupied,
+        capacity,
+        pricePerPerson,
+        tableConfigId: selected.id,
+        tableSize: selected.table_size,
+        tableCount,
+        parentId,
       });
     });
   });
@@ -138,6 +306,61 @@ function buildSaveGroups(
   });
 
   return Array.from(groups.values());
+}
+
+export function buildAutoFillAdditions(
+  slots: ExistingTableSlot[],
+  guestsToAdd: number,
+  options?: { allowSeatExtension?: boolean },
+): Record<string, number> {
+  if (guestsToAdd <= 0) return {};
+
+  const allowSeatExtension = options?.allowSeatExtension ?? false;
+  let remaining = guestsToAdd;
+  const next: Record<string, number> = {};
+
+  slots.forEach((slot) => {
+    if (remaining <= 0) {
+      next[slot.key] = 0;
+      return;
+    }
+    const free = getExistingTableFreeSeats(slot);
+    const assign = allowSeatExtension
+      ? Math.min(remaining, free > 0 ? free : remaining)
+      : Math.min(free, remaining);
+    next[slot.key] = assign;
+    remaining -= assign;
+  });
+
+  return next;
+}
+
+/** Map saved selected-table allocations onto fill-existing slot keys. */
+export function buildAdditionsFromSelectedTables(
+  slots: ExistingTableSlot[],
+  selectedTables: SelectedTable[],
+): Record<string, number> {
+  if (slots.length === 0 || selectedTables.length === 0) return {};
+
+  const slotKeyByParentId = new Map(
+    slots.map((slot) => [slot.parentId, slot.key] as const),
+  );
+  const additions: Record<string, number> = {};
+
+  selectedTables.forEach((selected) => {
+    iterSelectedTableAllocationEntries(
+      selected.allocation as SelectedTableAllocationInput,
+    ).forEach(({ parentId, seats }) => {
+      if (seats <= 0) return;
+
+      const slotKey = slotKeyByParentId.get(parentId);
+      if (!slotKey) return;
+
+      additions[slotKey] = (additions[slotKey] ?? 0) + seats;
+    });
+  });
+
+  return additions;
 }
 
 interface ExistingTablesPlacedSummaryProps {
@@ -250,16 +473,23 @@ export function FillExistingTablesPanel({
   onStateChange,
   guestsPlacedOnNewTable = 0,
   optional = false,
+  autoFillSignal = 0,
+  canPlaceRemainingOnNewTable = false,
+  newTableMinGuests,
+  remainingBelowNewTableMin = false,
+  seatingConfirmed = false,
+  onConfirmSeating,
   hideCapacityBanner = false,
   hideFooter = false,
+  allowSeatExtension = false,
+  restoredAdditionsBySlot,
 }: FillExistingTablesPanelProps) {
   const [additionsBySlot, setAdditionsBySlot] = useState<
     Record<string, number>
-  >({});
-
-  useEffect(() => {
-    setAdditionsBySlot({});
-  }, [guestsToAdd]);
+  >(() => restoredAdditionsBySlot ?? {});
+  const lastAutoFillSignalRef = useRef(0);
+  const prevGuestsToAddRef = useRef(guestsToAdd);
+  const restoredAdditionsRef = useRef(restoredAdditionsBySlot);
 
   const totalFreeSeats = useMemo(
     () =>
@@ -308,9 +538,11 @@ export function FillExistingTablesPanel({
       const free = getFreeSeats(slot);
       const otherAdded = totalAdded - (additionsBySlot[slot.key] ?? 0);
       const remainingGuests = Math.max(0, guestsToAdd - otherAdded);
-      return Math.min(free, remainingGuests);
+      const seatBudget =
+        allowSeatExtension && free <= 0 ? remainingGuests : Math.min(free, remainingGuests);
+      return seatBudget;
     },
-    [additionsBySlot, getFreeSeats, guestsToAdd, totalAdded],
+    [additionsBySlot, allowSeatExtension, getFreeSeats, guestsToAdd, totalAdded],
   );
 
   const setSlotAddition = (slotKey: string, next: number) => {
@@ -320,31 +552,83 @@ export function FillExistingTablesPanel({
     }));
   };
 
-  const handleAutoFill = () => {
-    if (guestsToAdd <= 0) return;
-
-    let remaining = guestsToAdd;
-    const next: Record<string, number> = {};
-
-    slots.forEach((slot) => {
-      if (remaining <= 0) {
-        next[slot.key] = 0;
-        return;
-      }
-      const free = getFreeSeats(slot);
-      const assign = Math.min(free, remaining);
-      next[slot.key] = assign;
-      remaining -= assign;
-    });
-
-    setAdditionsBySlot(next);
+  const handleConfirmSeating = () => {
+    if (totalAdded <= 0) return;
+    onConfirmSeating?.();
+    toast.success("Existing table seating confirmed");
   };
+
+  const handleAutoFill = useCallback(() => {
+    setAdditionsBySlot(
+      buildAutoFillAdditions(slots, guestsToAdd, { allowSeatExtension }),
+    );
+  }, [allowSeatExtension, guestsToAdd, slots]);
+
+  useEffect(() => {
+    if (autoFillSignal > lastAutoFillSignalRef.current) {
+      lastAutoFillSignalRef.current = autoFillSignal;
+      handleAutoFill();
+    }
+  }, [autoFillSignal, handleAutoFill]);
+
+  useEffect(() => {
+    if (prevGuestsToAddRef.current === guestsToAdd) return;
+
+    const prevGuests = prevGuestsToAddRef.current;
+    prevGuestsToAddRef.current = guestsToAdd;
+
+    if (guestsToAdd <= 0) {
+      setAdditionsBySlot({});
+      return;
+    }
+
+    setAdditionsBySlot((prev) => {
+      const prevTotal = Object.values(prev).reduce((sum, count) => sum + count, 0);
+      if (prevTotal <= 0) return prev;
+
+      if (guestsToAdd >= prevGuests) {
+        if (prevTotal <= guestsToAdd) return prev;
+      }
+
+      let remaining = guestsToAdd;
+      const next: Record<string, number> = {};
+      slots.forEach((slot) => {
+        const current = prev[slot.key] ?? 0;
+        const assign = Math.min(current, remaining);
+        next[slot.key] = assign;
+        remaining -= assign;
+      });
+      return next;
+    });
+  }, [guestsToAdd, slots]);
+
+  useEffect(() => {
+    const restored = restoredAdditionsBySlot;
+    if (!restored || Object.keys(restored).length === 0) return;
+    if (restoredAdditionsRef.current === restored) return;
+    restoredAdditionsRef.current = restored;
+
+    setAdditionsBySlot((prev) => {
+      const prevTotal = Object.values(prev).reduce((sum, count) => sum + count, 0);
+      if (prevTotal > 0) return prev;
+      return restored;
+    });
+  }, [restoredAdditionsBySlot]);
 
   const autoFillCapacity = Math.min(guestsToAdd, totalFreeSeats);
   const unplacedGuests = Math.max(
     0,
     guestsToAdd - totalAdded - guestsPlacedOnNewTable,
   );
+  const allGuestsPlacedOnExisting =
+    totalAdded > 0 && totalAdded === guestsToAdd;
+  const canConfirmExistingPortion =
+    totalAdded > 0 &&
+    totalAdded < guestsToAdd &&
+    canPlaceRemainingOnNewTable;
+  const showConfirmButton =
+    !seatingConfirmed &&
+    (allGuestsPlacedOnExisting || canConfirmExistingPortion);
   const showCapacityBanner = guestsToAdd > 0 && !hideCapacityBanner && !optional;
 
   if (slots.length === 0) return null;
@@ -497,7 +781,15 @@ export function FillExistingTablesPanel({
             {unplacedGuests > 0 && totalAdded > 0 && (
               <p className="mt-1 text-[10px] font-semibold leading-[1.4] text-[#b45309]">
                 {unplacedGuests} guest{unplacedGuests === 1 ? "" : "s"} remaining
-                — place them on a new table below.
+                {canPlaceRemainingOnNewTable
+                  ? " — you can add a new table below."
+                  : remainingBelowNewTableMin &&
+                      newTableMinGuests != null &&
+                      newTableMinGuests > 0
+                    ? ` — new tables require at least ${newTableMinGuests} guests. Use the options below to adjust.`
+                    : optional
+                      ? "."
+                      : " — place them on a new table below."}
               </p>
             )}
           </div>
@@ -505,6 +797,36 @@ export function FillExistingTablesPanel({
             {formatCurrency(totalCost)}
           </span>
         </div>
+      )}
+
+      {showConfirmButton && (
+        <>
+          <p className="text-[11px] leading-snug text-muted-foreground">
+            Tap{" "}
+            <span className="font-semibold text-foreground">Confirm seating</span>{" "}
+            {allGuestsPlacedOnExisting
+              ? "to add guests to your order."
+              : "to lock existing tables, then add a new table for remaining guests."}
+          </p>
+          <button
+            type="button"
+            className="h-8 w-full rounded-md text-xs font-bold leading-none hover:opacity-[0.92]"
+            style={{
+              backgroundColor: "var(--color-success)",
+              color: "var(--color-primary-foreground, #fff)",
+            }}
+            onClick={handleConfirmSeating}
+          >
+            Confirm seating
+          </button>
+        </>
+      )}
+
+      {seatingConfirmed && totalAdded > 0 && (
+        <p className="text-[11px] font-semibold text-emerald-700">
+          Existing seating confirmed · {totalAdded} guest
+          {totalAdded === 1 ? "" : "s"}
+        </p>
       )}
     </div>
   );

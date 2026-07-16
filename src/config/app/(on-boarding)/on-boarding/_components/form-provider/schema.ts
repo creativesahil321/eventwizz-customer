@@ -74,6 +74,8 @@ export const stepOneSchema = z
   });
 export type StepOneType = z.infer<typeof stepOneSchema>;
 
+import { coerceApiBoolean } from "@/lib/coerce-api-boolean";
+
 /** Snake or camel `has_multiple_locations` on any API object (root, step, venue). */
 export function readHasMultipleLocationsField(source: unknown): unknown {
   if (!source || typeof source !== "object") return undefined;
@@ -85,13 +87,7 @@ export function readHasMultipleLocationsField(source: unknown): unknown {
 export function coerceHasMultipleLocationsFromApi(
   value: unknown,
 ): boolean | undefined {
-  if (value === true || value === 1 || value === "1" || value === "true") {
-    return true;
-  }
-  if (value === false || value === 0 || value === "0" || value === "false") {
-    return false;
-  }
-  return undefined;
+  return coerceApiBoolean(value, { extendedStrings: false });
 }
 
 /** Merge API step-1 fields (e.g. brand_name, string booleans) into client stepOne shape. */
@@ -343,16 +339,7 @@ const depositDueDateMessage = {
 };
 
 // Base schema for date - add booking_type to the base schema
-const normalizeBoolean = (value: unknown) => {
-  if (typeof value === "boolean") return value;
-  if (typeof value === "number") return value === 1;
-  if (typeof value === "string") {
-    const trimmed = value.trim().toLowerCase();
-    if (["true", "1", "yes", "on"].includes(trimmed)) return true;
-    if (["false", "0", "no", "off", ""].includes(trimmed)) return false;
-  }
-  return undefined;
-};
+const normalizeBoolean = (value: unknown) => coerceApiBoolean(value);
 
 const normalizeDepositType = (value: unknown) => {
   if (typeof value !== "string") return undefined;

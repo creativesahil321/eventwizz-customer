@@ -22,6 +22,7 @@ import { Input } from "@/components/ui/input";
 import { X, Search } from "lucide-react";
 import { TransactionsTableSkeleton } from "./skeleton-loader";
 import { useCurrencyFormat } from "@/hooks/use-currency-format";
+import { pageCardClassName } from "@/app/(protected)/_components/page-header-card";
 
 interface TransactionsDataTableProps {
   transactions: Transaction[];
@@ -80,14 +81,19 @@ export function TransactionsDataTable({
   }
 
   return (
-    <section className="w-full max-w-full min-w-0 relative text-black pb-20 sm:pb-6 overflow-x-hidden">
-      <div className="min-w-0 max-w-full bg-white p-4 sm:p-6 rounded-md shadow-sm overflow-hidden">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 mb-4 sm:mb-6 min-w-0">
-          <h1 className="text-xl sm:text-2xl title-header font-bold">
-            Transactions
-          </h1>
+    <section className="relative w-full min-w-0 max-w-full overflow-x-hidden pb-20 text-black sm:pb-6">
+      <div className={pageCardClassName("min-w-0 max-w-full overflow-hidden")}>
+        <div className="mb-4 flex min-w-0 flex-col gap-3 sm:mb-6 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
+          <div className="min-w-0">
+            <h1 className="text-xl font-bold text-black title-header sm:text-2xl">
+              Transactions
+            </h1>
+            <p className="mt-1 text-sm text-muted-foreground sm:text-base">
+              View your payment history and transaction details
+            </p>
+          </div>
           {stats && (
-            <div className="flex flex-wrap items-center gap-3 sm:gap-4 text-xs sm:text-sm">
+            <div className="flex flex-wrap items-center gap-3 text-xs sm:gap-4 sm:text-sm">
               <div className="text-muted-foreground">
                 Total:{" "}
                 <span className="font-semibold text-foreground">
@@ -218,13 +224,17 @@ export function TransactionsDataTable({
       </div>
 
       {safeTransactions.length === 0 && !isLoading ? (
-        <div className="p-4 sm:p-6 text-center text-gray-500 bg-white mt-2 rounded-md shadow-sm">
+        <div className={pageCardClassName("mt-4 text-center text-gray-500")}>
           <p className="text-sm sm:text-base">
             No transactions found. Try adjusting your filters.
           </p>
         </div>
       ) : (
-        <div className="bg-white mt-2 rounded-md shadow-sm overflow-hidden max-w-full">
+        <div
+          className={pageCardClassName(
+            "mt-4 max-w-full overflow-hidden !py-0"
+          )}
+        >
           <div className="overflow-x-auto px-4 sm:px-6 max-w-full">
             <div className="min-w-full inline-block align-middle">
               <TransactionListComponent

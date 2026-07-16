@@ -21,6 +21,10 @@ import type {
   PersistedMenuChoice,
 } from "@/services/customer/bookings/type";
 import AllergenSection, { type AllergenData } from "./allergen-section";
+import {
+  getMenuCategorySelectionKey,
+  persistedSelectionsToFormSelections,
+} from "./menu-category-utils";
 
 const TITLE_OPTIONS = ["Mr", "Mrs", "Ms", "Miss", "Dr", "Prof"];
 
@@ -32,7 +36,7 @@ interface AttendeeFormProps {
   editingAttendee: PersistedMenuChoice | null;
   isTableFull: boolean;
   isSaving: boolean;
-  onSave: (data: AttendeeFormData) => void;
+  onSave: (data: AttendeeFormData) => void | Promise<void>;
   onCancelEdit: () => void;
   /** Flat layout inside a shared mobile card — no outer border. */
   embedded?: boolean;
@@ -74,12 +78,13 @@ export default function AttendeeForm({
         menuSelections: z.record(z.string(), z.string()),
       })
       .superRefine((data, ctx) => {
-        requiredCategories.forEach((category) => {
-          if (!data.menuSelections[category.title]) {
+        requiredCategories.forEach((category, index) => {
+          const selectionKey = getMenuCategorySelectionKey(category, index);
+          if (!data.menuSelections[selectionKey]) {
             ctx.addIssue({
               code: z.ZodIssueCode.custom,
               message: `Please select an item from "${category.title}"`,
-              path: ["menuSelections", category.title],
+              path: ["menuSelections", selectionKey],
             });
           }
         });
@@ -115,7 +120,10 @@ export default function AttendeeForm({
       reset({
         title: editingAttendee.title || "",
         fullName: editingAttendee.full_name || "",
-        menuSelections: editingAttendee.menu_selections || {},
+        menuSelections: persistedSelectionsToFormSelections(
+          editingAttendee.menu_selections || {},
+          menuCategories,
+        ),
       });
       setAllergenData({
         allergens: editingAttendee.allergens || [],
@@ -130,24 +138,37 @@ export default function AttendeeForm({
         additionalNotes: "",
       });
     }
-  }, [editingAttendee, reset]);
+  }, [editingAttendee, menuCategories, reset]);
 
-  const onSubmit = (data: {
+  const onSubmit = async (data: {
     title?: string;
     fullName: string;
     menuSelections: Record<string, string>;
   }) => {
-    onSave({
-      title: data.title || "",
-      fullName: data.fullName,
-      menuSelections: data.menuSelections,
-      ...allergenData,
-    });
+    try {
+      await onSave({
+        title: data.title || "",
+        fullName: data.fullName,
+        menuSelections: data.menuSelections,
+        ...allergenData,
+      });
+
+      if (!editingAttendee) {
+        reset({ title: "", fullName: "", menuSelections: {} });
+        setAllergenData({
+          allergens: [],
+          dietaryRequirements: [],
+          additionalNotes: "",
+        });
+      }
+    } catch {
+      // Errors are handled by the save mutation / parent.
+    }
   };
 
   const isEditing = !!editingAttendee;
 
-  if (isTableFull && !isEditing) {
+  if (isTableFull && !isEditing && !isSaving) {
     return (
       <div
         className={cn(
@@ -231,8 +252,9 @@ export default function AttendeeForm({
         <div className="space-y-3.5">
           {categoriesWithItems.map((category, idx) => {
             const isRequired = idx < 3;
+            const selectionKey = getMenuCategorySelectionKey(category, idx);
             return (
-              <div key={category.title} className="flex flex-col gap-1.5">
+              <div key={selectionKey} className="flex flex-col gap-1.5">
                 <Label className="text-xs font-medium text-gray-500">
                   {category.title}{" "}
                   {isRequired ? (
@@ -244,11 +266,11 @@ export default function AttendeeForm({
                   )}
                 </Label>
                 <Select
-                  value={menuSelections?.[category.title] || ""}
+                  value={menuSelections?.[selectionKey] || ""}
                   onValueChange={(v) =>
                     setValue("menuSelections", {
                       ...menuSelections,
-                      [category.title]: v,
+                      [selectionKey]: v,
                     })
                   }
                 >
@@ -271,7 +293,7 @@ export default function AttendeeForm({
                       string,
                       { message?: string }
                     >
-                  )?.[category.title] && (
+                  )?.[selectionKey] && (
                     <p className="text-[11px] text-red-500">
                       {
                         (
@@ -279,7 +301,7 @@ export default function AttendeeForm({
                             string,
                             { message?: string }
                           >
-                        )[category.title]?.message
+                        )[selectionKey]?.message
                       }
                     </p>
                   )}

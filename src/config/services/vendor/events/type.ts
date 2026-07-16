@@ -16,6 +16,10 @@ export interface EventsQueryParams {
   page?: number;
   per_page?: number;
   status?: string;
+  from_date?: string;
+  to_date?: string;
+  category_id?: string;
+  room_id?: string;
 }
 
 /**
@@ -34,6 +38,9 @@ export interface EventItem {
   slug: string;
   image: string | null;
   status: string;
+  is_submitted_for_approval?: boolean;
+  event_category_id?: number;
+  category_name?: string;
   /** Legacy: single date (older APIs) */
   event_date?: string;
   /** Current: multiple event dates (newer APIs) */
@@ -41,6 +48,30 @@ export interface EventItem {
   // Legacy fields for backward compatibility
   current_step?: number;
   event_id?: number;
+}
+
+export interface EventsListCategoryOption {
+  id: number;
+  name: string;
+}
+
+export interface EventsListRoomOption {
+  room_id: number;
+  room_name: string;
+}
+
+export interface EventsListFilterMeta {
+  from_date?: string | null;
+  to_date?: string | null;
+  date_filter_on?: string;
+  selected_category_id?: number | null;
+  selected_category_name?: string | null;
+  available_dates?: string[];
+  available_categories?: EventsListCategoryOption[];
+  selected_room_id?: number | null;
+  selected_room_name?: string | null;
+  has_room_events?: boolean;
+  available_rooms?: EventsListRoomOption[];
 }
 
 // Minimal event detail structure required by preview
@@ -303,6 +334,7 @@ export interface EventsResponse {
     total: number;
   };
   errors: string[];
+  filter_meta?: EventsListFilterMeta;
 }
 
 /**
@@ -312,6 +344,18 @@ export interface EventOverviewQueryParams {
   date_status?: "all" | "available" | "sold_out";
   date_per_page?: number;
   date_page?: number;
+  date_filter?: string;
+  room_id?: string;
+}
+
+export interface EventOverviewFilterMeta {
+  date_filter?: string | null;
+  date_filter_on?: string;
+  available_dates?: string[];
+  selected_room_id?: number | null;
+  selected_room_name?: string | null;
+  has_room_events?: boolean;
+  available_rooms?: EventsListRoomOption[];
 }
 
 export interface EventOverviewTableConfig {
@@ -387,4 +431,5 @@ export interface EventOverviewResponse {
     }>;
     path: string;
   };
+  filter_meta?: EventOverviewFilterMeta;
 }

@@ -11,6 +11,7 @@ import {
   Tag,
   RotateCcw,
   Wallet,
+  Building2,
 } from "lucide-react";
 import HistoryDataTable from "./_components/history-data-table";
 import { Shell } from "@/components/shell";
@@ -43,6 +44,7 @@ export default function BookingHistoryPage() {
   const { format: formatMoney } = useCurrencyFormat();
   const [globalFilterValue, setGlobalFilterValue] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [roomFilter, setRoomFilter] = useState("all");
   const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
   const [, setSelectedRowCount] = useState(0);
   const tableRef = React.useRef<Table<History> | null>(null);
@@ -70,29 +72,9 @@ export default function BookingHistoryPage() {
 
   useEffect(() => {
     setPage(1);
-  }, [debouncedSearch, statusFilter, fromDate, toDate, setPage]);
+  }, [debouncedSearch, statusFilter, roomFilter, fromDate, toDate, setPage]);
 
-  const hasActiveFilters =
-    !!debouncedSearch ||
-    statusFilter !== "all" ||
-    !!dateRange?.from ||
-    !!dateRange?.to;
-
-  const handleResetAllFilters = () => {
-    setGlobalFilterValue("");
-    setStatusFilter("all");
-    setDateRange(undefined);
-    setPage(1);
-  };
-
-  const searchParams: SearchParams = {
-    page: "1",
-    per_page: "30",
-    search: debouncedSearch,
-    status: statusFilter === "all" ? "" : statusFilter,
-    from_date: fromDate,
-    to_date: toDate,
-  };
+  const selectedRoomId = roomFilter === "all" ? undefined : roomFilter;
 
   const {
     data: historyData,
@@ -105,9 +87,64 @@ export default function BookingHistoryPage() {
     status: statusFilter === "all" ? "" : statusFilter,
     from_date: fromDate,
     to_date: toDate,
+    room_id: selectedRoomId,
   });
 
-  // Get summary from API response
+  const filterMeta = historyData?.filter_meta;
+  const availableRooms = React.useMemo(
+    () => filterMeta?.available_rooms ?? [],
+    [filterMeta?.available_rooms],
+  );
+  const showRoomFilter =
+    !!fromDate &&
+    filterMeta?.has_room_bookings === true &&
+    availableRooms.length > 0;
+
+  useEffect(() => {
+    if (!fromDate) {
+      if (roomFilter !== "all") setRoomFilter("all");
+      return;
+    }
+
+    if (roomFilter === "all") return;
+
+    const isValidSelection = availableRooms.some(
+      (room) => String(room.room_id) === roomFilter,
+    );
+    if (!isValidSelection) {
+      setRoomFilter("all");
+    }
+  }, [fromDate, availableRooms, roomFilter]);
+
+  const hasActiveFilters =
+    !!debouncedSearch ||
+    statusFilter !== "all" ||
+    roomFilter !== "all" ||
+    !!dateRange?.from ||
+    !!dateRange?.to;
+
+  const handleResetAllFilters = () => {
+    setGlobalFilterValue("");
+    setStatusFilter("all");
+    setRoomFilter("all");
+    setDateRange(undefined);
+    setPage(1);
+  };
+
+  const handleDateRangeChange = (range: DateRange | undefined) => {
+    setDateRange(range);
+    setRoomFilter("all");
+  };
+  const searchParams: SearchParams = {
+    page: "1",
+    per_page: "30",
+    search: debouncedSearch,
+    status: statusFilter === "all" ? "" : statusFilter,
+    from_date: fromDate,
+    to_date: toDate,
+    room_id: selectedRoomId,
+  };
+
   const summaryTotals = React.useMemo(() => {
     if (historyData?.summary) {
       return {
@@ -192,12 +229,38 @@ export default function BookingHistoryPage() {
                       <div className="w-full min-w-0 sm:w-auto sm:min-w-[280px]">
                         <DateRangePicker
                           date={dateRange}
-                          onDateChange={setDateRange}
+                          onDateChange={handleDateRangeChange}
                           placeholder="Filter by date range"
                           disabled={isFetching}
                           showClear={true}
+                          disableFutureDates={false}
                         />
                       </div>
+                      {showRoomFilter && (
+                        <Select
+                          value={roomFilter}
+                          onValueChange={setRoomFilter}
+                          disabled={isFetching}
+                        >
+                          <SelectTrigger className="w-full sm:w-[200px] shrink-0 min-w-[160px]">
+                            <div className="flex items-center gap-2 truncate">
+                              <Building2 className="h-4 w-4 shrink-0 text-muted-foreground" />
+                              <SelectValue placeholder="All halls" />
+                            </div>
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="all">All halls</SelectItem>
+                            {availableRooms.map((room) => (
+                              <SelectItem
+                                key={room.room_id}
+                                value={String(room.room_id)}
+                              >
+                                {room.room_name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      )}
                       {/* Search */}
                       <div className="relative flex-1 min-w-[200px] sm:min-w-[180px] max-w-full">
                         <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
@@ -222,9 +285,6 @@ export default function BookingHistoryPage() {
                           <SelectItem value="all">All Bookings</SelectItem>
                           <SelectItem value="confirmed">Confirmed</SelectItem>
                           <SelectItem value="cancelled">Cancelled</SelectItem>
-                          <SelectItem value="pending">
-                            Pending (Draft)
-                          </SelectItem>
                           <SelectItem value="partially_paid">
                             Partially Paid
                           </SelectItem>

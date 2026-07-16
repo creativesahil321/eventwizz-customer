@@ -11,6 +11,8 @@ import { useAuthStore } from "@/store/auth.store";
 import { useDomainStore } from "@/store/domain.store";
 import { getSession } from "next-auth/react";
 import type {
+  BookingDetailsDate,
+  BookingPaymentSummary,
   MenuItemsResponse,
   MenuSelectionResponse,
   SaveMenuChoicePayload,
@@ -21,6 +23,22 @@ import type {
   VendorUpdateBookingStatusPayload,
   VendorUpdateBookingStatusResponse,
 } from "./type";
+
+export interface VendorBookingRoomFilterOption {
+  room_id: number;
+  room_name: string;
+}
+
+export interface VendorBookingFilterMeta {
+  from_date?: string | null;
+  to_date?: string | null;
+  date_filter_on?: string | null;
+  has_room_bookings?: boolean;
+  room_scope?: string | null;
+  selected_room_id?: number | null;
+  selected_room_name?: string | null;
+  available_rooms?: VendorBookingRoomFilterOption[];
+}
 
 export interface VendorBookingHistoryResponse {
   status: boolean;
@@ -34,6 +52,8 @@ export interface VendorBookingHistoryResponse {
     refunded_amount?: string;
     platform_fee_due?: string;
   };
+  summary_by_location?: unknown[];
+  filter_meta?: VendorBookingFilterMeta;
   links: {
     first: string | null;
     last: string | null;
@@ -84,7 +104,15 @@ export interface VendorBookingTable {
   table_size: number;
   price_per_person: number;
   no_tables: number;
-  allocation: Record<string, number>; // { "214": 15, "215": 15 } - tableId: peopleCount
+  allocation:
+  | Record<string, number | string>
+  | Array<{
+    id?: number;
+    table_number?: number | string;
+    final_table_number?: number | string;
+    parent_id?: number;
+    seats?: number;
+  }>;
   people: number;
   total: number;
 }
@@ -142,6 +170,19 @@ export interface VendorBookingEventDate {
   parent_booking_date?: string | VendorBookingParentDate | null;
 }
 
+export interface VendorStatusOption {
+  value: number;
+  label: string;
+}
+
+export type VendorBookingDetailDate = BookingDetailsDate & {
+  vendor_status_options?: VendorStatusOption[];
+  /** When true, vendor chooses online/offline when saving add-ons. */
+  show_payment_mode_option?: boolean;
+  /** Default payment mode when `show_payment_mode_option` is false. */
+  unpaid_addon_payment_mode?: "online" | "offline" | string;
+};
+
 export interface VendorBookingComment {
   authorName: string;
   role: string;
@@ -154,21 +195,36 @@ export interface VendorBookingDetail {
   booking_number: string;
   user: VendorBookingUser;
   event_name: string;
-  is_menu_choice: boolean;
-  slug: string;
+  event_slug?: string;
   location: string;
-  drink_title: string;
-  payment_status: string;
-  payment_gateways: string[] | { id: number; slug: string }[];
-  sub_total: number;
-  addons_amount: number | null;
-  deposit_paid: number | null;
-  paid_amount: number;
-  pending_payment: number | null;
-  total: number;
+  is_room_system?: boolean;
+  is_menu_choice?: boolean;
+  /** Whole-booking order status (e.g. Cancelled, Confirmed) */
+  status?: string;
+  /** API-driven — when false, reschedule must not be offered */
+  can_reschedule?: boolean;
+  has_unbooked_event_dates?: boolean;
+  payment_status_code?: number;
+  payment_status_label: string;
   reschedule_status?: boolean;
+  /** True when a vendor-initiated reschedule is in progress on any date */
+  reschedule_initiated?: boolean;
+  reschedule_count?: number;
+  dates?: VendorBookingDetailDate[];
+  payment_summary?: BookingPaymentSummary;
   comments?: VendorBookingComment[];
-  event_dates: VendorBookingEventDate[];
+  /** @deprecated legacy detail shape */
+  slug?: string;
+  drink_title?: string;
+  payment_status?: string;
+  payment_gateways?: string[] | { id: number; slug: string }[];
+  sub_total?: number;
+  addons_amount?: number | null;
+  deposit_paid?: number | null;
+  paid_amount?: number;
+  pending_payment?: number | null;
+  total?: number;
+  event_dates?: VendorBookingEventDate[];
 }
 
 export interface VendorBookingDetailResponse {
@@ -186,6 +242,7 @@ export interface VendorBookingsQueryParams {
   event_date?: string;
   from_date?: string;
   to_date?: string;
+  room_id?: number | string;
 }
 
 /**

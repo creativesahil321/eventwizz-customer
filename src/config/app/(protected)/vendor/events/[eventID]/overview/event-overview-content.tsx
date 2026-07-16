@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo, useCallback } from "react";
+import { parseAsString, useQueryState } from "nuqs";
 import {
   ArrowLeft,
   Calendar,
@@ -13,11 +14,9 @@ import {
   Ticket,
   GlassWater,
   Loader2,
-  X,
 } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
@@ -28,6 +27,7 @@ import {
 import { useEventOverview } from "./_hooks/useEventOverview";
 import { EmptyPlaceholder } from "@/components/empty-placeholder";
 import EventOverviewSkeleton from "./_components/overview-skeleton";
+import EventOverviewFilters from "./_components/event-overview-filters";
 import { BookingItemSkeleton } from "./_components/booking-item-skeleton";
 import { useCurrencyFormat } from "@/hooks/use-currency-format";
 import { parseFormattedMoney } from "@/lib/currency-format";
@@ -41,7 +41,21 @@ export default function EventOverviewClient({
 }: EventOverviewClientProps) {
   const { formatLocale: formatMoneyLocale, symbol: tenantCurrencySymbol } =
     useCurrencyFormat();
-  const [dateFilter, setDateFilter] = useState("");
+
+  const [dateFilterInUrl, setDateFilterInUrl] = useQueryState(
+    "date_filter",
+    parseAsString.withDefault(""),
+  );
+  const [roomInUrl, setRoomInUrl] = useQueryState(
+    "room_id",
+    parseAsString.withDefault("all"),
+  );
+
+  const dateFilter =
+    dateFilterInUrl && dateFilterInUrl !== "all" ? dateFilterInUrl : undefined;
+  const roomFilter = roomInUrl || "all";
+  const appliedRoomId = roomFilter === "all" ? undefined : roomFilter;
+
   const [selectedTab, setSelectedTab] = useState<
     "all" | "available" | "sold_out"
   >("all");
@@ -60,7 +74,8 @@ export default function EventOverviewClient({
     dateStatus: "all",
     page: 1,
     perPage: 1000,
-    dateFilter: dateFilter || undefined,
+    dateFilter,
+    roomId: appliedRoomId,
   });
 
   // Infinite scroll only for "available" and "sold_out" tabs (avoids duplicate overview request when on "all")
@@ -76,9 +91,62 @@ export default function EventOverviewClient({
     eventId,
     dateStatus: selectedTab,
     perPage: 10,
-    dateFilter: dateFilter || undefined,
+    dateFilter,
+    roomId: appliedRoomId,
     enabled: selectedTab !== "all",
   });
+
+  const filterMeta = allDataResponse?.filter_meta;
+  const availableDates = useMemo(
+    () => filterMeta?.available_dates ?? [],
+    [filterMeta?.available_dates],
+  );
+  const availableRooms = useMemo(
+    () => filterMeta?.available_rooms ?? [],
+    [filterMeta?.available_rooms],
+  );
+  const hasRoomEvents = filterMeta?.has_room_events === true;
+
+  const hasActiveFilters = !!dateFilter || roomFilter !== "all";
+
+  const handleDateFilterChange = useCallback(
+    (value: string) => {
+      setDateFilterInUrl(value === "all" ? "" : value);
+      setRoomInUrl("all");
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    },
+    [setDateFilterInUrl, setRoomInUrl],
+  );
+
+  const handleRoomFilterChange = useCallback(
+    (value: string) => {
+      setRoomInUrl(value);
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    },
+    [setRoomInUrl],
+  );
+
+  const handleResetFilters = useCallback(() => {
+    setDateFilterInUrl("");
+    setRoomInUrl("all");
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }, [setDateFilterInUrl, setRoomInUrl]);
+
+  useEffect(() => {
+    if (!dateFilter) {
+      if (roomFilter !== "all") setRoomInUrl("all");
+      return;
+    }
+
+    if (roomFilter === "all") return;
+
+    const isValidRoom = availableRooms.some(
+      (room) => String(room.room_id) === roomFilter,
+    );
+    if (!isValidRoom) {
+      setRoomInUrl("all");
+    }
+  }, [dateFilter, availableRooms, roomFilter, setRoomInUrl]);
 
   // Setup intersection observer for infinite scroll
   useEffect(() => {
@@ -183,14 +251,6 @@ export default function EventOverviewClient({
   // Handler for tab changes
   const handleTabChange = (value: string) => {
     setSelectedTab(value as "all" | "available" | "sold_out");
-    // Scroll to top for better UX
-    window.scrollTo({ top: 0, behavior: "smooth" });
-  };
-
-  // Handler for date filter changes
-  const handleDateFilterChange = (value: string) => {
-    setDateFilter(value);
-    // Scroll to top for better UX
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
@@ -333,40 +393,18 @@ export default function EventOverviewClient({
                 View and manage all table bookings for this event
               </p>
             </div>
-            <div className="flex items-center gap-2 w-full md:w-auto">
-              <div className="relative w-full md:w-[180px]">
-                <Input
-                  type="date"
-                  value={dateFilter}
-                  onChange={(e) => handleDateFilterChange(e.target.value)}
-                  className="w-full md:w-[180px]"
-                  aria-label="Filter by date (dd-mm-yyyy)"
-                />
-                {!dateFilter && (
-                  <span
-                    className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-500 sm:hidden"
-                    aria-hidden
-                  >
-                    dd-mm-yyyy
-                  </span>
-                )}
-              </div>
-              {dateFilter ? (
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    setDateFilter("");
-                    window.scrollTo({ top: 0, behavior: "smooth" });
-                  }}
-                  className="shrink-0"
-                >
-                  <X className="h-4 w-4 mr-1.5" />
-                  Reset
-                </Button>
-              ) : null}
-            </div>
+            <EventOverviewFilters
+              selectedDate={dateFilterInUrl || "all"}
+              onDateChange={handleDateFilterChange}
+              availableDates={availableDates}
+              roomFilter={roomFilter}
+              onRoomFilterChange={handleRoomFilterChange}
+              availableRooms={availableRooms}
+              hasRoomEvents={hasRoomEvents}
+              disabled={isRefetching}
+              onReset={handleResetFilters}
+              hasActiveFilters={hasActiveFilters}
+            />
           </div>
         </CardHeader>
 

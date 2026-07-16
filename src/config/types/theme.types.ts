@@ -44,13 +44,18 @@ export interface ThemeTypography {
 
 /**
  * Contact details configuration
+ * Theme API may omit alternative* fields; consumers should treat them as optional.
  */
 export interface ContactDetails {
   email: string; // Primary contact email
-  alternativeEmail: string; // Alternative contact email
+  alternativeEmail?: string; // Alternative contact email
   phone: string; // Primary phone number
-  alternativePhone: string; // Alternative phone number
+  alternativePhone?: string; // Alternative phone number
   address: string; // Physical address
+  /** Legacy / alternate API key — prefer `phone` */
+  phoneNumber?: string;
+  alternativePhoneNumber?: string;
+  alternativeAddress?: string;
 }
 
 /**
@@ -84,12 +89,17 @@ export interface LatestUpcomingEvent {
 
 /**
  * Location data structure with event information
+ * Theme `/theme/settings` may include per-location contact fields.
  */
 export interface LocationData {
   id?: number;
   is_default?: unknown;
   city: string;
   slug: string;
+  address?: string | null;
+  email?: string | null;
+  /** Per-location phone from theme settings API */
+  phone_number?: string | null;
   cover_image?: string | null;
   total_events?: number;
   latest_upcoming_event?: LatestUpcomingEvent;

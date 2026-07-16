@@ -1,12 +1,13 @@
 "use client";
 
-import { AlertCircle, Mail, Phone } from "lucide-react";
+import { AlertCircle, Mail, MapPin, Phone } from "lucide-react";
 
 interface VenueContactNoticeProps {
   title?: string;
   message?: string;
   phone?: string | null;
   email?: string | null;
+  address?: string | null;
 }
 
 export default function VenueContactNotice({
@@ -14,9 +15,12 @@ export default function VenueContactNotice({
   message,
   phone,
   email,
+  address,
 }: VenueContactNoticeProps) {
   const hasPhone = Boolean(phone?.trim());
   const hasEmail = Boolean(email?.trim());
+  const hasAddress = Boolean(address?.trim());
+  const hasContactDetails = hasPhone || hasEmail || hasAddress;
 
   return (
     <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-5 text-center sm:px-4 sm:py-6">
@@ -27,7 +31,7 @@ export default function VenueContactNotice({
       {message && (
         <p className="mt-1.5 text-balance text-sm text-amber-800">{message}</p>
       )}
-      {(hasPhone || hasEmail) && (
+      {hasContactDetails && (
         <div className="mt-4 flex flex-col items-stretch gap-2 sm:items-center">
           {hasPhone && (
             <a
@@ -46,6 +50,12 @@ export default function VenueContactNotice({
               <Mail className="h-4 w-4 flex-shrink-0" />
               <span className="break-all">{email}</span>
             </a>
+          )}
+          {hasAddress && (
+            <p className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg px-3 text-sm font-medium text-amber-800 sm:min-h-0 sm:justify-start sm:px-0">
+              <MapPin className="h-4 w-4 flex-shrink-0" />
+              <span className="text-left break-words">{address}</span>
+            </p>
           )}
         </div>
       )}

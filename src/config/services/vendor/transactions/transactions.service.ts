@@ -5,6 +5,7 @@
 
 import { api } from "@/services/core/api-client";
 import { API_ENDPOINTS } from "@/services/core/endpoints";
+import type { VendorBookingFilterMeta } from "@/services/vendor/bookings/bookings.service";
 
 export interface VendorTransactionsResponse {
   status: boolean;
@@ -32,6 +33,7 @@ export interface VendorTransactionsResponse {
     }>;
   };
   earnings: string;
+  filter_meta?: VendorBookingFilterMeta;
 }
 
 export interface VendorTransactionItem {
@@ -42,8 +44,8 @@ export interface VendorTransactionItem {
   event_date: string; // Format: "02-14-2026"
   full_name: string;
   email: string;
-  card_brand: string;
-  cardLast4: string;
+  card_brand: string | null;
+  cardLast4: string | null;
   status: string; // "success", "Pending", "failed", etc.
   amount: string; // Format: "3675.00"
   platform_fee: string; // Format: "201.25"
@@ -57,6 +59,7 @@ export interface FetchTransactionsParams {
   booking_date?: string;
   from?: string;
   to?: string;
+  room_id?: number | string;
 }
 
 export interface ExportReceiptsPayload {
@@ -64,11 +67,21 @@ export interface ExportReceiptsPayload {
   to: string;
 }
 
+function omitEmptyParams(
+  params: Record<string, string | number | undefined>,
+): Record<string, string | number> {
+  return Object.fromEntries(
+    Object.entries(params).filter(
+      ([, value]) => value !== undefined && value !== "",
+    ),
+  ) as Record<string, string | number>;
+}
+
 /**
  * Fetch vendor transactions with pagination and filters
  */
 export const fetchVendorTransactions = async (
-  params: FetchTransactionsParams = {}
+  params: FetchTransactionsParams = {},
 ): Promise<VendorTransactionsResponse> => {
   const {
     page = 1,
@@ -78,33 +91,36 @@ export const fetchVendorTransactions = async (
     booking_date = "",
     from = "",
     to = "",
+    room_id,
   } = params;
 
-  const endpoint = API_ENDPOINTS.VENDOR.TRANSACTIONS.GET_ALL.replace(
-    "{page}",
-    String(page)
-  )
-    .replace("{per_page}", String(per_page))
-    .replace("{search}", search)
-    .replace("{status}", status)
-    .replace("{booking_date}", booking_date)
-    .replace("{from}", from)
-    .replace("{to}", to);
-
-  return api.get<VendorTransactionsResponse>(endpoint, {
-    returnFullResponse: true,
-  });
+  return api.get<VendorTransactionsResponse>(
+    API_ENDPOINTS.VENDOR.TRANSACTIONS.GET_ALL,
+    {
+      returnFullResponse: true,
+      params: omitEmptyParams({
+        page,
+        per_page,
+        search,
+        status,
+        booking_date,
+        from,
+        to,
+        room_id,
+      }),
+    },
+  );
 };
 
 /**
  * Get single transaction receipt (PDF/file) by transaction id
  */
 export const getSingleReceipt = async (
-  id: number | string
+  id: number | string,
 ): Promise<Blob> => {
   const url = API_ENDPOINTS.VENDOR.TRANSACTIONS.GET_SINGLE_RECEIPT.replace(
     "{id}",
-    String(id)
+    String(id),
   );
   const blob = await api.get<Blob>(url, {
     responseType: "blob",
@@ -116,7 +132,7 @@ export const getSingleReceipt = async (
  * Export all receipts as CSV for the given date range (payload: from, to)
  */
 export const exportAllReceiptsCSV = async (
-  payload: ExportReceiptsPayload
+  payload: ExportReceiptsPayload,
 ): Promise<Blob> => {
   const { from, to } = payload;
   const response = await api.get<Blob>(
@@ -125,8 +141,7 @@ export const exportAllReceiptsCSV = async (
       params: { from, to },
       responseType: "blob",
       headers: { Accept: "text/csv" },
-    }
+    },
   );
   return response;
 };
-

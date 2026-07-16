@@ -46,7 +46,6 @@ export default function BookingsListContent({
     if (displayStatus === "all") return undefined;
     
     const statusMap: Record<string, string> = {
-      pending: "pending",
       confirmed: "confirmed",
       cancelled: "cancelled",
       partial_payment: "partial_payment",

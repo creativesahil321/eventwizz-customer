@@ -38,6 +38,20 @@ export const API_ENDPOINTS = {
     DASHBOARD: {
       STATISTICS: "/vendor/dashboard",
     },
+    SUPPORT_TICKETS: {
+      DASHBOARD: "/vendor/support-tickets/dashboard",
+      LIST: "/vendor/support-tickets",
+      STORE: "/vendor/support-tickets/store",
+      MESSAGES: "/vendor/support-tickets/{ticketKey}/messages",
+      MARK_MESSAGES_READ:
+        "/vendor/support-tickets/{ticketKey}/messages/read",
+      PIN: "/vendor/support-tickets/pin/{ticketKey}",
+      ESCALATE: "/vendor/support-tickets/escalate/{ticketKey}",
+      CLOSE: "/vendor/support-tickets/close/{ticketKey}",
+      ASSIGN: "/vendor/support-tickets/assign/{ticketKey}",
+      STORE_MESSAGE:
+        "/vendor/support-tickets/{ticketKey}/messages/store",
+    },
     ROOMS: "/vendor/rooms",
     ROOMS_STORE: "/vendor/rooms/store",
     ROOM_BY_ID: "/vendor/rooms/{room_id}",
@@ -206,8 +220,7 @@ export const API_ENDPOINTS = {
       BULK_DELETE: "/vendor/email-logs/bulk-delete",
     },
     TRANSACTIONS: {
-      GET_ALL:
-        "/vendor/transactions?page={page}&per_page={per_page}&search={search}&status={status}&booking_date={booking_date}&from={from}&to={to}",
+      GET_ALL: "/vendor/transactions",
       GET_SINGLE_RECEIPT: "/vendor/transactions/{id}/receipt",
       EXPORT_ALL_RECEIPTS_CSV: "/vendor/transactions/export",
     },
@@ -258,6 +271,7 @@ export const API_ENDPOINTS = {
     BOOK_EVENT: {
       STORE_CART_DATA: "/customer/event/store", // This is for to store the cart data and event booking data in database
       GET_CART_DATA: "/customer/event", // This is for to get the cart data from database and show in the cart page
+      DELETE_ALL_CART_DATA: "/customer/event/delete",
       DELETE_CART_DATA: "/customer/event/delete/{date}", // Non-room events: delete one date from cart
       DELETE_CART_DATA_ROOM:
         "/customer/event/delete/{room_id}/{date}", // Room events: delete one date for a specific room
@@ -269,6 +283,16 @@ export const API_ENDPOINTS = {
     TRANSACTIONS: {
       GET_ALL:
         "/customer/transactions?page={page}&per_page={per_page}&search={search}&status={status}&payment_date={payment_date}&method={method}",
+    },
+
+    SUPPORT_TICKETS: {
+      LIST: "/customer/support-tickets",
+      STORE: "/customer/support-tickets/store",
+      LOCATIONS: "/customer/support-tickets/locations",
+      MESSAGES: "/customer/support-tickets/{ticketKey}/messages",
+      STORE_MESSAGE: "/customer/support-tickets/{ticketKey}/messages/store",
+      MARK_MESSAGES_READ:
+        "/customer/support-tickets/{ticketKey}/messages/read",
     },
   },
   // Admin Endpoints
@@ -320,12 +344,22 @@ export const API_ENDPOINTS = {
       NOTIFICATION: "/admin/users/notification",
     },
     SUPPORT_TICKETS: {
+      DASHBOARD: "/admin/support-tickets/dashboard",
+      LIST: "/admin/support-tickets",
+      MESSAGES: "/admin/support-tickets/{ticketKey}/messages",
+      MARK_MESSAGES_READ:
+        "/admin/support-tickets/{ticketKey}/messages/read",
+      PIN: "/admin/support-tickets/pin/{ticketKey}",
+      ASSIGN: "/admin/support-tickets/assign/{ticketKey}",
+      CLOSE: "/admin/support-tickets/close/{ticketKey}",
+      STORE_MESSAGE:
+        "/admin/support-tickets/{ticketKey}/messages/store",
       PAGINATE: "/admin/tickets/paginate",
       STATISTICS: "/admin/tickets/statics",
       ALL: "/admin/tickets/paginate",
       CREATE: "/admin/tickets/create",
-      CLOSE: "/admin/tickets/status",
-      ASSIGN: "/admin/tickets/assign_to/{key}",
+      UPDATE_STATUS: "/admin/tickets/status",
+      ASSIGN_TO: "/admin/tickets/assign_to/{key}",
 
       TICKET: "/admin/tickets/show/{key}",
       TICKET_MESSAGES: "/admin/tickets/{key}/messages",

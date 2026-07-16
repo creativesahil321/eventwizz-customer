@@ -1,4 +1,9 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  keepPreviousData,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query";
 import { cartService } from "./cart.service";
 import {
   CartRequest,
@@ -32,6 +37,8 @@ export const useGetCartData = (enabled: boolean = true) => {
     enabled,
     staleTime: 2 * 60 * 1000, // 2 minutes
     retry: 2,
+    // Keep cart visible during background refetch (e.g. after delete) — avoids full-page skeleton flash.
+    placeholderData: keepPreviousData,
   });
 };
 
@@ -44,7 +51,6 @@ export const useGetCartData = (enabled: boolean = true) => {
  */
 export const useStoreEventBooking = () => {
   const queryClient = useQueryClient();
-  const { clearDrinks } = useDrinkSelectionStore();
 
   return useMutation({
     mutationFn: (input: StoreEventBookingInput | CartRequest) => {
@@ -57,10 +63,20 @@ export const useStoreEventBooking = () => {
       const skipInvalidation =
         "data" in input ? Boolean(input.skipInvalidation) : false;
       const variables: CartRequest = "data" in input ? input.data : input;
+      const storedSlug = decodeURIComponent(variables.slug);
 
-      clearDrinks({
+      useDrinkSelectionStore.getState().clearDrinks({
         eventSlug: variables.slug,
         roomId: variables.room_id,
+      });
+
+      // Backend store replaces other events — drop stale local carts immediately
+      // so checkout doesn't keep the previous event's active room / dates.
+      const { editingData, removeAllDates } = useCartEditStore.getState();
+      Object.keys(editingData).forEach((eventSlug) => {
+        if (decodeURIComponent(eventSlug) !== storedSlug) {
+          removeAllDates(eventSlug);
+        }
       });
 
       if (!skipInvalidation) {
@@ -92,10 +108,9 @@ export const useDeleteCartDate = () => {
       // 1️⃣ Delete from database (already done by mutation)
       console.log("✅ Database cleared");
 
-      // 2️⃣ Clear TanStack Query cache to force refetch
-      queryClient.removeQueries({ queryKey: ["cart-data"] });
-      queryClient.invalidateQueries({ queryKey: ["cart-data"] });
-      console.log("✅ TanStack Query cache cleared");
+      // 2️⃣ Soft refetch — keep cached cart visible while syncing (no skeleton flash)
+      void queryClient.invalidateQueries({ queryKey: ["cart-data"] });
+      console.log("✅ TanStack Query cache invalidated");
 
       // 3️⃣ Remove from Zustand store
       const currentEventSlug = getCurrentEventSlug();
@@ -128,10 +143,9 @@ export const useClearAllCart = () => {
       // 1️⃣ Clear database (already done by mutation)
       console.log("✅ Database cleared");
 
-      // 2️⃣ Clear TanStack Query cache (remove all cart-data queries)
-      queryClient.removeQueries({ queryKey: ["cart-data"] });
-      queryClient.invalidateQueries({ queryKey: ["cart-data"] });
-      console.log("✅ TanStack Query cache cleared");
+      // 2️⃣ Soft refetch — keep UI stable while syncing
+      void queryClient.invalidateQueries({ queryKey: ["cart-data"] });
+      console.log("✅ TanStack Query cache invalidated");
 
       // 3️⃣ Clear Zustand localStorage
       clearAllCarts();

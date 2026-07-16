@@ -3,19 +3,19 @@
  *
  * Handles cart conflict detection and resolution when users try to add
  * items from different events to their cart.
+ *
+ * Event switch uses store-only replace: POST /customer/event/store replaces
+ * other events on the backend — no delete API before store.
  */
 
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { toast } from "sonner";
 import { useSession } from "next-auth/react";
 import { useCartEditStore } from "@/store/cart-edit.store";
-import {
-  useClearAllCart,
-  useGetCartData,
-} from "@/services/customer/cart/query";
+import { useGetCartData } from "@/services/customer/cart/query";
 import {
   countEventCartDates,
   extractEventsFromApiResponse,
@@ -33,6 +33,9 @@ export interface CartConflictInfo {
   newEvent: EventInfo;
 }
 
+/** Pending store (or add) to run when the user confirms replace — no delete first. */
+export type CartReplaceAction = () => void | Promise<void>;
+
 export interface UseCartConflictReturn {
   // State
   isConflictModalOpen: boolean;
@@ -40,7 +43,11 @@ export interface UseCartConflictReturn {
   isProcessing: boolean;
 
   // Actions
-  checkForConflict: (newEventSlug: string, newEventInfo: EventInfo) => boolean;
+  checkForConflict: (
+    newEventSlug: string,
+    newEventInfo: EventInfo,
+    onConfirmReplace?: CartReplaceAction,
+  ) => boolean;
   openConflictModal: (conflictInfo: CartConflictInfo) => void;
   closeConflictModal: () => void;
   handleReplaceCart: () => void;
@@ -50,28 +57,44 @@ export interface UseCartConflictReturn {
 export function useCartConflict(): UseCartConflictReturn {
   const [isConflictModalOpen, setIsConflictModalOpen] = useState(false);
   const [conflictInfo, setConflictInfo] = useState<CartConflictInfo | null>(
-    null
+    null,
   );
   const [isProcessing, setIsProcessing] = useState(false);
+  const pendingReplaceActionRef = useRef<CartReplaceAction | null>(null);
 
   const router = useRouter();
   const pathname = usePathname();
   const { data: session } = useSession();
   const isPreviewMode = useIsPreviewMode();
-  const { getCurrentCartEventSlug, clearAllCarts, editingData } =
-    useCartEditStore();
-  const clearAllCartMutation = useClearAllCart();
+  const { getCurrentCartEventSlug, editingData } = useCartEditStore();
 
   // Get cart data from API for accurate conflict detection (only for authenticated customers and not in preview mode)
   const { data: apiCartData } = useGetCartData(
-    session?.user?.account_type === "customer" && !isPreviewMode
+    session?.user?.account_type === "customer" && !isPreviewMode,
   );
+
+  const rememberPendingReplace = useCallback(
+    (onConfirmReplace?: CartReplaceAction) => {
+      pendingReplaceActionRef.current = onConfirmReplace ?? null;
+    },
+    [],
+  );
+
+  const clearConflictState = useCallback(() => {
+    setIsConflictModalOpen(false);
+    setConflictInfo(null);
+    pendingReplaceActionRef.current = null;
+  }, []);
 
   /**
    * Check if adding items from a new event would create a conflict
    */
   const checkForConflict = useCallback(
-    (newEventSlug: string, newEventInfo: EventInfo): boolean => {
+    (
+      newEventSlug: string,
+      newEventInfo: EventInfo,
+      onConfirmReplace?: CartReplaceAction,
+    ): boolean => {
       // Check API data first (most reliable)
       const apiEvents = extractEventsFromApiResponse(apiCartData);
       if (apiEvents.length > 0) {
@@ -89,7 +112,6 @@ export function useCartConflict(): UseCartConflictReturn {
         // Conflict detected - different event already in cart
         const dateCount = countEventCartDates(currentEvent);
 
-        // Create conflict info for the modal
         const conflict: CartConflictInfo = {
           currentEvent: {
             name: currentEvent.event_name,
@@ -100,6 +122,7 @@ export function useCartConflict(): UseCartConflictReturn {
           newEvent: newEventInfo,
         };
 
+        rememberPendingReplace(onConfirmReplace);
         setConflictInfo(conflict);
         setIsConflictModalOpen(true);
         return true; // TRUE means conflict detected
@@ -127,7 +150,6 @@ export function useCartConflict(): UseCartConflictReturn {
         ? Object.keys(currentEventData).length
         : 0;
 
-      // Create conflict info for the modal
       const conflict: CartConflictInfo = {
         currentEvent: {
           name: currentCartEventSlug
@@ -139,11 +161,12 @@ export function useCartConflict(): UseCartConflictReturn {
         newEvent: newEventInfo,
       };
 
+      rememberPendingReplace(onConfirmReplace);
       setConflictInfo(conflict);
       setIsConflictModalOpen(true);
       return true;
     },
-    [apiCartData, getCurrentCartEventSlug, editingData]
+    [apiCartData, getCurrentCartEventSlug, editingData, rememberPendingReplace],
   );
 
   /**
@@ -159,13 +182,13 @@ export function useCartConflict(): UseCartConflictReturn {
    */
   const closeConflictModal = useCallback(() => {
     if (!isProcessing) {
-      setIsConflictModalOpen(false);
-      setConflictInfo(null);
+      clearConflictState();
     }
-  }, [isProcessing]);
+  }, [isProcessing, clearConflictState]);
 
   /**
-   * Handle replacing the current cart with the new event
+   * Replace cart with the new event via store only (backend removes other events).
+   * Prefer the pending store action from the blocked add; otherwise navigate to the event.
    */
   const handleReplaceCart = useCallback(async () => {
     if (!conflictInfo) return;
@@ -173,32 +196,33 @@ export function useCartConflict(): UseCartConflictReturn {
     setIsProcessing(true);
 
     try {
-      // Clear all cart data from both API and Zustand store
-      await clearAllCartMutation.mutateAsync();
-      clearAllCarts();
+      const pendingReplace = pendingReplaceActionRef.current;
 
-      toast.success(
-        `Cart cleared! You can now add items from ${conflictInfo.newEvent.name}`,
-        {
-          duration: 3000,
-        }
+      if (pendingReplace) {
+        // Store-only replace — no delete. Cart cache refreshes after successful store.
+        await pendingReplace();
+        clearConflictState();
+        return;
+      }
+
+      // No pending store (e.g. resolve-from-warning): go to the new event;
+      // the next POST /event/store will replace other events on the backend.
+      toast.info(
+        `Select a date to switch your cart to ${conflictInfo.newEvent.name}`,
+        { duration: 3000 },
       );
 
-      // Close modal and redirect to new event
-      setIsConflictModalOpen(false);
-      setConflictInfo(null);
+      clearConflictState();
 
-      // Redirect to the new event page
-      // Extract location from current pathname (e.g., /ewell/events/divesh-wedding -> ewell)
       const pathSegments = pathname.split("/");
-      const locationSlug = pathSegments[1]; // Get the location slug from current path
+      const locationSlug = pathSegments[1];
       router.push(`/${locationSlug}/events/${conflictInfo.newEvent.slug}`);
     } catch (error) {
-      console.error("Error clearing cart:", error);
+      console.error("Error replacing cart with new event:", error);
     } finally {
       setIsProcessing(false);
     }
-  }, [conflictInfo, clearAllCartMutation, clearAllCarts, router, pathname]);
+  }, [conflictInfo, router, pathname, clearConflictState]);
 
   /**
    * Handle continuing with the current cart (redirect to checkout)
@@ -213,21 +237,18 @@ export function useCartConflict(): UseCartConflictReturn {
         `Continuing with ${conflictInfo.currentEvent.name}. Redirecting to checkout...`,
         {
           duration: 2000,
-        }
+        },
       );
 
-      // Close modal
-      setIsConflictModalOpen(false);
-      setConflictInfo(null);
+      clearConflictState();
 
-      // Redirect to simple checkout page
       router.push("/vendor/checkout");
     } catch (error) {
       console.error("Error redirecting to checkout:", error);
     } finally {
       setIsProcessing(false);
     }
-  }, [conflictInfo, router]);
+  }, [conflictInfo, router, clearConflictState]);
 
   return {
     // State

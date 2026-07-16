@@ -176,10 +176,9 @@ export const vendorMenus: MenuItemProps[] = [
     id: 18,
     title: "Support",
     icon: "support",
-    href: createVendorUrl("/vendor/support"),
-    url: createVendorUrl("/vendor/support"),
+    href: createVendorUrl("/vendor/support/dashboard"),
+    url: createVendorUrl("/vendor/support/dashboard"),
     type: "title",
-    permissions: "read-ticket",
     menu: [],
   },
   {

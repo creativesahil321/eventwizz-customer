@@ -2,17 +2,24 @@
 
 import { useInfiniteQuery, keepPreviousData } from "@tanstack/react-query";
 import { eventsService } from "@/services/vendor/events/events.service";
+import type { EventOverviewResponse } from "@/services/vendor/events/type";
 import { useSession } from "next-auth/react";
 
 // Query keys for infinite event overview
 export const eventOverviewInfiniteKeys = {
   all: ["event-overview-infinite"] as const,
-  byId: (eventId: string, status: string, dateFilter?: string) =>
+  byId: (
+    eventId: string,
+    status: string,
+    dateFilter?: string,
+    roomId?: string,
+  ) =>
     [
       ...eventOverviewInfiniteKeys.all,
       eventId,
       status,
       dateFilter || "",
+      roomId || "",
     ] as const,
 };
 
@@ -20,101 +27,29 @@ interface UseEventOverviewInfiniteParams {
   eventId: string;
   dateStatus: "all" | "available" | "sold_out";
   perPage?: number;
-  dateFilter?: string; // Date filter in YYYY-MM-DD format
+  dateFilter?: string;
+  roomId?: string;
   /** When false, the query is disabled. Use to avoid duplicate fetch when "all" data is loaded elsewhere. */
   enabled?: boolean;
 }
-
-// Types matching the actual API response
-type TableConfig = {
-  size: number;
-  count: number;
-  price: string;
-  sold: number;
-  total: number;
-};
-
-type TicketInfo = {
-  id: number;
-  name: string;
-  sold: number;
-  total: number;
-};
-
-type DrinkInfo = {
-  id: number;
-  name: string;
-  quantity: number;
-};
-
-type TableEntry = {
-  id: number;
-  eventDate: string;
-  tables: TableConfig[];
-  totalTables: number;
-  category: string;
-  tablesLeft: number;
-  tablesBooked: number;
-  totalPeople: number;
-  submittedOn: string;
-  soldOut: boolean;
-  tickets?: TicketInfo[];
-  drink_title?: string;
-  drinks?: DrinkInfo[];
-};
-
-type EventInfo = {
-  id: number;
-  name: string;
-  date: string;
-  status: string;
-  totalRevenue: string;
-  totalBookings: number;
-  totalGuests: number;
-};
-
-type PaginationLink = {
-  url: string | null;
-  label: string;
-  page: number | null;
-  active: boolean;
-};
-
-type PaginationMeta = {
-  current_page: number;
-  from: number;
-  last_page: number;
-  per_page: number;
-  to: number;
-  total: number;
-  links: PaginationLink[];
-  path: string;
-};
-
-export type EventOverviewResponse = {
-  success: boolean;
-  event: EventInfo;
-  data: TableEntry[];
-  links: {
-    first: string | null;
-    last: string | null;
-    prev: string | null;
-    next: string | null;
-  };
-  meta: PaginationMeta;
-};
 
 export function useEventOverviewInfinite({
   eventId,
   dateStatus,
   perPage = 10,
   dateFilter,
+  roomId,
   enabled: enabledProp = true,
 }: UseEventOverviewInfiniteParams) {
   const { data: session } = useSession();
 
   return useInfiniteQuery<EventOverviewResponse>({
-    queryKey: eventOverviewInfiniteKeys.byId(eventId, dateStatus, dateFilter),
+    queryKey: eventOverviewInfiniteKeys.byId(
+      eventId,
+      dateStatus,
+      dateFilter,
+      roomId,
+    ),
     queryFn: async ({ pageParam = 1 }) => {
       if (!session?.user?.token || !eventId) {
         throw new Error("Missing authentication or event ID");
@@ -125,6 +60,7 @@ export function useEventOverviewInfinite({
         date_per_page: perPage,
         date_page: pageParam as number,
         date_filter: dateFilter,
+        room_id: roomId,
       });
 
       return response as EventOverviewResponse;
@@ -144,3 +80,5 @@ export function useEventOverviewInfinite({
     placeholderData: keepPreviousData,
   });
 }
+
+export type { EventOverviewResponse } from "@/services/vendor/events/type";

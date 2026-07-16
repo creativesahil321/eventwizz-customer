@@ -47,6 +47,7 @@ export function PendingRescheduleBanner({
                       </span>
                     </>
                   )}
+                  . Your current date stays active until payment is complete.
                 </p>
               </div>
 

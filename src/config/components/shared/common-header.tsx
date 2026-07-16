@@ -36,6 +36,7 @@ import {
   useIsPreviewMode,
 } from "@/contexts/preview-context";
 import type { HeaderDownloadLink } from "@/lib/event-header-downloads";
+import { resolvePublicPageContact } from "@/lib/resolve-venue-contact";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -200,6 +201,8 @@ interface CommonHeaderProps {
    * instead of `window` so the floating bar shadow activates on scroll.
    */
   scrollContainerRef?: RefObject<HTMLElement | null>;
+  /** Prefer this location's phone from theme.locations when set */
+  locationSlug?: string | null;
 }
 
 export default function CommonHeader({
@@ -214,6 +217,7 @@ export default function CommonHeader({
   hideHeaderPhone = false,
   compactGuestAuth = false,
   scrollContainerRef,
+  locationSlug,
 }: CommonHeaderProps) {
   const { theme } = useContext(ServerContext);
   const isPreviewFromProvider = useIsPreviewModeFromProvider();
@@ -265,12 +269,12 @@ export default function CommonHeader({
       ? logoToUse
       : "/assets/images/logos/eventwizz-logo.png";
 
-  // Extract phone number from props, theme, or use default
-  const phoneNumber =
-    contact_number ||
-    (vendorTheme as ThemeSchema & { contactDetails?: { phoneNumber?: string } })
-      ?.contactDetails?.phoneNumber ||
-    "+1 (123) 456-7890";
+  // Prefer explicit prop → location contact → main contactDetails (no fake placeholders)
+  const resolvedPhone = resolvePublicPageContact({
+    theme: vendorTheme,
+    locationSlug,
+  }).phone;
+  const phoneNumber = contact_number?.trim() || resolvedPhone || "";
 
   // Define header data using theme
   const headerData = {
@@ -279,11 +283,15 @@ export default function CommonHeader({
       linkText: "Browse Events",
     },
     navLinks: [
-      {
-        icon: "phone" as IconKey,
-        link: `tel:${phoneNumber}`,
-        linkText: phoneNumber,
-      },
+      ...(phoneNumber
+        ? [
+            {
+              icon: "phone" as IconKey,
+              link: `tel:${phoneNumber}`,
+              linkText: phoneNumber,
+            },
+          ]
+        : []),
       // Only show login button if not authenticated
       ...(isAuthenticated
         ? []

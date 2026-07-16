@@ -24,10 +24,10 @@ import {
 } from "../_lib/dummy-data";
 import type { SearchParams } from "../_lib/types";
 import type { Transaction } from "../_lib/types";
-import { useCurrencySymbol } from "@/hooks/use-currency-format";
+import { useCurrencyFormat } from "@/hooks/use-currency-format";
 
 export default function Transactions() {
-  const currencySymbol = useCurrencySymbol();
+  const { formatLocale } = useCurrencyFormat();
   const [globalFilterValue, setGlobalFilterValue] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
@@ -132,8 +132,7 @@ export default function Transactions() {
                   Earnings:
                 </span>
                 <span className="text-lg font-bold text-green-600">
-                  {currencySymbol}
-                  {earnings}
+                  {formatLocale(parseFloat(earnings))}
                 </span>
               </div>
             </div>

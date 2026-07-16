@@ -2,6 +2,7 @@ import type {
   BookingDetailsAddonBreakdown,
   BookingDetailsAddons,
   BookingDetailsAddonPackage,
+  BookingDetailsAddonTable,
   BookingDetailsPackage,
   BookingDetailsTable,
   BookingDetailsTicket,
@@ -78,10 +79,21 @@ export interface BookingDateSource {
   addons?: BookingDetailsAddons;
 }
 
+/** Prefer per-date `package_title` from booking API; optional booking-level fallback. */
+export function resolvePackageSectionTitle(
+  date?: Pick<BookingDateSource, "package_title"> | null,
+  fallback?: string | null,
+): string | undefined {
+  const fromDate = date?.package_title?.trim();
+  if (fromDate) return fromDate;
+  const fromFallback = fallback?.trim();
+  return fromFallback || undefined;
+}
+
 function formatAllocations(
   allocations: BookingTableAllocation[] | undefined,
   tableSize?: number,
-): AllocationPill[] { 
+): AllocationPill[] {
   if (!allocations?.length) return [];
   return allocations.map((row) => {
     const capacity = row.capacity ?? tableSize ?? row.people;
@@ -101,11 +113,83 @@ function formatAllocations(
   });
 }
 
+function formatAddonTableLineMeta(
+  table: BookingDetailsAddonTable,
+  formatUnit: (amount: number) => string,
+): string {
+  const apiLabel = table.guest_pricing_label?.trim();
+  if (apiLabel) return apiLabel;
+  return formatTableLineMeta(table, formatUnit);
+}
+
+function buildAddonTableDisplay(table: BookingDetailsAddonTable): {
+  name: string;
+  description?: string;
+  allocation?: AllocationPill[];
+  quantityBadge?: number;
+} {
+  const itemType = table.item_type;
+  const seatCount = table.quantity ?? 0;
+  const parentLabel = table.parent_table_label?.trim();
+
+  if (itemType === "seat_extension") {
+    const name = table.name?.trim() || "Additional seats";
+    const description =
+      table.description?.trim() ||
+      (parentLabel
+        ? `+${seatCount} seat${seatCount === 1 ? "" : "s"} on ${parentLabel}`
+        : seatCount > 0
+          ? `+${seatCount} additional seat${seatCount === 1 ? "" : "s"}`
+          : undefined);
+
+    return { name, description };
+  }
+
+  if (itemType === "new_table") {
+    const name =
+      table.name?.trim() ||
+      (table.table_size ? `Table of ${table.table_size}` : "New table");
+    const allocation = formatAllocations(table.allocations, table.table_size);
+    const primaryAllocation = allocation[0];
+    const guests = seatCount || primaryAllocation?.occupied || 0;
+    const tableLabel = primaryAllocation?.label?.trim();
+    const description =
+      tableLabel && guests > 0
+        ? `New table — ${tableLabel} (${guests} guest${guests === 1 ? "" : "s"})`
+        : table.description?.trim() || "New add-on table";
+
+    return {
+      name,
+      description,
+      allocation,
+      quantityBadge:
+        table.table_count && table.table_count > 1 ? table.table_count : undefined,
+    };
+  }
+
+  const name = table.name?.trim() || `Table of ${table.table_size ?? seatCount}`;
+  return {
+    name,
+    description: table.description ?? undefined,
+    allocation: formatAllocations(table.allocations, table.table_size),
+    quantityBadge:
+      table.table_count && table.table_count > 1 ? table.table_count : undefined,
+  };
+}
+
+function countAddonTablesForSubtitle(tables: BookingDetailsAddonTable[]): number {
+  return tables.reduce((sum, table) => {
+    if (table.item_type === "seat_extension") return sum;
+    return sum + Math.max(1, table.table_count ?? 1);
+  }, 0);
+}
+
 function formatTableLineMeta(
-  table: Pick<
-    BookingDetailsTable,
-    "unit_price" | "quantity" | "guest_pricing_label"
-  >,
+  table: {
+    unit_price: number | string;
+    quantity: number;
+    guest_pricing_label?: string | null;
+  },
   formatUnit: (amount: number) => string,
 ): string {
   const unitPrice = parseUnitPrice(table.unit_price);
@@ -267,6 +351,13 @@ export function buildLineItemsForDate(
   });
 
   date.tables?.forEach((table, idx) => {
+    const isAddonTable = isPaidAddonRecord(table);
+    const menuChoiceContext = buildMenuChoiceContext(
+      date,
+      table,
+      options?.bookingId,
+    );
+
     const base = {
       id: `table-${date.id}-${table.id}-${idx}`,
       kind: "table" as const,
@@ -276,20 +367,13 @@ export function buildLineItemsForDate(
       amount: normalizeLineAmount(table.total_amount),
       unitPrice: table.unit_price,
       quantity: table.table_count > 1 ? table.table_count : undefined,
-      showMenuChoices: true,
+      showMenuChoices: menuChoiceContext != null,
     };
 
-    const menuChoiceContext = buildMenuChoiceContext(
-      date,
-      table,
-      options?.bookingId,
-    );
-
-    if (isPaidAddonRecord(table)) {
+    if (isAddonTable) {
       pushPaidAddonBookingItem(items, {
         ...base,
         allocation: formatAllocations(table.allocations, table.table_size),
-        showMenuChoices: true,
         menuChoiceContext,
       });
       return;
@@ -308,27 +392,29 @@ export function buildLineItemsForDate(
 
   date.addons?.tables?.forEach((table, idx) => {
     const unitPrice = parseUnitPrice(table.unit_price);
-    const menuChoiceContext = buildMenuChoiceContext(
-      date,
-      table,
-      options?.bookingId,
-    );
+    const display = buildAddonTableDisplay(table);
+    const lineId = table.booking_date_table_id ?? table.id ?? idx;
+
     items.push({
-      id: `addon-table-${date.id}-${idx}`,
+      id: `addon-table-${date.id}-${lineId}-${table.item_type ?? "legacy"}-${idx}`,
       kind: "table",
-      name: table.name || `Table of ${table.table_size}`,
-      meta: `${formatUnit(unitPrice)} × ${table.quantity}`,
+      name: display.name,
+      description: display.description,
+      meta: formatAddonTableLineMeta(table, formatUnit),
       amount: normalizeLineAmount(table.total_amount),
       unitPrice,
-      quantity: table.table_count && table.table_count > 1 ? table.table_count : undefined,
-      allocation: formatAllocations(table.allocations, table.table_size),
-      showMenuChoices: true,
-      menuChoiceContext,
+      quantity: display.quantityBadge,
+      allocation: display.allocation,
       isSavedAddon: true,
       deletable: true,
       deletePayload: {
         type: "table",
-        keyword: table.booking_date_table_id ?? table.id ?? table.table_size,
+        keyword:
+          table.booking_date_table_id ??
+          table.id ??
+          table.parent_table_id ??
+          table.table_size ??
+          idx,
       },
     });
   });
@@ -534,18 +620,38 @@ export function buildPaymentBreakdown(
 
 /** Fallback subtitle when room name is not shown on date cards */
 export function buildDateSubtitle(date: BookingDateSource): string | undefined {
-  if (date.item_summary?.trim()) return date.item_summary.trim();
+  const bookedTableCount = (date.tables ?? []).reduce(
+    (sum, table) => sum + Math.max(1, table.table_count ?? 1),
+    0,
+  );
+  const addonTableCount = countAddonTablesForSubtitle(date.addons?.tables ?? []);
+  const tableCount = bookedTableCount + addonTableCount;
 
-  const tables =
-    (date.tables?.length ?? 0) +
-    (date.addons?.tables?.length ?? 0);
-  const tickets =
-    (date.tickets?.reduce((s, t) => s + t.quantity, 0) ?? 0) +
-    (date.addons?.tickets?.reduce((s, t) => s + t.quantity, 0) ?? 0);
+  const ticketCount =
+    (date.tickets?.reduce((sum, ticket) => sum + (ticket.quantity ?? 0), 0) ??
+      0) +
+    (date.addons?.tickets?.reduce((sum, ticket) => sum + (ticket.quantity ?? 0), 0) ??
+      0);
+
+  const packageCount =
+    (date.packages?.reduce((sum, pkg) => sum + (pkg.quantity ?? 0), 0) ?? 0) +
+    (date.addons?.packages?.reduce((sum, pkg) => sum + (pkg.quantity ?? 0), 0) ??
+      0);
 
   const parts: string[] = [];
-  if (tables > 0) parts.push(`${tables} ${tables === 1 ? "table" : "tables"}`);
-  if (tickets > 0)
-    parts.push(`${tickets} ${tickets === 1 ? "ticket" : "tickets"}`);
-  return parts.length > 0 ? parts.join(" · ") : undefined;
+  if (ticketCount > 0) {
+    parts.push(`${ticketCount} ${ticketCount === 1 ? "ticket" : "tickets"}`);
+  }
+  if (tableCount > 0) {
+    parts.push(`${tableCount} ${tableCount === 1 ? "table" : "tables"}`);
+  }
+  if (packageCount > 0) {
+    parts.push(
+      `${packageCount} ${packageCount === 1 ? "package" : "packages"}`,
+    );
+  }
+
+  if (parts.length > 0) return parts.join(" · ");
+
+  return date.item_summary?.trim() || undefined;
 }

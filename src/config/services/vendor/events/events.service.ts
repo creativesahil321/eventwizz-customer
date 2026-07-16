@@ -129,21 +129,22 @@ export const eventsService = {
       date_status?: "all" | "available" | "sold_out";
       date_per_page?: number;
       date_page?: number;
-      date_filter?: string; // Date filter in YYYY-MM-DD format
-    }
+      date_filter?: string;
+      room_id?: string;
+    },
   ) => {
     let endpoint = API_ENDPOINTS.VENDOR.EVENT.GET_EVENT_OVERVIEW.replace(
       "{eventId}",
-      eventId
+      eventId,
     ).replace("{date_status}", params.date_status || "all");
 
-    // Replace date_filter - use empty string if not provided (backend will ignore it)
     endpoint = endpoint.replace("{date_filter}", params.date_filter || "");
 
     return api.get(endpoint, {
       params: {
         date_per_page: params.date_per_page || 10,
         date_page: params.date_page || 1,
+        room_id: params.room_id || undefined,
       },
       returnFullResponse: true,
     });

@@ -6,11 +6,20 @@ import { ChevronDown, ChevronUp, UtensilsCrossed } from "lucide-react";
 import { toast } from "sonner";
 import { bookingsKeys, useSaveMenuChoice } from "@/services/customer/bookings/query";
 import { bookingsService } from "@/services/customer/bookings/bookings.service";
+import {
+  useSaveVendorMenuChoice,
+  vendorBookingsKeys,
+} from "@/services/vendor/bookings/query";
+import { vendorBookingsService } from "@/services/vendor/bookings/bookings.service";
 import type { PersistedMenuChoice, MenuCategory } from "@/services/customer/bookings/type";
 import TableTabBar, { type TableTab } from "./table-tab-bar";
 import StatusBar from "./status-bar";
 import AttendeeForm, { type AttendeeFormData } from "./attendee-form";
 import AttendeesSidebar from "./attendee-sidebar";
+import {
+  formSelectionsToChoicesArray,
+  persistedSelectionsToFormSelections,
+} from "./menu-category-utils";
 
 interface MenuChoicesInlineProps {
   bookingId: number;
@@ -22,23 +31,7 @@ interface MenuChoicesInlineProps {
     people: number;
     capacity: number;
   }>;
-}
-
-function mapMenuSelectionsToChoicesArray(
-  menuSelections: Record<string, string>,
-  menuCategories: MenuCategory[],
-): Array<{ event_menu_id: number; menu_item_id: number }> {
-  const choices: Array<{ event_menu_id: number; menu_item_id: number }> = [];
-  Object.entries(menuSelections).forEach(([categoryTitle, itemId]) => {
-    const category = menuCategories.find((cat) => cat.title === categoryTitle);
-    if (category?.id && itemId) {
-      const menuItemId = parseInt(itemId);
-      if (!isNaN(menuItemId) && menuItemId > 0) {
-        choices.push({ event_menu_id: category.id, menu_item_id: menuItemId });
-      }
-    }
-  });
-  return choices;
+  menuApi?: "customer" | "vendor";
 }
 
 function generateUniqueDuplicateName(
@@ -64,32 +57,37 @@ export default function MenuChoicesInline({
   dateKey,
   roomId,
   tableAllocations,
+  menuApi = "customer",
 }: MenuChoicesInlineProps) {
+  const useVendorApi = menuApi === "vendor";
   const [expanded, setExpanded] = useState(false);
   const [activeTableId, setActiveTableId] = useState(tableAllocations[0]?.id ?? 0);
   const [editingAttendee, setEditingAttendee] = useState<PersistedMenuChoice | null>(null);
   const [duplicatingId, setDuplicatingId] = useState<number | null>(null);
   const isDuplicatingRef = useRef(false);
-  const [pendingSaveCount, setPendingSaveCount] = useState(0);
 
   const resolvedRoomId =
     roomId != null && roomId > 0 ? roomId : undefined;
 
   const tableMenuQueries = useQueries({
     queries: tableAllocations.map((alloc) => ({
-      queryKey: bookingsKeys.menuItem(
-        bookingId,
-        dateKey,
-        alloc.id,
-        resolvedRoomId,
-      ),
+      queryKey: useVendorApi
+        ? vendorBookingsKeys.menuItem(bookingId, dateKey, alloc.id)
+        : bookingsKeys.menuItem(
+            bookingId,
+            dateKey,
+            alloc.id,
+            resolvedRoomId,
+          ),
       queryFn: () =>
-        bookingsService.getMenuItems(
-          bookingId,
-          dateKey,
-          alloc.id,
-          resolvedRoomId,
-        ),
+        useVendorApi
+          ? vendorBookingsService.getMenuItems(bookingId, dateKey, alloc.id)
+          : bookingsService.getMenuItems(
+              bookingId,
+              dateKey,
+              alloc.id,
+              resolvedRoomId,
+            ),
       enabled: !!bookingId && !!dateKey && !!alloc.id,
       staleTime: 2 * 60 * 1000,
       gcTime: 10 * 60 * 1000,
@@ -104,7 +102,11 @@ export default function MenuChoicesInline({
   const isLoading = activeQuery?.isLoading ?? false;
   const menuItemsData = activeQuery?.data;
 
-  const saveMenuChoice = useSaveMenuChoice();
+  const saveCustomerMenuChoice = useSaveMenuChoice();
+  const saveVendorMenuChoice = useSaveVendorMenuChoice();
+  const saveMenuChoice = useVendorApi
+    ? saveVendorMenuChoice
+    : saveCustomerMenuChoice;
 
   const menuCategories: MenuCategory[] = menuItemsData?.data?.event_menu || [];
 
@@ -134,7 +136,10 @@ export default function MenuChoicesInline({
     return Math.min(currentAttendees.length + 1, Math.max(totalSeats, 1));
   }, [editingAttendee, currentAttendees, totalSeats]);
 
-  const isTableFull = currentAttendees.length + pendingSaveCount >= totalSeats;
+  // Only count persisted attendees — optimistic pending saves caused a flash of
+  // "All menu choices added" before the query refetched the new row.
+  const isTableFull =
+    totalSeats > 0 && currentAttendees.length >= totalSeats;
 
   const completedCounts = useMemo(() => {
     const counts: Record<number, number> = {};
@@ -175,7 +180,10 @@ export default function MenuChoicesInline({
 
   const handleSave = useCallback(
     async (data: AttendeeFormData) => {
-      const choices = mapMenuSelectionsToChoicesArray(data.menuSelections, menuCategories);
+      const choices = formSelectionsToChoicesArray(
+        data.menuSelections,
+        menuCategories,
+      );
       if (choices.length === 0) {
         toast.error("Please select at least one menu item");
         return;
@@ -195,14 +203,11 @@ export default function MenuChoicesInline({
         additional_notes: data.additionalNotes,
       };
 
-      setPendingSaveCount((count) => count + 1);
       try {
         await saveMenuChoice.mutateAsync(payload);
         setEditingAttendee(null);
-      } catch (err) {
-        console.error("Save menu choice failed:", err);
-      } finally {
-        setPendingSaveCount((count) => Math.max(0, count - 1));
+      } catch {
+        // Error toast is shown by the API client interceptor.
       }
     },
     [bookingId, activeTableId, roomId, totalSeats, editingAttendee, menuCategories, saveMenuChoice],
@@ -211,7 +216,7 @@ export default function MenuChoicesInline({
   const handleDuplicate = useCallback(
     async (attendee: PersistedMenuChoice) => {
       if (isDuplicatingRef.current) return;
-      if (currentAttendees.length + pendingSaveCount >= totalSeats) {
+      if (currentAttendees.length >= totalSeats || saveMenuChoice.isPending) {
         toast.error("Table is full", {
           description: "Cannot duplicate. Edit an existing attendee instead.",
         });
@@ -226,7 +231,10 @@ export default function MenuChoicesInline({
         await handleSave({
           title: attendee.title,
           fullName: dupName,
-          menuSelections: attendee.menu_selections || {},
+          menuSelections: persistedSelectionsToFormSelections(
+            attendee.menu_selections || {},
+            menuCategories,
+          ),
           allergens: attendee.allergens || [],
           dietaryRequirements: attendee.dietary_requirements || [],
           additionalNotes: attendee.additional_notes || "",
@@ -236,7 +244,7 @@ export default function MenuChoicesInline({
         setDuplicatingId(null);
       }
     },
-    [currentAttendees, totalSeats, pendingSaveCount, handleSave],
+    [currentAttendees, totalSeats, saveMenuChoice.isPending, handleSave, menuCategories],
   );
 
   return (

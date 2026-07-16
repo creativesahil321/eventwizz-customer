@@ -60,11 +60,11 @@ export default function PageWrapper({
   return (
     <main
       className={cn(
-        "flex-1 min-w-0 bg-default-100 dark:bg-background transition-all duration-300 overflow-hidden",
+        "flex-1 min-h-0 min-w-0 overflow-x-hidden overflow-y-auto bg-default-100 dark:bg-background transition-all duration-300",
         collapsed ? "lg:ml-[60px]" : "lg:ml-[264px]",
       )}
     >
-      <div className="p-3 mb-24 md:mb-0 text-black min-w-0">{children}</div>
+      <div className="min-w-0 px-3 pt-4 pb-32 text-black sm:pt-5 md:pb-6">{children}</div>
     </main>
   );
 }

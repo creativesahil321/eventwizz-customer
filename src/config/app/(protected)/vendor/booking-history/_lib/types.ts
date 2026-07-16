@@ -43,6 +43,7 @@ export interface AdminHistoryParams {
   event_date?: string;
   from_date?: string;
   to_date?: string;
+  room_id?: number | string;
 }
 
 export interface DataTableRowAction<TData> {
@@ -58,6 +59,7 @@ export type SearchParams = {
   event_date?: string;
   from_date?: string;
   to_date?: string;
+  room_id?: string;
   filters?: string | unknown;
   [key: string]: string | string[] | undefined | unknown;
 };

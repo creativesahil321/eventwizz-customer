@@ -219,16 +219,26 @@ export interface BookingDetailsAddonPackage {
   total_amount?: number;
 }
 
+/** Unpaid add-on table row — seat extensions vs new tables are separate lines. */
+export type BookingAddonTableItemType = "seat_extension" | "new_table";
+
 /** Saved add-on table on a booking date */
 export interface BookingDetailsAddonTable {
   id?: number;
   booking_date_table_id?: number;
+  /** Distinguishes extra seats on an existing table from a newly added table. */
+  item_type?: BookingAddonTableItemType;
   name?: string;
+  description?: string | null;
   unit_price: number;
+  /** Guest/seat count for pricing display. */
   quantity: number;
   total_amount: number;
-  table_size: number;
+  table_size?: number;
   table_count?: number;
+  parent_table_id?: number;
+  parent_table_label?: string;
+  guest_pricing_label?: string;
   allocations?: BookingTableAllocation[];
 }
 
@@ -280,6 +290,11 @@ export interface BookingDetailsDate {
   can_pay_now?: boolean;
   is_menu_choice?: boolean;
   has_unbooked_event_dates?: boolean;
+  /** API-driven — when false, reschedule must not be offered for this date */
+  can_reschedule?: boolean;
+  /** Vendor has initiated a reschedule for this date — awaiting customer action */
+  reschedule_initiated?: boolean;
+  reschedule_block_reason?: string;
   tickets: BookingDetailsTicket[];
   packages: BookingDetailsPackage[];
   tables: BookingDetailsTable[];
@@ -314,6 +329,8 @@ export interface BookingDetailsData {
   event_slug: string;
   location: string;
   is_room_system?: boolean;
+  /** Whole-booking order status (e.g. Cancelled, Confirmed) */
+  status?: string;
   payment_status_code?: number;
   payment_status_label: string;
   is_menu_choice?: boolean;
@@ -347,6 +364,10 @@ export interface AddOnsTable {
   total_tables: number;
   sold_tables: number;
   available_tables: number;
+  available_new_tables?: number;
+  has_existing_on_booking?: boolean;
+  can_extend_existing?: boolean;
+  can_add_new_table?: boolean;
 }
 
 export interface AddOnsTicket {
@@ -570,11 +591,17 @@ export interface RescheduleTableDetail {
  */
 export interface AvailableRescheduleDate {
   id: number;
+  /** Preferred id for `new_booking_date_id` on store */
+  event_date_id?: number;
   dateKey?: string;
   date_key?: string;
   date: string;
+  date_label?: string;
   price: number;
   unpaid_amount?: number;
+  /** Server-computed upgrade amount — use on review when `requires_payment` */
+  additional_payment_required?: number;
+  requires_payment?: boolean;
   people: number;
   tables: number;
   drinks?: number;
@@ -590,7 +617,9 @@ export interface RescheduleCurrentDate {
   dateKey?: string;
   date_key?: string;
   date: string;
+  date_label?: string;
   price: string;
+  paid_amount?: number | string;
   people: number;
   tables: number;
   drinks?: number;
@@ -606,7 +635,8 @@ export interface RescheduleDataResponse {
   message: string;
   data: {
     current: RescheduleCurrentDate;
-    payment_gateways: ReschedulePaymentGateway[];
+    payment_gateways?: ReschedulePaymentGateway[];
+    paymentGateways?: ReschedulePaymentGateway[];
     availableDates?: AvailableRescheduleDate[];
     available_dates?: AvailableRescheduleDate[];
     is_room_system?: boolean;
@@ -639,20 +669,9 @@ export interface RescheduleBookingPayload {
   new_date: string; // Date string like "2025-09-20"
   total_amount: number;
   unpaid_amount: number;
-  payment_gateway: string; // Payment gateway slug like "stripe"
+  /** Numeric gateway id (e.g. 1 = Stripe) — only when `unpaid_amount > 0` */
+  payment_gateway?: number;
   table_details: RescheduleTableDetailPayload[];
-}
-
-/**
- * Payment details returned when payment is required for rescheduling
- */
-export interface ReschedulePaymentData {
-  payment_id: number;
-  gateway: string;
-  redirect_url: string;
-  amount: string;
-  currency: string;
-  status: string;
 }
 
 /**
@@ -660,10 +679,15 @@ export interface ReschedulePaymentData {
  * Contains reschedule request ID and payment details if payment is required
  */
 export interface RescheduleBookingResponseData {
+  booking_id?: number;
+  booking_number?: string;
+  amount?: number;
   unpaid_amount?: number;
   reschedule_request_id?: number;
   payment_gateway?: string;
-  payment?: ReschedulePaymentData;
+  payment?: BookingPaymentGatewayInfo;
+  /** Legacy redirect-based gateways */
+  redirect_url?: string;
 }
 
 /**

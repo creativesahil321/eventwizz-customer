@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useState } from "react";
 import {
   Minus,
   Plus,
@@ -27,7 +27,7 @@ interface InlineTableAllocationProps {
   isMixedPlan?: boolean;
   nested?: boolean;
   showConfirmHint?: boolean;
-  onTableSeatingConfirmed?: () => void | Promise<void>;
+  onTableSeatingConfirmed?: () => boolean | Promise<boolean>;
 }
 
 function normalizeAllocation(
@@ -51,6 +51,12 @@ export default function InlineTableAllocation({
 }: InlineTableAllocationProps) {
   const { format: formatMoney } = useCurrencyFormat();
   const { getDateData, confirmTableSeating } = useCartEditStore();
+  const isStoreConfirmed = useCartEditStore(
+    (state) =>
+      state.editingData[eventSlug]?.[date]?.confirmedTableIds?.includes(
+        table.id,
+      ) ?? false,
+  );
   const [isSavingSeating, setIsSavingSeating] = useState(false);
 
   const minPersons = table.minPersons || 1;
@@ -67,7 +73,9 @@ export default function InlineTableAllocation({
     useState<number[]>(committedAllocation);
   const [isConfirmed, setIsConfirmed] = useState(false);
 
-  useEffect(() => {
+  // Sync before paint so Confirm seating never submits stale allocation after
+  // group-size / auto-match updates (useEffect was one frame too late).
+  useLayoutEffect(() => {
     setDraftAllocation(committedAllocation);
   }, [committedAllocation]);
 
@@ -179,10 +187,6 @@ export default function InlineTableAllocation({
     updateDraft(Array(table.quantity).fill(minPersons));
   };
 
-  const dateData = getDateData(eventSlug, date);
-  const isStoreConfirmed =
-    dateData?.confirmedTableIds?.includes(table.id) ?? false;
-
   const showConfirmButton =
     validation.isValid && !isStoreConfirmed && !isSavingSeating;
 
@@ -199,7 +203,16 @@ export default function InlineTableAllocation({
       setIsConfirmed(true);
 
       if (onTableSeatingConfirmed) {
-        await onTableSeatingConfirmed();
+        let saved = await onTableSeatingConfirmed();
+        if (!saved) {
+          await new Promise((resolve) => setTimeout(resolve, 200));
+          saved = await onTableSeatingConfirmed();
+        }
+        if (!saved) {
+          toast.error("Could not save seating. Please try again.");
+          setIsConfirmed(false);
+          return;
+        }
       }
 
       toast.success("Seating confirmed");

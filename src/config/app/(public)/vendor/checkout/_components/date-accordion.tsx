@@ -19,6 +19,7 @@ import {
   Ticket,
   MessageSquare,
   Trash2,
+  Loader2,
 } from "lucide-react";
 import { format } from "date-fns";
 import { toast } from "sonner";
@@ -54,6 +55,8 @@ interface DateAccordionProps {
   isExpanded: boolean;
   onToggle: () => void;
   onRemoveDate?: (date: string) => void;
+  /** Shows a subtle spinner on the date delete control while the API request runs. */
+  isRemoving?: boolean;
   /** Room ID for multi-room events (display/context only — store uses composite key). */
   roomId?: number;
   /** Nested inside the room checkout card (no outer card chrome). */
@@ -99,6 +102,7 @@ export default function DateAccordion({
   isExpanded,
   onToggle,
   onRemoveDate,
+  isRemoving = false,
   roomId,
   embedded = false,
   roomAccentIndex = 0,
@@ -112,6 +116,7 @@ export default function DateAccordion({
   const [showSpecialRequest, setShowSpecialRequest] = useState(false);
   const autoSaveTimerRef = useRef<NodeJS.Timeout | null>(null);
   const isSavingRef = useRef(false);
+  const pendingFollowUpSaveRef = useRef(false);
   const isPreviewMode = useIsPreviewMode();
   const { mutateAsync: storeEventBooking } = useStoreEventBooking();
 
@@ -174,11 +179,15 @@ export default function DateAccordion({
 
   const totalAmount = calculateEditableDateTotal(dateData);
 
-  const handleSaveDate = async () => {
-    if (isSavingRef.current || isSaving) return;
+  const handleSaveDate = async (): Promise<boolean> => {
+    if (isSavingRef.current || isSaving) {
+      pendingFollowUpSaveRef.current = true;
+      return false;
+    }
 
     isSavingRef.current = true;
     setIsSaving(true);
+    let succeeded = false;
 
     const saveTimeout = setTimeout(() => {
       if (isSavingRef.current) {
@@ -197,6 +206,8 @@ export default function DateAccordion({
         cartData.tickets.length > 0 ||
         cartData.drink_package.length > 0;
 
+      let canPersist = true;
+
       if (hasItems) {
         const validation = validateDateRequirements(eventSlug, date);
         if (!validation.isValid) {
@@ -204,72 +215,80 @@ export default function DateAccordion({
             validation.errorMessage ||
               "Please select at least one table or ticket",
           );
-          return;
+          canPersist = false;
         }
 
-        const stillPendingTables = useCartEditStore
-          .getState()
-          .hasPendingTableConfirmation(eventSlug, date);
+        if (canPersist) {
+          const stillPendingTables = useCartEditStore
+            .getState()
+            .hasPendingTableConfirmation(eventSlug, date);
 
-        if (!stillPendingTables) {
-          const allocationValidation = validateGuestAllocation(eventSlug, date);
-          if (!allocationValidation.isValid) {
-            toast.error(
-              allocationValidation.errors[0] ||
-                "Please complete guest allocation for your tables",
+          if (!stillPendingTables) {
+            const allocationValidation = validateGuestAllocation(
+              eventSlug,
+              date,
             );
-            return;
+            if (!allocationValidation.isValid) {
+              toast.error(
+                allocationValidation.errors[0] ||
+                  "Please complete guest allocation for your tables",
+              );
+              canPersist = false;
+            }
           }
         }
       }
 
-      if (!hasItems) {
-        toast.info(`Removing all items for ${formatDateMobile(date)}`);
-      }
+      if (canPersist) {
+        if (!hasItems) {
+          toast.info(`Removing all items for ${formatDateMobile(date)}`);
+        }
 
-      if (process.env.NODE_ENV === "development") {
-        console.log(`🔍 Saving ${formatDateMobile(date)}:`, cartData);
-      }
+        if (process.env.NODE_ENV === "development") {
+          console.log(`🔍 Saving ${formatDateMobile(date)}:`, cartData);
+        }
 
-      // Security: Validate prices against server data
-      if (serverEventData) {
-        const priceValidation = await validateCartPrices(
-          cartData,
-          serverEventData as Parameters<typeof validateCartPrices>[1],
-        );
-
-        if (!priceValidation.isValid) {
-          logSecurityIncident(priceValidation);
-          toast.error(
-            "Price data appears to be outdated. Please refresh the page and try again.",
+        // Security: Validate prices against server data
+        if (serverEventData) {
+          const priceValidation = await validateCartPrices(
+            cartData,
+            serverEventData as Parameters<typeof validateCartPrices>[1],
           );
-          return;
-        }
 
-        const sanitizedCartData = sanitizeCartPrices(
-          cartData,
-          serverEventData as Parameters<typeof sanitizeCartPrices>[1],
-        );
-        const response = await storeEventBooking({
-          data: sanitizedCartData,
-          skipInvalidation: true,
-        });
-        if (response?.status === true) {
-          markDateAsSaved(eventSlug, date);
-          await new Promise((resolve) => setTimeout(resolve, 150));
+          if (!priceValidation.isValid) {
+            logSecurityIncident(priceValidation);
+            toast.error(
+              "Price data appears to be outdated. Please refresh the page and try again.",
+            );
+          } else {
+            const sanitizedCartData = sanitizeCartPrices(
+              cartData,
+              serverEventData as Parameters<typeof sanitizeCartPrices>[1],
+            );
+            const response = await storeEventBooking({
+              data: sanitizedCartData,
+              skipInvalidation: true,
+            });
+            if (response?.status === true) {
+              markDateAsSaved(eventSlug, date);
+              await new Promise((resolve) => setTimeout(resolve, 150));
+              succeeded = true;
+            } else {
+              console.error("API Error Response:", response);
+            }
+          }
         } else {
-          console.error("API Error Response:", response);
-        }
-      } else {
-        const response = await storeEventBooking({
-          data: cartData,
-          skipInvalidation: true,
-        });
-        if (response?.status === true) {
-          markDateAsSaved(eventSlug, date);
-          await new Promise((resolve) => setTimeout(resolve, 150));
-        } else {
-          console.error("API Error Response:", response);
+          const response = await storeEventBooking({
+            data: cartData,
+            skipInvalidation: true,
+          });
+          if (response?.status === true) {
+            markDateAsSaved(eventSlug, date);
+            await new Promise((resolve) => setTimeout(resolve, 150));
+            succeeded = true;
+          } else {
+            console.error("API Error Response:", response);
+          }
         }
       }
     } catch (error) {
@@ -314,7 +333,15 @@ export default function DateAccordion({
       clearTimeout(saveTimeout);
       isSavingRef.current = false;
       setIsSaving(false);
+
+      if (pendingFollowUpSaveRef.current) {
+        pendingFollowUpSaveRef.current = false;
+        const followUpSucceeded = await handleSaveDate();
+        succeeded = followUpSucceeded || succeeded;
+      }
     }
+
+    return succeeded;
   };
 
   const handleQuantityChange = (
@@ -462,11 +489,17 @@ export default function DateAccordion({
             <button
               type="button"
               onClick={() => onRemoveDate(date)}
-              className="rounded-lg p-1.5 text-gray-300 transition-colors hover:bg-red-50 hover:text-red-500"
+              disabled={isRemoving}
+              className="rounded-lg p-1.5 text-gray-300 transition-colors hover:bg-red-50 hover:text-red-500 disabled:pointer-events-none disabled:opacity-60"
               title="Remove this date"
               aria-label="Remove this date"
+              aria-busy={isRemoving}
             >
-              <Trash2 className="h-3.5 w-3.5" />
+              {isRemoving ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin text-red-400" />
+              ) : (
+                <Trash2 className="h-3.5 w-3.5" />
+              )}
             </button>
           )}
 

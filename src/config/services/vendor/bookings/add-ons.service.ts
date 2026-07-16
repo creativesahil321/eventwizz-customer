@@ -9,12 +9,16 @@ import { API_ENDPOINTS } from "@/services/core/endpoints";
 // Add-ons Response Types
 export interface VendorAddOnsTable {
   id: number;
-  max_persons: number;
   min_persons: number;
+  max_persons: number;
   price: number;
   total_tables: number;
   sold_tables: number;
-  available_tables?: number; // Optional - can be calculated from total_tables - sold_tables
+  available_tables?: number;
+  available_new_tables?: number;
+  has_existing_on_booking?: boolean;
+  can_extend_existing?: boolean;
+  can_add_new_table?: boolean;
   status?: number;
 }
 
@@ -44,6 +48,7 @@ export interface VendorAddOnsDrink {
  */
 export interface VendorAllocationEntry {
   parent_id: number;
+  booking_date_table_id?: number;
   seats: number;
 }
 
@@ -56,6 +61,11 @@ export interface VendorAddOnsSelectedTable {
 }
 
 export interface VendorAddOnsData {
+  booking_date_id?: number;
+  room_id?: number | null;
+  room_name?: string | null;
+  date_key?: string;
+  event_date_id?: number;
   selected_tables: VendorAddOnsSelectedTable[];
   tables: VendorAddOnsTable[];
   tickets: VendorAddOnsTicket[];
@@ -83,18 +93,24 @@ export interface VendorAddOnsSaveResponse {
  */
 export const vendorAddOnsService = {
   /**
-   * Fetch add-ons available for a specific booking date
-   * @param bookingId Booking ID
-   * @param date Date key (e.g., "2026-02-14")
-   * @returns Promise with add-ons data
+   * Fetch add-ons available for a specific booking date.
+   * Room-scoped bookings pass `room_id` as a query param (mirrors customer add-ons).
    */
-  getAddOns: (bookingId: number | string, date: string) => {
+  getAddOns: (
+    bookingId: number | string,
+    date: string,
+    roomId?: number | null,
+  ) => {
     const url = API_ENDPOINTS.VENDOR.BOOKING_HISTORY.ADD_ONS.GET_ALL.replace(
       "{id}",
-      bookingId.toString()
+      bookingId.toString(),
     ).replace("{date}", date);
+    const resolvedRoomId =
+      roomId != null && Number(roomId) > 0 ? Number(roomId) : undefined;
+
     return api.get<VendorAddOnsResponse>(url, {
       returnFullResponse: true,
+      params: resolvedRoomId != null ? { room_id: resolvedRoomId } : undefined,
     });
   },
 

@@ -23,6 +23,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useFormContext } from "../../form-provider";
 import { stepSixSchema, StepSixType } from "../../form-provider/schema";
+import { normalizeOnboardingCateringOption } from "../../../_lib/onboarding-catering-ready";
 import { X, PlusCircle } from "lucide-react";
 import {
   OnboardingTitle,
@@ -69,13 +70,6 @@ type MenuType = {
 
 // Empty initial menus - moved outside component to prevent recreation on each render
 const emptyMenus: MenuType[] = [];
-
-const normalizeCateringOption = (value: unknown): 0 | 1 => {
-  if (value === 1 || value === "1" || value === true || value === "true") {
-    return 1;
-  }
-  return 0;
-};
 
 /** Menu categories are event-level — dedupe by id so the dropdown never lists duplicates. */
 function dedupeMenuCategoriesById(
@@ -222,7 +216,7 @@ export default function StepSix() {
   const canApplyToAllRooms = useMemo(() => {
     if (!roomScope.isMultiRoom || rooms.length < 2) return false;
     return isOnboardingCateringRoomReady({
-      catering_option: normalizeCateringOption(watchedCateringOption),
+      catering_option: normalizeOnboardingCateringOption(watchedCateringOption),
       menu_title: watchedMenuTitle,
       menu_description: watchedMenuDescription,
       event_menu_category_id: watchedMenuCategoryId,
@@ -290,7 +284,7 @@ export default function StepSix() {
         `multiSpace.rooms.${previousRoomIndex}.catering`,
         {
           ...existingCatering,
-          catering_option: normalizeCateringOption(outgoing.catering_option),
+          catering_option: normalizeOnboardingCateringOption(outgoing.catering_option),
           menu_title: outgoing.menu_title ?? "",
           menu_description: outgoing.menu_description ?? "",
           menus: (outgoing.menus as MenuType[]) ?? [],
@@ -309,7 +303,7 @@ export default function StepSix() {
     form.reset({
       step: 6,
       event_id: currentEventId,
-      catering_option: normalizeCateringOption(scoped.catering_option),
+      catering_option: normalizeOnboardingCateringOption(scoped.catering_option),
       menu_title: scoped.menu_title ?? "",
       menu_description: scoped.menu_description ?? "",
       event_menu_category_id:
@@ -364,7 +358,7 @@ export default function StepSix() {
 
   // Set showMenuSection based on catering_option value
   const cateringOption = form.watch("catering_option");
-  const showMenuSection = normalizeCateringOption(cateringOption) === 1;
+  const showMenuSection = normalizeOnboardingCateringOption(cateringOption) === 1;
 
   // Setup field array for menus
   const {
@@ -831,7 +825,7 @@ export default function StepSix() {
                                     }
                                   }}
                                   value={String(
-                                    normalizeCateringOption(field.value),
+                                    normalizeOnboardingCateringOption(field.value),
                                   )}
                                   className="flex mt-4 space-x-6"
                                   onFocus={() =>

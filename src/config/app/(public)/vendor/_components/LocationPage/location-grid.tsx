@@ -117,6 +117,11 @@ export default function LocationGrid({
               ? location.cover_image
               : null;
 
+          const locationAddress =
+            typeof locationData.address === "string"
+              ? locationData.address.trim()
+              : "";
+
           const hoverTint = HOVER_GRADIENTS[idx % HOVER_GRADIENTS.length];
 
           const handleCardClick = () => {
@@ -191,6 +196,16 @@ export default function LocationGrid({
                     variant="onDark"
                     className="mb-2 !text-3xl !font-black tracking-tight !text-white sm:!text-4xl"
                   />
+
+                  {locationAddress ? (
+                    <p className="mb-3 flex items-start gap-1.5 text-sm text-white/75">
+                      <MapPin
+                        className="mt-0.5 h-3.5 w-3.5 shrink-0 opacity-90"
+                        aria-hidden
+                      />
+                      <span className="line-clamp-2">{locationAddress}</span>
+                    </p>
+                  ) : null}
 
                   {upcomingEvent ? (
                     <div

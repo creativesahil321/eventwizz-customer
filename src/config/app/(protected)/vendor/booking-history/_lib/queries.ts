@@ -7,7 +7,9 @@ import {
 } from "@tanstack/react-query";
 import {
   vendorBookingsService,
+  VendorBookingFilterMeta,
   VendorBookingHistoryResponse,
+  VendorBookingRoomFilterOption,
 } from "@/services/vendor/bookings/bookings.service";
 import { AdminHistoryParams, History } from "./types";
 
@@ -105,9 +107,37 @@ export interface BookingHistoryResponse {
     refunded_amount?: string;
     platform_fee_due?: string;
   };
+  filter_meta?: VendorBookingFilterMeta;
   links: VendorBookingHistoryResponse["links"];
   meta: VendorBookingHistoryResponse["meta"];
   errors: string[];
+}
+
+function normalizeAvailableRooms(
+  rooms: VendorBookingFilterMeta["available_rooms"],
+): VendorBookingRoomFilterOption[] {
+  if (!Array.isArray(rooms)) return [];
+
+  return rooms
+    .map((room) => {
+      const raw = room as {
+        room_id?: number;
+        id?: number;
+        room_name?: string;
+        name?: string;
+      };
+      const roomId = raw.room_id ?? raw.id;
+      if (roomId == null || !Number.isFinite(Number(roomId))) return null;
+      const roomName =
+        raw.room_name?.trim() ||
+        raw.name?.trim() ||
+        `Room ${roomId}`;
+      return {
+        room_id: Number(roomId),
+        room_name: roomName,
+      };
+    })
+    .filter((room): room is VendorBookingRoomFilterOption => room != null);
 }
 
 type ExtendedUseQueryOptions<
@@ -139,6 +169,7 @@ export const useHistory = (
     event_date = "",
     from_date,
     to_date,
+    room_id,
   } = params;
 
   return useQuery({
@@ -150,6 +181,7 @@ export const useHistory = (
       event_date,
       from_date,
       to_date,
+      room_id,
     }),
     queryFn: async () => {
       const response = await vendorBookingsService.getBookings({
@@ -160,16 +192,27 @@ export const useHistory = (
         event_date: event_date || undefined,
         from_date: from_date || undefined,
         to_date: to_date || undefined,
+        room_id: room_id || undefined,
       });
 
       // Transform API response to History format
       const transformedData = response.data.map(transformBookingItem);
+
+      const filterMeta = response.filter_meta
+        ? {
+            ...response.filter_meta,
+            available_rooms: normalizeAvailableRooms(
+              response.filter_meta.available_rooms,
+            ),
+          }
+        : undefined;
 
       return {
         status: response.status,
         message: response.message,
         data: transformedData,
         summary: response.summary,
+        filter_meta: filterMeta,
         links: response.links,
         meta: response.meta,
         errors: [],

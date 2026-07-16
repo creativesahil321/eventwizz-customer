@@ -91,7 +91,7 @@ export default function AdjustBookingContent({
             : Math.max(totalAmount - paidAmount, 0);
 
         const paymentStatusLabel =
-          bookingData.payment_status_label?.trim() || "Pending";
+          bookingData.payment_status_label?.trim() || "";
 
         const bookingCanPay = apiSummary?.can_pay_now !== false;
         const isRoomSystem = bookingData.is_room_system === true;
@@ -100,6 +100,7 @@ export default function AdjustBookingContent({
           booking_date_id: number;
           is_menu_choice?: boolean;
           has_unbooked_event_dates?: boolean;
+          can_reschedule?: boolean;
           total: string;
           totalAmount: number;
           paidAmount: number;
@@ -119,6 +120,8 @@ export default function AdjustBookingContent({
           const paymentStatus = normalizePaymentStatus(
             dateEntry.payment_status_label,
           );
+          const datePaymentStatusLabel =
+            dateEntry.payment_status_label?.trim() || undefined;
           const dateCanPay =
             bookingCanPay &&
             dateEntry.can_pay_now !== false &&
@@ -137,13 +140,14 @@ export default function AdjustBookingContent({
               dateEntry.is_menu_choice ?? bookingData.is_menu_choice ?? false,
             has_unbooked_event_dates:
               dateEntry.has_unbooked_event_dates === true,
+            can_reschedule: dateEntry.can_reschedule === true,
             date: dateEntry.date_label,
             previous_date_label: dateEntry.previous_date_label ?? null,
             room_name: dateEntry.room_name,
             package_title: dateEntry.package_title,
             item_summary: dateEntry.item_summary,
             paymentStatus,
-            paymentStatusLabel: dateEntry.payment_status_label?.trim() || undefined,
+            paymentStatusLabel: datePaymentStatusLabel,
             addOnsPaymentStatus: normalizePaymentStatusForAddOnsDate(
               dateEntry.payment_status_label,
             ),
@@ -171,6 +175,8 @@ export default function AdjustBookingContent({
             bookingData.booking_number || bookingData.booking_id.toString(),
           location: bookingData.location,
           payment_status: paymentStatusLabel,
+          booking_status:
+            bookingData.status?.trim() || paymentStatusLabel,
           canPayNow: bookingCanPay && outstandingAmount > 0,
           isRoomSystem: bookingData.is_room_system === true,
           is_menu_choice: bookingData.is_menu_choice || false,
@@ -257,6 +263,7 @@ export default function AdjustBookingContent({
       eventName={transformedData.event_name}
       location={transformedData.location}
       paymentStatus={transformedData.payment_status}
+      bookingStatus={transformedData.booking_status}
       canPayNow={transformedData.canPayNow}
       isRoomSystem={transformedData.isRoomSystem}
       isMenuChoice={transformedData.is_menu_choice}

@@ -75,7 +75,21 @@ export function EventListingHorizontalScroll({
     if (!container) return;
 
     const handleWheel = (e: WheelEvent) => {
+      // Native horizontal trackpad/mouse gestures — leave alone.
       if (e.deltaY === 0) return;
+
+      const maxScrollLeft = container.scrollWidth - container.clientWidth;
+      // No horizontal overflow: never trap the wheel (lets the page scroll).
+      if (maxScrollLeft <= 2) return;
+
+      const scrollingRight = e.deltaY > 0;
+      const canScrollFurther = scrollingRight
+        ? container.scrollLeft < maxScrollLeft - 1
+        : container.scrollLeft > 1;
+
+      // At a horizontal edge: release the wheel so the page can scroll.
+      if (!canScrollFurther) return;
+
       e.preventDefault();
       container.scrollLeft += e.deltaY;
       checkScrollability();

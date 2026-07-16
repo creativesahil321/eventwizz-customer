@@ -1,9 +1,9 @@
 import { ColumnDef } from "@tanstack/react-table";
 import { DataTableColumnHeader } from "@/components/data-table/data-table-column-header";
 import { Button } from "@/components/ui/button";
-import { Download } from "lucide-react";
+import { Download, Loader2 } from "lucide-react";
 import React from "react";
-import { DataTableRowAction, Transaction } from "../_lib/types";
+import { Transaction } from "../_lib/types";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { parseFormattedMoney } from "@/lib/currency-format";
 
@@ -15,14 +15,14 @@ function ledgerAmount(value: string): number {
 }
 
 interface GetTransactionColumnsProps {
-  setRowAction: React.Dispatch<
-    React.SetStateAction<DataTableRowAction<Transaction> | null>
-  >;
+  onDownloadReceipt: (paymentId: number) => void;
+  downloadingPaymentId: number | null;
   formatMoneyLocale: (amount: number) => string;
 }
 
 export function getTransactionColumns({
-  setRowAction,
+  onDownloadReceipt,
+  downloadingPaymentId,
   formatMoneyLocale,
 }: GetTransactionColumnsProps): ColumnDef<Transaction>[] {
   return [
@@ -163,9 +163,13 @@ export function getTransactionColumns({
       cell: ({ row }) => {
         const cardBrand = row.original.card_brand;
         const cardLast4 = row.original.cardLast4;
+        if (!cardBrand && !cardLast4) {
+          return <span className="text-sm text-muted-foreground">—</span>;
+        }
         return (
           <span className="text-sm font-medium capitalize">
-            {cardBrand} ••{cardLast4}
+            {cardBrand ?? "Card"}
+            {cardLast4 ? ` ••${cardLast4}` : ""}
           </span>
         );
       },
@@ -244,17 +248,31 @@ export function getTransactionColumns({
           title="Receipt"
         />
       ),
-      cell: ({ row }) => (
-        <Button
-          onClick={() => setRowAction({ row, type: "download" })}
-          variant="ghost"
-          size="sm"
-          className="h-8 w-8 p-0 hover:bg-gray-100"
-          title="Download Receipt"
-        >
-          <Download className="h-4 w-4 text-gray-600" />
-        </Button>
-      ),
+      cell: ({ row }) => {
+        const paymentId = row.original.payment_id;
+        const isDownloading = downloadingPaymentId === paymentId;
+
+        return (
+          <Button
+            onClick={() => onDownloadReceipt(paymentId)}
+            variant="ghost"
+            size="sm"
+            className="h-8 w-8 p-0 hover:bg-gray-100"
+            title="Download Receipt"
+            disabled={isDownloading}
+            aria-busy={isDownloading}
+            aria-label={
+              isDownloading ? "Downloading receipt" : "Download receipt"
+            }
+          >
+            {isDownloading ? (
+              <Loader2 className="h-4 w-4 animate-spin text-primary" />
+            ) : (
+              <Download className="h-4 w-4 text-gray-600" />
+            )}
+          </Button>
+        );
+      },
       enableSorting: false,
       enableHiding: false,
     },

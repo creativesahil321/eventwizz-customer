@@ -3,7 +3,6 @@
 import CommonHeader from "@/components/shared/common-header";
 import HeroBanner from "../../vendor/_components/EventListPage/hero-banner";
 import ExperienceSection from "../../vendor/_components/EventListPage/experience";
-import ContactFormSection from "../../vendor/_components/EventListPage/contact-form-section";
 import FooterSection from "../../vendor/_components/EventListPage/footer";
 import { LocationMarketingBody } from "@/components/public/location-marketing-sections";
 import { LocationData } from "@/services/common/events/type";
@@ -32,7 +31,7 @@ export default function LocationPageClient({
   const upcomingEvents = locationData.upcoming_events || [];
   return (
     <>
-      <CommonHeader variant="default" />
+      <CommonHeader variant="default" locationSlug={locationSlug} />
       <HeroBanner
         locationName={locationData.city || ""}
         coverImage={locationData.cover_image}
@@ -60,8 +59,15 @@ export default function LocationPageClient({
         locationSlug={locationSlug}
         locationLabel={locationData.city ?? null}
       />
-      <ContactFormSection />
-      <FooterSection />
+      <FooterSection
+        locationSlug={locationSlug}
+        contactOverride={{
+          address: locationData.address,
+          email: locationData.email,
+          phone: locationData.phone,
+          phone_number: locationData.phone_number,
+        }}
+      />
     </>
   );
 }

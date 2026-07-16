@@ -8,13 +8,16 @@ import Link from "next/link";
 export default function PermissionDebugGlobal() {
   const [expanded, setExpanded] = useState(false);
   const { permissions, isLoaded } = usePermissionStore();
-  const { status } = useSession();
+  const { data: session, status } = useSession();
 
   // Hide when not authenticated
   if (status !== "authenticated") return null;
 
+  // Dev-only overlay: hide for customers to avoid blocking mobile support UI
+  if (session?.user?.account_type === "customer") return null;
+
   return (
-    <div className="fixed bottom-4 left-4 z-100">
+    <div className="fixed bottom-4 left-4 z-[60] hidden sm:block">
       <button
         onClick={() => setExpanded(!expanded)}
         className="rounded bg-amber-600 px-3 py-1.5 text-xs font-bold text-black shadow-lg hover:bg-amber-700 sm:px-4 sm:py-2"

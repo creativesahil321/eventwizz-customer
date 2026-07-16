@@ -1,7 +1,7 @@
 "use client";
 
 import { Users, UserCog, UserX } from "lucide-react";
-import { Card, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardTitle } from "@/components/ui/card";
 
 interface SummaryItem {
   id: string;
@@ -68,34 +68,34 @@ export default function DashboardSummary({
   };
 
   return (
-    <div className="w-full bg-white p-6 rounded-lg">
-      <div className="mb-4">
+    <Card className="w-full border shadow-sm">
+      <CardContent className="p-6 space-y-4">
         <CardTitle className="text-2xl mb-0 title-header font-medium">
           {title}
         </CardTitle>
-      </div>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {summaryItems.map((item) => (
-          <Card
-            key={item.id}
-            className={`border-none shadow-sm ${getBgColorByItemId(
-              item.id
-            )} rounded-lg p-4`}
-          >
-            <div className="flex items-center justify-between">
-              <div className="bg-white/20 rounded-full p-3">
-                {getIconByItemId(item.id)}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {summaryItems.map((item) => (
+            <Card
+              key={item.id}
+              className={`border-none shadow-sm ${getBgColorByItemId(
+                item.id
+              )} rounded-lg p-4`}
+            >
+              <div className="flex items-center justify-between">
+                <div className="bg-white/20 rounded-full p-3">
+                  {getIconByItemId(item.id)}
+                </div>
+                <div className="text-right">
+                  <p className="text-white text-sm mb-1">
+                    {getCleanLabel(item.id)}
+                  </p>
+                  <p className="text-white text-3xl font-bold">{item.value}</p>
+                </div>
               </div>
-              <div className="text-right">
-                <p className="text-white text-sm mb-1">
-                  {getCleanLabel(item.id)}
-                </p>
-                <p className="text-white text-3xl font-bold">{item.value}</p>
-              </div>
-            </div>
-          </Card>
-        ))}
-      </div>
-    </div>
+            </Card>
+          ))}
+        </div>
+      </CardContent>
+    </Card>
   );
 }

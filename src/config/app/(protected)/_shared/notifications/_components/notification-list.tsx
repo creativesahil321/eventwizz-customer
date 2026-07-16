@@ -64,7 +64,7 @@ export function NotificationListComponent({
 
   return (
     <div className="space-y-4">
-      <div className="border rounded-md overflow-hidden">
+      <div className="divide-y divide-[var(--color-border)] overflow-hidden rounded-lg border border-[var(--color-border)]">
         {notifications.map((notification) => (
           <NotificationItemComponent
             key={notification.id}

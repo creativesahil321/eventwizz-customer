@@ -3,6 +3,7 @@
  */
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import type { AxiosError } from "axios";
 import { bookingsService } from "../bookings.service";
 import { bookingsKeys } from "../query";
 import { SaveAddOnsPayload, SaveAddOnsResponse } from "../type";
@@ -56,6 +57,36 @@ export function useSaveAddOns() {
       }
 
       void Promise.all(invalidatePromises);
+    },
+    onError: (error: Error, variables) => {
+      const status = (error as AxiosError)?.response?.status;
+      if (status !== 409) return;
+
+      let bookingIdToInvalidate: number | null = null;
+
+      if (variables instanceof FormData) {
+        const rawId = variables.get("booking_id");
+        if (typeof rawId === "string") {
+          const parsed = Number.parseInt(rawId, 10);
+          if (!Number.isNaN(parsed) && parsed > 0) {
+            bookingIdToInvalidate = parsed;
+          }
+        }
+      } else if (
+        variables &&
+        typeof (variables as SaveAddOnsPayload).booking_id === "number"
+      ) {
+        bookingIdToInvalidate = (variables as SaveAddOnsPayload).booking_id;
+      }
+
+      if (bookingIdToInvalidate) {
+        queryClient.invalidateQueries({
+          queryKey: bookingsKeys.bookingDetail(bookingIdToInvalidate),
+        });
+      }
+      queryClient.invalidateQueries({
+        queryKey: ["add-ons-details"],
+      });
     },
   });
 }

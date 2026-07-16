@@ -10,6 +10,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Card, CardContent } from "@/components/ui/card";
 import EventCard from "./event-card";
 import EventsTabSkeleton from "./events-skeleton";
+import EventListFilters from "./event-list-filters";
 import {
   useEvents,
   useBulkUpdateEventStatus,
@@ -20,7 +21,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import EventPagination from "./event-pagination";
 import { Button } from "@/components/ui/button";
 import { RefreshCcw, Check, Trash2 } from "lucide-react";
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { useSession } from "next-auth/react";
 import { EventItem, EventsQueryParams } from "@/services/vendor/events/type";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -36,10 +37,11 @@ import {
 } from "@/components/ui/alert-dialog";
 import { LocationIndicator } from "@/components/location-indicator";
 import { PermissionGuard } from "@/components/permission/PermissionGuard";
+import { DateRange } from "react-day-picker";
+import { format, parseISO } from "date-fns";
 
-const tabs = ["all", "active", "old", "draft", "cancelled"];
-const tabLabels: Record<string, string> = {
-  all: "All",
+const tabs = ["active", "old", "draft", "cancelled"] as const;
+const tabLabels: Record<(typeof tabs)[number], string> = {
   active: "Active",
   old: "Past",
   draft: "Draft",
@@ -50,13 +52,33 @@ type EventsProps = {
   search: SearchParams;
 };
 
+function normalizeStatus(
+  raw: string | null | undefined,
+): (typeof tabs)[number] {
+  if (raw && tabs.includes(raw as (typeof tabs)[number])) {
+    return raw as (typeof tabs)[number];
+  }
+  return "active";
+}
+
+function parseDateRangeFromUrl(
+  from?: string | null,
+  to?: string | null,
+): DateRange | undefined {
+  if (!from) return undefined;
+  const fromDate = parseISO(from);
+  if (Number.isNaN(fromDate.getTime())) return undefined;
+  const toDate = to ? parseISO(to) : fromDate;
+  if (Number.isNaN(toDate.getTime())) return { from: fromDate, to: fromDate };
+  return { from: fromDate, to: toDate };
+}
+
 export default function EventTabs({ search }: EventsProps) {
   const session = useSession();
   const queryClient = useQueryClient();
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedEvents, setSelectedEvents] = useState<number[]>([]);
 
-  // Confirmation modal states
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [pendingAction, setPendingAction] = useState<
     "active" | "refresh" | null
@@ -64,10 +86,11 @@ export default function EventTabs({ search }: EventsProps) {
   const [confirmMessage, setConfirmMessage] = useState("");
   const [bulkDeleteDialogOpen, setBulkDeleteDialogOpen] = useState(false);
 
-  // Query state for filters and pagination
   const [status, setStatus] = useQueryState(
     "status",
-    parseAsString.withDefault(search?.status ? String(search.status) : "all"),
+    parseAsString.withDefault(
+      normalizeStatus(search?.status ? String(search.status) : undefined),
+    ),
   );
 
   const [page, setPage] = useQueryState(
@@ -80,39 +103,107 @@ export default function EventTabs({ search }: EventsProps) {
     parseAsInteger.withDefault(search?.per_page ? Number(search.per_page) : 30),
   );
 
-  // Format API query params
+  const [fromDateInUrl, setFromDateInUrl] = useQueryState(
+    "from_date",
+    parseAsString.withDefault(
+      search?.from_date
+        ? String(search.from_date)
+        : search?.from
+          ? String(search.from)
+          : "",
+    ),
+  );
+
+  const [toDateInUrl, setToDateInUrl] = useQueryState(
+    "to_date",
+    parseAsString.withDefault(
+      search?.to_date
+        ? String(search.to_date)
+        : search?.to
+          ? String(search.to)
+          : "",
+    ),
+  );
+
+  const [categoryInUrl, setCategoryInUrl] = useQueryState(
+    "category_id",
+    parseAsString.withDefault(
+      search?.category_id ? String(search.category_id) : "all",
+    ),
+  );
+
+  const [roomInUrl, setRoomInUrl] = useQueryState(
+    "room_id",
+    parseAsString.withDefault(search?.room_id ? String(search.room_id) : "all"),
+  );
+
+  const activeStatus = normalizeStatus(status);
+
+  const dateRange = useMemo(
+    () => parseDateRangeFromUrl(fromDateInUrl, toDateInUrl),
+    [fromDateInUrl, toDateInUrl],
+  );
+
+  const categoryFilter = categoryInUrl || "all";
+  const roomFilter = roomInUrl || "all";
+  const selectedRoomId = roomFilter === "all" ? undefined : roomFilter;
+  const selectedCategoryId =
+    categoryFilter === "all" ? undefined : categoryFilter;
+
+  const isActiveTab = activeStatus === "active";
+  const appliedFromDate =
+    isActiveTab && fromDateInUrl ? fromDateInUrl : undefined;
+  const appliedToDate = isActiveTab
+    ? toDateInUrl || fromDateInUrl || undefined
+    : undefined;
+
   const queryParams = {
     page,
     per_page: perPage,
-    status: status !== "all" ? status : "",
+    status: activeStatus,
     vendor_location_id: session.data?.user?.vendor_location_id,
     search: search?.search,
+    from_date: appliedFromDate,
+    to_date: appliedToDate,
+    category_id: isActiveTab ? selectedCategoryId : undefined,
+    room_id: isActiveTab ? selectedRoomId : undefined,
   };
 
-  // Fetch events with TanStack Query
   const {
     data: eventsData,
     isLoading,
+    isFetching,
     refetch,
   } = useEvents(queryParams as EventsQueryParams);
 
-  // Bulk update mutation
   const { mutate: bulkUpdateStatus, isPending: isUpdating } =
     useBulkUpdateEventStatus();
 
   const { mutate: bulkDeleteEvents, isPending: isBulkDeleting } =
     useBulkDeleteEvents();
 
-  // Extract items and meta from the response
   const events = eventsData?.items || [];
   const meta = eventsData?.meta || { last_page: 1, total: 0 };
+  const filterMeta = eventsData?.filter_meta;
 
-  /** Bulk select, Set Active, Delete — Draft tab only (list is already drafts) */
-  const isDraftTab = status === "draft";
+  const availableDates = useMemo(
+    () => filterMeta?.available_dates ?? [],
+    [filterMeta?.available_dates],
+  );
+  const availableCategories = useMemo(
+    () => filterMeta?.available_categories ?? [],
+    [filterMeta?.available_categories],
+  );
+  const availableRooms = useMemo(
+    () => filterMeta?.available_rooms ?? [],
+    [filterMeta?.available_rooms],
+  );
+  const hasRoomEvents = filterMeta?.has_room_events === true;
+
+  const isDraftTab = activeStatus === "draft";
   const hasDraftEventsToSelect = events.length > 0;
   const showDraftBulkUi = isDraftTab && hasDraftEventsToSelect;
 
-  /** Selected rows count (draft tab bulk actions). */
   const selectedDraftBreakdown = useMemo(() => {
     const picked = selectedEvents
       .map((id) => events.find((e) => e.id === id))
@@ -120,16 +211,55 @@ export default function EventTabs({ search }: EventsProps) {
     return { total: picked.length };
   }, [selectedEvents, events]);
 
-  // Toggle selection mode
+  const hasActiveFilters =
+    !!fromDateInUrl ||
+    categoryFilter !== "all" ||
+    roomFilter !== "all";
+
+  const handleDateRangeChange = useCallback(
+    (range: DateRange | undefined) => {
+      setFromDateInUrl(range?.from ? format(range.from, "yyyy-MM-dd") : "");
+      setToDateInUrl(
+        range?.to
+          ? format(range.to, "yyyy-MM-dd")
+          : range?.from
+            ? format(range.from, "yyyy-MM-dd")
+            : "",
+      );
+      setRoomInUrl("all");
+    },
+    [setFromDateInUrl, setToDateInUrl, setRoomInUrl],
+  );
+
+  const handleCategoryFilterChange = useCallback(
+    (value: string) => {
+      setCategoryInUrl(value);
+    },
+    [setCategoryInUrl],
+  );
+
+  const handleRoomFilterChange = useCallback(
+    (value: string) => {
+      setRoomInUrl(value);
+    },
+    [setRoomInUrl],
+  );
+
+  const handleResetFilters = useCallback(() => {
+    setFromDateInUrl("");
+    setToDateInUrl("");
+    setCategoryInUrl("all");
+    setRoomInUrl("all");
+    setPage(1);
+  }, [setCategoryInUrl, setFromDateInUrl, setPage, setRoomInUrl, setToDateInUrl]);
+
   const toggleSelectionMode = () => {
     setSelectionMode(!selectionMode);
-    // Clear selections when disabling selection mode
     if (selectionMode) {
       setSelectedEvents([]);
     }
   };
 
-  // Toggle selection of an event
   const toggleEventSelection = (id: number) => {
     setSelectedEvents((prev) =>
       prev.includes(id)
@@ -138,7 +268,6 @@ export default function EventTabs({ search }: EventsProps) {
     );
   };
 
-  // Toggle select all events
   const toggleSelectAll = () => {
     if (selectedEvents.length === events.length) {
       setSelectedEvents([]);
@@ -147,13 +276,11 @@ export default function EventTabs({ search }: EventsProps) {
     }
   };
 
-  // Check if any selected events are cancelled
   const hasCancelledEvents = selectedEvents.some((eventId) => {
     const event = events.find((e) => e.id === eventId);
     return event?.status === "cancelled";
   });
 
-  // Bulk set active (draft tab only — no "Set Draft" here; everything is already draft)
   const handleBulkSetActive = () => {
     if (selectedEvents.length === 0 || hasCancelledEvents) return;
 
@@ -166,12 +293,10 @@ export default function EventTabs({ search }: EventsProps) {
     setShowConfirmModal(true);
   };
 
-  // Execute the confirmed action
   const executeBulkAction = () => {
     if (!pendingAction) return;
 
     if (pendingAction === "refresh") {
-      console.log("Manually refreshing data");
       refetch();
       setSelectedEvents([]);
       setShowConfirmModal(false);
@@ -197,7 +322,6 @@ export default function EventTabs({ search }: EventsProps) {
     );
   };
 
-  // Cancel confirmation modal
   const cancelBulkAction = () => {
     setShowConfirmModal(false);
     setPendingAction(null);
@@ -214,20 +338,57 @@ export default function EventTabs({ search }: EventsProps) {
           setSelectionMode(false);
           refetch();
         },
-      }
+      },
     );
   };
 
-  // Reset page to 1 when changing tabs; exit bulk mode when leaving Draft
+  useEffect(() => {
+    if (status !== activeStatus) {
+      setStatus(activeStatus);
+    }
+  }, [status, activeStatus, setStatus]);
+
   useEffect(() => {
     setPage(1);
     setSelectedEvents([]);
-    if (status !== "draft") {
+    if (activeStatus !== "draft") {
       setSelectionMode(false);
     }
-  }, [status, setPage]);
+  }, [activeStatus, setPage]);
 
-  // No rows — hide bulk UI and exit selection (e.g. after deleting last drafts)
+  useEffect(() => {
+    if (!isActiveTab) return;
+    setPage(1);
+  }, [fromDateInUrl, categoryFilter, roomFilter, isActiveTab, setPage]);
+
+  useEffect(() => {
+    if (!fromDateInUrl) {
+      if (roomFilter !== "all") setRoomInUrl("all");
+      return;
+    }
+
+    if (roomFilter === "all") return;
+
+    const isValidRoom = availableRooms.some(
+      (room) => String(room.room_id) === roomFilter,
+    );
+    if (!isValidRoom) {
+      setRoomInUrl("all");
+    }
+  }, [fromDateInUrl, availableRooms, roomFilter, setRoomInUrl]);
+
+  useEffect(() => {
+    if (categoryFilter === "all") return;
+    if (!availableCategories.length) return;
+
+    const isValidCategory = availableCategories.some(
+      (category) => String(category.id) === categoryFilter,
+    );
+    if (!isValidCategory) {
+      setCategoryInUrl("all");
+    }
+  }, [categoryFilter, availableCategories, setCategoryInUrl]);
+
   useEffect(() => {
     if (isDraftTab && events.length === 0) {
       setSelectionMode(false);
@@ -235,12 +396,43 @@ export default function EventTabs({ search }: EventsProps) {
     }
   }, [isDraftTab, events.length]);
 
-  // Force a refetch of the data immediately
   const refreshData = () => {
-    // Invalidate the query cache to ensure fresh data
     queryClient.invalidateQueries({ queryKey: eventKeys.lists() });
-    // Refetch the current query
     refetch();
+  };
+
+  const renderEventGrid = () => {
+    if (isLoading) {
+      return <EventsTabSkeleton count={15} />;
+    }
+
+    if (events.length === 0) {
+      return (
+        <p className="w-full py-6 flex justify-center items-center text-sm sm:text-base">
+          No Events Found
+        </p>
+      );
+    }
+
+    return (
+      <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4 sm:gap-6">
+        {events.map((event, idx) => (
+          <Card
+            key={`${event.id}-${idx}`}
+            className="shadow-none border-none pt-0 pb-1 px-0"
+          >
+            <CardContent className="px-0">
+              <EventCard
+                event={event}
+                selectionMode={showDraftBulkUi && selectionMode}
+                selected={selectedEvents.includes(event.id)}
+                onSelect={() => toggleEventSelection(event.id)}
+              />
+            </CardContent>
+          </Card>
+        ))}
+      </section>
+    );
   };
 
   return (
@@ -277,14 +469,17 @@ export default function EventTabs({ search }: EventsProps) {
             size="sm"
             onClick={refreshData}
             variant="outline"
+            disabled={isFetching}
           >
-            <RefreshCcw size={14} />
+            <RefreshCcw
+              size={14}
+              className={isFetching ? "animate-spin" : ""}
+            />
             <span className="hidden sm:inline">Refresh</span>
           </Button>
         </div>
       </header>
 
-      {/* Bulk actions: Draft tab + has rows + selection mode */}
       {showDraftBulkUi && selectionMode && (
         <PermissionGuard permissionKey="update-event">
           <div className="bg-muted/20 p-2 sm:p-3 mb-4 rounded-md mx-2 sm:mx-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
@@ -307,7 +502,7 @@ export default function EventTabs({ search }: EventsProps) {
               </div>
               {hasCancelledEvents && (
                 <div className="text-xs text-amber-600 bg-amber-50 px-2 py-1 rounded border border-amber-200">
-                  ⚠️ Cancelled events cannot be set to active
+                  Cancelled events cannot be set to active
                 </div>
               )}
             </div>
@@ -357,9 +552,27 @@ export default function EventTabs({ search }: EventsProps) {
       )}
 
       <main className="bg-background p-2 sm:p-4 md:p-6 rounded-md">
+        {isActiveTab && (
+          <EventListFilters
+            dateRange={dateRange}
+            onDateRangeChange={handleDateRangeChange}
+            availableDates={availableDates}
+            categoryFilter={categoryFilter}
+            onCategoryFilterChange={handleCategoryFilterChange}
+            availableCategories={availableCategories}
+            roomFilter={roomFilter}
+            onRoomFilterChange={handleRoomFilterChange}
+            availableRooms={availableRooms}
+            hasRoomEvents={hasRoomEvents}
+            disabled={isFetching}
+            onReset={handleResetFilters}
+            hasActiveFilters={hasActiveFilters}
+          />
+        )}
+
         <Tabs
           className="p-0"
-          defaultValue={status}
+          value={activeStatus}
           onValueChange={(newStatus) => setStatus(newStatus)}
         >
           <TabsList className="h-auto mb-6 w-full overflow-x-auto flex-wrap no-scrollbar">
@@ -370,45 +583,20 @@ export default function EventTabs({ search }: EventsProps) {
                 className="p-2 border-0 cursor-pointer text-black text-xs sm:text-sm whitespace-nowrap"
               >
                 <span className="hidden sm:inline">
-                  {tabLabels[key] ?? key} Events
+                  {tabLabels[key]} Events
                 </span>
-                <span className="sm:hidden">
-                  {tabLabels[key] ?? key}
-                </span>
+                <span className="sm:hidden">{tabLabels[key]}</span>
               </TabsTrigger>
             ))}
           </TabsList>
 
           {tabs.map((key) => (
             <TabsContent key={key} value={key}>
-              {isLoading ? (
-                <EventsTabSkeleton count={15} />
-              ) : events && events.length === 0 ? (
-                <p className="w-full py-6 flex justify-center items-center text-sm sm:text-base">
-                  No Events Found
-                </p>
-              ) : (
-                <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4 sm:gap-6">
-                  {events?.map((event, idx) => (
-                    <Card
-                      key={`${event.id}-${idx}`}
-                      className={`shadow-none border-none pt-0 pb-1 px-0`}
-                    >
-                      <CardContent className="px-0">
-                        <EventCard
-                          event={event}
-                          selectionMode={showDraftBulkUi && selectionMode}
-                          selected={selectedEvents.includes(event.id)}
-                          onSelect={() => toggleEventSelection(event.id)}
-                        />
-                      </CardContent>
-                    </Card>
-                  ))}
-                </section>
-              )}
+              {renderEventGrid()}
             </TabsContent>
           ))}
         </Tabs>
+
         <section className="w-full my-6">
           <EventPagination
             currentPage={page}
@@ -418,7 +606,6 @@ export default function EventTabs({ search }: EventsProps) {
         </section>
       </main>
 
-      {/* Confirmation Modal */}
       <AlertDialog open={showConfirmModal} onOpenChange={setShowConfirmModal}>
         <AlertDialogContent>
           <AlertDialogHeader>

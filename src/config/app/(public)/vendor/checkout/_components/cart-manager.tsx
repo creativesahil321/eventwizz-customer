@@ -1,6 +1,8 @@
 "use client";
 
 import { useMemo, useState, useEffect, useLayoutEffect, useRef } from "react";
+import { useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 import {
   ShoppingCart,
   CalendarPlus,
@@ -9,6 +11,7 @@ import {
   Trash2,
   MoreHorizontal,
   Package,
+  Loader2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
@@ -55,11 +58,13 @@ type CartManagerProps = Record<string, never>;
 
 export default function CartManager({}: CartManagerProps) {
   const [isProcessing, setIsProcessing] = useState(false);
+  const [removingDateKey, setRemovingDateKey] = useState<string | null>(null);
   const [expandedDates, setExpandedDates] = useState<Set<string>>(new Set());
   const [showClearConfirm, setShowClearConfirm] = useState(false);
   const [showActions, setShowActions] = useState(false);
   const [activeRoomId, setActiveRoomId] = useState<number | null>(null);
   const hasInitializedExpanded = useRef(false);
+  const hasLoadedCartRef = useRef(false);
   const isPreviewMode = useIsPreviewMode();
   const { data: session } = useSession();
 
@@ -88,6 +93,7 @@ export default function CartManager({}: CartManagerProps) {
   const { syncCart } = useCartSync(apiCartData);
   const deleteCartDateMutation = useDeleteCartDate();
   const clearAllCartMutation = useClearAllCart();
+  const queryClient = useQueryClient();
   const { format: formatMoney } = useCurrencyFormat();
 
   const { currentEventSlug, currentEventApiData, firstDate } = useMemo(() => {
@@ -131,15 +137,21 @@ export default function CartManager({}: CartManagerProps) {
     [locationSlug, currentEventSlug],
   );
 
-  // Initialize active room to first room
+  // Keep active room valid for the current cart event (reset after event replace).
   useEffect(() => {
-    if (roomMode && rooms.length > 0 && activeRoomId === null) {
-      setActiveRoomId(rooms[0].room_id);
-    }
     if (!roomMode) {
       setActiveRoomId(null);
+      return;
     }
-  }, [roomMode, rooms, activeRoomId]);
+    if (rooms.length === 0) {
+      setActiveRoomId(null);
+      return;
+    }
+    const activeStillValid = rooms.some((room) => room.room_id === activeRoomId);
+    if (activeRoomId == null || !activeStillValid) {
+      setActiveRoomId(rooms[0].room_id);
+    }
+  }, [roomMode, rooms, activeRoomId, currentEventSlug]);
 
   useEffect(() => {
     if (currentEventSlug) {
@@ -151,6 +163,12 @@ export default function CartManager({}: CartManagerProps) {
   }, [currentEventSlug, roomMode, activeRoomId, setCurrentEvent]);
 
   // Room mode: dates collapsed by default. Flat mode: all expanded.
+  // Reset when the cart event changes (e.g. store-only replace).
+  useEffect(() => {
+    hasInitializedExpanded.current = false;
+    setExpandedDates(new Set());
+  }, [currentEventSlug]);
+
   useEffect(() => {
     if (firstDate && !hasInitializedExpanded.current) {
       if (roomMode) {
@@ -168,9 +186,13 @@ export default function CartManager({}: CartManagerProps) {
     }
   }, [firstDate, currentEventApiData, roomMode, rooms]);
 
-  // Cart synchronization check
+  // Cart synchronization check — never treat "Zustand not hydrated yet" as a wipe.
   useEffect(() => {
     if (!currentEventSlug || !currentEventApiData) return;
+    const localEventData = useCartEditStore.getState().editingData[currentEventSlug];
+    if (!localEventData || Object.keys(localEventData).length === 0) {
+      return;
+    }
     syncCart(currentEventSlug).then((wasCleared) => {
       if (wasCleared) {
         setTimeout(() => {
@@ -262,10 +284,17 @@ export default function CartManager({}: CartManagerProps) {
   ]);
 
   const availableDates = useMemo(() => {
-    if (roomMode && activeRoomId != null) {
-      return getRoomDates(currentEventApiData, activeRoomId).map((d) =>
-        buildRoomDateKey(activeRoomId, d),
-      );
+    if (!currentEventApiData) return [];
+    if (roomMode) {
+      // Prefer the active room; fall back to all room dates so event-replace
+      // never flashes an empty cart before activeRoomId is reconciled.
+      if (activeRoomId != null) {
+        const roomDates = getRoomDates(currentEventApiData, activeRoomId);
+        if (roomDates.length > 0) {
+          return roomDates.map((d) => buildRoomDateKey(activeRoomId, d));
+        }
+      }
+      return getAllRoomDateKeys(currentEventApiData);
     }
     return getAvailableDates(currentEventApiData);
   }, [currentEventApiData, roomMode, activeRoomId]);
@@ -341,45 +370,61 @@ export default function CartManager({}: CartManagerProps) {
   }, [currentEventSlug, currentEventApiData, roomMode, getDateData]);
 
   const handleRemoveDate = async (dateKey: string) => {
+    if (removingDateKey || deleteCartDateMutation.isPending) return;
+
+    setRemovingDateKey(dateKey);
+
+    // Optimistic: remove locally immediately so the row disappears without waiting on the API.
+    if (currentEventSlug) {
+      removeDate(currentEventSlug, dateKey);
+    }
+    setExpandedDates((prev) => {
+      const newSet = new Set(prev);
+      newSet.delete(dateKey);
+      return newSet;
+    });
+
     try {
-      setIsProcessing(true);
       const { roomId, date: eventDate } = parseRoomDateKey(dateKey);
       await deleteCartDateMutation.mutateAsync({
         eventDate,
         roomId: roomId ?? undefined,
         storeDateKey: dateKey,
       });
-      if (currentEventSlug) {
-        removeDate(currentEventSlug, dateKey);
-      }
-      setExpandedDates((prev) => {
-        const newSet = new Set(prev);
-        newSet.delete(dateKey);
-        return newSet;
-      });
     } catch (error) {
       console.error("Error removing date:", error);
+      toast.error("Couldn't remove this date. Please try again.");
+      void queryClient.invalidateQueries({ queryKey: ["cart-data"] });
     } finally {
-      setIsProcessing(false);
+      setRemovingDateKey(null);
     }
   };
 
   const handleClearAllCart = async () => {
     try {
       setIsProcessing(true);
-      await clearAllCartMutation.mutateAsync();
       clearAllCarts();
       setExpandedDates(new Set());
       setShowClearConfirm(false);
+      await clearAllCartMutation.mutateAsync();
     } catch (error) {
       console.error("Error clearing cart:", error);
+      toast.error("Couldn't clear your cart. Please try again.");
+      void queryClient.invalidateQueries({ queryKey: ["cart-data"] });
     } finally {
       setIsProcessing(false);
     }
   };
 
-  // Show skeleton only on initial load
-  const isInitialLoad = isLoadingCartData && !apiCartData;
+  useEffect(() => {
+    if (apiCartData) {
+      hasLoadedCartRef.current = true;
+    }
+  }, [apiCartData]);
+
+  // Show skeleton only on first visit — never again after delete/refetch.
+  const isInitialLoad =
+    !hasLoadedCartRef.current && isLoadingCartData && !apiCartData;
   if (isInitialLoad) {
     return <CartSkeletonLoader />;
   }
@@ -406,8 +451,16 @@ export default function CartManager({}: CartManagerProps) {
     );
   }
 
-  // Empty cart
-  if (!isLoadingCartData && !isFetchingCartData && availableDates.length === 0) {
+  const hasRoomCartSessions = roomMode && rooms.length > 0;
+  const isCartEmpty =
+    !isLoadingCartData &&
+    !isFetchingCartData &&
+    availableDates.length === 0 &&
+    !hasRoomCartSessions;
+
+  // Empty cart — require no API rooms either (room carts can briefly have
+  // availableDates=[] while activeRoomId is reconciled after an event switch).
+  if (isCartEmpty) {
     return (
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-10 text-center">
         <div className="w-16 h-16 mx-auto bg-gray-50 rounded-2xl flex items-center justify-center mb-5">
@@ -531,6 +584,7 @@ export default function CartManager({}: CartManagerProps) {
               isExpanded={isExpanded}
               onToggle={() => toggleDateExpansion(date)}
               onRemoveDate={handleRemoveDate}
+              isRemoving={removingDateKey === date}
               roomId={roomMode ? (activeRoomId ?? undefined) : undefined}
               embedded={roomMode}
               roomAccentIndex={activeRoomIndex}
@@ -544,7 +598,7 @@ export default function CartManager({}: CartManagerProps) {
 
   if (roomMode && rooms.length > 0 && activeRoomId != null && activeRoom) {
     return (
-      <div className="space-y-4">
+      <div id="checkout-cart-section" className="space-y-4">
         {bookingHeader}
 
         <RoomTabSelector
@@ -566,7 +620,7 @@ export default function CartManager({}: CartManagerProps) {
   }
 
   return (
-    <div className="space-y-4">
+    <div id="checkout-cart-section" className="space-y-4">
       {bookingHeader}
       <div className="space-y-3">{dateSections}</div>
     </div>

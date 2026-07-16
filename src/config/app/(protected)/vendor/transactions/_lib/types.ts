@@ -8,8 +8,8 @@ export type Transaction = {
   event_date: string;
   full_name: string;
   email: string;
-  card_brand: string;
-  cardLast4: string;
+  card_brand: string | null;
+  cardLast4: string | null;
   status: string;
   amount: string;
   platform_fee: string;
@@ -25,6 +25,7 @@ export type SearchParams = {
   to?: string;
   from_date?: string;
   to_date?: string;
+  room_id?: string;
   filters?: string;
   [key: string]: string | string[] | undefined;
 };
@@ -37,6 +38,8 @@ export type TransactionsParams = {
   booking_date?: string;
   from_date?: string;
   to_date?: string;
+  event_date?: string;
+  room_id?: number | string;
   options?: unknown;
 };
 

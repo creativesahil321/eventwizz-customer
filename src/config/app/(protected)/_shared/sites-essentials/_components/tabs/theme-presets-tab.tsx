@@ -47,9 +47,11 @@ import {
 } from "@/components/ui/accordion";
 import { isLightUiBackground } from "@/lib/wcag-color-contrast";
 import { useSiteEssentialsUpdateGate } from "../../_lib/site-essentials-update-context";
+import { RestoreDefaultThemeControl } from "../restore-default-theme-control";
 
 type ThemePresetsTabProps = {
-  onGoToColors: () => void;
+  /** Omitted when the advanced Colors tab is hidden, so we don't surface a dead link. */
+  onGoToColors?: () => void;
   onGoToTypography: () => void;
   onGoToBranding: () => void;
 };
@@ -182,14 +184,18 @@ export function ThemePresetsTab({
 
       <p className="text-xs text-muted-foreground">
         <span className="text-foreground/70">More control:</span>{" "}
-        <button
-          type="button"
-          className="font-medium text-[color:var(--color-primary)] underline-offset-2 hover:underline"
-          onClick={onGoToColors}
-        >
-          Colors
-        </button>
-        <span className="mx-1 text-border">·</span>
+        {onGoToColors && (
+          <>
+            <button
+              type="button"
+              className="font-medium text-[color:var(--color-primary)] underline-offset-2 hover:underline"
+              onClick={onGoToColors}
+            >
+              Colors
+            </button>
+            <span className="mx-1 text-border">·</span>
+          </>
+        )}
         <button
           type="button"
           className="font-medium text-[color:var(--color-primary)] underline-offset-2 hover:underline"
@@ -432,12 +438,19 @@ export function ThemePresetsTab({
         ))}
       </Accordion>
 
+      <RestoreDefaultThemeControl
+        form={form}
+        presetCacheUserKey={presetCacheUserKey ?? "anonymous"}
+        readOnly={readOnly}
+      />
+
       <p className="text-[10px] leading-relaxed text-muted-foreground sm:text-[11px]">
         <span className="font-medium text-foreground/70">CDN font</span> presets
         add a stylesheet link (editable under Typography).{" "}
         <span className="text-foreground/60">
-          The highlighted preset is remembered in this browser (refresh / Reset)
-          until you apply another or the form exactly matches a different preset.
+          The highlighted preset is remembered in this browser (refresh / Discard
+          changes) until you apply another or the form exactly matches a different
+          preset.
         </span>
       </p>
     </div>

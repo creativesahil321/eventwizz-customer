@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   ArrowLeft,
-  CheckCircle2,
   ChevronDown,
   ChevronUp,
   Download,
@@ -13,21 +12,17 @@ import {
   RotateCcw,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-} from "@/components/ui/accordion";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { cn } from "@/lib/utils";
-import {
-  getStatusThemeKey,
-  type StatusThemeKey,
-} from "@/lib/status-theme";
+import { getStatusThemeKey, type StatusThemeKey } from "@/lib/status-theme";
 import { useCurrencyFormat } from "@/hooks/use-currency-format";
-import { useBookingPayment, bookingsKeys, useRescheduleBooking } from "@/services/customer/bookings/query";
+import {
+  useBookingPayment,
+  bookingsKeys,
+  useRescheduleBooking,
+} from "@/services/customer/bookings/query";
 import { resolveBookingPaymentAction } from "@/services/customer/bookings/booking-payment";
+import { resolveReschedulePaymentAction } from "@/services/customer/bookings/reschedule-payment";
 import type { BookingPaymentResponse } from "@/services/customer/bookings/type";
 import type { CheckoutStripePaymentSession } from "@/services/customer/checkout";
 import CheckoutStripePaymentModal from "@/app/(public)/vendor/checkout/_components/checkout-stripe-payment-modal";
@@ -41,13 +36,13 @@ import type {
   RescheduleBookingPayload,
 } from "@/services/customer/bookings/type";
 import { toast } from "sonner";
-import {
-  AddExtrasSection,
-} from "./add-extras-panel";
+import { resolveBookingPayAllVisibility } from "./booking-payment-visibility";
+import { AddExtrasSection } from "./add-extras-panel";
 import {
   buildDateSubtitle,
   buildPaymentBreakdown,
   formatDateStripLabel,
+  resolvePackageSectionTitle,
   splitLineItemsForDate,
   type BookingDateSource,
 } from "./build-line-items";
@@ -56,11 +51,11 @@ import {
   isBookingDateEligibleForAddOns,
   type BookingDatePaymentStatus,
 } from "@/lib/booking-addons-eligibility";
-import type { CheckoutDateCard, PaymentBreakdownGroup, PaymentBreakdownLine } from "./types";
+import type { CheckoutDateCard } from "./types";
 import {
-  getAddonCategoryLabel,
-  splitAddonsByCategory,
-} from "./types";
+  PaymentBreakdownDateAccordion,
+  PaymentBreakdownTotals,
+} from "./payment-breakdown";
 import { SingleDatePaymentModal } from "../single-date-payment-modal";
 import { RescheduleDateModal } from "../reschedule-date-modal";
 import {
@@ -211,6 +206,8 @@ interface BookingCheckoutPageProps {
   eventName: string;
   location?: string;
   paymentStatus: string;
+  /** Whole-booking order status from API `status` */
+  bookingStatus?: string;
   canPayNow?: boolean;
   isRoomSystem?: boolean;
   isMenuChoice?: boolean;
@@ -229,202 +226,13 @@ interface BookingCheckoutPageProps {
   isDownloadingInvoice?: boolean;
 }
 
-function PaymentBreakdownLineSections({
-  lines,
-  formatCurrency,
-  variant = "default",
-  packageSectionTitle,
-}: {
-  lines: PaymentBreakdownLine[];
-  formatCurrency: (amount: number) => string;
-  variant?: "default" | "addon";
-  packageSectionTitle?: string;
-}) {
-  const { seating, packages } = splitAddonsByCategory(lines);
-  const sections = [
-    { category: "seating" as const, items: seating },
-    { category: "package" as const, items: packages },
-  ].filter((section) => section.items.length > 0);
-
-  if (sections.length <= 1) {
-    return (
-      <div className="divide-y divide-border/60">
-        {lines.map((line) => (
-          <PaymentBreakdownLineRow
-            key={line.id}
-            line={line}
-            formatCurrency={formatCurrency}
-            variant={variant}
-          />
-        ))}
-      </div>
-    );
-  }
-
-  return (
-    <>
-      {sections.map((section, sectionIndex) => (
-        <div
-          key={section.category}
-          className={cn(
-            "py-1 pb-0.5",
-            variant === "addon" && "px-0",
-            sectionIndex > 0 && "mt-0.5 pt-2",
-          )}
-          style={sectionIndex > 0 ? {
-            borderTop: "1px solid color-mix(in srgb, var(--color-warning) 22%, var(--border))",
-          } : undefined}
-        >
-          <p
-            className="px-4 py-1.5 pb-1 text-[11px] font-extrabold tracking-[0.06em] uppercase"
-            style={{
-              color: variant === "addon"
-                ? "color-mix(in srgb, var(--color-warning) 75%, var(--muted-foreground))"
-                : "var(--kind-accent, var(--muted-foreground))",
-            }}
-          >
-            {getAddonCategoryLabel(
-              section.category,
-              section.items,
-              packageSectionTitle,
-            )}
-          </p>
-          <div className="divide-y divide-border/60">
-            {section.items.map((line) => (
-              <PaymentBreakdownLineRow
-                key={line.id}
-                line={line}
-                formatCurrency={formatCurrency}
-                variant={variant}
-              />
-            ))}
-          </div>
-        </div>
-      ))}
-    </>
-  );
-}
-
-function PaymentBreakdownLineRow({
-  line,
-  formatCurrency,
-  variant = "default",
-}: {
-  line: PaymentBreakdownLine;
-  formatCurrency: (amount: number) => string;
-  variant?: "default" | "addon";
-}) {
-  return (
-    <div
-      className="flex items-start justify-between gap-3 px-4 py-2.5"
-      style={variant === "addon" ? {
-        background: "color-mix(in srgb, var(--color-warning) 4%, var(--color-card))",
-      } : undefined}
-    >
-      <div className="min-w-0">
-        <p className="text-sm font-medium text-foreground">{line.label}</p>
-        <p className="text-[11px] font-normal text-muted-foreground">
-          {line.meta}
-        </p>
-      </div>
-      <span className="shrink-0 text-sm font-semibold tabular-nums text-foreground">
-        {formatCurrency(line.amount)}
-      </span>
-    </div>
-  );
-}
-
-function PaymentBreakdownDateAccordion({
-  groups,
-  formatCurrency,
-  openDates,
-  onOpenDatesChange,
-}: {
-  groups: PaymentBreakdownGroup[];
-  formatCurrency: (amount: number) => string;
-  openDates: string[];
-  onOpenDatesChange: (value: string[]) => void;
-}) {
-  if (groups.length === 0) return null;
-
-  return (
-    <Accordion
-      type="multiple"
-      value={openDates}
-      onValueChange={onOpenDatesChange}
-      className="space-y-3"
-    >
-      {groups.map((group) => (
-        <AccordionItem
-          key={group.id}
-          value={group.id}
-          className="overflow-hidden rounded-xl border border-border bg-card border-b-0"
-        >
-          <AccordionTrigger
-            className="px-4 py-2.5 font-semibold hover:no-underline data-[state=open]:border-b data-[state=open]:border-border"
-            style={{ background: "color-mix(in srgb, var(--color-muted) 55%, var(--color-card))" }}
-          >
-            <span className="text-sm font-semibold text-foreground">
-              {group.title}
-            </span>
-            <span className="ml-auto mr-1 text-sm font-bold tabular-nums text-foreground">
-              {formatCurrency(group.subtotal)}
-            </span>
-          </AccordionTrigger>
-          <AccordionContent className="pb-0 pt-0 [&>div]:py-0">
-            {group.lines.length > 0 && (
-              <PaymentBreakdownLineSections
-                lines={group.lines}
-                formatCurrency={formatCurrency}
-                packageSectionTitle={group.packageTitle}
-              />
-            )}
-
-            {group.addonLines && group.addonLines.length > 0 && (
-              <div
-                style={{
-                  borderTop: "1px dashed color-mix(in srgb, var(--color-warning) 35%, var(--border))",
-                  background: "color-mix(in srgb, var(--color-warning) 6%, var(--color-card))",
-                }}
-              >
-                <div
-                  className="flex items-center justify-between gap-3 px-4 py-2"
-                  style={{
-                    borderBottom: "1px solid color-mix(in srgb, var(--color-warning) 18%, var(--border))",
-                    background: "color-mix(in srgb, var(--color-warning) 10%, var(--color-card))",
-                  }}
-                >
-                  <span
-                    className="text-[11px] font-bold tracking-[0.04em] uppercase"
-                    style={{ color: "var(--color-warning)" }}
-                  >
-                    Extra add-ons
-                  </span>
-                  <span className="text-xs font-semibold tabular-nums">
-                    {formatCurrency(group.addonSubtotal ?? 0)}
-                  </span>
-                </div>
-                <PaymentBreakdownLineSections
-                  lines={group.addonLines}
-                  formatCurrency={formatCurrency}
-                  variant="addon"
-                  packageSectionTitle={group.packageTitle}
-                />
-              </div>
-            )}
-          </AccordionContent>
-        </AccordionItem>
-      ))}
-    </Accordion>
-  );
-}
-
 export default function BookingCheckoutPage({
   bookingId,
   bookingNumber,
   eventName,
   location,
   paymentStatus,
+  bookingStatus,
   canPayNow = true,
   isRoomSystem = false,
   isMenuChoice,
@@ -437,10 +245,8 @@ export default function BookingCheckoutPage({
 }: BookingCheckoutPageProps) {
   const router = useRouter();
   const queryClient = useQueryClient();
-  const {
-    format: formatCurrency,
-    formatCompact: formatUnit,
-  } = useCurrencyFormat();
+  const { format: formatCurrency, formatCompact: formatUnit } =
+    useCurrencyFormat();
   const paymentMutation = useBookingPayment();
   const rescheduleMutation = useRescheduleBooking();
   const deleteAddOnsMutation = useDeleteAddOns();
@@ -451,9 +257,6 @@ export default function BookingCheckoutPage({
   const [openBreakdownDates, setOpenBreakdownDates] = useState<string[]>(() =>
     dates[0]?.id ? [dates[0].id] : [],
   );
-  const [pendingExtrasByDate, setPendingExtrasByDate] = useState<
-    Record<string, { total: number; count: number }>
-  >({});
 
   const [paymentModalOpen, setPaymentModalOpen] = useState(false);
   const [paymentDateId, setPaymentDateId] = useState<string | null>(null);
@@ -467,13 +270,17 @@ export default function BookingCheckoutPage({
   const [isStripePaymentOpen, setIsStripePaymentOpen] = useState(false);
 
   const selectedDate = dates.find((d) => d.id === selectedDateId) ?? dates[0];
+  const packageTitleFallback = useMemo(
+    () => dates.find((d) => d.package_title?.trim())?.package_title,
+    [dates],
+  );
+  const packageSectionTitle = useMemo(
+    () => resolvePackageSectionTitle(selectedDate, packageTitleFallback),
+    [selectedDate, packageTitleFallback],
+  );
   const isMenuChoiceForDate =
     selectedDate?.is_menu_choice ?? isMenuChoice ?? false;
   const hasMultipleDates = dates.length > 1;
-  const pendingExtras = pendingExtrasByDate[selectedDateId] ?? {
-    total: 0,
-    count: 0,
-  };
 
   const dateCards: CheckoutDateCard[] = useMemo(
     () =>
@@ -546,11 +353,6 @@ export default function BookingCheckoutPage({
     );
   }, [breakdownOpen, selectedDateId]);
 
-  const pendingExtrasTotal = Object.values(pendingExtrasByDate).reduce(
-    (s, p) => s + p.total,
-    0,
-  );
-
   const payableDates = useMemo(
     () => dates.filter((date) => isDatePayable(date as CheckoutDate)),
     [dates],
@@ -560,32 +362,19 @@ export default function BookingCheckoutPage({
     selectedDate != null && canShowRescheduleButton(selectedDate);
 
   const bookingOutstanding = summary.outstanding;
-  const isFullyPaid = bookingOutstanding <= 0 && pendingExtrasTotal <= 0;
-  const footerLabel = isFullyPaid
-    ? "Total Paid"
-    : hasMultipleDates
-      ? "Total Due (all dates)"
-      : "Total Due";
-  const footerAmount = isFullyPaid
-    ? summary.paid > 0
-      ? summary.paid
-      : summary.total
-    : bookingOutstanding;
-  const showFooterPayAll =
-    canPayNow && bookingOutstanding > 0 && payableDates.length > 0 && hasMultipleDates;
-  const showPayAll =
-    canPayNow && bookingOutstanding > 0 && payableDates.length > 0;
-
-  const handlePendingExtrasChange = useCallback(
-    (total: number, count: number) => {
-      setPendingExtrasByDate((prev) => ({
-        ...prev,
-        [selectedDateId]: { total, count },
-      }));
-    },
-    [selectedDateId],
+  const showPaymentFooter = bookingOutstanding > 0;
+  const footerLabel = hasMultipleDates ? "Total Due (all dates)" : "Total Due";
+  const footerAmount = bookingOutstanding;
+  const payAllVisibility = useMemo(
+    () =>
+      resolveBookingPayAllVisibility({
+        canPayNow,
+        bookingOutstanding,
+        payableDateCount: payableDates.length,
+        hasMultipleDates,
+      }),
+    [canPayNow, bookingOutstanding, payableDates.length, hasMultipleDates],
   );
-
 
   const canModifyAddOns = isBookingDateEligibleForAddOns(
     selectedDate?.addOnsPaymentStatus,
@@ -617,8 +406,14 @@ export default function BookingCheckoutPage({
   const paymentDate = dates.find((d) => d.id === paymentDateId);
 
   const handlePayForDate = (dateId: string) => {
+    const date = dates.find((d) => d.id === dateId) as CheckoutDate | undefined;
+    const pendingRequest =
+      date?.reschedule_requests?.find((request) => request.unpaid_amount > 0) ??
+      date?.reschedule_requests?.[0] ??
+      null;
+
     setPaymentDateId(dateId);
-    setRescheduleRequest(null);
+    setRescheduleRequest(pendingRequest);
     setPaymentModalOpen(true);
   };
 
@@ -634,10 +429,23 @@ export default function BookingCheckoutPage({
 
     rescheduleMutation.mutate(payload, {
       onSuccess: (response) => {
-        if (response.status && !response.data?.payment?.redirect_url) {
+        if (!response.status || !response.data) return;
+
+        const action = resolveReschedulePaymentAction(response.data);
+        if (action?.type === "stripe") {
           setRescheduleModalOpen(false);
           setSelectedDateForReschedule(null);
+          setStripePaymentSession(action.session);
+          setIsStripePaymentOpen(true);
+          return;
         }
+
+        if (action?.type === "redirect") {
+          return;
+        }
+
+        setRescheduleModalOpen(false);
+        setSelectedDateForReschedule(null);
       },
     });
   };
@@ -688,6 +496,9 @@ export default function BookingCheckoutPage({
         queryKey: bookingsKeys.bookingDetail(parsedBookingId),
       });
       queryClient.invalidateQueries({
+        queryKey: bookingsKeys.rescheduleDates(),
+      });
+      queryClient.invalidateQueries({
         queryKey: bookingsKeys.lists(),
       });
     }
@@ -695,6 +506,8 @@ export default function BookingCheckoutPage({
     setIsStripePaymentOpen(false);
     setPaymentDateId(null);
     setRescheduleRequest(null);
+    setRescheduleModalOpen(false);
+    setSelectedDateForReschedule(null);
   }, [bookingId, queryClient]);
 
   const submitPayment = (targetDates: CheckoutDate[]) => {
@@ -728,19 +541,24 @@ export default function BookingCheckoutPage({
   return (
     <div
       className="w-full min-w-0 lg:!pb-0"
-      style={{
-        "--booking-kind-table": "var(--color-info)",
-        "--booking-kind-ticket": "var(--chart-3)",
-        "--booking-kind-package": "var(--color-success)",
-        "--booking-kind-addon": "var(--color-warning)",
-        paddingBottom: hasMultipleDates
-          ? "calc(8.5rem + max(0.75rem, env(safe-area-inset-bottom, 0px)))"
-          : "max(1rem, env(safe-area-inset-bottom, 0px))",
-      } as CSSProperties}
+      style={
+        {
+          "--booking-kind-table": "var(--color-info)",
+          "--booking-kind-ticket": "var(--chart-3)",
+          "--booking-kind-package": "var(--color-success)",
+          "--booking-kind-addon": "var(--color-warning)",
+          paddingBottom: showPaymentFooter
+            ? "calc(8.5rem + max(0.75rem, env(safe-area-inset-bottom, 0px)))"
+            : "max(1rem, env(safe-area-inset-bottom, 0px))",
+        } as CSSProperties
+      }
     >
       <div
         className="overflow-hidden rounded-xl border border-border bg-card lg:rounded-b-none lg:border-b-0"
-        style={{ boxShadow: "0 1px 2px color-mix(in srgb, var(--foreground) 4%, transparent)" }}
+        style={{
+          boxShadow:
+            "0 1px 2px color-mix(in srgb, var(--foreground) 4%, transparent)",
+        }}
       >
         {/* Header card */}
         <header className="border-b border-border p-4 sm:p-6 lg:p-8">
@@ -769,16 +587,16 @@ export default function BookingCheckoutPage({
                     <span className="text-sm font-normal text-muted-foreground">
                       Booking #{bookingNumber}
                     </span>
-                    <span className="text-muted-foreground/50">·</span>
-                    <StatusBadge
-                      status={paymentStatus}
-                      label={
-                        paymentStatus.toLowerCase().includes("paid")
-                          ? "Paid"
-                          : undefined
-                      }
-                      className="text-[11px] font-semibold"
-                    />
+                    {(bookingStatus ?? paymentStatus).trim() ? (
+                      <>
+                        <span className="text-muted-foreground/50">·</span>
+                        <StatusBadge
+                          status={(bookingStatus ?? paymentStatus).trim()}
+                          showIcon={false}
+                          className="text-[11px] font-semibold"
+                        />
+                      </>
+                    ) : null}
                     {rescheduleStatus && (
                       <>
                         <span className="text-muted-foreground/50">·</span>
@@ -870,7 +688,7 @@ export default function BookingCheckoutPage({
                     addonItems={lineItemSections.addonItems}
                     addonTotal={lineItemSections.addonTotal}
                     addonLineCount={lineItemSections.addonLineCount}
-                    packageSectionTitle={selectedDate.package_title}
+                    packageSectionTitle={packageSectionTitle}
                     formatCurrency={formatCurrency}
                     canModifyAddOns={canModifyAddOns}
                     isMenuChoice={isMenuChoiceForDate}
@@ -896,9 +714,9 @@ export default function BookingCheckoutPage({
                     }
                     paymentStatus={selectedDate.addOnsPaymentStatus}
                     dateSource={selectedDate}
+                    packageTitleFallback={packageTitleFallback}
                     formatCurrency={formatCurrency}
                     formatUnit={formatUnit}
-                    onPendingTotalChange={handlePendingExtrasChange}
                   />
                 )}
 
@@ -926,112 +744,115 @@ export default function BookingCheckoutPage({
       <section
         className={cn(
           "border-t border-border bg-card",
-          hasMultipleDates
+          showPaymentFooter
             ? "max-lg:fixed max-lg:inset-x-0 max-lg:bottom-0 max-lg:z-40 max-lg:rounded-t-xl"
             : "max-lg:static max-lg:z-auto max-lg:rounded-none max-lg:shadow-none",
           "lg:overflow-hidden lg:border lg:rounded-b-xl",
         )}
-        style={{
-          ...(hasMultipleDates ? {
-            boxShadow: "0 -8px 24px color-mix(in srgb, var(--foreground) 10%, transparent), 0 -1px 0 var(--border)",
-          } : {}),
-        } as CSSProperties}
+        style={
+          {
+            ...(showPaymentFooter
+              ? {
+                  boxShadow:
+                    "0 -8px 24px color-mix(in srgb, var(--foreground) 10%, transparent), 0 -1px 0 var(--border)",
+                }
+              : {}),
+          } as CSSProperties
+        }
       >
-          <div className="flex items-center justify-between gap-3 border-b border-border bg-card p-4 py-3 pr-14 sm:p-6 sm:pr-6 lg:p-8 lg:pr-8 sm:py-3.5">
-            <p className="text-[10px] font-extrabold tracking-[0.18em] leading-none uppercase text-foreground">Payment Summary</p>
-            <button
-              type="button"
-              onClick={() => setBreakdownOpen((v) => !v)}
-              className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap text-xs font-semibold leading-none transition-opacity hover:opacity-85"
-              style={{ color: "var(--color-primary)" }}
-            >
-              {breakdownOpen ? "Hide Breakdown" : "Show Breakdown"}
-              {breakdownOpen ? (
-                <ChevronUp className="h-3.5 w-3.5" strokeWidth={2.25} />
-              ) : (
-                <ChevronDown className="h-3.5 w-3.5" strokeWidth={2.25} />
-              )}
-            </button>
-          </div>
+        <div className="flex items-center justify-between gap-3 border-b border-border bg-card p-4 py-3 pr-14 sm:p-6 sm:pr-6 lg:p-8 lg:pr-8 sm:py-3.5">
+          <p className="text-[10px] font-extrabold tracking-[0.18em] leading-none uppercase text-foreground">
+            Payment Summary
+          </p>
+          <button
+            type="button"
+            onClick={() => setBreakdownOpen((v) => !v)}
+            className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap text-xs font-semibold leading-none transition-opacity hover:opacity-85"
+            style={{ color: "var(--color-primary)" }}
+          >
+            {breakdownOpen ? "Hide Breakdown" : "Show Breakdown"}
+            {breakdownOpen ? (
+              <ChevronUp className="h-3.5 w-3.5" strokeWidth={2.25} />
+            ) : (
+              <ChevronDown className="h-3.5 w-3.5" strokeWidth={2.25} />
+            )}
+          </button>
+        </div>
 
-          {breakdownOpen && (
-            <div className="border-b border-border bg-card p-4 sm:p-6 lg:p-8 py-4 max-lg:max-h-[min(42vh,20rem)] max-lg:overflow-y-auto">
-              <div className="space-y-4">
-                <PaymentBreakdownDateAccordion
-                  groups={breakdownGroups}
-                  formatCurrency={formatCurrency}
-                  openDates={openBreakdownDates}
-                  onOpenDatesChange={setOpenBreakdownDates}
-                />
+        {breakdownOpen && (
+          <div className="border-b border-border bg-card p-4 sm:p-6 lg:p-8 py-4 max-lg:max-h-[min(42vh,20rem)] max-lg:overflow-y-auto">
+            <div className="space-y-4">
+              <PaymentBreakdownDateAccordion
+                groups={breakdownGroups}
+                formatCurrency={formatCurrency}
+                openDates={openBreakdownDates}
+                onOpenDatesChange={setOpenBreakdownDates}
+              />
 
-                <div className="space-y-2 rounded-lg border border-border bg-card px-4 py-3">
-                  <div className="flex justify-between text-sm">
-                    <span className="font-normal text-muted-foreground">
-                      Subtotal
-                    </span>
-                    <span className="font-semibold tabular-nums text-foreground">
-                      {formatCurrency(summary.subTotal + summary.addOns)}
-                    </span>
-                  </div>
-                  {summary.paid > 0 && (
-                    <div className="flex justify-between text-sm">
-                      <span className="text-muted-foreground">Paid</span>
-                      <span className="font-semibold text-foreground">
-                        {formatCurrency(summary.paid)}
-                      </span>
-                    </div>
-                  )}
-                  {summary.outstanding > 0 && (
-                    <div className="flex justify-between text-sm">
-                      <span className="text-muted-foreground">Outstanding</span>
-                      <span className="font-semibold text-foreground">
-                        {formatCurrency(summary.outstanding)}
-                      </span>
-                    </div>
-                  )}
-                </div>
-              </div>
+              <PaymentBreakdownTotals
+                subTotal={summary.subTotal}
+                addOns={summary.addOns}
+                paid={summary.paid}
+                outstanding={summary.outstanding}
+                formatCurrency={formatCurrency}
+              />
             </div>
-          )}
+          </div>
+        )}
 
-          {!hasMultipleDates ? null : (
+        {showPaymentFooter && (
           <div className="bg-foreground text-card p-4 sm:p-6 lg:p-8 py-4 lg:rounded-b-xl">
             <div className="flex items-center justify-between gap-4">
               <div>
                 <p
                   className="text-[10px] font-bold tracking-[0.18em] leading-none uppercase"
-                  style={{ color: "color-mix(in srgb, var(--card) 62%, transparent)" }}
+                  style={{
+                    color: "color-mix(in srgb, var(--card) 62%, transparent)",
+                  }}
                 >
                   {footerLabel}
                 </p>
                 <p className="mt-1 text-2xl font-extrabold tabular-nums tracking-tight text-card sm:text-[1.75rem]">
                   {formatCurrency(footerAmount)}
                 </p>
-                {showPayAll && payableDates.length > 1 && (
+                {payAllVisibility.showPayableDatesHint && (
                   <p className="mt-1 text-[11px] text-card/70">
                     {payableDates.length} dates with outstanding balance
                   </p>
                 )}
               </div>
-              {showFooterPayAll ? (
+              {payAllVisibility.showPayAllButton ? (
                 <Button
                   type="button"
                   size="lg"
                   className="h-11 shrink-0 rounded-lg px-7 text-sm font-bold shadow-none hover:opacity-[0.92]"
                   style={{
                     backgroundColor: "var(--color-primary)",
-                    color: "var(--color-primary-foreground, var(--primary-foreground))",
+                    color:
+                      "var(--color-primary-foreground, var(--primary-foreground))",
                   }}
                   onClick={handlePayAll}
                   disabled={paymentMutation.isPending}
                 >
                   {paymentMutation.isPending ? "Processing…" : "Pay All"}
                 </Button>
-              ) : isFullyPaid ? (
-                <div className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-emerald-400/80 bg-emerald-600 px-4 py-2 text-xs font-bold text-white shadow-sm">
-                  <CheckCircle2 className="h-3.5 w-3.5 shrink-0" strokeWidth={2.5} />
-                  Paid
-                </div>
+              ) : payableDates.length === 1 ? (
+                <Button
+                  type="button"
+                  size="lg"
+                  className="h-11 shrink-0 rounded-lg px-7 text-sm font-bold shadow-none hover:opacity-[0.92]"
+                  style={{
+                    backgroundColor: "var(--color-primary)",
+                    color:
+                      "var(--color-primary-foreground, var(--primary-foreground))",
+                  }}
+                  onClick={() => handlePayForDate(payableDates[0].id)}
+                  disabled={paymentMutation.isPending}
+                >
+                  {paymentMutation.isPending
+                    ? "Processing…"
+                    : `Pay ${formatCurrency(bookingOutstanding)}`}
+                </Button>
               ) : (
                 <StatusBadge
                   status={paymentStatus}
@@ -1043,8 +864,8 @@ export default function BookingCheckoutPage({
               )}
             </div>
           </div>
-          )}
-        </section>
+        )}
+      </section>
 
       {paymentDate && (
         <SingleDatePaymentModal
@@ -1080,7 +901,11 @@ export default function BookingCheckoutPage({
           bookingId={numericBookingId}
           bookingDateId={selectedDateForReschedule.booking_date_id}
           hasAddons={dateHasAddons(selectedDateForReschedule)}
+          packageSectionTitle={resolvePackageSectionTitle(
+            selectedDateForReschedule,
+          )}
           isProcessing={rescheduleMutation.isPending}
+          bookingPaymentGateways={paymentGateways}
           onConfirm={handleRescheduleConfirm}
         />
       )}
