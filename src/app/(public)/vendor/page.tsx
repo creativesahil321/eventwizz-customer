@@ -9,6 +9,7 @@ import GoogleLocationMap from "./_components/LocationPage/location-map-google";
 import Image from "next/image";
 import { motion } from "framer-motion";
 import SubscribeSection from "./_components/EventListPage/subscribe";
+import FooterSection from "./_components/EventListPage/footer";
 import { Map, LayoutGrid } from "lucide-react";
 import { SiteHeading } from "@/components/public/site-heading";
 import { normalizeHeadingEmphasis } from "@/lib/heading-emphasis";
@@ -291,30 +292,10 @@ export default function VendorSiteHomePage() {
 
       <SubscribeSection />
 
-      <motion.footer
-        className="relative z-10 border-t border-[color:color-mix(in_srgb,var(--color-text)_10%,transparent)] bg-[var(--color-footer)] py-8 text-[var(--color-on-footer)]"
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ delay: 0.35, duration: 0.4 }}
-      >
-        <div className="container mx-auto flex flex-col items-center justify-between gap-4 px-6 md:flex-row">
-          <p className="text-sm opacity-90">
-            {settings?.copyright || "© 2023 EventWizz. All rights reserved."}
-          </p>
-
-          <div className="flex flex-wrap justify-center gap-6 text-sm">
-            {["Privacy Policy", "Terms of Service", "Contact"].map((link) => (
-              <a
-                key={link}
-                href="#"
-                className="opacity-85 transition-opacity hover:opacity-100"
-              >
-                {link}
-              </a>
-            ))}
-          </div>
-        </div>
-      </motion.footer>
+      <FooterSection
+        copyright={settings?.copyright}
+        logo={settings?.logo}
+      />
     </div>
   );
 }

@@ -15,7 +15,7 @@ import { Notification as ApiNotification } from "@/services/common/notification/
 
 const dynamicCategoryFilter = [
   { id: 1, title: "Customer", value: "customer" },
-  { id: 2, title: "Order", value: "order" },
+  { id: 2, title: "Booking", value: "order" },
   { id: 3, title: "Payment", value: "payment" },
   { id: 4, title: "Account", value: "account" },
   { id: 5, title: "Event", value: "event" },

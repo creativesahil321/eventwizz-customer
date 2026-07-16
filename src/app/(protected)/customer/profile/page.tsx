@@ -299,7 +299,7 @@ export default function ProfilePage() {
 
                 <div>
                   <FormLabel htmlFor="phone" className="block mb-2 text-black">
-                    Phone
+                    Telephone number
                   </FormLabel>
                   <Input
                     id="phone"
@@ -357,7 +357,7 @@ export default function ProfilePage() {
                 htmlFor="username"
                 className="block mb-2 font-medium text-black"
               >
-                User Name
+                Username
               </label>
               <Input
                 id="username"

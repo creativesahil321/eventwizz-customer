@@ -443,7 +443,7 @@ export default function BookingInfoTab({ bookingData }: BookingInfoTabProps) {
           return;
         }
 
-        toast.success(response.message || "Payment processed successfully!");
+        toast.success(response.message || "Payment processed successfully.");
         setSingleDatePaymentModalOpen(false);
         setSelectedDateForPayment(null);
         setSelectedRescheduleRequest(null);
@@ -1988,7 +1988,7 @@ export default function BookingInfoTab({ bookingData }: BookingInfoTabProps) {
           setIsStripePaymentOpen(open);
           if (!open && stripePaymentSession) {
             toast.message("Payment not completed", {
-              description: `Booking ${stripePaymentSession.bookingNumber} — tap Pay when you're ready to continue.`,
+              description: `Booking ${stripePaymentSession.bookingNumber} — select Pay when you’re ready to continue.`,
             });
           }
           if (!open) {

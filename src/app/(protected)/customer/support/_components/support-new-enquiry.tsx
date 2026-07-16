@@ -50,11 +50,15 @@ export default function SupportNewEnquiry() {
   const [description, setDescription] = useState("");
   const [attachments, setAttachments] = useState<File[]>([]);
 
+  const showBookingDetails = category === "general_support";
+
   const { data: locationsResponse, isLoading: isLoadingLocations } =
-    useCustomerSupportLocations();
+    useCustomerSupportLocations({ enabled: showBookingDetails });
   const { data: bookingsResponse, isLoading: isLoadingBookings } =
     useCustomerSupportLocationBookings(
-      bookingLocation !== NONE_LOCATION ? bookingLocation : null
+      showBookingDetails && bookingLocation !== NONE_LOCATION
+        ? bookingLocation
+        : null
     );
 
   const contactNumberValue = contactNumber || customer.phone || "";
@@ -76,6 +80,14 @@ export default function SupportNewEnquiry() {
       })),
     [bookingsResponse?.data]
   );
+
+  const handleCategoryChange = (value: SupportCategory) => {
+    setCategory(value);
+    if (value === "technical_support") {
+      setBookingLocation(NONE_LOCATION);
+      setBooking(NONE_BOOKING);
+    }
+  };
 
   const handleLocationChange = (locationId: string) => {
     setBookingLocation(locationId);
@@ -102,20 +114,22 @@ export default function SupportNewEnquiry() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!subject.trim() || !description.trim()) {
-      toast.error("Please fill in the subject and description.");
+      toast.error("Please enter a subject and description.");
       return;
     }
     if (!contactNumberValue.trim()) {
-      toast.error("Please enter your contact number.");
+      toast.error("Please enter your telephone number.");
       return;
     }
 
     const vendorLocationId =
-      bookingLocation !== NONE_LOCATION
+      showBookingDetails && bookingLocation !== NONE_LOCATION
         ? Number.parseInt(bookingLocation, 10)
         : null;
     const bookingId =
-      booking !== NONE_BOOKING ? Number.parseInt(booking, 10) : null;
+      showBookingDetails && booking !== NONE_BOOKING
+        ? Number.parseInt(booking, 10)
+        : null;
 
     try {
       const response = await createTicket.mutateAsync({
@@ -154,14 +168,14 @@ export default function SupportNewEnquiry() {
       <div className="min-w-0 overflow-hidden rounded-xl border border-[var(--color-border)] bg-white">
         <div className="border-b border-[var(--color-border)] px-4 py-4 sm:px-5 sm:py-5">
           <p className="text-xs font-semibold uppercase tracking-wider text-[var(--color-primary)]">
-            Start a conversation
+            Support enquiry
           </p>
           <h2 className="mt-1 text-xl font-semibold text-foreground">
-            Tell us what&apos;s going on
+            How can we help?
           </h2>
           <p className="mt-1 break-words text-sm text-muted-foreground">
-            Choose the right category so we can route your message to the team
-            that can help fastest.
+            Please choose a category so we can send your enquiry to the right
+            team.
           </p>
         </div>
         <div className="min-w-0 p-4 sm:p-5">
@@ -170,7 +184,7 @@ export default function SupportNewEnquiry() {
               <Label htmlFor="subject">Subject</Label>
               <Input
                 id="subject"
-                placeholder="e.g. Wrong seat allocation for Saturday's show"
+                placeholder="e.g. Unable to view my booking for Saturday"
                 value={subject}
                 onChange={(e) => setSubject(e.target.value)}
                 className="h-11 min-w-0 max-w-full bg-gray-50"
@@ -182,27 +196,29 @@ export default function SupportNewEnquiry() {
                 <Label>Category</Label>
                 <Select
                   value={category}
-                  onValueChange={(v) => setCategory(v as SupportCategory)}
+                  onValueChange={(v) =>
+                    handleCategoryChange(v as SupportCategory)
+                  }
                 >
                   <SelectTrigger className="h-11 bg-gray-50">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="general_support">
-                      General Support
+                      Event & booking support
                     </SelectItem>
                     <SelectItem value="technical_support">
-                      Technical Support
+                      Account & technical support
                     </SelectItem>
                   </SelectContent>
                 </Select>
               </div>
               <div className="min-w-0 space-y-2">
-                <Label htmlFor="contactNumber">Contact number</Label>
+                <Label htmlFor="contactNumber">Telephone number</Label>
                 <Input
                   id="contactNumber"
                   type="tel"
-                  placeholder="e.g. +44 7700 900123"
+                  placeholder="e.g. 07700 900123"
                   value={contactNumberValue}
                   onChange={(e) => setContactNumber(e.target.value)}
                   className="h-11 min-w-0 max-w-full bg-gray-50"
@@ -210,79 +226,83 @@ export default function SupportNewEnquiry() {
               </div>
             </div>
 
-            <div className="min-w-0 space-y-3 rounded-lg border border-[var(--color-border)] bg-slate-50/40 p-4">
-              <div>
-                <p className="text-sm font-medium text-foreground">
-                  Booking details{" "}
-                  <span className="font-normal text-muted-foreground">
-                    (optional)
-                  </span>
-                </p>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  Skip this for account, login, or password questions. Only fill
-                  it in when your enquiry is about a specific event or venue.
-                </p>
-              </div>
+            {showBookingDetails ? (
+              <div className="min-w-0 space-y-3 rounded-lg border border-[var(--color-border)] bg-slate-50/40 p-4">
+                <div>
+                  <p className="text-sm font-medium text-foreground">
+                    Booking details{" "}
+                    <span className="font-normal text-muted-foreground">
+                      (optional)
+                    </span>
+                  </p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Only complete this if your enquiry relates to a specific
+                    booking or venue. Leave blank for account or login issues.
+                  </p>
+                </div>
 
-              <div className="grid min-w-0 gap-5 sm:grid-cols-2">
-                <div className="min-w-0 space-y-2">
-                  <Label>Booking location</Label>
-                  <Select
-                    value={bookingLocation}
-                    onValueChange={handleLocationChange}
-                    disabled={isLoadingLocations}
-                  >
-                    <SelectTrigger className="h-11 bg-gray-50">
-                      <SelectValue
-                        placeholder={
-                          isLoadingLocations
-                            ? "Loading venues…"
-                            : "Optional — select a venue"
-                        }
-                      />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value={NONE_LOCATION}>
-                        Not related to a venue
-                      </SelectItem>
-                      {locationOptions.map((location) => (
-                        <SelectItem key={location.id} value={location.id}>
-                          {location.name}
+                <div className="grid min-w-0 gap-5 sm:grid-cols-2">
+                  <div className="min-w-0 space-y-2">
+                    <Label>Venue</Label>
+                    <Select
+                      value={bookingLocation}
+                      onValueChange={handleLocationChange}
+                      disabled={isLoadingLocations}
+                    >
+                      <SelectTrigger className="h-11 bg-gray-50">
+                        <SelectValue
+                          placeholder={
+                            isLoadingLocations
+                              ? "Loading venues…"
+                              : "Select a venue (optional)"
+                          }
+                        />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value={NONE_LOCATION}>
+                          No venue selected
                         </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="min-w-0 space-y-2">
-                  <Label>Related booking</Label>
-                  <Select
-                    value={booking}
-                    onValueChange={setBooking}
-                    disabled={bookingSelectDisabled}
-                  >
-                    <SelectTrigger className="h-11 bg-gray-50">
-                      <SelectValue
-                        placeholder={
-                          bookingLocation === NONE_LOCATION
-                            ? "Select a venue first"
-                            : isLoadingBookings
-                              ? "Loading bookings…"
-                              : "Optional — link a booking"
-                        }
-                      />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value={NONE_BOOKING}>None</SelectItem>
-                      {bookingOptions.map((opt) => (
-                        <SelectItem key={opt.id} value={opt.id}>
-                          {opt.label}
+                        {locationOptions.map((location) => (
+                          <SelectItem key={location.id} value={location.id}>
+                            {location.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="min-w-0 space-y-2">
+                    <Label>Booking</Label>
+                    <Select
+                      value={booking}
+                      onValueChange={setBooking}
+                      disabled={bookingSelectDisabled}
+                    >
+                      <SelectTrigger className="h-11 bg-gray-50">
+                        <SelectValue
+                          placeholder={
+                            bookingLocation === NONE_LOCATION
+                              ? "Please select a venue first"
+                              : isLoadingBookings
+                                ? "Loading bookings…"
+                                : "Select a booking (optional)"
+                          }
+                        />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value={NONE_BOOKING}>
+                          No booking selected
                         </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                        {bookingOptions.map((opt) => (
+                          <SelectItem key={opt.id} value={opt.id}>
+                            {opt.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
               </div>
-            </div>
+            ) : null}
 
             <div className="space-y-2">
               <Label>Priority</Label>
@@ -309,7 +329,7 @@ export default function SupportNewEnquiry() {
               <Label htmlFor="description">Description</Label>
               <Textarea
                 id="description"
-                placeholder="Share as much detail as possible — what happened, when, and what you'd like us to do."
+                placeholder="Please include as much detail as you can — what happened, when it occurred, and how we can help."
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 className="max-h-[320px] min-h-[140px] min-w-0 max-w-full resize-y overflow-x-hidden bg-gray-50"
@@ -320,11 +340,11 @@ export default function SupportNewEnquiry() {
               <div className="rounded-lg border border-dashed border-[var(--color-border)] bg-gray-50/50 p-6 text-center sm:p-8">
                 <Paperclip className="mx-auto size-8 text-muted-foreground" />
                 <p className="mt-2 text-sm font-medium text-foreground">
-                  Drag and drop, or browse
+                  Drag and drop files here, or choose files to upload
                 </p>
                 <p className="mt-1 text-xs text-muted-foreground">
-                  PDF, PNG, JPG — up to 10 MB each, max {MAX_SUPPORT_ATTACHMENTS}{" "}
-                  files
+                  PDF, PNG or JPG. Maximum 10 MB per file (up to{" "}
+                  {MAX_SUPPORT_ATTACHMENTS} files).
                 </p>
                 <input
                   ref={fileInputRef}
@@ -342,7 +362,7 @@ export default function SupportNewEnquiry() {
                   disabled={attachments.length >= MAX_SUPPORT_ATTACHMENTS}
                   onClick={() => fileInputRef.current?.click()}
                 >
-                  Browse files
+                  Choose files
                 </Button>
               </div>
 
@@ -379,7 +399,7 @@ export default function SupportNewEnquiry() {
 
             <div className="flex min-w-0 flex-col-reverse gap-3 pt-2 sm:flex-row sm:items-center sm:justify-between">
               <p className="break-words text-xs text-muted-foreground">
-                By submitting you agree to our support terms.
+                By submitting this form, you agree to our support terms.
               </p>
               <Button
                 type="submit"
@@ -388,7 +408,7 @@ export default function SupportNewEnquiry() {
                 className="w-full sm:w-auto"
               >
                 <Send className="size-4" />
-                {isSubmitting ? "Submitting..." : "Submit enquiry"}
+                {isSubmitting ? "Sending…" : "Submit enquiry"}
               </Button>
             </div>
           </form>

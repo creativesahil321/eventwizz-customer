@@ -254,7 +254,10 @@ export default function VendorSupportDashboard() {
                             {conversation.customerName}
                           </p>
                           <div className="mt-2 flex flex-wrap items-center gap-1.5">
-                            <StatusBadge status={conversation.status} />
+                            <StatusBadge
+                              status={conversation.status}
+                              label={conversation.statusLabel}
+                            />
                             <PriorityBadge priority={conversation.priority} />
                             <span className="text-[11px] text-muted-foreground">
                               {conversation.ref}

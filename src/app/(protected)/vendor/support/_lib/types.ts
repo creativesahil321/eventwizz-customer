@@ -49,6 +49,8 @@ export interface VendorSupportConversation {
   direction: VendorTicketDirection;
   bookingRef?: string;
   bookingTitle?: string;
+  bookingDate?: string;
+  bookingLocation?: string;
   openedAt: string;
   closedAt?: string;
   lastMessage: string;

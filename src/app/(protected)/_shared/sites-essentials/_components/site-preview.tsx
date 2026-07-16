@@ -6,7 +6,6 @@ import { SiteEssentialsFormValues } from "../_lib/schema";
 import CommonHeader from "@/components/shared/common-header";
 import HeroBanner from "@/app/(public)/vendor/_components/EventListPage/hero-banner";
 import ExperienceSection from "@/app/(public)/vendor/_components/EventListPage/experience";
-import ContactFormSection from "@/app/(public)/vendor/_components/EventListPage/contact-form-section";
 import FooterSection from "@/app/(public)/vendor/_components/EventListPage/footer";
 import { LocationMarketingBody } from "@/components/public/location-marketing-sections";
 import { siteEssentialsToPreviewRootStyle } from "../_lib/preview-root-style";
@@ -98,7 +97,6 @@ export function SitePreview({ formValues }: Readonly<SitePreviewProps>) {
         locationSlug={locationSlug}
         locationLabel={formValues.name?.trim() || null}
       />
-      <ContactFormSection />
       <FooterSection
         copyright={formValues.copyright}
         logo={getPreviewUrl(formValues.logo) || null}

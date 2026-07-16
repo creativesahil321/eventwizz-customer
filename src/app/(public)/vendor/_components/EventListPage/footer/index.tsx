@@ -7,26 +7,172 @@ import {
   Linkedin,
   MapPin,
   Phone,
-  Send,
+  Mail,
   Twitter,
   Youtube,
 } from "lucide-react";
-import { useContext } from "react";
+import { useContext, useMemo, type ReactNode } from "react";
 import { ServerContext } from "@/lib/server-context";
 import { ThemeSchema } from "@/types/theme.types";
 import { addCacheBusting } from "@/lib/image-utils";
+import {
+  buildMapsDirectionsUrl,
+  resolveFooterContactBlocks,
+  type ResolvedVenueContact,
+  type VenueContactOverride,
+} from "@/lib/resolve-venue-contact";
 
 interface FooterSectionProps {
   copyright?: string | null;
   logo?: string | null;
+  /** When set, show that location's contact alongside head office */
+  locationSlug?: string | null;
+  /** Optional fields from location/event API (merged over theme) */
+  contactOverride?: VenueContactOverride | null;
+}
+
+function SocialRow({
+  links,
+  align = "start",
+}: {
+  links: Array<{ icon: typeof Facebook; href: string; id: string }>;
+  align?: "start" | "center";
+}) {
+  if (links.length === 0) return null;
+
+  return (
+    <div
+      className={`flex gap-2.5 ${align === "center" ? "justify-center" : ""}`}
+    >
+      {links.map(({ icon: Icon, href, id }) => (
+        <Link
+          key={id}
+          href={href}
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label={id}
+          className="flex h-8 w-8 items-center justify-center rounded-full border border-[color:color-mix(in_srgb,var(--color-on-footer)_15%,transparent)] text-[var(--color-on-footer)]/70 transition-colors hover:border-[color:var(--color-primary)] hover:text-[color:var(--color-primary)]"
+        >
+          <Icon size={14} />
+        </Link>
+      ))}
+    </div>
+  );
+}
+
+function ContactColumn({
+  label,
+  href,
+  icon: Icon,
+  children,
+  external,
+  align = "start",
+}: {
+  label: string;
+  href: string;
+  icon: typeof Phone;
+  children: ReactNode;
+  external?: boolean;
+  align?: "start" | "center";
+}) {
+  const centered = align === "center";
+  const valueClass =
+    "mt-2.5 block text-sm font-normal leading-snug text-[var(--color-on-footer)] transition-colors group-hover:text-[color:var(--color-primary)] md:text-base";
+
+  const body = (
+    <>
+      <span
+        className={`flex items-center gap-2 text-sm font-bold uppercase tracking-[0.16em] text-[var(--color-on-footer)]/65 ${
+          centered ? "justify-center" : ""
+        }`}
+      >
+        <Icon
+          className="h-4 w-4 text-[color:var(--color-primary)]"
+          aria-hidden
+        />
+        {label}
+      </span>
+      <span className={`${valueClass} ${centered ? "text-center" : ""}`}>
+        {children}
+      </span>
+    </>
+  );
+
+  if (external) {
+    return (
+      <a
+        href={href}
+        target="_blank"
+        rel="noopener noreferrer"
+        className={`group block min-w-0 ${centered ? "text-center" : ""}`}
+      >
+        {body}
+      </a>
+    );
+  }
+
+  return (
+    <Link
+      href={href}
+      className={`group block min-w-0 ${centered ? "text-center" : ""}`}
+    >
+      {body}
+    </Link>
+  );
+}
+
+function ContactLines({ contact }: { contact: ResolvedVenueContact }) {
+  return (
+    <div className="flex flex-col gap-2.5">
+      {contact.phone ? (
+        <Link
+          href={`tel:${contact.phone}`}
+          className="inline-flex items-start gap-2 text-sm text-[var(--color-on-footer)]/80 transition-colors hover:text-[color:var(--color-primary)]"
+        >
+          <Phone
+            className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[color:var(--color-primary)]"
+            aria-hidden
+          />
+          <span className="break-words">{contact.phone}</span>
+        </Link>
+      ) : null}
+      {contact.address ? (
+        <a
+          href={buildMapsDirectionsUrl(contact.address)}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-start gap-2 text-sm text-[var(--color-on-footer)]/80 transition-colors hover:text-[color:var(--color-primary)] hover:underline hover:underline-offset-2"
+        >
+          <MapPin
+            className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[color:var(--color-primary)]"
+            aria-hidden
+          />
+          <span className="break-words">{contact.address}</span>
+        </a>
+      ) : null}
+      {contact.email ? (
+        <Link
+          href={`mailto:${contact.email}`}
+          className="inline-flex items-start gap-2 text-sm text-[var(--color-on-footer)]/80 transition-colors hover:text-[color:var(--color-primary)]"
+        >
+          <Mail
+            className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[color:var(--color-primary)]"
+            aria-hidden
+          />
+          <span className="break-words">{contact.email}</span>
+        </Link>
+      ) : null}
+    </div>
+  );
 }
 
 export default function FooterSection({
   copyright,
   logo,
+  locationSlug,
+  contactOverride,
 }: FooterSectionProps = {}) {
   const { theme } = useContext(ServerContext);
-  // Cast theme to our known structure
   const vendorTheme = theme as ThemeSchema;
 
   const logoToUse = logo || theme?.logo;
@@ -38,10 +184,8 @@ export default function FooterSection({
     logoToUse?.startsWith("blob")
       ? logoToUse
       : "/assets/images/logos/eventwizz-logo.png";
-  // Current year for copyright
   const currentYear = new Date().getFullYear();
 
-  // Social media icon mapping
   const socialIcons = {
     facebook: Facebook,
     twitter: Twitter,
@@ -50,134 +194,145 @@ export default function FooterSection({
     youtube: Youtube,
   } as const;
 
-  // Prepare social links from theme data
   const socialLinks = Object.entries(vendorTheme?.socialLinks || {})
     .filter(([, url]) => url && url.trim() !== "")
     .map(([platform, url]) => {
       const IconComponent = socialIcons[platform as keyof typeof socialIcons];
       if (!IconComponent) return null;
-      return {
-        icon: IconComponent,
-        href: url,
-        id: platform,
-      };
+      return { icon: IconComponent, href: url, id: platform };
     })
     .filter(
       (link): link is { icon: typeof Facebook; href: string; id: string } =>
-        link !== null
+        link !== null,
     );
 
-  // Prepare contact sections
-  const contactDetails = (
-    vendorTheme as ThemeSchema & {
-      contactDetails?: {
-        phoneNumber?: string;
-        email?: string;
-        address?: string;
-        alternativeAddress?: string;
-      };
-    }
-  )?.contactDetails;
+  const contactBlocks = useMemo(
+    () =>
+      resolveFooterContactBlocks({
+        theme: vendorTheme,
+        locationSlug,
+        override: contactOverride,
+      }),
+    [vendorTheme, locationSlug, contactOverride],
+  );
 
-  const contactSections = [
-    {
-      icon: Phone,
-      heading: "Phone Number:",
-      link: `tel:${contactDetails?.phoneNumber || "+1 (123) 456-7890"}`,
-      linkText: contactDetails?.phoneNumber || "+1 (123) 456-7890",
-    },
-    {
-      icon: MapPin,
-      heading: "Get Directions:",
-      textOne: contactDetails?.address || "123 Main St",
-      textTwo: contactDetails?.alternativeAddress || "City, Country",
-    },
-    {
-      icon: Send,
-      heading: "Email Address:",
-      link: `mailto:${contactDetails?.email || "info@eventwizz.com"}`,
-      linkText: contactDetails?.email || "info@eventwizz.com",
-    },
-  ];
+  const isMainPageFooter = !locationSlug && contactBlocks.length <= 1;
+  const singleContact = isMainPageFooter ? contactBlocks[0]?.contact : null;
+
+  const copyrightText =
+    copyright ||
+    vendorTheme?.copyright ||
+    `© ${currentYear} ${vendorTheme?.name || "EventWizz"}. All rights reserved.`;
 
   return (
-    <section className="px-4 py-10 bg-[color:var(--color-footer)] text-[var(--color-on-footer)]">
-      <div className="max-w-7xl mx-auto text-center pb-6">
-        <Link href="/">
-          <div className="h-20 flex items-center justify-center">
-            <img
-              src={addCacheBusting(logoPath)}
-              className="max-h-12 w-auto object-contain"
-              alt={vendorTheme?.name || "EventWizz"}
-            />
-          </div>
-        </Link>
-        {socialLinks.length > 0 && (
-          <div className="flex justify-center gap-4 my-5">
-            {socialLinks.map(({ icon: Icon, href, id }) => (
-              <Link
-                key={id}
-                href={href}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="hover:text-[color:var(--color-primary)] transition-colors"
-              >
-                <Icon size={20} />
-              </Link>
-            ))}
-          </div>
-        )}
-      </div>
-      <div className="max-w-7xl mx-auto py-8 grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-8">
-        {contactSections.map(
-          (
-            { icon: Icon, heading, link, linkText, textOne, textTwo },
-            index
-          ) => (
-            <div
-              key={index}
-              className="flex gap-3 md:gap-4 justify-start items-start px-4 md:px-0"
-            >
-              <Icon
-                className="mt-0.5 flex-shrink-0 text-[color:var(--color-primary)]"
-                size={20}
+    <footer className="bg-[color:var(--color-footer)] text-[var(--color-on-footer)]">
+      {isMainPageFooter ? (
+        /* Main page: centered brand + contact columns */
+        <div className="mx-auto max-w-7xl px-6 py-12 md:py-14">
+          <div className="flex flex-col items-center text-center">
+            <Link href="/" className="inline-flex">
+              <img
+                src={addCacheBusting(logoPath)}
+                className="h-10 w-auto object-contain"
+                alt={vendorTheme?.name || "EventWizz"}
               />
-              <div className="flex-1 min-w-0">
-                <h6 className="font-bold text-sm md:text-base mb-1">
-                  {heading}
-                </h6>
-                {link ? (
-                  <Link
-                    href={link}
-                    className="text-sm md:text-base break-words hover:text-[color:var(--color-primary)] transition-colors block"
+            </Link>
+            <div className="mt-5">
+              <SocialRow links={socialLinks} align="center" />
+            </div>
+
+            {singleContact &&
+            (singleContact.phone ||
+              singleContact.address ||
+              singleContact.email) ? (
+              <div className="mt-10 grid w-full max-w-3xl grid-cols-1 gap-8 sm:grid-cols-3 sm:gap-6">
+                {singleContact.phone ? (
+                  <ContactColumn
+                    label="Phone"
+                    href={`tel:${singleContact.phone}`}
+                    icon={Phone}
+                    align="center"
                   >
-                    {linkText}
-                  </Link>
-                ) : (
-                  <p className="text-sm md:text-base break-words">
-                    {textOne}
-                    {textTwo && (
-                      <>
-                        <br />
-                        {textTwo}
-                      </>
-                    )}
-                  </p>
-                )}
+                    {singleContact.phone}
+                  </ContactColumn>
+                ) : null}
+                {singleContact.address ? (
+                  <ContactColumn
+                    label="Visit us"
+                    href={buildMapsDirectionsUrl(singleContact.address)}
+                    icon={MapPin}
+                    external
+                    align="center"
+                  >
+                    {singleContact.address}
+                  </ContactColumn>
+                ) : null}
+                {singleContact.email ? (
+                  <ContactColumn
+                    label="Email"
+                    href={`mailto:${singleContact.email}`}
+                    icon={Mail}
+                    align="center"
+                  >
+                    {singleContact.email}
+                  </ContactColumn>
+                ) : null}
+              </div>
+            ) : null}
+          </div>
+        </div>
+      ) : (
+        /* Location / event pages: brand + labeled venue columns */
+        <div className="mx-auto max-w-7xl px-6 py-12">
+          <div className="grid grid-cols-1 gap-10 md:grid-cols-12 md:gap-8">
+            <div className="md:col-span-4">
+              <Link href="/" className="inline-flex">
+                <img
+                  src={addCacheBusting(logoPath)}
+                  className="h-10 w-auto object-contain"
+                  alt={vendorTheme?.name || "EventWizz"}
+                />
+              </Link>
+              <div className="mt-5">
+                <SocialRow links={socialLinks} />
               </div>
             </div>
-          )
-        )}
+
+            {contactBlocks.length > 0 && (
+              <div className="md:col-span-8">
+                <div
+                  className={`grid grid-cols-1 gap-8 ${
+                    contactBlocks.length >= 2
+                      ? "sm:grid-cols-2"
+                      : "sm:grid-cols-1 sm:max-w-sm"
+                  }`}
+                >
+                  {contactBlocks.map((block) => (
+                    <div key={block.id}>
+                      <h6 className="mb-3 text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--color-on-footer)]/45">
+                        {block.label}
+                      </h6>
+                      <ContactLines contact={block.contact} />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      <div className="border-t border-[color:color-mix(in_srgb,var(--color-on-footer)_10%,transparent)]">
+        <div className="mx-auto max-w-7xl px-6 py-4">
+          <p
+            className={`text-xs text-[var(--color-on-footer)]/55 ${
+              isMainPageFooter ? "text-center" : ""
+            }`}
+          >
+            {copyrightText}
+          </p>
+        </div>
       </div>
-      <div className="max-w-7xl mx-auto pt-6 text-center text-[var(--color-on-footer)]/75">
-        <p className="text-sm md:text-base">
-          {copyright ||
-            vendorTheme?.copyright ||
-            `© ${currentYear} ${
-              vendorTheme?.name || "EventWizz"
-            }. All rights reserved.`}
-        </p>
-      </div>
-    </section>
+    </footer>
   );
 }

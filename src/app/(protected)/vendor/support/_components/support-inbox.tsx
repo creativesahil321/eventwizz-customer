@@ -53,6 +53,7 @@ import {
   type VendorSupportTicketsParams,
 } from "@/services/vendor/support";
 import { cn } from "@/lib/utils";
+import { resolveSupportUnreadCount } from "@/app/(protected)/_shared/support/support-unread-count";
 
 const CHAT_MESSAGES_PER_PAGE = 30;
 
@@ -607,6 +608,7 @@ export default function VendorSupportInbox({
   );
 
   const inboxCount = data?.inbox_count ?? data?.meta.total ?? conversations.length;
+  const unreadCount = resolveSupportUnreadCount(data?.unread_count, data?.data);
 
   const selectedFallback = useMemo(() => {
     if (!selectedId) return undefined;
@@ -640,6 +642,11 @@ export default function VendorSupportInbox({
                 <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-slate-100 px-1.5 text-[11px] font-semibold text-muted-foreground">
                   {inboxCount}
                 </span>
+                {unreadCount > 0 ? (
+                  <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-[var(--color-primary)] px-1.5 text-[11px] font-semibold text-white">
+                    {unreadCount} unread
+                  </span>
+                ) : null}
                 {isFetching && !isLoading ? (
                   <Loader2 className="size-3.5 animate-spin text-muted-foreground" />
                 ) : null}

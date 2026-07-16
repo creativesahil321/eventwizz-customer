@@ -65,7 +65,7 @@ export function NotificationsDataTable({
     <section className="relative w-full min-w-0 space-y-4 text-black sm:space-y-6">
       <ProtectedPageHeader
         title="Notifications"
-        description="Stay updated with alerts and account activity"
+        description="View alerts and account activity"
         actions={
           <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row sm:items-center">
             <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:gap-2">
@@ -79,7 +79,7 @@ export function NotificationsDataTable({
                 }
               >
                 <SelectTrigger className="h-10 w-full sm:w-[180px]">
-                  <SelectValue placeholder="All Status" />
+                  <SelectValue placeholder="All statuses" />
                 </SelectTrigger>
                 <SelectContent>
                   {NOTIFICATION_STATUSES.map((status) => (

@@ -89,6 +89,9 @@ export default function VendorConversationHeader({
               {conversation.ref}
               {conversation.bookingRef
                 ? ` · Booking ${conversation.bookingRef}`
+                : ""}
+              {conversation.bookingLocation
+                ? ` · ${conversation.bookingLocation}`
                 : ""}{" "}
               · Opened {formatOpenedAt(conversation.openedAt)}
             </p>

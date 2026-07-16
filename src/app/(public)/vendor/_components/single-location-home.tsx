@@ -3,7 +3,6 @@
 import CommonHeader from "@/components/shared/common-header";
 import HeroBanner from "./EventListPage/hero-banner";
 import ExperienceSection from "./EventListPage/experience";
-import ContactFormSection from "./EventListPage/contact-form-section";
 import FooterSection from "./EventListPage/footer";
 import { LocationMarketingBody } from "@/components/public/location-marketing-sections";
 import { useQuery } from "@tanstack/react-query";
@@ -45,7 +44,7 @@ export function SingleLocationHome({
   if (isLoading || !locationData) {
     return (
       <div className="min-h-screen bg-[var(--color-background)]">
-        <CommonHeader variant="default" />
+        <CommonHeader variant="default" locationSlug={slug} />
         <Skeleton className="mx-auto mt-16 aspect-[21/9] max-w-full" />
         <div className="container mx-auto max-w-7xl space-y-6 px-4 py-12">
           <Skeleton className="h-8 w-64" />
@@ -62,7 +61,7 @@ export function SingleLocationHome({
 
   return (
     <>
-      <CommonHeader variant="default" />
+      <CommonHeader variant="default" locationSlug={slug} />
       <HeroBanner
         locationName={locationData.city || settings?.name || ""}
         coverImage={locationData.cover_image}
@@ -93,10 +92,16 @@ export function SingleLocationHome({
         locationSlug={slug}
         locationLabel={locationData.city ?? null}
       />
-      <ContactFormSection />
       <FooterSection
         copyright={settings?.copyright}
         logo={settings?.logo}
+        locationSlug={slug}
+        contactOverride={{
+          address: locationData.address,
+          email: locationData.email,
+          phone: locationData.phone,
+          phone_number: locationData.phone_number,
+        }}
       />
     </>
   );

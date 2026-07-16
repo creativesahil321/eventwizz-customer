@@ -3,6 +3,7 @@ import {
   PRIORITY_LABELS,
   getPriorityClass,
   getStatusClass,
+  getStatusLabel,
   normalizeSupportStatus,
 } from "../_lib/utils";
 import { cn } from "@/lib/utils";
@@ -40,7 +41,7 @@ interface StatusBadgeProps {
 
 export function StatusBadge({ status, label, className }: StatusBadgeProps) {
   const safeStatus = normalizeSupportStatus(status);
-  const text = label?.trim();
+  const text = getStatusLabel(safeStatus, label);
 
   return (
     <span
@@ -50,7 +51,7 @@ export function StatusBadge({ status, label, className }: StatusBadgeProps) {
         className,
       )}
     >
-      {text || "—"}
+      {text}
     </span>
   );
 }

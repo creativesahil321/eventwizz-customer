@@ -160,7 +160,7 @@ export default function BookingCard({
         {/* Price */}
         <div className="flex items-center justify-between py-2 sm:py-2.5 border-t border-b border-[var(--color-border)]">
           <span className="text-xs sm:text-sm font-medium text-muted-foreground">
-            Total Price
+            Total
           </span>
           <span className="text-lg sm:text-xl font-bold text-[var(--color-primary)]">
             {Number.isFinite(totalNum)
@@ -183,7 +183,7 @@ export default function BookingCard({
               className="h-8 sm:h-9 text-[10px] sm:text-xs font-medium gap-1 sm:gap-1.5 cursor-pointer hover:bg-muted transition-colors"
             >
               <UtensilsCrossed className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
-              <span className="hidden sm:inline">Add Menu</span>
+              <span className="hidden sm:inline">Menu choices</span>
               <span className="sm:hidden">Menu</span>
             </Button>
           )}

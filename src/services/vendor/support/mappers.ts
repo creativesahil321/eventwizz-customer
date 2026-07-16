@@ -39,6 +39,7 @@ export interface VendorSupportNeedsAttentionItem {
   subject: string;
   customerName: string;
   status: VendorSupportConversation["status"];
+  statusLabel?: string | null;
   priority: SupportPriority;
   date: string;
 }
@@ -113,6 +114,7 @@ export function mapVendorSupportNeedsAttention(
     subject: item.subject,
     customerName: item.customer_name,
     status: normalizeSupportStatus(item.status),
+    statusLabel: item.status_label?.trim() || null,
     priority: (["low", "medium", "high"].includes(item.priority)
       ? item.priority
       : "medium") as SupportPriority,
@@ -275,6 +277,14 @@ export function mapVendorTicketDetailToConversation(
     (typeof booking?.event_name === "string" && booking.event_name) ||
     (typeof booking?.title === "string" && booking.title) ||
     undefined;
+  const bookingDate =
+    (typeof booking?.event_date === "string" && booking.event_date) ||
+    (typeof booking?.date === "string" && booking.date) ||
+    undefined;
+  const bookingLocation =
+    typeof booking?.location_name === "string" && booking.location_name.trim()
+      ? booking.location_name.trim()
+      : undefined;
 
   const lastMessage = messages[messages.length - 1];
   const direction = mapVendorDirectionFromTicket(ticket);
@@ -292,6 +302,8 @@ export function mapVendorTicketDetailToConversation(
     direction,
     bookingRef,
     bookingTitle,
+    bookingDate,
+    bookingLocation,
     openedAt: lastMessage?.createdAt ?? new Date().toISOString(),
     lastMessage: lastMessage?.content ?? "",
     lastMessageAt: lastMessage?.createdAt ?? new Date().toISOString(),

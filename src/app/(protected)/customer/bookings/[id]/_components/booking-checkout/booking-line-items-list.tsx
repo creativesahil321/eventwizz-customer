@@ -550,7 +550,7 @@ function GroupedAddonRow({
       </div>
       {!expanded && members.length > 1 && (
         <p className="mt-[-0.25rem] mb-2 ml-7 text-[10px] text-muted-foreground">
-          {members.length} items combined · tap arrow to view details
+          {members.length} items combined · select the arrow to view details
         </p>
       )}
       {expanded && (

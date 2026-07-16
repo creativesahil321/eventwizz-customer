@@ -42,6 +42,7 @@ export interface VendorSupportDashboardNeedsAttentionItem {
   subject: string;
   ticket_id: string;
   status: VendorSupportTicketStatus;
+  status_label?: string | null;
   priority: VendorSupportTicketPriority;
   date: string;
 }
@@ -150,6 +151,7 @@ export interface VendorSupportTicketsResponse {
   };
   meta: VendorSupportTicketsPaginationMeta;
   inbox_count: number;
+  unread_count?: number;
   staff: VendorSupportStaff[];
 }
 
@@ -326,6 +328,8 @@ export interface VendorSupportTicketDetail {
     event_name?: string;
     title?: string;
     date?: string;
+    event_date?: string;
+    location_name?: string;
     [key: string]: unknown;
   } | null;
 }

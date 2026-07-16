@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Building2, Calendar, Mail, Phone, User } from "lucide-react";
+import { Building2, Calendar, Mail, MapPin, Phone, User } from "lucide-react";
 import { SourceBadge, StatusBadge } from "./support-badges";
 import type { AdminSupportConversation, SupportStatus } from "../_lib/types";
 
@@ -29,7 +29,10 @@ export default function AdminConversationSidebar({
 }: AdminConversationSidebarProps) {
   const { contact, venue } = conversation;
   const hasBooking = Boolean(
-    conversation.bookingRef || conversation.bookingTitle
+    conversation.bookingRef ||
+      conversation.bookingTitle ||
+      conversation.bookingDate ||
+      conversation.bookingLocation
   );
 
   return (
@@ -97,17 +100,33 @@ export default function AdminConversationSidebar({
                 {conversation.bookingTitle}
               </p>
             ) : null}
-            {conversation.bookingRef ? (
+            {conversation.bookingRef || conversation.bookingDate ? (
               <div className="mt-2 flex items-center gap-2 text-xs text-muted-foreground">
-                <Calendar className="size-3.5" />
-                <span>{conversation.bookingRef}</span>
+                <Calendar className="size-3.5 shrink-0" />
+                <span>
+                  {[conversation.bookingRef, conversation.bookingDate]
+                    .filter(Boolean)
+                    .join(" · ")}
+                </span>
               </div>
-            ) : (
+            ) : null}
+            {conversation.bookingLocation ? (
+              <div className="mt-2 flex items-center gap-2 text-xs text-muted-foreground">
+                <MapPin className="size-3.5 shrink-0" />
+                <span className="break-words">
+                  {conversation.bookingLocation}
+                </span>
+              </div>
+            ) : null}
+            {!conversation.bookingTitle &&
+            !conversation.bookingRef &&
+            !conversation.bookingDate &&
+            !conversation.bookingLocation ? (
               <div className="mt-2 flex items-center gap-2 text-xs text-muted-foreground">
                 <User className="size-3.5" />
                 Linked booking
               </div>
-            )}
+            ) : null}
           </div>
         </section>
       ) : null}

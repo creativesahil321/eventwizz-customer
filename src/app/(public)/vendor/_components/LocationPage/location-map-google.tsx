@@ -95,10 +95,14 @@ export default function GoogleLocationMap({
 
       const slug = "slug" in location && location.slug ? location.slug : "";
 
-      // Build address for geocoding (use address if available, otherwise use city/name)
+      // Build address for geocoding (prefer API address; fall back to city/name)
+      const rawAddress =
+        "address" in location && typeof location.address === "string"
+          ? location.address.trim()
+          : "";
       const address =
-        ("address" in location && location.address ? location.address : name) +
-        ", UK";
+        rawAddress ||
+        (name.toLowerCase().includes("uk") ? name : `${name}, UK`);
 
       // All locations need geocoding - use default UK center as placeholder
       return {

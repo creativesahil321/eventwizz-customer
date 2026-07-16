@@ -211,7 +211,7 @@ export default function BookingsList({
                 <p className="text-sm sm:text-base text-muted-foreground max-w-md">
                   {localSearchValue || statusFilter !== "all"
                     ? "Try adjusting your search or filters"
-                    : "You don't have any bookings yet. Start exploring events!"}
+                    : "You don’t have any bookings yet. Browse events to make your first booking."}
                 </p>
                 {(localSearchValue ||
                   searchQuery ||

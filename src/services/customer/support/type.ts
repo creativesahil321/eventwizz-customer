@@ -88,6 +88,7 @@ export interface CustomerSupportTicketsResponse {
   };
   meta: CustomerSupportTicketsPaginationMeta;
   inbox_count: number;
+  unread_count?: number;
 }
 
 /** Payload for POST /customer/support-tickets/store */
@@ -179,6 +180,8 @@ export interface CustomerSupportTicketDetail {
     event_name?: string;
     title?: string;
     date?: string;
+    event_date?: string;
+    location_name?: string;
     [key: string]: unknown;
   } | null;
 }

@@ -169,6 +169,7 @@ export interface AdminSupportTicketsResponse {
   };
   meta: AdminSupportTicketsPaginationMeta;
   inbox_count: number;
+  unread_count?: number;
   staff: AdminSupportStaff[];
   venues: AdminSupportVenueOption[];
 }
@@ -308,6 +309,8 @@ export interface AdminSupportTicketDetail {
     event_name?: string;
     title?: string;
     date?: string;
+    event_date?: string;
+    location_name?: string;
     [key: string]: unknown;
   } | null;
   booking_number?: string | null;

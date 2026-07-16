@@ -328,6 +328,14 @@ export function mapAdminTicketDetailToConversation(
     (typeof booking?.event_name === "string" && booking.event_name) ||
     (typeof booking?.title === "string" && booking.title) ||
     fallback?.bookingTitle;
+  const bookingDate =
+    (typeof booking?.event_date === "string" && booking.event_date) ||
+    (typeof booking?.date === "string" && booking.date) ||
+    fallback?.bookingDate;
+  const bookingLocation =
+    typeof booking?.location_name === "string" && booking.location_name.trim()
+      ? booking.location_name.trim()
+      : fallback?.bookingLocation;
 
   const lastMessage = messages[messages.length - 1];
   const source = mapAdminSourceFromTicket(ticket, fallback?.source);
@@ -357,6 +365,8 @@ export function mapAdminTicketDetailToConversation(
     },
     bookingRef,
     bookingTitle,
+    bookingDate,
+    bookingLocation,
     openedAt: lastMessage?.createdAt ?? fallback?.openedAt ?? new Date().toISOString(),
     lastMessage: lastMessage?.content ?? fallback?.lastMessage ?? "",
     lastMessageAt:

@@ -362,7 +362,7 @@ export function TableSeatingPanel({
     }
 
     setSeatingConfirmed(true);
-    toast.success("Seating ready — tap Add to booking to save");
+    toast.success("Seating ready. Select Add to booking to save.");
   };
 
   const showConfirmButton =

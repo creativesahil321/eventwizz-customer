@@ -8,8 +8,8 @@ export default function CustomerDashboardPage() {
     <Suspense fallback={<CustomerDashboardSkeleton />}>
       <section className="relative flex w-full flex-col space-y-4 sm:space-y-6 lg:space-y-8">
         <ProtectedPageHeader
-          title="Customer Dashboard"
-          description="Welcome back! Manage your events and bookings."
+          title="Dashboard"
+          description="View your upcoming events and recent bookings."
         />
 
         <CustomerDashboardContent />

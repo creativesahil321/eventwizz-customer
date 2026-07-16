@@ -28,6 +28,7 @@ import {
 import { cn } from "@/lib/utils";
 import { addCacheBusting } from "@/lib/image-utils";
 import { logout } from "@/lib/auth/logout";
+import { getModKeyLabel } from "@/app/(protected)/_shared/support/mod-key";
 import { useAuthStore } from "@/store/auth.store";
 import { useDomainStore } from "@/store/domain.store";
 import { MenuItemProps } from "@/config/menus/types";
@@ -119,7 +120,7 @@ function CustomerHeaderSearch() {
       .slice(0, 6)
       .map((item) => ({
         title: item.title,
-        subtitle: "Open page",
+        subtitle: "Go to page",
         href: item.href,
       }));
   }, [isSupportWorkspace, query, supportTicketsResponse?.data]);
@@ -142,12 +143,14 @@ function CustomerHeaderSearch() {
   }, [openSearch]);
 
   const placeholder = isSupportWorkspace
-    ? "Search conversations, customers, bookin..."
-    : "Search bookings, events, pages...";
+    ? "Search conversations or bookings…"
+    : "Search bookings, events, or pages…";
 
   const dialogPlaceholder = isSupportWorkspace
-    ? "Search conversations, customers, bookings..."
-    : "Search bookings, events, or pages...";
+    ? "Search conversations or bookings…"
+    : "Search bookings, events, or pages…";
+
+  const modKey = getModKeyLabel();
 
   return (
     <>
@@ -159,13 +162,13 @@ function CustomerHeaderSearch() {
           className="flex h-9 w-full items-center rounded-full border border-slate-200 bg-white pl-9 pr-3 text-left text-sm text-muted-foreground shadow-sm transition-colors hover:border-slate-300 sm:pr-12"
           aria-label="Search"
         >
-          <span className="truncate text-[13px] sm:hidden">Search...</span>
+          <span className="truncate text-[13px] sm:hidden">Search…</span>
           <span className="hidden truncate text-[13px] sm:inline">
             {placeholder}
           </span>
         </button>
         <kbd className="pointer-events-none absolute right-2.5 top-1/2 hidden -translate-y-1/2 items-center rounded border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground sm:inline-flex">
-          ⌘K
+          {modKey === "Cmd" ? "⌘K" : "Ctrl+K"}
         </kbd>
       </div>
 

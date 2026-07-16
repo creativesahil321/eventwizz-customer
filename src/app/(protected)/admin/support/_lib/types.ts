@@ -64,6 +64,8 @@ export interface AdminSupportConversation {
   venue: AdminSupportVenue;
   bookingRef?: string;
   bookingTitle?: string;
+  bookingDate?: string;
+  bookingLocation?: string;
   openedAt: string;
   closedAt?: string;
   lastMessage: string;

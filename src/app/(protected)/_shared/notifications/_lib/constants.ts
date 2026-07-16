@@ -1,15 +1,15 @@
 export const NOTIFICATION_CATEGORIES = [
-  { value: "all", label: "All Categories" },
+  { value: "all", label: "All categories" },
   { value: "account", label: "Account" },
   { value: "payment", label: "Payment" },
-  { value: "order", label: "Order" },
+  { value: "order", label: "Booking" },
   { value: "event", label: "Event" },
   { value: "customer", label: "Customer" },
   { value: "system", label: "System" },
 ];
 
 export const NOTIFICATION_STATUSES = [
-  { value: "all", label: "All Status" },
+  { value: "all", label: "All statuses" },
   { value: "read", label: "Read" },
   { value: "unread", label: "Unread" },
 ];

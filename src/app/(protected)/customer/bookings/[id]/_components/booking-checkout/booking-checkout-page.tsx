@@ -475,7 +475,7 @@ export default function BookingCheckoutPage({
         return;
       }
 
-      toast.success(response.message || "Payment processed successfully!");
+      toast.success(response.message || "Payment processed successfully.");
       setPaymentModalOpen(false);
       setPaymentDateId(null);
       setRescheduleRequest(null);
@@ -526,7 +526,7 @@ export default function BookingCheckoutPage({
 
   const handlePayAll = () => {
     if (payableDates.length === 0) {
-      toast.info("Nothing to pay right now");
+      toast.info("There’s nothing to pay at the moment.");
       return;
     }
 
@@ -916,7 +916,7 @@ export default function BookingCheckoutPage({
           setIsStripePaymentOpen(open);
           if (!open && stripePaymentSession) {
             toast.message("Payment not completed", {
-              description: `Booking ${stripePaymentSession.bookingNumber} — tap Pay Now when you're ready to continue.`,
+              description: `Booking ${stripePaymentSession.bookingNumber} — select Pay now when you’re ready to continue.`,
             });
           }
           if (!open) {

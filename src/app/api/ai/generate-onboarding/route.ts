@@ -228,7 +228,7 @@ export async function POST(req: NextRequest) {
         "payment_type": "full or deposit",
         "is_deposit_enabled": false,
         "deposit_type": "amount or percentage (only when payment_type is deposit)",
-        "deposit_value": "string (e.g. 50 for £50 or 25 for 25%, only when deposit enabled)",
+        "deposit_value": "string (e.g. 50 for a fixed amount or 25 for 25%, only when deposit enabled)",
         "deposit_due_date": "YYYY-MM-DD (before event_date, only when deposit enabled)"
       },
       {

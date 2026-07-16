@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Calendar, Loader2, Mail, Phone, User } from "lucide-react";
+import { Calendar, Loader2, Mail, MapPin, Phone, User } from "lucide-react";
 import { StatusBadge } from "./support-badges";
 import {
   mapVendorRecentTicketToConversation,
@@ -47,7 +47,17 @@ export default function VendorConversationSidebar({
     (typeof booking?.booking_number === "string" && booking.booking_number) ||
     (booking?.booking_id != null ? String(booking.booking_id) : null) ||
     (booking?.id != null ? String(booking.id) : null);
-  const bookingDate = typeof booking?.date === "string" ? booking.date : null;
+  const bookingDate =
+    (typeof booking?.event_date === "string" && booking.event_date) ||
+    (typeof booking?.date === "string" && booking.date) ||
+    null;
+  const locationName =
+    typeof booking?.location_name === "string" && booking.location_name.trim()
+      ? booking.location_name.trim()
+      : null;
+  const hasBookingDetails = Boolean(
+    bookingTitle || bookingRef || bookingDate || locationName
+  );
 
   const displayName = customer?.full_name?.trim() || "Unknown";
   const initials =
@@ -101,7 +111,7 @@ export default function VendorConversationSidebar({
         )}
       </section>
 
-      {booking ? (
+      {booking && hasBookingDetails ? (
         <section>
           <h3 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
             Booking
@@ -114,17 +124,24 @@ export default function VendorConversationSidebar({
             ) : null}
             {bookingRef || bookingDate ? (
               <div className="mt-2 flex items-center gap-2 text-xs text-muted-foreground">
-                <Calendar className="size-3.5" />
+                <Calendar className="size-3.5 shrink-0" />
                 <span>
                   {[bookingRef, bookingDate].filter(Boolean).join(" · ")}
                 </span>
               </div>
-            ) : (
+            ) : null}
+            {locationName ? (
+              <div className="mt-2 flex items-center gap-2 text-xs text-muted-foreground">
+                <MapPin className="size-3.5 shrink-0" />
+                <span className="break-words">{locationName}</span>
+              </div>
+            ) : null}
+            {!bookingTitle && !bookingRef && !bookingDate && !locationName ? (
               <div className="mt-2 flex items-center gap-2 text-xs text-muted-foreground">
                 <User className="size-3.5" />
                 Linked booking
               </div>
-            )}
+            ) : null}
           </div>
         </section>
       ) : null}
