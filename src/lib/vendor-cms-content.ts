@@ -135,18 +135,24 @@ const THEME_FIELD_BY_SECTION: Partial<
   refund: "refund_policy",
 };
 
+/** Raw HTML content keyed by info-page key (e.g. `terms_and_conditions`). */
+export type InfoPageContentMap = Record<string, string | null | undefined>;
+
 export function resolveVendorPolicySections(
   theme?: ThemeSchema | null,
+  contentByKey?: InfoPageContentMap,
 ): VendorPolicySection[] {
   const venueName = theme?.name?.trim() || "Our venue";
 
   return VENDOR_POLICY_SECTIONS.map(({ key, label }) => {
     const dummy = POLICY_SECTION_DUMMY[key];
     const themeField = THEME_FIELD_BY_SECTION[key];
-    const customBody =
-      themeField && theme
-        ? pickThemeHtml(theme[themeField] as string | undefined)
-        : null;
+    const customBody = themeField
+      ? pickThemeHtml(
+          contentByKey?.[themeField],
+          theme?.[themeField] as string | undefined,
+        )
+      : null;
 
     return {
       key,
@@ -160,11 +166,10 @@ export function resolveVendorPolicySections(
 export function resolveVendorPolicySection(
   section: VendorPolicySectionKey,
   theme?: ThemeSchema | null,
+  contentByKey?: InfoPageContentMap,
 ): VendorPolicySection {
-  return (
-    resolveVendorPolicySections(theme).find((s) => s.key === section) ??
-    resolveVendorPolicySections(theme)[0]
-  );
+  const sections = resolveVendorPolicySections(theme, contentByKey);
+  return sections.find((s) => s.key === section) ?? sections[0];
 }
 
 export function isValidPolicySection(
@@ -176,11 +181,12 @@ export function isValidPolicySection(
 export function resolveVendorCmsContent(
   page: VendorCmsPageKey,
   theme?: ThemeSchema | null,
+  contentByKey?: InfoPageContentMap,
 ): VendorCmsPageContent {
   const venueName = theme?.name?.trim() || "Our venue";
 
   if (page === "policies") {
-    const terms = resolveVendorPolicySection("terms", theme);
+    const terms = resolveVendorPolicySection("terms", theme, contentByKey);
     return { title: "Policies", body: terms.body };
   }
 
@@ -188,7 +194,10 @@ export function resolveVendorCmsContent(
   return {
     title: dummy.title,
     body: withVenueName(
-      pickThemeHtml(theme?.contact_page_content) || dummy.body,
+      pickThemeHtml(
+        contentByKey?.contact_page_content,
+        theme?.contact_page_content,
+      ) || dummy.body,
       venueName,
     ),
   };

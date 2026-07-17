@@ -13,7 +13,6 @@ import {
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
-import { getModKeyLabel } from "@/app/(protected)/_shared/support/mod-key";
 import {
   MAX_SUPPORT_ATTACHMENTS,
   SUPPORT_ATTACHMENT_ACCEPT,
@@ -323,7 +322,7 @@ export default function SupportConversationThread({
   ]);
 
   const handleKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
+    if (event.key === "Enter" && !event.shiftKey) {
       event.preventDefault();
       void handleSend();
     }
@@ -488,9 +487,6 @@ export default function SupportConversationThread({
               </div>
 
               <div className="flex flex-col-reverse items-stretch gap-2 sm:flex-row sm:items-center sm:gap-3">
-                <span className="hidden text-xs text-muted-foreground sm:inline">
-                  {getModKeyLabel()} + Enter to send
-                </span>
                 <Button
                   type="button"
                   variant="event-primary"

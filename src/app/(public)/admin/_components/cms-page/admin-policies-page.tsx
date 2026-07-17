@@ -10,11 +10,16 @@ import {
   isValidAdminPolicySection,
   resolveAdminPolicySection,
   resolveAdminPolicySections,
+  type InfoPageContentMap,
 } from "@/lib/admin-cms-content";
 import { CmsPageLayout } from "@/components/public/cms-page-ui";
 import { CmsPoliciesView } from "@/components/public/cms-policies-view";
 
-export default function AdminPoliciesPage() {
+export default function AdminPoliciesPage({
+  contentByKey,
+}: {
+  contentByKey?: InfoPageContentMap;
+}) {
   const { theme } = useContext(ServerContext);
   const adminTheme = theme as ThemeSchema;
   const searchParams = useSearchParams();
@@ -25,12 +30,12 @@ export default function AdminPoliciesPage() {
     : "privacy";
 
   const sections = useMemo(
-    () => resolveAdminPolicySections(adminTheme),
-    [adminTheme],
+    () => resolveAdminPolicySections(adminTheme, contentByKey),
+    [adminTheme, contentByKey],
   );
   const activeContent = useMemo(
-    () => resolveAdminPolicySection(activeSection, adminTheme),
-    [activeSection, adminTheme],
+    () => resolveAdminPolicySection(activeSection, adminTheme, contentByKey),
+    [activeSection, adminTheme, contentByKey],
   );
 
   return (

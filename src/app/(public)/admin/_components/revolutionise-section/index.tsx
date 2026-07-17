@@ -1,10 +1,19 @@
 "use client";
 
 import { useState } from "react";
-import Image from "next/image";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Check, PlayCircle } from "lucide-react";
 import BookACallModal from "../book-a-call-modal";
+import {
+  isExternalUrl,
+  resolveVideoEmbed,
+  type AdminHomeContent,
+} from "@/lib/admin-cms-content";
 
 const CONTROL_ITEMS = [
   "How guests book tickets or tables",
@@ -13,8 +22,15 @@ const CONTROL_ITEMS = [
   "How your venue website looks and feels",
 ];
 
-export default function RevolutioniseSection() {
+export default function RevolutioniseSection({
+  content,
+}: {
+  content: AdminHomeContent["showcase"];
+}) {
   const [bookCallOpen, setBookCallOpen] = useState(false);
+  const [videoOpen, setVideoOpen] = useState(false);
+  const hasVideo = Boolean(content.videoUrl);
+  const videoEmbed = hasVideo ? resolveVideoEmbed(content.videoUrl) : null;
 
   return (
     <>
@@ -28,22 +44,33 @@ export default function RevolutioniseSection() {
                 <div className="w-[420px] h-[420px] rounded-full bg-[color:var(--color-primary)]/10 blur-2xl" />
               </div>
               <div className="relative rounded-2xl overflow-hidden shadow-2xl ring-1 ring-white/10 group">
-                <Image
-                  src="/assets/images/admin/dashboard-mockup.jpg"
-                  alt="EventWizz platform dashboard"
-                  width={680}
-                  height={460}
+                {/* Plain img so tenant-supplied remote URLs work without next/image config */}
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={content.image}
+                  alt="Platform showcase"
                   className="w-full h-auto object-cover"
                 />
-                {/* Dark overlay for contrast with play button */}
-                <div className="absolute inset-0 bg-black/30 group-hover:bg-black/40 transition-colors duration-300" />
-                {/* Play button */}
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <div className="flex flex-col items-center gap-2 cursor-pointer">
-                    <PlayCircle className="h-16 w-16 text-white drop-shadow-2xl group-hover:scale-110 transition-transform duration-300" />
-                    <span className="text-white text-sm font-medium opacity-90">Watch Demo</span>
-                  </div>
-                </div>
+                {hasVideo ? (
+                  <>
+                    {/* Dark overlay for contrast with play button */}
+                    <div className="absolute inset-0 bg-black/30 group-hover:bg-black/40 transition-colors duration-300" />
+                    {/* Play button — opens the demo video */}
+                    <button
+                      type="button"
+                      onClick={() => setVideoOpen(true)}
+                      aria-label="Watch demo video"
+                      className="absolute inset-0 flex items-center justify-center"
+                    >
+                      <span className="flex flex-col items-center gap-2">
+                        <PlayCircle className="h-16 w-16 text-white drop-shadow-2xl group-hover:scale-110 transition-transform duration-300" />
+                        <span className="text-white text-sm font-medium opacity-90">
+                          Watch Demo
+                        </span>
+                      </span>
+                    </button>
+                  </>
+                ) : null}
               </div>
               {/* Floating stat card */}
               <div className="absolute -bottom-5 -right-4 bg-white/95 backdrop-blur-sm rounded-xl px-4 py-3 shadow-xl border border-white/30">
@@ -56,24 +83,15 @@ export default function RevolutioniseSection() {
             {/* Right: Content */}
             <div>
               <h2 className="text-3xl md:text-4xl font-bold text-[color:var(--color-text)] mb-6">
-                Event Management Software to Revolutionise Your Venue
+                {content.title}
               </h2>
-              <div className="space-y-4 text-[color:var(--color-text-dimmed)] leading-relaxed mb-8">
-                <p>
-                  We&apos;re built for wedding venues, pubs, event spaces, and
-                  restaurants; businesses just like yours. We&apos;ll save you
-                  valuable time and improve the customer experience with the
-                  ability to sell tickets online and manage your events from one
-                  easy-to-use dashboard.
-                </p>
-                <p>
-                  You can manage everything from how guests choose their menu
-                  options to how your events can be booked.
-                </p>
-              </div>
+              <div
+                className="space-y-4 text-[color:var(--color-text-dimmed)] leading-relaxed mb-8 [&_ul]:list-disc [&_ul]:pl-6 [&_ol]:list-decimal [&_ol]:pl-6 [&_a]:underline"
+                dangerouslySetInnerHTML={{ __html: content.body }}
+              />
 
               <h3 className="text-lg font-semibold text-[color:var(--color-text)] mb-4">
-                You stay in charge of:
+                {content.checklistTitle}
               </h3>
               <ul className="space-y-3 mb-8">
                 {CONTROL_ITEMS.map((item) => (
@@ -85,20 +103,66 @@ export default function RevolutioniseSection() {
                   </li>
                 ))}
               </ul>
-              <Button
-                variant="event-primary"
-                size="lg"
-                className="rounded-md px-8"
-                onClick={() => setBookCallOpen(true)}
-              >
-                Book a demo
-              </Button>
+              {content.ctaLink ? (
+                <Button
+                  asChild
+                  variant="event-primary"
+                  size="lg"
+                  className="rounded-md px-8"
+                >
+                  <a
+                    href={content.ctaLink}
+                    {...(isExternalUrl(content.ctaLink)
+                      ? { target: "_blank", rel: "noopener noreferrer" }
+                      : {})}
+                  >
+                    {content.cta}
+                  </a>
+                </Button>
+              ) : (
+                <Button
+                  variant="event-primary"
+                  size="lg"
+                  className="rounded-md px-8"
+                  onClick={() => setBookCallOpen(true)}
+                >
+                  {content.cta}
+                </Button>
+              )}
             </div>
           </div>
         </div>
       </section>
 
       <BookACallModal isOpen={bookCallOpen} onClose={() => setBookCallOpen(false)} />
+
+      {videoEmbed ? (
+        <Dialog open={videoOpen} onOpenChange={setVideoOpen}>
+          <DialogContent className="max-w-3xl overflow-hidden border-0 bg-black p-0">
+
+            <DialogTitle className="sr-only">Demo video</DialogTitle>
+            <div className="aspect-video w-full">
+              {videoEmbed.type === "iframe" ? (
+                <iframe
+                  src={videoEmbed.src}
+                  title="Demo video"
+                  className="h-full w-full"
+                  allow="autoplay; fullscreen; picture-in-picture; encrypted-media"
+                  allowFullScreen
+                />
+              ) : (
+                // eslint-disable-next-line jsx-a11y/media-has-caption
+                <video
+                  src={videoEmbed.src}
+                  controls
+                  autoPlay
+                  className="h-full w-full bg-black"
+                />
+              )}
+            </div>
+          </DialogContent>
+        </Dialog>
+      ) : null}
     </>
   );
 }

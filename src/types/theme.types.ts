@@ -190,6 +190,93 @@ export interface ThemeSchema {
   event_title_2?: string;
   event_gallery_title?: string;
 
+  // Admin marketing home (white-label) section content — generic keys.
+  home_hero_eyebrow?: string;
+  home_hero_title?: string;
+  home_hero_subtitle?: string;
+  home_hero_primary_cta?: string;
+  home_hero_secondary_cta?: string;
+  /** CTA target URLs/paths (empty = default book-a-call behaviour). */
+  home_hero_primary_cta_link?: string;
+  home_hero_secondary_cta_link?: string;
+  /** Hero background image URL (GET) / File (PATCH). */
+  home_hero_background_image?: string;
+  home_intro_title?: string;
+  /** Rich HTML */
+  home_intro_body?: string;
+  home_partners_title?: string;
+  home_partners_subtitle?: string;
+  /** Trusted-by partner logo image URLs (up to 6). */
+  home_partner_logo_1?: string;
+  home_partner_logo_2?: string;
+  home_partner_logo_3?: string;
+  home_partner_logo_4?: string;
+  home_partner_logo_5?: string;
+  home_partner_logo_6?: string;
+  home_audience_title?: string;
+  home_audience_subtitle?: string;
+  /** Audience cards ("Who is it for?") — 6 fixed slots (title, description, image URL). */
+  home_audience_1_title?: string;
+  home_audience_1_description?: string;
+  home_audience_1_image?: string;
+  home_audience_2_title?: string;
+  home_audience_2_description?: string;
+  home_audience_2_image?: string;
+  home_audience_3_title?: string;
+  home_audience_3_description?: string;
+  home_audience_3_image?: string;
+  home_audience_4_title?: string;
+  home_audience_4_description?: string;
+  home_audience_4_image?: string;
+  home_audience_5_title?: string;
+  home_audience_5_description?: string;
+  home_audience_5_image?: string;
+  home_audience_6_title?: string;
+  home_audience_6_description?: string;
+  home_audience_6_image?: string;
+  home_features_title?: string;
+  home_features_subtitle?: string;
+  /** Feature items ("Why use?") — 10 fixed slots (title + icon name). */
+  home_feature_1_title?: string;
+  home_feature_1_icon?: string;
+  home_feature_2_title?: string;
+  home_feature_2_icon?: string;
+  home_feature_3_title?: string;
+  home_feature_3_icon?: string;
+  home_feature_4_title?: string;
+  home_feature_4_icon?: string;
+  home_feature_5_title?: string;
+  home_feature_5_icon?: string;
+  home_feature_6_title?: string;
+  home_feature_6_icon?: string;
+  home_feature_7_title?: string;
+  home_feature_7_icon?: string;
+  home_feature_8_title?: string;
+  home_feature_8_icon?: string;
+  home_feature_9_title?: string;
+  home_feature_9_icon?: string;
+  home_feature_10_title?: string;
+  home_feature_10_icon?: string;
+  home_showcase_title?: string;
+  /** Rich HTML */
+  home_showcase_body?: string;
+  home_showcase_checklist_title?: string;
+  home_showcase_cta?: string;
+  home_showcase_cta_link?: string;
+  /** Showcase poster image URL (GET) / File (PATCH). */
+  home_showcase_image?: string;
+  /** Showcase demo video (YouTube/Vimeo/MP4 URL). Empty = no video. */
+  home_showcase_video_url?: string;
+  home_news_title?: string;
+  home_news_subtitle?: string;
+  home_faq_title?: string;
+  home_faq_subtitle?: string;
+  /**
+   * Repeatable FAQ list on the admin home page. Returned as an array on GET;
+   * may arrive as a JSON-encoded string when sent via multipart PATCH.
+   */
+  home_faq_items?: Array<{ question: string; answer: string }> | string;
+
   // Additional fields
   copyright?: string;
   domain?: string;

@@ -8,6 +8,7 @@ import AdminFooter from "@/app/(public)/admin/_components/footer";
 import {
   resolveAdminContactContent,
   resolveAdminContactDetails,
+  type InfoPageContentMap,
 } from "@/lib/admin-cms-content";
 import { ADMIN_SUPPORT_HOURS } from "@/lib/admin-contact-form";
 import { ServerContext } from "@/lib/server-context";
@@ -69,12 +70,16 @@ function QuickContactCard({
   );
 }
 
-export default function AdminContactPage() {
+export default function AdminContactPage({
+  contentByKey,
+}: {
+  contentByKey?: InfoPageContentMap;
+}) {
   const { theme } = useContext(ServerContext);
   const adminTheme = theme as ThemeSchema;
   const content = useMemo(
-    () => resolveAdminContactContent(adminTheme),
-    [adminTheme],
+    () => resolveAdminContactContent(adminTheme, contentByKey),
+    [adminTheme, contentByKey],
   );
   const contactDetails = useMemo(
     () => resolveAdminContactDetails(adminTheme),

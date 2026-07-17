@@ -11,17 +11,30 @@ import AdminContactPage from "@/app/(public)/admin/_components/cms-page/admin-co
 
 interface PublicCmsPageGateProps {
   page: VendorCmsPageKey;
+  /** Server-fetched page content (raw HTML) keyed by info-page key. */
+  contentByKey?: Record<string, string | null | undefined>;
 }
 
-export function PublicCmsPageGate({ page }: PublicCmsPageGateProps) {
+export function PublicCmsPageGate({
+  page,
+  contentByKey,
+}: PublicCmsPageGateProps) {
   const { subdomain, theme } = useContext(ServerContext);
   const vendorTheme = theme as ThemeSchema | null;
 
   if (isVendorPublicSite(subdomain, vendorTheme)) {
-    return page === "policies" ? <VendorPoliciesPage /> : <VendorContactPage />;
+    return page === "policies" ? (
+      <VendorPoliciesPage contentByKey={contentByKey} />
+    ) : (
+      <VendorContactPage contentByKey={contentByKey} />
+    );
   }
 
-  return page === "policies" ? <AdminPoliciesPage /> : <AdminContactPage />;
+  return page === "policies" ? (
+    <AdminPoliciesPage contentByKey={contentByKey} />
+  ) : (
+    <AdminContactPage contentByKey={contentByKey} />
+  );
 }
 
 /** @deprecated Use PublicCmsPageGate */

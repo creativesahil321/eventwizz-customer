@@ -135,6 +135,8 @@ export const API_ENDPOINTS = {
       UPDATE: "/vendor/site-essentials/update",
       RESET_THEME_DEFAULT: "/vendor/site-essentials/reset-theme-default",
     },
+    /** Public per-page CMS content for the vendor tenant site (SSR/SEO). */
+    INFO_PAGES: "/vendor/info-pages",
     LOCATION: {
       SWITCH_LOCATION: "/vendor/locations/switch",
       GET_ALL: "/vendor/locations",
@@ -307,6 +309,8 @@ export const API_ENDPOINTS = {
       UPDATE: "/admin/site-essentials/update",
       RESET_THEME_DEFAULT: "/admin/site-essentials/reset-theme-default",
     },
+    /** Public per-page CMS content for the main admin marketing site (SSR/SEO). */
+    INFO_PAGES: "/admin/info-pages",
     /** Default platform commission; per-venue overrides live on venue detail (PUT /admin/venues/{id}). */
     PAYMENT_SETTINGS: {
       GET_COMMISSION: "/admin/payment-settings/commission",

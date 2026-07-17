@@ -6,6 +6,8 @@ export const CMS_PROSE_CLASS =
   "[&_p]:mb-4 [&_p:last-child]:mb-0 " +
   "[&_strong]:font-semibold [&_strong]:text-[color:var(--color-text)] " +
   "[&_h2]:mb-3 [&_h2]:mt-8 [&_h2]:text-lg [&_h2]:font-bold [&_h2]:text-[color:var(--color-text)] md:[&_h2]:text-xl [&_h2:first-child]:mt-0 " +
+  "[&_h3]:mb-2 [&_h3]:mt-6 [&_h3]:text-base [&_h3]:font-semibold [&_h3]:text-[color:var(--color-text)] md:[&_h3]:text-lg [&_h3:first-child]:mt-0 " +
+  "[&_em]:italic " +
   "[&_ul]:mb-4 [&_ul]:list-disc [&_ul]:space-y-2 [&_ul]:pl-5 " +
   "[&_ol]:mb-4 [&_ol]:list-decimal [&_ol]:space-y-2 [&_ol]:pl-5 " +
   "[&_li]:pl-1 " +

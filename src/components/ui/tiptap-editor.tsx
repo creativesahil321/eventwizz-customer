@@ -19,6 +19,10 @@ import {
   Link as LinkIcon,
   Unlink,
   Sparkles,
+  Heading2,
+  Heading3,
+  List,
+  ListOrdered,
 } from "lucide-react";
 import { Button } from "./button";
 import { Toggle } from "./toggle";
@@ -49,14 +53,25 @@ interface TiptapEditorProps {
     event_category_name?: string;
     banner_heading?: string;
     banner_sub_heading?: string;
-    /** When set, generates policy/legal copy instead of short About text */
-    contentType?: "about" | "policy" | "contact";
+    /**
+     * Selects the AI generation style:
+     * - "about": short blurb (default, used for event/onboarding sections)
+     * - "policy": structured legal/policy HTML
+     * - "contact": short contact intro
+     * - "page": full structured marketing page (About Us, How It Works)
+     */
+    contentType?: "about" | "policy" | "contact" | "page";
     policySection?: string;
   };
   showAIButton?: boolean;
   wrapText?: boolean;
   /** When true, the editor is view-only (no toolbar, no edits). */
   readOnly?: boolean;
+  /**
+   * Enables heading (H2/H3) and bullet/numbered list formatting plus their
+   * toolbar buttons. Off by default so short-form editors stay simple.
+   */
+  enableRichBlocks?: boolean;
 }
 
 export function TiptapEditor({
@@ -70,6 +85,7 @@ export function TiptapEditor({
   showAIButton = true,
   wrapText = false,
   readOnly = false,
+  enableRichBlocks = false,
 }: TiptapEditorProps) {
   const [isLinkDialogOpen, setIsLinkDialogOpen] = useState(false);
   const [linkUrl, setLinkUrl] = useState("");
@@ -78,11 +94,11 @@ export function TiptapEditor({
   const editor = useEditor({
     extensions: [
       StarterKit.configure({
-        heading: false,
+        heading: enableRichBlocks ? { levels: [2, 3] } : false,
         codeBlock: false,
         blockquote: false,
-        bulletList: false,
-        orderedList: false,
+        bulletList: enableRichBlocks ? {} : false,
+        orderedList: enableRichBlocks ? {} : false,
       }),
       Placeholder.configure({
         placeholder,
@@ -91,7 +107,7 @@ export function TiptapEditor({
         limit: maxLength,
       }),
       TextAlign.configure({
-        types: ["paragraph"],
+        types: enableRichBlocks ? ["paragraph", "heading"] : ["paragraph"],
         alignments: ["left", "center", "right"],
       }),
       Underline,
@@ -205,6 +221,52 @@ export function TiptapEditor({
       <div className="min-h-[120px] w-full rounded-md border border-input bg-background overflow-hidden">
         {!readOnly && (
         <div className="flex flex-wrap gap-1 p-1 border-b border-input bg-background">
+          {enableRichBlocks && (
+            <>
+              <Toggle
+                size="sm"
+                pressed={editor.isActive("heading", { level: 2 })}
+                onPressedChange={() =>
+                  editor.chain().focus().toggleHeading({ level: 2 }).run()
+                }
+                aria-label="Heading"
+              >
+                <Heading2 className="h-4 w-4" />
+              </Toggle>
+              <Toggle
+                size="sm"
+                pressed={editor.isActive("heading", { level: 3 })}
+                onPressedChange={() =>
+                  editor.chain().focus().toggleHeading({ level: 3 }).run()
+                }
+                aria-label="Subheading"
+              >
+                <Heading3 className="h-4 w-4" />
+              </Toggle>
+              <Toggle
+                size="sm"
+                pressed={editor.isActive("bulletList")}
+                onPressedChange={() =>
+                  editor.chain().focus().toggleBulletList().run()
+                }
+                aria-label="Bullet list"
+              >
+                <List className="h-4 w-4" />
+              </Toggle>
+              <Toggle
+                size="sm"
+                pressed={editor.isActive("orderedList")}
+                onPressedChange={() =>
+                  editor.chain().focus().toggleOrderedList().run()
+                }
+                aria-label="Numbered list"
+              >
+                <ListOrdered className="h-4 w-4" />
+              </Toggle>
+
+              <div className="w-px h-full bg-border mx-1" />
+            </>
+          )}
           <Toggle
             size="sm"
             pressed={editor.isActive("bold")}
@@ -319,7 +381,11 @@ export function TiptapEditor({
         )}
         <EditorContent
           editor={editor}
-          className="px-3 py-2 overflow-x-hidden max-w-full"
+          className={cn(
+            "px-3 py-2 overflow-x-hidden max-w-full",
+            enableRichBlocks &&
+              "[&_h2]:mb-2 [&_h2]:mt-4 [&_h2]:text-lg [&_h2]:font-bold [&_h3]:mb-2 [&_h3]:mt-3 [&_h3]:text-base [&_h3]:font-semibold [&_ul]:my-2 [&_ul]:list-disc [&_ul]:pl-6 [&_ol]:my-2 [&_ol]:list-decimal [&_ol]:pl-6 [&_li]:mb-1",
+          )}
         />
       </div>
       <div className="text-xs text-muted-foreground mt-2 flex justify-between">

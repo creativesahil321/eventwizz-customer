@@ -36,7 +36,6 @@ import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { useSitePreviewStore } from "@/store/site-preview.store";
 import { SocialMediaTab } from "./tabs/social-media-tab";
-import { InfoPagesTab } from "./tabs/info-pages-tab";
 import { ThemePresetsTab } from "./tabs/theme-presets-tab";
 import {
   SiteEssentialsUpdateProvider,
@@ -56,6 +55,9 @@ function SiteEssentialsFormInner() {
   const { readOnly } = useSiteEssentialsUpdateGate();
   const { form, onSubmit, isLoading, siteEssentials, fetchSiteEssentials } =
     useSiteEssentials();
+  // The admin/main marketing site has no public "site preview" experience, so
+  // the whole preview flow is hidden for it. Vendor sites keep it.
+  const isAdminSite = form.watch("website_role") === "admin";
   const hasMultipleLocations = useHasMultipleLocations();
   const [submitting, setSubmitting] = useState(false);
   const [previewLoading, setPreviewLoading] = useState(false);
@@ -64,6 +66,7 @@ function SiteEssentialsFormInner() {
   const {
     setPreviewData,
     previewData,
+    previewFresh,
     clearPreviewData,
     startPreviewReview,
     previewScope,
@@ -103,31 +106,47 @@ function SiteEssentialsFormInner() {
     }
   }, [colorsUnlocked, activeTab]);
 
-  // Load preview data into form if available
-  // BUT never override File objects - form submission should use form's File objects, not preview store data
+  // Restore preview snapshot into the form ONLY when it was set during the
+  // current session (the editor → preview → editor round-trip). A persisted
+  // snapshot left over from a previous session/reload is stale and must never
+  // override the fresh server data — we discard it so the API values load.
   useEffect(() => {
-    if (previewData) {
-      try {
-        const currentFormValues = form.getValues();
+    if (!previewData) return;
 
-        // Check if form already has File objects uploaded
-        const hasFileUploads =
-          currentFormValues.logo instanceof File ||
-          currentFormValues.favicon instanceof File ||
-          currentFormValues.cover_image instanceof File ||
-          currentFormValues.cover_video instanceof File ||
-          currentFormValues.main_landing_cover_image instanceof File;
-
-        // Only reset with preview data if no files are currently uploaded
-        // This prevents overriding File objects with preview store data (object URLs)
-        if (!hasFileUploads) {
-          form.reset(toMutableSiteEssentialsFormValues(previewData));
-        }
-      } catch (error) {
-        console.error("Error resetting form with preview data:", error);
-      }
+    if (!previewFresh) {
+      // Stale localStorage snapshot from a prior session — drop it and let the
+      // server-data effect below populate the form from the latest API response.
+      clearPreviewData();
+      return;
     }
-  }, [form, previewData]);
+
+    try {
+      const currentFormValues = form.getValues();
+
+      // Check if form already has File objects uploaded
+      const hasFileUploads =
+        currentFormValues.logo instanceof File ||
+        currentFormValues.favicon instanceof File ||
+        currentFormValues.cover_image instanceof File ||
+        currentFormValues.cover_video instanceof File ||
+        currentFormValues.main_landing_cover_image instanceof File;
+
+      // Only reset with preview data if no files are currently uploaded
+      // This prevents overriding File objects with preview store data (object URLs)
+      if (!hasFileUploads) {
+        // Coalesce with the fresh server data so any field the snapshot is
+        // missing/empty (e.g. omitted Info Pages content) is filled from the API,
+        // while still honouring in-session preview edits that DO have a value.
+        form.reset(
+          toMutableSiteEssentialsFormValues(
+            mergeSiteEssentialsPreviewWithApi(previewData, siteEssentials),
+          ),
+        );
+      }
+    } catch (error) {
+      console.error("Error resetting form with preview data:", error);
+    }
+  }, [form, previewData, previewFresh, siteEssentials, clearPreviewData]);
 
   // Reset form when siteEssentials data changes (e.g., after location switch)
   // This ensures the form always reflects the current location's data
@@ -287,11 +306,13 @@ function SiteEssentialsFormInner() {
 
       const result = await onSubmit(payload);
       if (result) {
-        // Update the preview store with saved form values
-        // This ensures theme colors are available for event preview pages
-        // even if the user didn't click Preview button
-        const completeFormValues = form.getValues();
-        setPreviewData(completeFormValues);
+        // Update the preview store with saved form values so theme colors are
+        // available for the (vendor-only) preview experience. The admin site has
+        // no preview, so we skip this to avoid persisting unused preview state.
+        if (!isAdminSite) {
+          const completeFormValues = form.getValues();
+          setPreviewData(completeFormValues);
+        }
 
         router.refresh();
         toast({
@@ -465,12 +486,6 @@ function SiteEssentialsFormInner() {
                       </span>
                     )}
                   </TabsTrigger>
-                  <TabsTrigger
-                    value="info-pages"
-                    className="px-3 sm:px-4 py-1 h-8 text-xs font-medium whitespace-nowrap relative rounded-md data-[state=active]:bg-[var(--color-primary)] data-[state=active]:text-white data-[state=active]:shadow-sm mx-0.5"
-                  >
-                    Info Pages
-                  </TabsTrigger>
                 </TabsList>
               </div>
             </div>
@@ -564,30 +579,27 @@ function SiteEssentialsFormInner() {
                 </div>
               </TabsContent>
 
-              <TabsContent value="info-pages" className="mt-0 w-full">
-                <div className="bg-white rounded-lg p-3 sm:p-6">
-                  <InfoPagesTab />
-                </div>
-              </TabsContent>
             </div>
 
             {/* Actions sit on white, directly under tab content — avoids teal page chrome eating contrast */}
             <div className="border-t border-border bg-white px-4 py-4 sm:px-6 sm:py-5">
               <div className="flex flex-col gap-3 sm:flex-row sm:justify-end sm:gap-3">
-                <Button
-                  variant="outline"
-                  onClick={handlePreviewClick}
-                  type="button"
-                  disabled={previewLoading}
-                  className="flex items-center justify-center gap-2 border-slate-300 bg-white text-slate-900 hover:bg-slate-50"
-                >
-                  {previewLoading ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <Eye className="h-4 w-4" />
-                  )}
-                  {previewLoading ? "Loading..." : "Preview"}
-                </Button>
+                {!isAdminSite && (
+                  <Button
+                    variant="outline"
+                    onClick={handlePreviewClick}
+                    type="button"
+                    disabled={previewLoading}
+                    className="flex items-center justify-center gap-2 border-slate-300 bg-white text-slate-900 hover:bg-slate-50"
+                  >
+                    {previewLoading ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Eye className="h-4 w-4" />
+                    )}
+                    {previewLoading ? "Loading..." : "Preview"}
+                  </Button>
+                )}
                 {isDirty && !readOnly && (
                   <Button
                     variant="outline"

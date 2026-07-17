@@ -1,6 +1,7 @@
 import { api } from "@/services/core/api-client";
 import { SiteEssentials, SiteEssentialsResponse } from "./type";
 import { getEndpointsByRole } from "@/lib/utils/api-endpoints";
+import { flattenInfoPages } from "@/lib/flatten-info-pages";
 import { SiteEssentialsFormValues } from "@/app/(protected)/_shared/sites-essentials/_lib/schema";
 
 /**
@@ -41,7 +42,7 @@ export const getSiteEssentials = async (
       returnFullResponse: true,
       params: Object.keys(params).length > 0 ? params : undefined,
     });
-    return response.data;
+    return flattenInfoPages(response.data);
   } catch (error) {
     console.error("Error fetching site essentials:", error);
     throw error;
@@ -63,7 +64,7 @@ export const resetSiteEssentialsThemeToDefault = async (): Promise<SiteEssential
         returnFullResponse: true,
       },
     );
-    return response.data;
+    return flattenInfoPages(response.data);
   } catch (error) {
     console.error("Error resetting site essentials theme:", error);
     throw error;
@@ -117,14 +118,14 @@ export const updateSiteEssentials = async (
           },
         }
       );
-      return response.data;
+      return flattenInfoPages(response.data);
     } else {
       const response = await api.patch<SiteEssentialsResponse>(
         endpoints.UPDATE,
         data as unknown as SiteEssentialsFormValues,
         { returnFullResponse: true }
       );
-      return response.data;
+      return flattenInfoPages(response.data);
     }
   } catch (error) {
     console.error("Error updating site essentials:", error);

@@ -5,8 +5,13 @@ import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { CheckCircle2, Star } from "lucide-react";
 import BookACallModal from "../book-a-call-modal";
+import { isExternalUrl, type AdminHomeContent } from "@/lib/admin-cms-content";
 
-export default function HeroSection() {
+export default function HeroSection({
+  content,
+}: {
+  content: AdminHomeContent["hero"];
+}) {
   const [bookCallOpen, setBookCallOpen] = useState(false);
 
   return (
@@ -20,12 +25,11 @@ export default function HeroSection() {
       <section className="relative min-h-[92vh] flex items-center overflow-hidden">
         {/* ── Full-bleed background image ── */}
         <div className="absolute inset-0 z-0">
-          <Image
-            src="/assets/images/admin/hero-venue.jpg"
-            alt="Event venue background"
-            fill
-            className="object-cover object-center"
-            priority
+          {/* Plain img so tenant-supplied remote URLs work without next/image domain config */}
+          <img
+            src={content.backgroundImage}
+            alt="Hero background"
+            className="absolute inset-0 h-full w-full object-cover object-center"
           />
           {/* Dark gradient overlay so text is always readable */}
           <div className="absolute inset-0 bg-gradient-to-r from-black/80 via-black/60 to-black/30" />
@@ -42,16 +46,15 @@ export default function HeroSection() {
               {/* Trust chip — white/translucent so it works on any BG */}
               <div className="inline-flex items-center gap-2 bg-white/15 backdrop-blur-sm border border-white/25 text-white rounded-full px-4 py-1.5 text-sm font-medium w-fit">
                 <Star className="h-3.5 w-3.5 fill-current text-yellow-400" />
-                Trusted by 100+ UK venues
+                {content.eyebrow}
               </div>
 
               <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold leading-tight text-white">
-                Event Management Software for Venues
+                {content.title}
               </h1>
 
               <p className="text-lg md:text-xl text-white/80 leading-relaxed max-w-lg">
-                Manage your venue, your way, with an event management platform
-                that allows you to sell tickets online at the touch of a button.
+                {content.subtitle}
               </p>
 
               {/* Feature checkmarks — white so always visible on dark bg */}
@@ -65,22 +68,58 @@ export default function HeroSection() {
               </div>
 
               <div className="pt-2 flex flex-wrap gap-3">
-                <Button
-                  variant="event-primary"
-                  size="lg"
-                  className="rounded-md px-8 shadow-lg text-base"
-                  onClick={() => setBookCallOpen(true)}
-                >
-                  Book a demo
-                </Button>
-                <Button
-                  variant="outline"
-                  size="lg"
-                  className="rounded-md px-8 text-base bg-white/10 border-white/30 text-white hover:bg-white/20 hover:text-white backdrop-blur-sm"
-                  onClick={() => setBookCallOpen(true)}
-                >
-                  Learn More
-                </Button>
+                {content.primaryCtaLink ? (
+                  <Button
+                    asChild
+                    variant="event-primary"
+                    size="lg"
+                    className="rounded-md px-8 shadow-lg text-base"
+                  >
+                    <a
+                      href={content.primaryCtaLink}
+                      {...(isExternalUrl(content.primaryCtaLink)
+                        ? { target: "_blank", rel: "noopener noreferrer" }
+                        : {})}
+                    >
+                      {content.primaryCta}
+                    </a>
+                  </Button>
+                ) : (
+                  <Button
+                    variant="event-primary"
+                    size="lg"
+                    className="rounded-md px-8 shadow-lg text-base"
+                    onClick={() => setBookCallOpen(true)}
+                  >
+                    {content.primaryCta}
+                  </Button>
+                )}
+                {content.secondaryCtaLink ? (
+                  <Button
+                    asChild
+                    variant="outline"
+                    size="lg"
+                    className="rounded-md px-8 text-base bg-white/10 border-white/30 text-white hover:bg-white/20 hover:text-white backdrop-blur-sm"
+                  >
+                    <a
+                      href={content.secondaryCtaLink}
+                      {...(isExternalUrl(content.secondaryCtaLink)
+                        ? { target: "_blank", rel: "noopener noreferrer" }
+                        : {})}
+                    >
+                      {content.secondaryCta}
+                    </a>
+                  </Button>
+                ) : (
+                  <Button
+                    variant="outline"
+                    size="lg"
+                    className="rounded-md px-8 text-base bg-white/10 border-white/30 text-white hover:bg-white/20 hover:text-white backdrop-blur-sm"
+                    onClick={() => setBookCallOpen(true)}
+                  >
+                    {content.secondaryCta}
+                  </Button>
+                )}
               </div>
             </div>
 

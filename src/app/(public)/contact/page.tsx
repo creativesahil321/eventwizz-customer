@@ -2,6 +2,13 @@ import { Metadata } from "next";
 import { Suspense } from "react";
 import { PublicCmsPageGate } from "@/app/(public)/vendor/_components/cms-page/vendor-cms-page-gate";
 import { appConfig } from "@/config/app";
+import {
+  fetchServerThemeCached,
+  getRequestHost,
+  getSubdomainFromDomain,
+} from "@/lib/server-theme";
+import { isVendorPublicSite } from "@/lib/vendor-cms-content";
+import { fetchInfoPagesHtml } from "@/lib/server-info-pages";
 
 export const metadata: Metadata = {
   title: "Contact Us - EventWizz",
@@ -12,10 +19,21 @@ export const metadata: Metadata = {
   },
 };
 
-export default function ContactPage() {
+export default async function ContactPage() {
+  const host = await getRequestHost();
+  const subdomain = getSubdomainFromDomain(host);
+  const theme = await fetchServerThemeCached(host);
+  const isVendor = isVendorPublicSite(subdomain, theme);
+
+  const contentByKey = await fetchInfoPagesHtml(
+    isVendor ? "vendor" : "admin",
+    ["contact_page_content"],
+    host,
+  );
+
   return (
     <Suspense fallback={null}>
-      <PublicCmsPageGate page="contact" />
+      <PublicCmsPageGate page="contact" contentByKey={contentByKey} />
     </Suspense>
   );
 }

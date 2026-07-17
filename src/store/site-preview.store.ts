@@ -16,6 +16,13 @@ export type StartPreviewReviewOptions = {
 
 interface SitePreviewState {
   previewData: SiteEssentialsFormValues | null;
+  /**
+   * True only while `previewData` was set during the CURRENT browser session
+   * (the editor → preview → editor round-trip). Reset to false on every
+   * rehydration so a persisted snapshot from a past session/reload is treated
+   * as stale and never overrides fresh server data in the editor.
+   */
+  previewFresh: boolean;
   previewScope: SitePreviewScope;
   reviewStep: SitePreviewReviewStep;
   mainPageApproved: boolean;
@@ -40,10 +47,31 @@ interface SitePreviewState {
   clearPreviewData: () => void;
 }
 
+/**
+ * Info-page CMS bodies are large (up to ~20k chars each) and the preview flow
+ * never renders them — the public pages fetch this content from the info-pages
+ * API instead. Excluding them keeps the persisted `site-preview-storage` lean,
+ * and the editor back-fills them from the server on restore.
+ */
+const PREVIEW_OMITTED_KEYS = [
+  "terms_and_conditions",
+  "privacy_policy",
+  "refund_policy",
+  "cookie_policy",
+  "vendor_terms",
+  "about_page_content",
+  "how_it_works_page_content",
+  "contact_page_content",
+] as const satisfies ReadonlyArray<keyof SiteEssentialsFormValues>;
+
 const serializePreviewData = (
   data: SiteEssentialsFormValues,
 ): SiteEssentialsFormValues => {
   const serialized = { ...data };
+
+  for (const key of PREVIEW_OMITTED_KEYS) {
+    delete serialized[key];
+  }
 
   if (serialized.logo instanceof File) {
     serialized.logo = URL.createObjectURL(serialized.logo);
@@ -70,6 +98,7 @@ export const useSitePreviewStore = create<SitePreviewState>()(
   persist(
     immer((set) => ({
       previewData: null,
+      previewFresh: false,
       previewScope: "main" as SitePreviewScope,
       reviewStep: "main" as SitePreviewReviewStep,
       mainPageApproved: false,
@@ -139,12 +168,16 @@ export const useSitePreviewStore = create<SitePreviewState>()(
         }),
       setPreviewData: (data: SiteEssentialsFormValues) =>
         set((state) => {
+          state.previewFresh = true;
           try {
             const serializedData = serializePreviewData(data);
             state.previewData = serializedData;
           } catch (error) {
             console.error("Error serializing preview data:", error);
             const safeCopy = { ...data };
+            for (const key of PREVIEW_OMITTED_KEYS) {
+              delete safeCopy[key];
+            }
             if (safeCopy.logo instanceof File) safeCopy.logo = null;
             if (safeCopy.favicon instanceof File) safeCopy.favicon = null;
             if (safeCopy.cover_image instanceof File)
@@ -159,6 +192,7 @@ export const useSitePreviewStore = create<SitePreviewState>()(
       clearPreviewData: () =>
         set((state) => {
           state.previewData = null;
+          state.previewFresh = false;
           state.previewScope = "main";
           state.reviewStep = "main";
           state.mainPageApproved = false;
@@ -193,6 +227,9 @@ export const useSitePreviewStore = create<SitePreviewState>()(
         return {
           ...current,
           ...p,
+          // Persisted preview snapshots are always stale on load — only the
+          // in-session round-trip may mark them fresh again.
+          previewFresh: false,
           previewLocations: Array.isArray(p?.previewLocations)
             ? p.previewLocations
             : [],

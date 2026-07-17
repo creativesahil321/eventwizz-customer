@@ -2,7 +2,24 @@ import { NextResponse } from "next/server";
 import { tryModelsWithFallback, type FallbackResult } from "../lib/utils";
 import { env } from "@/env";
 
-type ContentType = "about" | "policy" | "contact";
+type ContentType = "about" | "policy" | "contact" | "page";
+
+/**
+ * Single source of truth for the HTML shape every CMS page produces. Keeping the
+ * tag whitelist identical to what the public `CMS_PROSE_CLASS` styles guarantees
+ * generated content is always cleanly aligned on the live page — no rogue <h1>,
+ * inline styles, <div>/<br> soup, or unstyled tags breaking the layout.
+ */
+const HTML_FORMAT_RULES = `
+
+Formatting rules (STRICT — output must be clean, consistent, well-aligned HTML):
+- Use ONLY these tags: <h2>, <h3>, <p>, <strong>, <em>, <ul>, <ol>, <li>, <a>.
+- Structure: a short intro <p>, then <h2> section headings, each followed by <p> paragraphs and, where useful, a <ul> or <ol> list.
+- Use <h2> for main sections and <h3> only for sub-sections. NEVER use <h1> (the page already renders its own title).
+- No inline styles, no class/id/style attributes, no <div>, <span>, <br>, <font>, <table>, or <img>.
+- No markdown, no code fences (\`\`\`), no placeholder brackets, no lorem ipsum.
+- Write in clear, professional UK English for a public-facing website.
+- Respond with ONLY the HTML body content — no preamble, no explanation, no wrapping element.`;
 
 function buildPolicyPrompt({
   venueName,
@@ -22,19 +39,48 @@ function buildPolicyPrompt({
     }
   }
 
-  userPrompt += `
-\n\nRequirements:
-- Use clear HTML with <p>, <strong>, and <h2> headings where appropriate.
-- Write in plain UK English suitable for a public-facing website.
-- Cover the key points customers expect for a ${policySection} page.
-- Do not include placeholder brackets or lorem ipsum.
-- Respond ONLY with the HTML body content. No preamble or explanation.`;
+  userPrompt +=
+    `\n\nCover the key points customers expect on a ${policySection} page, grouped into clearly titled sections.` +
+    HTML_FORMAT_RULES;
 
   return {
     system:
       "You are a professional legal and policy content writer for UK event venues. Output only valid HTML fragments suitable for a rich text editor.",
     user: userPrompt,
     maxTokens: 1200,
+  };
+}
+
+function buildPagePrompt({
+  venueName,
+  pageName,
+  currentDescription,
+}: {
+  venueName: string;
+  pageName: string;
+  currentDescription?: string;
+}): { system: string; user: string; maxTokens: number } {
+  let userPrompt = `Write professional, engaging content for the "${pageName}" page of "${venueName}", a UK events and hospitality business.`;
+
+  if (currentDescription && currentDescription !== "undefined") {
+    const plainDescription = currentDescription.replace(/<[^>]*>/g, "");
+    if (plainDescription.trim()) {
+      userPrompt += `\n\nExisting draft to improve or expand:\n"${plainDescription}"`;
+    }
+  }
+
+  userPrompt +=
+    `\n\nInclude:
+- A warm, concise introduction paragraph.
+- 2 to 4 clearly titled <h2> sections covering what a visitor expects on a "${pageName}" page.
+- Where it adds value, a short <ul> bullet list of key points or benefits.` +
+    HTML_FORMAT_RULES;
+
+  return {
+    system:
+      "You are a professional web content writer for UK event businesses. Output only valid HTML fragments suitable for a rich text editor.",
+    user: userPrompt,
+    maxTokens: 1400,
   };
 }
 
@@ -110,6 +156,18 @@ export async function POST(req: Request) {
       systemContent = policy.system;
       userPrompt = policy.user;
       maxTokens = policy.maxTokens;
+    } else if (contentType === "page") {
+      const page = buildPagePrompt({
+        venueName,
+        pageName:
+          typeof policySection === "string" && policySection.trim()
+            ? policySection.trim()
+            : "About Us",
+        currentDescription,
+      });
+      systemContent = page.system;
+      userPrompt = page.user;
+      maxTokens = page.maxTokens;
     } else if (contentType === "contact") {
       const contact = buildContactPrompt({
         venueName,

@@ -16,8 +16,10 @@ import {
   ADMIN_FOOTER_DISCLAIMER,
   ADMIN_FOOTER_NAV_LINKS,
   resolveAdminCompanyInfo,
+  resolveAdminCopyright,
 } from "@/lib/admin-cms-content";
 import { ThemeSchema } from "@/types/theme.types";
+import FAQSection from "../faq-section";
 
 function SocialRow({
   links,
@@ -47,8 +49,11 @@ function SocialRow({
 export default function AdminFooter() {
   const { theme } = useContext(ServerContext);
   const adminTheme = theme as ThemeSchema;
-  const currentYear = new Date().getFullYear();
   const companyInfo = resolveAdminCompanyInfo(adminTheme);
+  const copyright = resolveAdminCopyright(adminTheme);
+  // Copyright is now a rich-text field that can hold both a legal disclaimer and
+  // the © line. When set, render it as HTML in place of the hardcoded fallback.
+  const customCopyrightHtml = adminTheme?.copyright?.trim();
 
   const logoPath =
     theme?.logo?.startsWith("/") ||
@@ -80,7 +85,10 @@ export default function AdminFooter() {
     );
 
   return (
-    <footer className="bg-[color:var(--color-footer)] text-[var(--color-on-footer)]">
+    <>
+      {/* Shown on every admin page just above the footer */}
+      <FAQSection />
+      <footer className="bg-[color:var(--color-footer)] text-[var(--color-on-footer)]">
       <div className="container mx-auto px-4 py-12 md:py-14">
         <div className="grid grid-cols-1 gap-10 md:grid-cols-2 lg:grid-cols-12 lg:gap-8">
           {/* Brand */}
@@ -163,15 +171,24 @@ export default function AdminFooter() {
         </div>
 
         <div className="mt-10 border-t border-[var(--color-on-footer)]/20 pt-8">
-          <p className="mx-auto max-w-4xl text-center text-xs leading-relaxed text-[var(--color-on-footer)]/60">
-            {ADMIN_FOOTER_DISCLAIMER}
-          </p>
-          <p className="mt-4 text-center text-xs text-[var(--color-on-footer)]/70">
-            &copy; {currentYear} {companyInfo.legalName}. All rights
-            reserved.
-          </p>
+          {customCopyrightHtml ? (
+            <div
+              className="mx-auto max-w-4xl text-center text-xs leading-relaxed text-[var(--color-on-footer)]/65 [&_p]:mb-3 [&_p:last-child]:mb-0 [&_strong]:font-semibold [&_em]:italic [&_a]:underline [&_a]:transition-colors hover:[&_a]:text-[color:var(--color-primary)]"
+              dangerouslySetInnerHTML={{ __html: customCopyrightHtml }}
+            />
+          ) : (
+            <>
+              <p className="mx-auto max-w-4xl text-center text-xs leading-relaxed text-[var(--color-on-footer)]/60">
+                {ADMIN_FOOTER_DISCLAIMER}
+              </p>
+              <p className="mt-4 text-center text-xs text-[var(--color-on-footer)]/70">
+                {copyright}
+              </p>
+            </>
+          )}
         </div>
       </div>
-    </footer>
+      </footer>
+    </>
   );
 }

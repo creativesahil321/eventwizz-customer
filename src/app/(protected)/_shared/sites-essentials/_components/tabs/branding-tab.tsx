@@ -5,7 +5,7 @@ import { useFormContext, useWatch } from "react-hook-form";
 import { SiteEssentialsFormValues } from "../../_lib/hooks";
 import {
   BANNER_SUB_HEADING_MAX_CHARS,
-  COPYRIGHT_MAX_CHARS,
+  COPYRIGHT_MAX_TEXT_CHARS,
 } from "../../_lib/schema";
 import {
   FormField,
@@ -21,6 +21,9 @@ import { SectionTitle } from "../ui/section-title";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { TiptapEditor } from "@/components/ui/tiptap-editor";
+import { AdminHomePageSection } from "./admin-home-page-section";
+import { InfoPagesTab } from "./info-pages-tab";
+import { SectionCard } from "../ui/section-card";
 import { VideoFormatInfo } from "@/components/shared/video-format-info";
 import { addCacheBusting } from "@/lib/image-utils";
 import { LocationIndicator } from "@/components/location-indicator";
@@ -60,12 +63,17 @@ interface BrandingTabProps {
   serverMainLandingCoverImage?: string;
 }
 
-type BrandingScopeTab = "site-identity" | "main-home" | "location-page";
+type BrandingScopeTab =
+  | "site-identity"
+  | "main-home"
+  | "location-page"
+  | "info-pages";
 
 const BRANDING_SCOPE_TO_PREVIEW: Record<BrandingScopeTab, SitePreviewScope> = {
   "site-identity": "main",
   "main-home": "main",
   "location-page": "location",
+  "info-pages": "main",
 };
 
 export function BrandingTab({
@@ -80,6 +88,9 @@ export function BrandingTab({
     hasMultipleLocations ? "main-home" : "site-identity",
   );
   const form = useFormContext<SiteEssentialsFormValues>();
+  // The admin/main marketing site edits a fixed set of home sections (no
+  // per-location vendor fields), so we swap in a dedicated editor.
+  const isAdmin = form.watch("website_role") === "admin";
 
   const previewScopeForTab = (tab: BrandingScopeTab): SitePreviewScope => {
     if (!hasMultipleLocations) {
@@ -359,7 +370,14 @@ export function BrandingTab({
       <Alert className="border-slate-200 bg-slate-50 text-slate-800">
         <Info className="h-4 w-4" />
         <AlertDescription className="text-sm">
-          {hasMultipleLocations ? (
+          {isAdmin ? (
+            <>
+              Edit your marketing site here. <strong>Site identity</strong>{" "}
+              (logo, favicon, copyright) applies everywhere;{" "}
+              <strong>Home page</strong> controls each section of your public
+              home.
+            </>
+          ) : hasMultipleLocations ? (
             <>
               Use the tabs below to edit each part of your public site.{" "}
               <strong>Site identity</strong> applies everywhere;{" "}
@@ -380,7 +398,7 @@ export function BrandingTab({
       <Tabs value={brandingScope} onValueChange={handleBrandingScopeChange}>
         <TabsList
           className={`grid h-auto w-full gap-1 bg-muted/60 p-1 ${
-            hasMultipleLocations ? "grid-cols-3" : "grid-cols-2"
+            hasMultipleLocations ? "grid-cols-4" : "grid-cols-3"
           }`}
         >
           <TabsTrigger
@@ -402,6 +420,12 @@ export function BrandingTab({
             className="text-xs sm:text-sm data-[state=active]:bg-[var(--color-primary)] data-[state=active]:text-white"
           >
             {hasMultipleLocations ? "Location page" : "Home page"}
+          </TabsTrigger>
+          <TabsTrigger
+            value="info-pages"
+            className="text-xs sm:text-sm data-[state=active]:bg-[var(--color-primary)] data-[state=active]:text-white"
+          >
+            Info pages
           </TabsTrigger>
         </TabsList>
 
@@ -445,17 +469,21 @@ export function BrandingTab({
             name="copyright"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Copyright Text</FormLabel>
+                <FormLabel>Copyright &amp; Disclaimer</FormLabel>
                 <FormControl>
-                  <Input
-                    placeholder="© 2023 EventWizz, All Rights Reserved"
-                    disabled={readOnly}
-                    maxLength={COPYRIGHT_MAX_CHARS}
-                    {...field}
+                  <TiptapEditor
+                    value={field.value || ""}
+                    onChange={field.onChange}
+                    placeholder="© 2023 EventWizz. All Rights Reserved. Add any legal disclaimer here…"
+                    maxLength={COPYRIGHT_MAX_TEXT_CHARS}
+                    className="min-h-[120px]"
+                    readOnly={readOnly}
+                    showAIButton={false}
                   />
                 </FormControl>
                 <FormDescription>
-                  Up to {COPYRIGHT_MAX_CHARS} characters for legal/disclaimer text.
+                  Shown at the very bottom of your public site. You can include both a
+                  legal disclaimer and the copyright line here.
                 </FormDescription>
                 <FormMessage />
               </FormItem>
@@ -633,31 +661,26 @@ export function BrandingTab({
         ) : null}
 
         <TabsContent value="location-page" className="mt-6">
-      <div className="relative rounded-xl border-2 border-blue-400 dark:border-blue-600 bg-gradient-to-br from-blue-50 to-slate-50 dark:from-blue-950/50 dark:to-slate-900/50 p-0 overflow-hidden shadow-sm">
-        {/* Thick left accent */}
-        <div
-          className="absolute left-0 top-0 bottom-0 w-1.5 bg-blue-500 dark:bg-blue-400"
-          aria-hidden
-        />
-
-        {/* Unmissable top banner */}
-        <div className="flex flex-wrap items-center gap-3 px-6 py-4 bg-blue-100/90 dark:bg-blue-900/60 border-b border-blue-200 dark:border-blue-700">
-          <div className="flex items-center gap-2.5">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-blue-500 dark:bg-blue-600 text-white shadow-sm">
-              <MapPin className="h-5 w-5" />
-            </div>
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-wider text-blue-700 dark:text-blue-300">
-                {hasMultipleLocations
-                  ? "For this location only"
-                  : "Your public home page"}
-              </p>
-              <p className="text-sm font-bold text-blue-900 dark:text-blue-100">
-                {hasMultipleLocations
-                  ? "All fields below apply only to this location"
-                  : "Hero, banner, and sections visitors see on your site home"}
-              </p>
-            </div>
+          {isAdmin ? (
+            <AdminHomePageSection />
+          ) : (
+      <div className="space-y-6">
+        {/* Location context banner */}
+        <div className="flex flex-wrap items-center gap-3 rounded-xl border border-blue-200 bg-blue-50 px-5 py-4 dark:border-blue-800 dark:bg-blue-950/40">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-blue-500 text-white">
+            <MapPin className="h-5 w-5" />
+          </div>
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wider text-blue-700 dark:text-blue-300">
+              {hasMultipleLocations
+                ? "For this location only"
+                : "Your public home page"}
+            </p>
+            <p className="text-sm font-bold text-blue-900 dark:text-blue-100">
+              {hasMultipleLocations
+                ? "All fields below apply only to this location"
+                : "Hero, banner, and sections visitors see on your site home"}
+            </p>
           </div>
           {hasMultipleLocations ? (
             <div className="ml-auto flex items-center gap-2 rounded-lg border border-blue-200 bg-white px-3 py-2 shadow-sm dark:border-blue-700 dark:bg-slate-800">
@@ -669,22 +692,18 @@ export function BrandingTab({
           ) : null}
         </div>
 
-        <div className="p-6 space-y-6">
-          <Separator className="my-0 -mx-6" />
-
-          <SectionTitle
-            title={
-              hasMultipleLocations
-                ? "Location page hero text"
-                : "Home page hero text"
-            }
-            description={
-              hasMultipleLocations
-                ? "Heading and subheading on this location’s public page. Text position is set from Try theme on the Presets tab or preview — not here."
-                : "Heading and subheading on your site home. Text position is set from Try theme on the Presets tab or preview — not here."
-            }
-          />
-
+        <SectionCard
+          title={
+            hasMultipleLocations
+              ? "Location page hero text"
+              : "Home page hero text"
+          }
+          description={
+            hasMultipleLocations
+              ? "Heading and subheading on this location’s public page. Text position is set from Try theme on the Presets tab or preview — not here."
+              : "Heading and subheading on your site home. Text position is set from Try theme on the Presets tab or preview — not here."
+          }
+        >
           <div className="grid gap-6 md:grid-cols-2">
             <FormField
               control={form.control}
@@ -755,14 +774,12 @@ export function BrandingTab({
               }}
             />
           </div>
+        </SectionCard>
 
-          <Separator className="my-4" />
-
-          <SectionTitle
-            title="Location page banner"
-            description="Image or video hero for this location’s page only"
-          />
-
+        <SectionCard
+          title="Location page banner"
+          description="Image or video hero for this location’s page only"
+        >
           <div className="space-y-4">
             <Tabs
               value={bannerType}
@@ -922,16 +939,12 @@ export function BrandingTab({
               </TabsContent>
             </Tabs>
           </div>
+        </SectionCard>
 
-          <Separator className="my-4" />
-
-          <SectionTitle
-            title="About section"
-            description="About block on this location’s page"
-          />
-
-          <Separator className="my-4" />
-
+        <SectionCard
+          title="About section"
+          description="About block on this location’s page"
+        >
           <FormField
             control={form.control}
             name="about_title"
@@ -993,13 +1006,12 @@ export function BrandingTab({
             )}
           />
 
-          <Separator className="my-4" />
+        </SectionCard>
 
-          <SectionTitle
-            title="Event sections"
-            description="Section titles on this location’s page"
-          />
-
+        <SectionCard
+          title="Event sections"
+          description="Section titles on this location’s page"
+        >
           <div className="grid gap-6 md:grid-cols-2">
             <FormField
               control={form.control}
@@ -1070,13 +1082,12 @@ export function BrandingTab({
             />
           </div>
 
-          <Separator className="my-4" />
+        </SectionCard>
 
-          <SectionTitle
-            title="Gallery section"
-            description="Gallery title on this location’s page"
-          />
-
+        <SectionCard
+          title="Gallery section"
+          description="Gallery title on this location’s page"
+        >
           <div className="grid gap-6">
             <FormField
               control={form.control}
@@ -1112,8 +1123,13 @@ export function BrandingTab({
               }}
             />
           </div>
-        </div>
+        </SectionCard>
       </div>
+          )}
+        </TabsContent>
+
+        <TabsContent value="info-pages" className="mt-6">
+          <InfoPagesTab />
         </TabsContent>
       </Tabs>
     </div>

@@ -6,7 +6,40 @@ import {
 
 /** Hero subline; was 80 — too short for full sentences (often cut mid-word in CMS). */
 export const BANNER_SUB_HEADING_MAX_CHARS = 220;
-export const COPYRIGHT_MAX_CHARS = 200;
+/**
+ * Copyright/disclaimer is a rich-text (HTML) field, so the limit is on the
+ * stored HTML string — generous enough for a short legal paragraph plus the
+ * copyright line and their markup.
+ */
+export const COPYRIGHT_MAX_CHARS = 2000;
+/** Visible-text cap for the copyright rich editor (excludes HTML tags). */
+export const COPYRIGHT_MAX_TEXT_CHARS = 600;
+
+/**
+ * Admin marketing home (white-label) section text limits. Keys are generic so
+ * the same fields work for any rebranded platform instance.
+ */
+export const HOME_TITLE_MAX_CHARS = 120;
+export const HOME_SUBTITLE_MAX_CHARS = 240;
+export const HOME_EYEBROW_MAX_CHARS = 60;
+export const HOME_CTA_MAX_CHARS = 40;
+/** URL / relative path a CTA button links to (empty = default book-a-call). */
+export const HOME_CTA_LINK_MAX_CHARS = 300;
+/** Max stored HTML length for rich body fields. */
+export const HOME_BODY_MAX_CHARS = 4000;
+/** Visible-text cap for the rich body editors (excludes HTML tags). */
+export const HOME_BODY_MAX_TEXT_CHARS = 1200;
+/** Fixed audience-card slots ("Who is it for?") on the admin home page. */
+export const HOME_AUDIENCE_MAX_CARDS = 6;
+export const HOME_CARD_TITLE_MAX_CHARS = 60;
+export const HOME_CARD_DESC_MAX_CHARS = 200;
+/** Fixed feature slots ("Why use?") on the admin home page. */
+export const HOME_FEATURES_MAX_ITEMS = 10;
+export const HOME_FEATURE_TITLE_MAX_CHARS = 80;
+/** Repeatable FAQ list limits on the admin home page. */
+export const HOME_FAQ_MAX_ITEMS = 8;
+export const HOME_FAQ_QUESTION_MAX_CHARS = 160;
+export const HOME_FAQ_ANSWER_MAX_CHARS = 600;
 import { HEADING_EMPHASIS_VALUES } from "@/lib/heading-emphasis";
 import {
   BANNER_HEADING_ALIGN_VALUES,
@@ -100,6 +133,45 @@ const httpsStylesheetUrlSchema = z
     },
     { message: "Must be a valid https:// stylesheet URL" },
   );
+
+/** Shared validators for the fixed audience-card text slots. */
+function audienceCardTitleField() {
+  return z
+    .string()
+    .max(
+      HOME_CARD_TITLE_MAX_CHARS,
+      `Must not exceed ${HOME_CARD_TITLE_MAX_CHARS} characters`,
+    )
+    .nullable()
+    .optional();
+}
+
+function audienceCardDescField() {
+  return z
+    .string()
+    .max(
+      HOME_CARD_DESC_MAX_CHARS,
+      `Must not exceed ${HOME_CARD_DESC_MAX_CHARS} characters`,
+    )
+    .nullable()
+    .optional();
+}
+
+/** Shared validators for the fixed feature ("Why use?") slots. */
+function featureTitleField() {
+  return z
+    .string()
+    .max(
+      HOME_FEATURE_TITLE_MAX_CHARS,
+      `Must not exceed ${HOME_FEATURE_TITLE_MAX_CHARS} characters`,
+    )
+    .nullable()
+    .optional();
+}
+
+function featureIconField() {
+  return z.string().max(60).nullable().optional();
+}
 
 // Form schema for validation
 export const siteEssentialsFormSchema = z.object({
@@ -271,6 +343,200 @@ export const siteEssentialsFormSchema = z.object({
     .string()
     .max(120, "Locations list subtitle must not exceed 120 characters")
     .nullable()
+    .optional(),
+  // Admin marketing home (white-label) — generic keys, admin site only.
+  home_hero_eyebrow: z
+    .string()
+    .max(HOME_EYEBROW_MAX_CHARS, `Must not exceed ${HOME_EYEBROW_MAX_CHARS} characters`)
+    .nullable()
+    .optional(),
+  home_hero_title: z
+    .string()
+    .max(HOME_TITLE_MAX_CHARS, `Must not exceed ${HOME_TITLE_MAX_CHARS} characters`)
+    .nullable()
+    .optional(),
+  home_hero_subtitle: z
+    .string()
+    .max(HOME_SUBTITLE_MAX_CHARS, `Must not exceed ${HOME_SUBTITLE_MAX_CHARS} characters`)
+    .nullable()
+    .optional(),
+  home_hero_primary_cta: z
+    .string()
+    .max(HOME_CTA_MAX_CHARS, `Must not exceed ${HOME_CTA_MAX_CHARS} characters`)
+    .nullable()
+    .optional(),
+  home_hero_secondary_cta: z
+    .string()
+    .max(HOME_CTA_MAX_CHARS, `Must not exceed ${HOME_CTA_MAX_CHARS} characters`)
+    .nullable()
+    .optional(),
+  home_hero_primary_cta_link: z
+    .string()
+    .max(HOME_CTA_LINK_MAX_CHARS, `Link is too long`)
+    .nullable()
+    .optional(),
+  home_hero_secondary_cta_link: z
+    .string()
+    .max(HOME_CTA_LINK_MAX_CHARS, `Link is too long`)
+    .nullable()
+    .optional(),
+  home_hero_background_image: z.any().optional(),
+  home_intro_title: z
+    .string()
+    .max(HOME_TITLE_MAX_CHARS, `Must not exceed ${HOME_TITLE_MAX_CHARS} characters`)
+    .nullable()
+    .optional(),
+  home_intro_body: z
+    .string()
+    .max(HOME_BODY_MAX_CHARS, `Content is too long`)
+    .nullable()
+    .optional(),
+  home_partners_title: z
+    .string()
+    .max(HOME_TITLE_MAX_CHARS, `Must not exceed ${HOME_TITLE_MAX_CHARS} characters`)
+    .nullable()
+    .optional(),
+  home_partners_subtitle: z
+    .string()
+    .max(HOME_SUBTITLE_MAX_CHARS, `Must not exceed ${HOME_SUBTITLE_MAX_CHARS} characters`)
+    .nullable()
+    .optional(),
+  // Trusted-by partner logos — fixed single-image slots (URL on GET, File on PATCH).
+  home_partner_logo_1: z.any().optional(),
+  home_partner_logo_2: z.any().optional(),
+  home_partner_logo_3: z.any().optional(),
+  home_partner_logo_4: z.any().optional(),
+  home_partner_logo_5: z.any().optional(),
+  home_partner_logo_6: z.any().optional(),
+  home_audience_title: z
+    .string()
+    .max(HOME_TITLE_MAX_CHARS, `Must not exceed ${HOME_TITLE_MAX_CHARS} characters`)
+    .nullable()
+    .optional(),
+  home_audience_subtitle: z
+    .string()
+    .max(HOME_SUBTITLE_MAX_CHARS, `Must not exceed ${HOME_SUBTITLE_MAX_CHARS} characters`)
+    .nullable()
+    .optional(),
+  // Audience cards ("Who is it for?") — 6 fixed slots (title, description, image).
+  home_audience_1_title: audienceCardTitleField(),
+  home_audience_1_description: audienceCardDescField(),
+  home_audience_1_image: z.any().optional(),
+  home_audience_2_title: audienceCardTitleField(),
+  home_audience_2_description: audienceCardDescField(),
+  home_audience_2_image: z.any().optional(),
+  home_audience_3_title: audienceCardTitleField(),
+  home_audience_3_description: audienceCardDescField(),
+  home_audience_3_image: z.any().optional(),
+  home_audience_4_title: audienceCardTitleField(),
+  home_audience_4_description: audienceCardDescField(),
+  home_audience_4_image: z.any().optional(),
+  home_audience_5_title: audienceCardTitleField(),
+  home_audience_5_description: audienceCardDescField(),
+  home_audience_5_image: z.any().optional(),
+  home_audience_6_title: audienceCardTitleField(),
+  home_audience_6_description: audienceCardDescField(),
+  home_audience_6_image: z.any().optional(),
+  home_features_title: z
+    .string()
+    .max(HOME_TITLE_MAX_CHARS, `Must not exceed ${HOME_TITLE_MAX_CHARS} characters`)
+    .nullable()
+    .optional(),
+  home_features_subtitle: z
+    .string()
+    .max(HOME_SUBTITLE_MAX_CHARS, `Must not exceed ${HOME_SUBTITLE_MAX_CHARS} characters`)
+    .nullable()
+    .optional(),
+  // Feature items ("Why use?") — 10 fixed slots (title + icon name).
+  home_feature_1_title: featureTitleField(),
+  home_feature_1_icon: featureIconField(),
+  home_feature_2_title: featureTitleField(),
+  home_feature_2_icon: featureIconField(),
+  home_feature_3_title: featureTitleField(),
+  home_feature_3_icon: featureIconField(),
+  home_feature_4_title: featureTitleField(),
+  home_feature_4_icon: featureIconField(),
+  home_feature_5_title: featureTitleField(),
+  home_feature_5_icon: featureIconField(),
+  home_feature_6_title: featureTitleField(),
+  home_feature_6_icon: featureIconField(),
+  home_feature_7_title: featureTitleField(),
+  home_feature_7_icon: featureIconField(),
+  home_feature_8_title: featureTitleField(),
+  home_feature_8_icon: featureIconField(),
+  home_feature_9_title: featureTitleField(),
+  home_feature_9_icon: featureIconField(),
+  home_feature_10_title: featureTitleField(),
+  home_feature_10_icon: featureIconField(),
+  home_showcase_title: z
+    .string()
+    .max(HOME_TITLE_MAX_CHARS, `Must not exceed ${HOME_TITLE_MAX_CHARS} characters`)
+    .nullable()
+    .optional(),
+  home_showcase_body: z
+    .string()
+    .max(HOME_BODY_MAX_CHARS, `Content is too long`)
+    .nullable()
+    .optional(),
+  home_showcase_checklist_title: z
+    .string()
+    .max(HOME_EYEBROW_MAX_CHARS, `Must not exceed ${HOME_EYEBROW_MAX_CHARS} characters`)
+    .nullable()
+    .optional(),
+  home_showcase_cta: z
+    .string()
+    .max(HOME_CTA_MAX_CHARS, `Must not exceed ${HOME_CTA_MAX_CHARS} characters`)
+    .nullable()
+    .optional(),
+  home_showcase_cta_link: z
+    .string()
+    .max(HOME_CTA_LINK_MAX_CHARS, `Link is too long`)
+    .nullable()
+    .optional(),
+  home_showcase_image: z.any().optional(),
+  home_showcase_video_url: z
+    .string()
+    .max(HOME_CTA_LINK_MAX_CHARS, `Link is too long`)
+    .nullable()
+    .optional(),
+  home_news_title: z
+    .string()
+    .max(HOME_TITLE_MAX_CHARS, `Must not exceed ${HOME_TITLE_MAX_CHARS} characters`)
+    .nullable()
+    .optional(),
+  home_news_subtitle: z
+    .string()
+    .max(HOME_SUBTITLE_MAX_CHARS, `Must not exceed ${HOME_SUBTITLE_MAX_CHARS} characters`)
+    .nullable()
+    .optional(),
+  home_faq_title: z
+    .string()
+    .max(HOME_TITLE_MAX_CHARS, `Must not exceed ${HOME_TITLE_MAX_CHARS} characters`)
+    .nullable()
+    .optional(),
+  home_faq_subtitle: z
+    .string()
+    .max(HOME_SUBTITLE_MAX_CHARS, `Must not exceed ${HOME_SUBTITLE_MAX_CHARS} characters`)
+    .nullable()
+    .optional(),
+  home_faq_items: z
+    .array(
+      z.object({
+        question: z
+          .string()
+          .max(
+            HOME_FAQ_QUESTION_MAX_CHARS,
+            `Question must not exceed ${HOME_FAQ_QUESTION_MAX_CHARS} characters`,
+          ),
+        answer: z
+          .string()
+          .max(
+            HOME_FAQ_ANSWER_MAX_CHARS,
+            `Answer must not exceed ${HOME_FAQ_ANSWER_MAX_CHARS} characters`,
+          ),
+      }),
+    )
+    .max(HOME_FAQ_MAX_ITEMS, `Add up to ${HOME_FAQ_MAX_ITEMS} questions`)
     .optional(),
   /** From API — used for main landing preview only */
   locations: z.array(siteEssentialsLocationSchema).optional(),

@@ -352,13 +352,12 @@ export default function FooterSection({
 
       <div className="border-t border-[color:color-mix(in_srgb,var(--color-on-footer)_10%,transparent)]">
         <div className="mx-auto max-w-7xl px-6 py-4">
-          <p
-            className={`text-xs text-[var(--color-on-footer)]/55 ${
+          <div
+            className={`text-xs text-[var(--color-on-footer)]/55 [&_p]:mb-2 [&_p:last-child]:mb-0 [&_strong]:font-semibold [&_em]:italic [&_a]:underline ${
               isMainPageFooter ? "text-center" : ""
             }`}
-          >
-            {copyrightText}
-          </p>
+            dangerouslySetInnerHTML={{ __html: copyrightText }}
+          />
         </div>
       </div>
     </footer>

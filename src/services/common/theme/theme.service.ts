@@ -1,6 +1,7 @@
 import { API_ENDPOINTS } from "@/services/core/endpoints";
 import { ThemeSchema } from "@/types/theme.types";
 import { env } from "@/env";
+import { flattenInfoPages } from "@/lib/flatten-info-pages";
 import { ApiResponse, ServiceResponse } from "./type";
 
 /**
@@ -72,7 +73,7 @@ export const themeService = {
       return {
         isSuccess: true,
         message: "Theme settings fetched successfully",
-        data: data.data,
+        data: flattenInfoPages(data.data),
       };
     } catch (error) {
       // Type error in a more specific way

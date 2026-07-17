@@ -12,7 +12,6 @@ import {
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
-import { getModKeyLabel } from "@/app/(protected)/_shared/support/mod-key";
 import {
   SUPPORT_ATTACHMENT_ACCEPT,
   SUPPORT_IMAGE_ATTACHMENT_ACCEPT,
@@ -293,7 +292,7 @@ export default function AdminConversationThread({
   ]);
 
   const handleKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
+    if (event.key === "Enter" && !event.shiftKey) {
       event.preventDefault();
       void handleSend();
     }
@@ -405,7 +404,7 @@ export default function AdminConversationThread({
               placeholder={
                 isInternal
                   ? "Write an internal note — only your team can see this..."
-                  : "Type your reply. Use @ to mention a teammate."
+                  : "Type your reply."
               }
               value={draft}
               onChange={(event) => setDraft(event.target.value)}
@@ -489,9 +488,6 @@ export default function AdminConversationThread({
                 </Button>
               </div>
               <div className="flex flex-col-reverse items-stretch gap-2 sm:flex-row sm:items-center sm:gap-3">
-                <span className="hidden text-xs text-muted-foreground sm:inline">
-                  {getModKeyLabel()} + Enter to send
-                </span>
                 <Button
                   type="button"
                   variant={isInternal ? "default" : "event-primary"}

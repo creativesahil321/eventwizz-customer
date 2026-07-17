@@ -64,27 +64,46 @@ const PARTNERS = [
   },
 ];
 
-export default function TrustedBy() {
+import type { AdminHomeContent } from "@/lib/admin-cms-content";
+
+export default function TrustedBy({
+  content,
+}: {
+  content: AdminHomeContent["partners"];
+}) {
   return (
     <section className="py-16 bg-[color:var(--color-background)]">
       <div className="container mx-auto px-4 text-center">
         <h2 className="text-3xl md:text-4xl font-bold text-[color:var(--color-text)] mb-3">
-          Trusted By
+          {content.title}
         </h2>
         <p className="text-[color:var(--color-text-dimmed)] mb-10 max-w-lg mx-auto">
-          Don&apos;t just take our word for it. We&apos;re trusted by venues and
-          businesses across the UK.
+          {content.subtitle}
         </p>
 
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-5">
-          {PARTNERS.map((partner) => (
-            <div
-              key={partner.name}
-              className="bg-white rounded-xl p-4 flex flex-col items-center justify-center shadow-sm hover:shadow-md transition-all duration-200 hover:-translate-y-0.5 min-h-[90px] border border-gray-100"
-            >
-              {partner.svg}
-            </div>
-          ))}
+          {content.logos.length > 0
+            ? content.logos.map((logo, idx) => (
+                <div
+                  key={`${logo}-${idx}`}
+                  className="bg-white rounded-xl p-4 flex flex-col items-center justify-center shadow-sm hover:shadow-md transition-all duration-200 hover:-translate-y-0.5 min-h-[90px] border border-gray-100"
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={logo}
+                    alt={`Partner logo ${idx + 1}`}
+                    className="w-full h-14 object-contain"
+                  />
+                </div>
+              ))
+            : PARTNERS.map((partner) => (
+                <div
+                  key={partner.name}
+                  className="bg-white rounded-xl p-4 flex flex-col items-center justify-center shadow-sm hover:shadow-md transition-all duration-200 hover:-translate-y-0.5 min-h-[90px] border border-gray-100"
+                >
+                  {partner.svg}
+                </div>
+              ))}
         </div>
       </div>
     </section>

@@ -34,7 +34,7 @@ type InfoPageFieldConfig = {
   maxLength: number;
   maxWords: number;
   description?: string;
-  contentType: "policy" | "contact" | "about";
+  contentType: "policy" | "contact" | "page";
 };
 
 const VENDOR_POLICY_FIELDS: InfoPageFieldConfig[] = [
@@ -115,7 +115,7 @@ const ADMIN_PAGE_FIELDS: InfoPageFieldConfig[] = [
     maxLength: 20000,
     maxWords: 3000,
     description: "Public page at /about",
-    contentType: "about",
+    contentType: "page",
   },
   {
     name: "how_it_works_page_content",
@@ -124,7 +124,7 @@ const ADMIN_PAGE_FIELDS: InfoPageFieldConfig[] = [
     maxLength: 20000,
     maxWords: 3000,
     description: "Public page at /how-it-works",
-    contentType: "about",
+    contentType: "page",
   },
   {
     name: "contact_page_content",
@@ -179,6 +179,7 @@ function InfoPageEditor({
               maxWords={field.maxWords}
               className="min-h-[160px]"
               readOnly={readOnly}
+              enableRichBlocks
               aiContext={
                 field.contentType === "policy"
                   ? {
@@ -192,9 +193,9 @@ function InfoPageEditor({
                         contentType: "contact",
                       }
                     : {
-                        title: field.label,
-                        description: `${field.label} page for ${venueName}`,
-                        contentType: "about",
+                        title: venueName,
+                        contentType: "page",
+                        policySection: field.label,
                       }
               }
             />

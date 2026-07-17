@@ -9,12 +9,17 @@ import {
   isValidPolicySection,
   resolveVendorPolicySection,
   resolveVendorPolicySections,
+  type InfoPageContentMap,
   type VendorPolicySectionKey,
 } from "@/lib/vendor-cms-content";
 import { VendorCmsShell } from "./vendor-cms-shell";
 import { CmsPoliciesView } from "@/components/public/cms-policies-view";
 
-export default function VendorPoliciesPage() {
+export default function VendorPoliciesPage({
+  contentByKey,
+}: {
+  contentByKey?: InfoPageContentMap;
+}) {
   const { theme } = useContext(ServerContext);
   const vendorTheme = theme as ThemeSchema;
   const searchParams = useSearchParams();
@@ -27,13 +32,13 @@ export default function VendorPoliciesPage() {
     : "terms";
 
   const sections = useMemo(
-    () => resolveVendorPolicySections(vendorTheme),
-    [vendorTheme],
+    () => resolveVendorPolicySections(vendorTheme, contentByKey),
+    [vendorTheme, contentByKey],
   );
 
   const activeContent = useMemo(
-    () => resolveVendorPolicySection(activeSection, vendorTheme),
-    [activeSection, vendorTheme],
+    () => resolveVendorPolicySection(activeSection, vendorTheme, contentByKey),
+    [activeSection, vendorTheme, contentByKey],
   );
 
   return (

@@ -70,9 +70,11 @@ export default function DashboardSummary({
   return (
     <Card className="w-full border shadow-sm">
       <CardContent className="p-6 space-y-4">
-        <CardTitle className="text-2xl mb-0 title-header font-medium">
-          {title}
-        </CardTitle>
+        <div className="flex min-h-[40px] items-center">
+          <CardTitle className="text-2xl mb-0 title-header font-medium">
+            {title}
+          </CardTitle>
+        </div>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {summaryItems.map((item) => (
             <Card

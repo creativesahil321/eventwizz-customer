@@ -1,5 +1,6 @@
 import Image from "next/image";
 import { ArrowRight } from "lucide-react";
+import type { AdminHomeContent } from "@/lib/admin-cms-content";
 
 const NEWS_ARTICLES = [
   {
@@ -28,16 +29,20 @@ const NEWS_ARTICLES = [
   },
 ];
 
-export default function NewsSection() {
+export default function NewsSection({
+  content,
+}: {
+  content: AdminHomeContent["news"];
+}) {
   return (
     <section className="py-20 bg-[color:var(--color-background)]">
       <div className="container mx-auto px-4">
         <div className="text-center mb-12">
           <h2 className="text-3xl md:text-4xl font-bold text-[color:var(--color-text)] mb-3">
-            Latest News & Articles
+            {content.title}
           </h2>
           <p className="text-[color:var(--color-text-dimmed)]">
-            Insights, tips, and best practices from the EventWizz team
+            {content.subtitle}
           </p>
         </div>
 

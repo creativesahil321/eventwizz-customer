@@ -3,7 +3,10 @@
 import { useContext, useMemo } from "react";
 import { ServerContext } from "@/lib/server-context";
 import type { ThemeSchema } from "@/types/theme.types";
-import { resolveVendorCmsContent } from "@/lib/vendor-cms-content";
+import {
+  resolveVendorCmsContent,
+  type InfoPageContentMap,
+} from "@/lib/vendor-cms-content";
 import { resolveVenueContact } from "@/lib/resolve-venue-contact";
 import { VendorContactCards } from "./vendor-contact-cards";
 import {
@@ -12,12 +15,16 @@ import {
   VENDOR_CMS_PROSE_CLASS,
 } from "./vendor-cms-shell";
 
-export default function VendorContactPage() {
+export default function VendorContactPage({
+  contentByKey,
+}: {
+  contentByKey?: InfoPageContentMap;
+}) {
   const { theme } = useContext(ServerContext);
   const vendorTheme = theme as ThemeSchema;
   const content = useMemo(
-    () => resolveVendorCmsContent("contact", vendorTheme),
-    [vendorTheme],
+    () => resolveVendorCmsContent("contact", vendorTheme, contentByKey),
+    [vendorTheme, contentByKey],
   );
 
   const contact = useMemo(

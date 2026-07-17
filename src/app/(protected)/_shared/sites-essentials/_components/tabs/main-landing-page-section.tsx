@@ -13,8 +13,7 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { FileUploader } from "@/components/ui/file-uploader";
-import { SectionTitle } from "../ui/section-title";
-import { Separator } from "@/components/ui/separator";
+import { SectionCard } from "../ui/section-card";
 import { SiteEssentialsFormValues } from "../../_lib/schema";
 import { BANNER_SUB_HEADING_MAX_CHARS } from "../../_lib/schema";
 import { addCacheBusting } from "@/lib/image-utils";
@@ -102,34 +101,25 @@ export function MainLandingPageSection({
   };
 
   return (
-    <div className="relative overflow-hidden rounded-xl border-2 border-teal-400 bg-gradient-to-br from-teal-50 to-slate-50 p-0 shadow-sm dark:border-teal-600 dark:from-teal-950/50 dark:to-slate-900/50">
-      <div
-        className="absolute bottom-0 left-0 top-0 w-1.5 bg-teal-500 dark:bg-teal-400"
-        aria-hidden
-      />
-
-      <div className="flex flex-wrap items-center gap-3 border-b border-teal-200 bg-teal-100/90 px-6 py-4 dark:border-teal-700 dark:bg-teal-900/60">
-        <div className="flex items-center gap-2.5">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-teal-500 text-white shadow-sm dark:bg-teal-600">
-            <Home className="h-5 w-5" />
-          </div>
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-wider text-teal-700 dark:text-teal-300">
-              Main home page
-            </p>
-            <p className="text-sm font-bold text-teal-900 dark:text-teal-100">
-              Shown before guests pick a location — same on every city
-            </p>
-          </div>
+    <div className="space-y-6">
+      <div className="flex flex-wrap items-center gap-3 rounded-xl border border-teal-200 bg-teal-50 px-5 py-4 dark:border-teal-800 dark:bg-teal-950/40">
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-teal-500 text-white">
+          <Home className="h-5 w-5" />
+        </div>
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-wider text-teal-700 dark:text-teal-300">
+            Main home page
+          </p>
+          <p className="text-sm font-bold text-teal-900 dark:text-teal-100">
+            Shown before guests pick a location — same on every city
+          </p>
         </div>
       </div>
 
-      <div className="space-y-6 p-6">
-        <SectionTitle
-          title="Hero & background"
-          description="Headline, subline, and full-width background image on your multi-location home page."
-        />
-
+      <SectionCard
+        title="Hero & background"
+        description="Headline, subline, and full-width background image on your multi-location home page."
+      >
         <div className="grid gap-6 md:grid-cols-2">
           <FormField
             control={form.control}
@@ -257,13 +247,12 @@ export function MainLandingPageSection({
           )}
         />
 
-        <Separator />
+      </SectionCard>
 
-        <SectionTitle
-          title="Locations list"
-          description="Title and subtitle above the city / location grid on the main home page."
-        />
-
+      <SectionCard
+        title="Locations list"
+        description="Title and subtitle above the city / location grid on the main home page."
+      >
         <div className="grid gap-6 md:grid-cols-2">
           <FormField
             control={form.control}
@@ -321,7 +310,7 @@ export function MainLandingPageSection({
             }}
           />
         </div>
-      </div>
+      </SectionCard>
     </div>
   );
 }
