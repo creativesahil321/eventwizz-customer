@@ -267,8 +267,28 @@ export function BrandingTab({
     setLandingPageVideoUrl(""); // Clear video URL
     setBannerType("image");
 
-    form.setValue("cover_image", files.length > 0 ? files[0] : null);
+    const coverFile = files.length > 0 ? files[0] : null;
+    form.setValue("cover_image", coverFile);
     form.setValue("cover_video", null); // Clear video
+
+    const slug = form.getValues("slug")?.trim();
+    const locations = form.getValues("locations");
+    if (slug && Array.isArray(locations) && locations.length > 0) {
+      form.setValue(
+        "locations",
+        locations.map((loc) =>
+          loc.slug?.trim() === slug
+            ? {
+                ...loc,
+                cover_image: coverFile
+                  ? URL.createObjectURL(coverFile)
+                  : loc.cover_image,
+              }
+            : loc,
+        ),
+        { shouldDirty: true },
+      );
+    }
   };
 
   const handleLandingPageVideoChange = async (files: File[]) => {

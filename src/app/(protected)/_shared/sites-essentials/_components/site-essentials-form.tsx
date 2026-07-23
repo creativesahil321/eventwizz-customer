@@ -79,9 +79,19 @@ function SiteEssentialsFormInner() {
   const defaultVenueLocation = resolveDefaultVenueLocation(
     venueLocations,
     venueLocations.find(
-      (loc) => String(loc.id) === String(session?.user?.vendor_location_id ?? ""),
+      (loc) =>
+        String(loc.id) === String(session?.user?.vendor_location_id ?? ""),
     ),
   );
+
+  // Keep form.slug aligned with the active venue — Import/preview overlays need it
+  // to paint the unsaved cover onto the correct Main home city card.
+  useEffect(() => {
+    const slug = defaultVenueLocation?.slug?.trim();
+    if (!slug) return;
+    if (form.getValues("slug")?.trim() === slug) return;
+    form.setValue("slug", slug, { shouldDirty: false, shouldValidate: false });
+  }, [defaultVenueLocation?.slug, form]);
 
   // Track validation errors by tab
   const [tabsWithErrors, setTabsWithErrors] = useState<Record<string, boolean>>(
@@ -240,14 +250,17 @@ function SiteEssentialsFormInner() {
     try {
       const rawFormValues = form.getValues();
       const openOnLocation = previewScope === "location";
+      // Prefer form slug (set when editing a location); fall back to active session venue
       const activeLocationSlug =
-        defaultVenueLocation?.slug?.trim() || rawFormValues.slug?.trim();
-      const previewSnapshot: SiteEssentialsFormValues = openOnLocation
-        ? {
-            ...rawFormValues,
-            slug: activeLocationSlug || rawFormValues.slug,
-          }
-        : rawFormValues;
+        rawFormValues.slug?.trim() ||
+        defaultVenueLocation?.slug?.trim() ||
+        undefined;
+      // Always tag the snapshot with the active location slug so Main home
+      // city cards can show unsaved Import/upload covers before Save.
+      const previewSnapshot: SiteEssentialsFormValues = {
+        ...rawFormValues,
+        slug: activeLocationSlug || rawFormValues.slug,
+      };
       const completeFormValues = mergeSiteEssentialsPreviewWithApi(
         previewSnapshot,
         siteEssentials ?? undefined,
@@ -277,13 +290,17 @@ function SiteEssentialsFormInner() {
         completeFormValues.name?.trim() ||
         null;
       const initialLocationIndex = activeLocationSlug
-        ? previewLocationList.findIndex((loc) => loc.slug === activeLocationSlug)
+        ? previewLocationList.findIndex(
+            (loc) => loc.slug === activeLocationSlug,
+          )
         : 0;
 
       startPreviewReview(multi, previewLocationList, vendorKey ?? undefined, {
         openOnLocation,
         initialLocationIndex:
           initialLocationIndex >= 0 ? initialLocationIndex : 0,
+        // View-only when the editor has no unsaved changes
+        requiresSave: Boolean(form.formState.isDirty),
       });
       setPreviewData(completeFormValues);
 
@@ -602,7 +619,6 @@ function SiteEssentialsFormInner() {
                   <SeoTab />
                 </div>
               </TabsContent>
-
             </div>
 
             {/* Actions sit on white, directly under tab content — avoids teal page chrome eating contrast */}

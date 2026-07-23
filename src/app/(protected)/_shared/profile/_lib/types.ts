@@ -32,6 +32,10 @@ export type ProfileResponse = {
     post_code: string | null;
     /** When present (tenant branding), matches theme API display symbol */
     currency_symbol?: string;
+    /** Same as login — true when at least one payment gateway is connected. */
+    has_payment_provider?: boolean;
+    /** Public vendor storefront URL for copy/open in the header. */
+    site_url?: string | null;
   };
   errors?: string[];
 };

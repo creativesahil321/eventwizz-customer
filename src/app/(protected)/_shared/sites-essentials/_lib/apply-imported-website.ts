@@ -73,6 +73,7 @@ export async function applyImportedWebsite(
   form: FormType,
   result: WebsiteImportResult,
   selection: ImportSelection,
+  options?: { locationSlug?: string | null },
 ): Promise<ApplyImportSummary> {
   const { content, images, socialLinks, typography } = result;
   let appliedFields = 0;
@@ -176,6 +177,27 @@ export async function applyImportedWebsite(
       if (coverFile) {
         form.setValue("cover_image", coverFile, { shouldDirty: true });
         form.setValue("cover_video", null, { shouldDirty: true });
+        // Keep Main home city-card preview in sync for the location being edited
+        const slug =
+          form.getValues("slug")?.trim() ||
+          options?.locationSlug?.trim() ||
+          "";
+        if (slug && !form.getValues("slug")?.trim()) {
+          form.setValue("slug", slug, { shouldDirty: false });
+        }
+        const locations = form.getValues("locations");
+        if (slug && Array.isArray(locations) && locations.length > 0) {
+          const coverPreviewUrl = URL.createObjectURL(coverFile);
+          form.setValue(
+            "locations",
+            locations.map((loc) =>
+              loc.slug?.trim() === slug
+                ? { ...loc, cover_image: coverPreviewUrl }
+                : loc,
+            ),
+            { shouldDirty: true },
+          );
+        }
         appliedFields += 1;
       } else {
         imageErrors.push("cover image");

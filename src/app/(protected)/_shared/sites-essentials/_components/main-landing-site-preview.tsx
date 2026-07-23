@@ -85,8 +85,7 @@ export function MainLandingSitePreview({
     formValues.main_landing_locations_list_subtitle?.trim() ||
     "Tap a city to see all upcoming events";
 
-  const heroAccentHint =
-    formValues.banner_heading_accent?.trim() || null;
+  const heroAccentHint = formValues.banner_heading_accent?.trim() || null;
 
   const locations = (formValues.locations ?? []) as LocationData[];
 

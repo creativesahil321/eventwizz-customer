@@ -6,23 +6,51 @@ import { AlertCircle, CreditCard, ArrowRight, X } from "lucide-react";
 import Link from "next/link";
 import { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
+import { useProfileData } from "@/app/(protected)/_shared/profile/_lib";
 
 export function PaymentSetupAlert() {
-  const { data: session } = useSession();
+  const { data: session, status, update } = useSession();
+  const { data: profileResponse, isLoading: isProfileLoading } = useProfileData(
+    {},
+    "vendor",
+  );
   const [dismissed, setDismissed] = useState(false);
+
+  const fromProfile = profileResponse?.data?.has_payment_provider;
+  const fromSession = session?.user?.has_payment_provider;
+
+  // Prefer profile (fresh), else login/session JWT
+  const hasPaymentProvider =
+    typeof fromProfile === "boolean" ? fromProfile : fromSession === true;
 
   useEffect(() => {
     const isDismissed = localStorage.getItem("payment_setup_alert_dismissed");
     if (isDismissed === "true") setDismissed(true);
   }, []);
 
+  // Keep session in sync when profile returns the canonical flag
+  useEffect(() => {
+    if (typeof fromProfile !== "boolean") return;
+    if (fromProfile === fromSession) return;
+    void update({ has_payment_provider: fromProfile });
+  }, [fromProfile, fromSession, update]);
+
   const handleDismiss = () => {
     setDismissed(true);
     localStorage.setItem("payment_setup_alert_dismissed", "true");
   };
 
-  // Show banner only when session key has_payment_provider is not true
-  const hasPaymentProvider = session?.user?.has_payment_provider === true;
+  if (status === "loading") return null;
+  // Avoid a false "setup required" flash before we know the flag
+  if (
+    typeof fromProfile !== "boolean" &&
+    fromSession === undefined &&
+    isProfileLoading
+  ) {
+    return null;
+  }
+
+  // true → hide banner; false → show
   if (dismissed || hasPaymentProvider) {
     return null;
   }
@@ -36,14 +64,14 @@ export function PaymentSetupAlert() {
       >
         <X className="w-4 h-4" />
       </button>
-      
+
       <div className="flex items-start gap-4 pr-8">
         <div className="flex-shrink-0">
           <div className="w-12 h-12 rounded-full bg-amber-100 flex items-center justify-center">
             <CreditCard className="w-6 h-6 text-amber-600" />
           </div>
         </div>
-        
+
         <div className="flex-1">
           <div className="flex items-center gap-2 mb-2">
             <AlertCircle className="h-5 w-5 text-amber-600" />
@@ -51,13 +79,13 @@ export function PaymentSetupAlert() {
               Payment Gateway Setup Required
             </h3>
           </div>
-          
+
           <AlertDescription className="text-amber-800 mb-4">
             You haven&apos;t connected a payment gateway yet. Without a payment
             method, customers won&apos;t be able to complete their bookings.
             Connect Stripe, PayPal, or TrueLayer in just a few minutes.
           </AlertDescription>
-          
+
           <div className="flex flex-wrap gap-3">
             <Link href="/vendor/payment-settings?tab=payment-gateways">
               <Button
@@ -69,7 +97,7 @@ export function PaymentSetupAlert() {
                 <ArrowRight className="w-4 h-4 ml-2" />
               </Button>
             </Link>
-            
+
             <Button
               variant="outline"
               onClick={handleDismiss}

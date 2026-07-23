@@ -12,6 +12,7 @@ import { MainLandingSitePreview } from "@/app/(protected)/_shared/sites-essentia
 import { SitePreviewReviewChrome } from "@/app/(protected)/_shared/sites-essentials/_components/site-preview-review-chrome";
 import { SiteEssentialsFormValues } from "@/app/(protected)/_shared/sites-essentials/_lib/schema";
 import { toSiteEssentialsUpdatePayload } from "@/app/(protected)/_shared/sites-essentials/_lib/payload";
+import { hydratePreviewMediaForSave } from "@/app/(protected)/_shared/sites-essentials/_lib/hydrate-preview-media-for-save";
 import {
   siteEssentialsKeys,
   useSiteEssentialsBySlugQuery,
@@ -46,7 +47,7 @@ export default function SitePreviewPage() {
   const queryClient = useQueryClient();
   const { data: session } = useSession();
   const { toast } = useToast();
-  const { mutate: switchLocation } = useSwitchLocation();
+  const { mutateAsync: switchLocation } = useSwitchLocation();
   const { data: siteEssentialsFromApi } = useSiteEssentialsQuery();
   const { locations: venueLocations, isLoading: isLoadingVenueLocations } =
     useVendorLocationsList();
@@ -60,25 +61,20 @@ export default function SitePreviewPage() {
     previewVendorKey,
     currentLocationIndex,
     approvedLocationSlugs,
+    previewRequiresSave,
     setPreviewData,
+    setPreviewRequiresSave,
     setReviewStep,
     setMainPageApproved,
     setCurrentLocationIndex,
     approveLocationSlug,
+    clearPreviewData,
   } = useSitePreviewStore();
 
   const [isLoading, setIsLoading] = useState(true);
   const [formData, setFormData] = useState<SiteEssentialsFormValues | null>(
     null,
   );
-
-  const resolvedGlobalData = useMemo(() => {
-    if (!formData) return null;
-    return mergeSiteEssentialsPreviewWithApi(
-      formData,
-      siteEssentialsFromApi ?? undefined,
-    );
-  }, [formData, siteEssentialsFromApi]);
 
   const safePreviewLocations = previewLocations ?? [];
   const safeApprovedSlugs = approvedLocationSlugs ?? [];
@@ -94,6 +90,20 @@ export default function SitePreviewPage() {
       ),
     [venueLocations, session?.user?.vendor_location_id],
   );
+
+  const resolvedGlobalData = useMemo(() => {
+    if (!formData) return null;
+    // Persisted snapshots sometimes omit slug; fall back to the active venue so
+    // unsaved cover_image still paints onto the correct Main home city card.
+    const slugFallback =
+      formData.slug?.trim() || defaultVenueLocation?.slug?.trim() || undefined;
+    return mergeSiteEssentialsPreviewWithApi(
+      slugFallback && !formData.slug?.trim()
+        ? { ...formData, slug: slugFallback }
+        : formData,
+      siteEssentialsFromApi ?? undefined,
+    );
+  }, [formData, siteEssentialsFromApi, defaultVenueLocation?.slug]);
 
   const sessionLocationFallback = useMemo(
     () => ({
@@ -144,7 +154,10 @@ export default function SitePreviewPage() {
     }
     return {
       ...resolvedGlobalData,
-      locations: resolveMainLandingPreviewLocations(formLocations, locationList),
+      locations: resolveMainLandingPreviewLocations(
+        formLocations,
+        locationList,
+      ),
     };
   }, [resolvedGlobalData, locationList]);
 
@@ -236,7 +249,10 @@ export default function SitePreviewPage() {
     }
     return {
       ...data,
-      locations: resolveMainLandingPreviewLocations(formLocations, locationList),
+      locations: resolveMainLandingPreviewLocations(
+        formLocations,
+        locationList,
+      ),
     };
   }, [locationPreviewData, resolvedGlobalData, locationList]);
 
@@ -344,13 +360,24 @@ export default function SitePreviewPage() {
     (next: SiteEssentialsFormValues) => {
       setFormData(next);
       setPreviewData(next);
+      // Theme/customizer edits mean there is something to approve & save
+      setPreviewRequiresSave(true);
     },
-    [setPreviewData],
+    [setPreviewData, setPreviewRequiresSave],
   );
 
   const handleGoBack = () => {
     router.back();
   };
+
+  const handleClosePreview = useCallback(() => {
+    clearPreviewData();
+    const editorPath =
+      session?.user?.account_type === "admin"
+        ? "/admin/sites-essentials"
+        : "/vendor/sites-essentials";
+    router.replace(editorPath);
+  }, [clearPreviewData, router, session?.user?.account_type]);
 
   const handleEdit = () => {
     const loc = locationList[safeLocationIndex];
@@ -438,67 +465,150 @@ export default function SitePreviewPage() {
     }
   };
 
-  const handleSave = useCallback(async () => {
-    const ready = hasMultipleLocations
-      ? mainPageApproved &&
-        allPreviewLocationsApproved(locationList, safeApprovedSlugs)
-      : allPreviewLocationsApproved(locationList, safeApprovedSlugs);
-
-    if (!resolvedGlobalData || !ready) {
-      return;
-    }
-
-    try {
-      await saveSiteEssentials({
-        ...toSiteEssentialsUpdatePayload(resolvedGlobalData),
-        _method: "PATCH",
-      } as Partial<SiteEssentialsFormValues> & { _method: "PATCH" });
-      await queryClient.invalidateQueries({ queryKey: themeKeys.all });
-      await queryClient.invalidateQueries({
-        queryKey: siteEssentialsKeys.details(),
-      });
-      locationList.forEach((loc) => {
-        queryClient.invalidateQueries({
-          queryKey: siteEssentialsKeys.bySlug(loc.slug),
-        });
-      });
-      try {
-        setPreviewData(structuredClone(resolvedGlobalData));
-      } catch {
-        setPreviewData(JSON.parse(JSON.stringify(resolvedGlobalData)));
+  const handleSave = useCallback(
+    async (options?: { approveSlug?: string }) => {
+      if (options?.approveSlug) {
+        approveLocationSlug(options.approveSlug);
       }
-      toast({
-        title: "Saved",
-        description: "Site essentials were updated successfully.",
-      });
-      router.back();
-    } catch {
-      toast({
-        title: "Could not save",
-        description:
-          "Please try again from Site Essentials or fix any validation errors.",
-        variant: "destructive",
-      });
-    }
-  }, [
-    resolvedGlobalData,
-    hasMultipleLocations,
-    mainPageApproved,
-    locationList,
-    safeApprovedSlugs,
-    queryClient,
-    router,
-    saveSiteEssentials,
-    setPreviewData,
-    toast,
-  ]);
+
+      const approvedSlugs =
+        options?.approveSlug &&
+        !safeApprovedSlugs.includes(options.approveSlug)
+          ? [...safeApprovedSlugs, options.approveSlug]
+          : safeApprovedSlugs;
+
+      const ready = hasMultipleLocations
+        ? mainPageApproved &&
+          allPreviewLocationsApproved(locationList, approvedSlugs)
+        : allPreviewLocationsApproved(locationList, approvedSlugs);
+
+      if (!resolvedGlobalData) {
+        toast({
+          title: "Nothing to save",
+          description: "Preview data is still loading. Try again in a moment.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      if (!ready) {
+        // Don't leave the user stuck — jump to the first page still needing approval.
+        if (hasMultipleLocations && !mainPageApproved) {
+          setReviewStep("main");
+          window.scrollTo({ top: 0, behavior: "smooth" });
+          toast({
+            title: "Review Main home first",
+            description:
+              "Approve the main home page, then continue through each location.",
+          });
+          return;
+        }
+
+        const pendingIndex = locationList.findIndex(
+          (loc) => !approvedSlugs.includes(loc.slug),
+        );
+        if (pendingIndex >= 0) {
+          const pending = locationList[pendingIndex];
+          setReviewStep("location");
+          setCurrentLocationIndex(pendingIndex);
+          window.scrollTo({ top: 0, behavior: "smooth" });
+          toast({
+            title: `Review ${pending.city}`,
+            description:
+              "This location was skipped — approve it here, then save again.",
+          });
+          return;
+        }
+
+        toast({
+          title: "Approve all pages first",
+          description: "Finish reviewing each page, then save.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      try {
+        // Switch session to the location that owns cover_image before PATCH
+        const targetSlug =
+          resolvedGlobalData.slug?.trim() ||
+          options?.approveSlug ||
+          currentSlug ||
+          undefined;
+        const targetLocation = locationList.find(
+          (loc) => loc.slug === targetSlug,
+        );
+        if (targetLocation?.id != null) {
+          await switchLocation(targetLocation.id);
+        }
+
+        const hydrated = await hydratePreviewMediaForSave(
+          toSiteEssentialsUpdatePayload(resolvedGlobalData),
+        );
+
+        await saveSiteEssentials({
+          ...hydrated,
+          _method: "PATCH",
+        } as Partial<SiteEssentialsFormValues> & { _method: "PATCH" });
+        await queryClient.invalidateQueries({ queryKey: themeKeys.all });
+        await queryClient.invalidateQueries({
+          queryKey: siteEssentialsKeys.details(),
+        });
+        locationList.forEach((loc) => {
+          queryClient.invalidateQueries({
+            queryKey: siteEssentialsKeys.bySlug(loc.slug),
+          });
+        });
+
+        // Close the preview session and return to the editor
+        clearPreviewData();
+        toast({
+          title: "Saved",
+          description: "Site essentials were updated successfully.",
+        });
+        const editorPath =
+          session?.user?.account_type === "admin"
+            ? "/admin/sites-essentials"
+            : "/vendor/sites-essentials";
+        router.replace(editorPath);
+      } catch {
+        toast({
+          title: "Could not save",
+          description:
+            "Please try again from Site Essentials or fix any validation errors.",
+          variant: "destructive",
+        });
+      }
+    },
+    [
+      resolvedGlobalData,
+      hasMultipleLocations,
+      mainPageApproved,
+      locationList,
+      safeApprovedSlugs,
+      approveLocationSlug,
+      setReviewStep,
+      setCurrentLocationIndex,
+      currentSlug,
+      switchLocation,
+      queryClient,
+      router,
+      saveSiteEssentials,
+      clearPreviewData,
+      session?.user?.account_type,
+      toast,
+    ],
+  );
 
   const handleSaveTheme = useCallback(async () => {
     const dataForSave = locationPreviewData ?? resolvedGlobalData;
     if (!dataForSave) return;
     try {
+      const hydrated = await hydratePreviewMediaForSave(
+        toSiteEssentialsUpdatePayload(dataForSave),
+      );
       await saveSiteEssentials({
-        ...toSiteEssentialsUpdatePayload(dataForSave),
+        ...hydrated,
         _method: "PATCH",
       } as Partial<SiteEssentialsFormValues> & { _method: "PATCH" });
       await queryClient.invalidateQueries({ queryKey: themeKeys.all });
@@ -564,7 +674,9 @@ export default function SitePreviewPage() {
     <PreviewProvider
       isPreviewMode={true}
       previewLocations={
-        hasMultipleLocations && locationList.length > 0 ? locationList : undefined
+        hasMultipleLocations && locationList.length > 0
+          ? locationList
+          : undefined
       }
       activePreviewLocationSlug={
         effectiveReviewStep === "location" ? currentSlug : undefined
@@ -608,7 +720,11 @@ export default function SitePreviewPage() {
             brandName={resolvedGlobalData.name?.trim() || "Site preview"}
             onSaveTheme={handleSaveTheme}
             isSavingTheme={isSaving}
-            sheetDescription="Adjust colors or fonts. Approve each location page, then save."
+            sheetDescription={
+              previewRequiresSave
+                ? "Adjust colors or fonts. Approve each location page, then save."
+                : "Adjust colors or fonts. Editing will enable Approve & save."
+            }
           />
         ) : null}
 
@@ -633,13 +749,26 @@ export default function SitePreviewPage() {
           approvedLocationSlugs={safeApprovedSlugs}
           isSaving={isSaving}
           isLoadingLocation={isLoadingLocationPreview}
+          viewOnly={!previewRequiresSave}
           onEdit={handleEdit}
           onApproveMain={handleApproveMain}
           onApproveCurrentLocation={handleApproveCurrentLocation}
           onContinueFromMain={handleContinueFromMain}
           onNextLocation={handleNextLocation}
           onPreviousLocation={handlePreviousLocation}
-          onSave={() => void handleSave()}
+          onSave={(options) => {
+            void handleSave(options);
+          }}
+          onClosePreview={handleClosePreview}
+          onGoToStep={(step) => {
+            if (step === "main") {
+              setReviewStep("main");
+            } else {
+              setReviewStep("location");
+              setCurrentLocationIndex(step.locationIndex);
+            }
+            window.scrollTo({ top: 0, behavior: "smooth" });
+          }}
           onBackToMain={
             hasMultipleLocations
               ? () => {

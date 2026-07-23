@@ -119,8 +119,8 @@ export const adminMenus: MenuItemProps[] = [
     id: 16,
     title: "Support",
     icon: "headphones", // <Headphones />
-    href: createAdminUrl("/admin/support/dashboard"),
-    url: createAdminUrl("/admin/support/dashboard"),
+    href: createAdminUrl("/admin/support"),
+    url: createAdminUrl("/admin/support"),
     type: "item",
     menu: [],
   },

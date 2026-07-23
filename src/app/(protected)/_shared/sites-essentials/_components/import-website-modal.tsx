@@ -34,6 +34,9 @@ import {
   applyImportedWebsite,
   type ImportSelection,
 } from "../_lib/apply-imported-website";
+import { useSession } from "next-auth/react";
+import { useVendorLocationsList } from "@/app/(protected)/vendor/venue-locations/_lib/queries";
+import { resolveDefaultVenueLocation } from "@/lib/auth/session-location";
 
 interface ImportWebsiteModalProps {
   open: boolean;
@@ -51,6 +54,15 @@ export function ImportWebsiteModal({
   onOpenChange,
 }: ImportWebsiteModalProps) {
   const form = useFormContext<SiteEssentialsFormValues>();
+  const { data: session } = useSession();
+  const { locations: venueLocations } = useVendorLocationsList();
+  const activeVenueSlug = resolveDefaultVenueLocation(
+    venueLocations,
+    venueLocations.find(
+      (loc) =>
+        String(loc.id) === String(session?.user?.vendor_location_id ?? ""),
+    ),
+  )?.slug?.trim();
   const { importWebsite, isImporting } = useWebsiteImport();
   const { generateColorTheme } = useColorThemeAI();
 
@@ -179,10 +191,18 @@ export function ImportWebsiteModal({
         await applyColorsFromWebsite();
       }
 
-      const summary = await applyImportedWebsite(form, result, {
-        ...selection,
-        coverUrl: selection.cover ? selectedCover || undefined : undefined,
-      });
+      const summary = await applyImportedWebsite(
+        form,
+        result,
+        {
+          ...selection,
+          coverUrl: selection.cover ? selectedCover || undefined : undefined,
+        },
+        {
+          locationSlug:
+            form.getValues("slug")?.trim() || activeVenueSlug || undefined,
+        },
+      );
 
       if (summary.imageErrors.length > 0) {
         toast.warning("Some images couldn't be imported", {

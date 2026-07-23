@@ -89,41 +89,40 @@ export const updateSiteEssentials = async (
     );
 
     if (hasFiles) {
-      // Create FormData for multipart request
+      // Laravel expects nested objects as PHP array fields
+      // (colors[primary], typography[fontFamily][heading], …) — not JSON strings.
       const formData = new FormData();
+      appendToFormData(formData, data as Record<string, unknown>);
 
-      Object.entries(data).forEach(([key, value]) => {
-        if (value instanceof File || value instanceof Blob) {
-          formData.append(key, value);
-        } else if (value !== null && value !== undefined) {
-          // Handle nested objects (like colors, typography, etc.)
-          if (typeof value === "object") {
-            formData.append(key, JSON.stringify(value));
-          } else {
-            formData.append(key, String(value));
-          }
-        }
-      });
+      if (!formData.has("_method")) {
+        formData.append("_method", "PATCH");
+      }
 
       const response = await api.post<SiteEssentialsResponse>(
         endpoints.UPDATE,
-        {
-          ...data,
-          _method: "PATCH",
-        },
+        formData,
         {
           returnFullResponse: true,
           headers: {
             "Content-Type": "multipart/form-data",
           },
-        }
+        },
       );
       return flattenInfoPages(response.data);
     } else {
+      // Strip unsaved blob/data URLs — they are not valid server media paths
+      const sanitized = Object.fromEntries(
+        Object.entries(data).filter(([_, value]) => {
+          if (typeof value !== "string") return true;
+          const v = value.trim();
+          return !(v.startsWith("blob:") || v.startsWith("data:"));
+        }),
+      ) as Partial<SiteEssentialsFormValues>;
+
       const response = await api.patch<SiteEssentialsResponse>(
         endpoints.UPDATE,
-        data as unknown as SiteEssentialsFormValues,
-        { returnFullResponse: true }
+        sanitized as unknown as SiteEssentialsFormValues,
+        { returnFullResponse: true },
       );
       return flattenInfoPages(response.data);
     }
@@ -132,6 +131,52 @@ export const updateSiteEssentials = async (
     throw error;
   }
 };
+
+/**
+ * Append nested objects/arrays using PHP/Laravel bracket notation so validators
+ * receive arrays (e.g. colors[primary]), not a JSON string.
+ */
+function appendToFormData(
+  formData: FormData,
+  value: unknown,
+  path = "",
+): void {
+  if (value === null || value === undefined) return;
+
+  if (value instanceof File || value instanceof Blob) {
+    if (path) formData.append(path, value);
+    return;
+  }
+
+  if (Array.isArray(value)) {
+    value.forEach((item, index) => {
+      appendToFormData(formData, item, `${path}[${index}]`);
+    });
+    return;
+  }
+
+  if (typeof value === "object") {
+    Object.entries(value as Record<string, unknown>).forEach(([key, nested]) => {
+      const nextPath = path ? `${path}[${key}]` : key;
+      appendToFormData(formData, nested, nextPath);
+    });
+    return;
+  }
+
+  if (!path) return;
+  if (typeof value === "boolean") {
+    formData.append(path, value ? "1" : "0");
+    return;
+  }
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    // Never send preview-only blob/data URLs to the API
+    if (trimmed.startsWith("blob:") || trimmed.startsWith("data:")) return;
+    formData.append(path, value);
+    return;
+  }
+  formData.append(path, String(value));
+}
 
 const siteEssentialsService = {
   getSiteEssentials,

@@ -410,43 +410,53 @@ After login, customers land on **Customer Dashboard** (/customer/dashboard). The
 
 2. **Profile** (/customer/profile) — Update **name** (first/last), **phone**, **avatar** (profile picture), and **password** (current password, new password, confirm). Save separately for profile vs password.
 
-3. **Bookings** (/customer/bookings) — **My Bookings** list. **Filters**: status (All, Pending, Confirmed, Cancelled, Partial Payment), **search**, **pagination**. Each booking shows event name, status, payment status, total, booking ref, etc. Actions: **View Details** → opens booking detail page; **Menu Choices** (if applicable) → opens menu choices for that booking.
+3. **Bookings** (/customer/bookings) — **My Bookings** list. **Filters**: status (All Bookings, Confirmed, Cancelled, Partial Payment), **search**. Each card shows booking ID, status, event name, date, total. Actions: **View** → opens booking detail; **Menu choices** (when available) → opens that booking’s detail focused on dish choices.
 
-4. **Notifications** (/customer/notifications) — List of **in-app notifications**. Filter, paginate, **mark as read / unread**, **mark all as read**. Open a notification to view details.
+4. **Support** (/customer/support) — **New enquiry** and **Inbox** for formal support tickets.
 
-5. **Transactions** (/customer/transactions) — **Payment history**: list of transactions (payments made). Filter by status, date, method; view transaction details. Use this to see “what I paid” and receipts, not to make a new payment (new payments are done at checkout).
+5. **Notifications** (/customer/notifications) — List of **in-app notifications**. Filter, paginate, **mark as read / unread**, **mark all as read**.
 
-**No sidebar item**: **Support** is commented out in the customer menu (not currently in the sidebar). Do not tell customers to go to “Support” in the sidebar unless it is re-enabled.
+6. **Transactions** (/customer/transactions) — **Payment history**: list of payments made. Use this to see “what I paid”, not to make a new payment (new payments are at checkout or on the booking detail page).
 
-### 4. Booking detail: pay balance, reschedule, and add-ons
+### 4. Booking detail: pay balance, reschedule, and add-ons (ACCURATE UI — MUST FOLLOW)
 
-- **Booking detail** — **/customer/bookings/[id]** (replace [id] with the booking ID). This is the **same booking** they see in **Bookings** (/customer/bookings). From here they can **pay balance**, **reschedule** a date, and **add add-ons**. **Tabs**: **Booking Info** (summary, dates, payment status, download invoice, pay outstanding balance), **Add-ons** (add more tables/tickets/drinks for a date, reschedule a date, view or remove existing add-ons). **Menu choices** link goes to /customer/menu-choices/[bookingId] when the booking has catering.
+- **Booking detail** — **/customer/bookings/[id]**. One checkout-style page (not separate “Booking Info” / “Add-ons” tabs). From here the customer can: **pay balance**, **Reschedule**, **Add extras for this date**, **menu choices** (inline), and **Download Invoice**.
+
+**CRITICAL — ROOMS AFTER BOOKING (NEVER GET THIS WRONG):**
+- Customers **cannot** add, change, remove, or update **rooms** (event spaces / halls) after a booking is made.
+- There is **no** “Additional Rooms”, “Add room”, or “new room on existing booking” button on the booking page.
+- **Add room** exists **only on Checkout** (before the booking is completed), when booking another space in the cart.
+- If someone asks “how do I book / add a new room on my existing booking?”, say clearly that **rooms cannot be changed after booking**, and guide them to **Add extras for this date** if they need extra **tickets**, **tables/guests**, or **drink packages** for the room/date they already booked. For a different room/hall they must make a **new booking** (venue site → event → **Choose Your Room** → date → Checkout).
 
 **If payment failed at checkout**  
-If the customer’s **payment failed** at checkout (e.g. card declined, session expired), the **booking is still created** and appears in their **dashboard** under **Bookings** with a status like Pending or Partial Payment. They open **the same booking** (View Details → /customer/bookings/[id]), and on the booking detail page they can **pay the balance** (outstanding amount). So: payment failed at checkout → go to **Bookings** in the dashboard → open that booking → **pay from the booking detail page**.
+The booking still appears under **Bookings**. Open it with **View**, then **Pay … Now** / **Pay All** for the outstanding amount. Do not book again.
 
 **Pay balance**  
-On the booking detail page, the **outstanding balance** (or “Balance due”) is shown. The customer can **pay** it from there (same payment options as at checkout). Use this for: failed checkout payment, deposit balance due, or add-ons they just added.
+Buttons: **Pay {amount} Now**, **Pay All** (multi-date), or **Pay {amount}**. Use for failed checkout, deposit balance due, or extras just added.
 
 **Reschedule**  
-From the **booking detail** page, the customer can **reschedule** one or more dates (e.g. “Reschedule” for a date, often from the Add-ons tab or per-date actions). They choose a **new date** from the available event dates and confirm. **Important**: Rescheduling a date may **remove add-ons** for that date (e.g. extra tables, tickets, drinks added for that date); the system may show a warning before confirming. After reschedule they may need to **pay** if there is a fee or balance. Tell customers: go to **Bookings** → open the booking → use **Reschedule** for the date you want to change; check the warning about add-ons.
+Use **Reschedule** on the booking detail page when shown. Pick a new date and confirm. **Important**: rescheduling may **remove add-ons** for that date (warning shown). After reschedule they may need to pay.
 
-**Add add-ons**  
-From the **booking detail** page, **Add-ons** tab: the customer can **add more** tables, tickets, or drinks to an **existing** booking for a given date. They select the date, then add extra tables/tickets/drinks (same types as at checkout). They may need to **pay** for the new add-ons (balance updates). They can also **view or remove** existing add-ons here. So: **Bookings** → open booking → **Add-ons** tab → choose date → add tables/tickets/drinks → pay if required.
+**Add extras (add-ons) — this is the only way to add more after booking**  
+On the booking detail page, open **Add extras for this date**, then add:
+- **Tickets**
+- **Table Seating** / **Add guests / tables** (extra guests or tables for that date — **not** a new venue room)
+- **Drink Packages**
+Then **Add to booking** and pay if required. They can **View add-ons** and remove unpaid add-on lines when allowed.
 
-- **Menu choices** — **/customer/menu-choices/[bookingId]**. For bookings that include **catering** (tables with menu), the customer selects **menu items per date and per table** (e.g. starter, main, dessert). **Date switcher** and **table switcher**; **Save** to submit. Vendor sees these under **Vendor → Menu Choice**.
+**Menu choices**  
+From the list use **Menu choices**, or on the booking detail page use **Add menu choices** / attendees inline on table lines. There is **no** separate /customer/menu-choices/[bookingId] page in the live UI. Vendor reviews picks under **Menu Choice**.
 
 ### 5. Summary for the AI
 
-- **Where do customers book?** On **vendor subdomains** (e.g. venue.eventwizz.com): browse events → event detail → add to cart → **Checkout** (/vendor/checkout). Must be **logged in as customer** to checkout.
-- **Where do customers go after login?** **/customer/dashboard** (Dashboard, then Bookings, Profile, Notifications, Transactions as needed).
-- **How do they see their bookings?** **Bookings** (/customer/bookings). View details: **/customer/bookings/[id]**.
-- **How do they add menu choices (e.g. dish selection)?** **Menu Choices** for that booking: from Bookings list click “Menu Choices” for the booking, or open **/customer/menu-choices/[bookingId]**.
-- **How do they pay balance or update profile?** Pay balance from **booking detail** (/customer/bookings/[id]). Update name/phone/avatar/password in **Profile** (/customer/profile).
-- **Payment failed at checkout?** The same booking appears in **Bookings**; open it and **pay the balance** on the booking detail page. No need to book again.
-- **Reschedule:** From **booking detail** → Reschedule for a date → choose new date → confirm (warning: add-ons for that date may be removed).
-- **Add add-ons:** From **booking detail** → **Add-ons** tab → choose date → add tables/tickets/drinks → pay if required.
-- **Transactions** = history of payments made. **Notifications** = in-app notifications (read/unread).
+- **Where do customers book?** Venue site → event → optional **Choose Your Room** → **Select a Date** → **Checkout**. Must be logged in as customer at checkout.
+- **Where do customers go after login?** **Dashboard**, then **Bookings**, **Profile**, **Support**, **Notifications**, **Transactions**.
+- **How do they see bookings?** **Bookings** → **View**.
+- **Menu choices?** **Menu choices** on the list or **Add menu choices** on the booking page.
+- **Pay balance?** Booking detail → **Pay … Now** / **Pay All**.
+- **Reschedule?** Booking detail → **Reschedule** (add-ons for that date may be removed).
+- **Add more after booking?** Only **Add extras for this date** (tickets / tables-guests / drinks). **Never** rooms.
+- **Want another room/hall?** New booking on the venue site — not on the existing booking.
 
 ## Complete EventWizz Platform Overview
 
@@ -475,12 +485,10 @@ EventWizz is a comprehensive multi-tenant event management platform that serves 
 - **Key Features** (see “Customer Flow & Customer Dashboard” for full detail):
   - **Dashboard** (/customer/dashboard): My Upcoming Events, Nearby Events, Recent Bookings (link to Bookings and to booking detail).
   - **Profile** (/customer/profile): Update name, phone, avatar, password.
-  - **Bookings** (/customer/bookings): My Bookings list with status filter (All, Pending, Confirmed, Cancelled, Partial Payment), search, pagination; View Details → /customer/bookings/[id]; Menu Choices → /customer/menu-choices/[bookingId].
-  - **Booking detail** (/customer/bookings/[id]): Same booking as in list. **Pay balance** (including after failed checkout), **Reschedule** a date (new date; add-ons for that date may be removed), **Add-ons** tab (add more tables/tickets/drinks per date, view/remove existing), download invoice, link to menu choices.
-  - **Menu choices** (/customer/menu-choices/[bookingId]): Select dishes per date and per table for that booking; save choices.
-  - **Notifications** (/customer/notifications): In-app notifications; mark read/unread.
-  - **Transactions** (/customer/transactions): Payment history and transaction details.
-  - **Public (no login)**: Browse events on vendor subdomain, event detail, add to cart; **login required at checkout**.
+  - **Bookings** (/customer/bookings): My Bookings list; **View** and **Menu choices** on cards → booking detail /customer/bookings/[id].
+  - **Booking detail** (/customer/bookings/[id]): **Pay … Now** / **Pay All**, **Reschedule**, **Add extras for this date** (tickets / tables-guests / drinks only — **not rooms**), inline **Add menu choices**, **Download Invoice**. No “Add room” after booking.
+  - **Support**, **Notifications**, **Transactions** in the customer menu.
+  - **Public (no login)**: Browse events on vendor subdomain; **login required at checkout**. **Add room** only on Checkout before payment.
 
 
 ### Checkout & Booking System
@@ -606,18 +614,19 @@ The full **11-step vendor onboarding** is described in the "Vendor Onboarding (F
 - **"Do I need to create an account?"** - You can browse events without an account. To **complete a booking** you must **log in as a customer** (or register at /auth/register then /auth/register/customer). At checkout, if you’re not logged in, you’ll be sent to login and then back to checkout.
 
 #### For Customers (Dashboard — After Login)
-- **"Where do I go after login?"** - You are taken to **Customer Dashboard** (/customer/dashboard). There is no “select location” step; you see **My Upcoming Events**, **Nearby Events**, and **Recent Bookings**.
-- **"Where are my bookings?"** - **Bookings** (/customer/bookings). You can filter by status (All, Pending, Confirmed, Cancelled, Partial Payment) and search. Click a booking to view details or open **Menu Choices** for that booking.
-- **"How do I view one booking?"** - In **Bookings**, click **View Details** on the booking, or go to **/customer/bookings/[booking-id]**.
-- **"How do I add menu choices (dishes) for my booking?"** - From **Bookings**, click **Menu Choices** for that booking, or go to **/customer/menu-choices/[bookingId]**. Select dishes per date and per table, then save.
-- **"How do I pay my balance?"** - Go to **Bookings** → open the booking (**View Details**) → **/customer/bookings/[id]**. On the booking detail page you’ll see the outstanding balance and can **pay** it there (same payment options as checkout). You can also **reschedule** or **add add-ons** from that page.
-- **"Payment failed at checkout — how do I pay?"** - The **same booking** will appear in your **Bookings** list in the dashboard (e.g. Pending or Partial Payment). Open that booking (**View Details**), then on the **booking detail** page (**/customer/bookings/[id]**) you can **pay the balance** (outstanding amount). You don’t have to book again; just pay on the existing booking.
-- **"How do I reschedule my booking?"** - Go to **Bookings** → open the booking (**View Details**) → booking detail page. Use **Reschedule** for the date you want to change (often in the **Add-ons** tab or next to that date). Pick a **new date** from the available event dates and confirm. **Note**: Rescheduling a date may remove add-ons for that date (e.g. extra tables/drinks); the page will warn you before you confirm.
-- **"How do I add add-ons (extra tables, tickets, drinks) to my booking?"** - Go to **Bookings** → open the booking (**View Details**) → **Add-ons** tab. Choose the **date**, then add more **tables**, **tickets**, or **drinks** (same types as at booking). You may need to **pay** for the new add-ons. You can also view or remove existing add-ons there.
-- **"Where do I update my name or password?"** - **Profile** (/customer/profile). You can update first name, last name, phone, avatar, and password (current password required for password change).
-- **"Where do I see my payment history?"** - **Transactions** (/customer/transactions). This shows payments you’ve made and transaction details; it is not for making new payments (new payments are at checkout or on the booking detail page).
-- **"Where are my notifications?"** - **Notifications** (/customer/notifications). You can mark items read/unread and view details.
-- **"Is my payment secure?"** - Yes. Payments are processed via secure gateways (e.g. Stripe, PayPal). Do not share your password or payment details with anyone; the platform never asks for your full card number in chat.
+- **"Where do I go after login?"** - **Customer Dashboard**. No “select location” step.
+- **"Where are my bookings?"** - **Bookings**. Filter and search; use **View** or **Menu choices** on a card.
+- **"How do I view one booking?"** - **Bookings** → **View**.
+- **"How do I add menu choices (dishes) for my booking?"** - **Bookings** → **Menu choices**, or open the booking and use **Add menu choices** on the booking page (inline attendees).
+- **"How do I pay my balance?"** - **Bookings** → **View** → **Pay … Now** / **Pay All**.
+- **"Payment failed at checkout — how do I pay?"** - Same booking in **Bookings** → **View** → pay the outstanding amount. Do not book again.
+- **"How do I reschedule my booking?"** - **Bookings** → **View** → **Reschedule**. Warning: add-ons for that date may be removed.
+- **"How do I add add-ons / extras?"** - **Bookings** → **View** → **Add extras for this date** → tickets, tables/guests, or drink packages → **Add to booking** → pay if needed. There is **no** separate “Add-ons” tab label — the button is **Add extras for this date**.
+- **"Can I add / change a room on an existing booking?"** - **No.** Rooms cannot be added or changed after booking. Use **Add extras for this date** for extra tickets/tables/drinks on the room you already booked. To book a different room/hall, start a **new booking** on the venue site (**Choose Your Room** → date → Checkout). Never invent an “Additional Rooms” or “Add room” step on the booking page.
+- **"Where do I update my name or password?"** - **Profile**.
+- **"Where do I see my payment history?"** - **Transactions**.
+- **"Where are my notifications?"** - **Notifications**.
+- **"Is my payment secure?"** - Yes. Secure payment gateways. Never ask for full card numbers or passwords in chat.
 
 #### For Vendors (Fresh / Onboarding)
 - **"How many steps is onboarding?"** - 11 steps: Venue, Site, Event, Package, Dates, Catering, Other Packages, Brochure info, FAQs, Domain, Payment
@@ -803,7 +812,14 @@ WHAT YOU HELP WITH (customer-facing):
 - Optional **Choose Your Room**, then **Select a Date** → **Checkout**
 - On Checkout: **Tickets**, **Table Seating**, **Drinks**, guest allocation, Pay in Full or Table deposit
 - After log in: **Dashboard**, **Profile**, **Bookings**, **Support**, **Notifications**, **Transactions**
-- Paying a balance, rescheduling, add extras, menu choices — using on-screen labels only
+- Paying a balance, rescheduling, **Add extras for this date**, menu choices — using on-screen labels only
+
+CRITICAL ACCURACY (MUST FOLLOW — NEVER INVENT UI):
+- After a booking exists, customers **cannot** add or change **rooms**. Do **not** invent “Additional Rooms”, “Add room”, or any room-update steps on the booking page.
+- Post-booking extras are only via **Add extras for this date** (tickets, tables/guests, drink packages).
+- **Add room** is Checkout-only (before the booking is paid/completed).
+- Prefer a different room after booking → tell them to make a **new booking** on the venue site.
+- Never invent buttons, tabs, or pages that are not listed in your knowledge.
 
 ${supportGuidance}
 
@@ -856,13 +872,15 @@ export const VENDOR_STOREFRONT_KNOWLEDGE = `
 
 ## After login (customer)
 - Menu: **Dashboard**, **Profile**, **Bookings**, **Support**, **Notifications**, **Transactions**.
-- **Bookings** → **View** a booking → pay balance (**Pay Now**), **Reschedule** (add-ons for that date may be removed), **Add extras for this date**, dish choices (**Menu choices** / attendees on the booking page).
+- **Bookings** → **View** a booking → **Pay … Now** / **Pay All**, **Reschedule** (add-ons for that date may be removed), **Add extras for this date** (tickets / tables-guests / drinks), **Add menu choices** on the booking page, **Download Invoice**.
 - Failed checkout: open the same booking and pay — do not start a brand-new booking.
 - **Support** → **New enquiry** or **Inbox**. Guests use **Contact Us**.
 
-## Rooms (event spaces)
-- Some events have multiple rooms/halls. Customer picks **Choose Your Room** to see that space’s packages, menus and dates.
-- On Checkout, room tabs switch between rooms in the cart; **Add room** to book another space.
+## Rooms (event spaces) — CRITICAL
+- Before booking: multi-room events use **Choose Your Room** on the event page. On Checkout, room tabs switch rooms in the cart; **Add room** adds another space to the cart **before** payment.
+- **After booking: rooms are fixed.** Customers **cannot** add, swap, or update rooms on an existing booking. There is no “Additional Rooms” section.
+- After booking they may only use **Add extras for this date** for more tickets, guests/tables, or drinks on the room/date already booked.
+- Need a different room/hall? Start a **new booking** (event → Choose Your Room → date → Checkout).
 `.trim();
 
 /**
@@ -914,9 +932,9 @@ Opt-in on Timeline & package. Each room can have its own packages, dates, cateri
 
 ## Customer public booking (venue site)
 Main home (multi-location) → city → location page → event → optional room → **Select a Date** → **Checkout**.
-On Checkout: Tickets, Table Seating, Drinks, Guest Allocation, Pay in Full or Table deposit.
+On Checkout: Tickets, Table Seating, Drinks, Guest Allocation, Pay in Full or Table deposit. **Add room** only here (before booking completes).
 Login required at checkout. After login: Dashboard, Profile, Bookings, Support, Notifications, Transactions.
-Booking detail: Pay Now / balance, Reschedule, Add extras for this date, menu choices on the booking page.
+Booking detail (**View**): **Pay … Now**, **Reschedule**, **Add extras for this date** (tickets / tables-guests / drinks only), inline menu choices. **No Add room / Additional Rooms after booking.**
 
 ## Do not confuse
 | Goal | Place |
@@ -928,7 +946,9 @@ Booking detail: Pay Now / balance, Reschedule, Add extras for this date, menu ch
 | Event address / brochure PDFs | **Brochure Info** |
 | Customer dish picks | Booking detail / vendor **Menu Choice** |
 | Seating after sale | **Table Assignment** |
-| Multiple halls | **Multiple event spaces** / rooms |
+| Multiple halls (before booking) | **Choose Your Room** / Checkout **Add room** |
+| Extra tickets/tables/drinks after booking | **Add extras for this date** |
+| Add/change room after booking | **Not possible** — new booking required |
 `.trim();
 
 export const CHAT_INSTRUCTIONS = `
@@ -945,6 +965,8 @@ IMPORTANT GUIDELINES:
 - Always respond in a user-friendly, non-technical way
 - Never mention coding jargon (API endpoints, databases, servers). Do **not** invent URLs.
 - When directing someone to a page, use the **NAVIGATION LINKS** list: include a clickable markdown link [Label](/path) plus the plain menu name.
+- **Never invent UI** (buttons, tabs, sections). If it is not in the knowledge / training, do not describe it.
+- **Rooms after booking**: customers cannot add or change rooms on an existing booking. Only **Add extras for this date**. Say this clearly when asked.
 - Focus on practical solutions and step-by-step guidance
 - Be professional but approachable
 - Tailor your responses to the user type when possible
@@ -961,9 +983,10 @@ When helping **vendors** or **customers**, never use coding jargon (API, endpoin
 USER TYPE GUIDANCE:
 
 For CUSTOMERS (event attendees):
-- **Booking**: On the venue website: browse → event → optional **Choose Your Room** → **Select a Date** (adds to cart) → **Checkout**. On Checkout choose **Tickets**, **Table Seating**, **Drinks**, complete guest allocation if needed, then **Pay in Full** or **Table deposit**. Login required at checkout.
+- **Booking**: On the venue website: browse → event → optional **Choose Your Room** → **Select a Date** (adds to cart) → **Checkout**. On Checkout choose **Tickets**, **Table Seating**, **Drinks**, complete guest allocation if needed, then **Pay in Full** or **Table deposit**. Login required at checkout. **Add room** only on Checkout before the booking is completed.
 - **After login**: **Dashboard**, **Profile**, **Bookings**, **Support**, **Notifications**, **Transactions**.
-- **Where to do what**: View bookings → **Bookings**. Pay balance → open booking → **Pay Now**. Reschedule → **Reschedule** (add-ons for that date may be removed). Add extras → **Add extras for this date**. Dish choices → on the booking page (**Menu choices** / attendees). Profile → **Profile**. Payments history → **Transactions**. Help → **Support** → **New enquiry**.
+- **Where to do what**: View bookings → **Bookings** → **View**. Pay balance → **Pay … Now**. Reschedule → **Reschedule** (add-ons for that date may be removed). Add extras → **Add extras for this date** (tickets / tables-guests / drinks). Dish choices → **Menu choices** / **Add menu choices** on the booking page. Profile → **Profile**. Payments history → **Transactions**. Help → **Support** → **New enquiry**.
+- **NEVER**: tell customers they can add or change **rooms** after booking. That is impossible. Do not invent “Additional Rooms” or “Add room” on the booking page.
 
 For VENDORS (venue owners):
 - **Onboarding**: AI-Powered or Manual. Steps in order: Venue, Site, Event, Timeline & Package, Dates, Catering, Brochure info, Other Packages, FAQs, Domain, Payment. Optional **Multiple event spaces** (rooms).

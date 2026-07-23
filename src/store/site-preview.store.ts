@@ -12,6 +12,11 @@ export type StartPreviewReviewOptions = {
   openOnLocation?: boolean;
   /** Which location to show when `openOnLocation` is true. */
   initialLocationIndex?: number;
+  /**
+   * When false, preview is view-only (no unsaved editor changes) —
+   * browse pages and close without Approve & save.
+   */
+  requiresSave?: boolean;
 };
 
 interface SitePreviewState {
@@ -23,6 +28,11 @@ interface SitePreviewState {
    * as stale and never overrides fresh server data in the editor.
    */
   previewFresh: boolean;
+  /**
+   * True when the editor had unsaved changes (or preview was edited).
+   * False = view-only browse; no Approve & save required.
+   */
+  previewRequiresSave: boolean;
   previewScope: SitePreviewScope;
   reviewStep: SitePreviewReviewStep;
   mainPageApproved: boolean;
@@ -33,6 +43,7 @@ interface SitePreviewState {
   /** Detects stale localStorage from another vendor/session (domain or site name). */
   previewVendorKey: string | null;
   setPreviewData: (data: SiteEssentialsFormValues) => void;
+  setPreviewRequiresSave: (requiresSave: boolean) => void;
   setPreviewScope: (scope: SitePreviewScope) => void;
   setReviewStep: (step: SitePreviewReviewStep) => void;
   setMainPageApproved: (approved: boolean) => void;
@@ -99,6 +110,7 @@ export const useSitePreviewStore = create<SitePreviewState>()(
     immer((set) => ({
       previewData: null,
       previewFresh: false,
+      previewRequiresSave: false,
       previewScope: "main" as SitePreviewScope,
       reviewStep: "main" as SitePreviewReviewStep,
       mainPageApproved: false,
@@ -109,6 +121,10 @@ export const useSitePreviewStore = create<SitePreviewState>()(
       setPreviewScope: (scope: SitePreviewScope) =>
         set((state) => {
           state.previewScope = scope;
+        }),
+      setPreviewRequiresSave: (requiresSave: boolean) =>
+        set((state) => {
+          state.previewRequiresSave = requiresSave;
         }),
       setReviewStep: (step: SitePreviewReviewStep) =>
         set((state) => {
@@ -139,6 +155,7 @@ export const useSitePreviewStore = create<SitePreviewState>()(
           state.previewLocations = locations ?? [];
           state.approvedLocationSlugs = [];
           state.previewVendorKey = vendorKey?.trim() || null;
+          state.previewRequiresSave = options?.requiresSave ?? false;
 
           const openOnLocation =
             options?.openOnLocation ??
@@ -196,6 +213,7 @@ export const useSitePreviewStore = create<SitePreviewState>()(
         set((state) => {
           state.previewData = null;
           state.previewFresh = false;
+          state.previewRequiresSave = false;
           state.previewScope = "main";
           state.reviewStep = "main";
           state.mainPageApproved = false;
@@ -259,6 +277,8 @@ export const useSitePreviewStore = create<SitePreviewState>()(
           // Persisted preview snapshots are always stale on load — only the
           // in-session round-trip may mark them fresh again.
           previewFresh: false,
+          // Don't force Approve & save after a full page reload.
+          previewRequiresSave: false,
           previewLocations: Array.isArray(p?.previewLocations)
             ? p.previewLocations
             : [],

@@ -59,8 +59,9 @@ ${PLATFORM_VENDOR_CUSTOMER_TRAINING}
 - Rooms: optional Multiple event spaces (up to 3) — packages/dates/menus per room. Public: Choose Your Room.
 - Vendor after login: Welcome — Select Location only when on that page; then Dashboard. Sidebar includes Table Assignment, Sites Essentials, Payment Settings, Support. Create Event = header. Domain Settings = profile → Settings → Domain Settings.
 - Sites Essentials: Presets, Branding (Site identity, Main home page if multi-location, Location/Home page, Info pages), Colors, Typography, Social, SEO. Preview before Save. Not for tickets/domain.
-- Customer book: location → event → optional room → Select a Date → Checkout (tickets/tables/drinks + guest allocation) → Pay in Full or Table deposit. Login at checkout.
-- Customer after login: Dashboard, Profile, Bookings, Support, Notifications, Transactions. Booking detail: Pay Now, Reschedule, Add extras, menu choices on booking page.
+- Customer book: location → event → optional room → Select a Date → Checkout (tickets/tables/drinks + guest allocation) → Pay in Full or Table deposit. Login at checkout. **Add room** only on Checkout before payment.
+- Customer after login: Dashboard, Profile, Bookings, Support, Notifications, Transactions. Booking detail: Pay Now, Reschedule, **Add extras for this date** (tickets/tables/drinks), menu choices on booking page.
+- **CRITICAL**: After booking, customers **cannot** add or change rooms. Never invent “Additional Rooms” / “Add room” on the booking page. Different room = new booking on the venue site.
 `;
 
   return condensed.length < KNOWLEDGE_BASE.length + PLATFORM_VENDOR_CUSTOMER_TRAINING.length

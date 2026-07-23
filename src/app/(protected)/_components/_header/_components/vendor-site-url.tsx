@@ -7,56 +7,38 @@ import { useSession } from "next-auth/react";
 import { Copy, ExternalLink } from "lucide-react";
 import { toast } from "sonner";
 import Link from "next/link";
-import { env } from "@/env";
+import { useProfileData } from "@/app/(protected)/_shared/profile/_lib";
 
 interface VendorSiteUrlProps {
   className?: string;
 }
 
-/** Local hosts-file vendor storefront */
-const LOCAL_VENDOR_SITE_URL = "http://vendor.eventwizz.com:3000/";
-
-/** Vercel / cloud customer (vendor) public site */
-const VERCEL_VENDOR_SITE_URL = "https://eventwizz-customer.vercel.app/";
-
-function getStaticVendorSiteUrl(): string {
-  // Prefer browser host for local :3000 so Site URL updates without rebuild quirks
-  if (typeof window !== "undefined") {
-    const port = window.location.port;
-    const host = window.location.hostname;
-    if (
-      port === "3000" ||
-      port === "3001" ||
-      host === "eventwizz.com" ||
-      host.endsWith(".eventwizz.com") ||
-      host === "localhost" ||
-      host === "127.0.0.1"
-    ) {
-      return LOCAL_VENDOR_SITE_URL;
-    }
-  }
-
-  if (
-    env.NEXT_PUBLIC_DEV_MODE ||
-    env.NEXT_PUBLIC_NODE_ENV === "development"
-  ) {
-    return LOCAL_VENDOR_SITE_URL;
-  }
-
-  return VERCEL_VENDOR_SITE_URL;
-}
-
 /**
- * Shows the vendor’s public site URL so they can copy/open the live preview.
+ * Shows the vendor’s public site URL from profile (`site_url`) so they can
+ * copy/open the live storefront.
  */
 const VendorSiteUrl: React.FC<VendorSiteUrlProps> = ({ className }) => {
   const { data: session } = useSession();
-  const user = useMemo(() => session?.user, [session]);
+  const accountType = session?.user?.account_type;
+  const profileUserType =
+    accountType === "admin"
+      ? "admin"
+      : accountType === "vendor"
+        ? "vendor"
+        : undefined;
+  const { data: profileResponse } = useProfileData(
+    {},
+    profileUserType,
+  );
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const siteUrl = useMemo(() => getStaticVendorSiteUrl(), []);
+  const siteUrl = useMemo(() => {
+    const raw = profileResponse?.data?.site_url?.trim();
+    return raw || "";
+  }, [profileResponse?.data?.site_url]);
 
   const copySiteUrl = () => {
+    if (!siteUrl) return;
     try {
       if (navigator?.clipboard?.writeText) {
         navigator.clipboard
@@ -87,9 +69,9 @@ const VendorSiteUrl: React.FC<VendorSiteUrlProps> = ({ className }) => {
   };
 
   const shouldShow = useMemo(() => {
-    if (!user?.account_type) return false;
-    return ["vendor", "admin"].includes(user.account_type);
-  }, [user]);
+    if (!accountType) return false;
+    return ["vendor", "admin"].includes(accountType) && Boolean(siteUrl);
+  }, [accountType, siteUrl]);
 
   if (!shouldShow) return null;
 

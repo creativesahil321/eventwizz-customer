@@ -87,20 +87,25 @@ export default function HeroBanner({
         ? vendorTheme.banner_heading_accent.trim()
         : null;
 
-  // Media sources with priority: API cover_video > API cover_image > theme video > theme image > fallback video
+  // Media priority: explicit cover video → explicit cover image → theme video → theme image → fallback
   const apiVideoUrl = coverVideo || null;
   const apiImageUrl = coverImage || null;
   const themeVideoUrl = vendorTheme?.cover_video || null;
   const themeImageUrl = vendorTheme?.cover_image || null;
 
-  // Priority order: API video > API image > theme video > theme image > fallback video
+  const hasApiVideo = Boolean(apiVideoUrl);
+  const hasApiImage = Boolean(apiImageUrl);
+  const hasThemeVideo = Boolean(themeVideoUrl);
+  const hasThemeImage = Boolean(themeImageUrl);
+
+  // Unsaved preview images must beat the live theme video (common Site Essentials case).
+  const useVideo =
+    hasApiVideo ||
+    (!hasApiImage && hasThemeVideo) ||
+    (!hasApiVideo && !hasApiImage && !hasThemeVideo && !hasThemeImage);
+
   const finalVideoUrl = apiVideoUrl || themeVideoUrl || FALLBACK_VIDEO_URL;
   const finalImageUrl = apiImageUrl || themeImageUrl || DEFAULT_IMAGE_URL;
-  // Use video if API video exists, theme video exists, or no custom content at all
-  const useVideo =
-    !!apiVideoUrl ||
-    !!themeVideoUrl ||
-    (!apiVideoUrl && !apiImageUrl && !themeVideoUrl && !themeImageUrl);
 
   const textAlign = normalizeBannerHeadingAlign(
     bannerHeadingAlignProp !== undefined && bannerHeadingAlignProp !== null

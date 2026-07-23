@@ -26,6 +26,7 @@ import { useCreateCustomerSupportTicket } from "@/services/customer/support";
 import type { SupportCategory } from "@/app/(protected)/customer/support/_lib/types";
 import { CATEGORY_LABELS } from "@/app/(protected)/customer/support/_lib/utils";
 import { resolveChatNavLink } from "@/lib/chat-nav-links";
+import { pickReadableForeground } from "@/lib/color-contrast";
 
 type QuickAction = {
   id: string;
@@ -102,12 +103,20 @@ const SUPPORT_INTENT_RE =
 const AUTH_INTENT_RE =
   /\b(register|sign\s*up|create (an? )?account|log\s*in|sign\s*in|need (an? )?account|asked?( me)? to register|ask(s|ed)? for register|registration|make an account)\b/i;
 
+/** Customer wants to add/change a room on an existing booking — not possible in product. */
+const ADD_ROOM_AFTER_BOOKING_RE =
+  /\b((add|book|update|change|swap|get|include).{0,40}\broom|new room|another room|extra room|additional room|different room).{0,40}\b(booking|booked|existing)|room.{0,30}(existing|current|my) booking\b/i;
+
 function isSupportIntent(text: string): boolean {
   return SUPPORT_INTENT_RE.test(text);
 }
 
 function isAuthIntent(text: string): boolean {
   return AUTH_INTENT_RE.test(text);
+}
+
+function isAddRoomAfterBookingIntent(text: string): boolean {
+  return ADD_ROOM_AFTER_BOOKING_RE.test(text);
 }
 
 function isValidPhone(value: string): boolean {
@@ -124,7 +133,7 @@ function buildSubject(issueSummary: string, description: string): string {
 /** Render markdown links + safe relative paths as clickable anchors. */
 function renderMessageContent(content: string, isUser: boolean): ReactNode[] {
   const linkClass = isUser
-    ? "underline underline-offset-2 font-medium text-white"
+    ? "underline underline-offset-2 font-medium opacity-95"
     : "underline underline-offset-2 font-medium text-[var(--color-primary)]";
 
   const nodes: ReactNode[] = [];
@@ -253,6 +262,10 @@ export function ChatBot() {
     domainWebsiteRole ||
     (theme?.website_role as string | undefined) ||
     null;
+  /** User bubbles sit on primary; pick black/white so light themes stay readable. */
+  const userBubbleTextColor = pickReadableForeground(
+    theme?.colors?.primary ?? "#0F172A",
+  );
   const isLoggedInCustomer =
     sessionStatus === "authenticated" &&
     session?.user?.account_type === "customer";
@@ -684,6 +697,31 @@ export function ChatBot() {
       return;
     }
 
+    // Hard guard: rooms cannot be added/changed after booking (never invent UI)
+    if (isAddRoomAfterBookingIntent(userText)) {
+      const nameBit = userName ? `, ${userName}` : "";
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: "assistant",
+          content: `Sorry${nameBit} — once a booking is made, you **cannot add or change rooms** (event spaces). There is no “Add room” or “Additional Rooms” option on an existing booking.
+
+What you *can* do on your booking:
+1. Open **Bookings** → tap **View** on the booking.
+2. Use **Add extras for this date** to add more **tickets**, **tables/guests**, or **drink packages** for the room and date you already booked.
+3. Then pay any outstanding amount with **Pay … Now** if needed.
+
+If you need a **different room/hall**, please start a **new booking** on the venue site: open the event → **Choose Your Room** → select a date → **Checkout**.
+
+Is there anything else I can help you with?`,
+          supportCta: isAuthenticated
+            ? { href: "/customer/bookings", label: "Open Bookings" }
+            : { href: "/auth/login", label: "Log in to view bookings" },
+        },
+      ]);
+      return;
+    }
+
     // Guests (or non-support): AI chat + navigation / contact CTAs
     setIsLoading(true);
     const wantsSupport = isSupportIntent(userText);
@@ -981,15 +1019,22 @@ export function ChatBot() {
                                 className={cn(
                                   "min-w-0 px-3.5 py-2.5 text-sm leading-relaxed",
                                   isUser
-                                    ? "rounded-2xl rounded-br-md bg-[var(--color-primary)] text-white"
-                                    : "rounded-2xl rounded-bl-md border border-black/6 bg-white text-[var(--color-text,#0f172a)] shadow-[0_1px_2px_rgba(15,23,42,0.04)]",
+                                    ? "rounded-2xl rounded-br-md bg-[var(--color-primary)]"
+                                    : // Always dark text on white — never inherit theme --color-text (invisible on dark themes)
+                                      "rounded-2xl rounded-bl-md border border-black/6 bg-white text-slate-900 shadow-[0_1px_2px_rgba(15,23,42,0.04)]",
                                 )}
+                                style={
+                                  isUser
+                                    ? { color: userBubbleTextColor }
+                                    : { color: "#0F172A" }
+                                }
                               >
                                 <p
                                   className="whitespace-pre-wrap break-words"
                                   style={{
                                     wordBreak: "break-word",
                                     overflowWrap: "anywhere",
+                                    color: "inherit",
                                   }}
                                 >
                                   {renderMessageContent(
@@ -1099,11 +1144,11 @@ export function ChatBot() {
                         className="flex items-end gap-2"
                       >
                         <ChatAvatar src={avatarSrc} alt={siteName} size="sm" />
-                        <div className="rounded-2xl rounded-bl-md border border-black/6 bg-white px-3.5 py-3 shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
+                        <div className="rounded-2xl rounded-bl-md border border-black/6 bg-white px-3.5 py-3 text-slate-900 shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
                           <div className="flex gap-1">
-                            <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-black/25 [animation-delay:0ms]" />
-                            <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-black/25 [animation-delay:150ms]" />
-                            <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-black/25 [animation-delay:300ms]" />
+                            <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-slate-400 [animation-delay:0ms]" />
+                            <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-slate-400 [animation-delay:150ms]" />
+                            <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-slate-400 [animation-delay:300ms]" />
                           </div>
                         </div>
                       </motion.div>
@@ -1112,7 +1157,7 @@ export function ChatBot() {
                   </div>
                 </ScrollArea>
 
-                <div className="shrink-0 border-t border-black/6 bg-white p-3">
+                <div className="shrink-0 border-t border-black/6 bg-white p-3 text-slate-900">
                   <div className="flex items-center gap-2">
                     <Input
                       value={input}
@@ -1120,7 +1165,7 @@ export function ChatBot() {
                       onKeyDown={handleKeyDown}
                       placeholder={inputPlaceholder}
                       disabled={isLoading || supportFlow.step === "submitting"}
-                      className="h-10 flex-1 rounded-full border-black/10 px-4 text-sm shadow-none focus-visible:ring-1 focus-visible:ring-[var(--color-primary)] focus-visible:ring-offset-0"
+                      className="h-10 flex-1 rounded-full border-black/10 bg-white px-4 text-sm text-slate-900 shadow-none placeholder:text-slate-400 focus-visible:ring-1 focus-visible:ring-[var(--color-primary)] focus-visible:ring-offset-0"
                     />
                     <Button
                       type="button"
@@ -1134,9 +1179,14 @@ export function ChatBot() {
                       className={cn(
                         "h-10 w-10 shrink-0 rounded-full transition-transform",
                         input.trim()
-                          ? "bg-[var(--color-primary)] text-white hover:opacity-90 hover:scale-105"
+                          ? "bg-[var(--color-primary)] hover:opacity-90 hover:scale-105"
                           : "bg-black/5 text-black/35",
                       )}
+                      style={
+                        input.trim()
+                          ? { color: userBubbleTextColor }
+                          : undefined
+                      }
                       aria-label="Send message"
                     >
                       {isLoading ? (

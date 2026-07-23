@@ -54,7 +54,7 @@ const CUSTOMER_QUICK_LINKS = [
   },
   {
     title: "Support",
-    href: "/customer/support/inbox",
+    href: "/customer/support",
     keywords: ["support", "help", "enquiry", "ticket"],
   },
   {

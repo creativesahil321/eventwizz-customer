@@ -142,7 +142,7 @@ const NAV_RULES: NavRule[] = [
   {
     id: "bookings-customer",
     pattern:
-      /\b(my bookings?|view my booking|pay (the )?balance|reschedule|add(-| )?ons|add extras|menu choices?)\b/i,
+      /\b(my bookings?|view my booking|pay (the )?balance|reschedule|add(-| )?ons|add extras|menu choices?|add (a )?room|new room|another room|extra room|change (the )?room)\b/i,
     customer: { href: "/customer/bookings", label: "Open Bookings" },
     guest: { href: "/auth/login", label: "Log in to view bookings" },
   },
@@ -254,6 +254,7 @@ Format exactly as [Label](/path). Also mention the left-menu name in plain Engli
 NAVIGATION LINKS (MUST INCLUDE WHEN RELEVANT):
 When the customer asks where to go, briefly explain, then **always** include a markdown link:
 - Bookings / pay balance / reschedule / extras → [Open Bookings](/customer/bookings)
+- IMPORTANT: Rooms cannot be added after booking. For “add room to existing booking”, still link Bookings and explain they can only use **Add extras for this date**, or make a new booking for another room.
 - Profile → [Open Profile](/customer/profile)
 - Support enquiry → [Open New enquiry](/customer/support/new)
 - Support inbox → [Open Support Inbox](/customer/support/inbox)

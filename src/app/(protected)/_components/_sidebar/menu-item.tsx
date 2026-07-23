@@ -11,111 +11,11 @@ import { cn } from "@/lib/utils";
 import { usePathname, useSearchParams } from "next/navigation";
 import { useMenuPermission } from "@/components/permission/use-menu-permission";
 import { useAuthStore } from "@/store/auth.store";
+import { isMenuActive } from "./utils";
 
 interface MenuItemComponentProps {
   menu: MenuItemProps;
 }
-
-// Check if a menu item is active by comparing pathnames and query parameters
-const isMenuActive = (
-  menu: MenuItemProps,
-  pathname: string,
-  searchParams: URLSearchParams
-): boolean => {
-  // Extract path and query from menu URLs
-  const getPathAndQuery = (
-    url: string
-  ): { path: string; query: URLSearchParams } => {
-    try {
-      // If it's a full URL, extract the pathname and search params
-      if (url.startsWith("http")) {
-        const urlObj = new URL(url);
-        return {
-          path: urlObj.pathname,
-          query: new URLSearchParams(urlObj.search),
-        };
-      }
-
-      // Handle relative URLs with query params
-      const [path, queryString] = url.split("?");
-      return {
-        path,
-        query: new URLSearchParams(queryString || ""),
-      };
-    } catch {
-      // If URL parsing fails, return the original string as path with empty query
-      return {
-        path: url,
-        query: new URLSearchParams(),
-      };
-    }
-  };
-
-  // Get paths and queries to compare
-  const menuHref = menu.href || "";
-  const menuUrl = menu.url || "";
-
-  const { path: menuPathFromHref, query: menuQueryFromHref } =
-    getPathAndQuery(menuHref);
-  const { path: menuPathFromUrl, query: menuQueryFromUrl } =
-    getPathAndQuery(menuUrl);
-
-  const pathMatchesHref =
-    pathname === menuPathFromHref ||
-    (menuPathFromHref.length > 1 &&
-      pathname.startsWith(`${menuPathFromHref}/`));
-  const pathMatchesUrl =
-    pathname === menuPathFromUrl ||
-    (menuPathFromUrl.length > 1 &&
-      pathname.startsWith(`${menuPathFromUrl}/`));
-  const pathMatches = pathMatchesHref || pathMatchesUrl;
-
-  // If path matches, check query parameters
-  if (pathMatches) {
-    // For menu items with query parameters (like status filters)
-    if (menuQueryFromHref.toString() || menuQueryFromUrl.toString()) {
-      // Check if all menu query parameters are present in current URL
-      let queryMatches = true;
-
-      // Check href query params
-      if (menuQueryFromHref.toString()) {
-        for (const [key, value] of menuQueryFromHref.entries()) {
-          if (searchParams.get(key) !== value) {
-            queryMatches = false;
-            break;
-          }
-        }
-      }
-
-      // Check url query params if href didn't match
-      if (!queryMatches && menuQueryFromUrl.toString()) {
-        queryMatches = true; // Reset for url check
-        for (const [key, value] of menuQueryFromUrl.entries()) {
-          if (searchParams.get(key) !== value) {
-            queryMatches = false;
-            break;
-          }
-        }
-      }
-
-      if (queryMatches) return true;
-    } else {
-      // For menu items without query parameters, a path match is sufficient
-      // But only if the current URL also doesn't have significant query params
-      // For tabs like "All Customers" that should only be active when no status filter is applied
-      if (!searchParams.has("status")) {
-        return true;
-      }
-    }
-  }
-
-  // Finally check children recursively
-  return (
-    menu.menu?.some((subMenu) =>
-      isMenuActive(subMenu, pathname, searchParams)
-    ) ?? false
-  );
-};
 
 const MenuItemComponent: React.FC<MenuItemComponentProps> = ({ menu }) => {
   const [isOpen, setIsOpen] = useState(false);
