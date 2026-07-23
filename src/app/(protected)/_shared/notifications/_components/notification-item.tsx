@@ -8,6 +8,7 @@ import { formatDistanceToNow } from "date-fns";
 import { Loader2 } from "lucide-react";
 import { resolveNotificationPresentation } from "../_lib/notification-ui";
 import { useRouter } from "next/navigation";
+import { cn } from "@/lib/utils";
 
 interface NotificationItemProps {
   notification: Notification;
@@ -58,8 +59,8 @@ export function NotificationItemComponent({
   };
 
   return (
-    <div className="flex items-center justify-between p-4 border-b border-border last:border-0 hover:bg-accent/5 transition-colors">
-      <div className="flex items-center gap-4 flex-1 min-w-0">
+    <div className="flex flex-col gap-3 p-4 border-b border-border last:border-0 hover:bg-accent/5 transition-colors sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex items-center gap-4 flex-1 min-w-0 w-full sm:w-auto">
         {/* User avatar */}
         <Avatar className="h-10 w-10">
           <AvatarFallback>
@@ -100,10 +101,13 @@ export function NotificationItemComponent({
       </div>
 
       {/* Status and actions */}
-      <div className="flex items-center gap-3 ml-4 flex-shrink-0">
+      <div className="flex flex-wrap items-center gap-2 w-full justify-end sm:w-auto sm:gap-3 sm:ml-4 sm:flex-shrink-0">
         <Badge
           variant={status === "read" ? "outline" : "default"}
-          className={status === "read" ? "text-black bg-muted/30" : "primary"}
+          className={cn(
+            "mr-auto sm:mr-0",
+            status === "read" ? "text-black bg-muted/30" : "primary",
+          )}
         >
           {status === "read" ? "Read" : "Unread"}
         </Badge>

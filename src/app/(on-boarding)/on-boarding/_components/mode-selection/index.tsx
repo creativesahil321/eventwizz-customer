@@ -115,7 +115,7 @@ export default function ModeSelection({ onSelectMode }: ModeSelectionProps) {
             <span style={accent.gradient}>build your site?</span>
           </h1>
           <p className="text-slate-400 text-lg max-w-xl mx-auto">
-            Choose your preferred setup experience. You can always customize
+            Choose your preferred setup experience. You can always customise
             everything later.
           </p>
 
@@ -156,8 +156,9 @@ export default function ModeSelection({ onSelectMode }: ModeSelectionProps) {
                         landing page text, event name and schedule, packages,
                         dates, catering menu, other packages, brochure content,
                         FAQs, and placeholder images. You review and edit
-                        anything you like, then connect payment (Stripe/PayPal
-                        etc.) and publish. Best if you want a professional site
+                        anything you like, then set your domain and connect
+                        payment (Stripe/PayPal etc.). Best if you want a
+                        professional site
                         in about 5 minutes.
                       </p>
                     </div>
@@ -170,8 +171,8 @@ export default function ModeSelection({ onSelectMode }: ModeSelectionProps) {
                         You go through all 11 steps yourself: venue details
                         (select from Google), site branding (logo, banner image,
                         colours), event details, packages, dates, catering,
-                        other packages, brochure &amp; PDFs, FAQs, payment, and
-                        publish. You type or upload everything. Best if you want
+                        other packages, brochure &amp; PDFs, FAQs, domain, and
+                        payment. You type or upload everything. Best if you want
                         full control and already have all content and assets
                         ready (~30 minutes).
                       </p>

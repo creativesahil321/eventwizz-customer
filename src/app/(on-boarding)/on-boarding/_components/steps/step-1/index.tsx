@@ -216,7 +216,7 @@ export default function StepOne() {
     <div className="flex flex-col items-center justify-center w-full min-h-screen py-8 px-4">
       <OnboardingCard className="w-full max-w-2xl">
         <CardHeader className="pb-2 pt-4">
-          <OnboardingTitle>OK Tell us About Your Business!</OnboardingTitle>
+          <OnboardingTitle>Tell us about your business</OnboardingTitle>
         </CardHeader>
         <CardContent>
           {showLocationGate ? (
@@ -253,7 +253,7 @@ export default function StepOne() {
             <>
               <section className="w-full mb-4">
                 <OnboardingFieldGroupTitle className="text-base">
-                  {isBrandMode ? "Brand information" : "Venue Information"}
+                  {isBrandMode ? "Brand information" : "Venue information"}
                 </OnboardingFieldGroupTitle>
               </section>
               <Form {...form}>
@@ -303,7 +303,7 @@ export default function StepOne() {
                           render={({ field }) => (
                             <FormItem>
                               <FormLabel className="text-sm font-medium">
-                                {isBrandMode ? "Brand name" : "Venue Name"}{" "}
+                                {isBrandMode ? "Brand name" : "Venue name"}{" "}
                                 <span className="text-red-400">*</span>
                               </FormLabel>
                               <FormControl>
@@ -430,11 +430,11 @@ export default function StepOne() {
                           render={({ field }) => (
                             <FormItem>
                               <FormLabel className="text-sm font-medium">
-                                {isBrandMode ? "Address" : "Venue Address"}
+                                {isBrandMode ? "Address" : "Venue address"}
                               </FormLabel>
                               <FormControl>
                                 <Input
-                                  placeholder="e.g Stock Brook Country Club,..."
+                                  placeholder="e.g. Stock Brook Country Club"
                                   className="bg-white/5"
                                   {...field}
                                 />
@@ -449,7 +449,7 @@ export default function StepOne() {
                           render={({ field }) => (
                             <FormItem>
                               <FormLabel className="text-sm font-medium">
-                                {isBrandMode ? "Email" : "Venue Email"}
+                                {isBrandMode ? "Email" : "Venue email"}
                               </FormLabel>
                               <FormControl>
                                 <Input

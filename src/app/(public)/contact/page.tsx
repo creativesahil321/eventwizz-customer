@@ -1,6 +1,7 @@
 import { Metadata } from "next";
 import { Suspense } from "react";
 import { PublicCmsPageGate } from "@/app/(public)/vendor/_components/cms-page/vendor-cms-page-gate";
+import { PageLoader } from "@/components/ui/page-loader";
 import { appConfig } from "@/config/app";
 import {
   fetchServerThemeCached,
@@ -32,7 +33,7 @@ export default async function ContactPage() {
   );
 
   return (
-    <Suspense fallback={null}>
+    <Suspense fallback={<PageLoader />}>
       <PublicCmsPageGate page="contact" contentByKey={contentByKey} />
     </Suspense>
   );

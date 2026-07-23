@@ -766,6 +766,13 @@ export interface BookingPaymentGatewayInfo {
   gateway: string;
   payment_id: number;
   stripe?: BookingPaymentStripeDetails;
+  /** Present when gateway is "paypal". */
+  paypal?: {
+    redirect_url: string;
+    order_id?: string;
+    expires_at?: number;
+  };
+  /** Generic redirect payload for other hosted gateways. */
   redirect_url?: string;
 }
 

@@ -1,9 +1,14 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Image from "next/image";
 import { motion } from "framer-motion";
-import { CheckCircle2 } from "lucide-react";
+import { Map, LayoutGrid } from "lucide-react";
 import LocationSelectionHeader from "@/app/(public)/vendor/_components/LocationPage/location-selection-header";
+import LocationGrid from "@/app/(public)/vendor/_components/LocationPage/location-grid";
+import GoogleLocationMap from "@/app/(public)/vendor/_components/LocationPage/location-map-google";
+import SubscribeSection from "@/app/(public)/vendor/_components/EventListPage/subscribe";
+import FooterSection from "@/app/(public)/vendor/_components/EventListPage/footer";
 import { SiteHeading } from "@/components/public/site-heading";
 import { normalizeHeadingEmphasis } from "@/lib/heading-emphasis";
 import {
@@ -13,14 +18,12 @@ import {
   heroBandVerticalClass,
   heroBannerStackClass,
   vendorHomeSubheroClass,
-  vendorHomeTrustRowClass,
 } from "@/lib/banner-heading-align";
 import { cn } from "@/lib/utils";
 import { shouldUseNextImageOptimization } from "@/lib/image-utils";
 import { SiteEssentialsFormValues } from "../_lib/schema";
 import { siteEssentialsToPreviewRootStyle } from "../_lib/preview-root-style";
 import { SiteEssentialsGoogleFontsLoader } from "@/components/shared/site-essentials-google-fonts-loader";
-import LocationGrid from "@/app/(public)/vendor/_components/LocationPage/location-grid";
 import type { LocationData } from "@/types/theme.types";
 
 interface MainLandingSitePreviewProps {
@@ -38,43 +41,66 @@ function getPreviewUrl(
   return undefined;
 }
 
+/**
+ * Multi-location main home for Site Essentials preview.
+ * Kept in sync with live `VendorSiteHomePage` (hero, map/grid, newsletter, footer).
+ */
 export function MainLandingSitePreview({
   formValues,
   onLocationSelect,
 }: Readonly<MainLandingSitePreviewProps>) {
   const previewStyles = siteEssentialsToPreviewRootStyle(formValues);
+  const [viewMode, setViewMode] = useState<"map" | "grid">("grid");
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const checkMobile = () => {
+      const mobile = window.innerWidth < 768;
+      setIsMobile(mobile);
+      if (mobile) setViewMode("grid");
+    };
+    checkMobile();
+    window.addEventListener("resize", checkMobile);
+    return () => window.removeEventListener("resize", checkMobile);
+  }, []);
 
   const heroImageSrc =
     getPreviewUrl(formValues.main_landing_cover_image) ||
+    getPreviewUrl(formValues.cover_image) ||
     "/assets/images/Homepage/Homepage-Banner.png";
 
   const heroHeading =
-    formValues.main_landing_banner_heading?.trim() || "Find Events Near You";
+    formValues.main_landing_banner_heading?.trim() ||
+    formValues.banner_heading?.trim() ||
+    "Find Events Near You";
 
   const heroSubheading =
     formValues.main_landing_banner_sub_heading?.trim() ||
     "Discover verified venues and curated events in your area. Browse by location to find the perfect experience.";
 
   const locationsTitle =
-    formValues.main_landing_locations_list_title?.trim() ||
-    "Choose Your City";
+    formValues.main_landing_locations_list_title?.trim() || "Choose Your City";
 
   const locationsSubtitle =
     formValues.main_landing_locations_list_subtitle?.trim() ||
     "Tap a city to see all upcoming events";
 
-  const trustItems = [
-    "Verified Venues",
-    "Secure Bookings",
-    "1,200+ Happy Customers",
-  ] as const;
+  const heroAccentHint =
+    formValues.banner_heading_accent?.trim() || null;
 
   const locations = (formValues.locations ?? []) as LocationData[];
+
+  const handleLocationSelect = (slug: string) => {
+    if (onLocationSelect) {
+      return onLocationSelect(slug);
+    }
+    return false;
+  };
 
   return (
     <div
       style={previewStyles}
-      className="w-full min-w-0 text-[color:var(--color-text)] font-body"
+      className="relative flex min-h-screen w-full min-w-0 flex-col bg-[var(--color-background)] font-body text-[color:var(--color-text)]"
     >
       <SiteEssentialsGoogleFontsLoader
         linkId="site-essentials-google-fonts-main-landing-preview"
@@ -89,7 +115,7 @@ export function MainLandingSitePreview({
 
       <section
         className={cn(
-          "relative flex w-full min-w-0 justify-center overflow-hidden",
+          "relative mx-auto flex w-full min-w-0 justify-center overflow-hidden",
           heroBandHeightClass,
           heroBandVerticalClass("center"),
         )}
@@ -118,7 +144,7 @@ export function MainLandingSitePreview({
           <motion.div
             initial={{ y: 28, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
-            transition={{ duration: 0.6 }}
+            transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
             className={cn(
               heroBannerStackClass("center"),
               "w-full min-w-0 overflow-visible",
@@ -127,61 +153,108 @@ export function MainLandingSitePreview({
             <SiteHeading
               level={1}
               title={heroHeading}
+              accentHint={heroAccentHint}
               emphasis={normalizeHeadingEmphasis(
                 formValues.typography?.headingEmphasis,
               )}
               variant="onDark"
               align="center"
-              className="mb-6 w-full min-w-0 max-w-full font-bold !text-3xl !leading-[0.98] sm:!text-4xl md:!text-5xl"
+              className="mb-6 w-full min-w-0 max-w-full font-bold !text-3xl !leading-[0.98] sm:!text-4xl md:!text-5xl md:max-w-5xl lg:!text-6xl"
             />
             <p className={vendorHomeSubheroClass("center")}>{heroSubheading}</p>
-            <div className={vendorHomeTrustRowClass("center")}>
-              {trustItems.map((label) => (
-                <div
-                  key={label}
-                  className="inline-flex items-center justify-center gap-2 rounded-full border border-white/10 bg-white/[0.07] px-4 py-2.5 text-sm text-white/90"
-                >
-                  <CheckCircle2
-                    className="h-4 w-4 shrink-0 text-[color:var(--color-primary)]"
-                    aria-hidden
-                  />
-                  <span className="font-medium tracking-tight">{label}</span>
-                </div>
-              ))}
-            </div>
           </motion.div>
         </div>
       </section>
 
-      <section className="w-full bg-[var(--color-background)] pb-16 pt-10">
-        <div className="mx-auto w-full min-w-0 max-w-7xl px-4 sm:px-6">
-          <div className="mb-10 text-center">
-            <span className="mb-2 block text-xs font-bold uppercase tracking-widest text-[color:var(--color-primary)]">
-              Explore cities
-            </span>
-            <SiteHeading
-              level={2}
-              align="center"
-              title={locationsTitle}
-              variant="onSurface"
-              className="mb-3 !text-3xl !font-black tracking-tight sm:!text-4xl"
+      {!isMobile && (
+        <section className="flex justify-center bg-[var(--color-background)] py-8">
+          <motion.div
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.45, delay: 0.08 }}
+            className="rounded-full border border-[color:color-mix(in_srgb,var(--color-text)_12%,transparent)] bg-[var(--color-surface)] p-1 shadow-sm"
+          >
+            <div className="flex">
+              <button
+                type="button"
+                onClick={() => setViewMode("map")}
+                className={`flex items-center gap-2 rounded-full px-5 py-2 text-sm font-medium transition-all ${
+                  viewMode === "map"
+                    ? "bg-[var(--color-primary)] text-[var(--color-primary-foreground)] shadow-sm"
+                    : "text-[var(--color-text-dimmed)] hover:text-[var(--color-text)]"
+                }`}
+              >
+                <Map className="h-4 w-4" aria-hidden />
+                Map View
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewMode("grid")}
+                className={`flex items-center gap-2 rounded-full px-5 py-2 text-sm font-medium transition-all ${
+                  viewMode === "grid"
+                    ? "bg-[var(--color-primary)] text-[var(--color-primary-foreground)] shadow-sm"
+                    : "text-[var(--color-text-dimmed)] hover:text-[var(--color-text)]"
+                }`}
+              >
+                <LayoutGrid className="h-4 w-4" aria-hidden />
+                Grid View
+              </button>
+            </div>
+          </motion.div>
+        </section>
+      )}
+
+      <section
+        className={cn(
+          "bg-[var(--color-background)] pb-16 md:pb-20",
+          isMobile ? "pt-10 sm:pt-12" : "pt-6 md:pt-8",
+        )}
+      >
+        <motion.div
+          className="container mx-auto max-w-7xl px-4 sm:px-6"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.45, delay: 0.12 }}
+        >
+          {viewMode === "grid" || isMobile ? (
+            <div className="mb-10 text-center md:mb-12">
+              <span className="mb-2 block text-xs font-bold uppercase tracking-widest text-[color:var(--color-primary)]">
+                Explore cities
+              </span>
+              <SiteHeading
+                level={2}
+                align="center"
+                title={locationsTitle}
+                variant="onSurface"
+                className="mb-3 !text-3xl !font-black tracking-tight sm:!text-4xl"
+              />
+              <p className="text-[var(--color-text-dimmed)]">
+                {locationsSubtitle}
+              </p>
+            </div>
+          ) : null}
+
+          {viewMode === "map" && !isMobile ? (
+            <GoogleLocationMap
+              locations={locations}
+              onSelect={handleLocationSelect}
             />
-            <p className="text-[var(--color-text-dimmed)]">
-              {locationsSubtitle}
-            </p>
-          </div>
-          <LocationGrid
-            locations={locations}
-            isLoading={false}
-            onSelect={(slug) => {
-              if (onLocationSelect) {
-                return onLocationSelect(slug);
-              }
-              return false;
-            }}
-          />
-        </div>
+          ) : (
+            <LocationGrid
+              locations={locations}
+              isLoading={false}
+              onSelect={handleLocationSelect}
+            />
+          )}
+        </motion.div>
       </section>
+
+      <SubscribeSection />
+
+      <FooterSection
+        copyright={formValues.copyright}
+        logo={getPreviewUrl(formValues.logo) || null}
+      />
     </div>
   );
 }

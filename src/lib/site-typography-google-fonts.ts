@@ -32,6 +32,8 @@ export const SITE_ESSENTIALS_GOOGLE_FONT_NAMES = [
   "Space Grotesk",
   "Syne",
   "Instrument Sans",
+  "Afacad",
+  "Figtree",
 ] as const;
 
 const GOOGLE_SET = new Set<string>(SITE_ESSENTIALS_GOOGLE_FONT_NAMES);

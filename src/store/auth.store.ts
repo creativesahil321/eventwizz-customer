@@ -33,6 +33,8 @@ interface AuthState {
   active_role: StaffRole | string | null; // Renamed from userRole
   /** Mirrors NextAuth session `user.vendor_location_id` for API headers (no per-request getSession). */
   vendor_location_id: number | null;
+  /** Mirrors NextAuth session `user.isOnboarded` for public chrome without useSession. */
+  isOnboarded: boolean;
   loading: boolean;
   error: string | null;
   isSessionChecked: boolean;
@@ -124,6 +126,7 @@ export const useAuthStore = create<AuthState>()(
       account_type: null, // Renamed from userType
       active_role: null, // Renamed from userRole
       vendor_location_id: null,
+      isOnboarded: false,
       loading: false,
       error: null,
       isSessionChecked: false,
@@ -141,6 +144,7 @@ export const useAuthStore = create<AuthState>()(
             state.account_type = null; // Renamed from userType
             state.active_role = null; // Renamed from userRole
             state.vendor_location_id = null;
+            state.isOnboarded = false;
             state.tokenExpiry = null;
           });
           return;
@@ -183,6 +187,7 @@ export const useAuthStore = create<AuthState>()(
           // Safely access role using type assertion
           state.active_role = (session.user as AuthUser).active_role || null;
           state.vendor_location_id = vendorLocationId;
+          state.isOnboarded = Boolean(session.user?.isOnboarded);
           state.tokenExpiry = expiryTime;
         });
 
@@ -345,6 +350,7 @@ export const useAuthStore = create<AuthState>()(
           state.account_type = null;
           state.active_role = null;
           state.vendor_location_id = null;
+          state.isOnboarded = false;
           state.loading = false;
           state.error = null;
           state.tokenExpiry = null;
@@ -389,6 +395,7 @@ export const useAuthStore = create<AuthState>()(
         account_type: state.account_type, // Renamed from userType
         active_role: state.active_role, // Renamed from userRole
         vendor_location_id: state.vendor_location_id,
+        isOnboarded: state.isOnboarded,
         tokenExpiry: state.tokenExpiry,
       }),
     }

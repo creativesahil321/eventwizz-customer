@@ -165,7 +165,7 @@ function StripeFormBody({
           </div>
           <div className="text-right">
             <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[color:var(--checkout-muted-foreground)]">
-              Due today
+              Pay today
             </p>
             <p className="text-xl font-bold tabular-nums leading-none text-[color:var(--checkout-foreground)]">
               {formatMoney(session.amount)}

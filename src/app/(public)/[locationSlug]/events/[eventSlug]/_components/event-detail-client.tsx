@@ -2,12 +2,20 @@
 
 import { useEventDetail } from "../_lib/hooks";
 import { EventDetail } from "@/services/common/events/type";
-import { useContext, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { EventHeroBand } from "@/components/public/event-hero-band";
 import { EventRoomSelector } from "@/components/public/event-room-selector";
-import { ONBOARDING_ROOM_SELECTOR_SCROLL_THRESHOLD_PX } from "@/app/(on-boarding)/on-boarding/_components/form-preview/preview-layout-constants";
+import { EventRoomChooser } from "@/components/public/event-room-chooser";
+import { RoomContentTransition } from "@/components/public/room-content-transition";
 
 import CommonHeader from "@/components/shared/common-header";
 import FooterSection from "@/app/(public)/vendor/_components/EventListPage/footer";
@@ -35,8 +43,13 @@ import { EVENT_BOOKING_SECTION_CLASSNAME } from "@/lib/event-booking-section-lay
 import { slugToShortLabel } from "@/lib/slug-short-label";
 import {
   isPublicEventRoomMode,
+  listPublicEventRoomSummaries,
   resolvePublicEventActiveSlices,
 } from "@/lib/resolve-public-event-room-slices";
+import { scrollToElementIfNeeded } from "@/lib/scroll-to-element-if-needed";
+
+/** Sticky site header height — keep scroll targets / triggers clear of the header. */
+const HEADER_OFFSET_PX = 72;
 
 interface EventDetailClientProps {
   event: EventDetail;
@@ -71,10 +84,16 @@ export default function EventDetailClient({
     [eventData, currentRoomIndex],
   );
 
-  const showRoomSelector = roomPreviewMode && slices.rooms.length >= 2;
+  const roomSummaries = useMemo(
+    () => (roomPreviewMode ? listPublicEventRoomSummaries(eventData) : []),
+    [roomPreviewMode, eventData],
+  );
+
+  const showRoomSelector = roomPreviewMode && roomSummaries.length >= 2;
   const roomSelectorVisible = showRoomSelector && roomSelectorScrollVisible;
 
   const heroRef = useRef<HTMLElement>(null);
+  const chooserRef = useRef<HTMLDivElement>(null);
   const aboutRef = useRef<HTMLDivElement>(null);
   const timelineRef = useRef<HTMLDivElement>(null);
   const packageRef = useRef<HTMLDivElement>(null);
@@ -83,25 +102,48 @@ export default function EventDetailClient({
   const faqRef = useRef<HTMLDivElement>(null);
   const bookingRef = useRef<HTMLDivElement>(null);
 
+  /**
+   * Any room change: update the active room, then glide to the dates/booking
+   * section when it isn't already in a comfortable viewport band.
+   * Double-rAF waits for React to paint the new room content before measuring.
+   */
+  const handleRoomChange = useCallback((index: number) => {
+    setCurrentRoomIndex(index);
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        scrollToElementIfNeeded(bookingRef.current, {
+          headerOffsetPx: HEADER_OFFSET_PX,
+        });
+      });
+    });
+  }, []);
+
   useEffect(() => {
     if (!showRoomSelector) {
       setRoomSelectorScrollVisible(false);
       return;
     }
 
-    const threshold = ONBOARDING_ROOM_SELECTOR_SCROLL_THRESHOLD_PX;
-
+    /** Sticky mini-bar appears only once the in-flow chooser scrolls under the header. */
     const handleScroll = () => {
-      const scrollTop = window.scrollY;
-      const height = window.innerHeight;
-      setRoomSelectorScrollVisible(
-        scrollTop >= Math.max(threshold, height * 0.22),
-      );
+      const chooser = chooserRef.current;
+      if (!chooser) {
+        setRoomSelectorScrollVisible(
+          window.scrollY > window.innerHeight * 0.6,
+        );
+        return;
+      }
+      const { bottom } = chooser.getBoundingClientRect();
+      setRoomSelectorScrollVisible(bottom <= HEADER_OFFSET_PX + 8);
     };
 
     handleScroll();
     window.addEventListener("scroll", handleScroll, { passive: true });
-    return () => window.removeEventListener("scroll", handleScroll);
+    window.addEventListener("resize", handleScroll, { passive: true });
+    return () => {
+      window.removeEventListener("scroll", handleScroll);
+      window.removeEventListener("resize", handleScroll);
+    };
   }, [showRoomSelector]);
 
   const heroTitle =
@@ -172,6 +214,7 @@ export default function EventDetailClient({
   );
 
   const activeRoomId = slices.activeRoom?.room_id;
+  const roomContentKey = activeRoomId ?? `room-${currentRoomIndex}`;
 
   return (
     <CartConflictProvider>
@@ -193,16 +236,12 @@ export default function EventDetailClient({
           <EventRoomSelector
             rooms={slices.rooms}
             currentRoomIndex={currentRoomIndex}
-            onRoomChange={setCurrentRoomIndex}
+            onRoomChange={handleRoomChange}
             visible={roomSelectorVisible}
           />
         ) : null}
 
-        <div
-          className={cn(
-            roomSelectorVisible && "-mt-12 transition-all duration-300",
-          )}
-        >
+        <div>
           <EventHeroBand
             sectionRef={heroRef}
             title={heroTitle}
@@ -244,28 +283,43 @@ export default function EventDetailClient({
           />
         </div>
 
-        {showTimeline ? (
-          <div ref={timelineRef}>
-            <Timeline
-              eventSchedular={timelineRows}
-              eventSchedularTitle={slices.event_schedular_title}
-              eventSchedularBackgroundImage={
-                typeof slices.event_schedular_background_image === "string"
-                  ? slices.event_schedular_background_image
-                  : undefined
-              }
+        {showRoomSelector ? (
+          <div ref={chooserRef}>
+            <EventRoomChooser
+              rooms={roomSummaries}
+              currentRoomIndex={currentRoomIndex}
+              onRoomChange={handleRoomChange}
+              headingEmphasis={headingEmphasisFromSite}
             />
           </div>
         ) : null}
 
+        {showTimeline ? (
+          <div ref={timelineRef}>
+            <RoomContentTransition roomKey={roomContentKey}>
+              <Timeline
+                eventSchedular={timelineRows}
+                eventSchedularTitle={slices.event_schedular_title}
+                eventSchedularBackgroundImage={
+                  typeof slices.event_schedular_background_image === "string"
+                    ? slices.event_schedular_background_image
+                    : undefined
+                }
+              />
+            </RoomContentTransition>
+          </div>
+        ) : null}
+
         <div ref={packageRef}>
-          <PackageSec
-            heading={slices.package_title}
-            subHeading={slices.package_description}
-            image={slices.package_image}
-            packageDetails={slices.package_details}
-            headingEmphasis={headingEmphasisFromSite}
-          />
+          <RoomContentTransition roomKey={roomContentKey}>
+            <PackageSec
+              heading={slices.package_title}
+              subHeading={slices.package_description}
+              image={slices.package_image}
+              packageDetails={slices.package_details}
+              headingEmphasis={headingEmphasisFromSite}
+            />
+          </RoomContentTransition>
         </div>
 
         <div
@@ -273,46 +327,52 @@ export default function EventDetailClient({
           id="booking"
           className={EVENT_BOOKING_SECTION_CLASSNAME}
         >
-          <DatesSection
-            dates={slices.dates}
-            eventSlug={eventSlug}
-            eventName={eventData.event_name}
-            eventImage={
-              eventData.event_banner_image ||
-              eventData.event_banner_video ||
-              undefined
-            }
-            roomId={activeRoomId}
-          />
+          <RoomContentTransition roomKey={roomContentKey}>
+            <DatesSection
+              dates={slices.dates}
+              eventSlug={eventSlug}
+              eventName={eventData.event_name}
+              eventImage={
+                eventData.event_banner_image ||
+                eventData.event_banner_video ||
+                undefined
+              }
+              roomId={activeRoomId}
+            />
+          </RoomContentTransition>
         </div>
 
         <EventGallery gallery={galleryItems} />
 
         {slices.menus && slices.menus.length > 0 && (
           <div ref={menuRef}>
-            <LazyMenuSection
-              menu_title={slices.menu_title}
-              menu_description={slices.menu_description}
-              menus={slices.menus}
-              catering_option={1}
-              menu_background_image={
-                typeof slices.menu_background_image === "string"
-                  ? slices.menu_background_image
-                  : undefined
-              }
-            />
+            <RoomContentTransition roomKey={roomContentKey}>
+              <LazyMenuSection
+                menu_title={slices.menu_title}
+                menu_description={slices.menu_description}
+                menus={slices.menus}
+                catering_option={1}
+                menu_background_image={
+                  typeof slices.menu_background_image === "string"
+                    ? slices.menu_background_image
+                    : undefined
+                }
+              />
+            </RoomContentTransition>
           </div>
         )}
 
         {drinkPackages.length > 0 && (
           <div ref={drinkRef}>
-            <LazyDrinkSection
-              title={slices.drink_title}
-              description={slices.drink_description}
-              packages={drinkPackages}
-              eventSlug={eventSlug}
-              roomId={activeRoomId}
-            />
+            <RoomContentTransition roomKey={roomContentKey}>
+              <LazyDrinkSection
+                title={slices.drink_title}
+                description={slices.drink_description}
+                packages={drinkPackages}
+                eventSlug={eventSlug}
+                roomId={activeRoomId}
+              />
+            </RoomContentTransition>
           </div>
         )}
 
@@ -348,14 +408,7 @@ export default function EventDetailClient({
           </div>
         )}
 
-        <FooterSection
-          locationSlug={locationSlug}
-          contactOverride={{
-            address: eventData.address,
-            email: eventData.email,
-            phone: eventData.phone,
-          }}
-        />
+        <FooterSection locationSlug={locationSlug} />
       </div>
     </CartConflictProvider>
   );

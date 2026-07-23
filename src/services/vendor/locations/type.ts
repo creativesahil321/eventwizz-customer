@@ -30,6 +30,7 @@ export interface Location {
   address?: string;
   slug: string;
   is_default: boolean;
+  is_headquarters?: boolean;
   created_at?: string;
   updated_at?: string;
 }

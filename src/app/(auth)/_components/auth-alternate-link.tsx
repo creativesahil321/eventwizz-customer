@@ -42,7 +42,7 @@ export function AuthAlternateLink({ variant }: AuthAlternateLinkProps) {
     <p className="text-center text-sm text-black/70 pt-4">
       Don&apos;t have an account?{" "}
       <Link href={getRegistrationPath(website_role)} className={linkClassName}>
-        Sign Up
+        Sign up
       </Link>
     </p>
   );

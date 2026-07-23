@@ -93,11 +93,16 @@ export function LocationSelector() {
                 </span>
               </div>
               <div className="flex items-center gap-2 flex-shrink-0">
-                {location.is_default && (
-                  <span className="text-xs text-[var(--color-secondary,#009ead)] whitespace-nowrap font-medium">
-                    (Default)
+                {location.is_headquarters ? (
+                  <span className="text-xs text-[var(--color-primary)] whitespace-nowrap font-medium">
+                    (Head office)
                   </span>
-                )}
+                ) : null}
+                {location.is_default ? (
+                  <span className="text-xs text-[var(--color-secondary,#009ead)] whitespace-nowrap font-medium">
+                    (In use)
+                  </span>
+                ) : null}
                 {location.status === false && (
                   <Badge
                     variant="outline"

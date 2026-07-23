@@ -111,7 +111,7 @@ export default function PackageSection({
             useMultiColumnList ? "md:items-start" : "md:items-center",
           )}
         >
-          <div className="w-full shrink-0 md:w-[46%] lg:w-[48%]">
+          <div className="w-full shrink-0 md:w-[50%] lg:w-[52%]">
             <div className="overflow-hidden rounded-3xl bg-[var(--color-surface)] shadow-[0_24px_60px_-28px_rgba(0,0,0,0.22)] ring-1 ring-[color:color-mix(in_srgb,var(--color-text)_6%,transparent)]">
               {image ? (
                 // eslint-disable-next-line @next/next/no-img-element -- blob / external URLs in preview

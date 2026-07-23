@@ -105,17 +105,23 @@ export function BrandingTab({
       return;
     }
     setBrandingScope(scope);
-    setPreviewScope(previewScopeForTab(scope));
+    if (!isAdmin) {
+      setPreviewScope(previewScopeForTab(scope));
+    }
   };
 
   useEffect(() => {
     if (!hasMultipleLocations && brandingScope === "main-home") {
       setBrandingScope("location-page");
-      setPreviewScope("location");
+      if (!isAdmin) {
+        setPreviewScope("location");
+      }
       return;
     }
-    setPreviewScope(previewScopeForTab(brandingScope));
-  }, [brandingScope, hasMultipleLocations, setPreviewScope]);
+    if (!isAdmin) {
+      setPreviewScope(previewScopeForTab(brandingScope));
+    }
+  }, [brandingScope, hasMultipleLocations, setPreviewScope, isAdmin]);
   const headerBackgroundColor =
     useWatch({ control: form.control, name: "colors.header" }) ??
     defaultThemeConstants.colors.header;

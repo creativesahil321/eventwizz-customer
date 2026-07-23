@@ -412,7 +412,7 @@ export default function StepEight() {
       <div className="w-full min-w-0 max-w-none mx-auto relative">
         <OnboardingCard className="w-full mx-auto shadow-sm mb-16">
           <CardHeader className="pb-2 pt-4">
-            <OnboardingTitle>Do You Want To Add Any Packages?</OnboardingTitle>
+            <OnboardingTitle>Do you want to add any packages?</OnboardingTitle>
           </CardHeader>
 
           <CardContent className="px-6 py-2 pb-8">
@@ -580,7 +580,7 @@ export default function StepEight() {
                         )}
                       >
                         <OnboardingFieldGroupTitle>
-                          Packages Deals
+                          Package deals
                         </OnboardingFieldGroupTitle>
 
                         <div className="space-y-6 mt-4">
@@ -663,7 +663,7 @@ export default function StepEight() {
                                   return (
                                     <FormItem>
                                       <FormLabel className="text-sm font-medium">
-                                        Package Description
+                                        Package description
                                       </FormLabel>
                                       <FormControl>
                                         <Input
@@ -711,7 +711,7 @@ export default function StepEight() {
                                 render={({ field }) => (
                                   <FormItem>
                                     <FormLabel className="text-sm font-medium">
-                                      Package Price{" "}
+                                      Package price{" "}
                                       <span className="text-red-500">*</span>
                                     </FormLabel>
                                     <FormControl>
@@ -794,7 +794,7 @@ export default function StepEight() {
                                 render={({ field }) => (
                                   <FormItem>
                                     <FormLabel className="text-sm font-medium">
-                                      Available Quantity{" "}
+                                      Available quantity{" "}
                                       <span className="text-red-500">*</span>
                                     </FormLabel>
                                     <FormControl>

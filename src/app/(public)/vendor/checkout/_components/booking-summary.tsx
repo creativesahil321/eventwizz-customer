@@ -930,7 +930,7 @@ export default function BookingSummary({}: BookingSummaryProps) {
   const fmtDate = (dateString: string) => {
     try {
       const { date: actualDate } = parseRoomDateKey(dateString);
-      return new Date(actualDate).toLocaleDateString("en-US", {
+      return new Date(actualDate).toLocaleDateString("en-GB", {
         weekday: "short",
         month: "short",
         day: "numeric",
@@ -1035,8 +1035,8 @@ export default function BookingSummary({}: BookingSummaryProps) {
           <div className="flex justify-between text-xs text-[color:var(--checkout-muted-foreground)]">
             <span>
               {platformFeeMeta?.mode === "percentage"
-                ? `Service fee (${platformFeeMeta.value}%)`
-                : "Service fee"}
+                ? `Booking fee (${platformFeeMeta.value}%)`
+                : "Booking fee"}
             </span>
             <span className="tabular-nums">{formatMoney(platformFee)}</span>
           </div>
@@ -1055,7 +1055,7 @@ export default function BookingSummary({}: BookingSummaryProps) {
 
         <div className="flex items-center justify-between pt-1">
           <span className="text-[11px] font-bold uppercase tracking-wider text-[color:var(--checkout-foreground)]">
-            {totalLater > 0 ? "Due Today" : "Total"}
+            {totalLater > 0 ? "Pay today" : "Total"}
           </span>
           {hasPayableTotal ? (
             <span className="text-2xl font-bold tabular-nums text-[color:var(--checkout-foreground)]">
@@ -1222,7 +1222,7 @@ export default function BookingSummary({}: BookingSummaryProps) {
             >
               <div className="min-w-0 flex-1">
                 <p className="text-[11px] font-medium text-[color:var(--checkout-muted-foreground)]">
-                  {totalLater > 0 ? "Due Today" : "Total"}
+                  {totalLater > 0 ? "Pay today" : "Total"}
                 </p>
                 <p className="truncate text-base font-bold tabular-nums text-[color:var(--checkout-brand-primary)] sm:text-lg">
                   {hasPayableTotal ? formatMoney(finalTotalWithFee) : "—"}

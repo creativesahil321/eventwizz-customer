@@ -473,7 +473,15 @@ export default function CartManager({}: CartManagerProps) {
           Browse events to find tickets, tables, and packages to add to your cart.
         </p>
         <Button
-          onClick={() => window.history.back()}
+          onClick={() => {
+            // Prefer going back when there's history; otherwise fall back to the
+            // tenant home so a direct visit to /checkout never dead-ends.
+            if (typeof window !== "undefined" && window.history.length > 1) {
+              window.history.back();
+            } else {
+              window.location.href = "/";
+            }
+          }}
           className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl px-6 h-10 text-sm font-medium shadow-sm"
         >
           Browse Events
@@ -529,14 +537,14 @@ export default function CartManager({}: CartManagerProps) {
               type="button"
               onClick={handleClearAllCart}
               disabled={isProcessing || clearAllCartMutation.isPending}
-              className="rounded-lg border border-red-200 px-3 py-2 text-xs font-semibold text-red-600 hover:bg-red-50"
+              className="inline-flex min-h-10 items-center rounded-lg border border-red-200 px-3 text-xs font-semibold text-red-600 hover:bg-red-50"
             >
               {clearAllCartMutation.isPending ? "Clearing..." : "Confirm"}
             </button>
             <button
               type="button"
               onClick={() => setShowClearConfirm(false)}
-              className="rounded-lg px-3 py-2 text-xs text-[color:var(--checkout-muted-foreground)]"
+              className="inline-flex min-h-10 items-center rounded-lg px-3 text-xs text-[color:var(--checkout-muted-foreground)]"
             >
               Cancel
             </button>
@@ -545,10 +553,12 @@ export default function CartManager({}: CartManagerProps) {
           <button
             type="button"
             onClick={() => setShowClearConfirm(true)}
-            className="rounded-lg border border-[color:var(--checkout-border)] bg-white p-2 text-[color:var(--checkout-muted-foreground)] transition-colors hover:bg-red-50 hover:text-red-500"
+            aria-label="Clear cart"
             title="Clear cart"
+            className="inline-flex min-h-10 min-w-10 items-center justify-center gap-1.5 rounded-lg border border-[color:var(--checkout-border)] bg-white px-2.5 text-[color:var(--checkout-muted-foreground)] transition-colors hover:bg-red-50 hover:text-red-500 sm:px-3"
           >
-            <Trash2 className="h-4 w-4" />
+            <Trash2 className="h-4 w-4 shrink-0" />
+            <span className="hidden text-sm font-semibold sm:inline">Clear</span>
           </button>
         )}
       </div>

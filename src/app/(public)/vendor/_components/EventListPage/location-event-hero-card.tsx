@@ -35,16 +35,18 @@ export function LocationEventHeroCard({
   const isInteractivePreview = isPreview && Boolean(onPreviewEventSelect);
   const href = `/${locationSlug}/events/${event.slug}`;
 
+  // Visual hover is decoupled from click interactivity so the Site Essentials
+  // preview matches the live site. Only the loading state blocks pointer events.
   const cardClassName = cn(
     "group relative block w-full overflow-hidden rounded-2xl border border-white/10 bg-zinc-950 outline-none md:rounded-3xl",
     "shadow-md transition-all duration-300 ease-out",
-    (!isPreview || isInteractivePreview) &&
+    !isPending &&
       "hover:-translate-y-0.5 hover:border-[color:var(--color-primary)] hover:shadow-xl hover:shadow-black/30",
-    (!isPreview || isInteractivePreview) &&
+    !isPending &&
       "hover:ring-2 hover:ring-[color:var(--color-primary)] hover:ring-offset-0",
     (!isPreview || isInteractivePreview) &&
       "focus-visible:ring-2 focus-visible:ring-[color:var(--color-primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--color-background)]",
-    (isPending || (isPreview && !isInteractivePreview)) && "pointer-events-none",
+    isPending && "pointer-events-none",
   );
 
   const cardBody = (
@@ -83,8 +85,7 @@ export function LocationEventHeroCard({
           variant="onDark"
           className={cn(
             "!text-left !text-xl !font-semibold leading-tight drop-shadow-sm sm:!text-2xl md:!text-3xl",
-            !isPreview &&
-              "transition-colors duration-300 group-hover:!text-[color:var(--color-primary)]",
+            "transition-colors duration-300 group-hover:!text-[color:var(--color-primary)]",
           )}
         />
         {event.dateLabel ? (

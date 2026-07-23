@@ -71,7 +71,7 @@ export const API_ENDPOINTS = {
     PAYMENT_GATEWAYS: {
       GET_ALL: "/vendor/payment-gateway",
       ENABLE_DISABLE_PAYMENT_GATEWAY: "/vendor/payment-gateway/{id}/is-enabled",
-      CONNECT_PAYMENT_GATEWAY: "/vendor/payment-gateway/connect",
+      DISCONNECT: "/vendor/payment-gateway/disconnect",
       DELETE_PAYMENT_GATEWAY: "/vendor/payment-gateway/{id}",
       RETURN_URL: "/vendor/payment-gateway/return/{gateway}?account={account_id}",
     },

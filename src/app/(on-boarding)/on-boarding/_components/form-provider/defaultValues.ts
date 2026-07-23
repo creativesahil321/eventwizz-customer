@@ -47,7 +47,7 @@ export const defaultValues: OnboardingFormData = {
     about_event_heading: "",
     about_event_sub_heading: "",
     about_event_description: "",
-    
+
     // gallery: [],
   },
   stepFour: {
@@ -152,6 +152,19 @@ export const defaultValues: OnboardingFormData = {
     isApproved: false,
     step: 10,
     event_id: 0,
+    has_multiple_locations: undefined as boolean | undefined,
+    submit_type: "submit" as "duplicate" | "submit",
+    address: "",
+    city: "",
+    reminder_email_before_days: 0,
+    domain: "",
+    confirm_domain: false,
+
+  },
+  stepEleven: {
+    isApproved: false,
+    step: 11,
+    event_id: 0,
     accept_payment_method: "both",
     payment_gateways: {
       stripe: {
@@ -180,18 +193,6 @@ export const defaultValues: OnboardingFormData = {
       },
     },
     is_skipped: false,
-  },
-  stepEleven: {
-    isApproved: false,
-    step: 11,
-    event_id: 0,
-    has_multiple_locations: undefined as boolean | undefined,
-    submit_type: "submit" as "duplicate" | "submit",
-    address: "",
-    city: "",
-    reminder_email_before_days: 0,
-    domain: "",
-    confirm_domain: false,
   },
   isApproved: false
 };

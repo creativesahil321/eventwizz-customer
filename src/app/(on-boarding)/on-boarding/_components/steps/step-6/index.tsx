@@ -337,25 +337,6 @@ export default function StepSix() {
     ],
   );
 
-  const clearCateringMenuDetails = useCallback(() => {
-    form.setValue("menu_title", "", { shouldValidate: false });
-    form.setValue("menu_description", "", { shouldValidate: false });
-    form.setValue("menus", [], { shouldValidate: false });
-    form.setValue("event_menu_category_id", undefined, {
-      shouldValidate: false,
-    });
-    setScopedCateringField("menu_title", "");
-    setScopedCateringField("menu_description", "");
-    setScopedCateringField("menus", []);
-    setScopedCateringField("event_menu_category_id", undefined);
-    form.clearErrors([
-      "event_menu_category_id",
-      "menu_title",
-      "menu_description",
-      "menus",
-    ]);
-  }, [form, setScopedCateringField]);
-
   // Set showMenuSection based on catering_option value
   const cateringOption = form.watch("catering_option");
   const showMenuSection = normalizeOnboardingCateringOption(cateringOption) === 1;
@@ -728,7 +709,7 @@ export default function StepSix() {
         <OnboardingCard className="w-full mx-auto shadow-sm mb-16">
           <CardHeader className="pb-2 pt-4">
             <OnboardingTitle>
-              Now Tell Us About Your Menu Options
+              Tell us about your menu options
             </OnboardingTitle>
           </CardHeader>
 
@@ -818,10 +799,17 @@ export default function StepSix() {
                                       "catering_option",
                                       numValue,
                                     );
-                                    // Only clear menu payload when the user explicitly chooses "No".
-                                    // Never auto-clear during hydration or room tab switches.
+                                    // Choosing "No" hides the menu section and the
+                                    // submit payload omits menus (see onSubmit). We keep
+                                    // the menu data in the form so toggling back to
+                                    // "Yes" restores it — only clear stale validation.
                                     if (numValue === 0) {
-                                      clearCateringMenuDetails();
+                                      form.clearErrors([
+                                        "event_menu_category_id",
+                                        "menu_title",
+                                        "menu_description",
+                                        "menus",
+                                      ]);
                                     }
                                   }}
                                   value={String(
@@ -871,7 +859,7 @@ export default function StepSix() {
                       {showMenuSection && (
                         <div className="my-6 border-t border-white/10 pt-6">
                           <OnboardingFieldGroupTitle className="mb-4">
-                            Menu Details
+                            Menu details
                           </OnboardingFieldGroupTitle>
 
                           <FormField
@@ -883,12 +871,12 @@ export default function StepSix() {
                               return (
                                 <FormItem>
                                   <FormLabel className="text-base font-medium">
-                                    Menu Title
+                                    Menu title
                                   </FormLabel>
                                   <FormControl>
                                     <Input
                                       {...field}
-                                      placeholder="e.g., The Menus"
+                                      placeholder="e.g. Our Menus"
                                       className="h-10 bg-white/5 border-white/10"
                                       maxLength={maxLength}
                                       onChange={(e) => {
@@ -933,12 +921,12 @@ export default function StepSix() {
                               return (
                                 <FormItem className="mt-4">
                                   <FormLabel className="text-base font-medium">
-                                    Menu Description
+                                    Menu description
                                   </FormLabel>
                                   <FormControl>
                                     <Input
                                       {...field}
-                                      placeholder="e.g., Select The Menus"
+                                      placeholder="e.g. Select from our menus"
                                       className="h-10 bg-white/5 border-white/10"
                                       maxLength={maxLength}
                                       onChange={(e) => {
@@ -977,7 +965,7 @@ export default function StepSix() {
                           {/* Menu Category field */}
                           <FormItem className="mt-4">
                             <FormLabel className="text-base font-medium">
-                              Menu Category
+                              Menu category
                             </FormLabel>
                             <Controller
                               control={form.control}
@@ -1202,7 +1190,7 @@ export default function StepSix() {
                                                   <FormControl>
                                                     <Input
                                                       {...field}
-                                                      placeholder="e.g., Spicy chicken with basmati rice"
+                                                      placeholder="e.g. Spicy chicken with basmati rice"
                                                       className="h-10 bg-white/5 border-white/10"
                                                       maxLength={maxLen}
                                                       value={v}

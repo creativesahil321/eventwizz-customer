@@ -10,6 +10,12 @@ import type {
   EventDetailStepSix,
   EventDetailStepThree,
 } from "@/services/vendor/events/type";
+import {
+  lowestPositivePrice,
+  pickRoomHighlights,
+  resolveRoomThumbnailUrl,
+  type EventRoomChooserItem,
+} from "@/lib/event-room-chooser-item";
 
 export type VendorPreviewRoomRef = {
   room_id: number;
@@ -64,6 +70,81 @@ export function listVendorPreviewRooms(
       room_id: Number(room.room_id),
       name: String(room.name || "").trim() || `Room ${index + 1}`,
     }));
+}
+
+/**
+ * Card summaries for the vendor event preview "Choose Your Room" section.
+ * Mirrors the public event page model (thumbnail, from-price, highlights).
+ */
+export function listVendorPreviewRoomSummaries(
+  data: EventDetailData,
+): EventRoomChooserItem[] {
+  const rooms = listVendorPreviewRooms(data);
+  const stepTwoRooms = normalizeVendorStepTwoRooms(
+    (data.stepTwo as { rooms?: unknown })?.rooms,
+  );
+
+  const bannerFallback = resolveRoomThumbnailUrl(
+    typeof data.stepOne?.event_banner_image === "string"
+      ? data.stepOne.event_banner_image
+      : null,
+  );
+
+  return rooms.map((room, index) => {
+    const pkg =
+      stepTwoRooms.find((entry) => Number(entry.room_id) === room.room_id) ??
+      stepTwoRooms[index];
+
+    const drinksPayload = pickRoomPayload(
+      data.stepSix as RoomKeyedStep,
+      room,
+    );
+    const drinkPackages = Array.isArray(drinksPayload?.packages)
+      ? (drinksPayload.packages as Array<{
+          title?: string;
+          price?: string | number;
+        }>)
+      : [];
+
+    const galleryUrl = (() => {
+      const gallery = pkg?.gallery;
+      if (!Array.isArray(gallery)) return null;
+      for (const item of gallery) {
+        if (typeof item === "object" && item && "url" in item) {
+          const url = resolveRoomThumbnailUrl(
+            (item as { url?: string }).url,
+          );
+          if (url) return url;
+        }
+      }
+      return null;
+    })();
+
+    const inclusionHighlights = pickRoomHighlights(
+      (pkg?.package_details ?? []).map((detail) => detail.title),
+      3,
+    );
+    const highlights =
+      inclusionHighlights.length > 0
+        ? inclusionHighlights
+        : pickRoomHighlights(
+            drinkPackages.map((drink) => drink.title),
+            3,
+          );
+
+    return {
+      room_id: room.room_id,
+      name: room.name,
+      index,
+      thumbnail:
+        resolveRoomThumbnailUrl(pkg?.package_image) ||
+        galleryUrl ||
+        bannerFallback,
+      fromPrice: lowestPositivePrice(drinkPackages.map((drink) => drink.price)),
+      packageCount: drinkPackages.length,
+      highlights,
+    };
+  });
 }
 
 type PreviewMenuSlice = Pick<

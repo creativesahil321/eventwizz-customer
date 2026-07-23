@@ -183,7 +183,7 @@ CategoryDropdownProps) {
                   name="name"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Category Name</FormLabel>
+                      <FormLabel>Category name</FormLabel>
                       <FormControl>
                         <Input placeholder="Enter category name" {...field} />
                       </FormControl>

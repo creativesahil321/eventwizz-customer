@@ -30,9 +30,10 @@ import {
   useSiteEssentialsQuery,
 } from "@/app/(protected)/_shared/sites-essentials/_lib/queries";
 import { ProfileSkeleton } from "@/app/(protected)/_shared/profile/_components/profile-skeleton";
+import { pageCardClassName } from "@/app/(protected)/_components/page-header-card";
 import { useProfileSync } from "@/components/shared/profile-update-sync";
 import { addCacheBusting } from "@/lib/image-utils";
-import GoogleLocationSearch from "@/app/(on-boarding)/on-boarding/_components/steps/step-11/google-location-search";
+import GoogleLocationSearch from "@/app/(on-boarding)/on-boarding/_components/steps/step-10/google-location-search";
 import { env } from "@/env";
 import { themeKeys } from "@/hooks/use-theme-query";
 import { toast } from "sonner";
@@ -241,9 +242,9 @@ export default function ProfilePage() {
   return (
     <section className="relative flex w-full flex-col space-y-8 text-black">
       <section className="relative w-full">
-        <div className="relative w-full rounded-md bg-background p-6 shadow-sm">
+        <div className={pageCardClassName("relative w-full min-w-0")}>
           <header className="mb-6 w-full">
-            <h2 className="text-2xl font-bold title-header">Profile</h2>
+            <h1 className="text-2xl font-bold title-header">Profile</h1>
             <p className="mt-2 max-w-3xl text-sm text-muted-foreground">
               Your account and company details shown on the public EventWizz
               site.
@@ -432,7 +433,7 @@ export default function ProfilePage() {
       </section>
 
       <section className="relative w-full">
-        <div className="relative w-full rounded-md bg-background p-6 shadow-sm">
+        <div className={pageCardClassName("relative w-full min-w-0")}>
           <header className="mb-6 w-full">
             <h2 className="text-2xl font-bold title-header">Account</h2>
           </header>
@@ -467,7 +468,7 @@ export default function ProfilePage() {
       </section>
 
       <section className="relative w-full">
-        <div className="relative w-full rounded-md bg-background p-6 shadow-sm">
+        <div className={pageCardClassName("relative w-full min-w-0")}>
           <header className="mb-6 w-full">
             <h2 className="text-2xl font-bold title-header">Change password</h2>
           </header>

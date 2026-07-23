@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useFieldArray, useFormContext } from "react-hook-form";
-import { MapPin, Plus, Trash2 } from "lucide-react";
+import { Loader2, MapPin, Plus, Sparkles, Trash2 } from "lucide-react";
 import { SiteEssentialsFormValues } from "../../_lib/hooks";
 import {
   HOME_BODY_MAX_TEXT_CHARS,
@@ -47,6 +47,17 @@ import {
   ADMIN_HOME_ICON_OPTIONS,
   getAdminHomeIcon,
 } from "@/lib/admin-home-icons";
+import { useLogoUploadProcessor } from "@/hooks/use-logo-upload-processor";
+import {
+  LOGO_SUPPORTED_ACCEPT,
+  LOGO_SUPPORTED_FORMATS_LABEL,
+  LOGO_UPLOAD_HINT,
+} from "@/lib/logo/supported-formats";
+import {
+  isLocalLogoUrl,
+  optimizeLogoFromSources,
+} from "@/lib/logo/optimize-logo-from-sources";
+import { getFriendlyLogoOptimizeErrorMessage } from "@/lib/logo/logo-process-notices";
 
 /** Character-counted single-line text field. */
 function TextField({
@@ -388,7 +399,10 @@ const PARTNER_LOGO_NAMES: PartnerLogoName[] = [
   "home_partner_logo_6",
 ];
 
-/** Single partner-logo image slot (mirrors the hero image uploader). */
+/** Trusted By cards use a white surface — optimize logos against that. */
+const PARTNER_LOGO_PREVIEW_BG = "#ffffff";
+
+/** Single partner-logo slot — same BG cleanup + contrast flow as site logo. */
 function PartnerLogoField({
   name,
   index,
@@ -398,16 +412,49 @@ function PartnerLogoField({
   index: number;
   readOnly?: boolean;
 }) {
-  const { watch, setValue } = useFormContext<SiteEssentialsFormValues>();
+  const { watch, setValue, getValues } = useFormContext<SiteEssentialsFormValues>();
   const rawValue = watch(name);
-  const existingUrl = typeof rawValue === "string" ? rawValue : "";
+  const existingUrl =
+    typeof rawValue === "string" && rawValue.trim() ? rawValue.trim() : "";
   const [files, setFiles] = useState<File[]>([]);
+  const { processUpload, reprocessExistingUrl, isProcessing } =
+    useLogoUploadProcessor({ headerBackgroundColor: PARTNER_LOGO_PREVIEW_BG });
 
-  const handleChange = (next: File[]) => {
-    const file = next[0];
-    if (!file) return;
-    setFiles([ensureFilePreview(file)]);
-    setValue(name, file, { shouldDirty: true });
+  const handleChange = async (next: File[]) => {
+    if (!next[0]) return;
+    const processed = await processUpload(next[0]);
+    const fileWithPreview = ensureFilePreview(processed);
+    revokeFilePreview(files[0]);
+    setFiles([fileWithPreview]);
+    setValue(name, fileWithPreview, { shouldDirty: true });
+  };
+
+  const handleOptimize = async () => {
+    if (readOnly || isProcessing) return;
+    const formValue = getValues(name);
+    const logoFile =
+      files[0] ?? (formValue instanceof File ? formValue : null);
+    if (!logoFile && !existingUrl) return;
+
+    try {
+      const processed = await optimizeLogoFromSources({
+        logoUrl: existingUrl || undefined,
+        logoFile,
+        processUpload,
+        reprocessExistingUrl,
+      });
+      if (!processed) return;
+      revokeFilePreview(files[0]);
+      const fileWithPreview = ensureFilePreview(processed);
+      setFiles([fileWithPreview]);
+      setValue(name, fileWithPreview, { shouldDirty: true });
+    } catch (error) {
+      console.error("Partner logo optimize failed:", error);
+      const { toast } = await import("sonner");
+      toast.message("Could not optimize logo", {
+        description: getFriendlyLogoOptimizeErrorMessage(error),
+      });
+    }
   };
 
   const handleRemove = () => {
@@ -418,7 +465,13 @@ function PartnerLogoField({
 
   const localPreview = (files[0] as (File & { preview?: string }) | undefined)
     ?.preview;
-  const previewUrl = localPreview || (existingUrl ? addCacheBusting(existingUrl) : "");
+  const previewUrl = localPreview
+    ? localPreview
+    : existingUrl
+      ? isLocalLogoUrl(existingUrl)
+        ? existingUrl
+        : addCacheBusting(existingUrl)
+      : "";
 
   return (
     <FormItem className="space-y-2">
@@ -426,38 +479,55 @@ function PartnerLogoField({
         Logo {index + 1}
       </FormLabel>
       <FormControl>
-        {previewUrl ? (
-          <div className="flex flex-col items-center gap-2 rounded-lg border border-gray-200 bg-white p-3 dark:border-gray-700 dark:bg-gray-900">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={previewUrl}
-              alt={`Partner logo ${index + 1} preview`}
-              className="h-14 w-full object-contain"
-            />
-            <button
-              type="button"
-              disabled={readOnly}
-              onClick={handleRemove}
-              className="text-red-500 text-xs underline disabled:pointer-events-none disabled:opacity-50"
+        {isProcessing ? (
+          <div className="flex flex-col items-center justify-center gap-2 rounded-lg border border-dashed py-8 text-xs text-muted-foreground">
+            <Loader2 className="h-5 w-5 animate-spin" />
+            Optimizing…
+          </div>
+        ) : previewUrl ? (
+          <div className="space-y-2">
+            <div
+              className="rounded-lg border p-3"
+              style={{ backgroundColor: PARTNER_LOGO_PREVIEW_BG }}
             >
-              Remove
-            </button>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={previewUrl}
+                alt={`Partner logo ${index + 1} preview`}
+                className="h-14 w-full object-contain"
+              />
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-7 px-2 text-xs"
+                disabled={readOnly || isProcessing}
+                onClick={() => void handleOptimize()}
+              >
+                <Sparkles className="mr-1 h-3 w-3" />
+                Optimize
+              </Button>
+              <button
+                type="button"
+                disabled={readOnly}
+                onClick={handleRemove}
+                className="text-red-500 text-xs underline disabled:pointer-events-none disabled:opacity-50"
+              >
+                Remove
+              </button>
+            </div>
           </div>
         ) : (
           <FileUploader
             value={files}
-            onValueChange={handleChange}
+            onValueChange={(next) => void handleChange(next)}
             maxFileCount={1}
-            maxSize={1 * 1024 * 1024}
+            maxSize={2 * 1024 * 1024}
             onRemove={handleRemove}
-            disabled={readOnly}
-            accept={{
-              "image/png": [],
-              "image/jpeg": [],
-              "image/jpg": [],
-              "image/webp": [],
-              "image/svg+xml": [],
-            }}
+            disabled={readOnly || isProcessing}
+            accept={LOGO_SUPPORTED_ACCEPT}
           />
         )}
       </FormControl>
@@ -473,8 +543,10 @@ function PartnerLogosField({ readOnly }: { readOnly?: boolean }) {
       <div>
         <FormLabel className="text-sm font-medium">Partner logos</FormLabel>
         <FormDescription>
-          Upload up to {PARTNER_LOGO_NAMES.length} logos (PNG, JPG, WEBP or SVG,
-          max 1MB each). Leave all empty to show the default sample logos.
+          Upload up to {PARTNER_LOGO_NAMES.length} logos (
+          {LOGO_SUPPORTED_FORMATS_LABEL}, max 2MB each). We remove the
+          background and adjust contrast for the white Trusted By cards.{" "}
+          {LOGO_UPLOAD_HINT} Leave all empty to show the default sample logos.
         </FormDescription>
       </div>
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">

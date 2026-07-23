@@ -82,6 +82,7 @@ const normalizeLocation = (location: unknown): ApiVenueLocation => {
   return {
     ...loc,
     is_default: Boolean(loc.is_default),
+    is_headquarters: Boolean(loc.is_headquarters),
     status: loc.status !== undefined ? Boolean(loc.status) : undefined,
     deleted_at: loc.deleted_at || undefined,
   } as unknown as ApiVenueLocation;

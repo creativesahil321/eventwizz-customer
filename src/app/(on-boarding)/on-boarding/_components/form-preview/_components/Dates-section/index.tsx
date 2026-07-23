@@ -1,11 +1,14 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
+import { CircleChevronLeft, CircleChevronRight } from "lucide-react";
 import {
-  CircleChevronLeft,
-  CircleChevronRight,
-} from "lucide-react";
-import { useState, useEffect, useCallback, useMemo, type ReactNode } from "react";
+  useState,
+  useEffect,
+  useCallback,
+  useMemo,
+  type ReactNode,
+} from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
@@ -286,9 +289,8 @@ export default function DatesSection({
   const sessionUser = session?.user as SessionUser | undefined;
   const cartQueryEnabled =
     sessionUser?.account_type === "customer" && !isOnboarding && !isPreviewMode;
-  const { data: apiCartData, isLoading: isCartDataLoading } = useGetCartData(
-    cartQueryEnabled,
-  );
+  const { data: apiCartData, isLoading: isCartDataLoading } =
+    useGetCartData(cartQueryEnabled);
 
   useEffect(() => {
     if (!cartQueryEnabled || isCartDataLoading || apiCartData === undefined) {
@@ -697,25 +699,25 @@ export default function DatesSection({
   const particles =
     isClient && !isPreviewMode
       ? Array.from({ length: 10 }, (_, i) => (
-        <motion.div
-          key={i}
-          className="absolute w-2 h-2 bg-white/20 rounded-full"
-          initial={{
-            x: Math.random() * (screenSize.width || 500),
-            y: Math.random() * (screenSize.height || 400),
-          }}
-          animate={{
-            x: Math.random() * (screenSize.width || 500),
-            y: Math.random() * (screenSize.height || 400),
-          }}
-          transition={{
-            duration: Math.random() * 15 + 10,
-            repeat: Infinity,
-            repeatType: "reverse",
-            ease: "linear",
-          }}
-        />
-      ))
+          <motion.div
+            key={i}
+            className="absolute w-2 h-2 bg-white/20 rounded-full"
+            initial={{
+              x: Math.random() * (screenSize.width || 500),
+              y: Math.random() * (screenSize.height || 400),
+            }}
+            animate={{
+              x: Math.random() * (screenSize.width || 500),
+              y: Math.random() * (screenSize.height || 400),
+            }}
+            transition={{
+              duration: Math.random() * 15 + 10,
+              repeat: Infinity,
+              repeatType: "reverse",
+              ease: "linear",
+            }}
+          />
+        ))
       : [];
 
   // Simple non-animated fallback for SSR that matches the client layout

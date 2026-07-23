@@ -47,7 +47,7 @@ export default function LocationNotFound() {
 
       <footer className="bg-black text-white py-6 text-center">
         <div className="container mx-auto">
-          <p>© 2023 EventWizz. All rights reserved.</p>
+          <p>© {new Date().getFullYear()} EventWizz. All rights reserved.</p>
         </div>
       </footer>
     </div>

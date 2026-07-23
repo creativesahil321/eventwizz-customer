@@ -1075,58 +1075,22 @@ const paymentGatewaysSchema = z.object({
   klarna: paymentGatewaySchema.optional(),
 });
 
-export const stepTenSchema = z
-  .object({
-    step: z.literal(10),
-    isApproved: z.boolean().optional(),
-    event_id: z.number(),
-    accept_payment_method: z.enum(["bank_transfer", "payment_gateway", "both"], {
-      required_error: "The accept payment method field is required.",
-    }),
-    payment_gateways: paymentGatewaysSchema.optional(),
-    is_skipped: z.boolean().default(false),
-  })
-  .superRefine((data, ctx) => {
-    // Validate that at least one payment gateway is ACTIVE if not skipped
-    if (!data.is_skipped) {
-      const hasAnyGatewayActive =
-        isGatewayStatusActive(data.payment_gateways?.stripe?.status) ||
-        isGatewayStatusActive(data.payment_gateways?.paypal?.status) ||
-        isGatewayStatusActive(data.payment_gateways?.truelayer?.status) ||
-        isGatewayStatusActive(data.payment_gateways?.worldpay?.status) ||
-        isGatewayStatusActive(data.payment_gateways?.klarna?.status);
-
-      if (!hasAnyGatewayActive) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          message:
-            "Connect at least one payment method (bank, Stripe, or PayPal) to save, or tap Skip for now.",
-          path: ["payment_gateways"],
-        });
-      }
-    }
-  });
-
-export type StepTenType = z.infer<typeof stepTenSchema>;
-
-//#===step-11===#
-export const stepElevenSchema = z
-  .object({
-    step: z.literal(11),
-    isApproved: z.boolean().optional(),
-    event_id: z.number(),
-    /** Persisted from API; also merged into `stepOne` for step 1 gate / brand mode. */
-    has_multiple_locations: z.boolean().optional(),
-    reminder_email_before_days: z.number().optional(),
-    submit_type: z.enum(["duplicate", "submit"]),
-    city: z.string().optional(),
-    address: z.string().optional(),
-    contact_number: z.string().optional(),
-    domain: z.string().min(1, "Please select a domain for your website"),
-    confirm_domain: z.boolean().refine((val) => val === true, {
-      message: "Please confirm your domain selection to continue",
-    }),
-  })
+export const stepTenSchema = z.object({
+  step: z.number(),
+  isApproved: z.boolean().optional(),
+  event_id: z.number(),
+  /** Persisted from API; also merged into `stepOne` for step 1 gate / brand mode. */
+  has_multiple_locations: z.boolean().optional(),
+  reminder_email_before_days: z.number().optional(),
+  submit_type: z.enum(["duplicate", "submit"]),
+  city: z.string().optional(),
+  address: z.string().optional(),
+  contact_number: z.string().optional(),
+  domain: z.string().min(1, "Please select a domain for your website"),
+  confirm_domain: z.boolean().refine((val) => val === true, {
+    message: "Please confirm your domain selection to continue",
+  }),
+})
   .superRefine((data, ctx) => {
     if (data.submit_type === "duplicate") {
       if (!data.city || data.city.trim() === "") {
@@ -1164,6 +1128,58 @@ export const stepElevenSchema = z
       }
     }
   });
+
+
+export type StepTenType = z.infer<typeof stepTenSchema>;
+
+//#===step-11===#
+export const stepElevenSchema = z
+  .object({
+    step: z.number(),
+    isApproved: z.boolean().optional(),
+    event_id: z.number(),
+    accept_payment_method: z.enum(["bank_transfer", "payment_gateway", "both"], {
+      required_error: "Choose how guests can pay.",
+    }),
+    payment_gateways: paymentGatewaysSchema.optional(),
+    is_skipped: z.boolean().default(false),
+  })
+  .superRefine((data, ctx) => {
+    // Validate that at least one payment gateway is ACTIVE if not skipped
+    if (!data.is_skipped) {
+      const hasAnyGatewayActive =
+        isGatewayStatusActive(data.payment_gateways?.stripe?.status) ||
+        isGatewayStatusActive(data.payment_gateways?.paypal?.status) ||
+        isGatewayStatusActive(data.payment_gateways?.truelayer?.status) ||
+        isGatewayStatusActive(data.payment_gateways?.worldpay?.status) ||
+        isGatewayStatusActive(data.payment_gateways?.klarna?.status);
+
+      if (!hasAnyGatewayActive) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message:
+            "Connect at least one payment method (bank, Stripe, or PayPal) to complete onboarding, or skip payment and finish.",
+          path: ["payment_gateways"],
+        });
+      }
+    }
+  });
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 export type StepElevenType = z.infer<typeof stepElevenSchema>;
 

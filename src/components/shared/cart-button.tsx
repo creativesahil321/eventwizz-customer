@@ -18,7 +18,7 @@ import { useCartVisibility } from "@/app/(public)/vendor/checkout/_lib/hooks/use
 interface CartButtonProps {
   className?: string;
   size?: "default" | "sm" | "lg" | "icon";
-  /** When false, hides the item-count badge (e.g. mobile drawer where count is redundant). */
+  /** When false, hides the item-count badge. */
   showBadge?: boolean;
   /** Stretch the control to full row width (mobile menu rows). */
   fullWidth?: boolean;
@@ -58,8 +58,8 @@ export default function CartButton({
               style={{ cursor: isLoading ? "not-allowed" : "pointer" }}
             >
               <span className="relative inline-flex shrink-0">
-                <ShoppingCart className="h-4 w-4" />
-                {cartSummary.hasItems && showBadge && (
+                <ShoppingCart className={fullWidth ? "h-5 w-5" : "h-4 w-4"} />
+                {cartSummary.hasItems && showBadge && !fullWidth && (
                   <Badge
                     variant="destructive"
                     className="absolute -top-2 -right-2 z-10 flex h-5 min-w-5 items-center justify-center rounded-full p-0 px-1 text-[10px] font-bold leading-none"
@@ -71,6 +71,16 @@ export default function CartButton({
                 )}
               </span>
               {size !== "icon" && <span className="inline">Cart</span>}
+              {cartSummary.hasItems && showBadge && fullWidth ? (
+                <Badge
+                  variant="destructive"
+                  className="ml-auto flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-[10px] font-bold leading-none"
+                >
+                  {cartSummary.badgeCount > 99
+                    ? "99+"
+                    : cartSummary.badgeCount}
+                </Badge>
+              ) : null}
             </div>
           </Link>
         </TooltipTrigger>

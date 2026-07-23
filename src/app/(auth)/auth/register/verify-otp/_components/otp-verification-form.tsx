@@ -217,7 +217,9 @@ export function OTPVerificationForm() {
         </div>
 
         <Small className="text-muted-foreground mt-2">
-          Otp: {timer > 0 ? `${timer}s` : "Expired"}
+          {timer > 0
+            ? `Code expires in ${timer}s`
+            : "Code expired — please resend"}
         </Small>
 
         <Paragraph className="text-sm mt-4">

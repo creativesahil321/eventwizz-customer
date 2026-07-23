@@ -30,6 +30,7 @@ import { EmptyPlaceholder } from "@/components/empty-placeholder";
 import { Receipt } from "lucide-react";
 import { TransactionsListSkeleton } from "./skeleton-loader";
 import { useCurrencyFormat } from "@/hooks/use-currency-format";
+import { TransactionItemComponent } from "./transaction-item";
 
 interface TransactionMeta {
   total: number;
@@ -98,7 +99,19 @@ export function TransactionListComponent({
 
   return (
     <div className="space-y-4">
-      <section className="overflow-x-auto overflow-y-visible rounded-lg border border-[var(--color-border)] bg-white">
+      {/* Mobile: stacked cards (avoids horizontal scrolling a wide table) */}
+      <div className="overflow-hidden rounded-lg border border-[var(--color-border)] bg-white md:hidden">
+        {table.getRowModel().rows.map((row) => (
+          <TransactionItemComponent
+            key={row.id}
+            transaction={row.original}
+            onViewDetails={onViewDetails}
+          />
+        ))}
+      </div>
+
+      {/* Desktop: full table */}
+      <section className="hidden overflow-x-auto overflow-y-visible rounded-lg border border-[var(--color-border)] bg-white md:block">
         <Table className="min-w-[900px]">
           <TableHeader>
             {table.getHeaderGroups().map((headerGroup) => (

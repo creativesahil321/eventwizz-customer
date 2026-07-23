@@ -134,9 +134,23 @@ export type StripePaymentSuccessResponse = {
   data?: StripePaymentSuccessData;
 };
 
+/** Redirect-based gateway details (PayPal, TrueLayer, etc.).
+ *  Unlike Stripe (embedded modal), these hand off to a hosted checkout page. */
+export interface CheckoutRedirectDetails {
+  /** Hosted checkout URL the customer is sent to. */
+  redirect_url: string;
+  /** Gateway order/session reference (e.g. PayPal order token). */
+  order_id?: string;
+  /** Seconds until this hosted session expires. */
+  expires_at?: number;
+}
+
 export interface CheckoutPaymentInfo {
   gateway: string;
   stripe?: CheckoutStripeDetails;
+  /** Present when gateway is "paypal". */
+  paypal?: CheckoutRedirectDetails;
+  /** Generic redirect payload for other hosted gateways (e.g. TrueLayer). */
   redirect_url?: string;
 }
 

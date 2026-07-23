@@ -35,7 +35,7 @@ export function AuthContent() {
         <div className="space-y-6">
           <p className="text-base sm:text-lg text-[var(--color-text)] leading-relaxed">
             Join our community of event enthusiasts. Get early access to
-            tickets, exclusive discounts, and personalized event recommendations
+            tickets, exclusive discounts, and personalised event recommendations
             tailored just for you.
           </p>
 
@@ -77,7 +77,7 @@ export function AuthContent() {
 
         <div className="space-y-6">
           <p className="text-base sm:text-lg leading-relaxed">
-            Join thousands of successful event organizers who have transformed
+            Join thousands of successful event organisers who have transformed
             their business with EventWizz. Our platform provides everything you
             need to manage and grow your events.
           </p>
@@ -104,7 +104,7 @@ export function AuthContent() {
               <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
             </svg>
             <span className="font-medium">
-              Trusted by over 50,000 organizers worldwide
+              Trusted by over 50,000 organisers worldwide
             </span>
           </div>
         </div>
@@ -122,8 +122,8 @@ export function AuthContent() {
 
         <div className="space-y-6">
           <p className="text-base sm:text-lg text-[var(--color-text)] leading-relaxed">
-            Your one-stop platform for seamless event management. Access your
-            dashboard, track sales, and manage your events with ease.
+            Sign in to book events, manage your bookings, and pick up right
+            where you left off.
           </p>
 
           <div className="grid grid-cols-3 gap-3 mt-8">
@@ -146,7 +146,7 @@ export function AuthContent() {
               <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
             </svg>
             <span className="font-medium">
-              Trusted by over 50,000 organizers worldwide
+              Trusted by thousands of event-goers and organisers
             </span>
           </div>
         </div>

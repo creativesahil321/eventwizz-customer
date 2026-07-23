@@ -96,12 +96,6 @@ export function SingleLocationHome({
         copyright={settings?.copyright}
         logo={settings?.logo}
         locationSlug={slug}
-        contactOverride={{
-          address: locationData.address,
-          email: locationData.email,
-          phone: locationData.phone,
-          phone_number: locationData.phone_number,
-        }}
       />
     </>
   );

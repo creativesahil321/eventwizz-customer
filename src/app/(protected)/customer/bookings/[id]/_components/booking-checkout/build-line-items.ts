@@ -31,7 +31,7 @@ export function getDateCalendarParts(dateKey: string): {
 
   return {
     month: parsed
-      .toLocaleString("en-US", { month: "short" })
+      .toLocaleString("en-GB", { month: "short" })
       .toUpperCase(),
     day: parsed.getDate(),
   };

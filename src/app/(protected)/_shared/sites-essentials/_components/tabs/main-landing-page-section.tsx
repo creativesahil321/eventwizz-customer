@@ -196,9 +196,11 @@ export function MainLandingPageSection({
           name="main_landing_cover_image"
           render={() => (
             <FormItem>
-              <FormLabel>Background image</FormLabel>
+              <FormLabel>Main home background image</FormLabel>
               <FormDescription>
-                Full-width hero background (recommended 1920×1080 or 16:9).
+                Full-width hero on the multi-location home page (before a city
+                is chosen). Recommended 1920×1080 or 16:9. This is separate from
+                each location’s cover image under Branding.
               </FormDescription>
               <FormControl>
                 {coverImageUrl ? (
@@ -246,7 +248,6 @@ export function MainLandingPageSection({
             </FormItem>
           )}
         />
-
       </SectionCard>
 
       <SectionCard

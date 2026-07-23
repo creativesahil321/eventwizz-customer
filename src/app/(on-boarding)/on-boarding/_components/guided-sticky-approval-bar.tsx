@@ -165,12 +165,12 @@ export function GuidedWholeStepApproveButton({
       className={guidedOnboardingApproveStepButtonClass}
       onClick={() => void guided.handleApproveSection()}
     >
-      Approve step
+      Approve section
     </Button>
   );
 }
 
-/** Approve step + Next section — same styling as whole-step Approve (outline). */
+/** Approve section + Next section — same styling as whole-step Approve (outline). */
 export function GuidedSectionCoreActions({ guided }: CoreActionsProps) {
   const allSectionsApproved =
     guided.sectionFlow.length > 0 &&
@@ -192,7 +192,7 @@ export function GuidedSectionCoreActions({ guided }: CoreActionsProps) {
           disabled={!guided.currentSection}
           onClick={() => void guided.handleApproveSection()}
         >
-          Approve step
+          Approve section
         </Button>
       )}
       {guided.currentSectionIndex < guided.sectionFlow.length - 1 &&

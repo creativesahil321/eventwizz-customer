@@ -452,7 +452,7 @@ function PaymentSuccessContent() {
                           <p className="text-sm text-gray-600 mt-1">
                             {new Date(
                               paymentData.event_date
-                            ).toLocaleDateString("en-US", {
+                            ).toLocaleDateString("en-GB", {
                               weekday: "long",
                               year: "numeric",
                               month: "long",

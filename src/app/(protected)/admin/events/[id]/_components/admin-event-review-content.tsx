@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft } from "lucide-react";
+import { pageCardClassName } from "@/app/(protected)/_components/page-header-card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Card } from "@/components/ui/card";
@@ -99,25 +100,27 @@ export function AdminEventReviewContent({
 
   return (
     <div className="flex w-full min-w-0 flex-col gap-5">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-        <div className="min-w-0 space-y-1">
-          <Button
-            variant="event-primary"
-            size="sm"
-            className="gap-1.5 h-8 w-fit"
-            asChild
-          >
-            <Link href={backHref}>
-              <ArrowLeft className="h-4 w-4" />
-              Back
-            </Link>
-          </Button>
-          <h1 className="text-2xl font-bold tracking-tight title-header text-[var(--color-text)]">
-            Event details
-          </h1>
-          <p className="truncate text-sm text-muted-foreground text-[var(--color-text-dimmed)]">
-            {displayName}
-          </p>
+      <div className={pageCardClassName("min-w-0")}>
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <div className="min-w-0 space-y-1">
+            <Button
+              variant="event-primary"
+              size="sm"
+              className="gap-1.5 h-8 w-fit"
+              asChild
+            >
+              <Link href={backHref}>
+                <ArrowLeft className="h-4 w-4" />
+                Back
+              </Link>
+            </Button>
+            <h1 className="text-2xl font-bold tracking-tight title-header text-[var(--color-text)]">
+              Event details
+            </h1>
+            <p className="truncate text-sm text-muted-foreground text-[var(--color-text-dimmed)]">
+              {displayName}
+            </p>
+          </div>
         </div>
       </div>
 

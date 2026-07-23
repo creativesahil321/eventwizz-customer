@@ -390,7 +390,7 @@ export default function StepTwo() {
     <section>
       <OnboardingCard>
         <CardHeader>
-          <OnboardingTitle>OK Let&apos;s Create Your Site</OnboardingTitle>
+          <OnboardingTitle>Let&apos;s create your site</OnboardingTitle>
         </CardHeader>
         <CardContent>
           <Form {...form}>
@@ -428,7 +428,7 @@ export default function StepTwo() {
                     render={({ field }) => (
                       <FormItem>
                         <OnboardingFieldGroupTitle>
-                          Upload Your Logo
+                          Upload your logo
                         </OnboardingFieldGroupTitle>
                         <p className="text-xs text-white/60 mb-2">
                           {LOGO_SUPPORTED_FORMATS_LABEL}, max 1MB.{" "}
@@ -442,7 +442,7 @@ export default function StepTwo() {
                             {isProcessingLogo ? (
                               <div className="flex flex-col items-center justify-center gap-2 py-10 text-sm text-white/70">
                                 <Loader2 className="h-6 w-6 animate-spin" />
-                                Optimizing logo for header…
+                                Optimising logo for header…
                               </div>
                             ) : logoUrl ? (
                               <div className="relative w-full space-y-2">
@@ -529,7 +529,7 @@ export default function StepTwo() {
                     render={({ field }) => (
                       <FormItem>
                         <OnboardingFieldGroupTitle>
-                          Landing Page Image
+                          Landing page image
                         </OnboardingFieldGroupTitle>
                         <FormControl>
                           <div
@@ -631,7 +631,7 @@ export default function StepTwo() {
                       return (
                         <FormItem>
                           <OnboardingFieldGroupTitle>
-                            Add a Banner Heading
+                            Add a banner heading
                           </OnboardingFieldGroupTitle>
                           <FormControl>
                             <Input
@@ -670,7 +670,7 @@ export default function StepTwo() {
                       return (
                         <FormItem>
                           <OnboardingFieldGroupTitle>
-                            Add a Banner Sub-Heading
+                            Add a banner subheading
                           </OnboardingFieldGroupTitle>
                           <FormControl>
                             <Input
@@ -751,7 +751,7 @@ export default function StepTwo() {
                       return (
                         <FormItem>
                           <OnboardingFieldGroupTitle>
-                            Add a Title for Your Page
+                            Add a title for your page
                           </OnboardingFieldGroupTitle>
                           <FormControl>
                             <Input
@@ -791,7 +791,7 @@ export default function StepTwo() {
                       <FormItem>
                         <div className="flex items-center justify-between">
                           <OnboardingFieldGroupTitle>
-                            Write a Short Description
+                            Write a short description
                           </OnboardingFieldGroupTitle>
                         </div>
                         <FormControl>

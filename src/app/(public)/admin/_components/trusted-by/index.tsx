@@ -1,3 +1,6 @@
+import type { AdminHomeContent } from "@/lib/admin-cms-content";
+import { SiteHeading } from "@/components/public/site-heading";
+
 /* Professional venue wordmark logos as inline SVG — looks clean on any theme */
 const PARTNERS = [
   {
@@ -64,8 +67,6 @@ const PARTNERS = [
   },
 ];
 
-import type { AdminHomeContent } from "@/lib/admin-cms-content";
-
 export default function TrustedBy({
   content,
 }: {
@@ -74,9 +75,13 @@ export default function TrustedBy({
   return (
     <section className="py-16 bg-[color:var(--color-background)]">
       <div className="container mx-auto px-4 text-center">
-        <h2 className="text-3xl md:text-4xl font-bold text-[color:var(--color-text)] mb-3">
-          {content.title}
-        </h2>
+        <SiteHeading
+          level={2}
+          title={content.title}
+          variant="onSurface"
+          align="center"
+          className="mb-3 !text-3xl !font-bold md:!text-4xl"
+        />
         <p className="text-[color:var(--color-text-dimmed)] mb-10 max-w-lg mx-auto">
           {content.subtitle}
         </p>

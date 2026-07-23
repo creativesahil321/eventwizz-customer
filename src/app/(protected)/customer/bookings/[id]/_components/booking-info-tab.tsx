@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect, useMemo } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
@@ -48,6 +48,10 @@ import type {
 } from "@/services/customer/bookings/type";
 import type { CheckoutStripePaymentSession } from "@/services/customer/checkout";
 import CheckoutStripePaymentModal from "@/app/(public)/vendor/checkout/_components/checkout-stripe-payment-modal";
+import {
+  DEFAULT_STRIPE_PAYMENT_GATEWAY,
+  normalizeReschedulePaymentGateways,
+} from "@/services/customer/bookings/reschedule-utils";
 import { useCurrencyFormat } from "@/hooks/use-currency-format";
 import { parseFormattedMoney } from "@/lib/currency-format";
 
@@ -221,6 +225,36 @@ export default function BookingInfoTab({ bookingData }: BookingInfoTabProps) {
     useState<BookingDate | null>(null);
   const [selectedRescheduleRequest, setSelectedRescheduleRequest] =
     useState<RescheduleRequest | null>(null);
+  const [selectedPaymentGatewayId, setSelectedPaymentGatewayId] = useState<
+    number | null
+  >(null);
+
+  const availablePaymentGateways = useMemo(
+    () =>
+      normalizeReschedulePaymentGateways(null, bookingData.payment_gateways),
+    [bookingData.payment_gateways],
+  );
+
+  useEffect(() => {
+    if (
+      availablePaymentGateways.length === 1 &&
+      selectedPaymentGatewayId == null
+    ) {
+      setSelectedPaymentGatewayId(availablePaymentGateways[0].id);
+      return;
+    }
+
+    if (
+      selectedPaymentGatewayId != null &&
+      !availablePaymentGateways.some((g) => g.id === selectedPaymentGatewayId)
+    ) {
+      setSelectedPaymentGatewayId(
+        availablePaymentGateways.length === 1
+          ? availablePaymentGateways[0].id
+          : null,
+      );
+    }
+  }, [availablePaymentGateways, selectedPaymentGatewayId]);
 
   const summary: PaymentSummaryData = bookingData.summary || {
     subTotal: 0,
@@ -393,13 +427,24 @@ export default function BookingInfoTab({ bookingData }: BookingInfoTabProps) {
       return;
     }
 
-    // Get payment gateway ID (default to first gateway or 1 for stripe)
-    const paymentGatewayId = bookingData.payment_gateways?.[0]?.id || 1;
+    const paymentGatewayId =
+      (selectedPaymentGatewayId != null &&
+      availablePaymentGateways.some((g) => g.id === selectedPaymentGatewayId)
+        ? selectedPaymentGatewayId
+        : null) ??
+      (availablePaymentGateways.length === 1
+        ? availablePaymentGateways[0].id
+        : null);
+
+    if (availablePaymentGateways.length > 1 && paymentGatewayId == null) {
+      toast.error("Please select a payment method");
+      return;
+    }
 
     // Build payment payload
     const paymentPayload: BookingPaymentPayload = {
       booking_id: parseInt(bookingData.booking_id),
-      payment_gateway: paymentGatewayId,
+      payment_gateway: paymentGatewayId ?? DEFAULT_STRIPE_PAYMENT_GATEWAY.id,
       dates: [
         {
           booking_date_id: selectedDateForPayment.booking_date_id,
@@ -1938,7 +1983,7 @@ export default function BookingInfoTab({ bookingData }: BookingInfoTabProps) {
           bookingDateId={selectedDateForReschedule.booking_date_id}
           hasAddons={(selectedDateForReschedule.addons?.total_amount ?? 0) > 0}
           isProcessing={rescheduleMutation.isPending}
-          bookingPaymentGateways={bookingData.payment_gateways}
+          bookingPaymentGateways={availablePaymentGateways}
           onConfirm={handleRescheduleConfirm}
         />
       )}
@@ -1978,6 +2023,9 @@ export default function BookingInfoTab({ bookingData }: BookingInfoTabProps) {
           }}
           rescheduleRequest={selectedRescheduleRequest}
           isProcessing={paymentMutation.isPending}
+          paymentGateways={availablePaymentGateways}
+          selectedPaymentGatewayId={selectedPaymentGatewayId}
+          onPaymentGatewaySelect={setSelectedPaymentGatewayId}
           onConfirm={handleSingleDatePaymentConfirm}
         />
       )}

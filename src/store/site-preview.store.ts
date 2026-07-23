@@ -168,6 +168,9 @@ export const useSitePreviewStore = create<SitePreviewState>()(
         }),
       setPreviewData: (data: SiteEssentialsFormValues) =>
         set((state) => {
+          // Vendor-only: admin Site Essentials must never populate preview storage.
+          if (data.website_role === "admin") return;
+
           state.previewFresh = true;
           try {
             const serializedData = serializePreviewData(data);
@@ -205,7 +208,33 @@ export const useSitePreviewStore = create<SitePreviewState>()(
     {
       name: "site-preview-storage",
       version: 2,
-      storage: createJSONStorage(() => localStorage),
+      // Only keep the key while a real vendor preview snapshot exists.
+      // Empty/cleared state (and admin) must not leave a shell in localStorage.
+      storage: createJSONStorage(() => ({
+        getItem: (name) => {
+          if (typeof window === "undefined") return null;
+          return localStorage.getItem(name);
+        },
+        setItem: (name, value) => {
+          if (typeof window === "undefined") return;
+          try {
+            const parsed = JSON.parse(value) as {
+              state?: { previewData?: unknown };
+            };
+            if (!parsed?.state?.previewData) {
+              localStorage.removeItem(name);
+              return;
+            }
+            localStorage.setItem(name, value);
+          } catch {
+            localStorage.removeItem(name);
+          }
+        },
+        removeItem: (name) => {
+          if (typeof window === "undefined") return;
+          localStorage.removeItem(name);
+        },
+      })),
       migrate: (persisted, version) => {
         const p = persisted as Partial<SitePreviewState> | undefined;
         if (version < 2) {

@@ -14,6 +14,7 @@ import {
   resolveVideoEmbed,
   type AdminHomeContent,
 } from "@/lib/admin-cms-content";
+import { SiteHeading } from "@/components/public/site-heading";
 
 const CONTROL_ITEMS = [
   "How guests book tickets or tables",
@@ -82,15 +83,21 @@ export default function RevolutioniseSection({
 
             {/* Right: Content */}
             <div>
-              <h2 className="text-3xl md:text-4xl font-bold text-[color:var(--color-text)] mb-6">
-                {content.title}
-              </h2>
+              <SiteHeading
+                level={2}
+                title={content.title}
+                variant="onSurface"
+                className="mb-6 !text-3xl !font-bold md:!text-4xl"
+              />
               <div
                 className="space-y-4 text-[color:var(--color-text-dimmed)] leading-relaxed mb-8 [&_ul]:list-disc [&_ul]:pl-6 [&_ol]:list-decimal [&_ol]:pl-6 [&_a]:underline"
                 dangerouslySetInnerHTML={{ __html: content.body }}
               />
 
-              <h3 className="text-lg font-semibold text-[color:var(--color-text)] mb-4">
+              <h3
+                className="text-lg font-semibold text-[color:var(--color-text)] mb-4"
+                style={{ fontFamily: "var(--font-heading)" }}
+              >
                 {content.checklistTitle}
               </h3>
               <ul className="space-y-3 mb-8">

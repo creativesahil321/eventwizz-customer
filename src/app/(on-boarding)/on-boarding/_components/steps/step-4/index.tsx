@@ -859,7 +859,7 @@ const StepFour = () => {
                         return (
                           <FormItem>
                             <FormLabel className="text-base font-medium">
-                              Timeline Title
+                              Timeline title
                             </FormLabel>
                             <FormControl>
                               <Input
@@ -904,7 +904,7 @@ const StepFour = () => {
                         return (
                           <FormItem>
                             <FormLabel className="text-base font-medium">
-                              Timeline Subtitle (optional)
+                              Timeline subtitle (optional)
                             </FormLabel>
                             <FormControl>
                               <Input
@@ -941,7 +941,7 @@ const StepFour = () => {
                     />
                     <div className="space-y-4">
                       <FormLabel className="text-base font-medium">
-                        Event Scheduler
+                        Event scheduler
                       </FormLabel>
                       {schedulerFields.map((item, index) => (
                         <div
@@ -1071,12 +1071,12 @@ const StepFour = () => {
                         return (
                           <FormItem className="mb-4">
                             <FormLabel className="text-base font-medium">
-                                Event Package Main Heading
+                                Event package main heading
                             </FormLabel>
                             <FormControl>
                               <Input
                                 {...field}
-                                placeholder="e.g., The Package"
+                                placeholder="e.g. The Package"
                                 className="h-11 bg-white/5 border-white/10"
                                 maxLength={maxLength}
                                 onFocus={() =>
@@ -1117,7 +1117,7 @@ const StepFour = () => {
                         return (
                           <FormItem className="mb-4">
                             <FormLabel className="text-base font-medium">
-                              Sub Heading
+                              Subheading
                             </FormLabel>
                             <FormControl>
                               <Input
@@ -1169,8 +1169,8 @@ const StepFour = () => {
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel className="text-base font-medium">
-                          Package Image
-                        </FormLabel>
+                        Package image
+                      </FormLabel>
                         <FormControl>
                           <div
                             onClick={() => handleFieldFocus("package_image")}

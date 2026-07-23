@@ -1394,56 +1394,12 @@ export const onboardingService = {
   },
 
   /**
-   * Store step 10 onboarding data (Payment Configuration)
-   * Payment gateways are handled separately via connectPaymentGateway()
-   * This step only stores basic step information and skip status
+   * Store step 10 onboarding data (Domain settings)
+   * Domain, confirm domain, reminder emails, and optional duplicate location.
    * @param data Step 10 data to be stored
    * @returns API response with status and message
    */
   storeStepTenData: async (data: StepTenType): Promise<ApiResponse> => {
-    // Create FormData for consistent handling
-    const formData = new FormData();
-
-    // Add required fields
-    formData.append("step", data.step.toString());
-    formData.append("event_id", data.event_id.toString());
-    formData.append("accept_payment_method", data.accept_payment_method);
-    formData.append("is_skipped", data.is_skipped ? "1" : "0");
-
-    appendManualIsApprovedToFormData(formData, data.isApproved);
-
-    const response = await request<ApiResponse>({
-      method: "POST",
-      url: API_ENDPOINTS.VENDOR.ONBOARDING.STEPS,
-      data: formData,
-      headers: {
-        "Content-Type": "multipart/form-data",
-      },
-      returnFullResponse: true,
-    });
-
-    // Check if onboarding is already completed
-    const isCompleted = await onboardingService.checkOnboardingCompleted(
-      response
-    );
-    if (isCompleted) {
-      return response;
-    }
-
-    // Notify that data has changed if successful
-    if (response.status) {
-      await onboardingService.notifyDataChanged();
-    }
-
-    return response;
-  },
-
-  /**
-   * Store step 11 onboarding data (Reminder Emails & Submit Type)
-   * @param data Step 11 data to be stored
-   * @returns API response with status and message
-   */
-  storeStepElevenData: async (data: StepElevenType): Promise<ApiResponse> => {
     // Create FormData for consistent handling
     const formData = new FormData();
 
@@ -1453,9 +1409,6 @@ export const onboardingService = {
     formData.append("submit_type", data.submit_type);
     formData.append("domain", data.domain);
     formData.append("confirm_domain", data.confirm_domain ? "true" : "false");
-
-    // // Add category_id with a default value if not provided
-    // formData.append("category_id", (data.category_id || 1).toString());
 
     // Handle city and address fields
     const city = data.city || "";
@@ -1523,6 +1476,51 @@ export const onboardingService = {
     return response;
   },
 
+  /**
+   * Store step 11 onboarding data (Payment Configuration)
+   * Payment gateways are handled separately via connectPaymentGateway()
+   * This step only stores basic step information and skip status
+   * @param data Step 11 data to be stored
+   * @returns API response with status and message
+   */
+  storeStepElevenData: async (data: StepElevenType): Promise<ApiResponse> => {
+    // Create FormData for consistent handling
+    const formData = new FormData();
+
+    // Add required fields
+    formData.append("step", data.step.toString());
+    formData.append("event_id", data.event_id.toString());
+    formData.append("accept_payment_method", data.accept_payment_method);
+    formData.append("is_skipped", data.is_skipped ? "1" : "0");
+
+    appendManualIsApprovedToFormData(formData, data.isApproved);
+
+    const response = await request<ApiResponse>({
+      method: "POST",
+      url: API_ENDPOINTS.VENDOR.ONBOARDING.STEPS,
+      data: formData,
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
+      returnFullResponse: true,
+    });
+
+    // Check if onboarding is already completed
+    const isCompleted = await onboardingService.checkOnboardingCompleted(
+      response
+    );
+    if (isCompleted) {
+      return response;
+    }
+
+    // Notify that data has changed if successful
+    if (response.status) {
+      await onboardingService.notifyDataChanged();
+    }
+
+    return response;
+  },
+
   getAllSteps: async (
     headers: Record<string, string>,
     isRooms = false,
@@ -1554,44 +1552,88 @@ export const onboardingService = {
   },
 
   /**
-   * Connect payment gateway (Stripe Connect, PayPal Commerce, TrueLayer, etc.)
-   * @param paymentGateway Payment gateway name: "truelayer" | "stripe" | "paypal" | "worldpay" | "klarna"
-   * @returns Standardized API response with onboarding_url/auth_url and account_id
+   * Connect a payment gateway via POST /vendor/onboarding/payment-gateway-connect.
+   * Stripe / PayPal / TrueLayer: pass API credentials `{ key, secret }`.
    */
   connectPaymentGateway: async (
-    paymentGateway: "truelayer" | "stripe" | "paypal" | "worldpay" | "klarna"
+    paymentGateway: "truelayer" | "stripe" | "paypal" | "worldpay" | "klarna",
+    credentials: { key: string; secret: string },
   ): Promise<{
     status: boolean;
     message: string;
     data?: {
-      onboarding_url?: string; // For Stripe/PayPal
-      auth_url?: string; // For TrueLayer
-      account_id?: string; // For Stripe/PayPal
       gateway: string;
+      account?: {
+        id: number;
+        account_status?: "pending" | "active" | "under_review" | "restricted";
+        is_enabled?: boolean;
+        key?: string;
+        client_secret?: string;
+        account_id?: string;
+      };
+      webhook_url?: string | null;
+      manual_webhook?: boolean;
+      webhook_setup_hint?: string | null;
+      public_key?: string | null;
+      verification?: {
+        stripe_account_verified_at?: string | null;
+        paypal_oauth_verified_at?: string | null;
+        truelayer_oauth_verified_at?: string | null;
+        truelayer_env?: string | null;
+        charges_enabled?: boolean;
+        payouts_enabled?: boolean;
+        manual_webhook?: boolean;
+        signing_key_generated?: boolean;
+      };
+      account_id?: string;
       connection_status?: string;
-      return_url?: string;
-      refresh_url?: string;
     };
-    errors: string[];
+    errors: string[] | Record<string, string[]>;
   }> => {
     try {
       const payload = {
         payment_gateway: paymentGateway,
+        credentials: {
+          key: credentials.key.trim(),
+          secret: credentials.secret.trim(),
+        },
       };
 
       const response = await api.post<{
         status: boolean;
         message: string;
         data?: {
-          onboarding_url?: string;
-          auth_url?: string;
-          account_id?: string;
           gateway: string;
+          account?: {
+            id: number;
+            account_status?:
+              | "pending"
+              | "active"
+              | "under_review"
+              | "restricted";
+            is_enabled?: boolean;
+            key?: string;
+            client_secret?: string;
+            account_id?: string;
+          };
+          webhook_url?: string | null;
+          manual_webhook?: boolean;
+          webhook_setup_hint?: string | null;
+          public_key?: string | null;
+          verification?: {
+            stripe_account_verified_at?: string | null;
+            paypal_oauth_verified_at?: string | null;
+            truelayer_oauth_verified_at?: string | null;
+            truelayer_env?: string | null;
+            charges_enabled?: boolean;
+            payouts_enabled?: boolean;
+            manual_webhook?: boolean;
+            signing_key_generated?: boolean;
+          };
+          account_id?: string;
           connection_status?: string;
-          return_url?: string;
-          refresh_url?: string;
         };
-        errors: string[];
+        errors: string[] | Record<string, string[]>;
       }>(API_ENDPOINTS.VENDOR.ONBOARDING.PAYMENT_GATEWAYS, payload, {
         returnFullResponse: true,
       });

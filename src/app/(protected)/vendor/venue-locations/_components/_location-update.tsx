@@ -26,8 +26,8 @@ import { useUpdateLocation } from "../_lib/queries";
 import { Location } from "../_lib/types";
 import { slugify } from "@/lib/utils";
 import { env } from "@/env";
-import GoogleLocationSearch from "@/app/(on-boarding)/on-boarding/_components/steps/step-11/google-location-search";
-import { fetchLocationDetails } from "@/app/(on-boarding)/on-boarding/_components/steps/step-11/_lib/actions";
+import GoogleLocationSearch from "@/app/(on-boarding)/on-boarding/_components/steps/step-10/google-location-search";
+import { fetchLocationDetails } from "@/app/(on-boarding)/on-boarding/_components/steps/step-10/_lib/actions";
 import { toast } from "sonner";
 
 interface UpdateLocationDialogProps {
@@ -143,11 +143,11 @@ export default function UpdateLocationDialog({
                     <GoogleLocationSearch
                       apiKey={env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}
                       value={field.value || ""}
-                      onChange={(value) => {
+                      onChange={(value: string) => {
                         field.onChange(value);
                         setIsAddressValid(false);
                       }}
-                      onSelect={(placeId) => {
+                      onSelect={(placeId: string) => {
                         addressPlaceIdRef.current = placeId;
                         setIsAddressValid(true);
                         fetchLocationDetails(form, placeId);

@@ -1,5 +1,6 @@
 "use client";
 
+import { pageCardClassName } from "@/app/(protected)/_components/page-header-card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Card } from "@/components/ui/card";
 
@@ -7,7 +8,7 @@ export function SiteEssentialsFormSkeleton() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="bg-background p-3 sm:p-6 border rounded-lg mb-6">
+      <div className={pageCardClassName("mb-6 min-w-0")}>
         <div className="flex flex-1 items-start justify-start flex-col relative text-black">
           <Skeleton className="h-8 w-52 mb-1" />
         </div>

@@ -18,7 +18,7 @@ export default function TrueLayerReturnPage() {
   const redirectAfterDelay = useCallback(
     (delay: number) => {
       setTimeout(() => {
-        router.push("/on-boarding?step=10");
+        router.push("/on-boarding?step=11");
       }, delay);
     },
     [router]
@@ -48,7 +48,7 @@ export default function TrueLayerReturnPage() {
         "Your TrueLayer bank account has been connected successfully!";
 
       if (bankAccount) {
-        message = `Your ${bankName} account (${accountNumber}) has been connected successfully! You can now accept secure bank-to-bank payments from customers.`;
+        message = `Your ${bankName} account (${accountNumber}) has been connected successfully! You can now accept secure bank-to-bank payments from guests.`;
       }
 
       setMessage(message);

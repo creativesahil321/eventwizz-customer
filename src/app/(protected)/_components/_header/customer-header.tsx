@@ -94,7 +94,7 @@ function CustomerHeaderSearch() {
   const debouncedQuery = useDebounce(query, 400);
   const { data: supportTicketsResponse } = useCustomerSupportTickets(
     { sort: "newest", search: debouncedQuery.trim() || undefined },
-    { enabled: isSupportWorkspace && debouncedQuery.trim().length > 0 }
+    { enabled: isSupportWorkspace && debouncedQuery.trim().length > 0 },
   );
 
   const results = useMemo(() => {
@@ -115,7 +115,7 @@ function CustomerHeaderSearch() {
     return CUSTOMER_QUICK_LINKS.filter(
       (item) =>
         item.title.toLowerCase().includes(q) ||
-        item.keywords.some((keyword) => keyword.includes(q))
+        item.keywords.some((keyword) => keyword.includes(q)),
     )
       .slice(0, 6)
       .map((item) => ({
@@ -307,7 +307,7 @@ function CustomerNotificationBell() {
         <span
           className={cn(
             "absolute -right-0.5 -top-0.5 flex size-4 items-center justify-center rounded-full text-[10px] font-bold",
-            "bg-[var(--color-primary)] text-white"
+            "bg-[var(--color-primary)] text-white",
           )}
         >
           {unreadCount > 9 ? "9+" : unreadCount}
@@ -328,7 +328,7 @@ export default function CustomerHeader({ menus = [] }: CustomerHeaderProps) {
     <header
       className={cn(
         "sticky top-0 z-50 flex-none border-b border-slate-200 bg-white px-2 py-2.5 shadow-sm transition-all duration-300 sm:px-4 md:px-6",
-        collapsed ? "lg:ml-[60px]" : "lg:ml-[264px]"
+        collapsed ? "lg:ml-[60px]" : "lg:ml-[264px]",
       )}
     >
       <div className="flex items-center justify-between gap-2 sm:gap-3">

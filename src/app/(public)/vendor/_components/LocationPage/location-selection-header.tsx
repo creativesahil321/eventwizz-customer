@@ -25,7 +25,16 @@ export default function LocationSelectionHeader({
   const { data: session, status: sessionStatus } = useSession();
   const isAuthenticated = sessionStatus === "authenticated";
   const accountType = session?.user?.account_type;
-  const dashboardHref = accountType ? `/${accountType}/dashboard` : "/auth/login";
+  const needsOnboarding =
+    accountType === "vendor" && !session?.user?.isOnboarded;
+  const dashboardHref = needsOnboarding
+    ? "/on-boarding"
+    : accountType
+      ? `/${accountType}/dashboard`
+      : "/auth/login";
+  const dashboardLabel = needsOnboarding
+    ? "Continue Onboarding"
+    : "Dashboard";
 
   const topBarChromeLinkClass = cn(
     "inline-flex items-center justify-center rounded-full border text-sm font-medium transition-colors whitespace-nowrap backdrop-blur-md px-3 py-1",
@@ -155,7 +164,7 @@ export default function LocationSelectionHeader({
                 ) : isAuthenticated ? (
                   <>
                     <Link href={dashboardHref} className={topBarChromeLinkClass}>
-                      Dashboard
+                      {dashboardLabel}
                     </Link>
                     <button
                       type="button"
@@ -225,7 +234,7 @@ export default function LocationSelectionHeader({
                       className={`${menuSurfaceChromeLinkClass} inline-flex w-full justify-center`}
                       onClick={() => setMobileMenuOpen(false)}
                     >
-                      Dashboard
+                      {dashboardLabel}
                     </Link>
                     <button
                       type="button"

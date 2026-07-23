@@ -1,5 +1,6 @@
 import type { AdminHomeContent } from "@/lib/admin-cms-content";
 import { getAdminHomeIcon } from "@/lib/admin-home-icons";
+import { SiteHeading } from "@/components/public/site-heading";
 
 export default function SellingPoints({
   content,
@@ -9,10 +10,14 @@ export default function SellingPoints({
   return (
     <section className="py-20 bg-[color:var(--color-surface)]">
       <div className="container mx-auto px-4">
-        <div className="text-center mb-12">
-          <h2 className="text-3xl md:text-4xl font-bold text-[color:var(--color-text)] mb-3">
-            {content.title}
-          </h2>
+        <div className="mb-12 text-center">
+          <SiteHeading
+            level={2}
+            title={content.title}
+            variant="onSurface"
+            align="center"
+            className="mb-3 !text-3xl !font-bold md:!text-4xl"
+          />
           <p className="text-[color:var(--color-text-dimmed)] max-w-xl mx-auto">
             {content.subtitle}
           </p>
@@ -29,7 +34,10 @@ export default function SellingPoints({
                 <div className="rounded-full bg-[color:var(--color-primary)]/10 w-12 h-12 flex items-center justify-center mb-4">
                   <Icon className="h-5 w-5 text-[color:var(--color-primary)]" />
                 </div>
-                <h3 className="text-sm font-semibold text-gray-800">
+                <h3
+                  className="text-sm font-semibold text-gray-800"
+                  style={{ fontFamily: "var(--font-heading)" }}
+                >
                   {point.title}
                 </h3>
               </div>

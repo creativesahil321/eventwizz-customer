@@ -13,7 +13,6 @@ interface DashboardEventItem {
   id: string;
   title: string;
   date: string;
-  time: string;
   location: string;
   ticketType: string;
   eventSlug?: string;
@@ -28,7 +27,6 @@ function mapUpcomingEvents(
     id: String(e.booking_date_id ?? e.id ?? e.event_slug ?? i),
     title: e.title ?? e.event_name ?? "Event",
     date: e.date ?? new Date().toISOString().slice(0, 10),
-    time: e.time ?? "—",
     location: e.location ?? "—",
     ticketType: e.ticketType ?? e.ticket_type ?? "—",
     eventSlug: e.event_slug,

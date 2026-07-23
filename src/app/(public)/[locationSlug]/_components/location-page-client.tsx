@@ -59,15 +59,8 @@ export default function LocationPageClient({
         locationSlug={locationSlug}
         locationLabel={locationData.city ?? null}
       />
-      <FooterSection
-        locationSlug={locationSlug}
-        contactOverride={{
-          address: locationData.address,
-          email: locationData.email,
-          phone: locationData.phone,
-          phone_number: locationData.phone_number,
-        }}
-      />
+      {/* Contact comes from theme: locations[] for this slug, contactDetails for head office */}
+      <FooterSection locationSlug={locationSlug} />
     </>
   );
 }

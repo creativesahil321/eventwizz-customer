@@ -335,6 +335,10 @@ export interface EventsResponse {
   };
   errors: string[];
   filter_meta?: EventsListFilterMeta;
+  active_events_count?: number;
+  past_events_count?: number;
+  draft_events_count?: number;
+  cancelled_events_count?: number;
 }
 
 /**

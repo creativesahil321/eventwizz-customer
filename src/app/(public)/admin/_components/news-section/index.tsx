@@ -1,6 +1,7 @@
 import Image from "next/image";
 import { ArrowRight } from "lucide-react";
 import type { AdminHomeContent } from "@/lib/admin-cms-content";
+import { SiteHeading } from "@/components/public/site-heading";
 
 const NEWS_ARTICLES = [
   {
@@ -37,10 +38,14 @@ export default function NewsSection({
   return (
     <section className="py-20 bg-[color:var(--color-background)]">
       <div className="container mx-auto px-4">
-        <div className="text-center mb-12">
-          <h2 className="text-3xl md:text-4xl font-bold text-[color:var(--color-text)] mb-3">
-            {content.title}
-          </h2>
+        <div className="mb-12 text-center">
+          <SiteHeading
+            level={2}
+            title={content.title}
+            variant="onSurface"
+            align="center"
+            className="mb-3 !text-3xl !font-bold md:!text-4xl"
+          />
           <p className="text-[color:var(--color-text-dimmed)]">
             {content.subtitle}
           </p>
@@ -52,7 +57,6 @@ export default function NewsSection({
               key={article.title}
               className="bg-[color:var(--color-surface)] rounded-2xl overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300 group cursor-pointer"
             >
-              {/* Image */}
               <div className="relative h-52 overflow-hidden">
                 <Image
                   src={article.image}
@@ -61,18 +65,19 @@ export default function NewsSection({
                   className="object-cover transition-transform duration-500 group-hover:scale-105"
                   sizes="(max-width: 768px) 100vw, 33vw"
                 />
-                {/* Category pill */}
                 <div className="absolute top-3 left-3 bg-[color:var(--color-primary)] text-[color:var(--color-primary-foreground)] text-xs font-semibold px-3 py-1 rounded-full shadow">
                   {article.category}
                 </div>
               </div>
 
-              {/* Content */}
               <div className="p-6">
                 <p className="text-xs text-[color:var(--color-text)] mb-2 font-medium">
                   {article.date}
                 </p>
-                <h3 className="font-bold text-[color:var(--color-text)] mb-2 leading-snug group-hover:text-[color:var(--color-primary)] transition-colors line-clamp-2">
+                <h3
+                  className="font-bold text-[color:var(--color-text)] mb-2 leading-snug group-hover:text-[color:var(--color-primary)] transition-colors line-clamp-2"
+                  style={{ fontFamily: "var(--font-heading)" }}
+                >
                   {article.title}
                 </h3>
                 <p className="text-sm text-[color:var(--color-text)] mb-4 leading-relaxed line-clamp-3">

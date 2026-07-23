@@ -19,8 +19,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { env } from "@/env";
-import GoogleLocationSearch from "@/app/(on-boarding)/on-boarding/_components/steps/step-11/google-location-search";
-import { fetchLocationDetails } from "@/app/(on-boarding)/on-boarding/_components/steps/step-11/_lib/actions";
+import GoogleLocationSearch from "@/app/(on-boarding)/on-boarding/_components/steps/step-10/google-location-search";
+import { fetchLocationDetails } from "@/app/(on-boarding)/on-boarding/_components/steps/step-10/_lib/actions";
 import {
   useCurrentLocationId,
   useVendorLocationsList,
@@ -220,7 +220,8 @@ export function DuplicateLocationFields({
                     {availableLocations.map((location) => (
                       <SelectItem key={location.id} value={String(location.id)}>
                         {formatLocationOptionLabel(location)}
-                        {location.is_default ? " (Default)" : ""}
+                        {location.is_headquarters ? " (Head office)" : ""}
+                        {location.is_default ? " (In use)" : ""}
                       </SelectItem>
                     ))}
                   </SelectContent>

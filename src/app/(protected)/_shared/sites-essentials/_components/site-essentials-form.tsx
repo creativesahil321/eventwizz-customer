@@ -9,6 +9,7 @@ import {
   AlertCircle,
   Eye,
   RotateCcw,
+  Globe,
 } from "lucide-react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -42,6 +43,7 @@ import {
   useSiteEssentialsUpdateGate,
 } from "../_lib/site-essentials-update-context";
 import { toMutableSiteEssentialsFormValues } from "../_lib/to-mutable-form-values";
+import { ImportWebsiteModal } from "./import-website-modal";
 
 export function SiteEssentialsForm() {
   return (
@@ -61,6 +63,7 @@ function SiteEssentialsFormInner() {
   const hasMultipleLocations = useHasMultipleLocations();
   const [submitting, setSubmitting] = useState(false);
   const [previewLoading, setPreviewLoading] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
   const router = useRouter();
   const { toast } = useToast();
   const {
@@ -106,11 +109,23 @@ function SiteEssentialsFormInner() {
     }
   }, [colorsUnlocked, activeTab]);
 
+  // Admin Site Essentials must never use the vendor preview round-trip or
+  // `site-preview-storage` — clear any stale snapshot and drop the key.
+  useEffect(() => {
+    if (!isAdminSite) return;
+    clearPreviewData();
+    if (typeof window !== "undefined") {
+      localStorage.removeItem("site-preview-storage");
+    }
+  }, [isAdminSite, clearPreviewData]);
+
   // Restore preview snapshot into the form ONLY when it was set during the
   // current session (the editor → preview → editor round-trip). A persisted
   // snapshot left over from a previous session/reload is stale and must never
   // override the fresh server data — we discard it so the API values load.
+  // Vendor sites only — admin has no preview flow.
   useEffect(() => {
+    if (isAdminSite) return;
     if (!previewData) return;
 
     if (!previewFresh) {
@@ -146,12 +161,19 @@ function SiteEssentialsFormInner() {
     } catch (error) {
       console.error("Error resetting form with preview data:", error);
     }
-  }, [form, previewData, previewFresh, siteEssentials, clearPreviewData]);
+  }, [
+    form,
+    previewData,
+    previewFresh,
+    siteEssentials,
+    clearPreviewData,
+    isAdminSite,
+  ]);
 
   // Reset form when siteEssentials data changes (e.g., after location switch)
   // This ensures the form always reflects the current location's data
   useEffect(() => {
-    if (siteEssentials && !previewData) {
+    if (siteEssentials && (isAdminSite || !previewData)) {
       try {
         // Reset form with fresh server data (mutable clone — query cache is frozen)
         form.reset(toMutableSiteEssentialsFormValues(siteEssentials), {
@@ -166,7 +188,7 @@ function SiteEssentialsFormInner() {
         console.error("Error resetting form with site essentials data:", error);
       }
     }
-  }, [siteEssentials, previewData, form]);
+  }, [siteEssentials, previewData, form, isAdminSite]);
 
   // Combined useEffect for form validation and error tracking
   useEffect(() => {
@@ -373,8 +395,10 @@ function SiteEssentialsFormInner() {
           keepSubmitCount: false,
         });
 
-        // Clear preview data
-        clearPreviewData();
+        // Clear preview data (vendor preview round-trip only)
+        if (!isAdminSite) {
+          clearPreviewData();
+        }
 
         // Clear any error states
         setShowErrorSummary(false);
@@ -584,6 +608,18 @@ function SiteEssentialsFormInner() {
             {/* Actions sit on white, directly under tab content — avoids teal page chrome eating contrast */}
             <div className="border-t border-border bg-white px-4 py-4 sm:px-6 sm:py-5">
               <div className="flex flex-col gap-3 sm:flex-row sm:justify-end sm:gap-3">
+                {!isAdminSite && !readOnly && (
+                  <Button
+                    variant="outline"
+                    onClick={() => setImportOpen(true)}
+                    type="button"
+                    disabled={submitting || previewLoading}
+                    className="flex items-center justify-center gap-2 border-slate-300 bg-white text-slate-900 hover:bg-slate-50"
+                  >
+                    <Globe className="h-4 w-4" />
+                    Import from website
+                  </Button>
+                )}
                 {!isAdminSite && (
                   <Button
                     variant="outline"
@@ -630,6 +666,10 @@ function SiteEssentialsFormInner() {
           </Card>
         </Tabs>
       </form>
+
+      {!isAdminSite && (
+        <ImportWebsiteModal open={importOpen} onOpenChange={setImportOpen} />
+      )}
     </FormProvider>
   );
 }

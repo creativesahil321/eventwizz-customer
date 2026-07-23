@@ -83,7 +83,7 @@ export function WholeStepGuidedShell<T extends FieldValues>({
         tabIndex={-1}
         className={guidedSectionSurfaceClass(true, "overflow-hidden p-0")}
       >
-        <div className="p-5 sm:p-6 space-y-6">
+        <div className="space-y-4 p-4 sm:p-5">
           <GuidedSectionTitleBar
             sectionIndex={0}
             sectionId={sectionId}

@@ -1,7 +1,10 @@
 "use client";
 
-import React, { useEffect, useState, Suspense } from "react";
+import React, { useEffect, useState, Suspense, useContext } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
+import { ServerContext } from "@/lib/server-context";
+import { resolvePublicPageContact } from "@/lib/resolve-venue-contact";
+import type { ThemeSchema } from "@/types/theme.types";
 import {
   XCircle,
   AlertTriangle,
@@ -27,9 +30,19 @@ interface PaymentFailureData {
   reason?: string;
 }
 
+const FALLBACK_SUPPORT_EMAIL = "support@eventwizz.com";
+
 function PaymentFailedContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
+
+  // Resolve the vendor's real contact details from theme (no fake placeholders).
+  const { theme } = useContext(ServerContext);
+  const resolvedContact = resolvePublicPageContact({
+    theme: theme as ThemeSchema | null,
+  });
+  const supportPhone = resolvedContact.phone;
+  const supportEmail = resolvedContact.email || FALLBACK_SUPPORT_EMAIL;
 
   const [failureData, setFailureData] = useState<PaymentFailureData | null>(
     null
@@ -82,7 +95,7 @@ function PaymentFailedContent() {
         failureData?.error_message || "N/A"
       }\n\nPlease assist me.\n\nThank you.`
     );
-    window.location.href = `mailto:support@eventwizz.com?subject=${subject}&body=${body}`;
+    window.location.href = `mailto:${supportEmail}?subject=${subject}&body=${body}`;
   };
 
   const handleViewCart = () => {
@@ -377,23 +390,25 @@ function PaymentFailedContent() {
               <p className="text-sm">
                 <span className="font-medium text-gray-700">Email:</span>{" "}
                 <a
-                  href="mailto:support@eventwizz.com"
+                  href={`mailto:${supportEmail}`}
                   className="text-blue-600 hover:text-blue-700"
                 >
-                  support@eventwizz.com
+                  {supportEmail}
                 </a>
               </p>
-              <p className="text-sm">
-                <span className="font-medium text-gray-700">Phone:</span>{" "}
-                <a
-                  href="tel:+441234567890"
-                  className="text-blue-600 hover:text-blue-700"
-                >
-                  +44 123 456 7890
-                </a>
-              </p>
+              {supportPhone && (
+                <p className="text-sm">
+                  <span className="font-medium text-gray-700">Phone:</span>{" "}
+                  <a
+                    href={`tel:${supportPhone.replace(/[^+\d]/g, "")}`}
+                    className="text-blue-600 hover:text-blue-700"
+                  >
+                    {supportPhone}
+                  </a>
+                </p>
+              )}
               <p className="text-xs text-gray-500 mt-2">
-                Available 24/7 • Response within 1 hour
+                We usually respond within one hour
               </p>
             </div>
           </div>

@@ -12,6 +12,7 @@ type OnboardingPreviewHeaderProps = {
   headerDownloads?: HeaderDownloadLink[];
   showRoomSelector?: boolean;
   roomSelectorVisible?: boolean;
+  onRoomChange?: (index: number) => void;
 };
 
 /**
@@ -25,6 +26,7 @@ export function OnboardingPreviewHeader({
   headerDownloads,
   showRoomSelector = false,
   roomSelectorVisible = false,
+  onRoomChange,
 }: OnboardingPreviewHeaderProps) {
   return (
     <>
@@ -37,7 +39,10 @@ export function OnboardingPreviewHeader({
         headerDownloads={headerDownloads}
       />
       {showRoomSelector ? (
-        <PreviewRoomFloatingSelector visible={roomSelectorVisible} />
+        <PreviewRoomFloatingSelector
+          visible={roomSelectorVisible}
+          onRoomChange={onRoomChange}
+        />
       ) : null}
     </>
   );

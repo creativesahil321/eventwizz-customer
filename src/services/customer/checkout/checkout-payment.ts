@@ -80,6 +80,26 @@ export function mergeStripePaymentSession(
   };
 }
 
+/**
+ * Resolves the hosted-checkout URL for redirect-based gateways (PayPal, TrueLayer, …).
+ *
+ * The backend nests the URL differently per gateway:
+ *  - PayPal:  `data.payment.paypal.redirect_url`
+ *  - Generic: `data.payment.redirect_url`
+ *  - Legacy:  `data.redirect_url` (top-level)
+ */
+export function resolveCheckoutRedirectUrl(
+  data: CheckoutResponseData,
+): string | null {
+  const payment = data.payment;
+  return (
+    payment?.paypal?.redirect_url ||
+    payment?.redirect_url ||
+    data.redirect_url ||
+    null
+  );
+}
+
 export function resolveCheckoutPaymentAction(
   data: CheckoutResponseData,
 ): CheckoutPaymentAction | null {
@@ -88,8 +108,9 @@ export function resolveCheckoutPaymentAction(
     return { type: "stripe", session };
   }
 
-  if (data.redirect_url) {
-    return { type: "redirect", url: data.redirect_url };
+  const redirectUrl = resolveCheckoutRedirectUrl(data);
+  if (redirectUrl) {
+    return { type: "redirect", url: redirectUrl };
   }
 
   return null;

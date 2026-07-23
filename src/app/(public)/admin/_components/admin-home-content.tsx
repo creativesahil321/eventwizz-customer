@@ -19,15 +19,15 @@ import AdminFooter from "./footer";
  * - /admin route (server page with metadata)
  * - / route via HomeContent when subdomain/theme is admin
  *
- * Section copy is resolved from the theme (white-label keys) with the current
- * platform copy as fallback, so nothing breaks before the backend returns keys.
+ * Typography matches vendor public pages: body stack on the shell,
+ * marketing titles via SiteHeading (--font-heading) inside sections.
  */
 export default function AdminHomeContent() {
   const { theme } = useContext(ServerContext);
   const content = resolveAdminHomeContent(theme as ThemeSchema);
 
   return (
-    <>
+    <div className="font-body text-[color:var(--color-text)]">
       <AdminHeader />
       <HeroSection content={content.hero} />
       <WhatIsSection content={content.intro} />
@@ -37,6 +37,6 @@ export default function AdminHomeContent() {
       <RevolutioniseSection content={content.showcase} />
       <NewsSection content={content.news} />
       <AdminFooter />
-    </>
+    </div>
   );
 }

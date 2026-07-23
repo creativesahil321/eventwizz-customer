@@ -119,7 +119,7 @@ const EventScheduler: React.FC<EventSchedulerProps> = ({
 
   return (
     <div className="space-y-4">
-      <OnboardingFieldGroupTitle>Event Scheduler</OnboardingFieldGroupTitle>
+      <OnboardingFieldGroupTitle>Event scheduler</OnboardingFieldGroupTitle>
 
       {fields.map((fieldItem, index) => (
         <div

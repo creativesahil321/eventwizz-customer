@@ -72,6 +72,11 @@ import {
   MultiDateSelector,
   type DateCardViewModel,
 } from "./multi-date-selector";
+import PaymentGatewaySelector from "@/app/(public)/vendor/checkout/_components/payment-gateway-selector";
+import {
+  DEFAULT_STRIPE_PAYMENT_GATEWAY,
+  normalizeReschedulePaymentGateways,
+} from "@/services/customer/bookings/reschedule-utils";
 
 interface CheckoutDate extends BookingDateSource {
   booking_date_id: number;
@@ -268,6 +273,35 @@ export default function BookingCheckoutPage({
   const [stripePaymentSession, setStripePaymentSession] =
     useState<CheckoutStripePaymentSession | null>(null);
   const [isStripePaymentOpen, setIsStripePaymentOpen] = useState(false);
+  const [selectedPaymentGatewayId, setSelectedPaymentGatewayId] = useState<
+    number | null
+  >(null);
+
+  const availablePaymentGateways = useMemo(
+    () => normalizeReschedulePaymentGateways(null, paymentGateways),
+    [paymentGateways],
+  );
+
+  useEffect(() => {
+    if (
+      availablePaymentGateways.length === 1 &&
+      selectedPaymentGatewayId == null
+    ) {
+      setSelectedPaymentGatewayId(availablePaymentGateways[0].id);
+      return;
+    }
+
+    if (
+      selectedPaymentGatewayId != null &&
+      !availablePaymentGateways.some((g) => g.id === selectedPaymentGatewayId)
+    ) {
+      setSelectedPaymentGatewayId(
+        availablePaymentGateways.length === 1
+          ? availablePaymentGateways[0].id
+          : null,
+      );
+    }
+  }, [availablePaymentGateways, selectedPaymentGatewayId]);
 
   const selectedDate = dates.find((d) => d.id === selectedDateId) ?? dates[0];
   const packageTitleFallback = useMemo(
@@ -510,12 +544,31 @@ export default function BookingCheckoutPage({
     setSelectedDateForReschedule(null);
   }, [bookingId, queryClient]);
 
+  const resolvePaymentGatewayId = (): number | null => {
+    if (
+      selectedPaymentGatewayId != null &&
+      availablePaymentGateways.some((g) => g.id === selectedPaymentGatewayId)
+    ) {
+      return selectedPaymentGatewayId;
+    }
+    if (availablePaymentGateways.length === 1) {
+      return availablePaymentGateways[0].id;
+    }
+    return null;
+  };
+
   const submitPayment = (targetDates: CheckoutDate[]) => {
     if (targetDates.length === 0) return;
 
+    const gatewayId = resolvePaymentGatewayId();
+    if (availablePaymentGateways.length > 1 && gatewayId == null) {
+      toast.error("Please select a payment method");
+      return;
+    }
+
     const payload: BookingPaymentPayload = {
       booking_id: parseInt(bookingId, 10),
-      payment_gateway: paymentGateways?.[0]?.id ?? 1,
+      payment_gateway: gatewayId ?? DEFAULT_STRIPE_PAYMENT_GATEWAY.id,
       dates: targetDates.map(buildPaymentDateEntry),
     };
 
@@ -802,6 +855,29 @@ export default function BookingCheckoutPage({
 
         {showPaymentFooter && (
           <div className="bg-foreground text-card p-4 sm:p-6 lg:p-8 py-4 lg:rounded-b-xl">
+            {availablePaymentGateways.length > 1 && (
+              <div className="mb-4 rounded-lg border border-border bg-white p-3 text-foreground sm:p-4">
+                <PaymentGatewaySelector
+                  availableGateways={availablePaymentGateways}
+                  selectedGateway={
+                    selectedPaymentGatewayId != null
+                      ? selectedPaymentGatewayId.toString()
+                      : null
+                  }
+                  onGatewaySelect={(gatewayId) => {
+                    const parsed = Number.parseInt(gatewayId, 10);
+                    setSelectedPaymentGatewayId(
+                      Number.isFinite(parsed) ? parsed : null,
+                    );
+                  }}
+                  disabled={paymentMutation.isPending}
+                  showError={
+                    selectedPaymentGatewayId == null &&
+                    !paymentMutation.isPending
+                  }
+                />
+              </div>
+            )}
             <div className="flex items-center justify-between gap-4">
               <div>
                 <p
@@ -832,7 +908,11 @@ export default function BookingCheckoutPage({
                       "var(--color-primary-foreground, var(--primary-foreground))",
                   }}
                   onClick={handlePayAll}
-                  disabled={paymentMutation.isPending}
+                  disabled={
+                    paymentMutation.isPending ||
+                    (availablePaymentGateways.length > 1 &&
+                      selectedPaymentGatewayId == null)
+                  }
                 >
                   {paymentMutation.isPending ? "Processing…" : "Pay All"}
                 </Button>
@@ -886,6 +966,9 @@ export default function BookingCheckoutPage({
           }}
           rescheduleRequest={rescheduleRequest}
           isProcessing={paymentMutation.isPending}
+          paymentGateways={availablePaymentGateways}
+          selectedPaymentGatewayId={selectedPaymentGatewayId}
+          onPaymentGatewaySelect={setSelectedPaymentGatewayId}
           onConfirm={handlePaymentConfirm}
         />
       )}
@@ -905,7 +988,7 @@ export default function BookingCheckoutPage({
             selectedDateForReschedule,
           )}
           isProcessing={rescheduleMutation.isPending}
-          bookingPaymentGateways={paymentGateways}
+          bookingPaymentGateways={availablePaymentGateways}
           onConfirm={handleRescheduleConfirm}
         />
       )}

@@ -40,6 +40,8 @@ export interface VenueLocation {
   contact_number?: string;
   email?: string;
   is_default: boolean;
+  /** Fixed head office — does not change when the vendor switches working location */
+  is_headquarters?: boolean;
   status?: boolean; // Dynamic status field: true = Active, false = Inactive
   created_at?: string;
   updated_at?: string;

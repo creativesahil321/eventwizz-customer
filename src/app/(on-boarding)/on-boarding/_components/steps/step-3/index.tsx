@@ -245,7 +245,7 @@ export default function StepThree() {
       {
         id: "event-details",
         label: "Event details",
-        description: "Backend event identifier and category.",
+        description: "Event name for your account, and category.",
         fields: ["event_name", "event_category_id"],
       },
     ];
@@ -640,7 +640,7 @@ export default function StepThree() {
       <OnboardingCard>
         <CardHeader>
           <OnboardingTitle>
-            Awesome! Let’s Create Your First Event
+            Let’s create your first event
           </OnboardingTitle>
         </CardHeader>
         <CardContent>
@@ -692,7 +692,7 @@ export default function StepThree() {
                       return (
                         <FormItem>
                           <FormLabel className="text-sm font-medium">
-                            Banner Heading{" "}
+                            Banner heading{" "}
                             <span className="text-red-400">*</span>
                           </FormLabel>
                           <FormControl>
@@ -741,7 +741,7 @@ export default function StepThree() {
                       return (
                         <FormItem>
                           <FormLabel className="text-sm font-medium">
-                            Banner Subheading{" "}
+                            Banner subheading{" "}
                             <span className="text-red-400">*</span>
                           </FormLabel>
                           <FormControl>
@@ -785,7 +785,7 @@ export default function StepThree() {
                   />
 
                   <OnboardingFieldGroupTitle>
-                    Banner Image <span className="text-red-400">*</span>
+                    Banner image <span className="text-red-400">*</span>
                   </OnboardingFieldGroupTitle>
 
                   <Tabs
@@ -804,7 +804,7 @@ export default function StepThree() {
                         render={({ field }) => (
                           <FormItem>
                             <OnboardingFieldGroupTitle>
-                              Add a Cover Photo
+                              Add a cover photo
                               <span className="text-red-400">*</span>
                             </OnboardingFieldGroupTitle>
                             <FormControl>
@@ -884,7 +884,7 @@ export default function StepThree() {
                         render={({ field }) => (
                           <FormItem>
                             <OnboardingFieldGroupTitle>
-                              Add a Cover Video
+                              Add a cover video
                               <span className="text-red-400">*</span>
                             </OnboardingFieldGroupTitle>
                             <FormControl>
@@ -1070,7 +1070,7 @@ export default function StepThree() {
                       return (
                         <FormItem>
                           <FormLabel className="text-sm font-medium">
-                            Sub Title
+                            Subtitle
                           </FormLabel>
                           <FormControl>
                             <Input
@@ -1199,12 +1199,12 @@ export default function StepThree() {
                         return (
                           <FormItem>
                             <FormLabel className="text-md font-medium">
-                              What is the unique event identifier?{" "}
+                              What should we call this event?{" "}
                               <span className="text-red-400">*</span>
                             </FormLabel>
                             <FormControl>
                               <Input
-                                placeholder="Ie Christmas Events 2026"
+                                placeholder="e.g. Christmas Events 2026"
                                 {...field}
                                 value={
                                   typeof field.value === "string"
@@ -1224,7 +1224,7 @@ export default function StepThree() {
                             </FormControl>
                             <div className="text-xs text-muted-foreground mt-1">
                               <p className="mb-1">
-                                Example helper text: Ie Christmas Events 2026
+                                e.g. Christmas Events 2026
                               </p>
                               <span
                                 className={
@@ -1247,7 +1247,7 @@ export default function StepThree() {
                       render={({ field }) => (
                         <FormItem>
                           <FormLabel className="text-md font-medium">
-                            Event Category
+                            Event category
                           </FormLabel>
                           <FormControl>
                             <CategoryDropdown

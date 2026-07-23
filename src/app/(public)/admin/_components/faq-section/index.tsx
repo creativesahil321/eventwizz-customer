@@ -5,6 +5,7 @@ import { ChevronDown } from "lucide-react";
 import { ServerContext } from "@/lib/server-context";
 import { ThemeSchema } from "@/types/theme.types";
 import { resolveAdminHomeContent } from "@/lib/admin-cms-content";
+import { SiteHeading } from "@/components/public/site-heading";
 
 export default function FAQSection() {
   const [openIndex, setOpenIndex] = useState<number | null>(null);
@@ -14,10 +15,14 @@ export default function FAQSection() {
   return (
     <section className="py-20 bg-[color:var(--color-surface)]">
       <div className="container mx-auto px-4 max-w-3xl">
-        <div className="text-center mb-12">
-          <h2 className="text-3xl md:text-4xl font-bold text-[color:var(--color-text)] mb-3">
-            {faq.title}
-          </h2>
+        <div className="mb-12 text-center">
+          <SiteHeading
+            level={2}
+            title={faq.title}
+            variant="onSurface"
+            align="center"
+            className="mb-3 !text-3xl !font-bold md:!text-4xl"
+          />
           <p className="text-[color:var(--color-text-dimmed)]">
             {faq.subtitle}
           </p>

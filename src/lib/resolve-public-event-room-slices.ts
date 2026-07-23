@@ -1,11 +1,19 @@
 import type { DatesSectionType } from "@/app/(on-boarding)/on-boarding/_components/form-preview/_components/Dates-section";
 import { parseEventIsRoomsFlag } from "@/lib/event-form-limits";
 import type { EventDetail, EventDetailRoom } from "@/services/common/events/type";
+import {
+  lowestPositivePrice,
+  pickRoomHighlights,
+  type EventRoomChooserItem,
+} from "@/lib/event-room-chooser-item";
 
 export type PublicEventRoomRef = {
   room_id: number;
   name: string;
 };
+
+/** @deprecated Prefer `EventRoomChooserItem` — kept as an alias for public callers. */
+export type PublicEventRoomSummary = EventRoomChooserItem;
 
 export type PublicEventActiveSlices = {
   roomMode: boolean;
@@ -60,6 +68,58 @@ export function listPublicEventRooms(event: EventDetail): PublicEventRoomRef[] {
     room_id: Number(entry.payload.room_id),
     name: entry.name || `Room ${index + 1}`,
   }));
+}
+
+/**
+ * Per-room card summaries for the public "Choose Your Room" section.
+ * Derives a thumbnail and a "from" price from each room payload — no fabricated
+ * metadata; fields fall back to `null` when the API does not provide them.
+ */
+export function listPublicEventRoomSummaries(
+  event: EventDetail,
+): EventRoomChooserItem[] {
+  const bannerFallback =
+    typeof event.event_banner_image === "string" &&
+    event.event_banner_image.trim().length > 0
+      ? event.event_banner_image.trim()
+      : null;
+
+  return listRoomEntries(event).map((entry, index) => {
+    const { payload, name } = entry;
+
+    const galleryImage =
+      payload.event_galley?.find((item) => item.url?.trim())?.url ?? null;
+
+    const packageImage =
+      typeof payload.package_image === "string" &&
+      payload.package_image.trim().length > 0
+        ? payload.package_image.trim()
+        : null;
+
+    const inclusionHighlights = pickRoomHighlights(
+      (payload.package_details ?? []).map((detail) => detail.title),
+      3,
+    );
+    const highlights =
+      inclusionHighlights.length > 0
+        ? inclusionHighlights
+        : pickRoomHighlights(
+            (payload.packages ?? []).map((pkg) => pkg.title),
+            3,
+          );
+
+    return {
+      room_id: Number(payload.room_id),
+      name: name || `Room ${index + 1}`,
+      index,
+      thumbnail: packageImage || galleryImage || bannerFallback,
+      fromPrice: lowestPositivePrice(
+        (payload.packages ?? []).map((pkg) => pkg.price),
+      ),
+      packageCount: payload.packages?.length ?? 0,
+      highlights,
+    };
+  });
 }
 
 export function isPublicEventRoomMode(event: EventDetail): boolean {

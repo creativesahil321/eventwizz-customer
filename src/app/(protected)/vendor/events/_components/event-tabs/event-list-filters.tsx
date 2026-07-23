@@ -53,7 +53,7 @@ export default function EventListFilters({
     availableRooms.length > 0;
 
   return (
-    <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center mb-6">
+    <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
       <div className="w-full min-w-0 sm:w-auto sm:min-w-[280px]">
         <DateRangePicker
           date={dateRange}

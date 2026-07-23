@@ -1,40 +1,88 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { CardContent, CardHeader, OnboardingCard } from "@/components/ui/card";
-import { Form } from "@/components/ui/form";
-import { Button } from "@/components/ui/button";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
 import { useFormContext } from "../../form-provider";
-import {
-  isGatewayStatusActive,
-  stepTenSchema,
-  StepTenType,
-} from "../../form-provider/schema";
-import { toast } from "sonner";
+import { stepTenSchema, StepTenType } from "../../form-provider/schema";
 import { onboardingService } from "@/services/vendor/onboarding/onboarding.service";
-import {
-  OnboardingFieldGroupTitle,
-  OnboardingTitle,
-} from "@/components/ui/typography";
-import { Resolver, type FieldErrors } from "react-hook-form";
 import { useSession } from "next-auth/react";
-import { StripeConnectButton } from "./stripe-connect-button";
+import { useQueryClient } from "@tanstack/react-query";
+import { syncVendorLocationsCache } from "@/app/(protected)/vendor/venue-locations/_lib/queries";
+import { useUpdateSessionWithLocation } from "@/services/common/auth/auth-session";
+import { OnboardingTitle, RadioButtonLabel } from "@/components/ui/typography";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
+import GoogleLocationSearch from "./google-location-search";
+import { fetchLocationDetails } from "./_lib/actions";
+import { env } from "@/env";
+import { useDomainSuggestions } from "./_lib/hooks/useDomainSuggestions";
+import { Loader2, Globe, Mail, MapPin } from "lucide-react";
 import { useEventId } from "../../../_lib/hooks/useEventId";
 import { WholeStepGuidedShell } from "../../whole-step-guided-shell";
-import { guidedInsetSectionSurfaceClass } from "../../guided-section-surface";
-import { guidedOnboardingSkipButtonClass } from "../../guided-sticky-approval-bar";
 import { GuidedWholeStepBottomActions } from "../../guided-section-chips";
-import { PayPalConnectButton } from "./paypal-connect-button";
-import { TrueLayerConnectButton } from "./truelayer-connect-button";
-import { ChevronDown, ChevronUp, Info, Sparkles } from "lucide-react";
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
+import { slugify } from "@/lib/utils";
+
+/** Public-link preview: never show raw venue names (spaces). Match subdomain rules: a-z, 0-9, hyphens, max 63. */
+function subdomainPublicPreviewLabel(
+  selected: string | undefined | null,
+  venueName: string,
+): string {
+  const stripHostSuffix = (s: string) =>
+    s
+      .replace(/\.eventwizz\.vercel\.app$/i, "")
+      .replace(/\.eventwizz\.com$/i, "")
+      .replace(/\.com$/i, "");
+
+  const normalizeLabel = (s: string) => {
+    const cleaned = stripHostSuffix(s.trim())
+      .toLowerCase()
+      .replace(/[^a-z0-9-]/g, "")
+      .replace(/-+/g, "-")
+      .replace(/^-+|-+$/g, "")
+      .slice(0, 63);
+    return cleaned || "yoursubdomain";
+  };
+
+  const trimmedSelected = (selected ?? "").trim();
+  if (trimmedSelected) {
+    return normalizeLabel(trimmedSelected);
+  }
+
+  const fromVenue = slugify(venueName.trim()).slice(0, 63);
+  return fromVenue || "yoursubdomain";
+}
+
+// Days options for reminder emails
+const days = Array.from({ length: 31 }, (_, i) => i + 1);
+
+const extraOptions = [
+  { value: 60, label: "2 months before" },
+  { value: 90, label: "3 months before" },
+  { value: 120, label: "4 months before" },
+  { value: 180, label: "6 months before" },
+];
+
+const publishCardClass =
+  "rounded-xl border border-white/[0.08] bg-white/[0.02] p-4 sm:p-5 space-y-3";
+const publishStepBadgeClass =
+  "flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/[0.06] text-sm font-semibold tabular-nums text-slate-100";
 
 export default function StepTen() {
   const {
@@ -48,713 +96,768 @@ export default function StepTen() {
     control: globalForm.control,
     name: "stepTen.isApproved",
   });
+  const { update } = useSession();
+  const queryClient = useQueryClient();
+  const updateSessionWithLocation = useUpdateSessionWithLocation();
   const [loading, setLoading] = useState(false);
-  const { update: updateSession } = useSession();
-  const [showAdvancedOptions, setShowAdvancedOptions] = useState(false);
+
+  // Domain suggestions
+  const {
+    suggestions,
+    isLoading: isGeneratingSuggestions,
+    error: suggestionsError,
+    generateSuggestions,
+    selectedDomain,
+    setSelectedDomain,
+  } = useDomainSuggestions();
+
+  // Function to get a user-friendly error message
+  const getErrorMessage = (error: string) => {
+    if (
+      error.includes("explicit") ||
+      error.includes("cannotprovide") ||
+      error.includes("content") ||
+      error.includes("inappropriate")
+    ) {
+      return "This subdomain name may not be appropriate for a professional event venue. Please try a different name.";
+    }
+    if (error.includes("model") || error.includes("API")) {
+      return "Unable to generate suggestions at the moment. Please try again.";
+    }
+    // Don't truncate error messages - let them display fully
+    return error;
+  };
+
+  const persistedStepTenDomain = useWatch({
+    control: globalForm.control,
+    name: "stepTen.domain",
+  });
+
+  // Reactive so subdomain can seed after persistence GET fills step one.
+  const venueName =
+    useWatch({
+      control: globalForm.control,
+      name: "stepOne.name",
+    }) || "";
+  const venueType = "event venue"; // Could be enhanced to get from form data
+  const venueLocation = globalForm.getValues("stepOne.city") || "";
+  /** Set from step 1 save and from persistence GET (root `has_multiple_locations` merged into stepOne in FormProvider). */
+  const stepOneHasMulti = globalForm.watch("stepOne.has_multiple_locations");
+  /** Hide duplicate flow for single-location (`false`). Show when multi (`true`) or legacy payloads without the flag (`undefined`). */
+  const showDuplicateEventOptions = stepOneHasMulti !== false;
 
   const eventId = useEventId(globalForm, "stepTen");
 
   const form = useForm<StepTenType>({
-    resolver: zodResolver(stepTenSchema) as Resolver<StepTenType>,
+    resolver: zodResolver(stepTenSchema),
     defaultValues: {
       step: 10,
+      isApproved: false,
       event_id: eventId,
-      accept_payment_method: "payment_gateway",
-      payment_gateways: {
-        stripe: { status: undefined, account_id: "" },
-        paypal: { status: undefined, account_id: "" },
-        truelayer: {
-          status: undefined,
-          account_id: "",
-          bank: {
-            bank_name: undefined,
-            account_masked: undefined,
-          },
-        },
-        worldpay: { status: undefined, account_id: "" },
-        klarna: { status: undefined, account_id: "" },
-      },
-      is_skipped: false,
+      reminder_email_before_days:
+        globalForm.getValues().stepTen?.reminder_email_before_days || 10,
+      submit_type: "submit",
+      address: globalForm.getValues().stepTen?.address || "",
+      city: globalForm.getValues().stepTen?.city || "",
+      contact_number: globalForm.getValues().stepTen?.contact_number || "",
+      domain: globalForm.getValues().stepTen?.domain || "",
+      confirm_domain: globalForm.getValues().stepTen?.confirm_domain || false,
     },
     mode: "onChange",
   });
 
-  // Helper to get initial payment gateways from backend persistence data
-  const getInitialPaymentGateways = useCallback(() => {
-    const stepTenData = globalForm.getValues("stepTen");
-
-    // Check if we have payment_gateways data from backend (new structure)
-    const paymentGateways = (stepTenData as Record<string, unknown>)
-      ?.payment_gateways;
-
-    if (paymentGateways && typeof paymentGateways === "object") {
-      // Return the payment_gateways directly (already in correct format)
-      return paymentGateways as StepTenType["payment_gateways"];
-    }
-
-    // Return defaults if no data
-    return {
-      stripe: { status: undefined, account_id: "" },
-      paypal: { status: undefined, account_id: "" },
-      truelayer: {
-        status: undefined,
-        account_id: "",
-        bank: {
-          bank_name: undefined,
-          account_masked: undefined,
-        },
-      },
-      worldpay: { status: undefined, account_id: "" },
-      klarna: { status: undefined, account_id: "" },
-    };
-  }, [globalForm]);
-
-  const deriveAcceptPaymentMethod = useCallback(
-    (
-      gateways: StepTenType["payment_gateways"] | undefined,
-    ): StepTenType["accept_payment_method"] => {
-      const hasBankTransferActive = isGatewayStatusActive(
-        gateways?.truelayer?.status,
-      );
-      const hasPaymentGatewayActive =
-        isGatewayStatusActive(gateways?.stripe?.status) ||
-        isGatewayStatusActive(gateways?.paypal?.status);
-
-      if (hasBankTransferActive && hasPaymentGatewayActive) return "both";
-      if (hasBankTransferActive) return "bank_transfer";
-      return "payment_gateway";
-    },
-    [],
-  );
-
-  // Update form when eventId changes or when persistence data loads
   useEffect(() => {
-    if (eventId > 0) {
-      form.setValue("event_id", eventId);
+    if (stepOneHasMulti === false) {
+      form.setValue("submit_type", "submit");
     }
+  }, [stepOneHasMulti, form]);
 
-    // Load payment gateways from persistence data
-    const stepTenData = globalForm.getValues("stepTen");
-    const paymentGateways = (stepTenData as Record<string, unknown>)
-      ?.payment_gateways;
-
-    if (paymentGateways && typeof paymentGateways === "object") {
-      const mappedGateways = getInitialPaymentGateways();
-      form.setValue("payment_gateways", mappedGateways);
-      form.setValue(
-        "accept_payment_method",
-        deriveAcceptPaymentMethod(mappedGateways),
-        { shouldValidate: true, shouldDirty: false },
-      );
-    }
-  }, [eventId, form, globalForm, getInitialPaymentGateways, deriveAcceptPaymentMethod]);
-
-  // Watch form values
-  const paymentGateways = form.watch("payment_gateways");
-  const stripeStatus = form.watch("payment_gateways.stripe.status");
-  const paypalStatus = form.watch("payment_gateways.paypal.status");
-  const truelayerStatus = form.watch("payment_gateways.truelayer.status");
-
-  // Keep backend field aligned with ACTIVE gateways before Zod runs on submit.
+  /**
+   * Visible subdomain input is driven by `selectedDomain`, while “Public link” preview can show
+   * slugified venue — keep them aligned from persistence and default preview.
+   */
+  const subdomainInputSeededRef = useRef(false);
   useEffect(() => {
-    const gateways = form.getValues("payment_gateways");
-    form.setValue("accept_payment_method", deriveAcceptPaymentMethod(gateways), {
-      shouldValidate: true,
-      shouldDirty: false,
-    });
-  }, [stripeStatus, paypalStatus, truelayerStatus, form, deriveAcceptPaymentMethod]);
+    if (!persistedProgressHydrated) return;
 
-  const hasConnectedGateway =
-    isGatewayStatusActive(paymentGateways?.stripe?.status) ||
-    isGatewayStatusActive(paymentGateways?.paypal?.status) ||
-    isGatewayStatusActive(paymentGateways?.truelayer?.status) ||
-    isGatewayStatusActive(paymentGateways?.worldpay?.status) ||
-    isGatewayStatusActive(paymentGateways?.klarna?.status);
-
-  // Handler for TrueLayer Connect (Pay by Bank)
-  const handleTrueLayerConnect = async () => {
-    try {
-      setLoading(true);
-      const loadingToast = toast.loading("Connecting to TrueLayer...");
-
-      const response =
-        await onboardingService.connectPaymentGateway("truelayer");
-
-      // Check if response is successful
-      if (!response.status) {
-        // Error toast is handled by axios interceptor
-        return;
-      }
-
-      // Get auth_url from data object (standardized backend response)
-      const auth_url = response.data?.auth_url;
-
-      if (auth_url) {
-        // Update form state with new structure
-        form.setValue("payment_gateways.truelayer", {
-          status: "pending",
-          account_id: response.data?.account_id || "",
-        });
-
-        // Save state before redirect
-        localStorage.setItem("truelayer_connecting", "true");
-        localStorage.setItem("onboarding_step", "10");
-
-        // Update toast to success
-        toast.success("Redirecting to TrueLayer...", {
-          id: loadingToast,
-          duration: 1000,
-        });
-
-        // Redirect to TrueLayer in the same window
-        setTimeout(() => {
-          window.location.href = auth_url;
-        }, 1000);
-      } else {
-        console.error("Invalid response structure:", response);
-      }
-    } catch (error) {
-      console.error("TrueLayer connection error:", error);
-      // Error toast is handled by axios interceptor
-    } finally {
-      setLoading(false);
+    const fromGlobal = (persistedStepTenDomain ?? "").trim();
+    if (fromGlobal) {
+      const slug = subdomainPublicPreviewLabel(fromGlobal, "");
+      setSelectedDomain(slug);
+      form.setValue("domain", slug);
+      subdomainInputSeededRef.current = true;
+      return;
     }
-  };
 
-  // Handler for Stripe Connect
-  const handleStripeConnect = async () => {
-    try {
-      setLoading(true);
-      toast.info("Connecting to Stripe...", { duration: 2000 });
+    if (subdomainInputSeededRef.current) return;
 
-      // Call the API to get Stripe onboarding URL
-      const response = await onboardingService.connectPaymentGateway("stripe");
-
-      // Debug: Log the full response to understand its structure
-      console.log("Stripe Connect Response:", response);
-
-      // Check if response is successful
-      if (!response.status) {
-        // Error toast is handled by axios interceptor
-        return;
-      }
-
-      // Get data from standardized backend response
-      const onboarding_url = response.data?.onboarding_url;
-      const account_id = response.data?.account_id;
-
-      if (onboarding_url && account_id) {
-        // Update form state with new structure
-        form.setValue("payment_gateways.stripe", {
-          status: "pending",
-          account_id: account_id,
-        });
-
-        // Store account ID in localStorage for the return page fallback
-        localStorage.setItem("stripe_account_id", account_id);
-
-        // Open Stripe onboarding in a new window
-        const stripeWindow = window.open(
-          onboarding_url,
-          "_blank",
-          "width=800,height=800",
-        );
-
-        if (stripeWindow) {
-          toast.success(
-            "Stripe onboarding opened! Complete the setup to connect your account.",
-            { duration: 5000 },
-          );
-
-          // Monitor popup window closure
-          const checkInterval = setInterval(() => {
-            if (stripeWindow.closed) {
-              clearInterval(checkInterval);
-
-              // Check if we have a successful connection by looking at localStorage
-              const connectionSuccess = localStorage.getItem(
-                "stripe_connection_success",
-              );
-              if (connectionSuccess === "true") {
-                // Clear the success flag
-                localStorage.removeItem("stripe_connection_success");
-                // Refresh the page to get updated payment gateway status
-                toast.success(
-                  "Stripe connection completed! Refreshing page...",
-                  { duration: 2000 },
-                );
-                setTimeout(() => {
-                  window.location.reload();
-                }, 1000);
-              } else {
-                toast.info(
-                  "Stripe onboarding window closed. If you completed the setup, your account details are under review.",
-                  { duration: 4000 },
-                );
-              }
-            }
-          }, 1000);
-        } else {
-          toast.error(
-            "Pop-up blocked! Please allow pop-ups to connect with Stripe.",
-          );
-        }
-      } else {
-        console.error("Invalid Stripe connect response:", response);
-      }
-    } catch (error) {
-      console.error("Stripe connection error:", error);
-    } finally {
-      setLoading(false);
+    const fallback = subdomainPublicPreviewLabel("", venueName);
+    if (fallback && fallback !== "yoursubdomain") {
+      setSelectedDomain(fallback);
+      form.setValue("domain", fallback);
+      subdomainInputSeededRef.current = true;
     }
-  };
+  }, [
+    persistedProgressHydrated,
+    persistedStepTenDomain,
+    venueName,
+    form,
+    setSelectedDomain,
+  ]);
 
-  // Handler for PayPal Connect
-  const handlePayPalConnect = async () => {
-    try {
-      setLoading(true);
-      toast.info("Connecting to PayPal...", { duration: 2000 });
+  // Watch reminder email configuration state
+  const showReminderDays =
+    form.watch("reminder_email_before_days") !== undefined;
 
-      // Call the API to get PayPal onboarding URL
-      const response = await onboardingService.connectPaymentGateway("paypal");
-
-      // Debug: Log the full response to understand its structure
-      console.log("PayPal Connect Response:", response);
-
-      // Check if response is successful
-      if (!response.status) {
-        // Error toast is handled by axios interceptor
-        return;
-      }
-
-      // Get data from standardized backend response
-      const onboarding_url = response.data?.onboarding_url;
-      const account_id = response.data?.account_id;
-
-      if (onboarding_url && account_id) {
-        // Update form state with new structure
-        form.setValue("payment_gateways.paypal", {
-          status: "pending",
-          account_id: account_id,
-        });
-
-        // Store merchant ID in localStorage for the return page fallback
-        localStorage.setItem("paypal_merchant_id", account_id);
-
-        // Open PayPal onboarding in a new window
-        const paypalWindow = window.open(
-          onboarding_url,
-          "_blank",
-          "width=800,height=800",
-        );
-
-        if (paypalWindow) {
-          toast.success(
-            "PayPal onboarding opened! Complete the setup to connect your account.",
-            { duration: 5000 },
-          );
-
-          // Monitor popup window closure
-          const checkInterval = setInterval(() => {
-            if (paypalWindow.closed) {
-              clearInterval(checkInterval);
-
-              // Check if we have a successful connection by looking at localStorage
-              const connectionSuccess = localStorage.getItem(
-                "paypal_connection_success",
-              );
-              if (connectionSuccess === "true") {
-                // Clear the success flag
-                localStorage.removeItem("paypal_connection_success");
-                // Refresh the page to get updated payment gateway status
-                toast.success(
-                  "PayPal connection completed! Refreshing page...",
-                  { duration: 2000 },
-                );
-                setTimeout(() => {
-                  window.location.reload();
-                }, 1000);
-              } else {
-                toast.info(
-                  "PayPal onboarding window closed. If you completed the setup, your account details are under review.",
-                  { duration: 4000 },
-                );
-              }
-            }
-          }, 1000);
-        } else {
-          toast.error(
-            "Pop-up blocked! Please allow pop-ups to connect with PayPal.",
-          );
-        }
-      } else {
-        console.error("Invalid PayPal connect response:", response);
-      }
-    } catch (error) {
-      console.error("PayPal connection error:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Handler for Skip
-  const handleSkip = async () => {
+  const onSubmit = async (values: StepTenType) => {
     setLoading(true);
     try {
-      form.setValue("is_skipped", true);
-      globalForm.setValue("stepTen.is_skipped", true);
+      globalForm.setValue("stepTen", values);
 
-      // INSTANT TRANSITION: Set active step FIRST for smooth UX
+      type StepTenPayload = {
+        step: 10;
+        event_id: number;
+        submit_type: "duplicate" | "submit";
+        address?: string;
+        city?: string;
+        contact_number?: string;
+        reminder_email_before_days?: number;
+        domain: string;
+        confirm_domain: boolean;
+        isApproved?: boolean;
+      };
+
+      const payload: StepTenPayload = {
+        step: 10,
+        event_id: values.event_id,
+        submit_type: values.submit_type,
+        domain: values.domain,
+        confirm_domain: values.confirm_domain,
+        isApproved: true,
+      };
+
+      if (values.submit_type === "duplicate") {
+        payload.address = values.address;
+        payload.city = values.city;
+        payload.contact_number = values.contact_number;
+      }
+
+      if (showReminderDays) {
+        payload.reminder_email_before_days =
+          values.reminder_email_before_days || 10;
+      }
+
+      const response = await onboardingService.storeStepTenData(
+        payload as StepTenType,
+      );
+      if (!response?.status) throw new Error("Failed to save domain settings");
+
+      globalForm.setValue("stepTen", { ...values, isApproved: true });
+
+      if (values.submit_type === "duplicate") {
+        const syncedLocations = await syncVendorLocationsCache(queryClient);
+        if (syncedLocations?.default_venue_location?.id) {
+          await updateSessionWithLocation({
+            vendor_location_id: syncedLocations.default_venue_location.id,
+          });
+        }
+        void queryClient.invalidateQueries({ queryKey: ["locations"] });
+      }
+
+      // Instant transition to payment (final step)
       setActiveStep(11);
-
-      // Then handle async operations in background
-      Promise.all([updateSession({ on_boarding_step: 11 }), save()]).catch(
+      Promise.all([update({ on_boarding_step: 10 }), save()]).catch(
         (error) => {
           console.error("Background save error:", error);
         },
       );
-
-      toast.info(
-        "Payment setup skipped. You can complete this anytime from your dashboard.",
-        { duration: 5000 },
-      );
-    } catch (error) {
-      console.error("Error skipping payment setup:", error);
-      // Error toast is handled by axios interceptor
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const onSubmitInvalid = useCallback((errors: FieldErrors<StepTenType>) => {
-    if (errors.payment_gateways) {
-      toast.error(
-        "Connect at least one payment method (bank, Stripe, or PayPal) to save, or tap Skip for now.",
-        { duration: 6500 },
-      );
-    } else if (errors.accept_payment_method) {
-      toast.error(
-        errors.accept_payment_method.message?.toString() ||
-          "Choose how customers can pay (bank transfer, card/online, or both).",
-        { duration: 6500 },
-      );
-    } else {
-      toast.error("Please fix the highlighted fields to continue.");
-    }
-  }, []);
-
-  // Handler for Submit (only runs after Zod + RHF validation passes)
-  const onSubmit = async (data: StepTenType) => {
-    setLoading(true);
-    try {
-      // Backend expects accept_payment_method based on what is actually ACTIVE.
-      data.accept_payment_method = deriveAcceptPaymentMethod(
-        data.payment_gateways,
-      );
-      globalForm.setValue("stepTen", data);
-
-      data.event_id = data?.event_id as number;
-
-      const hasAnyActiveGateway =
-        isGatewayStatusActive(data.payment_gateways?.stripe?.status) ||
-        isGatewayStatusActive(data.payment_gateways?.paypal?.status) ||
-        isGatewayStatusActive(data.payment_gateways?.truelayer?.status) ||
-        isGatewayStatusActive(data.payment_gateways?.worldpay?.status) ||
-        isGatewayStatusActive(data.payment_gateways?.klarna?.status);
-
-      const response = await onboardingService.storeStepTenData({
-        ...data,
-        isApproved: true,
-      });
-
-      if (response && response.status) {
-        globalForm.setValue("stepTen", { ...data, isApproved: true });
-        // INSTANT TRANSITION: Set active step FIRST for smooth UX
-        setActiveStep(11);
-
-        // Then handle async operations in background
-        Promise.all([
-          updateSession({
-            on_boarding_step: 11,
-            ...(hasAnyActiveGateway ? { has_payment_provider: true } : {}),
-          }),
-          save(),
-        ]).catch((error) => {
-          console.error("Background save error:", error);
-        });
-      } else {
-        // Error toast is handled by axios interceptor
-      }
     } catch (error) {
       console.error("Error during Step Ten submission:", error);
-      // Error toast is handled by axios interceptor
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="flex flex-col items-center justify-center w-full min-h-screen py-8 px-4 bg-transparent">
-      <div className="w-full max-w-4xl mx-auto relative">
-        <OnboardingCard className="w-full mx-auto shadow-sm">
-          <CardHeader className="pb-2 pt-4">
-            <OnboardingTitle>
-              How Would You Like To Accept Payment?
-            </OnboardingTitle>
+    <div className="flex w-full flex-col items-center justify-start bg-transparent px-4 py-8">
+      <div className="relative mx-auto mb-16 w-full max-w-3xl">
+        <OnboardingCard className="mx-auto w-full shadow-sm">
+          <CardHeader className="space-y-1.5 pb-2 pt-4 text-center sm:text-left">
+            <OnboardingTitle>Set your booking website</OnboardingTitle>
+            <p className="mx-auto max-w-xl text-sm leading-relaxed text-slate-400 sm:mx-0">
+              Choose your booking web address and optionally turn on balance
+              reminders. Payments come next — everything stays editable later.
+            </p>
           </CardHeader>
-          <CardContent className="px-6 py-2 pb-8">
+
+          <CardContent className="px-6 pb-6 pt-0">
             <Form {...form}>
-              <form onSubmit={(e) => e.preventDefault()} className="space-y-6">
+              <form onSubmit={(e) => e.preventDefault()} className="space-y-4">
+                {/* Hidden fields */}
                 <input type="hidden" {...form.register("step")} />
-                <input type="hidden" {...form.register("event_id")} />
-                <input type="hidden" {...form.register("accept_payment_method")} />
-                <input type="hidden" {...form.register("is_skipped")} />
+                <input
+                  type="hidden"
+                  {...form.register("event_id", {
+                    valueAsNumber: true,
+                  })}
+                />
 
                 <WholeStepGuidedShell
                   form={form}
-                  sectionId="step-ten-payments"
-                  chipLabel="Payment methods"
-                  chipDescription="Bank transfer and card providers (optional to skip)."
-                  lenientApproval
+                  sectionId="step-ten-domain"
+                  chipLabel="Domain"
+                  chipDescription="Subdomain, reminders, then continue to payment."
                   persistenceHydrated={persistedProgressHydrated}
                   persistedStepApproved={stepTenPersistedApproved === true}
                   renderFooter={({ guided }) => (
-                    <GuidedWholeStepBottomActions
-                      guided={guided}
-                      loading={loading}
-                      labelWhenReady="Save & continue"
-                      onContinue={() =>
-                        void form.handleSubmit(onSubmit, onSubmitInvalid)()
-                      }
-                      statusSlot={
-                        guided.allSectionsApproved && !hasConnectedGateway ? (
-                          <span className="mx-auto max-w-xl px-2 text-center text-xs text-amber-500/95">
-                            You&apos;ve reviewed this step, but{" "}
-                            <strong className="font-semibold text-amber-200">
-                              Save &amp; continue
-                            </strong>{" "}
-                            only works after at least one provider is connected.
-                            Use{" "}
-                            <strong className="font-semibold text-amber-200">
-                              Skip for now
-                            </strong>{" "}
-                            if you&apos;ll set this up later.
-                          </span>
-                        ) : undefined
-                      }
-                      hintSlot={
-                        <p className="mx-auto max-w-xl px-2 text-center text-xs text-muted-foreground">
-                          <span className="text-foreground/90">
-                            Save &amp; continue
-                          </span>{" "}
-                          saves and moves on only when a payment provider is
-                          connected. Not ready? Use{" "}
-                          <span className="text-foreground/90">
-                            Skip for now
-                          </span>
-                          .
+                    <div className="w-full space-y-4">
+                      <GuidedWholeStepBottomActions
+                        guided={guided}
+                        loading={loading}
+                        labelWhenReady={
+                          form.watch("submit_type") === "duplicate"
+                            ? "Duplicate & continue"
+                            : "Save & continue"
+                        }
+                        continueDisabled={
+                          loading ||
+                          !selectedDomain ||
+                          !form.watch("confirm_domain")
+                        }
+                        onContinue={() => void form.handleSubmit(onSubmit)()}
+                        primaryButtonClassName="h-12 px-10"
+                      />
+                      {!selectedDomain && (
+                        <p className="text-center text-sm text-muted-foreground">
+                          Please select a subdomain to continue
                         </p>
-                      }
-                      extraActions={
-                        <Button
-                          variant="event-outline"
-                          type="button"
-                          onClick={handleSkip}
-                          className={guidedOnboardingSkipButtonClass}
-                          disabled={loading}
-                        >
-                          Skip for Now
-                        </Button>
-                      }
-                    />
+                      )}
+                      {selectedDomain && !form.watch("confirm_domain") && (
+                        <p className="text-center text-sm text-muted-foreground">
+                          Please confirm your selection
+                        </p>
+                      )}
+                    </div>
                   )}
                 >
                   {() => (
-                    <>
-                      {/* Pay by Bank Section (TrueLayer) */}
-                      <section className="w-full mb-6 space-y-4">
-                        <div className="flex items-center gap-2">
-                          <OnboardingFieldGroupTitle className="text-base">
-                            🏦 Pay by Bank Transfer
-                          </OnboardingFieldGroupTitle>
-                          <Sparkles className="w-5 h-5 text-green-500" />
-                        </div>
-                        <Alert className="border-green-300 bg-green-100 text-green-900 dark:!border-green-400 dark:!bg-green-100 dark:!text-green-900">
-                          <Info className="h-4 w-4 text-green-700 dark:text-green-700 shrink-0" />
-                          <AlertDescription className="text-green-900 dark:!text-green-900 text-sm [&_strong]:text-green-900 [&_strong]:dark:!text-green-900">
-                            <strong>Direct Bank-to-Bank Payments:</strong>{" "}
-                            Customers pay directly from their banking app - no
-                            card details needed. 40% lower fees than cards. FCA
-                            authorized and trusted by millions.
-                          </AlertDescription>
-                        </Alert>
+                    <div className="w-full space-y-4">
+                      {/* 1 — Website address (required) */}
+                      <div className={publishCardClass}>
+                        <div className="flex gap-3">
+                          <span className={publishStepBadgeClass}>1</span>
+                          <div className="min-w-0 flex-1 space-y-3">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <Globe
+                                className="h-5 w-5 shrink-0 text-sky-400/90"
+                                aria-hidden
+                              />
+                              <h3 className="text-base font-semibold tracking-tight text-white">
+                                Your booking website address
+                              </h3>
+                            </div>
+                            <p className="text-sm leading-relaxed text-slate-400">
+                              Public link:{" "}
+                              <strong className="font-medium text-slate-200 break-all">
+                                {subdomainPublicPreviewLabel(
+                                  selectedDomain,
+                                  venueName,
+                                )}
+                                .{env.NEXT_PUBLIC_WHITE_LABEL_URL}
+                              </strong>
+                            </p>
 
-                        <TrueLayerConnectButton
-                          status={
-                            paymentGateways?.truelayer?.status as
-                              | "pending"
-                              | "active"
-                              | "under_review"
-                              | "restricted"
-                              | undefined
-                          }
-                          accountId={paymentGateways?.truelayer?.account_id}
-                          bankDetails={paymentGateways?.truelayer?.bank}
-                          isConnecting={loading}
-                          onConnect={handleTrueLayerConnect}
-                        />
-                      </section>
+                            <div className="space-y-3">
+                              <div className="space-y-2">
+                                <label className="text-sm font-medium text-slate-300">
+                                  Subdomain
+                                </label>
+                                <div className="relative">
+                                  <Input
+                                    placeholder="Enter subdomain name"
+                                    value={selectedDomain || ""}
+                                    onChange={(e) => {
+                                      const value = e.target.value
+                                        .toLowerCase()
+                                        .replace(/[^a-z0-9-]/g, "");
+                                      setSelectedDomain(value);
+                                      form.setValue("domain", value);
 
-                      {/* Visual Separator */}
-                      <div className="my-8 flex items-center justify-center">
-                        <div className="flex-1 border-t border-white/15" />
-                        <div className="bg-transparent px-4 text-sm font-medium text-muted-foreground">
-                          OR
+                                      // Generate suggestions based on typing
+                                      if (value && value.length >= 3) {
+                                        generateSuggestions(
+                                          value, // Use the typed value
+                                          venueType,
+                                          venueLocation,
+                                        );
+                                      }
+                                    }}
+                                    className="h-9 border-white/20 bg-white/5 pr-20 text-sm"
+                                    maxLength={63}
+                                  />
+                                  <div className="absolute right-3 top-1/2 flex -translate-y-1/2 transform items-center text-sm text-muted-foreground">
+                                    .eventwizz.com
+                                  </div>
+                                  {selectedDomain && (
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setSelectedDomain("");
+                                        form.setValue("domain", "");
+                                      }}
+                                      className="absolute right-16 top-1/2 transform -translate-y-1/2 text-slate-500 hover:text-slate-300"
+                                      title="Clear domain"
+                                    >
+                                      ✕
+                                    </button>
+                                  )}
+                                  {isGeneratingSuggestions && (
+                                    <div className="absolute right-20 top-1/2 transform -translate-y-1/2">
+                                      <Loader2 className="h-4 w-4 animate-spin text-blue-600" />
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+
+                              {suggestionsError && (
+                                <div className="flex items-start gap-2 mt-2 w-full">
+                                  <div className="w-4 h-4 rounded-full bg-red-500 flex items-center justify-center flex-shrink-0 mt-0.5">
+                                    <span className="text-white text-xs font-bold">
+                                      !
+                                    </span>
+                                  </div>
+                                  <div className="flex-1 min-w-0 w-full">
+                                    <p className="text-sm text-red-600 leading-relaxed break-words overflow-wrap-anywhere">
+                                      {getErrorMessage(suggestionsError)}
+                                    </p>
+                                    {(suggestionsError.includes("explicit") ||
+                                      suggestionsError.includes(
+                                        "cannotprovide",
+                                      ) ||
+                                      suggestionsError.includes("content")) && (
+                                      <div className="mt-2">
+                                        <p className="mb-2 text-xs text-muted-foreground">
+                                          Try these alternatives:
+                                        </p>
+                                        <div className="flex flex-wrap gap-2">
+                                          {[
+                                            "venue",
+                                            "events",
+                                            "booking",
+                                            "venue123",
+                                            "myvenue",
+                                          ].map((alt, index) => (
+                                            <button
+                                              key={index}
+                                              type="button"
+                                              onClick={() => {
+                                                setSelectedDomain(alt);
+                                                form.setValue("domain", alt);
+                                              }}
+                                              className="rounded-full border border-white/15 bg-white/[0.06] px-3 py-1.5 text-sm text-foreground transition-all duration-200 hover:border-white/25 hover:bg-white/[0.1]"
+                                            >
+                                              {alt}
+                                            </button>
+                                          ))}
+                                        </div>
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              )}
+
+                              {suggestions.length > 0 && (
+                                <div className="space-y-2">
+                                  <div className="flex flex-wrap gap-2">
+                                    {suggestions.map((suggestion, index) => (
+                                      <button
+                                        key={index}
+                                        type="button"
+                                        onClick={() => {
+                                          setSelectedDomain(suggestion.domain);
+                                          form.setValue(
+                                            "domain",
+                                            suggestion.domain,
+                                          );
+                                        }}
+                                        className={`rounded-full border px-3 py-1.5 text-sm transition-all duration-200 hover:shadow-sm ${
+                                          selectedDomain === suggestion.domain
+                                            ? "border-[var(--color-primary,#3b82f6)] bg-[var(--color-primary,#3b82f6)]/15 text-foreground shadow-sm"
+                                            : "border-white/15 bg-white/[0.06] text-foreground hover:border-white/25 hover:bg-white/[0.1]"
+                                        }`}
+                                      >
+                                        {suggestion.domain.replace(
+                                          /\.com$|\.eventwizz\.com$/g,
+                                          "",
+                                        )}
+                                      </button>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+
+                              {/* Show message when no suggestions available but user is typing */}
+                              {isGeneratingSuggestions &&
+                                (selectedDomain || "").length >= 3 && (
+                                  <div className="mt-2 flex items-center gap-2 text-xs text-[var(--color-primary,#38bdf8)]">
+                                    <Loader2 className="h-3 w-3 animate-spin" />
+                                    Finding suggestions...
+                                  </div>
+                                )}
+
+                              <FormField
+                                control={form.control}
+                                name="domain"
+                                render={({ field }) => (
+                                  <FormItem className="hidden">
+                                    <FormControl>
+                                      <Input {...field} />
+                                    </FormControl>
+                                    <FormMessage />
+                                  </FormItem>
+                                )}
+                              />
+
+                              <FormField
+                                control={form.control}
+                                name="confirm_domain"
+                                render={({ field }) => (
+                                  <FormItem>
+                                    <div className="flex items-start gap-3">
+                                      <FormControl>
+                                        <input
+                                          type="checkbox"
+                                          checked={field.value || false}
+                                          onChange={(e) => {
+                                            field.onChange(e.target.checked);
+                                          }}
+                                          className="mt-1 h-4 w-4 rounded border-white/30 text-[var(--color-primary,#38bdf8)] focus:ring-[var(--color-primary)]"
+                                          disabled={!selectedDomain}
+                                        />
+                                      </FormControl>
+                                      <div className="flex-1">
+                                        <FormLabel className="text-sm font-medium cursor-pointer">
+                                          I confirm this domain
+                                        </FormLabel>
+                                      </div>
+                                    </div>
+                                    <FormMessage />
+                                  </FormItem>
+                                )}
+                              />
+                            </div>
+                          </div>
                         </div>
-                        <div className="flex-1 border-t border-white/15" />
                       </div>
 
-                      {/* Online Payment Providers Section */}
-                      <section
-                        className={guidedInsetSectionSurfaceClass(
-                          "w-full mb-4 space-y-6",
-                        )}
-                      >
-                        {/* Recommended Providers */}
-                        <div className="space-y-4">
-                          <div className="flex items-center gap-2">
-                            <OnboardingFieldGroupTitle className="text-base">
-                              💳 Online Card Payments
-                            </OnboardingFieldGroupTitle>
-                            <Sparkles className="w-5 h-5 text-yellow-500" />
-                          </div>
-                          <Alert
-                            className="border-blue-300 dark:border-blue-400"
-                            style={{
-                              backgroundColor: "rgb(219 234 254)",
-                              color: "rgb(30 58 138)",
-                            }}
-                          >
-                            <Info
-                              className="h-4 w-4 shrink-0"
-                              style={{ color: "rgb(29 78 216)" }}
+                      {/* 2 — Reminder emails (optional) */}
+                      <div className={publishCardClass}>
+                        <div className="flex gap-3">
+                          <span className={publishStepBadgeClass}>2</span>
+                          <div className="min-w-0 flex-1 space-y-3">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <Mail
+                                className="h-5 w-5 shrink-0 text-amber-400/90"
+                                aria-hidden
+                              />
+                              <h3 className="text-base font-semibold tracking-tight text-white">
+                                Balance reminder emails
+                              </h3>
+                              <span className="rounded-full border border-white/10 bg-white/[0.04] px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-slate-400">
+                                Optional
+                              </span>
+                            </div>
+                            <p className="text-sm leading-relaxed text-slate-400">
+                              Send a reminder before the event so guests can pay
+                              any remaining balance. You can change this later.
+                            </p>
+                            <FormField
+                              control={form.control}
+                              name="reminder_email_before_days"
+                              render={({ field }) => (
+                                <FormItem className="relative">
+                                  <p className="text-sm font-medium text-slate-300">
+                                    Send reminders?
+                                  </p>
+                                  <FormControl>
+                                    <RadioGroup
+                                      onValueChange={(value) => {
+                                        if (value === "yes") {
+                                          field.onChange(10);
+                                        } else {
+                                          field.onChange(undefined);
+                                        }
+                                      }}
+                                      defaultValue={
+                                        field.value !== undefined ? "yes" : "no"
+                                      }
+                                      className="flex items-center space-x-4 mt-4"
+                                    >
+                                      <FormItem className="flex items-center space-x-3 space-y-0">
+                                        <FormControl>
+                                          <RadioGroupItem
+                                            value="yes"
+                                            className="text-[#47aab8] border-[#47aab8] focus:ring-[#47aab8] data-[state=checked]:bg-[var(--color-secondary,#009ead)] data-[state=checked]:text-white"
+                                          />
+                                        </FormControl>
+                                        <RadioButtonLabel>
+                                          Yes, set up reminders
+                                        </RadioButtonLabel>
+                                      </FormItem>
+                                      <FormItem className="flex items-center space-x-3 space-y-0">
+                                        <FormControl>
+                                          <RadioGroupItem
+                                            value="no"
+                                            className="text-[#47aab8] border-[#47aab8] focus:ring-[#47aab8] data-[state=checked]:bg-[var(--color-secondary,#009ead)] data-[state=checked]:text-white"
+                                          />
+                                        </FormControl>
+                                        <RadioButtonLabel>
+                                          Not now
+                                        </RadioButtonLabel>
+                                      </FormItem>
+                                    </RadioGroup>
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
                             />
-                            <AlertDescription
-                              className="text-sm"
-                              style={{ color: "rgb(30 58 138)" }}
-                            >
-                              <strong>Credit/Debit Card Processing:</strong>{" "}
-                              Accept Visa, Mastercard, and other major cards.
-                              5-minute setup, automatic payouts, no technical
-                              knowledge required. Your money flows directly to
-                              your bank account.
-                            </AlertDescription>
-                          </Alert>
 
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <StripeConnectButton
-                              isConnected={
-                                isGatewayStatusActive(
-                                  paymentGateways?.stripe?.status,
-                                )
-                              }
-                              status={paymentGateways?.stripe?.status}
-                              accountId={paymentGateways?.stripe?.account_id}
-                              onConnect={handleStripeConnect}
-                              disabled={loading}
-                            />
+                            {showReminderDays && (
+                              <FormField
+                                control={form.control}
+                                name="reminder_email_before_days"
+                                render={({ field }) => {
+                                  // Convert the value to string for the Select component
+                                  const defaultValue =
+                                    field.value !== undefined
+                                      ? field.value.toString()
+                                      : "10";
 
-                            <PayPalConnectButton
-                              isConnected={
-                                isGatewayStatusActive(
-                                  paymentGateways?.paypal?.status,
-                                )
-                              }
-                              status={paymentGateways?.paypal?.status}
-                              merchantId={paymentGateways?.paypal?.account_id}
-                              onConnect={handlePayPalConnect}
-                              disabled={loading}
-                            />
+                                  return (
+                                    <FormItem className="relative">
+                                      <p className="text-sm font-medium text-slate-300">
+                                        How many days before the event?
+                                      </p>
+                                      <Select
+                                        onValueChange={(value) => {
+                                          const numValue = parseInt(value, 10);
+                                          field.onChange(numValue);
+                                        }}
+                                        value={defaultValue}
+                                      >
+                                        <FormControl>
+                                          <SelectTrigger className="w-full h-10 bg-white/5 border-white/10 mt-4">
+                                            <SelectValue placeholder="Days" />
+                                          </SelectTrigger>
+                                        </FormControl>
+
+                                        <SelectContent className="w-full">
+                                          {[
+                                            ...days,
+                                            ...extraOptions.map((o) => o.value),
+                                          ].map((day) => {
+                                            const extra = extraOptions.find(
+                                              (o) => o.value === day,
+                                            );
+                                            return (
+                                              <SelectItem
+                                                key={day}
+                                                value={day.toString()}
+                                              >
+                                                {extra
+                                                  ? extra.label
+                                                  : `${day} ${
+                                                      day === 1 ? "Day" : "Days"
+                                                    }`}
+                                              </SelectItem>
+                                            );
+                                          })}
+                                        </SelectContent>
+                                      </Select>
+                                      <FormMessage />
+                                    </FormItem>
+                                  );
+                                }}
+                              />
+                            )}
                           </div>
                         </div>
+                      </div>
 
-                        {/* Advanced Options (Collapsible) */}
-                        <Collapsible
-                          open={showAdvancedOptions}
-                          onOpenChange={setShowAdvancedOptions}
-                        >
-                          <CollapsibleTrigger asChild>
-                            <Button
-                              type="button"
-                              variant="outline"
-                              className="w-full flex items-center justify-between p-4 h-auto"
-                            >
-                              <div className="flex items-center gap-2">
-                                <span className="font-medium">
-                                  ⚙️ Advanced Options
-                                </span>
-                                <span className="text-xs text-muted-foreground">
-                                  (WorldPay, Klarna)
-                                </span>
-                              </div>
-                              {showAdvancedOptions ? (
-                                <ChevronUp className="w-5 h-5" />
-                              ) : (
-                                <ChevronDown className="w-5 h-5" />
-                              )}
-                            </Button>
-                          </CollapsibleTrigger>
-
-                          <CollapsibleContent className="pt-4 space-y-6">
-                            <Alert className="border-amber-300 bg-amber-100 text-amber-900 dark:!border-amber-400 dark:!bg-amber-100 dark:!text-amber-900">
-                              <Info className="h-4 w-4 text-amber-700 dark:text-amber-700 shrink-0" />
-                              <AlertDescription className="text-amber-900 dark:!text-amber-900 text-sm [&_strong]:text-amber-900 [&_strong]:dark:!text-amber-900">
-                                <strong>Advanced users only:</strong> These
-                                providers require manual API key entry and
-                                manual payout processing. Only use if you
-                                already have an account with these providers.
-                              </AlertDescription>
-                            </Alert>
-
-                            {/* WorldPay & Klarna Note */}
-                            <div className="space-y-4">
-                              <Alert
-                                className="border-gray-300 dark:border-gray-400"
-                                style={{
-                                  backgroundColor: "rgb(243 244 246)",
-                                  color: "rgb(17 24 39)",
-                                }}
-                              >
-                                <Info
-                                  className="h-4 w-4 shrink-0"
-                                  style={{ color: "rgb(55 65 81)" }}
+                      {/* 3 — Copy event to another venue (multi-location only) */}
+                      {showDuplicateEventOptions && (
+                        <div className={publishCardClass}>
+                          <div className="flex gap-3">
+                            <span className={publishStepBadgeClass}>3</span>
+                            <div className="min-w-0 flex-1 space-y-3">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <MapPin
+                                  className="h-5 w-5 shrink-0 text-violet-400/90"
+                                  aria-hidden
                                 />
-                                <AlertDescription
-                                  className="text-sm"
-                                  style={{ color: "rgb(17 24 39)" }}
-                                >
-                                  <strong>WorldPay & Klarna:</strong> Advanced
-                                  payment gateways are currently managed
-                                  separately. Please contact support if you need
-                                  to configure these providers.
-                                </AlertDescription>
-                              </Alert>
-                            </div>
-                          </CollapsibleContent>
-                        </Collapsible>
-                      </section>
+                                <h3 className="text-base font-semibold tracking-tight text-white">
+                                  Another venue?
+                                </h3>
+                              </div>
+                              <p className="text-sm leading-relaxed text-slate-400">
+                                Only if you run more than one location:
+                                duplicate this event and attach it to a
+                                different address. You can edit everything in
+                                the dashboard.
+                              </p>
+                              <FormField
+                                control={form.control}
+                                name="submit_type"
+                                render={({ field }) => (
+                                  <FormItem className="relative">
+                                    <p className="text-sm font-medium text-slate-300">
+                                      Duplicate this event for another location?{" "}
+                                      <span className="text-red-400">*</span>
+                                    </p>
+                                    <FormControl>
+                                      <RadioGroup
+                                        onValueChange={(value) => {
+                                          field.onChange(value);
+                                          // Force re-render by setting state directly
+                                          form.setValue(
+                                            "submit_type",
+                                            value as "duplicate" | "submit",
+                                          );
+                                        }}
+                                        defaultValue={field.value || "submit"}
+                                        className="flex items-center space-x-4 mt-4"
+                                      >
+                                        <FormItem className="flex items-center space-x-3 space-y-0">
+                                          <FormControl>
+                                            <RadioGroupItem
+                                              value="duplicate"
+                                              className="text-[#47aab8] border-[#47aab8] focus:ring-[#47aab8] data-[state=checked]:bg-[var(--color-secondary,#009ead)] data-[state=checked]:text-white"
+                                            />
+                                          </FormControl>
+                                          <RadioButtonLabel>
+                                            Yes, duplicate
+                                          </RadioButtonLabel>
+                                        </FormItem>
+                                        <FormItem className="flex items-center space-x-3 space-y-0">
+                                          <FormControl>
+                                            <RadioGroupItem
+                                              value="submit"
+                                              className="text-[#47aab8] border-[#47aab8] focus:ring-[#47aab8] data-[state=checked]:bg-[var(--color-secondary,#009ead)] data-[state=checked]:text-white"
+                                            />
+                                          </FormControl>
+                                          <RadioButtonLabel>
+                                            No, only this event
+                                          </RadioButtonLabel>
+                                        </FormItem>
+                                      </RadioGroup>
+                                    </FormControl>
+                                    <FormMessage />
+                                  </FormItem>
+                                )}
+                              />
 
-                      {/* Skip Information */}
-                      <Alert className="border-amber-300 bg-amber-100 text-amber-900 dark:!border-amber-400 dark:!bg-amber-100 dark:!text-amber-900">
-                        <Info className="h-4 w-4 text-amber-700 dark:text-amber-700 shrink-0" />
-                        <AlertDescription className="text-amber-900 dark:!text-amber-900 text-sm [&_strong]:text-amber-900 [&_strong]:dark:!text-amber-900">
-                          <strong>Not ready to set up payments?</strong> You can
-                          skip this step and configure your payment methods
-                          later from your dashboard. However, you won&apos;t be
-                          able to accept bookings until payment is set up.
-                        </AlertDescription>
-                      </Alert>
-                    </>
+                              {form.watch("submit_type") === "duplicate" && (
+                                <div className="space-y-4 border-t border-white/10 pt-6">
+                                  <p className="text-sm font-medium text-slate-200">
+                                    Other venue address &amp; contact
+                                  </p>
+                                  <FormField
+                                    control={form.control}
+                                    name="address"
+                                    render={({ field }) => (
+                                      <FormItem>
+                                        <FormLabel className="text-sm font-medium text-slate-300">
+                                          Address{" "}
+                                          <span className="text-red-400">
+                                            *
+                                          </span>
+                                        </FormLabel>
+                                        <FormControl>
+                                          <GoogleLocationSearch
+                                            apiKey={
+                                              env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY
+                                            }
+                                            value={field.value || ""}
+                                            onChange={(value) =>
+                                              field.onChange(value)
+                                            }
+                                            onSelect={(placeId) =>
+                                              fetchLocationDetails(
+                                                form,
+                                                placeId,
+                                              )
+                                            }
+                                            placeholder="Search for a location..."
+                                            variant="dark"
+                                          />
+                                        </FormControl>
+                                        <FormMessage />
+                                      </FormItem>
+                                    )}
+                                  />
+
+                                  <FormField
+                                    control={form.control}
+                                    name="city"
+                                    render={({ field }) => (
+                                      <FormItem>
+                                        <FormLabel className="text-sm font-medium text-slate-300">
+                                          City{" "}
+                                          <span className="text-red-400">
+                                            *
+                                          </span>
+                                        </FormLabel>
+                                        <FormControl>
+                                          <Input
+                                            {...field}
+                                            placeholder="City"
+                                            className="h-10 border-white/10 bg-white/5"
+                                          />
+                                        </FormControl>
+                                        <FormMessage />
+                                      </FormItem>
+                                    )}
+                                  />
+
+                                  <FormField
+                                    control={form.control}
+                                    name="contact_number"
+                                    render={({ field }) => (
+                                      <FormItem>
+                                        <FormLabel className="text-sm font-medium text-slate-300">
+                                          Contact number{" "}
+                                          <span className="text-red-400">
+                                            *
+                                          </span>
+                                        </FormLabel>
+                                        <FormControl>
+                                          <Input
+                                            {...field}
+                                            type="tel"
+                                            inputMode="numeric"
+                                            placeholder="Phone number"
+                                            className="h-10 border-white/10 bg-white/5"
+                                            onChange={(e) => {
+                                              const value =
+                                                e.target.value.replace(
+                                                  /[^0-9+\-() ]/g,
+                                                  "",
+                                                );
+                                              field.onChange(value);
+                                            }}
+                                          />
+                                        </FormControl>
+                                        <FormMessage />
+                                      </FormItem>
+                                    )}
+                                  />
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
                   )}
                 </WholeStepGuidedShell>
               </form>

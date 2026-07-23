@@ -13,21 +13,17 @@ import EventsTabSkeleton from "./events-skeleton";
 import EventListFilters from "./event-list-filters";
 import {
   useEvents,
-  useBulkUpdateEventStatus,
   useBulkDeleteEvents,
-  eventKeys,
 } from "../../_lib/queries";
-import { useQueryClient } from "@tanstack/react-query";
 import EventPagination from "./event-pagination";
 import { Button } from "@/components/ui/button";
-import { RefreshCcw, Check, Trash2 } from "lucide-react";
+import { Trash2 } from "lucide-react";
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { useSession } from "next-auth/react";
 import { EventItem, EventsQueryParams } from "@/services/vendor/events/type";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   AlertDialog,
-  AlertDialogAction,
   AlertDialogCancel,
   AlertDialogContent,
   AlertDialogDescription,
@@ -37,8 +33,10 @@ import {
 } from "@/components/ui/alert-dialog";
 import { LocationIndicator } from "@/components/location-indicator";
 import { PermissionGuard } from "@/components/permission/PermissionGuard";
+import { pageCardClassName } from "@/app/(protected)/_components/page-header-card";
 import { DateRange } from "react-day-picker";
 import { format, parseISO } from "date-fns";
+import { cn } from "@/lib/utils";
 
 const tabs = ["active", "old", "draft", "cancelled"] as const;
 const tabLabels: Record<(typeof tabs)[number], string> = {
@@ -75,15 +73,8 @@ function parseDateRangeFromUrl(
 
 export default function EventTabs({ search }: EventsProps) {
   const session = useSession();
-  const queryClient = useQueryClient();
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedEvents, setSelectedEvents] = useState<number[]>([]);
-
-  const [showConfirmModal, setShowConfirmModal] = useState(false);
-  const [pendingAction, setPendingAction] = useState<
-    "active" | "refresh" | null
-  >(null);
-  const [confirmMessage, setConfirmMessage] = useState("");
   const [bulkDeleteDialogOpen, setBulkDeleteDialogOpen] = useState(false);
 
   const [status, setStatus] = useQueryState(
@@ -150,12 +141,8 @@ export default function EventTabs({ search }: EventsProps) {
   const selectedCategoryId =
     categoryFilter === "all" ? undefined : categoryFilter;
 
-  const isActiveTab = activeStatus === "active";
-  const appliedFromDate =
-    isActiveTab && fromDateInUrl ? fromDateInUrl : undefined;
-  const appliedToDate = isActiveTab
-    ? toDateInUrl || fromDateInUrl || undefined
-    : undefined;
+  const appliedFromDate = fromDateInUrl || undefined;
+  const appliedToDate = toDateInUrl || fromDateInUrl || undefined;
 
   const queryParams = {
     page,
@@ -165,8 +152,8 @@ export default function EventTabs({ search }: EventsProps) {
     search: search?.search,
     from_date: appliedFromDate,
     to_date: appliedToDate,
-    category_id: isActiveTab ? selectedCategoryId : undefined,
-    room_id: isActiveTab ? selectedRoomId : undefined,
+    category_id: selectedCategoryId,
+    room_id: selectedRoomId,
   };
 
   const {
@@ -176,15 +163,18 @@ export default function EventTabs({ search }: EventsProps) {
     refetch,
   } = useEvents(queryParams as EventsQueryParams);
 
-  const { mutate: bulkUpdateStatus, isPending: isUpdating } =
-    useBulkUpdateEventStatus();
-
   const { mutate: bulkDeleteEvents, isPending: isBulkDeleting } =
     useBulkDeleteEvents();
 
   const events = eventsData?.items || [];
   const meta = eventsData?.meta || { last_page: 1, total: 0 };
   const filterMeta = eventsData?.filter_meta;
+  const tabCounts = eventsData?.tab_counts ?? {
+    active: 0,
+    old: 0,
+    draft: 0,
+    cancelled: 0,
+  };
 
   const availableDates = useMemo(
     () => filterMeta?.available_dates ?? [],
@@ -276,57 +266,6 @@ export default function EventTabs({ search }: EventsProps) {
     }
   };
 
-  const hasCancelledEvents = selectedEvents.some((eventId) => {
-    const event = events.find((e) => e.id === eventId);
-    return event?.status === "cancelled";
-  });
-
-  const handleBulkSetActive = () => {
-    if (selectedEvents.length === 0 || hasCancelledEvents) return;
-
-    setPendingAction("active");
-    setConfirmMessage(
-      `Are you sure you want to set active ${
-        selectedEvents.length
-      } event${selectedEvents.length > 1 ? "s" : ""}? This will make them visible to customers.`,
-    );
-    setShowConfirmModal(true);
-  };
-
-  const executeBulkAction = () => {
-    if (!pendingAction) return;
-
-    if (pendingAction === "refresh") {
-      refetch();
-      setSelectedEvents([]);
-      setShowConfirmModal(false);
-      setPendingAction(null);
-      return;
-    }
-
-    if (selectedEvents.length === 0) return;
-
-    bulkUpdateStatus(
-      {
-        event_ids: selectedEvents,
-        action: pendingAction,
-      },
-      {
-        onSuccess: () => {
-          setSelectedEvents([]);
-          refetch();
-          setShowConfirmModal(false);
-          setPendingAction(null);
-        },
-      },
-    );
-  };
-
-  const cancelBulkAction = () => {
-    setShowConfirmModal(false);
-    setPendingAction(null);
-  };
-
   const confirmBulkDelete = () => {
     if (selectedEvents.length === 0) return;
     bulkDeleteEvents(
@@ -357,9 +296,8 @@ export default function EventTabs({ search }: EventsProps) {
   }, [activeStatus, setPage]);
 
   useEffect(() => {
-    if (!isActiveTab) return;
     setPage(1);
-  }, [fromDateInUrl, categoryFilter, roomFilter, isActiveTab, setPage]);
+  }, [fromDateInUrl, categoryFilter, roomFilter, setPage]);
 
   useEffect(() => {
     if (!fromDateInUrl) {
@@ -396,11 +334,6 @@ export default function EventTabs({ search }: EventsProps) {
     }
   }, [isDraftTab, events.length]);
 
-  const refreshData = () => {
-    queryClient.invalidateQueries({ queryKey: eventKeys.lists() });
-    refetch();
-  };
-
   const renderEventGrid = () => {
     if (isLoading) {
       return <EventsTabSkeleton count={15} />;
@@ -436,110 +369,91 @@ export default function EventTabs({ search }: EventsProps) {
   };
 
   return (
-    <section className="w-full bg-background flex flex-col relative rounded-md text-black">
-      <header className="bg-background p-4 sm:p-6 rounded-md flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div className="flex flex-col gap-3 w-full sm:flex-1 min-w-0">
-          <div className="flex flex-col sm:flex-row sm:items-center gap-3 flex-wrap">
-            <h2 className="text-xl sm:text-2xl title-header text-black font-bold shrink-0">
-              All Events
-            </h2>
-            {showDraftBulkUi && (
+    <section className="w-full flex flex-col relative rounded-md text-black min-w-0">
+      <header
+        className={cn(
+          pageCardClassName("mb-4 min-w-0"),
+          "flex flex-col gap-4",
+        )}
+      >
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+          <div className="flex flex-col gap-3 w-full sm:flex-1 min-w-0">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-3 flex-wrap">
+              <h2 className="text-xl sm:text-2xl title-header text-black font-bold shrink-0">
+                All Events
+              </h2>
+            </div>
+            <LocationIndicator variant="card" />
+          </div>
+          <div className="flex flex-wrap gap-2 w-full sm:w-auto sm:shrink-0 sm:justify-end">
+            {showDraftBulkUi && !selectionMode && (
               <PermissionGuard permissionKey="update-event">
                 <Button
                   size="sm"
                   onClick={toggleSelectionMode}
-                  variant={selectionMode ? "event-outline" : "event-primary"}
-                  className="w-fit shrink-0"
+                  variant="event-primary"
+                  className="flex-1 sm:flex-none"
                 >
-                  <span className="hidden sm:inline">
-                    {selectionMode ? "Exit Selection" : "Select Events"}
-                  </span>
-                  <span className="sm:hidden">
-                    {selectionMode ? "Exit" : "Select"}
-                  </span>
+                  <span className="hidden sm:inline">Select Events</span>
+                  <span className="sm:hidden">Select</span>
                 </Button>
               </PermissionGuard>
             )}
           </div>
-          <LocationIndicator variant="card" />
         </div>
-        <div className="flex flex-wrap gap-2 w-full sm:w-auto sm:shrink-0">
-          <Button
-            className="text-black flex items-center gap-1 flex-1 sm:flex-none"
-            size="sm"
-            onClick={refreshData}
-            variant="outline"
-            disabled={isFetching}
-          >
-            <RefreshCcw
-              size={14}
-              className={isFetching ? "animate-spin" : ""}
-            />
-            <span className="hidden sm:inline">Refresh</span>
-          </Button>
-        </div>
+
+        <EventListFilters
+          dateRange={dateRange}
+          onDateRangeChange={handleDateRangeChange}
+          availableDates={availableDates}
+          categoryFilter={categoryFilter}
+          onCategoryFilterChange={handleCategoryFilterChange}
+          availableCategories={availableCategories}
+          roomFilter={roomFilter}
+          onRoomFilterChange={handleRoomFilterChange}
+          availableRooms={availableRooms}
+          hasRoomEvents={hasRoomEvents}
+          disabled={isFetching}
+          onReset={handleResetFilters}
+          hasActiveFilters={hasActiveFilters}
+        />
       </header>
 
       {showDraftBulkUi && selectionMode && (
         <PermissionGuard permissionKey="update-event">
-          <div className="bg-muted/20 p-2 sm:p-3 mb-4 rounded-md mx-2 sm:mx-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-            <div className="flex flex-col gap-2 w-full sm:w-auto sm:flex-1 min-w-0">
-              <div className="flex items-center">
-                <Checkbox
-                  id="select-all"
-                  checked={
-                    selectedEvents.length > 0 &&
-                    selectedEvents.length === events.length
-                  }
-                  onCheckedChange={toggleSelectAll}
-                  className="mr-2"
-                />
-                <label htmlFor="select-all" className="text-sm font-medium">
-                  {selectedEvents.length > 0
-                    ? `${selectedEvents.length} of ${events.length} selected`
-                    : "Select All"}
-                </label>
-              </div>
-              {hasCancelledEvents && (
-                <div className="text-xs text-amber-600 bg-amber-50 px-2 py-1 rounded border border-amber-200">
-                  Cancelled events cannot be set to active
-                </div>
-              )}
+          <div className="bg-muted/20 p-2 sm:p-3 mb-4 rounded-md flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+            <div className="flex items-center">
+              <Checkbox
+                id="select-all"
+                checked={
+                  selectedEvents.length > 0 &&
+                  selectedEvents.length === events.length
+                }
+                onCheckedChange={toggleSelectAll}
+                className="mr-2"
+              />
+              <label htmlFor="select-all" className="text-sm font-medium">
+                {selectedEvents.length > 0
+                  ? `${selectedEvents.length} of ${events.length} selected`
+                  : "Select All"}
+              </label>
             </div>
 
-            <div className="flex flex-wrap gap-2 w-full sm:w-auto sm:justify-end">
+            <div className="flex w-full sm:w-auto flex-wrap items-center justify-end gap-2">
               <Button
-                className="flex items-center gap-1 flex-1 sm:flex-none"
-                variant="event-primary"
                 size="sm"
-                disabled={
-                  selectedEvents.length === 0 ||
-                  isUpdating ||
-                  isBulkDeleting ||
-                  hasCancelledEvents
-                }
-                onClick={() => handleBulkSetActive()}
-                title={
-                  hasCancelledEvents
-                    ? "Cannot set cancelled events to active"
-                    : ""
-                }
+                onClick={toggleSelectionMode}
+                variant="event-outline"
+                className="flex-1 sm:flex-none"
               >
-                <Check className="h-4 w-4" />
-                <span className="hidden sm:inline">Set Active</span>
-                <span className="sm:hidden">Active</span>
+                <span className="hidden sm:inline">Exit Selection</span>
+                <span className="sm:hidden">Exit</span>
               </Button>
-
               <Button
                 className="flex items-center gap-1 flex-1 sm:flex-none"
                 variant="destructive"
                 size="sm"
-                disabled={
-                  selectedEvents.length === 0 ||
-                  isUpdating ||
-                  isBulkDeleting ||
-                  hasCancelledEvents
-                }
+                disabled={selectedEvents.length === 0 || isBulkDeleting}
                 onClick={() => setBulkDeleteDialogOpen(true)}
               >
                 <Trash2 className="h-4 w-4" />
@@ -551,43 +465,39 @@ export default function EventTabs({ search }: EventsProps) {
         </PermissionGuard>
       )}
 
-      <main className="bg-background p-2 sm:p-4 md:p-6 rounded-md">
-        {isActiveTab && (
-          <EventListFilters
-            dateRange={dateRange}
-            onDateRangeChange={handleDateRangeChange}
-            availableDates={availableDates}
-            categoryFilter={categoryFilter}
-            onCategoryFilterChange={handleCategoryFilterChange}
-            availableCategories={availableCategories}
-            roomFilter={roomFilter}
-            onRoomFilterChange={handleRoomFilterChange}
-            availableRooms={availableRooms}
-            hasRoomEvents={hasRoomEvents}
-            disabled={isFetching}
-            onReset={handleResetFilters}
-            hasActiveFilters={hasActiveFilters}
-          />
-        )}
-
+      <main className="min-w-0">
         <Tabs
           className="p-0"
           value={activeStatus}
           onValueChange={(newStatus) => setStatus(newStatus)}
         >
-          <TabsList className="h-auto mb-6 w-full overflow-x-auto flex-wrap no-scrollbar">
-            {tabs.map((key) => (
-              <TabsTrigger
-                key={key}
-                value={key}
-                className="p-2 border-0 cursor-pointer text-black text-xs sm:text-sm whitespace-nowrap"
-              >
-                <span className="hidden sm:inline">
-                  {tabLabels[key]} Events
-                </span>
-                <span className="sm:hidden">{tabLabels[key]}</span>
-              </TabsTrigger>
-            ))}
+          <TabsList className="h-auto mb-6 w-full gap-1 overflow-x-auto rounded-lg bg-slate-100/80 p-1 flex-wrap no-scrollbar">
+            {tabs.map((key) => {
+              const count = tabCounts[key];
+              const hasItems = count > 0;
+
+              return (
+                <TabsTrigger
+                  key={key}
+                  value={key}
+                  className="group h-9 gap-2 rounded-md border-0 px-3 py-2 text-xs font-medium text-slate-600 data-[state=active]:bg-[var(--color-primary)] data-[state=active]:text-white data-[state=active]:shadow-sm sm:text-sm"
+                >
+                  <span className="hidden sm:inline">
+                    {tabLabels[key]} Events
+                  </span>
+                  <span className="sm:hidden">{tabLabels[key]}</span>
+                  <span
+                    className={
+                      hasItems
+                        ? "inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-[var(--color-primary)] px-1.5 text-[11px] font-bold tabular-nums leading-none text-white shadow-sm group-data-[state=active]:bg-white group-data-[state=active]:text-[var(--color-primary)]"
+                        : "inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-slate-200/90 px-1.5 text-[11px] font-semibold tabular-nums leading-none text-slate-500 group-data-[state=active]:bg-white/25 group-data-[state=active]:text-white"
+                    }
+                  >
+                    {count}
+                  </span>
+                </TabsTrigger>
+              );
+            })}
           </TabsList>
 
           {tabs.map((key) => (
@@ -605,23 +515,6 @@ export default function EventTabs({ search }: EventsProps) {
           />
         </section>
       </main>
-
-      <AlertDialog open={showConfirmModal} onOpenChange={setShowConfirmModal}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Confirm Action</AlertDialogTitle>
-            <AlertDialogDescription>{confirmMessage}</AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel onClick={cancelBulkAction}>
-              Cancel
-            </AlertDialogCancel>
-            <AlertDialogAction onClick={executeBulkAction}>
-              Confirm
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
 
       <AlertDialog
         open={bulkDeleteDialogOpen}

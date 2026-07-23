@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import type { DownloadItem } from "@/app/(on-boarding)/on-boarding/_components/form-preview/_components/brochure-section";
 import AboutEventSec from "@/app/(on-boarding)/on-boarding/_components/form-preview/_components/About-event-sec";
@@ -29,18 +29,22 @@ import { CartConflictProvider } from "@/app/(public)/vendor/checkout/_components
 import { ThemeAnimationManager } from "@/components/theme-animations/theme-animation-manager";
 import { useCurrencyFormat } from "@/hooks/use-currency-format";
 import { EventHeroBand } from "@/components/public/event-hero-band";
+import { EventRoomChooser } from "@/components/public/event-room-chooser";
+import { RoomContentTransition } from "@/components/public/room-content-transition";
 import { normalizeHeadingEmphasis } from "@/lib/heading-emphasis";
 import { headerLinksFromDownloadItems } from "@/lib/event-header-downloads";
 import { EVENT_BOOKING_SECTION_CLASSNAME } from "@/lib/event-booking-section-layout";
-import { ONBOARDING_ROOM_SELECTOR_SCROLL_THRESHOLD_PX } from "@/app/(on-boarding)/on-boarding/_components/form-preview/preview-layout-constants";
+import { scrollToElementIfNeeded } from "@/lib/scroll-to-element-if-needed";
 import {
   isVendorEventRoomPreviewMode,
+  listVendorPreviewRoomSummaries,
   resolveVendorPreviewActiveSlices,
 } from "../_lib/resolve-vendor-preview-room-slices";
 import { VendorPreviewRoomSelector } from "./vendor-preview-room-selector";
-import { useIsPreviewModeFromProvider } from "@/contexts/preview-context";
 
 import "@/app/(public)/[locationSlug]/events/[eventSlug]/event-detail.css";
+
+const HEADER_OFFSET_PX = 72;
 
 interface EventPreviewProps {
   data: EventDetailData;
@@ -94,11 +98,12 @@ export function EventPreview({
 }: EventPreviewProps) {
   const { format: formatMoney } = useCurrencyFormat();
   const previewContainerRef = useRef<HTMLDivElement>(null);
+  const chooserRef = useRef<HTMLDivElement>(null);
+  const bookingRef = useRef<HTMLDivElement>(null);
   const [currentRoomIndex, setCurrentRoomIndex] = useState(0);
   const [roomSelectorScrollVisible, setRoomSelectorScrollVisible] =
     useState(false);
 
-  const isPostOnboardingPreview = useIsPreviewModeFromProvider();
   const roomPreviewMode = isVendorEventRoomPreviewMode(data);
 
   useEffect(() => {
@@ -110,12 +115,27 @@ export function EventPreview({
     [data, currentRoomIndex],
   );
 
-  const showRoomSelector = roomPreviewMode && slices.rooms.length >= 2;
+  const roomSummaries = useMemo(
+    () => (roomPreviewMode ? listVendorPreviewRoomSummaries(data) : []),
+    [roomPreviewMode, data],
+  );
 
-  /** Post-onboarding review shows rooms immediately; in-form preview fades in after scroll. */
-  const roomSelectorVisible =
-    showRoomSelector &&
-    (isPostOnboardingPreview || roomSelectorScrollVisible);
+  const showRoomSelector = roomPreviewMode && roomSummaries.length >= 2;
+  const roomContentKey =
+    slices.activeRoom?.room_id ?? `room-${currentRoomIndex}`;
+  const roomSelectorVisible = showRoomSelector && roomSelectorScrollVisible;
+
+  const handleRoomChange = useCallback((index: number) => {
+    setCurrentRoomIndex(index);
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        scrollToElementIfNeeded(bookingRef.current, {
+          headerOffsetPx: HEADER_OFFSET_PX,
+          scrollContainer: previewContainerRef.current,
+        });
+      });
+    });
+  }, []);
 
   useEffect(() => {
     if (!showRoomSelector) {
@@ -123,42 +143,44 @@ export function EventPreview({
       return;
     }
 
-    const threshold = ONBOARDING_ROOM_SELECTOR_SCROLL_THRESHOLD_PX;
-
-    const isScrollableContainer = (el: HTMLElement) =>
-      el.scrollHeight > el.clientHeight + 1;
-
-    const getScrollTop = () => {
-      const container = previewContainerRef.current;
-      if (container && isScrollableContainer(container)) {
-        return container.scrollTop;
-      }
-      return typeof window !== "undefined" ? window.scrollY : 0;
-    };
-
-    const getViewportHeight = () => {
-      const container = previewContainerRef.current;
-      if (container && isScrollableContainer(container)) {
-        return container.clientHeight;
-      }
-      return typeof window !== "undefined" ? window.innerHeight : 0;
-    };
-
     const handleScroll = () => {
-      const scrollTop = getScrollTop();
-      const height = getViewportHeight();
-      setRoomSelectorScrollVisible(
-        scrollTop >= Math.max(threshold, height * 0.22),
-      );
+      const chooser = chooserRef.current;
+      const container = previewContainerRef.current;
+      const useContainer =
+        !!container && container.scrollHeight > container.clientHeight + 1;
+
+      if (!chooser) {
+        const scrollTop = useContainer
+          ? container!.scrollTop
+          : window.scrollY;
+        const height = useContainer
+          ? container!.clientHeight
+          : window.innerHeight;
+        setRoomSelectorScrollVisible(scrollTop > height * 0.6);
+        return;
+      }
+
+      if (useContainer && container) {
+        const chooserRect = chooser.getBoundingClientRect();
+        const containerRect = container.getBoundingClientRect();
+        const bottomRelative = chooserRect.bottom - containerRect.top;
+        setRoomSelectorScrollVisible(bottomRelative <= HEADER_OFFSET_PX + 8);
+        return;
+      }
+
+      const { bottom } = chooser.getBoundingClientRect();
+      setRoomSelectorScrollVisible(bottom <= HEADER_OFFSET_PX + 8);
     };
 
     handleScroll();
     window.addEventListener("scroll", handleScroll, { passive: true });
+    window.addEventListener("resize", handleScroll, { passive: true });
     const container = previewContainerRef.current;
     container?.addEventListener("scroll", handleScroll, { passive: true });
 
     return () => {
       window.removeEventListener("scroll", handleScroll);
+      window.removeEventListener("resize", handleScroll);
       container?.removeEventListener("scroll", handleScroll);
     };
   }, [showRoomSelector]);
@@ -408,29 +430,25 @@ export function EventPreview({
           <VendorPreviewRoomSelector
             rooms={slices.rooms}
             currentRoomIndex={currentRoomIndex}
-            onRoomChange={setCurrentRoomIndex}
+            onRoomChange={handleRoomChange}
             visible={roomSelectorVisible}
             layout="sticky"
           />
         ) : null}
 
-        <div
-          className={
-            roomSelectorVisible ? "-mt-12 transition-all duration-300" : ""
-          }
-        >
-        <EventHeroBand
-          title={heroTitle || eventName}
-          subHeading={s1?.event_banner_sub_heading || null}
-          accentHint={heroAccentHint}
-          headingEmphasis={headingEmphasisForHero}
-          bannerHeadingAlign={siteEssentials?.banner_heading_align ?? null}
-          bannerHeadingValign={siteEssentials?.banner_heading_valign ?? null}
-          bannerImage={bannerImage || null}
-          bannerVideo={bannerVideo}
-          cacheBustImage
-          imageAlt={eventName}
-        />
+        <div>
+          <EventHeroBand
+            title={heroTitle || eventName}
+            subHeading={s1?.event_banner_sub_heading || null}
+            accentHint={heroAccentHint}
+            headingEmphasis={headingEmphasisForHero}
+            bannerHeadingAlign={siteEssentials?.banner_heading_align ?? null}
+            bannerHeadingValign={siteEssentials?.banner_heading_valign ?? null}
+            bannerImage={bannerImage || null}
+            bannerVideo={bannerVideo}
+            cacheBustImage
+            imageAlt={eventName}
+          />
         </div>
 
         <AboutEventSec
@@ -441,66 +459,91 @@ export function EventPreview({
           aboutHeadingAccentHint={heroAccentHint}
         />
 
-        {showTimeline ? (
-          <Timeline
-            eventSchedular={timelineRows}
-            eventSchedularTitle={activePackage?.event_schedular_title || ""}
-            eventSchedularCopy={activePackage?.event_schedule_subtitle || ""}
-            eventSchedularBackgroundImage={
-              typeof activePackage?.event_schedular_background_image ===
-              "string"
-                ? activePackage.event_schedular_background_image
-                : undefined
-            }
-          />
+        {showRoomSelector ? (
+          <div ref={chooserRef}>
+            <EventRoomChooser
+              rooms={roomSummaries}
+              currentRoomIndex={currentRoomIndex}
+              onRoomChange={handleRoomChange}
+              headingEmphasis={headingEmphasisForHero}
+            />
+          </div>
         ) : null}
 
-        <PackageSec
-          heading={activePackage?.package_title || ""}
-          subHeading={activePackage?.package_description || ""}
-          image={activePackage?.package_image || null}
-          packageDetails={(activePackage?.package_details ?? []).map(
-            (detail) => ({
-              title: String(detail.title ?? ""),
-            }),
-          )}
-          headingEmphasis={headingEmphasisForHero}
-        />
+        {showTimeline ? (
+          <RoomContentTransition roomKey={roomContentKey}>
+            <Timeline
+              eventSchedular={timelineRows}
+              eventSchedularTitle={activePackage?.event_schedular_title || ""}
+              eventSchedularCopy={activePackage?.event_schedule_subtitle || ""}
+              eventSchedularBackgroundImage={
+                typeof activePackage?.event_schedular_background_image ===
+                "string"
+                  ? activePackage.event_schedular_background_image
+                  : undefined
+              }
+            />
+          </RoomContentTransition>
+        ) : null}
 
-        <div id="booking" className={EVENT_BOOKING_SECTION_CLASSNAME}>
-          <DatesSection
-            dates={datesForSection}
-            eventSlug={eventSlug}
-            eventName={eventName}
-            eventImage={
-              s1?.event_banner_image || s1?.event_banner_video || undefined
-            }
+        <RoomContentTransition roomKey={roomContentKey}>
+          <PackageSec
+            heading={activePackage?.package_title || ""}
+            subHeading={activePackage?.package_description || ""}
+            image={activePackage?.package_image || null}
+            packageDetails={(activePackage?.package_details ?? []).map(
+              (detail) => ({
+                title: String(detail.title ?? ""),
+              }),
+            )}
+            headingEmphasis={headingEmphasisForHero}
           />
+        </RoomContentTransition>
+
+        <div
+          ref={bookingRef}
+          id="booking"
+          className={EVENT_BOOKING_SECTION_CLASSNAME}
+        >
+          <RoomContentTransition roomKey={roomContentKey}>
+            <DatesSection
+              dates={datesForSection}
+              eventSlug={eventSlug}
+              eventName={eventName}
+              eventImage={
+                s1?.event_banner_image || s1?.event_banner_video || undefined
+              }
+            />
+          </RoomContentTransition>
         </div>
 
         <EventGallery gallery={galleryImages} />
 
         {showMenu && (
-          <LazyMenuSection
-            menu_title={activeMenu?.menu_title || ""}
-            menu_description={activeMenu?.menu_description || ""}
-            menus={menus}
-            catering_option={1}
-            menu_background_image={
-              typeof activeMenu?.menu_background_image === "string"
-                ? activeMenu.menu_background_image
-                : (activeMenu?.menu_background_image ?? undefined)
-            }
-          />
+          <RoomContentTransition roomKey={roomContentKey}>
+            <LazyMenuSection
+              menu_title={activeMenu?.menu_title || ""}
+              menu_description={activeMenu?.menu_description || ""}
+              menus={menus}
+              catering_option={1}
+              menu_background_image={
+                typeof activeMenu?.menu_background_image === "string"
+                  ? activeMenu.menu_background_image
+                  : (activeMenu?.menu_background_image ?? undefined)
+              }
+            />
+          </RoomContentTransition>
         )}
 
         {showDrinks && (
-          <LazyDrinkSection
-            title={activeDrinks?.drink_title || ""}
-            description={activeDrinks?.drink_description || ""}
-            packages={drinkPackages}
-            eventSlug={eventSlug}
-          />
+          <RoomContentTransition roomKey={roomContentKey}>
+            <LazyDrinkSection
+              title={activeDrinks?.drink_title || ""}
+              description={activeDrinks?.drink_description || ""}
+              packages={drinkPackages}
+              eventSlug={eventSlug}
+            />
+          </RoomContentTransition>
         )}
 
         <LazyBrochureSection

@@ -5,7 +5,7 @@ import {
   LocationRowAction,
   ToggleLocationStatusMutation,
 } from "../_lib/types";
-import { Settings, ChevronDown, XCircle } from "lucide-react";
+import { Settings, ChevronDown, XCircle, Building2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -45,24 +45,42 @@ export const getColumns = ({
     ),
     cell: ({ row }) => {
       const city = row.original.city || "-";
+      const isHeadquarters = Boolean(row.original.is_headquarters);
       return (
-        <TooltipProvider>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <button
-                type="button"
-                onClick={() => setRowAction({ type: "view", row })}
-                className="max-w-[200px] min-w-0 truncate rounded-md px-1.5 py-1 -mx-1.5 -my-1 text-left text-foreground transition-colors hover:bg-slate-50 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
-                title={`View location: ${city}`}
-              >
-                {city}
-              </button>
-            </TooltipTrigger>
-            <TooltipContent className="max-w-md break-words">
-              <p className="break-words whitespace-normal">{city}</p>
-            </TooltipContent>
-          </Tooltip>
-        </TooltipProvider>
+        <div className="flex min-w-0 max-w-[280px] flex-wrap items-center gap-2">
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  type="button"
+                  onClick={() => setRowAction({ type: "view", row })}
+                  className="min-w-0 truncate rounded-md px-1.5 py-1 -mx-1.5 -my-1 text-left font-medium text-foreground transition-colors hover:bg-slate-50 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+                  title={`View location: ${city}`}
+                >
+                  {city}
+                </button>
+              </TooltipTrigger>
+              <TooltipContent className="max-w-md break-words">
+                <p className="break-words whitespace-normal">{city}</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+          {isHeadquarters ? (
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Badge className="shrink-0 gap-1 border-0 bg-[var(--color-primary)] px-2 py-0.5 text-[11px] font-semibold text-white shadow-none hover:bg-[var(--color-primary)]">
+                    <Building2 className="h-3 w-3" />
+                    Head office
+                  </Badge>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>This is the fixed head office for this account</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          ) : null}
+        </div>
       );
     },
     enableSorting: true,
@@ -265,7 +283,7 @@ export const getColumns = ({
                 <DropdownMenuItem
                   onClick={() => setRowAction({ type: "setDefault", row })}
                 >
-                  Set as default
+                  Manage this Location
                 </DropdownMenuItem>
               </PermissionGuard>
             )}

@@ -211,10 +211,11 @@ export function useOnboardingData() {
 
       // Only sync if there's location data to sync
       if (venueLocations.length > 0) {
-        // Normalize locations to ensure is_default is boolean
+        // Normalize locations to ensure flags are boolean
         const normalizedLocations = venueLocations.map((loc) => ({
           ...loc,
           is_default: Boolean(loc.is_default),
+          is_headquarters: Boolean(loc.is_headquarters),
         }));
 
         setLocations(normalizedLocations);
@@ -245,6 +246,7 @@ export function useOnboardingData() {
         const normalizedDefaultLocation = {
           ...defaultVenueLocation,
           is_default: Boolean(defaultVenueLocation.is_default),
+          is_headquarters: Boolean(defaultVenueLocation.is_headquarters),
         };
 
         setLocations([normalizedDefaultLocation]);

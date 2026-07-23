@@ -559,7 +559,7 @@ export default function StepSeven() {
         <OnboardingCard className="w-full mx-auto shadow-sm mb-16">
           <CardHeader className="pb-2 pt-4">
             <OnboardingTitle>
-              Check Out The Latest Dates To Be Released
+              Add your brochure and location
             </OnboardingTitle>
           </CardHeader>
 
@@ -636,7 +636,7 @@ export default function StepSeven() {
                         )}
                       >
                         <OnboardingFieldGroupTitle>
-                          Add More Information
+                          Add more information
                         </OnboardingFieldGroupTitle>
 
                         <div className="mt-4 w-full min-w-0 space-y-6 rounded-lg border border-white/10 bg-white/[0.03] p-4 sm:p-6">
@@ -646,7 +646,7 @@ export default function StepSeven() {
                             render={() => (
                               <FormItem>
                                 <FormLabel className="text-sm font-medium">
-                                  Event Brochure PDF (Optional)
+                                  Event brochure PDF (optional)
                                 </FormLabel>
                                 <FormControl>
                                   {brochurePdfUrl ? (
@@ -754,7 +754,7 @@ export default function StepSeven() {
                             render={() => (
                               <FormItem>
                                 <FormLabel className="text-sm font-medium">
-                                  Event Flyer PDF (Optional)
+                                  Event flyer PDF (optional)
                                 </FormLabel>
                                 <FormControl>
                                   {brochurePdfUrl2 ? (
@@ -870,7 +870,7 @@ export default function StepSeven() {
                         )}
                       >
                         <OnboardingFieldGroupTitle>
-                          Event Location
+                          Event location
                         </OnboardingFieldGroupTitle>
 
                         <div className="space-y-4 rounded-lg border border-white/10 bg-white/[0.03] p-6">
@@ -880,7 +880,7 @@ export default function StepSeven() {
                             render={({ field }) => (
                               <FormItem>
                                 <FormLabel className="text-sm font-medium">
-                                  Event Address (exact location)
+                                  Event address (exact location)
                                 </FormLabel>
                                 <FormControl>
                                   <AddressAutocomplete

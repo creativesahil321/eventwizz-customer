@@ -6,6 +6,7 @@ import {
   useEffect,
   useState,
   useCallback,
+  type CSSProperties,
   type ReactNode,
 } from "react";
 import { cn } from "@/lib/utils";
@@ -17,6 +18,7 @@ type EventListingHorizontalScrollProps = {
   className?: string;
   leftButtonClassName?: string;
   rightButtonClassName?: string;
+  /** Fallback delta when card width cannot be measured */
   scrollAmount?: number;
 };
 
@@ -26,6 +28,9 @@ const INTERACTIVE_SEL =
 /**
  * Same interaction model as the event schedule timeline: native overflow-x,
  * scroll-smooth, drag-to-scroll (skips links/buttons), wheel → horizontal, arrows.
+ *
+ * Exposes `--event-scroll-slot` (usable track width) so child cards can size
+ * as one full mobile slide without relying on `vw` or fragile % flex math.
  */
 export function EventListingHorizontalScroll({
   children,
@@ -42,8 +47,9 @@ export function EventListingHorizontalScroll({
   const [showArrows, setShowArrows] = useState(false);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(false);
+  const [slotPx, setSlotPx] = useState<number | null>(null);
 
-  const checkScrollability = useCallback(() => {
+  const measure = useCallback(() => {
     const container = scrollContainerRef.current;
     if (!container) return;
 
@@ -54,32 +60,63 @@ export function EventListingHorizontalScroll({
       container.scrollLeft <
         container.scrollWidth - container.clientWidth - 1,
     );
+
+    // Usable width inside horizontal padding — one full card + tiny peek.
+    const styles = window.getComputedStyle(container);
+    const padL = Number.parseFloat(styles.paddingLeft) || 0;
+    const padR = Number.parseFloat(styles.paddingRight) || 0;
+    const inner = Math.max(0, container.clientWidth - padL - padR);
+    setSlotPx(inner > 0 ? Math.round(inner) : null);
   }, []);
 
+  const getStep = useCallback(() => {
+    const container = scrollContainerRef.current;
+    if (!container) return scrollAmount;
+    const first = container.firstElementChild as HTMLElement | null;
+    if (!first) return scrollAmount;
+    const styles = window.getComputedStyle(container);
+    const gap = Number.parseFloat(styles.columnGap || styles.gap || "0") || 0;
+    return first.getBoundingClientRect().width + gap;
+  }, [scrollAmount]);
+
   useEffect(() => {
-    const run = () => checkScrollability();
+    const container = scrollContainerRef.current;
+    if (!container) return;
+
+    const run = () => measure();
     const id = requestAnimationFrame(() => {
       run();
       requestAnimationFrame(run);
     });
-    const handleResize = () => run();
-    window.addEventListener("resize", handleResize);
+
+    const ro =
+      typeof ResizeObserver !== "undefined"
+        ? new ResizeObserver(() => run())
+        : null;
+    ro?.observe(container);
+    window.addEventListener("resize", run);
+
     return () => {
       cancelAnimationFrame(id);
-      window.removeEventListener("resize", handleResize);
+      ro?.disconnect();
+      window.removeEventListener("resize", run);
     };
-  }, [checkScrollability, watchKey]);
+  }, [measure, watchKey]);
+
+  // Padding for arrows changes usable width — remeasure after toggle.
+  useEffect(() => {
+    const id = requestAnimationFrame(() => measure());
+    return () => cancelAnimationFrame(id);
+  }, [showArrows, measure]);
 
   useEffect(() => {
     const container = scrollContainerRef.current;
     if (!container) return;
 
     const handleWheel = (e: WheelEvent) => {
-      // Native horizontal trackpad/mouse gestures — leave alone.
       if (e.deltaY === 0) return;
 
       const maxScrollLeft = container.scrollWidth - container.clientWidth;
-      // No horizontal overflow: never trap the wheel (lets the page scroll).
       if (maxScrollLeft <= 2) return;
 
       const scrollingRight = e.deltaY > 0;
@@ -87,15 +124,14 @@ export function EventListingHorizontalScroll({
         ? container.scrollLeft < maxScrollLeft - 1
         : container.scrollLeft > 1;
 
-      // At a horizontal edge: release the wheel so the page can scroll.
       if (!canScrollFurther) return;
 
       e.preventDefault();
       container.scrollLeft += e.deltaY;
-      checkScrollability();
+      measure();
     };
 
-    const handleScroll = () => checkScrollability();
+    const handleScroll = () => measure();
 
     container.addEventListener("wheel", handleWheel, { passive: false });
     container.addEventListener("scroll", handleScroll, { passive: true });
@@ -103,7 +139,7 @@ export function EventListingHorizontalScroll({
       container.removeEventListener("wheel", handleWheel);
       container.removeEventListener("scroll", handleScroll);
     };
-  }, [checkScrollability, watchKey]);
+  }, [measure, watchKey]);
 
   const handleMouseDown = (e: React.MouseEvent) => {
     if ((e.target as HTMLElement).closest(INTERACTIVE_SEL)) return;
@@ -139,22 +175,29 @@ export function EventListingHorizontalScroll({
   const scroll = (direction: "left" | "right") => {
     const container = scrollContainerRef.current;
     if (!container) return;
-    const delta = direction === "right" ? scrollAmount : -scrollAmount;
+    const step = getStep();
+    const delta = direction === "right" ? step : -step;
     container.scrollTo({
       left: container.scrollLeft + delta,
       behavior: "smooth",
     });
-    window.setTimeout(() => checkScrollability(), 320);
+    window.setTimeout(() => measure(), 320);
   };
+
+  const slotStyle = {
+    ["--event-scroll-slot" as string]:
+      slotPx != null ? `${slotPx}px` : "100%",
+  } as CSSProperties;
 
   return (
     <div className={cn("relative w-full min-w-0", className)}>
       <div
         ref={scrollContainerRef}
+        style={slotStyle}
         className={cn(
           "no-scrollbar relative z-[1] flex min-w-0 cursor-grab select-none items-stretch gap-4 overflow-x-auto overflow-y-visible overscroll-x-contain py-1 [-webkit-overflow-scrolling:touch] sm:gap-5",
-          "scroll-smooth",
-          showArrows && "px-10 sm:px-12",
+          "snap-x snap-mandatory scroll-smooth",
+          showArrows && "px-11 sm:px-12",
           !showArrows && "justify-center",
         )}
         onMouseDown={handleMouseDown}

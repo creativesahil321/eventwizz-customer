@@ -28,9 +28,9 @@ import { LocationFormValues, locationSchema } from "../_lib/validations";
 import { useCreateLocation } from "../_lib/queries";
 import { slugify } from "@/lib/utils";
 import { useSession } from "next-auth/react";
-import GoogleLocationSearch from "@/app/(on-boarding)/on-boarding/_components/steps/step-11/google-location-search";
+import GoogleLocationSearch from "@/app/(on-boarding)/on-boarding/_components/steps/step-10/google-location-search";
 import { env } from "@/env";
-import { fetchLocationDetails } from "@/app/(on-boarding)/on-boarding/_components/steps/step-11/_lib/actions";
+import { fetchLocationDetails } from "@/app/(on-boarding)/on-boarding/_components/steps/step-10/_lib/actions";
 import { toast } from "sonner";
 
 export default function CreateLocationDialog() {

@@ -85,6 +85,7 @@ export default function ForgotPassword({
             </div>
             <div className="flex flex-col justify-start space-y-2 mb-2 mt-8">
               <Button
+                type="submit"
                 disabled={loading}
                 variant="event-primary"
                 size="xl"

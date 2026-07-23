@@ -38,6 +38,8 @@ export function VendorPreviewRoomSelector({
       stickyTop={
         layout === "sticky" ? ONBOARDING_PREVIEW_HEADER_OFFSET : undefined
       }
+      label="Choose Room"
+      size="lg"
       className={cn("z-[58] mx-auto max-w-7xl sm:px-6", className)}
     />
   );

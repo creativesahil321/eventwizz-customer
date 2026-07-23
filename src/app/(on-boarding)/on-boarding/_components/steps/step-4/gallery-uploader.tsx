@@ -202,7 +202,7 @@ const GalleryUploader: React.FC<GalleryUploaderProps> = ({
 
   return (
     <FormItem className="w-full">
-      <OnboardingFieldGroupTitle>Gallery Images</OnboardingFieldGroupTitle>
+      <OnboardingFieldGroupTitle>Gallery images</OnboardingFieldGroupTitle>
 
       {/* Display gallery preview grid */}
       {galleryItems.length > 0 && (

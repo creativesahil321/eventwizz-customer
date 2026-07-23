@@ -63,7 +63,7 @@ export default function EventCard({
   const formatEventDateLabel = (raw: string): string => {
     const d = new Date(raw);
     if (!Number.isNaN(d.getTime())) {
-      return d.toLocaleDateString("en-US", {
+      return d.toLocaleDateString("en-GB", {
         year: "numeric",
         month: "short",
         day: "numeric",

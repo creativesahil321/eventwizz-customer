@@ -50,7 +50,8 @@ export function DualEventShowcase({
         </div>
 
         <div className={dualEventShowcaseFrameClass}>
-          <div className="grid grid-cols-2 gap-3 sm:gap-4 md:gap-5">
+          {/* Mobile: stack full-width cards; sm+: side-by-side */}
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-4 md:gap-5">
             {events.map((event, index) => (
               <LocationEventCard
                 key={event.slug || index}

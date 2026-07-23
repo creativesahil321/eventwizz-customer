@@ -87,7 +87,7 @@ export default function CompactPaymentSelection({
                 <div className="font-semibold">
                   {formatCurrency(totalAmount)}
                 </div>
-                <div className="text-xs text-gray-500">Due today</div>
+                <div className="text-xs text-gray-500">Pay today</div>
               </div>
             </div>
           </Button>

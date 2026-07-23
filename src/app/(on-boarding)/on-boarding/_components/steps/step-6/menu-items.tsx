@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { X } from "lucide-react";
 import { useEffect } from "react";
 import { Controller, useFieldArray, UseFormReturn } from "react-hook-form";
-import { StepSevenType } from "../../form-provider/schema";
+import { StepSixType } from "../../form-provider/schema";
 import {
   createDefaultMenuItemRow,
   menuItemTitleLabel,
@@ -21,7 +21,7 @@ export default function MenuItems({
   form,
 }: {
   menuIndex: number;
-  form: UseFormReturn<StepSevenType>;
+  form: UseFormReturn<StepSixType>;
 }) {
   const {
     fields: itemFields,
@@ -65,7 +65,7 @@ export default function MenuItems({
             defaultValue={itemField.description || ""}
             render={({ field, fieldState: { error } }) => (
               <FormItem className="w-full">
-                <FormLabel>Item Description</FormLabel>
+                <FormLabel>Item description</FormLabel>
                 <FormControl>
                   <Input placeholder="e.g. Spicy, grilled" {...field} />
                 </FormControl>

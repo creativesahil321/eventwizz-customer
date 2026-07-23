@@ -22,6 +22,8 @@ import {
   type VenueContactOverride,
 } from "@/lib/resolve-venue-contact";
 import { VENDOR_FOOTER_PAGE_LINKS } from "@/lib/vendor-cms-content";
+import { useThemeQuery } from "@/hooks/use-theme-query";
+import { useDomain } from "@/providers/domain-provider/domain-provider";
 
 interface FooterSectionProps {
   copyright?: string | null;
@@ -43,7 +45,7 @@ function SocialRow({
 
   return (
     <div
-      className={`flex gap-2.5 ${align === "center" ? "justify-center" : ""}`}
+      className={`flex gap-2 ${align === "center" ? "justify-center" : ""}`}
     >
       {links.map(({ icon: Icon, href, id }) => (
         <Link
@@ -67,33 +69,23 @@ function ContactColumn({
   icon: Icon,
   children,
   external,
-  align = "start",
 }: {
   label: string;
   href: string;
   icon: typeof Phone;
   children: ReactNode;
   external?: boolean;
-  align?: "start" | "center";
 }) {
-  const centered = align === "center";
-  const valueClass =
-    "mt-2.5 block text-sm font-normal leading-snug text-[var(--color-on-footer)] transition-colors group-hover:text-[color:var(--color-primary)] md:text-base";
-
   const body = (
     <>
-      <span
-        className={`flex items-center gap-2 text-sm font-bold uppercase tracking-[0.16em] text-[var(--color-on-footer)]/65 ${
-          centered ? "justify-center" : ""
-        }`}
-      >
+      <span className="flex items-center justify-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--color-on-footer)]/55">
         <Icon
-          className="h-4 w-4 text-[color:var(--color-primary)]"
+          className="h-3.5 w-3.5 text-[color:var(--color-primary)]"
           aria-hidden
         />
         {label}
       </span>
-      <span className={`${valueClass} ${centered ? "text-center" : ""}`}>
+      <span className="mt-1.5 block break-words text-center text-sm leading-snug text-[var(--color-on-footer)] transition-colors group-hover:text-[color:var(--color-primary)]">
         {children}
       </span>
     </>
@@ -105,7 +97,7 @@ function ContactColumn({
         href={href}
         target="_blank"
         rel="noopener noreferrer"
-        className={`group block min-w-0 ${centered ? "text-center" : ""}`}
+        className="group block min-w-0 text-center"
       >
         {body}
       </a>
@@ -113,10 +105,7 @@ function ContactColumn({
   }
 
   return (
-    <Link
-      href={href}
-      className={`group block min-w-0 ${centered ? "text-center" : ""}`}
-    >
+    <Link href={href} className="group block min-w-0 text-center">
       {body}
     </Link>
   );
@@ -126,13 +115,13 @@ function FooterPageLinks({ centered }: { centered?: boolean }) {
   return (
     <nav
       aria-label="Footer pages"
-      className={`flex flex-wrap gap-x-5 gap-y-2 ${centered ? "justify-center" : ""}`}
+      className={`flex flex-wrap gap-x-4 gap-y-1.5 ${centered ? "justify-center" : ""}`}
     >
       {VENDOR_FOOTER_PAGE_LINKS.map((link) => (
         <Link
           key={link.href}
           href={link.href}
-          className="text-sm text-[var(--color-on-footer)]/70 transition-colors hover:text-[color:var(--color-primary)]"
+          className="text-xs text-[var(--color-on-footer)]/70 transition-colors hover:text-[color:var(--color-primary)] sm:text-sm"
         >
           {link.label}
         </Link>
@@ -141,13 +130,25 @@ function FooterPageLinks({ centered }: { centered?: boolean }) {
   );
 }
 
-function ContactLines({ contact }: { contact: ResolvedVenueContact }) {
+function ContactLines({
+  contact,
+  align = "start",
+}: {
+  contact: ResolvedVenueContact;
+  align?: "start" | "center";
+}) {
+  const centered = align === "center";
+
   return (
-    <div className="flex flex-col gap-2.5">
+    <div
+      className={`flex flex-col gap-2 ${centered ? "items-center" : ""}`}
+    >
       {contact.phone ? (
         <Link
           href={`tel:${contact.phone}`}
-          className="inline-flex items-start gap-2 text-sm text-[var(--color-on-footer)]/80 transition-colors hover:text-[color:var(--color-primary)]"
+          className={`inline-flex max-w-full items-start gap-2 text-sm text-[var(--color-on-footer)]/80 transition-colors hover:text-[color:var(--color-primary)] ${
+            centered ? "justify-center text-center" : ""
+          }`}
         >
           <Phone
             className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[color:var(--color-primary)]"
@@ -161,7 +162,9 @@ function ContactLines({ contact }: { contact: ResolvedVenueContact }) {
           href={buildMapsDirectionsUrl(contact.address)}
           target="_blank"
           rel="noopener noreferrer"
-          className="inline-flex items-start gap-2 text-sm text-[var(--color-on-footer)]/80 transition-colors hover:text-[color:var(--color-primary)] hover:underline hover:underline-offset-2"
+          className={`inline-flex max-w-full items-start gap-2 text-sm text-[var(--color-on-footer)]/80 transition-colors hover:text-[color:var(--color-primary)] hover:underline hover:underline-offset-2 ${
+            centered ? "justify-center text-center" : ""
+          }`}
         >
           <MapPin
             className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[color:var(--color-primary)]"
@@ -173,7 +176,9 @@ function ContactLines({ contact }: { contact: ResolvedVenueContact }) {
       {contact.email ? (
         <Link
           href={`mailto:${contact.email}`}
-          className="inline-flex items-start gap-2 text-sm text-[var(--color-on-footer)]/80 transition-colors hover:text-[color:var(--color-primary)]"
+          className={`inline-flex max-w-full items-start gap-2 text-sm text-[var(--color-on-footer)]/80 transition-colors hover:text-[color:var(--color-primary)] ${
+            centered ? "justify-center text-center" : ""
+          }`}
         >
           <Mail
             className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[color:var(--color-primary)]"
@@ -192,10 +197,12 @@ export default function FooterSection({
   locationSlug,
   contactOverride,
 }: FooterSectionProps = {}) {
-  const { theme } = useContext(ServerContext);
-  const vendorTheme = theme as ThemeSchema;
+  const { theme: serverTheme } = useContext(ServerContext);
+  const { domain } = useDomain();
+  const { data: queryTheme } = useThemeQuery(domain, serverTheme);
+  const vendorTheme = (queryTheme ?? serverTheme) as ThemeSchema;
 
-  const logoToUse = logo || theme?.logo;
+  const logoToUse = logo || vendorTheme?.logo;
   const logoPath =
     logoToUse?.startsWith("/") ||
     logoToUse?.startsWith("data:") ||
@@ -236,125 +243,133 @@ export default function FooterSection({
     [vendorTheme, locationSlug, contactOverride],
   );
 
-  const isMainPageFooter = !locationSlug && contactBlocks.length <= 1;
-  const singleContact = isMainPageFooter ? contactBlocks[0]?.contact : null;
+  const isSingleContactFooter = contactBlocks.length <= 1;
+  const singleContact = isSingleContactFooter
+    ? contactBlocks[0]?.contact
+    : null;
 
   const copyrightText =
     copyright ||
     vendorTheme?.copyright ||
     `© ${currentYear} ${vendorTheme?.name || "EventWizz"}. All rights reserved.`;
 
+  const hasSingleContact =
+    singleContact &&
+    (singleContact.phone || singleContact.address || singleContact.email);
+
   return (
     <footer className="bg-[color:var(--color-footer)] text-[var(--color-on-footer)]">
-      {isMainPageFooter ? (
-        /* Main page: centered brand + contact columns */
-        <div className="mx-auto max-w-7xl px-6 py-12 md:py-14">
+      {isSingleContactFooter ? (
+        <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 sm:py-8 md:py-10">
           <div className="flex flex-col items-center text-center">
-            <Link href="/" className="inline-flex">
+            <Link href="/" className="inline-flex max-w-full">
               <img
                 src={addCacheBusting(logoPath)}
-                className="h-10 w-auto object-contain"
+                className="h-8 w-auto max-w-[min(100%,10rem)] object-contain sm:h-9"
                 alt={vendorTheme?.name || "EventWizz"}
               />
             </Link>
-            <div className="mt-5">
-              <SocialRow links={socialLinks} align="center" />
-            </div>
 
-            {singleContact &&
-            (singleContact.phone ||
-              singleContact.address ||
-              singleContact.email) ? (
-              <div className="mt-10 grid w-full max-w-3xl grid-cols-1 gap-8 sm:grid-cols-3 sm:gap-6">
-                {singleContact.phone ? (
-                  <ContactColumn
-                    label="Phone"
-                    href={`tel:${singleContact.phone}`}
-                    icon={Phone}
-                    align="center"
-                  >
-                    {singleContact.phone}
-                  </ContactColumn>
-                ) : null}
-                {singleContact.address ? (
-                  <ContactColumn
-                    label="Visit us"
-                    href={buildMapsDirectionsUrl(singleContact.address)}
-                    icon={MapPin}
-                    external
-                    align="center"
-                  >
-                    {singleContact.address}
-                  </ContactColumn>
-                ) : null}
-                {singleContact.email ? (
-                  <ContactColumn
-                    label="Email"
-                    href={`mailto:${singleContact.email}`}
-                    icon={Mail}
-                    align="center"
-                  >
-                    {singleContact.email}
-                  </ContactColumn>
-                ) : null}
+            {socialLinks.length > 0 ? (
+              <div className="mt-3 sm:mt-4">
+                <SocialRow links={socialLinks} align="center" />
               </div>
             ) : null}
 
-            <div className="mt-10">
+            {hasSingleContact ? (
+              <>
+                {/* Mobile: compact icon + value rows (no giant stacked labels) */}
+                <div className="mt-4 w-full max-w-md sm:hidden">
+                  <ContactLines contact={singleContact} align="center" />
+                </div>
+
+                {/* sm+: three-column contact */}
+                <div className="mt-6 hidden w-full max-w-3xl grid-cols-3 gap-5 sm:grid md:mt-8 md:gap-6">
+                  {singleContact.phone ? (
+                    <ContactColumn
+                      label="Phone"
+                      href={`tel:${singleContact.phone}`}
+                      icon={Phone}
+                    >
+                      {singleContact.phone}
+                    </ContactColumn>
+                  ) : null}
+                  {singleContact.address ? (
+                    <ContactColumn
+                      label="Visit us"
+                      href={buildMapsDirectionsUrl(singleContact.address)}
+                      icon={MapPin}
+                      external
+                    >
+                      {singleContact.address}
+                    </ContactColumn>
+                  ) : null}
+                  {singleContact.email ? (
+                    <ContactColumn
+                      label="Email"
+                      href={`mailto:${singleContact.email}`}
+                      icon={Mail}
+                    >
+                      {singleContact.email}
+                    </ContactColumn>
+                  ) : null}
+                </div>
+              </>
+            ) : null}
+
+            <div className="mt-4 sm:mt-6">
               <FooterPageLinks centered />
             </div>
           </div>
         </div>
       ) : (
-        /* Location / event pages: brand + labeled venue columns */
-        <div className="mx-auto max-w-7xl px-6 py-12">
-          <div className="grid grid-cols-1 gap-10 md:grid-cols-12 md:gap-8">
-            <div className="md:col-span-4">
-              <Link href="/" className="inline-flex">
+        <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 sm:py-8 md:py-10">
+          <div className="grid grid-cols-1 gap-5 md:grid-cols-12 md:gap-8">
+            <div className="flex flex-col items-center text-center md:col-span-4 md:items-start md:text-left">
+              <Link href="/" className="inline-flex max-w-full">
                 <img
                   src={addCacheBusting(logoPath)}
-                  className="h-10 w-auto object-contain"
+                  className="h-8 w-auto max-w-[min(100%,10rem)] object-contain sm:h-9"
                   alt={vendorTheme?.name || "EventWizz"}
                 />
               </Link>
-              <div className="mt-5">
-                <SocialRow links={socialLinks} />
-              </div>
+              {socialLinks.length > 0 ? (
+                <div className="mt-3 flex justify-center md:mt-4 md:justify-start">
+                  <SocialRow links={socialLinks} />
+                </div>
+              ) : null}
             </div>
 
-            {contactBlocks.length > 0 && (
-              <div className="md:col-span-8">
-                <div
-                  className={`grid grid-cols-1 gap-8 ${
-                    contactBlocks.length >= 2
-                      ? "sm:grid-cols-2"
-                      : "sm:grid-cols-1 sm:max-w-sm"
-                  }`}
-                >
-                  {contactBlocks.map((block) => (
-                    <div key={block.id}>
-                      <h6 className="mb-3 text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--color-on-footer)]/45">
-                        {block.label}
-                      </h6>
+            <div className="md:col-span-8">
+              <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 sm:gap-6">
+                {contactBlocks.map((block) => (
+                  <div
+                    key={block.id}
+                    className="min-w-0 text-center sm:text-left"
+                  >
+                    <h6 className="mb-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--color-on-footer)]/45 sm:text-[11px]">
+                      {block.label}
+                    </h6>
+                    <div className="flex justify-center sm:justify-start">
                       <ContactLines contact={block.contact} />
                     </div>
-                  ))}
-                </div>
+                  </div>
+                ))}
               </div>
-            )}
+            </div>
           </div>
 
-          <div className="mt-8 md:col-span-12">
+          <div className="mt-5 flex justify-center md:mt-6 md:justify-start">
             <FooterPageLinks />
           </div>
         </div>
       )}
 
       <div className="border-t border-[color:color-mix(in_srgb,var(--color-on-footer)_10%,transparent)]">
-        <div className="mx-auto max-w-7xl px-6 py-4">
+        <div className="mx-auto max-w-7xl px-4 pb-[calc(4.25rem+env(safe-area-inset-bottom,0px))] pt-3 sm:px-6 sm:pb-5 sm:pt-4">
           <div
-            className={`text-xs text-[var(--color-on-footer)]/55 [&_p]:mb-2 [&_p:last-child]:mb-0 [&_strong]:font-semibold [&_em]:italic [&_a]:underline ${
-              isMainPageFooter ? "text-center" : ""
+            className={`break-words text-[11px] leading-relaxed text-[var(--color-on-footer)]/55 sm:text-xs [&_a]:underline [&_em]:italic [&_p]:mb-1.5 [&_p:last-child]:mb-0 [&_strong]:font-semibold ${
+              isSingleContactFooter ? "text-center" : "text-center md:text-left"
             }`}
             dangerouslySetInnerHTML={{ __html: copyrightText }}
           />

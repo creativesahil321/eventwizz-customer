@@ -17,7 +17,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import UniversalSearch from "./_components/search";
-import ReferralUrl from "./_components/referral";
+import VendorSiteUrl from "./_components/vendor-site-url";
 import { PermissionGuard } from "@/components/permission";
 import NotificationBell from "./_components/notification-bell";
 import { LocationSelector } from "@/components/location-selector";
@@ -52,16 +52,14 @@ const Header: React.FC<HeaderProps> = memo(({ menus }) => {
   const venueName = useMemo(() => {
     if (!isVendor) return "";
     return (
-      profileData?.data?.venue_name?.trim() ||
-      session?.user?.name?.trim() ||
-      ""
+      profileData?.data?.venue_name?.trim() || session?.user?.name?.trim() || ""
     );
   }, [isVendor, profileData?.data?.venue_name, session?.user?.name]);
 
   const headerClass = useMemo(
     () =>
       cn(
-        "flex-none min-w-0 border-b border-[var(--color-border)] bg-[var(--color-header)] text-[var(--color-on-header)] px-4 py-3 md:px-6 md:py-4 flex items-center justify-between sticky top-0 z-50 shadow-sm transition-all duration-300 overflow-hidden",
+        "flex-none min-w-0 border-b border-slate-200 bg-[var(--color-header)] text-[var(--color-on-header)] px-4 py-3 md:px-6 md:py-4 flex items-center justify-between sticky top-0 z-50 shadow-[0_1px_2px_0_rgba(0,0,0,0.05)] transition-all duration-300 overflow-hidden",
         collapsed ? "xl:ml-[60px]" : "xl:ml-[264px]",
       ),
     [collapsed],
@@ -84,9 +82,9 @@ const Header: React.FC<HeaderProps> = memo(({ menus }) => {
       </div>
 
       <div className="flex items-center gap-2 ml-1">
-        {/* Referral URL - Using the separate component */}
+        {/* Vendor public site URL — copy / open live preview */}
         <div className="hidden lg:block">
-          <ReferralUrl />
+          <VendorSiteUrl />
         </div>
 
         {/* Location Selector - Only show for vendors with multiple locations */}

@@ -87,6 +87,8 @@ const stepComponents = {
 const splitLayoutSteps = new Set([2, 3, 4, 5, 6, 7, 8, 9]);
 const centeredSteps = new Set([1, 6, 11, 10]);
 const fullScreenCenteredSteps = new Set([4]); // Remove step 1 from full screen centered
+/** Tall centered steps need natural scroll + top padding (like step 1), not fixed-height justify-center. */
+const naturalScrollCenteredSteps = new Set([1, 10, 11]);
 
 const SplitLayout = React.memo(
   ({
@@ -169,9 +171,10 @@ const FullLayout = React.memo(
     activeStep: number;
   }) => {
     const isFullScreenCentered = fullScreenCenteredSteps.has(activeStep || 0);
+    const usesNaturalScroll = naturalScrollCenteredSteps.has(activeStep || 0);
     const scrollAreaClasses = isFullScreenCentered
       ? "h-[calc(100vh-40px)] flex flex-col justify-center items-center"
-      : centered && activeStep === 1
+      : centered && usesNaturalScroll
         ? "flex justify-center"
         : centered
           ? "h-[calc(100vh-40px)] flex justify-center"
@@ -179,7 +182,7 @@ const FullLayout = React.memo(
 
     const containerClasses =
       isFullScreenCentered || centered
-        ? activeStep === 1
+        ? usesNaturalScroll
           ? "flex flex-col items-center w-full pb-8"
           : "flex flex-col justify-center items-center min-h-screen"
         : "w-full";
@@ -187,14 +190,14 @@ const FullLayout = React.memo(
     return (
       <section
         className={`w-full bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 ${
-          activeStep === 1 ? "overflow-visible" : ""
+          usesNaturalScroll ? "overflow-visible" : ""
         }`}
       >
         {centered && <Stepper activeStep={activeStep} />}
 
         <ScrollArea
           className={`w-full ${scrollAreaClasses}`}
-          type={activeStep === 1 ? "always" : "auto"}
+          type={usesNaturalScroll ? "always" : "auto"}
         >
           <div
             data-step={activeStep}

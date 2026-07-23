@@ -1,4 +1,5 @@
 import type { AdminHomeContent } from "@/lib/admin-cms-content";
+import { SiteHeading } from "@/components/public/site-heading";
 
 export default function EventTypes({
   content,
@@ -8,10 +9,14 @@ export default function EventTypes({
   return (
     <section className="py-20 bg-[color:var(--color-background)]">
       <div className="container mx-auto px-4">
-        <div className="text-center mb-12">
-          <h2 className="font-heading mb-3 text-3xl font-bold text-[color:var(--color-text)] md:text-4xl">
-            {content.title}
-          </h2>
+        <div className="mb-12 text-center">
+          <SiteHeading
+            level={2}
+            title={content.title}
+            variant="onSurface"
+            align="center"
+            className="mb-3 !text-3xl !font-bold md:!text-4xl"
+          />
           <p className="text-[color:var(--color-text-dimmed)] max-w-2xl mx-auto">
             {content.subtitle}
           </p>
@@ -35,7 +40,10 @@ export default function EventTypes({
 
               {/* Content pinned to bottom */}
               <div className="absolute bottom-0 left-0 right-0 p-5 text-white">
-                <h3 className="font-bold text-lg leading-snug mb-1.5">
+                <h3
+                  className="font-heading font-bold text-lg leading-snug mb-1.5"
+                  style={{ fontFamily: "var(--font-heading)" }}
+                >
                   {card.title}
                 </h3>
                 {/* Description slides up on hover */}

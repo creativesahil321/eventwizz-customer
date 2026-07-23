@@ -1,11 +1,11 @@
 "use client";
+import { ProtectedPageHeader } from "@/app/(protected)/_components/page-header-card";
 import { useDataTable } from "@/hooks/data-table/use-data-table";
 import { DataTableRowAction, EmailTemplate, SearchParams } from "../_lib/types";
 import React from "react";
 import { getColumns } from "./columns";
 import { DataTable } from "@/components/data-table/data-table";
 import { useEmailTemplates } from "../_lib/queries";
-import { DataTableToolbar } from "./data-table-toolbar";
 import { ShowEmailTemplateDialog } from "./_view-template";
 import { TableCell, TableRow } from "@/components/ui/table";
 import EmailTemplatesSkeleton from "./email-templates-skeleton";
@@ -168,16 +168,13 @@ export default function EmailTemplatesTable({
   }, [isFetching, isError, table]);
 
   return (
-    <section className="w-full relative">
+    <section className="w-full relative min-w-0">
+      <ProtectedPageHeader
+        title="Email Templates"
+        className="mb-4 min-w-0"
+      />
       <div className="max-w-full overflow-x-auto rounded-lg">
-        <DataTable table={table} emptyStateRenderer={renderEmptyState}>
-          <DataTableToolbar
-            className="bg-background p-3 sm:p-6 border rounded-lg"
-            table={table}
-            filterFields={[]}
-            title="Email Templates"
-          ></DataTableToolbar>
-        </DataTable>
+        <DataTable table={table} emptyStateRenderer={renderEmptyState} />
       </div>
       {rowAction?.type === "show" && (
         <ShowEmailTemplateDialog

@@ -254,7 +254,7 @@ export default function MenuCategoryDropdown({
                     return (
                       <FormItem>
                         <FormLabel className="text-black">
-                          Category Name
+                          Category name
                         </FormLabel>
                         <FormControl>
                           <Input

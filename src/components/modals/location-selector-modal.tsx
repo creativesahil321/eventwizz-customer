@@ -134,9 +134,14 @@ export function LocationSelectorModal({
                     <div className="flex items-center justify-between">
                       <div className="font-medium text-lg">{location.name}</div>
                       <div className="flex items-center gap-2">
+                        {location.is_headquarters && (
+                          <div className="text-xs bg-[var(--color-primary)] text-white px-2 py-1 rounded-md whitespace-nowrap font-medium">
+                            Head office
+                          </div>
+                        )}
                         {location.is_default && (
                           <div className="text-xs bg-teal-100 text-teal-800 px-2 py-1 rounded whitespace-nowrap">
-                            Default
+                            In use
                           </div>
                         )}
                         {location.status === false && (

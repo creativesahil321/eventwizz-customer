@@ -44,16 +44,19 @@ export function LocationEventCard({
   const isInteractivePreview = isPreview && Boolean(onPreviewEventSelect);
   const href = `/${locationSlug}/events/${event.slug}`;
 
+  // Visual hover is decoupled from click interactivity: preview cards should
+  // still show the hover treatment (WYSIWYG) even though they don't navigate.
+  // Only the loading/pending state disables pointer events.
   const cardClassName = cn(
     "group relative block h-full w-full overflow-hidden rounded-xl border border-white/10 bg-zinc-950 outline-none",
     "shadow-sm transition-all duration-300 ease-out",
-    (!isPreview || isInteractivePreview) &&
+    !isPending &&
       "hover:-translate-y-1 hover:border-[color:var(--color-primary)] hover:shadow-lg hover:shadow-black/50",
-    (!isPreview || isInteractivePreview) &&
+    !isPending &&
       "hover:ring-2 hover:ring-[color:var(--color-primary)] hover:ring-offset-0",
     (!isPreview || isInteractivePreview) &&
       "focus-visible:ring-2 focus-visible:ring-[color:var(--color-primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--color-background)]",
-    (isPending || (isPreview && !isInteractivePreview)) && "pointer-events-none",
+    isPending && "pointer-events-none",
   );
 
   const cardBody = (

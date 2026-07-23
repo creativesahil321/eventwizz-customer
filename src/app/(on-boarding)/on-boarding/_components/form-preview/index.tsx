@@ -1,5 +1,6 @@
 "use client";
 import React, {
+  useCallback,
   useEffect,
   useState,
   useMemo,
@@ -18,7 +19,6 @@ import {
   siteEssentialsToPreviewRootStyle,
 } from "../../_lib/onboarding-site-essentials-bridge";
 import { OnboardingPreviewHeader } from "./onboarding-preview-header";
-import { ONBOARDING_ROOM_SELECTOR_SCROLL_THRESHOLD_PX } from "./preview-layout-constants";
 import { SiteEssentialsGoogleFontsLoader } from "@/components/shared/site-essentials-google-fonts-loader";
 import FooterSection from "@/app/(public)/vendor/_components/EventListPage/footer";
 import HeroBanner from "@/app/(public)/vendor/_components/EventListPage/hero-banner";
@@ -27,10 +27,17 @@ import "@/app/(public)/[locationSlug]/events/[eventSlug]/event-detail.css";
 import { headerLinksFromDownloadItems } from "@/lib/event-header-downloads";
 import { EVENT_BOOKING_SECTION_CLASSNAME } from "@/lib/event-booking-section-layout";
 import { EventHeroBand } from "@/components/public/event-hero-band";
+import { EventRoomChooser } from "@/components/public/event-room-chooser";
+import { RoomContentTransition } from "@/components/public/room-content-transition";
 import { LocationMarketingBody } from "@/components/public/location-marketing-sections";
 import { Image as ImageIcon } from "lucide-react";
 import { useCurrencySymbol } from "@/hooks/use-currency-format";
 import { normalizeSlug } from "@/lib/utils";
+import { scrollToElementIfNeeded } from "@/lib/scroll-to-element-if-needed";
+import { useRoomManager } from "../rooms/use-room-manager";
+import { listOnboardingPreviewRoomSummaries } from "../rooms/list-onboarding-preview-room-summaries";
+
+const HEADER_OFFSET_PX = 72;
 
 // Lazy load components - only import what's actually used
 const BrochureSection = lazy(() => import("./_components/brochure-section"));
@@ -300,39 +307,81 @@ export default function FormPreview() {
   const moreInfoRef = useRef<HTMLDivElement>(null);
   const faqRef = useRef<HTMLDivElement>(null);
   const previewContainerRef = useRef<HTMLDivElement>(null);
+  const chooserRef = useRef<HTMLDivElement>(null);
   const [roomSelectorScrollVisible, setRoomSelectorScrollVisible] =
     useState(false);
 
+  const {
+    enabled: roomsEnabled,
+    rooms: managedRooms,
+    currentRoomIndex,
+    setCurrentRoomIndex,
+  } = useRoomManager();
+
   const showRoomFloatingSelector = useMemo(() => {
-    const ms = formState.multiSpace;
     return (
-      Boolean(ms?.enabled) &&
-      (ms?.rooms?.length ?? 0) > 0 &&
+      roomsEnabled &&
+      managedRooms.length > 0 &&
       EVENT_PREVIEW_ROOM_SELECTOR_STEPS.has(activeStep)
     );
+  }, [activeStep, roomsEnabled, managedRooms.length]);
+
+  const roomSummaries = useMemo(() => {
+    if (!roomsEnabled || managedRooms.length < 2) return [];
+    const banner =
+      typeof formState.stepThree?.event_banner_image === "string"
+        ? formState.stepThree.event_banner_image
+        : null;
+    return listOnboardingPreviewRoomSummaries(managedRooms, banner);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeStep, formState.multiSpace, formTick]);
+  }, [roomsEnabled, managedRooms, formState.stepThree?.event_banner_image, formTick]);
+
+  const showRoomChooser =
+    showRoomFloatingSelector && roomSummaries.length >= 2;
+
+  const roomContentKey =
+    managedRooms[currentRoomIndex]?.id ?? `room-${currentRoomIndex}`;
+
+  const handleRoomChange = useCallback(
+    (index: number) => {
+      setCurrentRoomIndex(index);
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          scrollToElementIfNeeded(datesRef.current, {
+            headerOffsetPx: HEADER_OFFSET_PX,
+            scrollContainer: previewContainerRef.current,
+          });
+        });
+      });
+    },
+    [setCurrentRoomIndex],
+  );
 
   useEffect(() => {
     const container = previewContainerRef.current;
-    if (!container || !showRoomFloatingSelector) {
+    if (!container || !showRoomChooser) {
       setRoomSelectorScrollVisible(false);
       return;
     }
 
-    const threshold = Math.max(
-      ONBOARDING_ROOM_SELECTOR_SCROLL_THRESHOLD_PX,
-      container.clientHeight * 0.22,
-    );
-
     const handleScroll = () => {
-      setRoomSelectorScrollVisible(container.scrollTop >= threshold);
+      const chooser = chooserRef.current;
+      if (!chooser) {
+        setRoomSelectorScrollVisible(
+          container.scrollTop > container.clientHeight * 0.6,
+        );
+        return;
+      }
+      const chooserRect = chooser.getBoundingClientRect();
+      const containerRect = container.getBoundingClientRect();
+      const bottomRelative = chooserRect.bottom - containerRect.top;
+      setRoomSelectorScrollVisible(bottomRelative <= HEADER_OFFSET_PX + 8);
     };
 
     handleScroll();
     container.addEventListener("scroll", handleScroll, { passive: true });
     return () => container.removeEventListener("scroll", handleScroll);
-  }, [showRoomFloatingSelector, activeStep]);
+  }, [showRoomChooser, activeStep]);
 
   const activePreviewPackage = useMemo(() => {
     const ms = formState.multiSpace;
@@ -822,14 +871,15 @@ export default function FormPreview() {
           logo={formState.stepTwo?.logo || null}
           headerDownloads={previewHeaderDownloads}
           showRoomSelector={showRoomFloatingSelector}
-          roomSelectorVisible={roomSelectorScrollVisible}
+          roomSelectorVisible={
+            showRoomChooser && roomSelectorScrollVisible
+          }
+          onRoomChange={handleRoomChange}
         />
 
         <div
           ref={eventHeroRef}
-          className={`transition-all duration-300 ${
-            showRoomFloatingSelector && roomSelectorScrollVisible ? "-mt-12" : ""
-          } ${getHighlightClass(3, "banner")}`}
+          className={`transition-all duration-300 ${getHighlightClass(3, "banner")}`}
         >
           <EventHeroBand
             title={
@@ -888,6 +938,19 @@ export default function FormPreview() {
           </Suspense>
         </div>
 
+        {showRoomChooser ? (
+          <div ref={chooserRef}>
+            <EventRoomChooser
+              rooms={roomSummaries}
+              currentRoomIndex={currentRoomIndex}
+              onRoomChange={handleRoomChange}
+              headingEmphasis={
+                tryHeroPreviewProps?.headingEmphasis ?? undefined
+              }
+            />
+          </div>
+        ) : null}
+
         {/* Event Schedular */}
         {showTimelineSection && (
           <div
@@ -898,22 +961,24 @@ export default function FormPreview() {
             )}`}
           >
             <Suspense fallback={<SectionLoader />}>
-              <Timeline
-                eventSchedularTitle={
-                  activePreviewPackage?.event_schedular_title || ""
-                }
-                eventSchedularCopy={
-                  activePreviewPackage?.event_schedule_subtitle ||
-                  activePreviewPackageLegacy?.event_schedular_custom_copy ||
-                  ""
-                }
-                eventSchedular={
-                  timelineRows as Array<{
-                    title: string;
-                    time: string;
-                  }>
-                }
-              />
+              <RoomContentTransition roomKey={roomContentKey}>
+                <Timeline
+                  eventSchedularTitle={
+                    activePreviewPackage?.event_schedular_title || ""
+                  }
+                  eventSchedularCopy={
+                    activePreviewPackage?.event_schedule_subtitle ||
+                    activePreviewPackageLegacy?.event_schedular_custom_copy ||
+                    ""
+                  }
+                  eventSchedular={
+                    timelineRows as Array<{
+                      title: string;
+                      time: string;
+                    }>
+                  }
+                />
+              </RoomContentTransition>
             </Suspense>
           </div>
         )}
@@ -927,28 +992,30 @@ export default function FormPreview() {
           )}`}
         >
           <Suspense fallback={<SectionLoader />}>
-            <PackageSection
-              heading={activePreviewPackage?.package_title || ""}
-              image={
-                typeof activePreviewPackage?.package_image === "string"
-                  ? {
-                      path: activePreviewPackage.package_image,
-                      relativePath: activePreviewPackage.package_image,
-                      preview: activePreviewPackage.package_image,
-                    }
-                  : activePreviewPackage?.package_image || null
-              }
-              subHeading={activePreviewPackage?.package_description || ""}
-              packageDetails={
-                activePreviewPackage?.package_details?.map((detail) => ({
-                  title: detail.title || "",
-                  description: detail.title || "", // Use title as description since it's not in the schema
-                })) || []
-              }
-              headingEmphasis={
-                tryHeroPreviewProps?.headingEmphasis ?? undefined
-              }
-            />
+            <RoomContentTransition roomKey={roomContentKey}>
+              <PackageSection
+                heading={activePreviewPackage?.package_title || ""}
+                image={
+                  typeof activePreviewPackage?.package_image === "string"
+                    ? {
+                        path: activePreviewPackage.package_image,
+                        relativePath: activePreviewPackage.package_image,
+                        preview: activePreviewPackage.package_image,
+                      }
+                    : activePreviewPackage?.package_image || null
+                }
+                subHeading={activePreviewPackage?.package_description || ""}
+                packageDetails={
+                  activePreviewPackage?.package_details?.map((detail) => ({
+                    title: detail.title || "",
+                    description: detail.title || "", // Use title as description since it's not in the schema
+                  })) || []
+                }
+                headingEmphasis={
+                  tryHeroPreviewProps?.headingEmphasis ?? undefined
+                }
+              />
+            </RoomContentTransition>
           </Suspense>
         </div>
 
@@ -962,14 +1029,16 @@ export default function FormPreview() {
           )}`}
         >
           <Suspense fallback={<SectionLoader />}>
-            <DatesSection
-              dates={datesPreviewItems}
-              eventSlug={previewEventSlug}
-              eventName={formState.stepThree?.event_name || undefined}
-              eventImage={datesEventImage}
-              roomId={activePreviewRoomScope.roomId}
-              roomIndex={activePreviewRoomScope.roomIndex}
-            />
+            <RoomContentTransition roomKey={roomContentKey}>
+              <DatesSection
+                dates={datesPreviewItems}
+                eventSlug={previewEventSlug}
+                eventName={formState.stepThree?.event_name || undefined}
+                eventImage={datesEventImage}
+                roomId={activePreviewRoomScope.roomId}
+                roomIndex={activePreviewRoomScope.roomIndex}
+              />
+            </RoomContentTransition>
           </Suspense>
         </div>
 

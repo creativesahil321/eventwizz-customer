@@ -137,7 +137,7 @@ function MobileCartOrLocationSlot({
       <div onClick={onNavigate}>
         <CartButton
           size="sm"
-          showBadge={false}
+          showBadge
           fullWidth
           className={cn(
             mobileNavRowClass,
@@ -305,17 +305,27 @@ export default function CommonHeader({
       ...(isAuthenticated
         ? []
         : [{ link: "/auth/register", linkText: "Register" }]),
-      // Show dashboard button if authenticated
+      // Show dashboard (or continue onboarding) when authenticated
       ...(isAuthenticated && session?.user?.account_type
         ? [
-            {
-              link: `/${session.user.account_type}/dashboard`,
-              linkText: "Dashboard",
-            },
+            session.user.account_type === "vendor" && !session.user.isOnboarded
+              ? {
+                  link: "/on-boarding",
+                  linkText: "Continue Onboarding",
+                }
+              : {
+                  link: `/${session.user.account_type}/dashboard`,
+                  linkText: "Dashboard",
+                },
           ]
         : []),
     ] as NavLink[],
   };
+
+  const accountHomeHref =
+    session?.user?.account_type === "vendor" && !session.user.isOnboarded
+      ? "/on-boarding"
+      : `/${session?.user?.account_type}/dashboard`;
 
   const desktopNavLinkEntries = headerData.navLinks.filter((l) => {
     if (l.icon === "phone" && hideHeaderPhone) return false;
@@ -1009,13 +1019,18 @@ export default function CommonHeader({
               </div>
             ) : isAuthenticated ? (
               <Link
-                href={`/${session?.user?.account_type}/dashboard`}
+                href={accountHomeHref}
                 className={cn(
                   "flex h-9 w-9 items-center justify-center rounded-md transition-colors",
                   styles.textColor,
                   styles.hoverColor,
                 )}
-                aria-label="Dashboard"
+                aria-label={
+                  session?.user?.account_type === "vendor" &&
+                  !session.user.isOnboarded
+                    ? "Continue Onboarding"
+                    : "Dashboard"
+                }
               >
                 <UserCircle className="h-5 w-5" />
               </Link>
@@ -1199,7 +1214,8 @@ export default function CommonHeader({
                   useNonInteractiveChrome && !link.startsWith("tel:");
 
                 const AccountIcon =
-                  linkText === "Dashboard"
+                  linkText === "Dashboard" ||
+                  linkText === "Continue Onboarding"
                     ? LayoutDashboard
                     : linkText === "Log In"
                       ? LogIn

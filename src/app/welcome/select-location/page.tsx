@@ -410,9 +410,14 @@ export default function WelcomeLocationSelectionPage() {
                             <span className="font-semibold text-sm text-gray-900 truncate">
                               {location.city || "Unknown Location"}
                             </span>
+                            {location.is_headquarters && (
+                              <span className="shrink-0 inline-flex items-center text-[10px] font-semibold px-2 py-0.5 rounded-md bg-[color:var(--color-primary)] text-white">
+                                Head office
+                              </span>
+                            )}
                             {location.is_default && (
-                              <span className="shrink-0 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-[color:var(--color-primary)] text-white">
-                                Default
+                              <span className="shrink-0 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800">
+                                In use
                               </span>
                             )}
                             {location.status === false && (

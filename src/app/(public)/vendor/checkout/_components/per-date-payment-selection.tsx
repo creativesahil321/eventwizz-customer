@@ -170,7 +170,7 @@ function FullPaymentDateRow({
           </p>
           <p className="truncate text-[11px] text-[color:var(--checkout-muted-foreground)]">
             {roomName ? `${roomName} · ` : ""}
-            Due today · Pay in full
+            Pay today · Pay in full
           </p>
         </div>
       </div>

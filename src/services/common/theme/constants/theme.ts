@@ -108,9 +108,8 @@ export function generateThemeCSS(theme: ThemeSchema | null): string {
       theme.colors.secondary || defaultThemeConstants.colors.secondary;
 
     // Create slightly darker hover variants
-    const primaryHover = primaryColor === "#0EA5E9" ? "#0284C7" : primaryColor;
-    const secondaryHover =
-      secondaryColor === "#1E293B" ? "#0F172A" : secondaryColor;
+    const primaryHover = darkenHex(primaryColor);
+    const secondaryHover = darkenHex(secondaryColor);
 
     css += `--color-primary-hover: ${primaryHover};`;
     css += `--color-primary-focus: ${primaryColor};`;
