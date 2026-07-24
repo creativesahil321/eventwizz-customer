@@ -72,9 +72,17 @@ export interface VendorDashboardData {
   bookings_stats: VendorDashboardBookingsStats;
   /** Optional. When present, Commissions tab shows real data; otherwise frontend shows zeros. */
   commissions_stats?: VendorDashboardCommissionsStats;
-  period: string;
-  period_start: string;
-  period_end: string;
+  /** Legacy period fields */
+  period?: string;
+  period_start?: string;
+  period_end?: string;
+  /** Current API period fields for bookings */
+  booking_period?: string;
+  booking_period_start?: string;
+  booking_period_end?: string;
+  comission_period?: string;
+  comission_period_start?: string;
+  comission_period_end?: string;
   recent_bookings: VendorDashboardRecentBooking[];
   last_event_performing_overview: VendorDashboardLastEventItem[];
 }

@@ -27,13 +27,18 @@ export const vendorDashboardKeys = {
     ] as const,
 };
 
-export function useVendorDashboardBookings(dateRange: DashboardDateRangeParams) {
+export function useVendorDashboardBookings(
+  dateRange: DashboardDateRangeParams,
+  options?: { enabled?: boolean },
+) {
+  const enabled = options?.enabled !== false;
   return useQuery<VendorDashboardResponse>({
     queryKey: vendorDashboardKeys.bookings(dateRange),
     queryFn: () =>
       vendorDashboardService.getBookingsStatistics({
         dateRange,
       }),
+    enabled,
     staleTime: 2 * 60 * 1000,
     gcTime: 10 * 60 * 1000,
     placeholderData: (previousData) => previousData,

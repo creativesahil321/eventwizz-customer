@@ -75,6 +75,10 @@ export const API_ENDPOINTS = {
       DELETE_PAYMENT_GATEWAY: "/vendor/payment-gateway/{id}",
       RETURN_URL: "/vendor/payment-gateway/return/{gateway}?account={account_id}",
     },
+    GOCARDLESS: {
+      CONNECT: "/vendor/gocardless/connect",
+      ALLOW_AUTO_DEBIT: "/vendor/gocardless/allow-auto-debit",
+    },
     EVENT: {
       GET_EVENTS: "/vendor/events",
       GET_EVENT: "/vendor/events/show/{eventId}/{is_rooms}",
@@ -151,7 +155,6 @@ export const API_ENDPOINTS = {
       MARK_AS_READ_ALL: "/vendor/notifications/mark-as-read-all",
       MARK_AS_UNREAD: "/vendor/notifications/mark-as-unread/{id}",
       MARK_AS_READ: "/vendor/notifications/mark-as-read/{id}",
-      STATS: "/vendor/notifications/stats",
     },
 
     MENU_CHOICES: {
@@ -268,7 +271,6 @@ export const API_ENDPOINTS = {
       MARK_AS_READ_ALL: "/customer/notifications/mark-as-read-all",
       MARK_AS_UNREAD: "/customer/notifications/mark-as-unread/{id}",
       MARK_AS_READ: "/customer/notifications/mark-as-read/{id}",
-      STATS: "/customer/notifications/stats",
     },
 
     BOOK_EVENT: {
@@ -591,9 +593,9 @@ export const API_ENDPOINTS = {
     },
     NOTIFICATIONS: {
       ALL: "/admin/notifications/paginate",
-      STATS: "/admin/notifications/stats",
       MARK_AS_READ: "/admin/notifications/mark-as-read/{id}",
       MARK_AS_UNREAD: "/admin/notifications/mark-as-unread/{id}",
+      MARK_AS_READ_ALL: "/admin/notifications/mark-as-read-all",
       MARK_ALL_AS_READ: "/admin/notifications/mark-as-read-all",
     },
     LANGUAGES: {

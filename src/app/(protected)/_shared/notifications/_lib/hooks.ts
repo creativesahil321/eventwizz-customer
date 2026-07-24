@@ -34,7 +34,7 @@ export const useNotificationSystem = () => {
     refetch: refetchNotifications,
   } = useNotifications(filters);
 
-  const { data: stats, isLoading: isLoadingStats } = useNotificationStats();
+  const { data: stats } = useNotificationStats();
 
   // Mutations
   const { mutate: markAsRead, isPending: isMarkingAsRead } = useMarkAsRead();
@@ -49,7 +49,7 @@ export const useNotificationSystem = () => {
     : [];
 
   const meta = notificationsResponse?.data?.meta;
-  const isLoading = isLoadingNotifications || isLoadingStats;
+  const isLoading = isLoadingNotifications;
   const isPending = isMarkingAsRead || isMarkingAsUnread || isMarkingAllAsRead;
 
   // Actions

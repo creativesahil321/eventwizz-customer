@@ -2,7 +2,6 @@ import { api } from "@/services/core/api-client";
 import {
   NotificationFilters,
   NotificationResponse,
-  NotificationStats,
 } from "./type";
 import {
   getCurrentUserRole,
@@ -10,7 +9,6 @@ import {
 } from "@/lib/utils/api-endpoints";
 
 type NotificationEndpoints = {
-  STATS: string;
   MARK_AS_READ: string;
   MARK_AS_UNREAD: string;
   MARK_AS_READ_ALL: string;
@@ -34,19 +32,6 @@ export const notificationService = {
       params: filters,
       returnFullResponse: true,
     });
-  },
-
-  /**
-   * Fetch notification statistics
-   */
-  getNotificationStats: async (): Promise<NotificationStats> => {
-    const role = getCurrentUserRole();
-    const endpoints = getEndpointsByRole<NotificationEndpoints>(
-      "NOTIFICATIONS",
-      role
-    );
-
-    return api.get<NotificationStats>(endpoints.STATS);
   },
 
   /**

@@ -4,6 +4,7 @@ import { useSession } from "next-auth/react";
 import { VenueLocation } from "@/types/api.types";
 import { useSitePreviewStore } from "@/store/site-preview.store";
 import { useLocationStore } from "@/store/location.store";
+import { useAuthStore } from "@/store/auth.store";
 import { LocationsQueryData, LOCATION_DEPENDENT_QUERY_KEYS } from "./queries";
 
 /**
@@ -25,7 +26,9 @@ export function useSwitchLocation() {
       await queryClient.cancelQueries({ queryKey: ["locations"] });
 
       // Get current location data
-      const previousLocations = queryClient.getQueriesData({ queryKey: ["locations"] });
+      const previousLocations = queryClient.getQueriesData({
+        queryKey: ["locations"],
+      });
 
       // Optimistically update locations to show new default instantly
       queryClient.setQueriesData<LocationsQueryData>(
@@ -42,7 +45,7 @@ export function useSwitchLocation() {
           }));
 
           return { ...old, data: updatedLocations };
-        }
+        },
       );
 
       return { previousLocations };
@@ -52,10 +55,20 @@ export function useSwitchLocation() {
 
       // Update NextAuth session with the new location ID
       if (default_venue_location?.id) {
+        const locId = Number(default_venue_location.id);
         useLocationStore.getState().setSelectedLocation(default_venue_location);
+        // Sync auth store immediately so profile query key + API headers match
+        useAuthStore.setState((state) => {
+          state.vendor_location_id = locId;
+        });
+        try {
+          localStorage.setItem("vendor_location_id", String(locId));
+        } catch {
+          // ignore
+        }
         try {
           await updateSession({
-            vendor_location_id: String(default_venue_location.id),
+            vendor_location_id: String(locId),
           });
         } catch (error) {
           console.error("Failed to update session with new location:", error);
@@ -70,6 +83,12 @@ export function useSwitchLocation() {
       // Refetch location-dependent data so APIs hit with new vendor_location_id
       LOCATION_DEPENDENT_QUERY_KEYS.forEach((queryKey) => {
         queryClient.invalidateQueries({ queryKey, refetchType: "active" });
+      });
+
+      // Explicit profile refetch (site_url / payment / notification stats)
+      await queryClient.invalidateQueries({
+        queryKey: ["profile"],
+        refetchType: "active",
       });
 
       // Clear site essentials preview store so it doesn't show previous location's data

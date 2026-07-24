@@ -34,12 +34,12 @@ import { useDomainStore } from "@/store/domain.store";
 import { MenuItemProps } from "@/config/menus/types";
 import MobileSidebar from "./_components/mobile-sidebar";
 import LayoutToggle from "./_components/layout-toggle";
-import { notificationService } from "@/services/common/notification";
 import {
   mapCustomerSupportTicketToConversation,
   useCustomerSupportTickets,
 } from "@/services/customer/support";
 import { useDebounce } from "@/hooks/data-table/use-debounce";
+import { useProfileData } from "@/app/(protected)/_shared/profile/_lib";
 
 const CUSTOMER_QUICK_LINKS = [
   {
@@ -277,22 +277,11 @@ function CustomerUserPill() {
 
 function CustomerNotificationBell() {
   const router = useRouter();
-  const [unreadCount, setUnreadCount] = useState(0);
-
-  useEffect(() => {
-    const fetchStats = async () => {
-      try {
-        const data = await notificationService.getNotificationStats();
-        setUnreadCount(data.unread ?? 0);
-      } catch (error) {
-        console.error("Failed to fetch notification stats:", error);
-      }
-    };
-
-    fetchStats();
-    const interval = setInterval(fetchStats, 60000);
-    return () => clearInterval(interval);
-  }, []);
+  const { data: profileResponse } = useProfileData({}, "customer");
+  const unreadCount =
+    Number(
+      profileResponse?.data?.notification_stats?.unread_notifications ?? 0,
+    ) || 0;
 
   return (
     <Button

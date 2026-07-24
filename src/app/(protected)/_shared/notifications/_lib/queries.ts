@@ -1,11 +1,18 @@
 "use client";
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useSession } from "next-auth/react";
+import { useMemo } from "react";
 import { notificationService } from "@/services/common/notification/notification.service";
 import {
   NotificationFilters,
   NotificationResponse,
+  NotificationStats,
 } from "@/services/common/notification/type";
+import {
+  profileKeys,
+  useProfileData,
+} from "@/app/(protected)/_shared/profile/_lib";
 
 // Query keys
 export const notificationKeys = {
@@ -13,8 +20,24 @@ export const notificationKeys = {
   lists: () => [...notificationKeys.all, "list"] as const,
   list: (filters: NotificationFilters) =>
     [...notificationKeys.lists(), filters] as const,
-  stats: () => [...notificationKeys.all, "stats"] as const,
 };
+
+function mapProfileNotificationStats(
+  stats:
+    | {
+        total_notifications?: number;
+        unread_notifications?: number;
+        read_notifications?: number;
+      }
+    | null
+    | undefined,
+): NotificationStats {
+  return {
+    total: Number(stats?.total_notifications ?? 0),
+    unread: Number(stats?.unread_notifications ?? 0),
+    read: Number(stats?.read_notifications ?? 0),
+  };
+}
 
 // Query hooks
 export const useNotifications = (filters: NotificationFilters = {}) => {
@@ -26,13 +49,30 @@ export const useNotifications = (filters: NotificationFilters = {}) => {
   });
 };
 
+/** Notification counts from the global profile API (no /notifications/stats). */
 export const useNotificationStats = () => {
-  return useQuery({
-    queryKey: notificationKeys.stats(),
-    queryFn: () => notificationService.getNotificationStats(),
-    staleTime: 1000 * 60 * 5, // 5 minutes
-  });
+  const { data: session } = useSession();
+  const userType = session?.user?.account_type ?? "vendor";
+  const profileQuery = useProfileData({}, userType);
+
+  const stats = useMemo(
+    () => mapProfileNotificationStats(profileQuery.data?.data?.notification_stats),
+    [profileQuery.data?.data?.notification_stats],
+  );
+
+  return {
+    ...profileQuery,
+    data: stats,
+  };
 };
+
+function invalidateNotificationAndProfile(
+  queryClient: ReturnType<typeof useQueryClient>,
+) {
+  queryClient.invalidateQueries({ queryKey: notificationKeys.lists() });
+  // Counts live on profile now
+  queryClient.invalidateQueries({ queryKey: profileKeys.all });
+}
 
 // Mutation hooks
 export const useMarkAsRead = () => {
@@ -41,9 +81,7 @@ export const useMarkAsRead = () => {
   return useMutation({
     mutationFn: (id: number) => notificationService.markAsRead(id),
     onSuccess: () => {
-      // Invalidate and refetch
-      queryClient.invalidateQueries({ queryKey: notificationKeys.lists() });
-      queryClient.invalidateQueries({ queryKey: notificationKeys.stats() });
+      invalidateNotificationAndProfile(queryClient);
     },
   });
 };
@@ -54,9 +92,7 @@ export const useMarkAsUnread = () => {
   return useMutation({
     mutationFn: (id: number) => notificationService.markAsUnread(id),
     onSuccess: () => {
-      // Invalidate and refetch
-      queryClient.invalidateQueries({ queryKey: notificationKeys.lists() });
-      queryClient.invalidateQueries({ queryKey: notificationKeys.stats() });
+      invalidateNotificationAndProfile(queryClient);
     },
   });
 };
@@ -67,9 +103,7 @@ export const useMarkAllAsRead = () => {
   return useMutation({
     mutationFn: () => notificationService.markAllAsRead(),
     onSuccess: () => {
-      // Invalidate and refetch
-      queryClient.invalidateQueries({ queryKey: notificationKeys.lists() });
-      queryClient.invalidateQueries({ queryKey: notificationKeys.stats() });
+      invalidateNotificationAndProfile(queryClient);
     },
   });
 };

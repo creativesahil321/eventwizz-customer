@@ -51,6 +51,7 @@ export interface VendorBookingHistoryResponse {
     total_platform_fee?: string;
     refunded_amount?: string;
     platform_fee_due?: string;
+    platform_fee_settled?: string;
   };
   summary_by_location?: unknown[];
   filter_meta?: VendorBookingFilterMeta;

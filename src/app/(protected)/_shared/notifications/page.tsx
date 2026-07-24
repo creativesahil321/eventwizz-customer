@@ -11,7 +11,6 @@ export default function NotificationsPage() {
     filters,
     notifications,
     meta,
-    stats,
     selectedNotification,
     isDetailsOpen,
     isLoading,
@@ -39,7 +38,6 @@ export default function NotificationsPage() {
       <NotificationsDataTable
         notifications={notifications}
         meta={formattedMeta}
-        stats={stats}
         filters={filters}
         isLoading={isLoading}
         onFilterChange={handleFilterChange}

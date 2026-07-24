@@ -4,6 +4,7 @@ import { useState, useRef, useEffect, useMemo, type ReactNode } from "react";
 import Link from "next/link";
 import { useRouter, usePathname } from "next/navigation";
 import { useSession } from "next-auth/react";
+import { format } from "date-fns";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -27,6 +28,31 @@ import type { SupportCategory } from "@/app/(protected)/customer/support/_lib/ty
 import { CATEGORY_LABELS } from "@/app/(protected)/customer/support/_lib/utils";
 import { resolveChatNavLink } from "@/lib/chat-nav-links";
 import { pickReadableForeground } from "@/lib/color-contrast";
+import type {
+  VendorChatLiveStats,
+  VendorChatDashboardSnapshot,
+} from "@/lib/chat-vendor-live-stats";
+import {
+  resolveChatDateRange,
+  isVendorStatsIntent,
+  isVendorEarningsIntent,
+  isVendorCommissionIntent,
+  buildVendorStatsDirectReply,
+} from "@/lib/chat-vendor-live-stats";
+import {
+  isVendorEventOverviewIntent,
+  fetchVendorEventOverviewChatReply,
+} from "@/lib/chat-vendor-event-overview";
+import {
+  isVendorBookingListIntent,
+  fetchVendorBookingListChatReply,
+} from "@/lib/chat-vendor-booking-list";
+import {
+  useVendorDashboardBookings,
+  vendorDashboardService,
+} from "@/services/vendor/dashboard";
+import { vendorBookingsService } from "@/services/vendor/bookings/bookings.service";
+import { useQuery } from "@tanstack/react-query";
 
 type QuickAction = {
   id: string;
@@ -81,6 +107,10 @@ const CATEGORY_ACTIONS: QuickAction[] = [
     id: "technical_support",
     label: CATEGORY_LABELS.technical_support,
   },
+  {
+    id: "cancel_flow",
+    label: "No thanks",
+  },
 ];
 
 /** Guest auth options — register / login from chat */
@@ -107,6 +137,10 @@ const AUTH_INTENT_RE =
 const ADD_ROOM_AFTER_BOOKING_RE =
   /\b((add|book|update|change|swap|get|include).{0,40}\broom|new room|another room|extra room|additional room|different room).{0,40}\b(booking|booked|existing)|room.{0,30}(existing|current|my) booking\b/i;
 
+/** User declining guided support / enquiry wizard. */
+const DECLINE_INTENT_RE =
+  /\b(no|nope|nah|cancel|stop|never\s*mind|nevermind|don'?t want|do not want|not now|no thanks|no thank you|forget (it|that)|leave it)\b/i;
+
 function isSupportIntent(text: string): boolean {
   return SUPPORT_INTENT_RE.test(text);
 }
@@ -117,6 +151,14 @@ function isAuthIntent(text: string): boolean {
 
 function isAddRoomAfterBookingIntent(text: string): boolean {
   return ADD_ROOM_AFTER_BOOKING_RE.test(text);
+}
+
+function isDeclineIntent(text: string): boolean {
+  const t = text.trim().toLowerCase();
+  if (!t) return false;
+  // Short declines like "no" / "nope"
+  if (/^(no|nope|nah|cancel|stop)([!.]?)$/i.test(t)) return true;
+  return DECLINE_INTENT_RE.test(t);
 }
 
 function isValidPhone(value: string): boolean {
@@ -130,17 +172,19 @@ function buildSubject(issueSummary: string, description: string): string {
   return seed.length > 80 ? `${seed.slice(0, 77)}…` : seed;
 }
 
-/** Render markdown links + safe relative paths as clickable anchors. */
+/** Render markdown links, bold (**text**), and safe relative paths. */
 function renderMessageContent(content: string, isUser: boolean): ReactNode[] {
   const linkClass = isUser
     ? "underline underline-offset-2 font-medium opacity-95"
     : "underline underline-offset-2 font-medium text-[var(--color-primary)]";
+  const boldClass = isUser
+    ? "font-bold opacity-100"
+    : "font-bold text-slate-950";
+
+  const pattern =
+    /(\*\*([^*]+)\*\*)|\[([^\]]+)\]\((\/[^)\s]*|https?:\/\/[^)\s]+)\)|(\/(?:vendor|customer|admin|auth|contact|welcome|on-boarding|preview)[^\s]*)/g;
 
   const nodes: ReactNode[] = [];
-  // Allow any relative app path in markdown, plus common bare paths
-  const pattern =
-    /\[([^\]]+)\]\((\/[^)\s]*|https?:\/\/[^)\s]+)\)|(\/(?:vendor|customer|admin|auth|contact|welcome|on-boarding|preview)[^\s]*)/g;
-
   let lastIndex = 0;
   let match: RegExpExecArray | null;
   let key = 0;
@@ -150,30 +194,38 @@ function renderMessageContent(content: string, isUser: boolean): ReactNode[] {
       nodes.push(content.slice(lastIndex, match.index));
     }
 
-    const label = match[1];
-    const markdownHref = match[2];
-    const bareHref = match[3];
-    const href = markdownHref || bareHref || "";
-    const text = label || href;
-
-    if (href.startsWith("/")) {
+    if (match[1] && match[2] != null) {
       nodes.push(
-        <Link key={`link-${key++}`} href={href} className={linkClass}>
-          {text}
-        </Link>,
+        <strong key={`bold-${key++}`} className={boldClass}>
+          {match[2]}
+        </strong>,
       );
     } else {
-      nodes.push(
-        <a
-          key={`link-${key++}`}
-          href={href}
-          target="_blank"
-          rel="noopener noreferrer"
-          className={linkClass}
-        >
-          {text}
-        </a>,
-      );
+      const label = match[3];
+      const markdownHref = match[4];
+      const bareHref = match[5];
+      const href = markdownHref || bareHref || "";
+      const text = label || href;
+
+      if (href.startsWith("/")) {
+        nodes.push(
+          <Link key={`link-${key++}`} href={href} className={linkClass}>
+            {text}
+          </Link>,
+        );
+      } else if (href) {
+        nodes.push(
+          <a
+            key={`link-${key++}`}
+            href={href}
+            target="_blank"
+            rel="noopener noreferrer"
+            className={linkClass}
+          >
+            {text}
+          </a>,
+        );
+      }
     }
 
     lastIndex = match.index + match[0].length;
@@ -255,6 +307,7 @@ export function ChatBot() {
   const { theme } = useTheme();
   const { data: session, status: sessionStatus } = useSession();
   const authUser = useAuthStore((s) => s.user);
+  const vendorLocationId = useAuthStore((s) => s.vendor_location_id);
   const { website_role: domainWebsiteRole } = useDomainContext();
   const createTicket = useCreateCustomerSupportTicket();
 
@@ -288,6 +341,76 @@ export function ChatBot() {
     session?.user?.name,
   ]);
   const isVendorStorefront = websiteRole === "vendor";
+  const isLoggedInVendor =
+    sessionStatus === "authenticated" && accountType === "vendor";
+
+  const todayYmd = useMemo(() => format(new Date(), "yyyy-MM-dd"), []);
+  const chatDashboardRange = useMemo(
+    () => ({ from_date: todayYmd, to_date: todayYmd }),
+    [todayYmd],
+  );
+
+  const { data: vendorDashboardResponse } = useVendorDashboardBookings(
+    chatDashboardRange,
+    { enabled: isLoggedInVendor },
+  );
+
+  const { data: vendorBookingsSummaryResponse } = useQuery({
+    queryKey: ["vendor", "bookings", "chat-summary", "per_page_1000"],
+    queryFn: () =>
+      vendorBookingsService.getBookings({
+        page: 1,
+        // Backend `summary` is derived from returned rows — per_page=1 yields wrong totals
+        per_page: 1000,
+      }),
+    enabled: isLoggedInVendor,
+    staleTime: 2 * 60 * 1000,
+    gcTime: 10 * 60 * 1000,
+  });
+
+  const vendorLiveStats = useMemo((): VendorChatLiveStats | null => {
+    if (!isLoggedInVendor) return null;
+
+    const raw = vendorDashboardResponse?.data;
+    const bookingSummary = vendorBookingsSummaryResponse?.summary;
+    const metaTotal = vendorBookingsSummaryResponse?.meta?.total;
+
+    if (!raw && !bookingSummary && metaTotal == null) return null;
+
+    const dashboard: VendorChatDashboardSnapshot | null = raw
+      ? {
+          current_location_id: raw.current_location_id,
+          booking_period: raw.booking_period ?? raw.period ?? null,
+          booking_period_start:
+            raw.booking_period_start ?? raw.period_start ?? null,
+          booking_period_end: raw.booking_period_end ?? raw.period_end ?? null,
+          summary: raw.summary ?? null,
+          bookings_stats: raw.bookings_stats ?? null,
+          commissions_stats: raw.commissions_stats ?? null,
+          recent_bookings: (raw.recent_bookings ?? []).slice(0, 5),
+        }
+      : null;
+
+    return {
+      fetchedAt: new Date().toISOString(),
+      dashboard,
+      bookingSummary: {
+        booking_count: metaTotal ?? 0,
+        total_amount: bookingSummary?.total_amount ?? "0.00",
+        deposit_amount: bookingSummary?.deposit_amount ?? "0.00",
+        pending_amount: bookingSummary?.pending_amount ?? "0.00",
+        refunded_amount: bookingSummary?.refunded_amount ?? "0.00",
+        total_platform_fee: bookingSummary?.total_platform_fee ?? "0.00",
+        platform_fee_settled: bookingSummary?.platform_fee_settled ?? "0.00",
+        platform_fee_due: bookingSummary?.platform_fee_due ?? "0.00",
+      },
+    };
+  }, [
+    isLoggedInVendor,
+    vendorDashboardResponse?.data,
+    vendorBookingsSummaryResponse?.summary,
+    vendorBookingsSummaryResponse?.meta?.total,
+  ]);
 
   const contactPhone =
     theme?.contactDetails?.phone?.trim() ||
@@ -373,7 +496,7 @@ export function ChatBot() {
       {
         role: "assistant",
         content:
-          "I can raise a support enquiry for you. Please choose a category:",
+          "I can raise a support enquiry for you. Please choose a category (or No thanks to cancel):",
         quickActions: CATEGORY_ACTIONS,
       },
     ]);
@@ -580,8 +703,7 @@ export function ChatBot() {
   }
 
   async function handleGuidedFlowText(userText: string) {
-    const lower = userText.toLowerCase();
-    if (lower === "cancel" || lower === "stop") {
+    if (isDeclineIntent(userText) || userText.toLowerCase() === "cancel") {
       cancelGuidedSupport();
       return;
     }
@@ -601,7 +723,8 @@ export function ChatBot() {
         ...clearQuickActions(prev),
         {
           role: "assistant",
-          content: "Please choose a category using one of the buttons below:",
+          content:
+            "Please choose a category using one of the buttons below — or tap No thanks to cancel:",
           quickActions: CATEGORY_ACTIONS,
         },
       ]);
@@ -615,7 +738,8 @@ export function ChatBot() {
           {
             role: "assistant",
             content:
-              "Please enter a valid UK telephone number (at least 7 digits) so our team can contact you.",
+              "Please enter a valid UK telephone number (at least 7 digits) so our team can contact you. Or type cancel to stop.",
+            quickActions: [{ id: "cancel_flow", label: "Cancel" }],
           },
         ]);
         return;
@@ -631,7 +755,8 @@ export function ChatBot() {
           {
             role: "assistant",
             content:
-              "Could you add a little more detail so we can help you properly?",
+              "Could you add a little more detail so we can help you properly? Or type cancel to stop.",
+            quickActions: [{ id: "cancel_flow", label: "Cancel" }],
           },
         ]);
         return;
@@ -641,12 +766,8 @@ export function ChatBot() {
     }
 
     if (supportFlow.step === "confirm") {
-      if (/\b(yes|submit|confirm|ok|okay|sure)\b/i.test(userText)) {
+      if (/\b(yes|submit|confirm|ok|okay|sure|send)\b/i.test(userText)) {
         await submitGuidedSupport(supportFlow);
-        return;
-      }
-      if (/\b(no|cancel|stop)\b/i.test(userText)) {
-        cancelGuidedSupport();
         return;
       }
       setMessages((prev) => [
@@ -668,14 +789,18 @@ export function ChatBot() {
 
     const userText = input.trim();
     const userMessage: Message = { role: "user", content: userText };
-    setMessages((prev) => [...clearQuickActions(prev), userMessage]);
     setInput("");
 
     // Active guided support flow — handle without calling the AI
     if (supportFlow.step !== "idle" && supportFlow.step !== "submitting") {
+      // Single update: keep user bubble + response together so category
+      // buttons are never cleared without being re-attached.
+      setMessages((prev) => [...clearQuickActions(prev), userMessage]);
       await handleGuidedFlowText(userText);
       return;
     }
+
+    setMessages((prev) => [...clearQuickActions(prev), userMessage]);
 
     // Logged-in customer on vendor site: start professional enquiry wizard
     if (
@@ -725,13 +850,111 @@ Is there anything else I can help you with?`,
     // Guests (or non-support): AI chat + navigation / contact CTAs
     setIsLoading(true);
     const wantsSupport = isSupportIntent(userText);
-    const navLink = resolveChatNavLink(userText, {
-      accountType,
-      isAuthenticated,
-      isVendorStorefront,
-    });
 
-    // Prefer specific nav CTA; fall back to Contact for guest support on storefront
+    // Follow-ups like “not this month / overall” keep the prior stats question
+    // (e.g. refunds) so we still fetch the right metric all-time.
+    let statsQueryText = userText;
+    const isPeriodFollowUp =
+      /^(not\s+this\s+month|overall|all\s*-?\s*time|altogether|in\s+total)\b/i.test(
+        userText.trim(),
+      ) ||
+      (/\b(overall|all\s*-?\s*time|not\s+this\s+month)\b/i.test(userText) &&
+        !isVendorStatsIntent(userText));
+    if (isPeriodFollowUp) {
+      const priorUser = [...messages]
+        .reverse()
+        .find((m) => m.role === "user" && m.content.trim() !== userText.trim());
+      if (priorUser && isVendorStatsIntent(priorUser.content)) {
+        statsQueryText = `${priorUser.content} ${userText}`;
+      }
+    }
+
+    const asksEventOverview =
+      isLoggedInVendor && isVendorEventOverviewIntent(statsQueryText);
+    const asksBookingList =
+      isLoggedInVendor &&
+      !asksEventOverview &&
+      isVendorBookingListIntent(userText);
+    const asksVendorStats =
+      isLoggedInVendor &&
+      !asksEventOverview &&
+      !asksBookingList &&
+      isVendorStatsIntent(statsQueryText);
+
+    // List pending bookings + customer phone/email (direct API — no LLM)
+    if (asksBookingList) {
+      try {
+        const priorUserTexts = messages
+          .filter((m) => m.role === "user")
+          .map((m) => m.content)
+          .slice(-4);
+        const result = await fetchVendorBookingListChatReply({
+          userText,
+          userName,
+          priorUserTexts,
+        });
+        if (result?.reply) {
+          setMessages((prev) => [
+            ...prev,
+            {
+              role: "assistant",
+              content: result.reply,
+              supportCta: result.bookingsHref
+                ? {
+                    href: result.bookingsHref,
+                    label: "Open Bookings",
+                  }
+                : undefined,
+            },
+          ]);
+          setIsLoading(false);
+          return;
+        }
+      } catch (error) {
+        console.error("Chat booking list reply failed:", error);
+      }
+    }
+
+    // Named event (e.g. Christmas) → overview API, not today's dashboard totals
+    if (asksEventOverview) {
+      try {
+        const result = await fetchVendorEventOverviewChatReply({
+          userText: statsQueryText,
+          userName,
+          vendorLocationId:
+            vendorLocationId ?? session?.user?.vendor_location_id ?? null,
+        });
+        if (result?.reply) {
+          setMessages((prev) => [
+            ...prev,
+            {
+              role: "assistant",
+              content: result.reply,
+              supportCta: result.overviewHref
+                ? {
+                    href: result.overviewHref,
+                    label: "Open Event overview",
+                  }
+                : undefined,
+            },
+          ]);
+          setIsLoading(false);
+          return;
+        }
+      } catch (error) {
+        console.error("Chat event overview reply failed:", error);
+      }
+    }
+
+    // Never push Dashboard/Transactions CTAs for stats questions — answer with numbers.
+    const navLink = asksVendorStats
+      ? undefined
+      : resolveChatNavLink(userText, {
+          accountType,
+          isAuthenticated,
+          isVendorStorefront,
+        });
+
     const supportCta =
       navLink ??
       (isVendorStorefront && wantsSupport && !isLoggedInCustomer
@@ -741,15 +964,178 @@ Is there anything else I can help you with?`,
           }
         : undefined);
 
+    // Fetch the period they asked about (last month / all time / etc.)
+    let statsForChat = vendorLiveStats;
+    if (asksVendorStats) {
+      try {
+        const range = resolveChatDateRange(statsQueryText);
+        const bookingDateParams = range.allTime
+          ? {}
+          : {
+              from_date: range.from_date ?? undefined,
+              to_date: range.to_date ?? undefined,
+            };
+
+        // Dashboard API requires dates — use a wide range for all-time
+        const dashFrom = range.allTime
+          ? "2000-01-01"
+          : (range.from_date as string);
+        const dashTo = range.allTime
+          ? format(new Date(), "yyyy-MM-dd")
+          : (range.to_date as string);
+
+        const [bookingsResult, commissionsResult, listResult] =
+          await Promise.allSettled([
+            vendorDashboardService.getBookingsStatistics({
+              dateRange: {
+                from_date: dashFrom,
+                to_date: dashTo,
+              },
+            }),
+            isVendorEarningsIntent(statsQueryText) ||
+              isVendorCommissionIntent(statsQueryText)
+              ? vendorDashboardService.getCommissionsStatistics({
+                  from_date: dashFrom,
+                  to_date: dashTo,
+                })
+              : Promise.resolve(null),
+            vendorBookingsService.getBookings({
+              page: 1,
+              // Must load enough rows — API summary matches the returned page set
+              per_page: 1000,
+              ...bookingDateParams,
+            }),
+          ]);
+
+        const bookingsDash =
+          bookingsResult.status === "fulfilled" ? bookingsResult.value : null;
+        const commissionsDash =
+          commissionsResult.status === "fulfilled"
+            ? commissionsResult.value
+            : null;
+        const bookingsList =
+          listResult.status === "fulfilled" ? listResult.value : null;
+
+        if (bookingsResult.status === "rejected") {
+          console.error(
+            "Chat bookings stats failed:",
+            bookingsResult.reason,
+          );
+        }
+        if (commissionsResult.status === "rejected") {
+          console.error(
+            "Chat commissions stats failed:",
+            commissionsResult.reason,
+          );
+        }
+        if (listResult.status === "rejected") {
+          console.error("Chat bookings list failed:", listResult.reason);
+        }
+
+        const raw = bookingsDash?.data;
+        const commissionStats =
+          commissionsDash?.data?.commissions_stats ?? raw?.commissions_stats;
+        const bookingSummary = bookingsList?.summary;
+        const metaTotal = bookingsList?.meta?.total;
+
+        if (raw || bookingSummary || metaTotal != null) {
+          const dashboard: VendorChatDashboardSnapshot | null = raw
+            ? {
+                current_location_id: raw.current_location_id,
+                booking_period: range.label,
+                booking_period_start: range.allTime
+                  ? null
+                  : range.from_date,
+                booking_period_end: range.allTime ? null : range.to_date,
+                summary: raw.summary ?? null,
+                bookings_stats: raw.bookings_stats ?? null,
+                commissions_stats: commissionStats ?? null,
+                recent_bookings: (raw.recent_bookings ?? []).slice(0, 5),
+              }
+            : null;
+
+          statsForChat = {
+            fetchedAt: new Date().toISOString(),
+            periodLabel: range.label,
+            dashboard,
+            bookingSummary: {
+              booking_count: metaTotal ?? 0,
+              total_amount: bookingSummary?.total_amount ?? "0.00",
+              deposit_amount: bookingSummary?.deposit_amount ?? "0.00",
+              pending_amount: bookingSummary?.pending_amount ?? "0.00",
+              refunded_amount: bookingSummary?.refunded_amount ?? "0.00",
+              total_platform_fee:
+                bookingSummary?.total_platform_fee ?? "0.00",
+              platform_fee_settled:
+                bookingSummary?.platform_fee_settled ?? "0.00",
+              platform_fee_due: bookingSummary?.platform_fee_due ?? "0.00",
+            },
+          };
+        }
+      } catch (error) {
+        console.error("Failed to load period vendor stats for chat:", error);
+      }
+    }
+
+    // Answer stats/earnings from API numbers directly — do not rely on the LLM
+    // to invent “visit Dashboard / change date filter” redirects.
+    // Only when we successfully loaded the requested period (periodLabel set).
+    if (asksVendorStats && statsForChat?.periodLabel) {
+      const direct = buildVendorStatsDirectReply({
+        userText: statsQueryText,
+        stats: statsForChat,
+        userName,
+      });
+      if (direct) {
+        setMessages((prev) => [
+          ...prev,
+          { role: "assistant", content: direct },
+        ]);
+        setIsLoading(false);
+        return;
+      }
+    }
+
     try {
+      // Keep AI payload small (413 if we send huge booking dumps / long history)
+      const slimStats: VendorChatLiveStats | null = statsForChat
+        ? {
+            fetchedAt: statsForChat.fetchedAt,
+            periodLabel: statsForChat.periodLabel,
+            bookingSummary: statsForChat.bookingSummary ?? null,
+            dashboard: statsForChat.dashboard
+              ? {
+                  current_location_id:
+                    statsForChat.dashboard.current_location_id,
+                  booking_period: statsForChat.dashboard.booking_period,
+                  booking_period_start:
+                    statsForChat.dashboard.booking_period_start,
+                  booking_period_end: statsForChat.dashboard.booking_period_end,
+                  summary: statsForChat.dashboard.summary ?? null,
+                  bookings_stats: statsForChat.dashboard.bookings_stats ?? null,
+                  commissions_stats:
+                    statsForChat.dashboard.commissions_stats ?? null,
+                  recent_bookings: (
+                    statsForChat.dashboard.recent_bookings ?? []
+                  ).slice(0, 3),
+                }
+              : null,
+          }
+        : null;
+
       const response = await fetch("/api/ai/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          messages: [...messages, userMessage].map(({ role, content }) => ({
-            role,
-            content,
-          })),
+          messages: [...messages, userMessage]
+            .slice(-8)
+            .map(({ role, content }) => ({
+              role,
+              content:
+                typeof content === "string" && content.length > 4000
+                  ? `${content.slice(0, 4000)}…`
+                  : content,
+            })),
           context: {
             websiteRole,
             siteName,
@@ -761,6 +1147,7 @@ Is there anything else I can help you with?`,
             contactPhone,
             contactEmail,
             contactAddress,
+            vendorLiveStats: isLoggedInVendor ? slimStats : null,
           },
         }),
       });
@@ -1055,50 +1442,29 @@ Is there anything else I can help you with?`,
                                         onClick={() =>
                                           void handleQuickAction(action)
                                         }
-                                        initial={
-                                          motionSafe
-                                            ? { opacity: 0, y: 8, scale: 0.96 }
-                                            : false
-                                        }
-                                        animate={
-                                          motionSafe
-                                            ? {
-                                                opacity: 1,
-                                                y: 0,
-                                                scale: [1, 1.03, 1],
-                                              }
-                                            : { opacity: 1 }
-                                        }
+                                        initial={false}
+                                        animate={{ opacity: 1, y: 0 }}
                                         transition={{
-                                          opacity: {
-                                            delay: 0.12 + actionIndex * 0.08,
-                                          },
-                                          y: {
-                                            delay: 0.12 + actionIndex * 0.08,
-                                          },
-                                          scale: {
-                                            delay: 0.45 + actionIndex * 0.12,
-                                            duration: 1.6,
-                                            repeat: 2,
-                                            ease: "easeInOut",
-                                          },
+                                          delay: motionSafe
+                                            ? 0.05 + actionIndex * 0.04
+                                            : 0,
                                         }}
                                         whileHover={
                                           motionSafe
-                                            ? { scale: 1.04 }
+                                            ? { scale: 1.02 }
                                             : undefined
                                         }
                                         whileTap={
                                           motionSafe
-                                            ? { scale: 0.97 }
+                                            ? { scale: 0.98 }
                                             : undefined
                                         }
                                         className={cn(
                                           "w-fit max-w-full rounded-full border px-3 py-1.5 text-left text-xs font-semibold transition-colors",
-                                          "border-[var(--color-primary)]/25 bg-white text-[var(--color-primary)]",
-                                          "hover:bg-[var(--color-primary)] hover:text-white",
+                                          action.id === "cancel_flow"
+                                            ? "border-slate-300 bg-white text-slate-700 hover:bg-slate-100"
+                                            : "border-[var(--color-primary)]/40 bg-white text-[var(--color-primary)] hover:bg-[var(--color-primary)] hover:text-white",
                                           "disabled:pointer-events-none disabled:opacity-50",
-                                          "shadow-[0_0_0_0_rgba(0,0,0,0)]",
                                         )}
                                       >
                                         {action.label}
@@ -1157,8 +1523,8 @@ Is there anything else I can help you with?`,
                   </div>
                 </ScrollArea>
 
-                <div className="shrink-0 border-t border-black/6 bg-white p-3 text-slate-900">
-                  <div className="flex items-center gap-2">
+                <div className="shrink-0 border-t border-black/6 bg-white text-slate-900">
+                  <div className="flex items-center gap-2 p-3">
                     <Input
                       value={input}
                       onChange={(e) => setInput(e.target.value)}

@@ -7,8 +7,9 @@ import CharacterCount from "@tiptap/extension-character-count";
 import TextAlign from "@tiptap/extension-text-align";
 import Underline from "@tiptap/extension-underline";
 import Link from "@tiptap/extension-link";
+import Image from "@tiptap/extension-image";
 import { cn } from "@/lib/utils";
-import React, { useState } from "react";
+import React, { useRef, useState } from "react";
 import {
   Bold,
   Italic,
@@ -23,6 +24,7 @@ import {
   Heading3,
   List,
   ListOrdered,
+  ImageIcon,
 } from "lucide-react";
 import { Button } from "./button";
 import { Toggle } from "./toggle";
@@ -72,6 +74,8 @@ interface TiptapEditorProps {
    * toolbar buttons. Off by default so short-form editors stay simple.
    */
   enableRichBlocks?: boolean;
+  /** Allows inserting images into the body (file picker → inline image). */
+  enableImages?: boolean;
 }
 
 export function TiptapEditor({
@@ -86,10 +90,12 @@ export function TiptapEditor({
   wrapText = false,
   readOnly = false,
   enableRichBlocks = false,
+  enableImages = false,
 }: TiptapEditorProps) {
   const [isLinkDialogOpen, setIsLinkDialogOpen] = useState(false);
   const [linkUrl, setLinkUrl] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
+  const imageInputRef = useRef<HTMLInputElement>(null);
 
   const editor = useEditor({
     extensions: [
@@ -121,6 +127,17 @@ export function TiptapEditor({
         },
         validate: (href) => /^https?:\/\//.test(href),
       }),
+      ...(enableImages
+        ? [
+            Image.configure({
+              inline: false,
+              allowBase64: true,
+              HTMLAttributes: {
+                class: "my-4 h-auto max-w-full rounded-sm",
+              },
+            }),
+          ]
+        : []),
     ],
     content: value,
     onUpdate: ({ editor }) => {
@@ -160,6 +177,31 @@ export function TiptapEditor({
     editor?.chain().focus().setLink({ href: url }).run();
     setLinkUrl("");
     setIsLinkDialogOpen(false);
+  };
+
+  const handleInsertImage = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file || !editor) return;
+
+    if (!file.type.startsWith("image/")) {
+      toast.error("Please choose an image file");
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error("Image must be 5MB or smaller");
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      const src = typeof reader.result === "string" ? reader.result : "";
+      if (!src) return;
+      editor.chain().focus().setImage({ src, alt: file.name }).run();
+    };
+    reader.onerror = () => toast.error("Could not read that image");
+    reader.readAsDataURL(file);
   };
 
   const handleAIGenerate = async () => {
@@ -363,6 +405,30 @@ export function TiptapEditor({
             </Toggle>
           )}
 
+          {enableImages && (
+            <>
+              <div className="w-px h-full bg-border mx-1" />
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                className="h-8 px-2"
+                onClick={() => imageInputRef.current?.click()}
+                aria-label="Insert image"
+                title="Insert image"
+              >
+                <ImageIcon className="h-4 w-4" />
+              </Button>
+              <input
+                ref={imageInputRef}
+                type="file"
+                accept="image/png,image/jpeg,image/webp,image/gif"
+                className="hidden"
+                onChange={handleInsertImage}
+              />
+            </>
+          )}
+
           <div className="w-px h-full bg-border mx-1" />
           {showAIButton && (
             <Button
@@ -385,6 +451,7 @@ export function TiptapEditor({
             "px-3 py-2 overflow-x-hidden max-w-full",
             enableRichBlocks &&
               "[&_h2]:mb-2 [&_h2]:mt-4 [&_h2]:text-lg [&_h2]:font-bold [&_h3]:mb-2 [&_h3]:mt-3 [&_h3]:text-base [&_h3]:font-semibold [&_ul]:my-2 [&_ul]:list-disc [&_ul]:pl-6 [&_ol]:my-2 [&_ol]:list-decimal [&_ol]:pl-6 [&_li]:mb-1",
+            enableImages && "[&_img]:my-4 [&_img]:h-auto [&_img]:max-w-full [&_img]:rounded-sm",
           )}
         />
       </div>

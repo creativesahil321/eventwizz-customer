@@ -1,9 +1,7 @@
 "use client";
 
 import { memo, useMemo } from "react";
-import { useDomainStore } from "@/store/domain.store";
 import LayoutToggle from "./_components/layout-toggle";
-import { cn } from "@/lib/utils";
 import UserDropdown from "./_components/user-dropdown";
 import MobileSidebar from "./_components/mobile-sidebar";
 import { MenuItemProps } from "@/config/menus/types";
@@ -35,9 +33,9 @@ interface HeaderProps {
 }
 
 const Header: React.FC<HeaderProps> = memo(({ menus }) => {
-  const { sidebarCollapsed: collapsed } = useDomainStore();
   const { data: session } = useSession();
   const isVendor = session?.user?.account_type === "vendor";
+  const accountType = session?.user?.account_type ?? "vendor";
 
   // Fetch locations to check count (only for vendors)
   // IMPORTANT: Only fetch if user is vendor to avoid 403 errors on customer pages
@@ -48,7 +46,7 @@ const Header: React.FC<HeaderProps> = memo(({ menus }) => {
     return locationsData.data || [];
   }, [locationsData]);
   const hasMultipleLocations = locationsList.length > 1;
-  const { data: profileData } = useProfileData({}, "vendor");
+  const { data: profileData } = useProfileData({}, accountType);
   const venueName = useMemo(() => {
     if (!isVendor) return "";
     return (
@@ -56,14 +54,8 @@ const Header: React.FC<HeaderProps> = memo(({ menus }) => {
     );
   }, [isVendor, profileData?.data?.venue_name, session?.user?.name]);
 
-  const headerClass = useMemo(
-    () =>
-      cn(
-        "flex-none min-w-0 border-b border-slate-200 bg-[var(--color-header)] text-[var(--color-on-header)] px-4 py-3 md:px-6 md:py-4 flex items-center justify-between sticky top-0 z-50 shadow-[0_1px_2px_0_rgba(0,0,0,0.05)] transition-all duration-300 overflow-hidden",
-        collapsed ? "xl:ml-[60px]" : "xl:ml-[264px]",
-      ),
-    [collapsed],
-  );
+  const headerClass =
+    "flex-none min-w-0 w-full border-b border-slate-200 bg-[var(--color-header)] text-[var(--color-on-header)] px-4 py-3 md:px-6 md:py-4 flex items-center justify-between shadow-[0_1px_2px_0_rgba(0,0,0,0.05)] overflow-hidden";
 
   return (
     <header className={headerClass}>

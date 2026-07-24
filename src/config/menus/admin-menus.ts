@@ -96,6 +96,15 @@ export const adminMenus: MenuItemProps[] = [
     menu: [],
   },
   {
+    id: 21,
+    title: "Blog Management",
+    icon: "newspaper",
+    href: createAdminUrl("/admin/blog-management"),
+    url: createAdminUrl("/admin/blog-management"),
+    type: "item",
+    menu: [],
+  },
+  {
     id: 14,
     title: "Marketing Analytics",
     icon: "trendingUp", // <TrendingUp />

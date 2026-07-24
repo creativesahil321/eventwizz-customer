@@ -8,6 +8,10 @@ import {
 } from "@/services/common/ai/knowledge-base";
 import { buildCurrentPagePromptBlock } from "@/lib/chat-page-context";
 import { getAllowedNavLinksForPrompt } from "@/lib/chat-nav-links";
+import {
+  buildVendorLiveStatsPromptBlock,
+  type VendorChatLiveStats,
+} from "@/lib/chat-vendor-live-stats";
 import { tryModelsWithFallback, type FallbackResult } from "../lib/utils";
 import { env } from "@/env";
 
@@ -59,6 +63,7 @@ ${PLATFORM_VENDOR_CUSTOMER_TRAINING}
 - Rooms: optional Multiple event spaces (up to 3) — packages/dates/menus per room. Public: Choose Your Room.
 - Vendor after login: Welcome — Select Location only when on that page; then Dashboard. Sidebar includes Table Assignment, Sites Essentials, Payment Settings, Support. Create Event = header. Domain Settings = profile → Settings → Domain Settings.
 - Sites Essentials: Presets, Branding (Site identity, Main home page if multi-location, Location/Home page, Info pages), Colors, Typography, Social, SEO. Preview before Save. Not for tickets/domain.
+- Logged-in vendors may receive LIVE VENDOR STATS for the period they asked about (today, last month, this week, etc.). Always answer with those figures first. Optional Dashboard/Bookings links only after the number — never instead of it.
 - Customer book: location → event → optional room → Select a Date → Checkout (tickets/tables/drinks + guest allocation) → Pay in Full or Table deposit. Login at checkout. **Add room** only on Checkout before payment.
 - Customer after login: Dashboard, Profile, Bookings, Support, Notifications, Transactions. Booking detail: Pay Now, Reschedule, **Add extras for this date** (tickets/tables/drinks), menu choices on booking page.
 - **CRITICAL**: After booking, customers **cannot** add or change rooms. Never invent “Additional Rooms” / “Add room” on the booking page. Different room = new booking on the venue site.
@@ -88,6 +93,8 @@ type ChatContext = {
   contactPhone?: string | null;
   contactEmail?: string | null;
   contactAddress?: string | null;
+  /** Live dashboard + booking summary for logged-in vendors */
+  vendorLiveStats?: VendorChatLiveStats | null;
 };
 
 function buildLoggedInUserContextBlock(context: ChatContext): string {
@@ -117,6 +124,9 @@ CURRENT VISITOR (MUST FOLLOW):
     context.accountType === "vendor"
       ? `
 - Help them with the vendor experience using the **CURRENT PAGE** below. Do not invent which screen they are on.
+- If LIVE VENDOR STATS are present, answer booking/payment/event count questions from those figures.
+- Keep stats answers short and bold every number with markdown (**16**). Only include metrics they asked for.
+- Never tell them to open Dashboard and change the date filter when LIVE VENDOR STATS already cover the period they asked about — give the number first.
 `
       : context.accountType === "admin"
         ? `
@@ -157,6 +167,10 @@ function buildSystemPrompt(context: ChatContext): string {
     isAuthenticated: Boolean(context.isAuthenticated),
     isVendorStorefront,
   });
+  const liveStatsBlock =
+    context.accountType === "vendor"
+      ? buildVendorLiveStatsPromptBlock(context.vendorLiveStats)
+      : "";
 
   if (isVendorStorefront) {
     return `${getVendorStorefrontChatInstructions({
@@ -172,6 +186,8 @@ function buildSystemPrompt(context: ChatContext): string {
       ${pageBlock}
 
       ${navBlock}
+
+      ${liveStatsBlock}
       
       Use this knowledge to answer questions about the venue site:
       ${VENDOR_STOREFRONT_KNOWLEDGE}
@@ -191,6 +207,8 @@ function buildSystemPrompt(context: ChatContext): string {
       ${pageBlock}
 
       ${navBlock}
+
+      ${liveStatsBlock}
       
       Use this knowledge base to answer questions:
       ${getCondensedKnowledgeBase()}

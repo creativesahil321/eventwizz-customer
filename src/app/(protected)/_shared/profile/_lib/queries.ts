@@ -8,6 +8,8 @@ import {
 import { api, ApiResponse } from "@/services/core/api-client";
 import { API_ENDPOINTS } from "@/services/core/endpoints";
 import { env } from "@/env";
+import { useAuthStore } from "@/store/auth.store";
+import { useSession } from "next-auth/react";
 
 /**
  * Helper function to check if application is in development mode
@@ -23,8 +25,10 @@ const isDevMode = (): boolean => {
  */
 export const profileKeys = {
   all: ["profile"] as const,
-  details: (domain: string = "default") =>
-    [...profileKeys.all, domain] as const,
+  details: (domain: string = "default", locationId?: string | number | null) =>
+    locationId != null && locationId !== ""
+      ? ([...profileKeys.all, domain, String(locationId)] as const)
+      : ([...profileKeys.all, domain] as const),
   account: (domain: string = "default") =>
     [...profileKeys.all, "account", domain] as const,
   password: (domain: string = "default") =>
@@ -189,37 +193,45 @@ export const updatePassword = async (
 
 /**
  * Hook for fetching profile data
- * Uses TanStack Query for data fetching with caching
- * @param options Optional configuration including callbacks
- * @param userType The type of user (admin, vendor, partner, customer) for query key domain
- * @returns Typed query result with profile data
+ * Uses TanStack Query for data fetching with caching.
+ * Vendor profile is keyed by active location so switching venue always hits /profile.
  */
 export const useProfileData = (
   options?: {
     onSuccess?: (data: ApiResponse<ProfileResponse["data"]>) => void;
     onError?: (error: Error) => void;
+    enabled?: boolean;
   },
   userType?: string
 ) => {
-  // Get current domain for query key
-  // If userType is provided, use it as the domain
-  // Otherwise use the hostname or default
+  const { data: session } = useSession();
+  const storeLocationId = useAuthStore((s) => s.vendor_location_id);
+  const sessionLocationId = session?.user?.vendor_location_id ?? null;
+
   const domain = userType
     ? userType
     : typeof window !== "undefined"
-    ? window.location.hostname
-    : "default";
+      ? window.location.hostname
+      : "default";
+
+  const locationId =
+    storeLocationId ??
+    (sessionLocationId != null && sessionLocationId !== ""
+      ? Number(sessionLocationId)
+      : null);
 
   return useQuery<
     ApiResponse<ProfileResponse["data"]>,
     Error,
     ApiResponse<ProfileResponse["data"]>
   >({
-    queryKey: profileKeys.details(domain),
+    queryKey: profileKeys.details(domain, locationId),
     queryFn: fetchProfileData,
-    staleTime: 5 * 60 * 1000, // 5 minutes
-    gcTime: 10 * 60 * 1000, // 10 minutes
-    refetchOnWindowFocus: false,
+    // Location-scoped; invalidate on switch also forces refetch
+    staleTime: 60 * 1000,
+    gcTime: 10 * 60 * 1000,
+    refetchOnWindowFocus: true,
+    refetchOnMount: true,
     ...options,
   });
 };

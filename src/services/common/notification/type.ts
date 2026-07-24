@@ -30,9 +30,7 @@ export interface NotificationFilters {
 export interface NotificationStats {
   total: number;
   unread: number;
-  categories: {
-    [key: string]: number;
-  };
+  read: number;
 }
 
 export interface NotificationResponse {

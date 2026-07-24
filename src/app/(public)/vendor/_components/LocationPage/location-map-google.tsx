@@ -648,26 +648,19 @@ export default function GoogleLocationMap({
             }}
           >
             <div
-              className="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-8 text-sm"
+              className="flex items-center justify-center gap-2 text-sm"
               style={{ color: "var(--color-text-dimmed, #64748b)" }}
             >
-              <div className="flex items-center gap-2">
-                <span
-                  className="inline-flex h-2.5 w-2.5 rounded-full animate-pulse"
-                  style={{ backgroundColor: mapVisualTokens.primary }}
-                />
-                <span
-                  className="font-semibold"
-                  style={{ color: "var(--color-text, #0f172a)" }}
-                >
-                  {locationMarkers.length} location
-                  {locationMarkers.length !== 1 ? "s" : ""} on the map
-                </span>
-              </div>
-              <span className="hidden sm:inline opacity-40">|</span>
-              <span className="text-center sm:text-left">
-                Pins use your site colors; map mode follows your background
-                brightness.
+              <span
+                className="inline-flex h-2.5 w-2.5 rounded-full animate-pulse"
+                style={{ backgroundColor: mapVisualTokens.primary }}
+              />
+              <span
+                className="font-semibold"
+                style={{ color: "var(--color-text, #0f172a)" }}
+              >
+                {locationMarkers.length} location
+                {locationMarkers.length !== 1 ? "s" : ""} on the map
               </span>
             </div>
           </div>

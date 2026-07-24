@@ -29,6 +29,8 @@ export const LOCATION_DEPENDENT_QUERY_KEYS = [
   ["vendor", "email-logs"],
   ["site-essentials"],
   ["events"],
+  // Profile carries site_url, has_payment_provider, notification_stats per location
+  ["profile"],
 ] as const;
 
 // Helper: Get current location ID from session (no localStorage)

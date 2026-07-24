@@ -64,7 +64,9 @@ export default function PageWrapper({
         collapsed ? "lg:ml-[60px]" : "lg:ml-[264px]",
       )}
     >
-      <div className="min-w-0 px-3 pt-4 pb-32 text-black sm:pt-5 md:pb-6">{children}</div>
+      <div className="min-w-0 px-3 pt-4 pb-32 text-black sm:pt-5 md:pb-6">
+        {children}
+      </div>
     </main>
   );
 }
