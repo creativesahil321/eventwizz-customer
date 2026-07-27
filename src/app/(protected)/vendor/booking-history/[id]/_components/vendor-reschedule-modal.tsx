@@ -29,6 +29,7 @@ import type {
   VendorRescheduleBookingPayload,
 } from "@/services/vendor/bookings/type";
 import { useCurrencyFormat } from "@/hooks/use-currency-format";
+import { cn } from "@/lib/utils";
 
 function getTotalMissingTableQuantity(
   missingTables: VendorMissingTableDetail[],
@@ -792,69 +793,59 @@ export function VendorRescheduleDateModal({
                         amount:
                       </p>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        <Button
+                        <button
                           type="button"
-                          variant={
+                          aria-pressed={paymentMethod === "online"}
+                          className={cn(
+                            "h-auto rounded-lg border-2 px-4 py-4 text-left transition-colors",
+                            "flex flex-col items-start gap-2 disabled:pointer-events-none disabled:opacity-50",
                             paymentMethod === "online"
-                              ? "event-primary"
-                              : "event-outline"
-                          }
-                          className={`h-auto py-4 px-4 flex flex-col items-start gap-2 ${
-                            paymentMethod === "online"
-                              ? "bg-[var(--color-primary)] text-white hover:bg-[var(--color-primary-hover)] border-[var(--color-primary)]"
-                              : "border-2 hover:border-blue-300 hover:bg-blue-50"
-                          }`}
+                              ? "border-[var(--color-primary)] bg-[var(--color-primary)]/10 ring-2 ring-[var(--color-primary)]/30"
+                              : "border-slate-200 bg-white hover:border-[var(--color-primary)]/50 hover:bg-slate-50",
+                          )}
                           onClick={() => setPaymentMethod("online")}
                           disabled={isProcessing}
                         >
-                          <div className="flex items-center gap-2 w-full">
-                            <CreditCard className="h-5 w-5" />
-                            <span className="font-semibold">
+                          <div className="flex w-full items-center gap-2 text-slate-900">
+                            <CreditCard
+                              className="h-5 w-5 shrink-0 text-[var(--color-primary)]"
+                              aria-hidden
+                            />
+                            <span className="text-sm font-semibold text-slate-900">
                               Online Payment
                             </span>
                           </div>
-                          <span
-                            className={`text-xs ${
-                              paymentMethod === "online"
-                                ? "text-blue-100"
-                                : "text-gray-600"
-                            }`}
-                          >
+                          <span className="text-xs leading-relaxed text-slate-600 whitespace-normal">
                             Customer will pay online via payment gateway
                           </span>
-                        </Button>
-                        <Button
+                        </button>
+                        <button
                           type="button"
-                          variant={
+                          aria-pressed={paymentMethod === "offline"}
+                          className={cn(
+                            "h-auto rounded-lg border-2 px-4 py-4 text-left transition-colors",
+                            "flex flex-col items-start gap-2 disabled:pointer-events-none disabled:opacity-50",
                             paymentMethod === "offline"
-                              ? "event-primary"
-                              : "event-outline"
-                          }
-                          className={`h-auto py-4 px-4 flex flex-col items-start gap-2 ${
-                            paymentMethod === "offline"
-                              ? "bg-[var(--color-primary)] text-white hover:bg-[var(--color-primary-hover)] border-[var(--color-primary)]"
-                              : "border-2 hover:border-blue-300 hover:bg-blue-50"
-                          }`}
+                              ? "border-[var(--color-primary)] bg-[var(--color-primary)]/10 ring-2 ring-[var(--color-primary)]/30"
+                              : "border-slate-200 bg-white hover:border-[var(--color-primary)]/50 hover:bg-slate-50",
+                          )}
                           onClick={() => setPaymentMethod("offline")}
                           disabled={isProcessing}
                         >
-                          <div className="flex items-center gap-2 w-full">
-                            <Receipt className="h-5 w-5" />
-                            <span className="font-semibold">
+                          <div className="flex w-full items-center gap-2 text-slate-900">
+                            <Receipt
+                              className="h-5 w-5 shrink-0 text-[var(--color-primary)]"
+                              aria-hidden
+                            />
+                            <span className="text-sm font-semibold text-slate-900">
                               Offline Payment
                             </span>
                           </div>
-                          <span
-                            className={`text-xs ${
-                              paymentMethod === "offline"
-                                ? "text-blue-100"
-                                : "text-gray-600"
-                            }`}
-                          >
+                          <span className="text-xs leading-relaxed text-slate-600 whitespace-normal">
                             Customer will pay manually (cash, bank transfer,
                             etc.)
                           </span>
-                        </Button>
+                        </button>
                       </div>
                       {!paymentMethod && (
                         <p className="text-xs text-red-600 mt-2">

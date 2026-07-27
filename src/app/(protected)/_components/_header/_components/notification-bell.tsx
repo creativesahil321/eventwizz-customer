@@ -48,7 +48,7 @@ export function NotificationBell() {
       {unread > 0 && (
         <span
           className={cn(
-            "absolute top-0 right-0 flex h-4 w-4 items-center justify-center rounded-full text-[10px] font-bold",
+            "absolute -top-0.5 -right-0.5 flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[10px] font-bold leading-none",
             "bg-[var(--color-primary)] text-[var(--color-background)]",
           )}
         >

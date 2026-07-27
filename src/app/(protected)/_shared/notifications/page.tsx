@@ -11,9 +11,12 @@ export default function NotificationsPage() {
     filters,
     notifications,
     meta,
+    stats,
     selectedNotification,
     isDetailsOpen,
     isLoading,
+    isMarkingAllAsRead,
+    userRole,
     handleFilterChange,
     handlePageChange,
     handleViewDetails,
@@ -23,7 +26,6 @@ export default function NotificationsPage() {
     handleMarkAllAsRead,
   } = useNotificationSystem();
 
-  // Convert the API meta format to the expected format for the component
   const formattedMeta = meta
     ? {
         total: meta.total,
@@ -40,6 +42,9 @@ export default function NotificationsPage() {
         meta={formattedMeta}
         filters={filters}
         isLoading={isLoading}
+        userRole={userRole}
+        unreadCount={stats?.unread ?? 0}
+        isMarkingAllAsRead={isMarkingAllAsRead}
         onFilterChange={handleFilterChange}
         onPageChange={handlePageChange}
         onViewDetails={handleViewDetails}

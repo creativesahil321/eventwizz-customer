@@ -15,23 +15,23 @@ export default function NewsSection({
   return (
     <section
       id="latest-news"
-      className="bg-[color:var(--color-background)] py-20"
+      className="bg-[color:var(--color-background)] py-12 sm:py-16 md:py-20"
     >
       <div className="container mx-auto px-4">
-        <div className="mb-12 text-center">
+        <div className="mb-8 text-center sm:mb-12">
           <SiteHeading
             level={2}
             title={content.title}
             variant="onSurface"
             align="center"
-            className="mb-3 !text-3xl !font-bold md:!text-4xl"
+            className="mb-3 !text-2xl !font-bold sm:!text-3xl md:!text-4xl"
           />
-          <p className="text-[color:var(--color-text-dimmed)]">
+          <p className="mx-auto max-w-2xl px-1 text-sm text-[color:var(--color-text-dimmed)] sm:text-base">
             {content.subtitle}
           </p>
         </div>
 
-        <div className="grid grid-cols-1 gap-8 md:grid-cols-3">
+        <div className="grid grid-cols-1 gap-5 sm:gap-6 md:grid-cols-2 md:gap-8 lg:grid-cols-3">
           {articles.map((article) => (
             <Link
               key={article.id}
@@ -39,7 +39,7 @@ export default function NewsSection({
               className="group cursor-pointer overflow-hidden rounded-2xl bg-[color:var(--color-surface)] shadow-sm transition-all duration-300 hover:shadow-xl"
             >
               <article>
-                <div className="relative h-52 overflow-hidden">
+                <div className="relative h-44 overflow-hidden sm:h-52">
                   <Image
                     src={article.cover_image}
                     alt={article.title}
@@ -49,7 +49,7 @@ export default function NewsSection({
                   />
                 </div>
 
-                <div className="p-6">
+                <div className="p-5 sm:p-6">
                   <p className="mb-2 text-xs font-medium text-[color:var(--color-text)]">
                     {formatBlogDate(article.published_at)}
                   </p>

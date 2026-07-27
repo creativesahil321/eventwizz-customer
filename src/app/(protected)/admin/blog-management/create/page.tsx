@@ -11,13 +11,13 @@ export default function CreateBlogPage() {
           label="Back to Blog Management"
         />
 
-        <div className="mb-6 rounded-lg border border-[var(--color-border)] bg-white p-6 shadow-md">
-          <h1 className="title-header mb-2 text-2xl font-bold">
+        <div className="mb-4 rounded-lg border border-[var(--color-border)] bg-white p-4 shadow-md sm:mb-6 sm:p-6">
+          <h1 className="title-header mb-2 text-xl font-bold sm:text-2xl">
             Create blog post
           </h1>
-          <p className="text-muted-foreground">
-            Write a new article with a featured image, category, excerpt, and
-            rich body content. Preview the public card before publishing.
+          <p className="text-sm text-muted-foreground sm:text-base">
+            Write a new article with a featured image, excerpt, rich body
+            content, and SEO meta. Preview the public card before publishing.
           </p>
         </div>
 

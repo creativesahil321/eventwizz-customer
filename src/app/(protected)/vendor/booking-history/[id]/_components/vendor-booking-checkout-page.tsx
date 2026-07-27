@@ -119,6 +119,9 @@ function VendorDatePaymentStatusRow({
     dateLabel: string,
   ) => void;
 }) {
+  // Remount Select after each pick so the same option can open the confirm
+  // modal again (Radix skips onValueChange when the value is unchanged).
+  const [selectResetKey, setSelectResetKey] = useState(0);
   const statusChangeOptions = getAllowedStatusOptions(
     date.paymentStatusCode,
     date.vendorStatusOptions,
@@ -140,6 +143,7 @@ function VendorDatePaymentStatusRow({
         <StatusBadge status={date.paymentStatusRaw} />
       </div>
       <Select
+        key={selectResetKey}
         onValueChange={(value) => {
           const newStatusCode = Number.parseInt(value, 10);
           if (Number.isNaN(newStatusCode)) return;
@@ -149,6 +153,7 @@ function VendorDatePaymentStatusRow({
             newStatusCode,
             date.date,
           );
+          setSelectResetKey((key) => key + 1);
         }}
         disabled={isUpdatingThis || statusChangeOptions.length === 0}
       >

@@ -40,13 +40,13 @@ export default function EditBlogPage() {
           label="Back to Blog Management"
         />
 
-        <div className="mb-6 rounded-lg border border-[var(--color-border)] bg-white p-6 shadow-md">
-          <h1 className="title-header mb-2 text-2xl font-bold">
+        <div className="mb-4 rounded-lg border border-[var(--color-border)] bg-white p-4 shadow-md sm:mb-6 sm:p-6">
+          <h1 className="title-header mb-2 text-xl font-bold sm:text-2xl">
             Edit blog post
           </h1>
-          <p className="text-muted-foreground">
-            Update content, imagery, and publish status. Changes are saved in
-            this browser until the API is connected.
+          <p className="text-sm text-muted-foreground sm:text-base">
+            Update content, imagery, SEO meta, and publish status. Changes are
+            saved in this browser until the API is connected.
           </p>
         </div>
 

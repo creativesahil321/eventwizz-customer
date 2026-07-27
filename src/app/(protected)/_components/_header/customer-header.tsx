@@ -295,8 +295,8 @@ function CustomerNotificationBell() {
       {unreadCount > 0 && (
         <span
           className={cn(
-            "absolute -right-0.5 -top-0.5 flex size-4 items-center justify-center rounded-full text-[10px] font-bold",
-            "bg-[var(--color-primary)] text-white",
+            "absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[10px] font-bold leading-none text-white",
+            "bg-[var(--color-primary)]",
           )}
         >
           {unreadCount > 9 ? "9+" : unreadCount}
@@ -316,7 +316,7 @@ export default function CustomerHeader({ menus = [] }: CustomerHeaderProps) {
   return (
     <header
       className={cn(
-        "sticky top-0 z-50 flex-none border-b border-slate-200 bg-white px-2 py-2.5 shadow-sm transition-all duration-300 sm:px-4 md:px-6",
+        "sticky top-0 z-40 flex-none border-b border-slate-200 bg-white px-2 py-2.5 shadow-sm transition-all duration-300 sm:px-4 md:px-6",
         collapsed ? "lg:ml-[60px]" : "lg:ml-[264px]",
       )}
     >

@@ -55,7 +55,7 @@ const Header: React.FC<HeaderProps> = memo(({ menus }) => {
   }, [isVendor, profileData?.data?.venue_name, session?.user?.name]);
 
   const headerClass =
-    "flex-none min-w-0 w-full border-b border-slate-200 bg-[var(--color-header)] text-[var(--color-on-header)] px-4 py-3 md:px-6 md:py-4 flex items-center justify-between shadow-[0_1px_2px_0_rgba(0,0,0,0.05)] overflow-hidden";
+    "flex-none min-w-0 w-full border-b border-slate-200 bg-[var(--color-header)] text-[var(--color-on-header)] px-4 py-3 md:px-6 md:py-4 flex items-center justify-between shadow-[0_1px_2px_0_rgba(0,0,0,0.05)]";
 
   return (
     <header className={headerClass}>

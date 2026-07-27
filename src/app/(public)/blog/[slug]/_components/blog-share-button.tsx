@@ -88,15 +88,16 @@ export function BlogShareButton({
 
   return (
     <div
-      className={cn(
-        "flex",
-        align === "left" && "justify-start",
-        align === "center" && "justify-center",
-        align === "right" && "justify-end",
-        className,
-      )}
-    >
-      <Popover open={open} onOpenChange={setOpen}>
+        className={cn(
+          "flex",
+          align === "left" && "justify-start",
+          align === "center" && "justify-center",
+          align === "right" && "justify-end",
+          // On small screens, center share for easier tapping when right-aligned
+          align === "right" && "max-sm:justify-center",
+          className,
+        )}
+      >      <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger asChild>
           <button
             type="button"

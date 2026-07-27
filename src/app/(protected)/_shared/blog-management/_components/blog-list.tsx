@@ -42,16 +42,35 @@ import { BlogCardPreview } from "./blog-card-preview";
 type ViewMode = "table" | "cards";
 type StatusFilter = "all" | BlogStatus;
 
+function useIsMobile(breakpoint = 768) {
+  const [isMobile, setIsMobile] = React.useState(false);
+
+  React.useEffect(() => {
+    const media = window.matchMedia(`(max-width: ${breakpoint - 1}px)`);
+    const update = () => setIsMobile(media.matches);
+    update();
+    media.addEventListener("change", update);
+    return () => media.removeEventListener("change", update);
+  }, [breakpoint]);
+
+  return isMobile;
+}
+
 export function BlogList() {
   const router = useRouter();
+  const isMobile = useIsMobile();
   const posts = useBlogStore((s) => s.posts);
   const deletePost = useBlogStore((s) => s.deletePost);
   const resetToDummy = useBlogStore((s) => s.resetToDummy);
 
   const [search, setSearch] = React.useState("");
   const [statusFilter, setStatusFilter] = React.useState<StatusFilter>("all");
-  const [viewMode, setViewMode] = React.useState<ViewMode>("table");
+  const [viewMode, setViewMode] = React.useState<ViewMode>("cards");
   const [deleteTarget, setDeleteTarget] = React.useState<BlogPost | null>(null);
+
+  React.useEffect(() => {
+    if (isMobile) setViewMode("cards");
+  }, [isMobile]);
 
   const filtered = React.useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -61,8 +80,7 @@ export function BlogList() {
       return (
         post.title.toLowerCase().includes(q) ||
         post.excerpt.toLowerCase().includes(q) ||
-        post.meta_title.toLowerCase().includes(q) ||
-        post.meta_keywords.toLowerCase().includes(q)
+        post.meta_title.toLowerCase().includes(q)
       );
     });
   }, [posts, search, statusFilter]);
@@ -77,17 +95,19 @@ export function BlogList() {
     setDeleteTarget(null);
   };
 
+  const effectiveView: ViewMode = isMobile ? "cards" : viewMode;
+
   return (
-    <div className="space-y-6">
-      <div className="grid gap-3 sm:grid-cols-3">
-        <StatCard label="Total posts" value={posts.length} />
+    <div className="space-y-4 sm:space-y-6">
+      <div className="grid grid-cols-3 gap-2 sm:gap-3">
+        <StatCard label="Total" value={posts.length} />
         <StatCard label="Published" value={publishedCount} accent="green" />
         <StatCard label="Drafts" value={draftCount} accent="amber" />
       </div>
 
-      <div className="rounded-lg border border-[var(--color-border)] bg-white p-4 shadow-sm">
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-          <div className="relative w-full max-w-md">
+      <div className="rounded-lg border border-[var(--color-border)] bg-white p-3 shadow-sm sm:p-4">
+        <div className="flex flex-col gap-3">
+          <div className="relative w-full">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
               value={search}
@@ -97,12 +117,12 @@ export function BlogList() {
             />
           </div>
 
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
             <Select
               value={statusFilter}
               onValueChange={(v) => setStatusFilter(v as StatusFilter)}
             >
-              <SelectTrigger className="w-[140px]">
+              <SelectTrigger className="w-full sm:w-[150px]">
                 <SelectValue placeholder="Status" />
               </SelectTrigger>
               <SelectContent>
@@ -112,72 +132,79 @@ export function BlogList() {
               </SelectContent>
             </Select>
 
-            <div className="flex rounded-md border border-[var(--color-border)] p-0.5">
+            <div className="flex flex-wrap items-center gap-2">
+              {!isMobile ? (
+                <div className="flex rounded-md border border-[var(--color-border)] p-0.5">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant={viewMode === "table" ? "event-primary" : "ghost"}
+                    className="h-8"
+                    onClick={() => setViewMode("table")}
+                  >
+                    Table
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant={viewMode === "cards" ? "event-primary" : "ghost"}
+                    className="h-8"
+                    onClick={() => setViewMode("cards")}
+                  >
+                    Cards
+                  </Button>
+                </div>
+              ) : null}
+
               <Button
                 type="button"
+                variant="event-outline"
                 size="sm"
-                variant={viewMode === "table" ? "event-primary" : "ghost"}
-                className="h-8"
-                onClick={() => setViewMode("table")}
+                className="h-9 flex-1 gap-1.5 sm:flex-none"
+                onClick={() => {
+                  resetToDummy();
+                  toast.success("Reset to sample blog posts");
+                }}
               >
-                Table
-              </Button>
-              <Button
-                type="button"
-                size="sm"
-                variant={viewMode === "cards" ? "event-primary" : "ghost"}
-                className="h-8"
-                onClick={() => setViewMode("cards")}
-              >
-                Cards
+                <RotateCcw className="h-3.5 w-3.5" />
+                Reset demo
               </Button>
             </div>
-
-            <Button
-              type="button"
-              variant="event-outline"
-              size="sm"
-              className="h-9 gap-1.5"
-              onClick={() => {
-                resetToDummy();
-                toast.success("Reset to sample blog posts");
-              }}
-            >
-              <RotateCcw className="h-3.5 w-3.5" />
-              Reset demo
-            </Button>
           </div>
         </div>
       </div>
 
       {filtered.length === 0 ? (
-        <div className="rounded-lg border border-dashed border-[var(--color-border)] bg-white px-6 py-16 text-center">
+        <div className="rounded-lg border border-dashed border-[var(--color-border)] bg-white px-4 py-12 text-center sm:px-6 sm:py-16">
           <p className="text-lg font-semibold text-foreground">No posts found</p>
           <p className="mt-1 text-sm text-muted-foreground">
             Try a different search, or create your first blog post.
           </p>
-          <Link href="/admin/blog-management/create" className="mt-4 inline-block">
-            <Button variant="event-primary" className="gap-1.5">
+          <Link
+            href="/admin/blog-management/create"
+            className="mt-4 inline-block w-full sm:w-auto"
+          >
+            <Button variant="event-primary" className="w-full gap-1.5 sm:w-auto">
               <PlusCircle className="h-4 w-4" />
               Create blog
             </Button>
           </Link>
         </div>
-      ) : viewMode === "cards" ? (
-        <div className="grid gap-6 sm:grid-cols-2 xl:grid-cols-3">
+      ) : effectiveView === "cards" ? (
+        <div className="grid gap-4 sm:grid-cols-2 sm:gap-6 xl:grid-cols-3">
           {filtered.map((post) => (
-            <div key={post.id} className="group relative">
+            <div key={post.id} className="relative overflow-hidden rounded-2xl">
               <BlogCardPreview
                 title={post.title}
                 excerpt={post.excerpt}
                 publishedAt={post.published_at}
                 coverImage={post.cover_image}
               />
-              <div className="absolute inset-x-3 bottom-3 flex justify-end gap-2">
+              <div className="absolute inset-x-0 bottom-0 flex gap-2 bg-gradient-to-t from-black/55 via-black/25 to-transparent p-3 pt-10">
                 <Button
                   size="sm"
                   variant="event-primary"
-                  className="shadow-md"
+                  className="h-9 flex-1 shadow-md"
                   onClick={() =>
                     router.push(`/admin/blog-management/edit/${post.id}`)
                   }
@@ -188,7 +215,7 @@ export function BlogList() {
                 <Button
                   size="sm"
                   variant="destructive"
-                  className="shadow-md"
+                  className="h-9 shrink-0 shadow-md"
                   onClick={() => setDeleteTarget(post)}
                 >
                   <Trash2 className="h-3.5 w-3.5" />
@@ -200,7 +227,7 @@ export function BlogList() {
       ) : (
         <div className="overflow-hidden rounded-lg border border-[var(--color-border)] bg-white shadow-sm">
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[760px] text-left text-sm">
+            <table className="w-full min-w-[720px] text-left text-sm">
               <thead className="border-b border-[var(--color-border)] bg-slate-50 text-muted-foreground">
                 <tr>
                   <th className="px-4 py-3 font-medium">#</th>
@@ -312,7 +339,7 @@ export function BlogList() {
         open={Boolean(deleteTarget)}
         onOpenChange={(open) => !open && setDeleteTarget(null)}
       >
-        <AlertDialogContent>
+        <AlertDialogContent className="mx-4 max-w-md">
           <AlertDialogHeader>
             <AlertDialogTitle>Delete this blog post?</AlertDialogTitle>
             <AlertDialogDescription>
@@ -320,11 +347,13 @@ export function BlogList() {
               can restore sample posts with Reset demo.
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+          <AlertDialogFooter className="flex-col gap-2 sm:flex-row">
+            <AlertDialogCancel className="m-0 w-full sm:w-auto">
+              Cancel
+            </AlertDialogCancel>
             <AlertDialogAction
               onClick={handleDelete}
-              className="bg-destructive text-white hover:bg-destructive/90"
+              className="m-0 w-full bg-destructive text-white hover:bg-destructive/90 sm:w-auto"
             >
               Delete
             </AlertDialogAction>
@@ -352,11 +381,13 @@ function StatCard({
         : "text-foreground";
 
   return (
-    <div className="rounded-lg border border-[var(--color-border)] bg-white px-4 py-3 shadow-sm">
-      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+    <div className="rounded-lg border border-[var(--color-border)] bg-white px-2.5 py-2.5 shadow-sm sm:px-4 sm:py-3">
+      <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground sm:text-xs">
         {label}
       </p>
-      <p className={`mt-1 text-2xl font-bold ${valueClass}`}>{value}</p>
+      <p className={`mt-0.5 text-xl font-bold sm:mt-1 sm:text-2xl ${valueClass}`}>
+        {value}
+      </p>
     </div>
   );
 }

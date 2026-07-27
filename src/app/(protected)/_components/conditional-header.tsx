@@ -27,7 +27,7 @@ export default function ConditionalHeader({ menus }: ConditionalHeaderProps) {
   return (
     <div
       className={cn(
-        "sticky top-0 z-[60] min-w-0 transition-all duration-300",
+        "sticky top-0 z-40 min-w-0 transition-all duration-300",
         collapsed ? "xl:ml-[60px]" : "xl:ml-[264px]",
       )}
     >

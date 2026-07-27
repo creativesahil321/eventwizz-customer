@@ -80,6 +80,5 @@ export function resolveBlogMeta(post: BlogPost) {
   return {
     title: post.meta_title?.trim() || `${post.title} | EventWizz`,
     description: post.meta_description?.trim() || post.excerpt,
-    keywords: post.meta_keywords?.trim() || undefined,
   };
 }

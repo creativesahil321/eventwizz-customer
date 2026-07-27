@@ -32,8 +32,6 @@ export const DUMMY_BLOG_POSTS: BlogPost[] = [
     meta_title: "Plan a Perfect Corporate Christmas Party | EventWizz",
     meta_description:
       "A practical checklist for corporate Christmas parties — timeline, catering, guest management, and how venues keep the night running smoothly.",
-    meta_keywords:
-      "corporate christmas party, event planning, venue events, christmas party checklist",
     created_at: "2024-11-20T10:00:00.000Z",
     updated_at: "2024-11-23T09:00:00.000Z",
   },
@@ -62,8 +60,6 @@ export const DUMMY_BLOG_POSTS: BlogPost[] = [
     meta_title: "Unforgettable Venue Events: Top Tips | EventWizz",
     meta_description:
       "Guest management, menus, and operations tips that help venues deliver events guests remember — and book again.",
-    meta_keywords:
-      "venue management, event operations, guest experience, venue events",
     created_at: "2024-10-10T11:00:00.000Z",
     updated_at: "2024-10-15T08:30:00.000Z",
   },
@@ -92,8 +88,6 @@ export const DUMMY_BLOG_POSTS: BlogPost[] = [
     meta_title: "Automated Ticketing & Event Revenue | EventWizz",
     meta_description:
       "How automated ticketing improves conversion, average order value, and operational reporting for venue events.",
-    meta_keywords:
-      "automated ticketing, event revenue, venue ticketing, event profitability",
     created_at: "2024-08-28T14:00:00.000Z",
     updated_at: "2024-09-02T10:00:00.000Z",
   },
@@ -112,7 +106,6 @@ export const DUMMY_BLOG_POSTS: BlogPost[] = [
     published_at: "2026-07-24",
     meta_title: "",
     meta_description: "",
-    meta_keywords: "",
     created_at: "2026-07-20T09:00:00.000Z",
     updated_at: "2026-07-22T16:00:00.000Z",
   },

@@ -47,7 +47,6 @@ function normalizePost(raw: Partial<BlogPost> & { id: string }): BlogPost {
     published_at: raw.published_at ?? new Date().toISOString().slice(0, 10),
     meta_title: raw.meta_title ?? "",
     meta_description: raw.meta_description ?? "",
-    meta_keywords: raw.meta_keywords ?? "",
     created_at: raw.created_at ?? new Date().toISOString(),
     updated_at: raw.updated_at ?? new Date().toISOString(),
   };
@@ -81,7 +80,6 @@ export const useBlogStore = create<BlogStoreState>()(
           published_at: input.published_at,
           meta_title: input.meta_title ?? "",
           meta_description: input.meta_description ?? "",
-          meta_keywords: input.meta_keywords ?? "",
           created_at: now,
           updated_at: now,
         };
@@ -110,7 +108,6 @@ export const useBlogStore = create<BlogStoreState>()(
           published_at: input.published_at,
           meta_title: input.meta_title ?? "",
           meta_description: input.meta_description ?? "",
-          meta_keywords: input.meta_keywords ?? "",
           updated_at: new Date().toISOString(),
         };
         set({

@@ -35,11 +35,6 @@ export const blogFormSchema = z.object({
     .max(160, "Meta description should be 160 characters or less")
     .optional()
     .or(z.literal("")),
-  meta_keywords: z
-    .string()
-    .max(200, "Keywords should be 200 characters or less")
-    .optional()
-    .or(z.literal("")),
 });
 
 export type BlogFormValues = z.infer<typeof blogFormSchema>;

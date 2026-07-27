@@ -18,7 +18,6 @@ export const useNotificationSystem = () => {
   const userRole = useActiveRole();
 
   const [filters, setFilters] = useState<NotificationFilters>({
-    status: "all",
     page: 1,
     limit: 10,
   });
@@ -107,6 +106,7 @@ export const useNotificationSystem = () => {
     isDetailsOpen,
     isLoading,
     isPending,
+    isMarkingAllAsRead,
     userRole,
 
     // Actions

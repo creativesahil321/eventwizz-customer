@@ -67,7 +67,6 @@ export function BlogForm({ mode, initialPost }: BlogFormProps) {
       published_at: initialPost?.published_at ?? todayIsoDate(),
       meta_title: initialPost?.meta_title ?? "",
       meta_description: initialPost?.meta_description ?? "",
-      meta_keywords: initialPost?.meta_keywords ?? "",
     },
   });
 
@@ -132,7 +131,6 @@ export function BlogForm({ mode, initialPost }: BlogFormProps) {
         status: nextStatus ?? values.status,
         meta_title: values.meta_title ?? "",
         meta_description: values.meta_description ?? "",
-        meta_keywords: values.meta_keywords ?? "",
       };
 
       if (mode === "edit" && initialPost) {
@@ -177,14 +175,14 @@ export function BlogForm({ mode, initialPost }: BlogFormProps) {
 
   return (
     <Form {...form}>
-      <form onSubmit={onSubmit} className="space-y-6">
-        <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_340px]">
-          <div className="space-y-6">
-            <section className="rounded-lg border border-[var(--color-border)] bg-white p-6 shadow-sm">
-              <h2 className="mb-1 text-lg font-semibold text-foreground">
+      <form onSubmit={onSubmit} className="space-y-4 pb-24 sm:space-y-6 xl:pb-0">
+        <div className="grid gap-4 sm:gap-6 xl:grid-cols-[minmax(0,1fr)_340px]">
+          <div className="order-2 space-y-4 sm:space-y-6 xl:order-1">
+            <section className="rounded-lg border border-[var(--color-border)] bg-white p-4 shadow-sm sm:p-6">
+              <h2 className="mb-1 text-base font-semibold text-foreground sm:text-lg">
                 Post details
               </h2>
-              <p className="mb-5 text-sm text-muted-foreground">
+              <p className="mb-4 text-sm text-muted-foreground sm:mb-5">
                 These fields power the public “Latest News & Articles” cards.
                 Section headings still come from Site Essentials.
               </p>
@@ -275,11 +273,11 @@ export function BlogForm({ mode, initialPost }: BlogFormProps) {
               </div>
             </section>
 
-            <section className="rounded-lg border border-[var(--color-border)] bg-white p-6 shadow-sm">
-              <h2 className="mb-1 text-lg font-semibold text-foreground">
+            <section className="rounded-lg border border-[var(--color-border)] bg-white p-4 shadow-sm sm:p-6">
+              <h2 className="mb-1 text-base font-semibold text-foreground sm:text-lg">
                 Featured image
               </h2>
-              <p className="mb-5 text-sm text-muted-foreground">
+              <p className="mb-4 text-sm text-muted-foreground sm:mb-5">
                 Recommended 16:9 landscape (about 1200×675). Shown on the card
                 grid and article header.
               </p>
@@ -292,7 +290,7 @@ export function BlogForm({ mode, initialPost }: BlogFormProps) {
                     <FormControl>
                       {coverImage ? (
                         <div className="space-y-3">
-                          <div className="relative h-52 w-full overflow-hidden rounded-xl border border-[var(--color-border)] bg-slate-50">
+                          <div className="relative h-40 w-full overflow-hidden rounded-xl border border-[var(--color-border)] bg-slate-50 sm:h-52">
                             <Image
                               src={coverImage}
                               alt="Featured cover"
@@ -336,11 +334,11 @@ export function BlogForm({ mode, initialPost }: BlogFormProps) {
               />
             </section>
 
-            <section className="rounded-lg border border-[var(--color-border)] bg-white p-6 shadow-sm">
-              <h2 className="mb-1 text-lg font-semibold text-foreground">
+            <section className="rounded-lg border border-[var(--color-border)] bg-white p-4 shadow-sm sm:p-6">
+              <h2 className="mb-1 text-base font-semibold text-foreground sm:text-lg">
                 Article body
               </h2>
-              <p className="mb-5 text-sm text-muted-foreground">
+              <p className="mb-4 text-sm text-muted-foreground sm:mb-5">
                 Use headings, lists, links, and the image button to place
                 pictures between paragraphs.
               </p>
@@ -358,7 +356,7 @@ export function BlogForm({ mode, initialPost }: BlogFormProps) {
                         enableRichBlocks
                         enableImages
                         showAIButton={false}
-                        className="min-h-[280px]"
+                        className="min-h-[220px] sm:min-h-[280px]"
                         maxLength={50000}
                         maxWords={8000}
                       />
@@ -369,11 +367,11 @@ export function BlogForm({ mode, initialPost }: BlogFormProps) {
               />
             </section>
 
-            <section className="rounded-lg border border-[var(--color-border)] bg-white p-6 shadow-sm">
-              <h2 className="mb-1 text-lg font-semibold text-foreground">
+            <section className="rounded-lg border border-[var(--color-border)] bg-white p-4 shadow-sm sm:p-6">
+              <h2 className="mb-1 text-base font-semibold text-foreground sm:text-lg">
                 Meta management
               </h2>
-              <p className="mb-5 text-sm text-muted-foreground">
+              <p className="mb-4 text-sm text-muted-foreground sm:mb-5">
                 SEO fields for search results and social previews. Leave blank
                 to fall back to the article title and excerpt.
               </p>
@@ -426,32 +424,12 @@ export function BlogForm({ mode, initialPost }: BlogFormProps) {
                     </FormItem>
                   )}
                 />
-
-                <FormField
-                  control={form.control}
-                  name="meta_keywords"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Meta keywords</FormLabel>
-                      <FormControl>
-                        <Input
-                          placeholder="event planning, venue tickets, christmas party"
-                          {...field}
-                        />
-                      </FormControl>
-                      <FormDescription>
-                        Comma-separated keywords (optional)
-                      </FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
               </div>
             </section>
           </div>
 
-          <aside className="space-y-4 xl:sticky xl:top-24 xl:self-start">
-            <div className="rounded-lg border border-[var(--color-border)] bg-white p-4 shadow-sm">
+          <aside className="order-1 space-y-4 xl:order-2 xl:sticky xl:top-24 xl:self-start">
+            <div className="hidden rounded-lg border border-[var(--color-border)] bg-white p-4 shadow-sm sm:block">
               <h2 className="mb-1 text-sm font-semibold text-foreground">
                 Card preview
               </h2>
@@ -466,17 +444,17 @@ export function BlogForm({ mode, initialPost }: BlogFormProps) {
               />
             </div>
 
-            <div className="rounded-lg border border-[var(--color-border)] bg-white p-4 shadow-sm">
-              <p className="mb-3 text-xs text-muted-foreground">
+            <div className="fixed inset-x-0 bottom-0 z-30 border-t border-[var(--color-border)] bg-white/95 p-3 backdrop-blur sm:static sm:z-auto sm:rounded-lg sm:border sm:bg-white sm:p-4 sm:shadow-sm sm:backdrop-blur-none">
+              <p className="mb-2 hidden text-xs text-muted-foreground sm:mb-3 sm:block">
                 Demo mode — changes are saved in this browser only. API wiring
                 comes next.
               </p>
-              <div className="flex flex-col gap-2">
+              <div className="flex gap-2 sm:flex-col">
                 <Button
                   type="button"
                   variant="event-primary"
                   disabled={isSubmitting}
-                  className="w-full gap-2"
+                  className="h-10 flex-1 gap-2 sm:w-full"
                   onClick={() => void publish()}
                 >
                   {isSubmitting ? (
@@ -484,23 +462,29 @@ export function BlogForm({ mode, initialPost }: BlogFormProps) {
                   ) : (
                     <Send className="h-4 w-4" />
                   )}
-                  {mode === "edit" ? "Save & publish" : "Publish"}
+                  <span className="sm:hidden">
+                    {mode === "edit" ? "Publish" : "Publish"}
+                  </span>
+                  <span className="hidden sm:inline">
+                    {mode === "edit" ? "Save & publish" : "Publish"}
+                  </span>
                 </Button>
                 <Button
                   type="button"
                   variant="event-outline"
                   disabled={isSubmitting}
-                  className="w-full gap-2"
+                  className="h-10 flex-1 gap-2 sm:w-full"
                   onClick={() => void saveAsDraft()}
                 >
                   <Save className="h-4 w-4" />
-                  Save as draft
+                  <span className="sm:hidden">Draft</span>
+                  <span className="hidden sm:inline">Save as draft</span>
                 </Button>
                 <Button
                   type="button"
                   variant="ghost"
                   disabled={isSubmitting}
-                  className="w-full"
+                  className="hidden h-10 w-full sm:flex"
                   onClick={() => router.push("/admin/blog-management")}
                 >
                   Cancel

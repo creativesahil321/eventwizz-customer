@@ -16,8 +16,6 @@ export interface BlogPost {
   meta_title: string;
   /** SEO meta description (falls back to excerpt when empty) */
   meta_description: string;
-  /** Comma-separated SEO keywords */
-  meta_keywords: string;
   created_at: string;
   updated_at: string;
 }

@@ -1,27 +1,25 @@
 "use client";
 
-import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
-import React from "react";
+import React, { useMemo, useState } from "react";
 import {
   NotificationFilters,
   Notification,
+  UserRole,
 } from "@/services/common/notification/type";
-import { NOTIFICATION_STATUSES } from "../_lib/constants";
-import { NotificationListComponent } from "./notification-list";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+  getNotificationFeedFilters,
+  type NotificationFeedFilter,
+} from "../_lib/constants";
+import { NotificationListComponent } from "./notification-list";
 import { Button } from "@/components/ui/button";
-import { X } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { CheckCheck, Loader2, Search } from "lucide-react";
 import { NotificationsTableSkeleton } from "./skeleton-loader";
 import {
   ProtectedPageHeader,
   pageCardClassName,
 } from "@/app/(protected)/_components/page-header-card";
+import { cn } from "@/lib/utils";
 
 interface NotificationMeta {
   total: number;
@@ -35,6 +33,9 @@ interface NotificationsDataTableProps {
   meta: NotificationMeta | undefined;
   filters: NotificationFilters;
   isLoading: boolean;
+  userRole?: UserRole | string | null;
+  unreadCount?: number;
+  isMarkingAllAsRead?: boolean;
   onFilterChange: (filters: Partial<NotificationFilters>) => void;
   onPageChange: (page: number) => void;
   onViewDetails: (notification: Notification) => void;
@@ -43,23 +44,66 @@ interface NotificationsDataTableProps {
   onMarkAllAsRead: () => void;
 }
 
+function getActiveFeedFilterId(
+  filters: NotificationFilters,
+  feedFilters: NotificationFeedFilter[],
+): string {
+  if (filters.status === "unread" && !filters.category) return "unread";
+  if (filters.category) {
+    const match = feedFilters.find(
+      (item) => item.type === "category" && item.value === filters.category,
+    );
+    if (match) return match.id;
+  }
+  return "all";
+}
+
 export function NotificationsDataTable({
   notifications,
   meta,
   filters,
   isLoading,
+  userRole,
+  unreadCount = 0,
+  isMarkingAllAsRead = false,
   onFilterChange,
   onPageChange,
   onViewDetails,
   onMarkAsRead,
   onMarkAsUnread,
+  onMarkAllAsRead,
 }: NotificationsDataTableProps) {
-  const hasFilters = filters.status && filters.status !== "all";
+  const [searchQuery, setSearchQuery] = useState("");
   const safeNotifications = Array.isArray(notifications) ? notifications : [];
+  const feedFilters = useMemo(
+    () => getNotificationFeedFilters(userRole),
+    [userRole],
+  );
+  const activeFilterId = useMemo(
+    () => getActiveFeedFilterId(filters, feedFilters),
+    [filters, feedFilters],
+  );
 
   if (isLoading && safeNotifications.length === 0) {
     return <NotificationsTableSkeleton />;
   }
+
+  const handleFeedFilterClick = (filterId: string) => {
+    const selected = feedFilters.find((item) => item.id === filterId);
+    if (!selected) return;
+
+    if (selected.type === "all") {
+      onFilterChange({ status: undefined, category: undefined });
+      return;
+    }
+
+    if (selected.type === "status") {
+      onFilterChange({ status: selected.value, category: undefined });
+      return;
+    }
+
+    onFilterChange({ category: selected.value, status: undefined });
+  };
 
   return (
     <section className="relative w-full min-w-0 space-y-4 text-black sm:space-y-6">
@@ -67,66 +111,91 @@ export function NotificationsDataTable({
         title="Notifications"
         description="View alerts and account activity"
         actions={
-          <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row sm:items-center">
-            <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:gap-2">
-              <span className="text-sm font-medium text-muted-foreground sm:text-foreground">
-                Filter by
-              </span>
-              <Select
-                value={filters.status || "all"}
-                onValueChange={(value) =>
-                  onFilterChange({ status: value === "all" ? undefined : value })
-                }
-              >
-                <SelectTrigger className="h-10 w-full sm:w-[180px]">
-                  <SelectValue placeholder="All statuses" />
-                </SelectTrigger>
-                <SelectContent>
-                  {NOTIFICATION_STATUSES.map((status) => (
-                    <SelectItem key={status.value} value={status.value}>
-                      {status.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            {hasFilters && (
-              <Button
-                variant="event-outline"
-                size="sm"
-                className="h-10 w-full sm:w-auto"
-                onClick={() => onFilterChange({ status: undefined })}
-              >
-                Reset <X className="ml-2 h-4 w-4" />
-              </Button>
-            )}
-          </div>
+          unreadCount > 0 ? (
+            <Button
+              variant="event-primary"
+              size="sm"
+              className="h-10 w-full sm:w-auto"
+              onClick={onMarkAllAsRead}
+              disabled={isMarkingAllAsRead}
+            >
+              {isMarkingAllAsRead ? (
+                <Loader2 className="size-4 animate-spin" />
+              ) : (
+                <CheckCheck className="size-4" />
+              )}
+              Mark all read
+            </Button>
+          ) : null
         }
       />
 
-      {safeNotifications.length === 0 && !isLoading ? (
-        <div className={pageCardClassName("text-center text-muted-foreground")}>
-          No notifications found. Try adjusting your filters.
+      <div className={pageCardClassName("space-y-5")}>
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
+          <div className="relative min-w-0 flex-1">
+            <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              value={searchQuery}
+              onChange={(event) => setSearchQuery(event.target.value)}
+              placeholder="Search bookings, tickets, references..."
+              className="h-11 rounded-xl border-[var(--color-border)] bg-muted/30 pl-10 shadow-none focus-visible:ring-[var(--color-primary)]/30"
+            />
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            {feedFilters.map((filter) => {
+              const isActive = activeFilterId === filter.id;
+              const showUnreadBadge =
+                filter.id === "unread" && unreadCount > 0;
+
+              return (
+                <button
+                  key={filter.id}
+                  type="button"
+                  onClick={() => handleFeedFilterClick(filter.id)}
+                  className={cn(
+                    "inline-flex h-9 items-center gap-1.5 rounded-full border px-3.5 text-sm font-medium transition-colors",
+                    isActive
+                      ? "border-[color-mix(in_srgb,var(--color-primary)_35%,transparent)] bg-[color-mix(in_srgb,var(--color-primary)_12%,white)] text-[var(--color-primary)]"
+                      : "border-transparent bg-muted/60 text-muted-foreground hover:bg-muted hover:text-foreground",
+                  )}
+                >
+                  {filter.label}
+                  {showUnreadBadge ? (
+                    <span
+                      className={cn(
+                        "inline-flex min-w-5 items-center justify-center rounded-full px-1.5 py-0.5 text-[10px] font-semibold",
+                        isActive
+                          ? "bg-[var(--color-primary)] text-[var(--color-primary-foreground,#fff)]"
+                          : "bg-background text-foreground",
+                      )}
+                    >
+                      {unreadCount > 99 ? "99+" : unreadCount}
+                    </span>
+                  ) : null}
+                </button>
+              );
+            })}
+          </div>
         </div>
-      ) : (
-        <div className={pageCardClassName("overflow-hidden")}>
-          <ScrollArea className="h-[calc(100dvh-24rem)] sm:h-[calc(100dvh-20rem)]">
-            <div className="px-1 py-1 sm:px-2">
-              <NotificationListComponent
-                notifications={safeNotifications}
-                meta={meta}
-                onViewDetails={onViewDetails}
-                onMarkAsRead={onMarkAsRead}
-                onMarkAsUnread={onMarkAsUnread}
-                onPageChange={onPageChange}
-                isLoading={isLoading}
-              />
-            </div>
-            <ScrollBar orientation="horizontal" />
-          </ScrollArea>
-        </div>
-      )}
+
+        {safeNotifications.length === 0 && !isLoading ? (
+          <div className="rounded-xl border border-dashed border-[var(--color-border)] px-4 py-10 text-center text-sm text-muted-foreground">
+            No notifications found. Try adjusting your filters.
+          </div>
+        ) : (
+          <NotificationListComponent
+            notifications={safeNotifications}
+            meta={meta}
+            searchQuery={searchQuery}
+            onViewDetails={onViewDetails}
+            onMarkAsRead={onMarkAsRead}
+            onMarkAsUnread={onMarkAsUnread}
+            onPageChange={onPageChange}
+            isLoading={isLoading}
+          />
+        )}
+      </div>
     </section>
   );
 }
