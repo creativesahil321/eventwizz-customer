@@ -76,6 +76,7 @@ export function MainLandingSitePreview({
 
   const heroSubheading =
     formValues.main_landing_banner_sub_heading?.trim() ||
+    formValues.banner_sub_heading?.trim() ||
     "Discover verified venues and curated events in your area. Browse by location to find the perfect experience.";
 
   const locationsTitle =

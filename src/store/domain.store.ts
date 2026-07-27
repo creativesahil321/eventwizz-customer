@@ -1,8 +1,9 @@
 import { create } from "zustand";
-import { persist } from "zustand/middleware";
+import { persist, createJSONStorage } from "zustand/middleware";
 import { immer } from "zustand/middleware/immer";
 import { ThemeSchema } from "@/types/theme.types";
 import { UserType } from "@/types/auth.types";
+import { slimDomainSettingsForStorage } from "@/lib/slim-domain-settings";
 
 interface DomainState {
   domain: string | null;
@@ -20,6 +21,17 @@ interface DomainState {
   reset: () => void;
 }
 
+type PersistedDomainState = Pick<
+  DomainState,
+  | "domain"
+  | "tenantId"
+  | "website_role"
+  | "parentDomain"
+  | "settings"
+  | "isDomainRequest"
+  | "sidebarCollapsed"
+>;
+
 export const useDomainStore = create<DomainState>()(
   persist(
     immer<DomainState>((set) => ({
@@ -36,7 +48,16 @@ export const useDomainStore = create<DomainState>()(
       // Actions
       setDomain: (data) =>
         set((state) => {
-          const newState = { ...state, ...data };
+          const nextSettings =
+            data.settings !== undefined
+              ? slimDomainSettingsForStorage(data.settings)
+              : undefined;
+
+          const newState = {
+            ...state,
+            ...data,
+            ...(nextSettings !== undefined ? { settings: nextSettings } : {}),
+          };
 
           // Ensure website_role is synchronized between top level and settings
           if (data.settings?.website_role && !data.website_role) {
@@ -65,15 +86,26 @@ export const useDomainStore = create<DomainState>()(
     })),
     {
       name: "domain-storage",
-      partialize: (state) => ({
+      // v1: strip info-page / CMS HTML from persisted settings
+      version: 1,
+      storage: createJSONStorage(() => localStorage),
+      partialize: (state): PersistedDomainState => ({
         domain: state.domain,
         tenantId: state.tenantId,
         website_role: state.website_role,
         parentDomain: state.parentDomain,
-        settings: state.settings,
+        // Never persist info-page HTML — dedicated info-pages API owns that data
+        settings: slimDomainSettingsForStorage(state.settings),
         isDomainRequest: state.isDomainRequest,
         sidebarCollapsed: state.sidebarCollapsed,
       }),
-    }
-  )
+      migrate: (persisted) => {
+        const p = (persisted ?? {}) as Partial<PersistedDomainState>;
+        return {
+          ...p,
+          settings: slimDomainSettingsForStorage(p.settings ?? null),
+        };
+      },
+    },
+  ),
 );

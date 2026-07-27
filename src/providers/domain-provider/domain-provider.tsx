@@ -69,16 +69,10 @@ export const DomainProvider = ({ children }: { children: ReactNode }) => {
       const serverHost = serverContext.host?.split(":")[0] ?? null;
       const ssrTheme = serverContext.theme;
       const canHydrateFromSsr =
-        ssrTheme != null &&
-        serverHost != null &&
-        serverHost === clientHost;
+        ssrTheme != null && serverHost != null && serverHost === clientHost;
 
       if (canHydrateFromSsr) {
-        if (
-          detectedDomain === currentDomain &&
-          currentSettings &&
-          !isLoading
-        ) {
+        if (detectedDomain === currentDomain && currentSettings && !isLoading) {
           return;
         }
 

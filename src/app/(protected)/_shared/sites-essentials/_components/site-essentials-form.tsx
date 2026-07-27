@@ -43,6 +43,7 @@ import {
   useSiteEssentialsUpdateGate,
 } from "../_lib/site-essentials-update-context";
 import { toMutableSiteEssentialsFormValues } from "../_lib/to-mutable-form-values";
+import { hydratePreviewMediaForSave } from "../_lib/hydrate-preview-media-for-save";
 import { ImportWebsiteModal } from "./import-website-modal";
 
 export function SiteEssentialsForm() {
@@ -129,18 +130,22 @@ function SiteEssentialsFormInner() {
     }
   }, [isAdminSite, clearPreviewData]);
 
-  // Restore preview snapshot into the form ONLY when it was set during the
+  // Restore the preview snapshot into the form ONLY when it was set during the
   // current session (the editor → preview → editor round-trip). A persisted
   // snapshot left over from a previous session/reload is stale and must never
-  // override the fresh server data — we discard it so the API values load.
+  // override fresh server data — we discard it so the `values` sync (in the
+  // form hook, with `keepDirtyValues`) repopulates the form from the API.
+  //
+  // Baseline server hydration is owned by react-hook-form's `values` option
+  // (see `useSiteEssentials`); this effect is only the preview-restore overlay.
   // Vendor sites only — admin has no preview flow.
   useEffect(() => {
     if (isAdminSite) return;
     if (!previewData) return;
 
     if (!previewFresh) {
-      // Stale localStorage snapshot from a prior session — drop it and let the
-      // server-data effect below populate the form from the latest API response.
+      // Stale localStorage snapshot from a prior session — drop it so the
+      // server `values` sync becomes the source of truth again.
       clearPreviewData();
       return;
     }
@@ -148,7 +153,8 @@ function SiteEssentialsFormInner() {
     try {
       const currentFormValues = form.getValues();
 
-      // Check if form already has File objects uploaded
+      // Never override freshly uploaded File objects with the snapshot's
+      // object-URL strings (uploads would otherwise silently become blob URLs).
       const hasFileUploads =
         currentFormValues.logo instanceof File ||
         currentFormValues.favicon instanceof File ||
@@ -156,8 +162,6 @@ function SiteEssentialsFormInner() {
         currentFormValues.cover_video instanceof File ||
         currentFormValues.main_landing_cover_image instanceof File;
 
-      // Only reset with preview data if no files are currently uploaded
-      // This prevents overriding File objects with preview store data (object URLs)
       if (!hasFileUploads) {
         // Coalesce with the fresh server data so any field the snapshot is
         // missing/empty (e.g. omitted Info Pages content) is filled from the API,
@@ -179,26 +183,6 @@ function SiteEssentialsFormInner() {
     clearPreviewData,
     isAdminSite,
   ]);
-
-  // Reset form when siteEssentials data changes (e.g., after location switch)
-  // This ensures the form always reflects the current location's data
-  useEffect(() => {
-    if (siteEssentials && (isAdminSite || !previewData)) {
-      try {
-        // Reset form with fresh server data (mutable clone — query cache is frozen)
-        form.reset(toMutableSiteEssentialsFormValues(siteEssentials), {
-          keepErrors: false,
-          keepDirty: false,
-          keepIsSubmitted: false,
-          keepTouched: false,
-          keepIsValid: false,
-          keepSubmitCount: false,
-        });
-      } catch (error) {
-        console.error("Error resetting form with site essentials data:", error);
-      }
-    }
-  }, [siteEssentials, previewData, form, isAdminSite]);
 
   // Combined useEffect for form validation and error tracking
   useEffect(() => {
@@ -335,11 +319,13 @@ function SiteEssentialsFormInner() {
     setShowErrorSummary(false);
 
     try {
-      // Don't use JSON.parse(JSON.stringify()) as it destroys File objects
-      // File objects need to be preserved for binary upload
-      const { ...restValues } = values;
+      // Don't use JSON.parse(JSON.stringify()) as it destroys File objects.
+      // Preview persistence can turn uploaded media into `blob:` URLs (e.g. after
+      // an Import → Preview → back round-trip); convert those back to Files so the
+      // API actually receives the binary instead of silently dropping the image.
+      const hydratedValues = await hydratePreviewMediaForSave(values);
       const payload = {
-        ...restValues,
+        ...hydratedValues,
         _method: "PATCH",
       };
 
@@ -352,6 +338,11 @@ function SiteEssentialsFormInner() {
           const completeFormValues = form.getValues();
           setPreviewData(completeFormValues);
         }
+
+        // Mark the form pristine so the server `values` re-sync (with
+        // `keepDirtyValues`) can adopt the canonical saved data and the
+        // Discard button correctly disappears.
+        form.reset(form.getValues(), { keepValues: true });
 
         router.refresh();
         toast({

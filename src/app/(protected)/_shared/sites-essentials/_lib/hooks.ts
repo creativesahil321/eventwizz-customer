@@ -119,6 +119,16 @@ export const useSiteEssentials = () => {
   // Set up form with react-hook-form
   const form = useForm<SiteEssentialsFormValues>({
     resolver: zodResolver(siteEssentialsFormSchema),
+    // `values` re-syncs the form whenever the server data reference changes
+    // (location `?slug=` query settling, mutation cache updates, invalidations,
+    // reconnect refetch). Without `keepDirtyValues` that re-sync silently wipes
+    // the vendor's unsaved edits/imports — the "data vanishes / fluctuates" bug.
+    // Keeping dirty values means only untouched fields are refreshed from the
+    // server, so typed content, imported colors/fonts and uploaded media stick.
+    resetOptions: {
+      keepDirtyValues: true,
+      keepErrors: true,
+    },
     defaultValues: {
       colors: {
         primary: "",

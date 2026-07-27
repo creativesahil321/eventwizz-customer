@@ -65,13 +65,25 @@ export default function VendorSiteHomePage() {
   }, [settings?.main_landing_banner_heading, settings?.banner_heading]);
 
   const heroSubheading = useMemo(() => {
-    const sub =
+    // Prefer dedicated main-home copy; fall back to location banner_sub_heading
+    // (same pattern as heroHeading → banner_heading) when the theme API omits
+    // main_landing_banner_sub_heading — otherwise the hardcoded default shows.
+    const main =
       typeof settings?.main_landing_banner_sub_heading === "string"
         ? settings.main_landing_banner_sub_heading.trim()
         : "";
-    if (sub.length > 0) return sub;
+    if (main.length > 0) return main;
+    if (
+      typeof settings?.banner_sub_heading === "string" &&
+      settings.banner_sub_heading.trim().length > 0
+    ) {
+      return settings.banner_sub_heading.trim();
+    }
     return "Discover verified venues and curated events in your area. Browse by location to find the perfect experience.";
-  }, [settings?.main_landing_banner_sub_heading]);
+  }, [
+    settings?.main_landing_banner_sub_heading,
+    settings?.banner_sub_heading,
+  ]);
 
   const locationsListTitle = useMemo(() => {
     const t =

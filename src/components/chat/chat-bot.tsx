@@ -301,6 +301,84 @@ function clearQuickActions(messages: Message[]): Message[] {
   );
 }
 
+/**
+ * Vendor-only stats loader. Rendered exclusively for logged-in vendors after the
+ * chat is opened, so the vendor query keys never register in the shared cache on
+ * customer/public tenants. Reports the computed stats up via `onStats`.
+ */
+function VendorChatStatsLoader({
+  dateRange,
+  onStats,
+}: {
+  dateRange: Parameters<typeof useVendorDashboardBookings>[0];
+  onStats: (stats: VendorChatLiveStats | null) => void;
+}) {
+  const { data: vendorDashboardResponse } = useVendorDashboardBookings(
+    dateRange,
+    { enabled: true },
+  );
+
+  const { data: vendorBookingsSummaryResponse } = useQuery({
+    queryKey: ["vendor", "bookings", "chat-summary", "per_page_1000"],
+    queryFn: () =>
+      vendorBookingsService.getBookings({
+        page: 1,
+        // Backend `summary` is derived from returned rows — per_page=1 yields wrong totals
+        per_page: 1000,
+      }),
+    enabled: true,
+    staleTime: 2 * 60 * 1000,
+    gcTime: 10 * 60 * 1000,
+  });
+
+  const stats = useMemo((): VendorChatLiveStats | null => {
+    const raw = vendorDashboardResponse?.data;
+    const bookingSummary = vendorBookingsSummaryResponse?.summary;
+    const metaTotal = vendorBookingsSummaryResponse?.meta?.total;
+
+    if (!raw && !bookingSummary && metaTotal == null) return null;
+
+    const dashboard: VendorChatDashboardSnapshot | null = raw
+      ? {
+          current_location_id: raw.current_location_id,
+          booking_period: raw.booking_period ?? raw.period ?? null,
+          booking_period_start:
+            raw.booking_period_start ?? raw.period_start ?? null,
+          booking_period_end: raw.booking_period_end ?? raw.period_end ?? null,
+          summary: raw.summary ?? null,
+          bookings_stats: raw.bookings_stats ?? null,
+          commissions_stats: raw.commissions_stats ?? null,
+          recent_bookings: (raw.recent_bookings ?? []).slice(0, 5),
+        }
+      : null;
+
+    return {
+      fetchedAt: new Date().toISOString(),
+      dashboard,
+      bookingSummary: {
+        booking_count: metaTotal ?? 0,
+        total_amount: bookingSummary?.total_amount ?? "0.00",
+        deposit_amount: bookingSummary?.deposit_amount ?? "0.00",
+        pending_amount: bookingSummary?.pending_amount ?? "0.00",
+        refunded_amount: bookingSummary?.refunded_amount ?? "0.00",
+        total_platform_fee: bookingSummary?.total_platform_fee ?? "0.00",
+        platform_fee_settled: bookingSummary?.platform_fee_settled ?? "0.00",
+        platform_fee_due: bookingSummary?.platform_fee_due ?? "0.00",
+      },
+    };
+  }, [
+    vendorDashboardResponse?.data,
+    vendorBookingsSummaryResponse?.summary,
+    vendorBookingsSummaryResponse?.meta?.total,
+  ]);
+
+  useEffect(() => {
+    onStats(stats);
+  }, [stats, onStats]);
+
+  return null;
+}
+
 export function ChatBot() {
   const router = useRouter();
   const pathname = usePathname();
@@ -350,67 +428,16 @@ export function ChatBot() {
     [todayYmd],
   );
 
-  const { data: vendorDashboardResponse } = useVendorDashboardBookings(
-    chatDashboardRange,
-    { enabled: isLoggedInVendor },
-  );
+  // Latch: only fetch vendor chat stats once the user actually opens the chat.
+  // ChatBot is mounted globally on every tenant, so gating on this avoids
+  // eager vendor API calls on customer/public pages (server-load bug).
+  const [hasOpenedChat, setHasOpenedChat] = useState(false);
+  const shouldLoadVendorChatStats = isLoggedInVendor && hasOpenedChat;
 
-  const { data: vendorBookingsSummaryResponse } = useQuery({
-    queryKey: ["vendor", "bookings", "chat-summary", "per_page_1000"],
-    queryFn: () =>
-      vendorBookingsService.getBookings({
-        page: 1,
-        // Backend `summary` is derived from returned rows — per_page=1 yields wrong totals
-        per_page: 1000,
-      }),
-    enabled: isLoggedInVendor,
-    staleTime: 2 * 60 * 1000,
-    gcTime: 10 * 60 * 1000,
-  });
-
-  const vendorLiveStats = useMemo((): VendorChatLiveStats | null => {
-    if (!isLoggedInVendor) return null;
-
-    const raw = vendorDashboardResponse?.data;
-    const bookingSummary = vendorBookingsSummaryResponse?.summary;
-    const metaTotal = vendorBookingsSummaryResponse?.meta?.total;
-
-    if (!raw && !bookingSummary && metaTotal == null) return null;
-
-    const dashboard: VendorChatDashboardSnapshot | null = raw
-      ? {
-          current_location_id: raw.current_location_id,
-          booking_period: raw.booking_period ?? raw.period ?? null,
-          booking_period_start:
-            raw.booking_period_start ?? raw.period_start ?? null,
-          booking_period_end: raw.booking_period_end ?? raw.period_end ?? null,
-          summary: raw.summary ?? null,
-          bookings_stats: raw.bookings_stats ?? null,
-          commissions_stats: raw.commissions_stats ?? null,
-          recent_bookings: (raw.recent_bookings ?? []).slice(0, 5),
-        }
-      : null;
-
-    return {
-      fetchedAt: new Date().toISOString(),
-      dashboard,
-      bookingSummary: {
-        booking_count: metaTotal ?? 0,
-        total_amount: bookingSummary?.total_amount ?? "0.00",
-        deposit_amount: bookingSummary?.deposit_amount ?? "0.00",
-        pending_amount: bookingSummary?.pending_amount ?? "0.00",
-        refunded_amount: bookingSummary?.refunded_amount ?? "0.00",
-        total_platform_fee: bookingSummary?.total_platform_fee ?? "0.00",
-        platform_fee_settled: bookingSummary?.platform_fee_settled ?? "0.00",
-        platform_fee_due: bookingSummary?.platform_fee_due ?? "0.00",
-      },
-    };
-  }, [
-    isLoggedInVendor,
-    vendorDashboardResponse?.data,
-    vendorBookingsSummaryResponse?.summary,
-    vendorBookingsSummaryResponse?.meta?.total,
-  ]);
+  // Held in parent state, but the vendor queries live in a child that only
+  // mounts for vendors — so customer/public tenants never register the keys.
+  const [vendorLiveStats, setVendorLiveStats] =
+    useState<VendorChatLiveStats | null>(null);
 
   const contactPhone =
     theme?.contactDetails?.phone?.trim() ||
@@ -1196,12 +1223,21 @@ Is there anything else I can help you with?`,
 
   return (
     <>
+      {shouldLoadVendorChatStats && (
+        <VendorChatStatsLoader
+          dateRange={chatDashboardRange}
+          onStats={setVendorLiveStats}
+        />
+      )}
       <AnimatePresence>
         {!isOpen && (
           <motion.button
             type="button"
             key="chat-launcher"
-            onClick={() => setIsOpen(true)}
+            onClick={() => {
+              setHasOpenedChat(true);
+              setIsOpen(true);
+            }}
             aria-label="Open chat"
             initial={motionSafe ? { opacity: 0, scale: 0.7, y: 16 } : false}
             animate={
