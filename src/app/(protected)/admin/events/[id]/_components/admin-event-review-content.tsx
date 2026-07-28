@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Card } from "@/components/ui/card";
 import { EventPreview } from "@/app/(protected)/vendor/events/_components/event-preview";
-import { PreviewProvider } from "@/contexts/preview-context";
+import { PreviewDeviceShell } from "@/components/preview/preview-device-shell";
 import { adminEventsService } from "@/services/admin/events/admin-events.service";
 import type { EventDetailData } from "@/services/vendor/events/type";
 
@@ -124,15 +124,15 @@ export function AdminEventReviewContent({
         </div>
       </div>
 
-      {/* Full width of the admin content column so preview lines up with Back / Approve / Reject above */}
-      <div className="relative isolate w-full min-h-[min(70vh,720px)] max-h-[min(88vh,calc(100dvh-9.5rem))] overflow-x-hidden overflow-y-auto rounded-xl border border-slate-200/90 bg-slate-50/80 shadow-[0_1px_3px_rgba(0,0,0,0.06)] scroll-smooth [transform:translateZ(0)] ring-1 ring-slate-200/60">
-        <PreviewProvider isPreviewMode>
+      {/* Full width of the admin content column — Desktop / Tablet / Mobile frame */}
+      <div className="relative isolate h-[min(70vh,720px)] max-h-[min(88vh,calc(100dvh-9.5rem))] w-full overflow-hidden rounded-xl border border-slate-200/90 shadow-[0_1px_3px_rgba(0,0,0,0.06)] ring-1 ring-slate-200/60">
+        <PreviewDeviceShell withPreviewProvider>
           <EventPreview
             data={eventPayload}
             siteEssentials={null}
             embedInShell
           />
-        </PreviewProvider>
+        </PreviewDeviceShell>
       </div>
     </div>
   );

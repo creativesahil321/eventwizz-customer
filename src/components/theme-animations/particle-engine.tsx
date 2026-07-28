@@ -6,6 +6,8 @@ import type { ParticleConfig, ParticleShape } from "./theme-configs";
 interface ParticleEngineProps {
   config: ParticleConfig;
   intensity: "low" | "medium" | "high";
+  /** Size to parent frame instead of the browser viewport (preview device frames). */
+  contained?: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -81,14 +83,14 @@ function drawSnowflake(ctx: CanvasRenderingContext2D, p: Particle) {
     ctx.moveTo(bx, by);
     ctx.lineTo(
       bx + Math.cos(branchAngle1) * s * 0.3,
-      by + Math.sin(branchAngle1) * s * 0.3
+      by + Math.sin(branchAngle1) * s * 0.3,
     );
     ctx.stroke();
     ctx.beginPath();
     ctx.moveTo(bx, by);
     ctx.lineTo(
       bx + Math.cos(branchAngle2) * s * 0.3,
-      by + Math.sin(branchAngle2) * s * 0.3
+      by + Math.sin(branchAngle2) * s * 0.3,
     );
     ctx.stroke();
   }
@@ -199,7 +201,13 @@ function drawFirework(ctx: CanvasRenderingContext2D, p: Particle) {
     ctx.stroke();
     // Tip dot
     ctx.beginPath();
-    ctx.arc(Math.cos(angle) * outerR, Math.sin(angle) * outerR, s * 0.1, 0, Math.PI * 2);
+    ctx.arc(
+      Math.cos(angle) * outerR,
+      Math.sin(angle) * outerR,
+      s * 0.1,
+      0,
+      Math.PI * 2,
+    );
     ctx.fill();
   }
   // Center glow
@@ -328,7 +336,11 @@ const SHAPE_RENDERERS: Record<
 // ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
-export function ParticleEngine({ config, intensity }: ParticleEngineProps) {
+export function ParticleEngine({
+  config,
+  intensity,
+  contained = false,
+}: ParticleEngineProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const particlesRef = useRef<Particle[]>([]);
   const rafRef = useRef<number>(0);
@@ -347,17 +359,14 @@ export function ParticleEngine({ config, intensity }: ParticleEngineProps) {
           initialY !== undefined
             ? initialY
             : config.direction === "up"
-            ? canvas.height + 20
-            : config.direction === "down"
-            ? -20
-            : Math.random() * canvas.height,
-        size:
-          sizeRange[0] + Math.random() * (sizeRange[1] - sizeRange[0]),
-        speed:
-          speedRange[0] + Math.random() * (speedRange[1] - speedRange[0]),
+              ? canvas.height + 20
+              : config.direction === "down"
+                ? -20
+                : Math.random() * canvas.height,
+        size: sizeRange[0] + Math.random() * (sizeRange[1] - sizeRange[0]),
+        speed: speedRange[0] + Math.random() * (speedRange[1] - speedRange[0]),
         opacity:
-          opacityRange[0] +
-          Math.random() * (opacityRange[1] - opacityRange[0]),
+          opacityRange[0] + Math.random() * (opacityRange[1] - opacityRange[0]),
         rotation: Math.random() * 360,
         color: colors[Math.floor(Math.random() * colors.length)],
         shape: shapes[Math.floor(Math.random() * shapes.length)],
@@ -367,7 +376,7 @@ export function ParticleEngine({ config, intensity }: ParticleEngineProps) {
         life: Math.random(),
       };
     },
-    [config]
+    [config],
   );
 
   useEffect(() => {
@@ -381,22 +390,37 @@ export function ParticleEngine({ config, intensity }: ParticleEngineProps) {
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    // Size canvas
+    // Size canvas to the preview frame (contained) or the browser viewport.
     const resize = () => {
       const dpr = Math.min(window.devicePixelRatio || 1, 2);
-      canvas.width = window.innerWidth * dpr;
-      canvas.height = window.innerHeight * dpr;
-      canvas.style.width = window.innerWidth + "px";
-      canvas.style.height = window.innerHeight + "px";
+      const host =
+        (contained
+          ? canvas.closest(".theme-animations-contained")
+          : null) ?? null;
+      const width = host?.clientWidth || window.innerWidth;
+      const height = host?.clientHeight || window.innerHeight;
+      canvas.width = width * dpr;
+      canvas.height = height * dpr;
+      canvas.style.width = `${width}px`;
+      canvas.style.height = `${height}px`;
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     };
     resize();
     window.addEventListener("resize", resize);
+    const host =
+      (contained
+        ? canvas.closest(".theme-animations-contained")
+        : null) ?? null;
+    const hostObserver =
+      host && typeof ResizeObserver !== "undefined"
+        ? new ResizeObserver(() => resize())
+        : null;
+    if (host && hostObserver) hostObserver.observe(host);
 
     // Create initial particles (scattered across screen)
     const count = Math.round(config.count * intensityMultiplier);
     particlesRef.current = Array.from({ length: count }, () =>
-      createParticle(canvas, Math.random() * canvas.height)
+      createParticle(canvas, Math.random() * canvas.height),
     );
 
     // Animation loop — throttle to ~30fps on low intensity
@@ -424,8 +448,8 @@ export function ParticleEngine({ config, intensity }: ParticleEngineProps) {
           config.direction === "up"
             ? -p.speed
             : config.direction === "down"
-            ? p.speed
-            : p.speed * (Math.random() > 0.5 ? 1 : -1) * 0.3;
+              ? p.speed
+              : p.speed * (Math.random() > 0.5 ? 1 : -1) * 0.3;
         p.y += config.gravity;
         p.rotation += config.rotationSpeed;
         p.life += 0.008;
@@ -470,13 +494,18 @@ export function ParticleEngine({ config, intensity }: ParticleEngineProps) {
     return () => {
       cancelAnimationFrame(rafRef.current);
       window.removeEventListener("resize", resize);
+      hostObserver?.disconnect();
     };
-  }, [config, intensity, intensityMultiplier, createParticle]);
+  }, [config, intensity, intensityMultiplier, createParticle, contained]);
 
   return (
     <canvas
       ref={canvasRef}
-      className="fixed inset-0 pointer-events-none"
+      className={
+        contained
+          ? "absolute inset-0 pointer-events-none"
+          : "fixed inset-0 pointer-events-none"
+      }
       style={{ zIndex: 10, background: "transparent" }}
       aria-hidden="true"
     />

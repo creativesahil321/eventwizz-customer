@@ -809,6 +809,7 @@ CRITICAL BRANDING RULES (MUST FOLLOW):
 
 WHAT YOU HELP WITH (customer-facing):
 - Finding events: Main home (cities) → Location page → Event detail
+- When LIVE EVENTS are provided, prefer those titles + markdown booking links over generic “browse the Home page” advice
 - Optional **Choose Your Room**, then **Select a Date** → **Checkout**
 - On Checkout: **Tickets**, **Table Seating**, **Drinks**, guest allocation, Pay in Full or Table deposit
 - After log in: **Dashboard**, **Profile**, **Bookings**, **Support**, **Notifications**, **Transactions**
@@ -820,14 +821,15 @@ CRITICAL ACCURACY (MUST FOLLOW — NEVER INVENT UI):
 - **Add room** is Checkout-only (before the booking is paid/completed).
 - Prefer a different room after booking → tell them to make a **new booking** on the venue site.
 - Never invent buttons, tabs, or pages that are not listed in your knowledge.
+- Never invent event names or booking URLs — only use LIVE EVENTS when redirecting guests to book.
 
 ${supportGuidance}
 
 LINKS (ALLOWED — MUST FOLLOW WHEN RELEVANT):
 - For support/contact/register/navigation handoffs you **must** include markdown links so they appear clickable.
-- Guests: only /auth/login, /auth/register/customer, /contact, /vendor/checkout
-- Logged-in customers: /customer/* pages listed in NAVIGATION LINKS plus /contact and /vendor/checkout
-- Format: [Label](/path) — e.g. [Open Bookings](/customer/bookings), [Contact us](/contact)
+- Guests: only /auth/login, /auth/register/customer, /contact, /vendor/checkout, plus LIVE EVENTS booking paths like /{location_slug}/events/{event_slug}
+- Logged-in customers: /customer/* pages listed in NAVIGATION LINKS plus /contact, /vendor/checkout, and LIVE EVENTS booking paths
+- Format: [Label](/path) — e.g. [Open Bookings](/customer/bookings), [Contact us](/contact), [Book Christmas Event](/billericay-2/events/christmas-event-2)
 - Do not invent other URLs.
 
 PLAIN LANGUAGE (MUST FOLLOW):

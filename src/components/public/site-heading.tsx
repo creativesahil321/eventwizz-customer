@@ -111,11 +111,22 @@ export function SiteHeading({
   const headingFamily = "var(--font-heading)";
   const bodyFamily = "var(--font-body)";
 
+  /** When align is set, force block so siblings (e.g. CTAs) don't sit inline beside the title. */
+  const alignBox =
+    align === "center" || align === "right" || align === "left"
+      ? cn(
+          "block w-full max-w-full",
+          align === "center" && "text-center",
+          align === "right" && "text-right",
+          align === "left" && "text-left",
+        )
+      : headingBox;
+
   if (emphasis === "uniform" || !accent) {
     return (
       <Tag
         className={cn(
-          headingBox,
+          alignBox,
           headingLine,
           levelClass[level],
           variant === "onDark" ? baseOnDark : baseOnSurface,
@@ -133,7 +144,7 @@ export function SiteHeading({
     return (
       <Tag
         className={cn(
-          headingBox,
+          alignBox,
           headingLine,
           levelClass[level],
           variant === "onDark" ? accentGradient : accentSolidPrimary,

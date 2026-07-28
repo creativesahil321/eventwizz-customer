@@ -5,6 +5,8 @@ import { Button } from "@/components/ui/button";
 import LocationMap from "./location-map";
 import { useCurrencyFormat } from "@/hooks/use-currency-format";
 import { cn } from "@/lib/utils";
+import { usePreviewNarrowLayout } from "@/hooks/use-preview-narrow-layout";
+import { SiteHeading } from "@/components/public/site-heading";
 
 type LucideIconName = keyof typeof Icons;
 
@@ -49,6 +51,7 @@ export default function BrochureSection({
   omitPricePanel = false,
 }: BrochureSectionProps) {
   const { format: formatMoney } = useCurrencyFormat();
+  const narrowPreview = usePreviewNarrowLayout();
 
   const sanitizeHref = (raw: unknown): string | null => {
     if (typeof raw !== "string") return null;
@@ -113,27 +116,40 @@ export default function BrochureSection({
 
   const gridClass = cn(
     "grid grid-cols-1 gap-4",
-    omitPricePanel
-      ? showDownloads
-        ? "sm:grid-cols-2"
-        : ""
-      : showDownloads
-        ? "sm:grid-cols-2 md:grid-cols-3"
-        : "sm:grid-cols-2",
+    // Mobile / framed Mobile-Tablet: stack like live phone (map → cards).
+    // Desktop preview + live desktop: multi-column grid.
+    !narrowPreview &&
+      (omitPricePanel
+        ? showDownloads
+          ? "sm:grid-cols-2"
+          : ""
+        : showDownloads
+          ? "sm:grid-cols-2 md:grid-cols-3"
+          : "sm:grid-cols-2"),
   );
 
   const pricePanelClass = cn(
     "flex w-full flex-col items-center justify-center rounded-md bg-[var(--color-primary)] px-2 py-5 text-[var(--color-primary-foreground)]",
-    showDownloads && !omitPricePanel && "sm:col-span-2 md:col-span-1",
+    !narrowPreview &&
+      showDownloads &&
+      !omitPricePanel &&
+      "sm:col-span-2 md:col-span-1",
   );
 
   return (
     <section className="py-16 px-4 bg-[color:var(--color-background)]">
       <div className="max-w-7xl mx-auto">
-        <div className="text-center mb-8">
-          <h2 className="text-2xl font-black tracking-tight text-[var(--color-text)] md:text-3xl max-w-4xl mx-auto">
-            Check Out The Latest Dates To Be Released — Get In Quick!
-          </h2>
+        <div className="mb-8 space-y-3 text-center">
+          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[color:var(--color-primary)]">
+            Location
+          </p>
+          <SiteHeading
+            level={2}
+            title="Check Out The Latest Dates To Be Released — Get In Quick!"
+            variant="onSurface"
+            align="center"
+            className="mx-auto !max-w-4xl !text-3xl !font-black tracking-tight md:!text-4xl"
+          />
         </div>
         <section className={gridClass}>
           <section className="w-full overflow-hidden rounded-md">
@@ -149,7 +165,12 @@ export default function BrochureSection({
           {showDownloads ? (
             <section className="flex w-full flex-col items-center justify-center rounded-md bg-[var(--color-primary)] px-2 py-5 text-[var(--color-primary-foreground)]">
               {renderIcon("Download", 24)}
-              <h2 className="py-2 text-base font-bold uppercase sm:py-3 sm:text-lg text-[var(--color-primary-foreground)]">
+              <h2
+                className={cn(
+                  "py-2 text-base font-bold uppercase text-[var(--color-primary-foreground)]",
+                  !narrowPreview && "sm:py-3 sm:text-lg",
+                )}
+              >
                 DOWNLOADS
               </h2>
               {validDownloads.map((item, idx) => (
@@ -157,7 +178,10 @@ export default function BrochureSection({
                   {renderIcon("FileText", 16)}
                   <a
                     href={sanitizeHref(item.download_link[0]) ?? "#"}
-                    className="break-all text-xs text-[var(--color-primary-foreground)] underline sm:text-sm"
+                    className={cn(
+                      "break-all text-xs text-[var(--color-primary-foreground)] underline",
+                      !narrowPreview && "sm:text-sm",
+                    )}
                     target="_blank"
                     rel="noopener noreferrer"
                     onClick={(e) => {
@@ -185,11 +209,19 @@ export default function BrochureSection({
           {!omitPricePanel ? (
             <section className={pricePanelClass}>
               {renderIcon(defaultPrice.icon, 24)}
-              <h2 className="max-w-full break-words px-2 py-2 text-base font-bold uppercase sm:py-3 sm:text-lg">
+              <h2
+                className={cn(
+                  "max-w-full break-words px-2 py-2 text-base font-bold uppercase",
+                  !narrowPreview && "sm:py-3 sm:text-lg",
+                )}
+              >
                 {defaultPrice.title}
               </h2>
               <p
-                className="max-w-full overflow-hidden px-2 text-xs break-words whitespace-normal sm:text-sm"
+                className={cn(
+                  "max-w-full overflow-hidden px-2 text-xs break-words whitespace-normal",
+                  !narrowPreview && "sm:text-sm",
+                )}
                 style={{ wordBreak: "break-word", overflowWrap: "break-word" }}
               >
                 {defaultPrice.description}

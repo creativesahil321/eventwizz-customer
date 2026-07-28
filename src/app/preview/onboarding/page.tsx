@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { ArrowRight, Calendar, Globe, Loader2, MapPin } from "lucide-react";
 import { PreviewProvider } from "@/contexts/preview-context";
+import { PreviewDeviceToolbar } from "@/components/preview/preview-device-toolbar";
+import { PreviewDeviceFrame } from "@/components/preview/preview-device-frame";
 import { SitePreview } from "@/app/(protected)/_shared/sites-essentials/_components/site-preview";
 import { MainLandingSitePreview } from "@/app/(protected)/_shared/sites-essentials/_components/main-landing-site-preview";
 import { SiteEssentialsFormValues } from "@/app/(protected)/_shared/sites-essentials/_lib/schema";
@@ -341,8 +343,14 @@ function OnboardingPreviewContent() {
         hasMultipleLocations ? handlePreviewLocationFromGrid : undefined
       }
     >
-      <div className="min-h-screen bg-white pb-28 sm:pb-32">
-        <div className="min-h-screen">
+      <div className="flex min-h-screen flex-col bg-slate-900 pb-28 sm:pb-32">
+        <div className="fixed inset-x-0 top-4 z-[60] flex justify-center px-4">
+          <PreviewDeviceToolbar />
+        </div>
+        <PreviewDeviceFrame
+          stageClassName="min-h-screen items-stretch bg-slate-900 px-2 pb-8 pt-16 sm:px-4"
+          frameClassName="min-h-[calc(100vh-4rem)]"
+        >
           {/* Main Landing Page */}
           {activeTab === "main-landing" && mainPreviewData && (
             <MainLandingSitePreview
@@ -396,7 +404,7 @@ function OnboardingPreviewContent() {
               )}
             </>
           )}
-        </div>
+        </PreviewDeviceFrame>
 
         <OnboardingPreviewReviewChrome
           hasMultipleLocations={hasMultipleLocations}

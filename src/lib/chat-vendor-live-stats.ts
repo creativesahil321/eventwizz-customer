@@ -15,6 +15,7 @@ import {
   endOfYear,
 } from "date-fns";
 import { formatMoneyLocale, parseFormattedMoney } from "@/lib/currency-format";
+import { getTenantCurrencySymbol } from "@/lib/tenant-currency";
 
 export type VendorChatDashboardSnapshot = {
   current_location_id?: number;
@@ -295,12 +296,13 @@ function n(value: unknown): string {
 }
 
 function money(value: unknown): string {
+  const symbol = getTenantCurrencySymbol();
   if (typeof value === "number" && Number.isFinite(value)) {
-    return formatMoneyLocale(value, "£");
+    return formatMoneyLocale(value, symbol);
   }
-  const parsed = parseFormattedMoney(String(value ?? ""), "£");
+  const parsed = parseFormattedMoney(String(value ?? ""), symbol);
   const amount = Number.isFinite(parsed) ? parsed : 0;
-  return formatMoneyLocale(amount, "£");
+  return formatMoneyLocale(amount, symbol);
 }
 
 /**

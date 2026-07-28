@@ -12,6 +12,8 @@ import {
   buildVendorLiveStatsPromptBlock,
   type VendorChatLiveStats,
 } from "@/lib/chat-vendor-live-stats";
+import { buildLiveEventsPromptBlock } from "@/lib/chat-live-events";
+import type { LiveEvent } from "@/types/theme.types";
 import { tryModelsWithFallback, type FallbackResult } from "../lib/utils";
 import { env } from "@/env";
 
@@ -95,6 +97,8 @@ type ChatContext = {
   contactAddress?: string | null;
   /** Live dashboard + booking summary for logged-in vendors */
   vendorLiveStats?: VendorChatLiveStats | null;
+  /** Theme live_events for public venue storefront booking redirects */
+  liveEvents?: LiveEvent[] | null;
 };
 
 function buildLoggedInUserContextBlock(context: ChatContext): string {
@@ -171,6 +175,9 @@ function buildSystemPrompt(context: ChatContext): string {
     context.accountType === "vendor"
       ? buildVendorLiveStatsPromptBlock(context.vendorLiveStats)
       : "";
+  const liveEventsBlock = isVendorStorefront
+    ? buildLiveEventsPromptBlock(context.liveEvents)
+    : "";
 
   if (isVendorStorefront) {
     return `${getVendorStorefrontChatInstructions({
@@ -188,6 +195,8 @@ function buildSystemPrompt(context: ChatContext): string {
       ${navBlock}
 
       ${liveStatsBlock}
+
+      ${liveEventsBlock}
       
       Use this knowledge to answer questions about the venue site:
       ${VENDOR_STOREFRONT_KNOWLEDGE}

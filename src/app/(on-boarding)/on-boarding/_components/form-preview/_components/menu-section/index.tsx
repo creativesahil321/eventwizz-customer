@@ -1,8 +1,11 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Navigation2 } from "lucide-react";
+import { ChevronRight } from "lucide-react";
 import { addCacheBusting } from "@/lib/image-utils";
+import { usePreviewNarrowLayout } from "@/hooks/use-preview-narrow-layout";
+import { SiteHeading } from "@/components/public/site-heading";
+import { cn } from "@/lib/utils";
 
 type MenuItem = {
   title: string;
@@ -22,6 +25,58 @@ type MenuSectionProps = {
   menu_background_image?: string | null;
 };
 
+/**
+ * Responsive category grid (live + every preview surface):
+ * 1 → centered single column
+ * 2 → 1 col phone / 2 equal cols tablet+
+ * 3 → 1 col until large desktop / 3 equal cols
+ * 4 → 1 col phone / 2x2 tablet / 4 cols wide desktop
+ *
+ * Preview max-container utilities keep framed Mobile/Tablet from inheriting
+ * wide-editor md/lg breakpoints.
+ */
+function menuGridClass(
+  count: number,
+  narrowPreview: boolean,
+): string {
+  if (narrowPreview || count <= 1) return "grid-cols-1";
+
+  switch (count) {
+    case 2:
+      return cn(
+        "grid-cols-1 md:grid-cols-2",
+        "@max-md/preview:!grid-cols-1",
+      );
+    case 3:
+      return cn(
+        "grid-cols-1 lg:grid-cols-3",
+        "@max-lg/preview:!grid-cols-1",
+      );
+    case 4:
+    default:
+      return cn(
+        "grid-cols-1 md:grid-cols-2 xl:grid-cols-4",
+        "@max-md/preview:!grid-cols-1",
+        "@max-xl/preview:md:!grid-cols-2",
+      );
+  }
+}
+
+function menuGridShellClass(count: number): string {
+  switch (count) {
+    case 1:
+      return "mx-auto w-full max-w-xl";
+    case 2:
+      // Tighter shell so two columns don’t float with a huge centre gap
+      return "mx-auto w-full max-w-4xl";
+    case 3:
+      return "mx-auto w-full max-w-6xl";
+    case 4:
+    default:
+      return "mx-auto w-full max-w-7xl";
+  }
+}
+
 export default function MenuSection({
   menu_title,
   menu_description,
@@ -30,6 +85,7 @@ export default function MenuSection({
   menu_background_image,
 }: MenuSectionProps) {
   const [menuBgImageFailed, setMenuBgImageFailed] = useState(false);
+  const narrowPreview = usePreviewNarrowLayout();
 
   useEffect(() => {
     setMenuBgImageFailed(false);
@@ -49,55 +105,40 @@ export default function MenuSection({
     .filter((menu) => menu.name.trim() !== "" && menu.items.length > 0)
     .slice(0, 4);
 
-  const getGridCols = () => {
-    switch (filteredMenus.length) {
-      case 1:
-        return "grid-cols-1";
-      case 2:
-        return "grid-cols-1 sm:grid-cols-2";
-      case 3:
-        return "grid-cols-1 sm:grid-cols-3";
-      case 4:
-      default:
-        return "grid-cols-1 sm:grid-cols-2 lg:grid-cols-4";
-    }
-  };
+  const count = filteredMenus.length;
+  const isSingleMenu = count === 1;
 
   return (
-    <section className="relative w-full bg-[color:var(--color-background)] px-4 py-16">
-      {/* Background — decorative; empty alt + onError so broken URLs never show alt text */}
+    <section className="relative w-full overflow-hidden bg-[color:var(--color-background)] px-4 py-16">
       <div className="absolute inset-0 z-0">
-        {!menuBgImageFailed ? (
+        {menu_background_image && !menuBgImageFailed ? (
           <img
-            src={addCacheBusting(
-              menu_background_image || "/assets/images/events/menus.webp",
-            )}
+            src={addCacheBusting(menu_background_image)}
             alt=""
             aria-hidden
             onError={() => setMenuBgImageFailed(true)}
-            className="absolute inset-0 h-full w-full object-cover opacity-30"
+            className="absolute inset-0 h-full w-full object-cover opacity-40"
           />
         ) : null}
-        {/* Dark overlay */}
-        <div className="absolute inset-0 " />
-        {/* Optional texture overlay */}
-        <div
-          className="absolute inset-0 opacity-20"
-          style={{
-            backgroundImage: `radial-gradient(circle, rgba(255, 255, 255, 0.1) 1px, transparent 1px)`,
-            backgroundSize: "20px 20px",
-          }}
-        />
+        {menu_background_image && !menuBgImageFailed ? (
+          <div className="absolute inset-0 bg-[color:color-mix(in_srgb,var(--color-background)_55%,transparent)]" />
+        ) : null}
       </div>
 
-      {/* Foreground: use body text tokens — secondary-foreground is only for text ON secondary fills */}
-      <div className="relative z-10 max-w-7xl mx-auto text-[var(--color-text)]">
-        <div className="w-full text-center mb-8">
-          <h2 className="text-2xl font-black tracking-tight md:text-3xl max-w-7xl mx-auto">
-            {menu_title || "Heading e.g. Menu"}
-          </h2>
+      <div className="relative z-10 mx-auto max-w-7xl text-[var(--color-text)]">
+        <div className="mb-10 w-full space-y-3 text-center">
+          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[color:var(--color-primary)]">
+            Menu
+          </p>
+          <SiteHeading
+            level={2}
+            title={menu_title?.trim() || "Menu"}
+            variant="onSurface"
+            align="center"
+            className="!text-3xl !font-black tracking-tight md:!text-4xl"
+          />
           <p
-            className="max-w-2xl mx-auto break-words whitespace-normal overflow-hidden text-[var(--color-text-dimmed)]"
+            className="mx-auto max-w-2xl overflow-hidden whitespace-normal break-words text-sm text-[var(--color-text-dimmed)] sm:text-base"
             style={{
               wordBreak: "break-word",
               overflowWrap: "break-word",
@@ -108,65 +149,100 @@ export default function MenuSection({
           </p>
         </div>
 
-        <div
-          className={`grid ${getGridCols()} gap-5 ${
-            filteredMenus.length === 1 ? "justify-items-center" : ""
-          }`}
-        >
-          {filteredMenus.length > 0 &&
-            filteredMenus.map((menu, index) => (
-              <div
-                className={`w-full overflow-hidden ${
-                  filteredMenus.length === 1 ? "max-w-2xl" : ""
-                }`}
-                key={index}
-              >
-                <h3
-                  className={`text-2xl font-bold py-5 break-words overflow-hidden ${
-                    filteredMenus.length === 1 ? "text-center" : "pl-6"
-                  }`}
-                  style={{
-                    wordBreak: "break-word",
-                    overflowWrap: "break-word",
-                  }}
+        {count > 0 ? (
+          <div className={menuGridShellClass(count)}>
+            <div
+              className={cn(
+                "grid items-start gap-8 md:gap-8 lg:gap-10",
+                menuGridClass(count, narrowPreview),
+              )}
+            >
+              {filteredMenus.map((menu, index) => (
+                <div
+                  className={cn(
+                    "min-w-0 overflow-hidden",
+                    isSingleMenu
+                      ? "mx-auto w-full justify-self-center"
+                      : "w-full",
+                  )}
+                  key={index}
                 >
-                  {menu.name}
-                </h3>
+                  <h3
+                    className={cn(
+                      "break-words overflow-hidden border-b border-[color:color-mix(in_srgb,var(--color-text)_12%,transparent)] pb-3 pt-1 text-lg font-semibold tracking-tight sm:text-xl",
+                      isSingleMenu ? "px-2 text-center" : "pl-1 text-left",
+                    )}
+                    style={{
+                      fontFamily: "var(--font-heading)",
+                      wordBreak: "break-word",
+                      overflowWrap: "break-word",
+                    }}
+                  >
+                    {menu.name}
+                  </h3>
 
-                {(menu.items ?? []).map((item, idx) => (
-                  <div className="w-full mb-4 overflow-hidden px-2" key={idx}>
-                    <h4 className="text-base sm:text-lg font-bold flex items-start break-words overflow-hidden">
-                      <Navigation2
-                        className="rotate-90 mr-1 sm:mr-2 text-[var(--color-primary)] flex-shrink-0 mt-1"
-                        size={14}
-                      />
-                      <span
-                        className="break-words overflow-hidden flex-1"
-                        style={{
-                          wordBreak: "break-word",
-                          overflowWrap: "break-word",
-                          hyphens: "auto",
-                        }}
+                  <ul className="mt-4 space-y-4">
+                    {(menu.items ?? []).map((item, idx) => (
+                      <li
+                        className={cn(
+                          "w-full px-1",
+                          isSingleMenu && "mx-auto max-w-md",
+                        )}
+                        key={idx}
                       >
-                        {item.title}
-                      </span>
-                    </h4>
-                    <div
-                      className="w-full overflow-hidden whitespace-normal break-words pl-4 text-sm text-[var(--color-text-dimmed)] sm:pl-6 sm:text-base"
-                      style={{
-                        wordBreak: "break-word",
-                        overflowWrap: "break-word",
-                        hyphens: "auto",
-                      }}
-                      dangerouslySetInnerHTML={{
-                        __html: item.description || "",
-                      }}
-                    />
-                  </div>
-                ))}
-              </div>
-            ))}
-        </div>
+                        <h4
+                          className={cn(
+                            "flex items-start gap-2 text-base font-semibold sm:text-lg",
+                            isSingleMenu
+                              ? "justify-center text-center"
+                              : "text-left",
+                          )}
+                        >
+                          <ChevronRight
+                            aria-hidden
+                            className="mt-1 h-4 w-4 shrink-0 text-[color:var(--color-primary)]"
+                            strokeWidth={2.75}
+                          />
+                          <span
+                            className={cn(
+                              "min-w-0 break-words",
+                              isSingleMenu ? "flex-none" : "flex-1",
+                            )}
+                            style={{
+                              wordBreak: "break-word",
+                              overflowWrap: "break-word",
+                              hyphens: "auto",
+                            }}
+                          >
+                            {item.title}
+                          </span>
+                        </h4>
+                        {item.description?.trim() ? (
+                          <div
+                            className={cn(
+                              "mt-0.5 w-full whitespace-normal break-words text-sm leading-relaxed text-[var(--color-text-dimmed)] sm:text-[0.95rem]",
+                              isSingleMenu
+                                ? "pl-0 text-center"
+                                : "pl-6 text-left sm:pl-7",
+                            )}
+                            style={{
+                              wordBreak: "break-word",
+                              overflowWrap: "break-word",
+                              hyphens: "auto",
+                            }}
+                            dangerouslySetInnerHTML={{
+                              __html: item.description,
+                            }}
+                          />
+                        ) : null}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : null}
       </div>
     </section>
   );

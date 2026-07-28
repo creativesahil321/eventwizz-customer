@@ -16,7 +16,13 @@ import {
   FileText,
 } from "lucide-react";
 import Link from "next/link";
-import { useContext, useState, useEffect, useMemo, type RefObject } from "react";
+import {
+  useContext,
+  useState,
+  useEffect,
+  useMemo,
+  type RefObject,
+} from "react";
 import { ServerContext } from "@/lib/server-context";
 import { LucideIcon } from "lucide-react";
 import { useSession } from "next-auth/react";
@@ -35,6 +41,7 @@ import {
   useIsPreviewModeFromProvider,
   useIsPreviewMode,
 } from "@/contexts/preview-context";
+import { usePreviewNarrowLayout } from "@/hooks/use-preview-narrow-layout";
 import type { HeaderDownloadLink } from "@/lib/event-header-downloads";
 import { resolvePublicPageContact } from "@/lib/resolve-venue-contact";
 import {
@@ -63,8 +70,7 @@ function useCustomerCartVisibility() {
   const { data: session } = useSession();
   const isPreviewMode = useIsPreviewMode();
   return useCartVisibility({
-    enabled:
-      session?.user?.account_type === "customer" && !isPreviewMode,
+    enabled: session?.user?.account_type === "customer" && !isPreviewMode,
   });
 }
 
@@ -86,7 +92,10 @@ function CartOrLocationSlot({
       return (
         <CartButton
           size="icon"
-          className={iconTriggerClassName ?? `p-2 transition-colors ${textColorClass} ${hoverColorClass}`}
+          className={
+            iconTriggerClassName ??
+            `p-2 transition-colors ${textColorClass} ${hoverColorClass}`
+          }
         />
       );
     }
@@ -104,7 +113,10 @@ function CartOrLocationSlot({
       <VendorPublicLocationBookNow
         variant="icon"
         pillGlassOnHero={pillGlassOnHero}
-        iconTriggerClassName={iconTriggerClassName ?? `p-2 transition-colors rounded-md ${textColorClass} ${hoverColorClass}`}
+        iconTriggerClassName={
+          iconTriggerClassName ??
+          `p-2 transition-colors rounded-md ${textColorClass} ${hoverColorClass}`
+        }
         align={align ?? "end"}
       />
     );
@@ -221,11 +233,24 @@ export default function CommonHeader({
 }: CommonHeaderProps) {
   const { theme } = useContext(ServerContext);
   const isPreviewFromProvider = useIsPreviewModeFromProvider();
+  const isPreviewPath = useIsPreviewMode();
+  /**
+   * Site/event/onboarding preview — render guest-facing chrome.
+   * Hide portal-only items (Dashboard / Continue Onboarding / Cart), but still
+   * show Log In / Register so the preview matches how public visitors see the site
+   * (vendors are authenticated while editing, which would otherwise strip those).
+   */
+  const isPreviewChrome =
+    variant === "preview" ||
+    variant === "onboarding" ||
+    isPreviewFromProvider ||
+    isPreviewPath;
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
   const { data: session, status } = useSession();
   const isAuthenticated = status === "authenticated";
-  // const isPreviewMode = useIsPreviewMode(); // Currently unused but available for future use
+  /** Guest auth CTAs in preview even when the editor session is signed in. */
+  const showGuestAuthLinks = isPreviewChrome || !isAuthenticated;
 
   // Handle scroll effect (window or embedded preview scroll container)
   useEffect(() => {
@@ -292,21 +317,18 @@ export default function CommonHeader({
             },
           ]
         : []),
-      // Only show login button if not authenticated
-      ...(isAuthenticated
-        ? []
-        : [
+      // Guest auth: live guests when signed out; always in preview (guest look)
+      ...(showGuestAuthLinks
+        ? [
             {
               link: "/auth/login",
               linkText: "Log In",
             },
-          ]),
-      // Only show register button if not authenticated
-      ...(isAuthenticated
-        ? []
-        : [{ link: "/auth/register", linkText: "Register" }]),
-      // Show dashboard (or continue onboarding) when authenticated
-      ...(isAuthenticated && session?.user?.account_type
+            { link: "/auth/register", linkText: "Register" },
+          ]
+        : []),
+      // Dashboard / Continue Onboarding is portal chrome — never show in site preview
+      ...(isAuthenticated && session?.user?.account_type && !isPreviewChrome
         ? [
             session.user.account_type === "vendor" && !session.user.isOnboarded
               ? {
@@ -433,8 +455,7 @@ export default function CommonHeader({
     (variant === "preview" && isPreviewFromProvider);
 
   const sessionPending = status === "loading";
-  const commerceSlotLoading =
-    !useNonInteractiveChrome && sessionPending;
+  const commerceSlotLoading = !useNonInteractiveChrome && sessionPending;
   const showHeaderCart =
     !useNonInteractiveChrome && !sessionPending && isAuthenticated;
   const showGuestLocationSwitcher =
@@ -521,13 +542,69 @@ export default function CommonHeader({
       ? "dark:bg-background"
       : "dark:bg-[color:var(--color-header)]";
 
-  /** Nested onboarding/site preview scrolls inside a panel — sticky, not viewport-fixed. */
+  /** Nested / framed previews scroll inside a panel — sticky, not viewport-fixed. */
   const usesEmbeddedScrollPanel = Boolean(scrollContainerRef);
+  const usesStickyHeader = variant === "preview" || usesEmbeddedScrollPanel;
+  /**
+   * Framed preview (onboarding / site / event): follow `@container/preview` on the
+   * device frame — never the editor viewport, and never a self-sized header
+   * container (that can grow with pill content and keep “desktop” labels at
+   * tablet widths → overlap).
+   *
+   * Tablet/Mobile device mode: force hamburger chrome via the preview store.
+   * Live pages: normal viewport breakpoints.
+   */
+  const isPreviewNarrow = usePreviewNarrowLayout();
+  const usePreviewContainerQueries =
+    variant === "preview" ||
+    usesEmbeddedScrollPanel ||
+    isPreviewFromProvider ||
+    isPreviewPath;
+
+  const desktopHeaderVisibility = isPreviewNarrow
+    ? "hidden"
+    : usePreviewContainerQueries
+      ? "hidden @lg/preview:flex"
+      : "hidden lg:flex";
+  const mobileHeaderVisibility = isPreviewNarrow
+    ? "grid"
+    : usePreviewContainerQueries
+      ? "@lg/preview:hidden"
+      : "lg:hidden";
+
+  /** Icon-first until the *frame* (preview) or viewport (live) is wide enough. */
+  const desktopActionLabelClass = usePreviewContainerQueries
+    ? "hidden @xl/preview:inline"
+    : "hidden xl:inline";
+  /**
+   * Phone numbers are the longest header label. In framed preview (onboarding side
+   * panel) always show the icon only — container queries often disagree with the
+   * visible panel width and leave icon + full number stacked/overlapping.
+   */
+  const desktopPhoneLabelClass = usePreviewContainerQueries
+    ? "sr-only"
+    : "hidden 2xl:inline";
+  const desktopIconActionClass = usePreviewContainerQueries
+    ? "inline-flex h-9 w-9 shrink-0 items-center justify-center gap-0 !px-0 @xl/preview:h-auto @xl/preview:w-auto @xl/preview:gap-1.5 @xl/preview:!px-3"
+    : "inline-flex h-9 w-9 shrink-0 items-center justify-center gap-0 !px-0 xl:h-auto xl:w-auto xl:gap-1.5 xl:!px-3";
+  const desktopPhoneIconActionClass = usePreviewContainerQueries
+    ? "inline-flex h-9 w-9 shrink-0 items-center justify-center gap-0 !px-0 box-border"
+    : "inline-flex h-9 w-9 shrink-0 items-center justify-center gap-0 !px-0 box-border 2xl:h-auto 2xl:w-auto 2xl:gap-1.5 2xl:!px-3";
+  const browseIconVisibilityClass = usePreviewContainerQueries
+    ? "h-4 w-4 shrink-0 @xl/preview:hidden"
+    : "h-4 w-4 shrink-0 xl:hidden";
+  const logoSizeClass = usePreviewContainerQueries
+    ? "max-h-10 max-w-[min(100%,7.5rem)] w-auto object-contain @xl/preview:max-h-12 @xl/preview:max-w-[min(100%,11rem)]"
+    : "max-h-10 max-w-[min(100%,7.5rem)] w-auto object-contain xl:max-h-12 xl:max-w-[min(100%,11rem)]";
+  // Keep actions above the logo column so a wide mark cannot cover/clip the phone pill.
+  const desktopActionsRowClass = usePreviewContainerQueries
+    ? "relative z-10 flex min-w-0 w-1/3 flex-nowrap items-center justify-end gap-1 text-xs @xl/preview:gap-2 @xl/preview:text-sm"
+    : "relative z-10 flex min-w-0 w-1/3 flex-nowrap items-center justify-end gap-1 text-xs xl:gap-2 xl:text-sm";
 
   return (
     <section
       className={cn(
-        usesEmbeddedScrollPanel
+        usesStickyHeader
           ? "sticky top-0 z-50 w-full transition-all duration-300"
           : "fixed top-0 left-0 right-0 z-50 transition-all duration-300",
         styles.container,
@@ -536,25 +613,38 @@ export default function CommonHeader({
         className,
       )}
     >
-      <div className="container mx-auto">
-        {/* Desktop Header */}
+      <div className="container mx-auto min-w-0 px-2 sm:px-4">
+        {/* Desktop Header — mirrors live site; container-aware when embedded */}
         <div
           className={cn(
-            "hidden md:flex justify-between items-center py-3",
+            desktopHeaderVisibility,
+            "justify-between items-center py-3",
             variant === "default" && styles.textColor,
           )}
         >
           <div
-            className={`flex items-center gap-3 w-1/3 ${
-              variant === "preview" && previewBackButtonOffset
-                ? "pl-[11.5rem]"
-                : ""
-            }`}
+            className={cn(
+              "flex min-w-0 w-1/3 items-center gap-3",
+              variant === "preview" &&
+                previewBackButtonOffset &&
+                "pl-[11.5rem]",
+            )}
           >
             {!hideBrowseEvents &&
               (useNonInteractiveChrome ? (
-                <div className={cn(topBarPillDisabledClass, styles.textColor)}>
-                  {headerData.browseEvent.linkText}
+                <div
+                  className={cn(
+                    topBarPillDisabledClass,
+                    styles.textColor,
+                    "inline-flex items-center gap-1.5",
+                    desktopIconActionClass,
+                  )}
+                  aria-label={headerData.browseEvent.linkText}
+                >
+                  <Calendar className={browseIconVisibilityClass} />
+                  <span className={desktopActionLabelClass}>
+                    {headerData.browseEvent.linkText}
+                  </span>
                 </div>
               ) : (
                 <Link
@@ -563,21 +653,27 @@ export default function CommonHeader({
                     topBarPillClass,
                     styles.textColor,
                     styles.hoverColor,
+                    "inline-flex items-center gap-1.5",
+                    desktopIconActionClass,
                   )}
+                  aria-label={headerData.browseEvent.linkText}
                 >
-                  {headerData.browseEvent.linkText}
+                  <Calendar className={browseIconVisibilityClass} />
+                  <span className={desktopActionLabelClass}>
+                    {headerData.browseEvent.linkText}
+                  </span>
                 </Link>
               ))}
           </div>
-          <div className="w-1/3 text-center">
+          <div className="relative z-0 w-1/3 min-w-0 overflow-hidden px-2 text-center">
             {useNonInteractiveChrome ? (
-              <div className="h-14 flex items-center justify-center cursor-default">
+              <div className="flex h-14 max-w-full items-center justify-center cursor-default">
                 {logoPath ? (
                   <img
                     src={addCacheBusting(logoPath as string)}
                     width={200}
                     height={116}
-                    className="max-h-12 w-auto object-contain"
+                    className={logoSizeClass}
                     alt={vendorTheme?.name || "EventWizz"}
                   />
                 ) : (
@@ -590,14 +686,18 @@ export default function CommonHeader({
                 )}
               </div>
             ) : (
-              <Link href="/" aria-label="Home">
-                <div className="h-14 flex items-center justify-center">
+              <Link
+                href="/"
+                aria-label="Home"
+                className="inline-flex max-w-full"
+              >
+                <div className="flex h-14 max-w-full items-center justify-center">
                   {logoPath ? (
                     <img
                       src={addCacheBusting(logoPath as string)}
                       width={200}
                       height={116}
-                      className="max-h-12 w-auto object-contain"
+                      className={logoSizeClass}
                       alt={vendorTheme?.name || "EventWizz"}
                     />
                   ) : (
@@ -612,9 +712,7 @@ export default function CommonHeader({
               </Link>
             )}
           </div>
-          <div
-            className={`flex items-center gap-2 sm:gap-3 w-1/3 justify-end text-xs sm:text-sm`}
-          >
+          <div className={desktopActionsRowClass}>
             {/* Cart (signed-in) or public location switcher (guest) */}
             {useNonInteractiveChrome ? (
               <>
@@ -622,16 +720,18 @@ export default function CommonHeader({
                   disabled
                   pillGlassOnHero={pillGlassOnHero}
                 />
-                {isAuthenticated ? (
+                {isAuthenticated && !isPreviewChrome ? (
                   <div
                     className={cn(
                       "flex items-center gap-1",
                       topBarPillDisabledClass,
                       styles.textColor,
+                      desktopIconActionClass,
                     )}
+                    aria-label="Cart"
                   >
-                    <ShoppingCart size={16} />
-                    <span>Cart</span>
+                    <ShoppingCart size={16} className="shrink-0" />
+                    <span className={desktopActionLabelClass}>Cart</span>
                   </div>
                 ) : null}
               </>
@@ -666,11 +766,13 @@ export default function CommonHeader({
                       "flex max-w-[min(100%,15rem)] shrink-0 items-center gap-1",
                       topBarPillDisabledClass,
                       styles.textColor,
+                      desktopIconActionClass,
                     )}
+                    aria-label={singleHeaderDownload.title}
                     aria-hidden
                   >
                     <FileText size={16} className="shrink-0" />
-                    <span className="truncate">
+                    <span className={cn("truncate", desktopActionLabelClass)}>
                       {singleHeaderDownload.title}
                     </span>
                   </div>
@@ -680,11 +782,13 @@ export default function CommonHeader({
                       "flex shrink-0 items-center gap-1",
                       topBarPillDisabledClass,
                       styles.textColor,
+                      desktopIconActionClass,
                     )}
+                    aria-label="Downloads"
                     aria-hidden
                   >
                     <Download size={16} className="shrink-0" />
-                    <span>Downloads</span>
+                    <span className={desktopActionLabelClass}>Downloads</span>
                   </div>
                 )
               ) : singleHeaderDownload ? (
@@ -697,14 +801,19 @@ export default function CommonHeader({
                     topBarPillClass,
                     styles.textColor,
                     styles.hoverColor,
+                    desktopIconActionClass,
                   )}
                   onClick={handleLinkClick}
+                  aria-label={singleHeaderDownload.title}
+                  title={singleHeaderDownload.title}
                 >
                   <FileText
                     size={16}
                     className={cn("shrink-0", downloadsFileIconClass)}
                   />
-                  <span className="truncate">{singleHeaderDownload.title}</span>
+                  <span className={cn("truncate", desktopActionLabelClass)}>
+                    {singleHeaderDownload.title}
+                  </span>
                 </a>
               ) : multipleHeaderDownloads ? (
                 <DropdownMenu>
@@ -716,11 +825,12 @@ export default function CommonHeader({
                         topBarPillClass,
                         styles.textColor,
                         styles.hoverColor,
+                        desktopIconActionClass,
                       )}
                       aria-label="Downloads"
                     >
                       <Download size={16} className="shrink-0" />
-                      <span>Downloads</span>
+                      <span className={desktopActionLabelClass}>Downloads</span>
                     </button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent
@@ -756,11 +866,34 @@ export default function CommonHeader({
               ) : null)}
 
             {desktopNavLinkEntries.map(({ icon, link, linkText }, index) => {
-              const IconComponent = icon ? iconComponents[icon] : null;
               const isPhoneNumber = icon === "phone";
+              const isDashboard =
+                linkText === "Dashboard" || linkText === "Continue Onboarding";
+              const isAuthLink =
+                linkText === "Log In" || linkText === "Register";
+              const IconComponent = icon
+                ? iconComponents[icon]
+                : isDashboard
+                  ? LayoutDashboard
+                  : linkText === "Log In"
+                    ? LogIn
+                    : linkText === "Register"
+                      ? UserPlus
+                      : null;
+              const iconOnlyUntilXl =
+                isPhoneNumber || isDashboard || isAuthLink;
+              const iconActionClass = isPhoneNumber
+                ? desktopPhoneIconActionClass
+                : iconOnlyUntilXl
+                  ? desktopIconActionClass
+                  : undefined;
+              const labelClass = isPhoneNumber
+                ? desktopPhoneLabelClass
+                : iconOnlyUntilXl
+                  ? desktopActionLabelClass
+                  : undefined;
 
-              const useDisabledNavLink =
-                useNonInteractiveChrome && !link.startsWith("tel:");
+              const useDisabledNavLink = useNonInteractiveChrome;
 
               if (useDisabledNavLink) {
                 return (
@@ -769,28 +902,20 @@ export default function CommonHeader({
                     className={cn(
                       "flex items-center gap-1",
                       topBarPillDisabledClass,
-                      "px-2 sm:px-3",
+                      iconActionClass,
+                      !iconOnlyUntilXl && "px-2 sm:px-3",
                       styles.textColor,
                     )}
-                    title={isPhoneNumber ? linkText : undefined}
+                    title={linkText}
+                    aria-label={linkText}
                   >
                     {IconComponent && (
                       <IconComponent
-                        size={14}
-                        className="sm:w-4 sm:h-4 flex-shrink-0"
+                        size={16}
+                        className="h-4 w-4 flex-shrink-0"
                       />
                     )}
-                    <span
-                      className={`${
-                        isPhoneNumber ? "text-[10px] sm:text-xs md:text-sm" : ""
-                      } ${
-                        isPhoneNumber
-                          ? "truncate max-w-[80px] sm:max-w-[120px] md:max-w-[160px] lg:max-w-none"
-                          : ""
-                      }`}
-                    >
-                      {linkText}
-                    </span>
+                    <span className={labelClass}>{linkText}</span>
                   </div>
                 );
               }
@@ -803,29 +928,21 @@ export default function CommonHeader({
                   className={cn(
                     "flex items-center gap-1",
                     topBarPillClass,
-                    "px-2 sm:px-3",
+                    iconActionClass,
+                    !iconOnlyUntilXl && "px-2 sm:px-3",
                     styles.textColor,
                     styles.hoverColor,
                   )}
-                  title={isPhoneNumber ? linkText : undefined}
+                  title={linkText}
+                  aria-label={linkText}
                 >
                   {IconComponent && (
                     <IconComponent
-                      size={14}
-                      className="sm:w-4 sm:h-4 flex-shrink-0"
+                      size={16}
+                      className="h-4 w-4 flex-shrink-0"
                     />
                   )}
-                  <span
-                    className={`${
-                      isPhoneNumber ? "text-[10px] sm:text-xs md:text-sm" : ""
-                    } ${
-                      isPhoneNumber
-                        ? "truncate max-w-[80px] sm:max-w-[120px] md:max-w-[160px] lg:max-w-none"
-                        : ""
-                    }`}
-                  >
-                    {linkText}
-                  </span>
+                  <span className={labelClass}>{linkText}</span>
                 </Link>
               );
             })}
@@ -837,11 +954,13 @@ export default function CommonHeader({
                     "flex items-center gap-1.5",
                     topBarPillDisabledClass,
                     styles.textColor,
+                    desktopIconActionClass,
                   )}
+                  aria-label="Account"
                   aria-hidden
                 >
                   <UserCircle size={16} className="shrink-0" />
-                  <span>Account</span>
+                  <span className={desktopActionLabelClass}>Account</span>
                 </div>
               ) : (
                 <DropdownMenu>
@@ -853,12 +972,13 @@ export default function CommonHeader({
                         topBarPillClass,
                         styles.textColor,
                         styles.hoverColor,
+                        desktopIconActionClass,
                       )}
                       aria-label="Account menu"
                       aria-haspopup="menu"
                     >
                       <UserCircle size={16} className="shrink-0" />
-                      <span>Account</span>
+                      <span className={desktopActionLabelClass}>Account</span>
                     </button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent
@@ -896,8 +1016,13 @@ export default function CommonHeader({
           </div>
         </div>
 
-        {/* Mobile Header */}
-        <div className="md:hidden grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-1.5 py-2.5 min-h-[3.25rem]">
+        {/* Mobile Header — tablet/phone preview + live below lg */}
+        <div
+          className={cn(
+            mobileHeaderVisibility,
+            "grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-1.5 py-2.5 min-h-[3.25rem]",
+          )}
+        >
           <button
             type="button"
             onClick={toggleMobileMenu}
@@ -931,7 +1056,11 @@ export default function CommonHeader({
                 )}
               </div>
             ) : (
-              <Link href="/" aria-label="Home" className="flex max-w-full min-w-0">
+              <Link
+                href="/"
+                aria-label="Home"
+                className="flex max-w-full min-w-0"
+              >
                 <div className="flex h-9 max-w-full items-center justify-center">
                   {logoPath ? (
                     <img
@@ -966,7 +1095,7 @@ export default function CommonHeader({
                     styles.textColor,
                   )}
                 />
-                {isAuthenticated ? (
+                {isAuthenticated && !isPreviewChrome ? (
                   <div
                     className={`flex h-9 w-9 items-center justify-center ${styles.textColor} opacity-60 transition-colors cursor-not-allowed`}
                   >
@@ -1053,7 +1182,10 @@ export default function CommonHeader({
         {/* Mobile Menu Overlay */}
         {mobileMenuOpen && (
           <div
-            className="md:hidden fixed inset-0 bg-black bg-opacity-50 z-40"
+            className={cn(
+              "fixed inset-0 bg-black bg-opacity-50 z-40",
+              mobileHeaderVisibility,
+            )}
             onClick={toggleMobileMenu}
           />
         )}
@@ -1061,7 +1193,8 @@ export default function CommonHeader({
         {/* Mobile Menu Panel */}
         <div
           className={cn(
-            "md:hidden fixed top-0 left-0 z-50 flex h-screen w-[70%] max-w-xs transform flex-col bg-[color:var(--color-header)] text-[var(--color-on-header)] transition-transform duration-300 ease-in-out",
+            "fixed top-0 left-0 z-50 flex h-screen w-[70%] max-w-xs transform flex-col bg-[color:var(--color-header)] text-[var(--color-on-header)] transition-transform duration-300 ease-in-out",
+            mobileHeaderVisibility,
             mobileMenuOpen ? "translate-x-0" : "-translate-x-full",
           )}
         >
@@ -1123,7 +1256,7 @@ export default function CommonHeader({
                     mobileNavIconWrap={mobileNavIconWrap}
                     hoverColorClass={styles.hoverColor}
                   />
-                  {isAuthenticated ? (
+                  {isAuthenticated && !isPreviewChrome ? (
                     <div
                       className={cn(
                         mobileNavRowClass,
@@ -1210,12 +1343,10 @@ export default function CommonHeader({
               )}
 
               {mobileAccountLinks.map(({ link, linkText }, index) => {
-                const useDisabledAccountLink =
-                  useNonInteractiveChrome && !link.startsWith("tel:");
+                const useDisabledAccountLink = useNonInteractiveChrome;
 
                 const AccountIcon =
-                  linkText === "Dashboard" ||
-                  linkText === "Continue Onboarding"
+                  linkText === "Dashboard" || linkText === "Continue Onboarding"
                     ? LayoutDashboard
                     : linkText === "Log In"
                       ? LogIn
@@ -1276,23 +1407,40 @@ export default function CommonHeader({
                 <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-[var(--color-on-header)]/55">
                   Contact
                 </p>
-                <a
-                  href={mobileContactLink.link}
-                  className={cn(
-                    mobileNavRowClass,
-                    "min-h-0 py-1",
-                    styles.hoverColor,
-                    "transition-colors",
-                  )}
-                  onClick={toggleMobileMenu}
-                >
-                  <span className={mobileNavIconWrap} aria-hidden>
-                    <Phone />
-                  </span>
-                  <span className="min-w-0 break-words">
-                    {mobileContactLink.linkText}
-                  </span>
-                </a>
+                {useNonInteractiveChrome ? (
+                  <div
+                    className={cn(
+                      mobileNavRowClass,
+                      "min-h-0 cursor-not-allowed py-1 opacity-60",
+                    )}
+                    aria-label={mobileContactLink.linkText}
+                  >
+                    <span className={mobileNavIconWrap} aria-hidden>
+                      <Phone />
+                    </span>
+                    <span className="min-w-0 break-words">
+                      {mobileContactLink.linkText}
+                    </span>
+                  </div>
+                ) : (
+                  <a
+                    href={mobileContactLink.link}
+                    className={cn(
+                      mobileNavRowClass,
+                      "min-h-0 py-1",
+                      styles.hoverColor,
+                      "transition-colors",
+                    )}
+                    onClick={toggleMobileMenu}
+                  >
+                    <span className={mobileNavIconWrap} aria-hidden>
+                      <Phone />
+                    </span>
+                    <span className="min-w-0 break-words">
+                      {mobileContactLink.linkText}
+                    </span>
+                  </a>
+                )}
               </div>
             )}
           </nav>

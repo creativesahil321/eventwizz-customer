@@ -1,6 +1,6 @@
 "use client";
 
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient, keepPreviousData } from "@tanstack/react-query";
 import { useSession } from "next-auth/react";
 import { useMemo } from "react";
 import { notificationService } from "@/services/common/notification/notification.service";
@@ -44,6 +44,8 @@ export const useNotifications = (filters: NotificationFilters = {}) => {
   return useQuery<NotificationResponse>({
     queryKey: notificationKeys.list(filters),
     queryFn: () => notificationService.getNotifications(filters),
+    // Keep previous list visible while search/filter refetches — avoids full-page skeleton flash
+    placeholderData: keepPreviousData,
     staleTime: 1000 * 60 * 5, // 5 minutes
     gcTime: 1000 * 60 * 10, // 10 minutes
   });

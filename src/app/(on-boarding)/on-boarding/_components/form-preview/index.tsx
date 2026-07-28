@@ -36,6 +36,8 @@ import { normalizeSlug } from "@/lib/utils";
 import { scrollToElementIfNeeded } from "@/lib/scroll-to-element-if-needed";
 import { useRoomManager } from "../rooms/use-room-manager";
 import { listOnboardingPreviewRoomSummaries } from "../rooms/list-onboarding-preview-room-summaries";
+import { PreviewDeviceToolbar } from "@/components/preview/preview-device-toolbar";
+import { PreviewDeviceFrame } from "@/components/preview/preview-device-frame";
 
 const HEADER_OFFSET_PX = 72;
 
@@ -110,9 +112,19 @@ const ONBOARDING_THEME_PREVIEW_STEPS = new Set([2, 3, 4, 5, 6, 7, 8, 9]);
 /** Event preview onward — room floating selector is for event pages only, not Site (step 2). */
 const EVENT_PREVIEW_ROOM_SELECTOR_STEPS = new Set([3, 4, 5, 6, 7, 8, 9]);
 
+/** Onboarding preview: no social URLs collected yet — suppress theme icons. */
+const EMPTY_ONBOARDING_FOOTER_SOCIAL_LINKS = {
+  facebook: "",
+  twitter: "",
+  instagram: "",
+  linkedin: "",
+  youtube: "",
+} as const;
+
 // Only load components needed for the current step
 export default function FormPreview() {
-  const { form, activeStep, activeField, previewTheme } = useFormContext();
+  const { form, activeStep, activeField, previewTheme, setActiveStep } =
+    useFormContext();
   const currencySymbol = useCurrencySymbol();
   const [formState, setFormState] = useState<OnboardingFormData>(
     form.getValues(),
@@ -148,6 +160,27 @@ export default function FormPreview() {
         tryThemePreviewValues.typography?.headingEmphasis ?? null,
     };
   }, [tryThemePreviewValues, activeStep]);
+
+  /**
+   * Footer contact must reflect the onboarding draft (stepOne), not the logged-in
+   * vendor's saved theme — otherwise the preview footer shows the real account
+   * email/phone/address instead of what the vendor is entering.
+   */
+  const onboardingFooterContact = useMemo(
+    () => ({
+      phone: formState.stepOne?.contact_number || null,
+      email: formState.stepOne?.email || null,
+      address: formState.stepOne?.address || null,
+    }),
+    [
+      formState.stepOne?.contact_number,
+      formState.stepOne?.email,
+      formState.stepOne?.address,
+    ],
+  );
+
+  /** Onboarding does not collect social URLs — never leak live vendor theme icons. */
+  const onboardingFooterSocialLinks = EMPTY_ONBOARDING_FOOTER_SOCIAL_LINKS;
 
   const activePreviewBrochure = useMemo(() => {
     const ms = formState.multiSpace;
@@ -311,6 +344,12 @@ export default function FormPreview() {
   const [roomSelectorScrollVisible, setRoomSelectorScrollVisible] =
     useState(false);
 
+  /** Site preview event cards → jump to Event step (same idea as `/preview/onboarding`). */
+  const handlePreviewEventSelect = useCallback(() => {
+    void setActiveStep(3);
+    previewContainerRef.current?.scrollTo({ top: 0, behavior: "smooth" });
+  }, [setActiveStep]);
+
   const {
     enabled: roomsEnabled,
     rooms: managedRooms,
@@ -334,10 +373,14 @@ export default function FormPreview() {
         : null;
     return listOnboardingPreviewRoomSummaries(managedRooms, banner);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [roomsEnabled, managedRooms, formState.stepThree?.event_banner_image, formTick]);
+  }, [
+    roomsEnabled,
+    managedRooms,
+    formState.stepThree?.event_banner_image,
+    formTick,
+  ]);
 
-  const showRoomChooser =
-    showRoomFloatingSelector && roomSummaries.length >= 2;
+  const showRoomChooser = showRoomFloatingSelector && roomSummaries.length >= 2;
 
   const roomContentKey =
     managedRooms[currentRoomIndex]?.id ?? `room-${currentRoomIndex}`;
@@ -368,19 +411,26 @@ export default function FormPreview() {
       const chooser = chooserRef.current;
       if (!chooser) {
         setRoomSelectorScrollVisible(
-          container.scrollTop > container.clientHeight * 0.6,
+          container.scrollTop > Math.min(280, container.clientHeight * 0.35),
         );
         return;
       }
       const chooserRect = chooser.getBoundingClientRect();
       const containerRect = container.getBoundingClientRect();
       const bottomRelative = chooserRect.bottom - containerRect.top;
-      setRoomSelectorScrollVisible(bottomRelative <= HEADER_OFFSET_PX + 8);
+      // Show sticky room bar once the in-page chooser has scrolled under the header.
+      setRoomSelectorScrollVisible(bottomRelative <= HEADER_OFFSET_PX + 24);
     };
 
     handleScroll();
     container.addEventListener("scroll", handleScroll, { passive: true });
-    return () => container.removeEventListener("scroll", handleScroll);
+    // Device frame width changes (Desktop/Tablet/Mobile) can move chooser geometry.
+    const ro = new ResizeObserver(() => handleScroll());
+    ro.observe(container);
+    return () => {
+      container.removeEventListener("scroll", handleScroll);
+      ro.disconnect();
+    };
   }, [showRoomChooser, activeStep]);
 
   const activePreviewPackage = useMemo(() => {
@@ -696,9 +746,7 @@ export default function FormPreview() {
 
   const hasPreviewFaqs = useMemo(() => {
     const faqs = formState.stepNine?.faqs ?? [];
-    return faqs.some(
-      (faq) => faq.question?.trim() || faq.answer?.trim(),
-    );
+    return faqs.some((faq) => faq.question?.trim() || faq.answer?.trim());
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [formState.stepNine?.faqs, formTick]);
 
@@ -810,6 +858,8 @@ export default function FormPreview() {
         <FooterSection
           copyright={tv.copyright}
           logo={resolveOnboardingLogoUrl(formState.stepTwo?.logo)}
+          contactOverride={onboardingFooterContact}
+          socialLinksOverride={onboardingFooterSocialLinks}
         />
       </div>
     );
@@ -862,6 +912,34 @@ export default function FormPreview() {
     const showTimelineSection =
       hasTimelineTitle || hasTimelineSubtitle || hasTimelineRows;
 
+    const hasPackagePreview = Boolean(
+      activeStep === 4 ||
+      String(activePreviewPackage?.package_title ?? "").trim() ||
+      String(activePreviewPackage?.package_description ?? "").trim() ||
+      activePreviewPackage?.package_image ||
+      (activePreviewPackage?.package_details?.length ?? 0) > 0,
+    );
+
+    const showDatesPreview = activeStep === 5 || datesPreviewItems.length > 0;
+
+    const menuBackgroundImage = (() => {
+      const raw = activePreviewCatering?.menu_background_image;
+      if (!raw) return undefined;
+      if (typeof raw === "string") return raw;
+      if (raw instanceof File) {
+        return (raw as File & { preview?: string }).preview ?? undefined;
+      }
+      if (
+        typeof raw === "object" &&
+        raw !== null &&
+        "preview" in raw &&
+        typeof (raw as { preview?: string }).preview === "string"
+      ) {
+        return (raw as { preview: string }).preview;
+      }
+      return undefined;
+    })();
+
     return (
       <div className="event-detail-page">
         {/* Same header chrome as live event detail (`EventDetailClient`); non-interactive when inside PreviewProvider. */}
@@ -871,9 +949,7 @@ export default function FormPreview() {
           logo={formState.stepTwo?.logo || null}
           headerDownloads={previewHeaderDownloads}
           showRoomSelector={showRoomFloatingSelector}
-          roomSelectorVisible={
-            showRoomChooser && roomSelectorScrollVisible
-          }
+          roomSelectorVisible={showRoomChooser && roomSelectorScrollVisible}
           onRoomChange={handleRoomChange}
         />
 
@@ -983,64 +1059,72 @@ export default function FormPreview() {
           </div>
         )}
 
-        {/* Package */}
-        <div
-          ref={packageRef}
-          className={`transition-all duration-300 ${getHighlightClass(
-            4,
-            "package",
-          )}`}
-        >
-          <Suspense fallback={<SectionLoader />}>
-            <RoomContentTransition roomKey={roomContentKey}>
-              <PackageSection
-                heading={activePreviewPackage?.package_title || ""}
-                image={
-                  typeof activePreviewPackage?.package_image === "string"
-                    ? {
-                        path: activePreviewPackage.package_image,
-                        relativePath: activePreviewPackage.package_image,
-                        preview: activePreviewPackage.package_image,
-                      }
-                    : activePreviewPackage?.package_image || null
-                }
-                subHeading={activePreviewPackage?.package_description || ""}
-                packageDetails={
-                  activePreviewPackage?.package_details?.map((detail) => ({
-                    title: detail.title || "",
-                    description: detail.title || "", // Use title as description since it's not in the schema
-                  })) || []
-                }
-                headingEmphasis={
-                  tryHeroPreviewProps?.headingEmphasis ?? undefined
-                }
-              />
-            </RoomContentTransition>
-          </Suspense>
-        </div>
+        {/* Package — hide empty shell (matches live: only real package content) */}
+        {hasPackagePreview ? (
+          <div
+            ref={packageRef}
+            className={`transition-all duration-300 ${getHighlightClass(
+              4,
+              "package",
+            )}`}
+          >
+            <Suspense fallback={<SectionLoader />}>
+              <RoomContentTransition roomKey={roomContentKey}>
+                <PackageSection
+                  heading={activePreviewPackage?.package_title || ""}
+                  image={
+                    typeof activePreviewPackage?.package_image === "string"
+                      ? {
+                          path: activePreviewPackage.package_image,
+                          relativePath: activePreviewPackage.package_image,
+                          preview: activePreviewPackage.package_image,
+                        }
+                      : activePreviewPackage?.package_image || null
+                  }
+                  subHeading={activePreviewPackage?.package_description || ""}
+                  packageDetails={
+                    activePreviewPackage?.package_details?.map((detail) => ({
+                      title: detail.title || "",
+                      description: detail.title || "",
+                    })) || []
+                  }
+                  headingEmphasis={
+                    tryHeroPreviewProps?.headingEmphasis ?? undefined
+                  }
+                />
+              </RoomContentTransition>
+            </Suspense>
+          </div>
+        ) : (
+          <div ref={packageRef} className="hidden" aria-hidden />
+        )}
 
-        {/* Event Dates */}
-        <div
-          id="booking"
-          ref={datesRef}
-          className={`${EVENT_BOOKING_SECTION_CLASSNAME} transition-all duration-300 ${getHighlightClass(
-            5,
-            "dates",
-          )}`}
-        >
-          <Suspense fallback={<SectionLoader />}>
-            <RoomContentTransition roomKey={roomContentKey}>
-              <DatesSection
-                dates={datesPreviewItems}
-                eventSlug={previewEventSlug}
-                eventName={formState.stepThree?.event_name || undefined}
-                eventImage={datesEventImage}
-                roomId={activePreviewRoomScope.roomId}
-                roomIndex={activePreviewRoomScope.roomIndex}
-              />
-            </RoomContentTransition>
-          </Suspense>
-        </div>
+        {/* Event Dates — real dates, or visible while editing the dates step */}
+        {showDatesPreview ? (
+          <div
+            id="booking"
+            ref={datesRef}
+            className={`${EVENT_BOOKING_SECTION_CLASSNAME} transition-all duration-300 ${getHighlightClass(
+              5,
+              "dates",
+            )}`}
+          >
+            <Suspense fallback={<SectionLoader />}>
+              <RoomContentTransition roomKey={roomContentKey}>
+                <DatesSection
+                  dates={datesPreviewItems}
+                  eventSlug={previewEventSlug}
+                  eventName={formState.stepThree?.event_name || undefined}
+                  eventImage={datesEventImage}
+                  roomId={activePreviewRoomScope.roomId}
+                  roomIndex={activePreviewRoomScope.roomIndex}
+                />
+              </RoomContentTransition>
+            </Suspense>
+          </div>
+        ) : (
+          <div id="booking" ref={datesRef} className="hidden" aria-hidden />
+        )}
 
         {/* Event Gallery — optional; hidden until at least one image is uploaded */}
         <div
@@ -1069,26 +1153,13 @@ export default function FormPreview() {
                 menu_description={activePreviewCatering?.menu_description || ""}
                 catering_option={activePreviewCatering?.catering_option ?? 1}
                 menus={activePreviewCatering?.menus || []}
+                menu_background_image={menuBackgroundImage}
               />
             </Suspense>
           )}
         </div>
 
-        {/*more_info and faqs */}
-        <div
-          ref={moreInfoRef}
-          className={`transition-all duration-300 ${getHighlightClass(
-            7,
-            "more_info",
-          )}`}
-        >
-          <BrochureSection
-            location={activePreviewBrochureLocation}
-            downloads={downloadsArray}
-            price={activePreviewBrochurePrice}
-          />
-        </div>
-        {/* Other Packages */}
+        {/* Drinks — before brochure, same order as live event page */}
         <div
           ref={drinkRef}
           className={`transition-all duration-300 ${getHighlightClass(
@@ -1117,6 +1188,21 @@ export default function FormPreview() {
           )}
         </div>
 
+        {/* Location / downloads / prices — after drinks, same as live */}
+        <div
+          ref={moreInfoRef}
+          className={`transition-all duration-300 ${getHighlightClass(
+            7,
+            "more_info",
+          )}`}
+        >
+          <BrochureSection
+            location={activePreviewBrochureLocation}
+            downloads={downloadsArray}
+            price={activePreviewBrochurePrice}
+          />
+        </div>
+
         {/* FAQs — same visibility rule as live event page */}
         <div
           ref={faqRef}
@@ -1138,21 +1224,29 @@ export default function FormPreview() {
         <FooterSection
           logo={resolveOnboardingLogoUrl(formState.stepTwo?.logo)}
           copyright={tryThemePreviewValues?.copyright ?? undefined}
+          contactOverride={onboardingFooterContact}
+          socialLinksOverride={onboardingFooterSocialLinks}
         />
       </div>
     );
   };
 
   return (
-    <PreviewProvider isPreviewMode={true}>
+    <PreviewProvider
+      isPreviewMode={true}
+      onEventSelect={handlePreviewEventSelect}
+    >
       <section className="relative isolate flex h-full min-h-0 w-full flex-col overflow-hidden bg-slate-950">
-        <div
+        <div className="flex shrink-0 items-center justify-center gap-2 border-b border-white/10 bg-slate-950/90 px-3 py-2">
+          <PreviewDeviceToolbar />
+        </div>
+        <PreviewDeviceFrame
           ref={previewContainerRef}
-          className="max-w-full min-h-0 flex-1 overflow-y-auto overflow-x-hidden scroll-smooth"
+          stageClassName="bg-slate-950 px-2 pb-2 pt-1 sm:px-3"
+          frameClassName="bg-[color:var(--color-background,#fff)]"
         >
-          {/* Avoid transform on this wrapper — it breaks sticky/fixed header inside the scroll panel. */}
+          {/* Avoid transform / overflow-x-hidden here — both break sticky header + room bar. */}
           <div className="w-full min-h-0 min-w-0 max-w-full">
-            {/* Room floating selector is rendered outside the scroll container (see below) */}
             {ONBOARDING_THEME_PREVIEW_STEPS.has(activeStep) &&
             tryThemePreviewValues ? (
               <div
@@ -1177,9 +1271,7 @@ export default function FormPreview() {
               renderFullSitePreview()
             )}
           </div>
-        </div>
-
-        {/* Room floating selector lives inside event preview header chrome (see OnboardingPreviewHeader). */}
+        </PreviewDeviceFrame>
       </section>
     </PreviewProvider>
   );

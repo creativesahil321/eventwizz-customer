@@ -33,6 +33,7 @@ const MoreInfoTab = lazy(() => import("./tabs/more-info-tab"));
 const FaqsTab = lazy(() => import("./tabs/faqs-tab"));
 const PublishTab = lazy(() => import("./tabs/publish-tab"));
 import { EventPreview } from "../event-preview";
+import { PreviewProvider } from "@/contexts/preview-context";
 import { useEventData } from "../../_lib/hooks/useEventData";
 import { useEventPreviewNavigation } from "../../_lib/use-event-preview-navigation";
 import { useParams } from "next/navigation";
@@ -909,13 +910,15 @@ export default function TabEventForm() {
                   </div>
                 </TabsContent>
 
-                {/* Live Preview (read-only) */}
+                {/* Live Preview (read-only) — full-width desktop embed (device switcher is onboarding-only) */}
                     <TabsContent value="preview" className="mt-0 w-full">
-                  <div className="bg-white rounded-lg p-0 sm:p-0">
-                    <EventPreview
-                      data={(eventData as { data?: object })?.data || {}}
-                      embedInShell
-                    />
+                  <div className="h-[min(70vh,720px)] max-h-[min(80vh,calc(100dvh-12rem))] overflow-hidden rounded-lg border border-slate-200/80 shadow-sm bg-white">
+                    <PreviewProvider isPreviewMode>
+                      <EventPreview
+                        data={(eventData as { data?: object })?.data || {}}
+                        embedInShell
+                      />
+                    </PreviewProvider>
                   </div>
                 </TabsContent>
               </div>

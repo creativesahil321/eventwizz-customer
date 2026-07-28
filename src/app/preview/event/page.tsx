@@ -29,6 +29,8 @@ import { eventsService } from "@/services/vendor/events/events.service";
 import { stepEightSchema } from "@/app/(protected)/vendor/events/_components/tab-event-form/schema";
 import { useSitePreviewStore } from "@/store/site-preview.store";
 import { PreviewProvider } from "@/contexts/preview-context";
+import { PreviewDeviceToolbar } from "@/components/preview/preview-device-toolbar";
+import { PreviewDeviceFrame } from "@/components/preview/preview-device-frame";
 import { useSiteEssentialsQuery } from "@/app/(protected)/_shared/sites-essentials/_lib/queries";
 import { SiteEssentialsFormValues } from "@/app/(protected)/_shared/sites-essentials/_lib/schema";
 import { useToast } from "@/components/ui/use-toast";
@@ -306,12 +308,46 @@ function EventPreviewPageContent() {
 
   return (
     <PreviewProvider isPreviewMode={true}>
-      <div className="relative min-h-screen">
-        {/* Event Preview - Full screen without any wrapper controls */}
-        <EventPreview
-          data={eventData.data as EventDetailData}
-          siteEssentials={siteEssentials}
-        />
+      <div className="relative flex min-h-screen flex-col bg-slate-900">
+        <div className="pointer-events-none fixed inset-x-0 top-0 z-[60] flex flex-wrap items-start justify-between gap-3 px-4 pt-4 sm:px-6">
+          <Button
+            variant="event-primary"
+            onClick={handleGoBack}
+            size="sm"
+            className="pointer-events-auto shrink-0 shadow-md ring-1 ring-black/10"
+          >
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            Back to Editor
+          </Button>
+          <div className="pointer-events-auto">
+            <PreviewDeviceToolbar />
+          </div>
+          <div className="pointer-events-auto flex shrink-0 items-center justify-end">
+            <Button
+              type="button"
+              variant="event-primary"
+              size="sm"
+              disabled={!eventPayloadRoot || isEventCancelled || isPublishing}
+              onClick={() => setPublishDialogOpen(true)}
+              className="shadow-md ring-1 ring-black/10"
+            >
+              <Rocket className="mr-2 h-4 w-4" />
+              Publish event
+            </Button>
+          </div>
+        </div>
+
+        <PreviewDeviceFrame
+          stageClassName="min-h-screen items-stretch bg-slate-900 px-2 pb-6 pt-16 sm:px-4"
+          frameClassName="flex h-[calc(100vh-4.5rem)] max-h-[calc(100vh-4.5rem)] flex-col"
+          scrollable={false}
+        >
+          <EventPreview
+            data={eventData.data as EventDetailData}
+            siteEssentials={siteEssentials}
+            embedInShell
+          />
+        </PreviewDeviceFrame>
 
         <AlertDialog
           open={publishDialogOpen}
@@ -346,31 +382,6 @@ function EventPreviewPageContent() {
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
-
-        <div className="pointer-events-none fixed left-4 right-4 top-4 z-[60] flex flex-wrap items-start justify-between gap-3 isolate sm:right-6 sm:left-6">
-          <Button
-            variant="event-primary"
-            onClick={handleGoBack}
-            size="sm"
-            className="pointer-events-auto shrink-0 shadow-md ring-1 ring-black/10"
-          >
-            <ArrowLeft className="mr-2 h-4 w-4" />
-            Back to Editor
-          </Button>
-          <div className="pointer-events-auto flex shrink-0 items-center justify-end">
-            <Button
-              type="button"
-              variant="event-primary"
-              size="sm"
-              disabled={!eventPayloadRoot || isEventCancelled || isPublishing}
-              onClick={() => setPublishDialogOpen(true)}
-              className="shadow-md ring-1 ring-black/10"
-            >
-              <Rocket className="mr-2 h-4 w-4" />
-              Publish event
-            </Button>
-          </div>
-        </div>
       </div>
     </PreviewProvider>
   );

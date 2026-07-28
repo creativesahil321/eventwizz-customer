@@ -45,8 +45,6 @@ export default function StepEleven() {
   const [disconnecting, setDisconnecting] = useState<
     CardProvider | "truelayer" | null
   >(null);
-  const [stripeWebhookUrl, setStripeWebhookUrl] = useState<string | null>(null);
-  const [paypalWebhookUrl, setPaypalWebhookUrl] = useState<string | null>(null);
   const [truelayerWebhookUrl, setTruelayerWebhookUrl] = useState<string | null>(
     null,
   );
@@ -189,13 +187,11 @@ export default function StepEleven() {
           status: undefined,
           account_id: "",
         });
-        setStripeWebhookUrl(null);
       } else if (gateway === "paypal") {
         form.setValue("payment_gateways.paypal", {
           status: undefined,
           account_id: "",
         });
-        setPaypalWebhookUrl(null);
       } else {
         form.setValue("payment_gateways.truelayer", {
           status: undefined,
@@ -214,13 +210,11 @@ export default function StepEleven() {
           status: undefined,
           account_id: "",
         });
-        setStripeWebhookUrl(null);
       } else if (gateway === "paypal") {
         form.setValue("payment_gateways.paypal", {
           status: undefined,
           account_id: "",
         });
-        setPaypalWebhookUrl(null);
       } else {
         form.setValue("payment_gateways.truelayer", {
           status: undefined,
@@ -295,7 +289,6 @@ export default function StepEleven() {
         account_id: accountId,
       });
       syncGlobalGateways();
-      setStripeWebhookUrl(response.data?.webhook_url || null);
       void updateSession({ has_payment_provider: true });
     } catch (error) {
       toast.dismiss(loadingToast);
@@ -327,7 +320,6 @@ export default function StepEleven() {
         account_id: accountId,
       });
       syncGlobalGateways();
-      setPaypalWebhookUrl(response.data?.webhook_url || null);
       void updateSession({ has_payment_provider: true });
     } catch (error) {
       toast.dismiss(loadingToast);
@@ -353,8 +345,10 @@ export default function StepEleven() {
 
       if (response && response.status) {
         globalForm.setValue("stepEleven", skippedData);
+        // Skipping payment still completes onboarding — mark the session
+        // onboarded before navigating (see onSubmit for rationale).
         await Promise.all([
-          updateSession({ on_boarding_step: 11 }),
+          updateSession({ on_boarding_step: 11, isOnboarded: true }),
           save(),
         ]).catch((error) => {
           console.error("Background save error:", error);
@@ -417,9 +411,14 @@ export default function StepEleven() {
       if (response && response.status) {
         globalForm.setValue("stepEleven", { ...data, isApproved: true });
 
+        // Completing the final step marks onboarding as done. Persist
+        // `isOnboarded` into the session *before* navigating so the server-side
+        // vendor/welcome guards (which read the JWT) don't bounce the vendor
+        // back to /on-boarding.
         await Promise.all([
           updateSession({
             on_boarding_step: 11,
+            isOnboarded: true,
             ...(hasAnyActiveGateway ? { has_payment_provider: true } : {}),
           }),
           save(),
@@ -519,8 +518,6 @@ export default function StepEleven() {
                       truelayerAccountId={
                         paymentGateways?.truelayer?.account_id
                       }
-                      stripeWebhookUrl={stripeWebhookUrl}
-                      paypalWebhookUrl={paypalWebhookUrl}
                       truelayerWebhookUrl={truelayerWebhookUrl}
                       truelayerWebhookHint={truelayerWebhookHint}
                       truelayerPublicKey={truelayerPublicKey}

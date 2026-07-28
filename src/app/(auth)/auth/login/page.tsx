@@ -25,7 +25,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
   return (
     <>
       <div className="flex flex-col space-y-2 text-center mb-8">
-        <h1 className="text-2xl font-semibold tracking-tight text-black">
+        <h1 className="font-heading text-2xl font-semibold tracking-tight text-black">
           Sign in
         </h1>
         <p className="text-sm text-black">

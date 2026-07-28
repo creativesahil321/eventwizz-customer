@@ -12,6 +12,8 @@ import { ParticleEngine } from "./particle-engine";
 import { AmbientOverlay } from "./ambient-overlay";
 import { ThemeCSSEffects } from "./theme-css-effects";
 import { ThemeSVGOverlays } from "./theme-svg-overlays";
+import { useIsPreviewMode } from "@/contexts/preview-context";
+import { cn } from "@/lib/utils";
 
 // ---------------------------------------------------------------------------
 // Props
@@ -63,6 +65,20 @@ const DECORATION_CSS = `
   65% { opacity: calc(var(--deco-opa) * 0.85); }
   80% { opacity: calc(var(--deco-opa) * 0.55); }
 }
+
+/* Preview frames: keep FX inside the device frame (not the editor chrome). */
+.theme-animations-contained {
+  position: absolute !important;
+  inset: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  overflow: hidden !important;
+  pointer-events: none !important;
+  z-index: 30;
+}
+.theme-animations-contained .fixed {
+  position: absolute !important;
+}
 `;
 
 if (typeof document !== "undefined") {
@@ -72,6 +88,21 @@ if (typeof document !== "undefined") {
     style.id = "theme-deco-keyframes";
     style.textContent = DECORATION_CSS;
     document.head.appendChild(style);
+  } else if (!existing.textContent?.includes("theme-animations-contained")) {
+    existing.textContent += `
+.theme-animations-contained {
+  position: absolute !important;
+  inset: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  overflow: hidden !important;
+  pointer-events: none !important;
+  z-index: 30;
+}
+.theme-animations-contained .fixed {
+  position: absolute !important;
+}
+`;
   }
 }
 
@@ -193,6 +224,7 @@ export function ThemeAnimationManager({
   enabled = true,
   intensity = "medium",
 }: ThemeAnimationManagerProps) {
+  const isPreviewMode = useIsPreviewMode();
   const detectedTheme = detectTheme(
     themeDetectionSource ?? (eventData as ThemeDetectionInput | null | undefined),
   );
@@ -216,7 +248,10 @@ export function ThemeAnimationManager({
 
   return (
     <div
-      className="theme-animations-container"
+      className={cn(
+        "theme-animations-container",
+        isPreviewMode && "theme-animations-contained",
+      )}
       data-theme={detectedTheme}
       aria-hidden="true"
     >
@@ -227,7 +262,11 @@ export function ThemeAnimationManager({
       <AmbientOverlay config={themeConfig.ambient} />
 
       {/* Layer 3: Canvas Particles (z-10) — atmospheric particle effects */}
-      <ParticleEngine config={themeConfig.particles} intensity={intensity} />
+      <ParticleEngine
+        config={themeConfig.particles}
+        intensity={intensity}
+        contained={isPreviewMode}
+      />
 
       {/* Layer 4: CSS Decorations (z-11) — gradient orbs, rings, streaks at corners */}
       <CSSDecorations decorations={themeConfig.decorations ?? []} />

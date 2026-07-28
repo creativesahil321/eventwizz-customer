@@ -34,6 +34,7 @@ import { EventListingHorizontalScroll } from "../event-listing-horizontal-scroll
 import { SingleEventShowcase } from "../single-event-showcase";
 import { DualEventShowcase } from "../dual-event-showcase";
 import { SiteHeading } from "@/components/public/site-heading";
+import { usePreviewNarrowLayout } from "@/hooks/use-preview-narrow-layout";
 
 export default function UpcomingEvents({
   events: apiEvents,
@@ -43,6 +44,7 @@ export default function UpcomingEvents({
 }: EventComponentProps) {
   const [pendingEventSlug, setPendingEventSlug] = useState<string | null>(null);
   const isSitePreview = useIsPreviewMode();
+  const narrowPreview = usePreviewNarrowLayout();
   const { theme } = useContext(ServerContext);
   const vendorTheme = theme as ThemeSchema;
   const currencySym = resolveCurrencySymbol(vendorTheme?.currency_symbol);
@@ -130,7 +132,12 @@ export default function UpcomingEvents({
             </div>
 
             {/* Professional Event Placeholders */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-5xl mx-auto">
+            <div
+              className={cn(
+                "mx-auto grid max-w-5xl grid-cols-1 gap-8",
+                !narrowPreview && "md:grid-cols-3",
+              )}
+            >
               {[...Array(3)].map((_, i) => (
                 <div key={i} className="group relative">
                   <div className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl p-6 h-80 border border-gray-200 shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1">
@@ -225,9 +232,10 @@ export default function UpcomingEvents({
 
           <div
             className={cn(
-              "grid grid-cols-1 gap-5 sm:grid-cols-2",
-              events.length === 3 && "lg:grid-cols-3",
-              events.length === 4 && "lg:grid-cols-4",
+              "grid grid-cols-1 gap-5",
+              !narrowPreview && "sm:grid-cols-2",
+              !narrowPreview && events.length === 3 && "lg:grid-cols-3",
+              !narrowPreview && events.length === 4 && "lg:grid-cols-4",
             )}
           >
             {events.map((event, index) => (

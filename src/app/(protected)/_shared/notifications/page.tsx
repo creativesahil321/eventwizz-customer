@@ -15,6 +15,7 @@ export default function NotificationsPage() {
     selectedNotification,
     isDetailsOpen,
     isLoading,
+    isListFetching,
     isMarkingAllAsRead,
     userRole,
     handleFilterChange,
@@ -42,6 +43,7 @@ export default function NotificationsPage() {
         meta={formattedMeta}
         filters={filters}
         isLoading={isLoading}
+        isListFetching={isListFetching}
         userRole={userRole}
         unreadCount={stats?.unread ?? 0}
         isMarkingAllAsRead={isMarkingAllAsRead}
@@ -58,7 +60,6 @@ export default function NotificationsPage() {
         isOpen={isDetailsOpen}
         onClose={handleCloseDetails}
         onMarkAsRead={handleMarkAsRead}
-        onMarkAsUnread={handleMarkAsUnread}
       />
     </section>
   );

@@ -4,6 +4,8 @@ import type { LocationEventCardModel } from "./location-event-card";
 import { LocationEventCard } from "./location-event-card";
 import { dualEventShowcaseFrameClass } from "./event-carousel-classes";
 import { SiteHeading } from "@/components/public/site-heading";
+import { usePreviewNarrowLayout } from "@/hooks/use-preview-narrow-layout";
+import { cn } from "@/lib/utils";
 type DualEventShowcaseProps = {
   sectionId: string;
   sectionLabel: string;
@@ -31,6 +33,8 @@ export function DualEventShowcase({
   imageFallbacks,
   footnote,
 }: DualEventShowcaseProps) {
+  const narrowPreview = usePreviewNarrowLayout();
+
   return (
     <section
       id={sectionId}
@@ -50,8 +54,13 @@ export function DualEventShowcase({
         </div>
 
         <div className={dualEventShowcaseFrameClass}>
-          {/* Mobile: stack full-width cards; sm+: side-by-side */}
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-4 md:gap-5">
+          {/* Mobile / narrow preview: stack; desktop: side-by-side */}
+          <div
+            className={cn(
+              "grid grid-cols-1 gap-4",
+              !narrowPreview && "sm:grid-cols-2 sm:gap-4 md:gap-5",
+            )}
+          >
             {events.map((event, index) => (
               <LocationEventCard
                 key={event.slug || index}

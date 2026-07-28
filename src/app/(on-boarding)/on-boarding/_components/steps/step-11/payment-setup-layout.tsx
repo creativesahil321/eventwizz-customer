@@ -506,8 +506,6 @@ export type PaymentSetupLayoutProps = {
   stripeAccountId?: string;
   paypalAccountId?: string;
   truelayerAccountId?: string;
-  stripeWebhookUrl?: string | null;
-  paypalWebhookUrl?: string | null;
   truelayerWebhookUrl?: string | null;
   truelayerWebhookHint?: string | null;
   truelayerPublicKey?: string | null;
@@ -533,8 +531,6 @@ export function PaymentSetupLayout({
   stripeAccountId,
   paypalAccountId,
   truelayerAccountId,
-  stripeWebhookUrl,
-  paypalWebhookUrl,
   truelayerWebhookUrl,
   truelayerWebhookHint,
   truelayerPublicKey,
@@ -585,43 +581,23 @@ export function PaymentSetupLayout({
         </p>
 
         {stripeConnected ? (
-          <>
-            <ConnectedRow
-              icon={<StripeIcon />}
-              title="Stripe linked"
-              detailLabel="Publishable key"
-              detailValue={stripeAccountId}
-              onDisconnect={onDisconnectStripe}
-              disconnecting={disconnecting === "stripe"}
-            />
-            {stripeWebhookUrl ? (
-              <WebhookBox
-                url={stripeWebhookUrl}
-                providerLabel="Stripe"
-                consoleHref="https://dashboard.stripe.com/webhooks"
-                consoleLabel="Open Stripe webhooks"
-              />
-            ) : null}
-          </>
+          <ConnectedRow
+            icon={<StripeIcon />}
+            title="Stripe linked"
+            detailLabel="Publishable key"
+            detailValue={stripeAccountId}
+            onDisconnect={onDisconnectStripe}
+            disconnecting={disconnecting === "stripe"}
+          />
         ) : paypalConnected ? (
-          <>
-            <ConnectedRow
-              icon={<PayPalIcon />}
-              title="PayPal linked"
-              detailLabel="Client ID"
-              detailValue={paypalAccountId}
-              onDisconnect={onDisconnectPayPal}
-              disconnecting={disconnecting === "paypal"}
-            />
-            {paypalWebhookUrl ? (
-              <WebhookBox
-                url={paypalWebhookUrl}
-                providerLabel="PayPal"
-                consoleHref="https://developer.paypal.com/dashboard/"
-                consoleLabel="Open PayPal Dashboard"
-              />
-            ) : null}
-          </>
+          <ConnectedRow
+            icon={<PayPalIcon />}
+            title="PayPal linked"
+            detailLabel="Client ID"
+            detailValue={paypalAccountId}
+            onDisconnect={onDisconnectPayPal}
+            disconnecting={disconnecting === "paypal"}
+          />
         ) : (
           <>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">

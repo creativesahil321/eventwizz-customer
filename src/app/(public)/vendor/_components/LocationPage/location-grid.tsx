@@ -11,6 +11,7 @@ import Image from "next/image";
 import { shouldUseNextImageOptimization } from "@/lib/image-utils";
 import { SiteHeading } from "@/components/public/site-heading";
 import { cn } from "@/lib/utils";
+import { usePreviewNarrowLayout } from "@/hooks/use-preview-narrow-layout";
 
 interface LocationGridProps {
   locations: (VenueLocation | LocationData)[];
@@ -32,10 +33,16 @@ export default function LocationGrid({
   onSelect,
 }: LocationGridProps) {
   const [pendingSlug, setPendingSlug] = useState<string | null>(null);
+  const narrowPreview = usePreviewNarrowLayout();
 
   if (isLoading) {
     return (
-      <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
+      <div
+        className={cn(
+          "grid grid-cols-1 gap-6",
+          !narrowPreview && "md:grid-cols-3",
+        )}
+      >
         {Array(6)
           .fill(0)
           .map((_, idx) => (
@@ -81,8 +88,12 @@ export default function LocationGrid({
         locations.length === 1 &&
           "mx-auto max-w-sm grid-cols-1 justify-items-center",
         locations.length === 2 &&
-          "mx-auto max-w-3xl grid-cols-1 md:grid-cols-2",
-        locations.length >= 3 && "grid-cols-1 md:grid-cols-3",
+          cn(
+            "mx-auto max-w-3xl grid-cols-1",
+            !narrowPreview && "md:grid-cols-2",
+          ),
+        locations.length >= 3 &&
+          cn("grid-cols-1", !narrowPreview && "md:grid-cols-3"),
       )}
     >
       <AnimatePresence>

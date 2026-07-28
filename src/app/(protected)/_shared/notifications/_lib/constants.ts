@@ -16,57 +16,60 @@ export const NOTIFICATION_STATUSES = [
   { value: "unread", label: "Unread" },
 ];
 
+/**
+ * Feed chips map 1:1 to the API `filter` query param
+ * (e.g. `?filter=bookings`, `?filter=customers`).
+ */
 export type NotificationFeedFilter = {
   id: string;
   label: string;
-  type: "all" | "status" | "category";
-  value?: string;
+  /** Omit for "All" (no `filter` query param). */
+  filter?:
+    | "unread"
+    | "bookings"
+    | "payments"
+    | "customers"
+    | "system";
 };
 
 const FEED_FILTER_ALL: NotificationFeedFilter = {
   id: "all",
   label: "All",
-  type: "all",
 };
 
 const FEED_FILTER_UNREAD: NotificationFeedFilter = {
   id: "unread",
   label: "Unread",
-  type: "status",
-  value: "unread",
+  filter: "unread",
 };
 
 const FEED_FILTER_BOOKINGS: NotificationFeedFilter = {
   id: "bookings",
   label: "Bookings",
-  type: "category",
-  value: "order",
+  filter: "bookings",
 };
 
 const FEED_FILTER_PAYMENTS: NotificationFeedFilter = {
   id: "payments",
   label: "Payments",
-  type: "category",
-  value: "payment",
+  filter: "payments",
 };
 
-const FEED_FILTER_CUSTOMER: NotificationFeedFilter = {
-  id: "customer",
-  label: "Customer",
-  type: "category",
-  value: "customer",
+const FEED_FILTER_CUSTOMERS: NotificationFeedFilter = {
+  id: "customers",
+  label: "Customers",
+  filter: "customers",
 };
 
 const FEED_FILTER_SYSTEM: NotificationFeedFilter = {
   id: "system",
   label: "System",
-  type: "category",
-  value: "system",
+  filter: "system",
 };
 
 /**
  * Role-aware feed chips.
- * "Customer" is only for vendor/admin (customer activity alerts) — never on customer dashboards.
+ * "Customers" is only for vendor/admin — never on customer dashboards.
  */
 export function getNotificationFeedFilters(
   role: UserRole | string | null | undefined,
@@ -89,7 +92,7 @@ export function getNotificationFeedFilters(
     FEED_FILTER_UNREAD,
     FEED_FILTER_BOOKINGS,
     FEED_FILTER_PAYMENTS,
-    FEED_FILTER_CUSTOMER,
+    FEED_FILTER_CUSTOMERS,
     FEED_FILTER_SYSTEM,
   ];
 }

@@ -3,7 +3,9 @@
 import { useMemo, useState } from "react";
 import { addCacheBusting } from "@/lib/image-utils";
 import { GalleryLightbox } from "@/components/public/gallery-lightbox";
+import { SiteHeading } from "@/components/public/site-heading";
 import { cn } from "@/lib/utils";
+import { usePreviewNarrowLayout } from "@/hooks/use-preview-narrow-layout";
 
 type PackageImage = {
   path: string;
@@ -30,12 +32,40 @@ function resolveImageSrc(image: PackageImage | File | null | string) {
   return "/assets/images/gallery-image.png";
 }
 
+function galleryShellClass(count: number): string {
+  if (count <= 1) return "mx-auto w-full max-w-xl";
+  if (count === 2) return "mx-auto w-full max-w-3xl";
+  if (count === 3) return "mx-auto w-full max-w-5xl";
+  return "mx-auto w-full max-w-7xl";
+}
+
+function galleryGridClass(count: number, narrowPreview: boolean): string {
+  if (narrowPreview || count <= 1) return "grid grid-cols-1 gap-4";
+  if (count === 2) {
+    return cn(
+      "grid grid-cols-1 gap-4 md:grid-cols-2",
+      "@max-md/preview:!grid-cols-1",
+    );
+  }
+  if (count === 3) {
+    return cn(
+      "grid grid-cols-1 gap-4 md:grid-cols-3",
+      "@max-md/preview:!grid-cols-1",
+    );
+  }
+  return cn(
+    "grid grid-cols-2 gap-4 md:grid-cols-4",
+    "@max-md/preview:!grid-cols-2",
+  );
+}
+
 export default function EventGallery({
   gallery,
   galleryTitle,
 }: PackageSectionProps) {
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState(0);
+  const narrowPreview = usePreviewNarrowLayout();
 
   const title = galleryTitle || "Captured Moments";
 
@@ -49,6 +79,9 @@ export default function EventGallery({
   if (imageSrcs.length === 0) {
     return null;
   }
+
+  const firstRow = imageSrcs.slice(0, Math.min(4, imageSrcs.length));
+  const secondRow = imageSrcs.slice(4, 8);
 
   const openAt = (index: number) => {
     setActiveIndex(index);
@@ -83,24 +116,39 @@ export default function EventGallery({
   );
 
   return (
-    <section className="w-full bg-[color:var(--color-background)] py-16 px-4">
-      <div className="max-w-7xl mx-auto">
-        <div className="text-center mb-8">
-          <h2 className="text-2xl font-black tracking-tight text-[var(--color-text)] md:text-3xl">
-            {title}
-          </h2>
-          <p className="mt-2 text-sm text-[var(--color-text-dimmed)]">
+    <section className="w-full bg-[color:var(--color-background)] px-4 py-16">
+      <div className="mx-auto max-w-7xl">
+        <div className="mb-8 space-y-3 text-center">
+          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[color:var(--color-primary)]">
+            Gallery
+          </p>
+          <SiteHeading
+            level={2}
+            title={title}
+            variant="onSurface"
+            align="center"
+            className="!text-3xl !font-black tracking-tight md:!text-4xl"
+          />
+          <p className="text-sm text-[var(--color-text-dimmed)]">
             Tap an image to view the full gallery
           </p>
         </div>
 
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          {imageSrcs.slice(0, 4).map((src, i) => renderTile(src, i))}
+        <div className={galleryShellClass(firstRow.length)}>
+          <div
+            className={galleryGridClass(firstRow.length, narrowPreview)}
+          >
+            {firstRow.map((src, i) => renderTile(src, i))}
+          </div>
         </div>
 
-        {imageSrcs.length > 4 ? (
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4">
-            {imageSrcs.slice(4, 8).map((src, i) => renderTile(src, i + 4))}
+        {secondRow.length > 0 ? (
+          <div className={cn(galleryShellClass(secondRow.length), "mt-4")}>
+            <div
+              className={galleryGridClass(secondRow.length, narrowPreview)}
+            >
+              {secondRow.map((src, i) => renderTile(src, i + 4))}
+            </div>
           </div>
         ) : null}
       </div>

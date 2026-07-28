@@ -158,8 +158,8 @@ export const defaultValues: OnboardingFormData = {
     city: "",
     reminder_email_before_days: 0,
     domain: "",
+    domain_suffix: "eventwizz.com",
     confirm_domain: false,
-
   },
   stepEleven: {
     isApproved: false,

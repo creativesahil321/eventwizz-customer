@@ -1,6 +1,5 @@
 "use client";
 
-import { useState } from "react";
 import {
   Dialog,
   DialogContent,
@@ -16,7 +15,7 @@ import {
   resolveNotificationPresentation,
 } from "../_lib/notification-ui";
 import { useRouter } from "next/navigation";
-import { ChevronRight, Loader2, X } from "lucide-react";
+import { ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface NotificationDetailsProps {
@@ -24,7 +23,6 @@ interface NotificationDetailsProps {
   isOpen: boolean;
   onClose: () => void;
   onMarkAsRead: (id: number, options?: { onSettled?: () => void }) => void;
-  onMarkAsUnread: (id: number, options?: { onSettled?: () => void }) => void;
 }
 
 export function NotificationDetailsComponent({
@@ -32,9 +30,7 @@ export function NotificationDetailsComponent({
   isOpen,
   onClose,
   onMarkAsRead,
-  onMarkAsUnread,
 }: NotificationDetailsProps) {
-  const [isUpdating, setIsUpdating] = useState(false);
   const router = useRouter();
   if (!notification) return null;
 
@@ -107,49 +103,8 @@ export function NotificationDetailsComponent({
           </div>
         </div>
 
-        <DialogFooter className="flex-row items-center justify-between gap-2 border-t border-[var(--color-border)] bg-muted/20 px-5 py-3 sm:justify-between">
-          <div className="flex items-center gap-2">
-            <Button variant="event-outline" size="sm" onClick={onClose}>
-              <X className="size-4" />
-              Close
-            </Button>
-
-            {isUnread ? (
-              <Button
-                variant="event-outline"
-                size="sm"
-                disabled={isUpdating}
-                onClick={() => {
-                  setIsUpdating(true);
-                  onMarkAsRead(id, { onSettled: () => setIsUpdating(false) });
-                }}
-              >
-                {isUpdating ? (
-                  <Loader2 className="size-4 animate-spin" />
-                ) : null}
-                Mark as read
-              </Button>
-            ) : (
-              <Button
-                variant="event-outline"
-                size="sm"
-                disabled={isUpdating}
-                onClick={() => {
-                  setIsUpdating(true);
-                  onMarkAsUnread(id, {
-                    onSettled: () => setIsUpdating(false),
-                  });
-                }}
-              >
-                {isUpdating ? (
-                  <Loader2 className="size-4 animate-spin" />
-                ) : null}
-                Mark as unread
-              </Button>
-            )}
-          </div>
-
-          {hasActionLink ? (
+        {hasActionLink ? (
+          <DialogFooter className="flex-row items-center justify-end gap-2 border-t border-[var(--color-border)] bg-muted/20 px-5 py-3 sm:justify-end">
             <Button
               variant="event-primary"
               size="sm"
@@ -158,8 +113,8 @@ export function NotificationDetailsComponent({
               {notification.action_label?.trim() || "Open"}
               <ChevronRight className="size-4" />
             </Button>
-          ) : null}
-        </DialogFooter>
+          </DialogFooter>
+        ) : null}
       </DialogContent>
     </Dialog>
   );

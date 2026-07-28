@@ -1,14 +1,11 @@
-/**
- * Date Card Component
- * Individual date card for event booking
- */
-
 "use client";
 
 import { motion } from "framer-motion";
 import { getDateInfo } from "@/lib/utils";
 import { DatesSectionType } from ".";
 import { useCurrencyFormat } from "@/hooks/use-currency-format";
+import { usePreviewNarrowLayout } from "@/hooks/use-preview-narrow-layout";
+import { cn } from "@/lib/utils";
 
 interface DateCardProps {
   dateItem: DatesSectionType[0];
@@ -24,11 +21,17 @@ export const DateCard = ({
   isFirstRow = false,
 }: DateCardProps) => {
   const { formatCompact: formatMoneyCompact } = useCurrencyFormat();
+  const narrowPreview = usePreviewNarrowLayout();
   const dateInfo = getDateInfo(dateItem);
 
   return (
     <motion.div
-      className="cursor-pointer border border-[var(--color-primary)] rounded-2xl overflow-hidden text-center w-[85px] sm:w-[100px] md:w-[120px] flex-shrink-0 shadow-[0_0_15px_rgba(60,70,147,0.25)] bg-transparent transition-all duration-300 hover:shadow-[0_0_25px_rgba(60,70,147,0.5)] hover:border-[var(--color-primary)] hover:bg-gradient-to-b hover:from-[var(--color-primary)]/10 hover:to-transparent"
+      className={cn(
+        "cursor-pointer overflow-hidden rounded-2xl border border-[var(--color-primary)] bg-transparent text-center shadow-[0_0_15px_rgba(60,70,147,0.25)] transition-all duration-300 hover:border-[var(--color-primary)] hover:bg-gradient-to-b hover:from-[var(--color-primary)]/10 hover:to-transparent hover:shadow-[0_0_25px_rgba(60,70,147,0.5)] flex-shrink-0",
+        narrowPreview
+          ? "w-[85px]"
+          : "w-[85px] sm:w-[100px] md:w-[120px]",
+      )}
       key={`${isFirstRow ? "first" : "second"}-${index}`}
       initial={{ opacity: 1, y: 0 }}
       animate={{ opacity: 1, y: 0 }}
@@ -41,14 +44,37 @@ export const DateCard = ({
       whileTap={{ scale: 0.98 }}
       onClick={() => onDateClick(dateItem)}
     >
-      <div className="p-2 sm:p-3">
-        <p className="text-xs sm:text-sm mb-0.5 sm:mb-1">{dateInfo.day}</p>
-        <p className="text-3xl sm:text-4xl md:text-5xl font-bold py-1">
+      <div className={narrowPreview ? "p-2" : "p-2 sm:p-3"}>
+        <p
+          className={
+            narrowPreview
+              ? "mb-0.5 text-xs"
+              : "mb-0.5 text-xs sm:mb-1 sm:text-sm"
+          }
+        >
+          {dateInfo.day}
+        </p>
+        <p
+          className={
+            narrowPreview
+              ? "py-1 text-3xl font-bold"
+              : "py-1 text-3xl font-bold sm:text-4xl md:text-5xl"
+          }
+        >
           {dateInfo.date}
         </p>
-        <p className="text-xs sm:text-sm">{dateInfo.month}</p>
+        <p className={narrowPreview ? "text-xs" : "text-xs sm:text-sm"}>
+          {dateInfo.month}
+        </p>
       </div>
-      <div className="bg-gradient-to-b from-[var(--color-primary)] to-[#232a61] text-white text-xl sm:text-2xl tracking-wider py-1 sm:py-1.5">
+      <div
+        className={cn(
+          "bg-gradient-to-b from-[var(--color-primary)] to-[#232a61] tracking-wider text-white",
+          narrowPreview
+            ? "py-1 text-xl"
+            : "py-1 text-xl sm:py-1.5 sm:text-2xl",
+        )}
+      >
         {formatMoneyCompact(Number.parseFloat(String(dateInfo.price)))}
       </div>
     </motion.div>

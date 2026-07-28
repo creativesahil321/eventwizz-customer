@@ -32,6 +32,7 @@ import { EventListingHorizontalScroll } from "../event-listing-horizontal-scroll
 import { SingleEventShowcase } from "../single-event-showcase";
 import { DualEventShowcase } from "../dual-event-showcase";
 import { SiteHeading } from "@/components/public/site-heading";
+import { usePreviewNarrowLayout } from "@/hooks/use-preview-narrow-layout";
 
 export default function PopularEvents({
   events: apiEvents,
@@ -43,6 +44,7 @@ export default function PopularEvents({
   const { theme } = useContext(ServerContext);
   const vendorTheme = theme as ThemeSchema;
   const currencySym = resolveCurrencySymbol(vendorTheme?.currency_symbol);
+  const narrowPreview = usePreviewNarrowLayout();
 
   const sectionTitleText =
     sectionTitle || vendorTheme?.event_title_1 || "Popular Events";
@@ -127,9 +129,10 @@ export default function PopularEvents({
 
           <div
             className={cn(
-              "grid grid-cols-1 gap-5 sm:grid-cols-2",
-              events.length === 3 && "lg:grid-cols-3",
-              events.length === 4 && "lg:grid-cols-4",
+              "grid grid-cols-1 gap-5",
+              !narrowPreview && "sm:grid-cols-2",
+              !narrowPreview && events.length === 3 && "lg:grid-cols-3",
+              !narrowPreview && events.length === 4 && "lg:grid-cols-4",
             )}
           >
             {events.map((event, index) => (

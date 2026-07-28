@@ -88,6 +88,17 @@ export interface LatestUpcomingEvent {
 }
 
 /**
+ * Lightweight live/bookable event from GET /theme/settings → data.live_events.
+ * Used by the public chatbot for direct booking redirects.
+ */
+export interface LiveEvent {
+  title: string;
+  slug: string;
+  location_slug: string;
+  location_city: string;
+}
+
+/**
  * Location data structure with event information
  * Theme `/theme/settings` may include per-location contact fields.
  */
@@ -144,6 +155,12 @@ export interface ThemeSchema {
 
   // Location data
   locations?: LocationData[];
+
+  /**
+   * Active/bookable events for public chat redirects.
+   * Keep lean: title + slugs only (no heavy event payloads).
+   */
+  live_events?: LiveEvent[];
 
   // Landing page content fields
   banner_heading?: string;
@@ -304,6 +321,9 @@ export interface ThemeSettings {
   website_role: string;
   /** Resolved display symbol for money formatting */
   currency_symbol: string;
+  /** Active/bookable events for chatbot booking redirects */
+  live_events?: LiveEvent[];
+  locations?: LocationData[];
 }
 
 /**

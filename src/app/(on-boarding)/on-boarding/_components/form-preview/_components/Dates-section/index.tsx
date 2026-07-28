@@ -33,9 +33,11 @@ import {
 import { reconcileLocalCartWithApi } from "@/lib/utils/cart-sync-helper";
 import { useOnboarding } from "@/hooks/use-onboarding";
 import { useIsPreviewMode } from "@/contexts/preview-context";
+import { usePreviewNarrowLayout } from "@/hooks/use-preview-narrow-layout";
 import { addCacheBusting } from "@/lib/image-utils";
 import { useCurrencySymbol } from "@/hooks/use-currency-format";
 import { cn } from "@/lib/utils";
+import { SiteHeading } from "@/components/public/site-heading";
 
 // Define proper user interface for session
 interface SessionUser {
@@ -98,9 +100,14 @@ function resolveDateCardVisual(
   };
 }
 
-function getDateCardContainerClass(visual: DateCardVisualState): string {
-  const base =
-    "border rounded-2xl overflow-hidden text-center w-[85px] sm:w-[100px] md:w-[120px] flex-shrink-0 transition-all duration-300";
+function getDateCardContainerClass(
+  visual: DateCardVisualState,
+  narrowPreview: boolean,
+): string {
+  const base = cn(
+    "flex-shrink-0 overflow-hidden rounded-2xl border text-center transition-all duration-300",
+    narrowPreview ? "w-[85px]" : "w-[85px] sm:w-[100px] md:w-[120px]",
+  );
 
   if (visual.isSoldOut) {
     return `${base} border-red-500/60 cursor-not-allowed bg-slate-900/40 backdrop-blur-sm opacity-80 shadow-[0_0_25px_rgba(239,68,68,0.45)]`;
@@ -120,9 +127,14 @@ function getDateCardContainerClass(visual: DateCardVisualState): string {
 function getDateCardFooterClass(
   visual: DateCardVisualState,
   inCartStyle: "primary" | "green",
+  narrowPreview: boolean,
 ): string {
-  const base =
-    "text-white text-sm sm:text-base tracking-wider py-1 sm:py-1.5 transition-all duration-300";
+  const base = cn(
+    "text-white tracking-wider transition-all duration-300",
+    narrowPreview
+      ? "py-1 text-sm"
+      : "py-1 text-sm sm:py-1.5 sm:text-base",
+  );
 
   if (visual.isSoldOut) {
     return `${base} bg-gradient-to-b from-red-600 to-red-800 text-white font-semibold border-t border-red-500/40 tracking-wide`;
@@ -184,6 +196,7 @@ type DateRowsScrollerProps = {
   firstRowCount: number;
   secondRowCount: number;
   pageOffset: number;
+  narrowPreview: boolean;
   getDateRowJustifyClass: (itemCount: number) => string;
   renderCard: (
     dateItem: DatesSectionType[0],
@@ -199,6 +212,7 @@ function DateRowsScroller({
   firstRowCount,
   secondRowCount,
   pageOffset,
+  narrowPreview,
   getDateRowJustifyClass,
   renderCard,
 }: DateRowsScrollerProps) {
@@ -212,17 +226,27 @@ function DateRowsScroller({
         "pb-2",
         hasPartialRow
           ? "overflow-visible"
-          : "overflow-x-auto sm:overflow-hidden [-webkit-overflow-scrolling:touch]",
+          : cn(
+              "overflow-x-auto [-webkit-overflow-scrolling:touch]",
+              !narrowPreview && "sm:overflow-hidden",
+            ),
       )}
     >
       <div
         className={cn(
-          "flex flex-col gap-4 sm:gap-5",
-          hasPartialRow ? "w-full" : "inline-flex w-max sm:w-full",
+          "flex flex-col",
+          narrowPreview ? "gap-4" : "gap-4 sm:gap-5",
+          hasPartialRow
+            ? "w-full"
+            : cn("inline-flex w-max", !narrowPreview && "sm:w-full"),
         )}
       >
         <div
-          className={`flex flex-nowrap ${getDateRowJustifyClass(firstRowCount)} items-center gap-3 sm:gap-5`}
+          className={cn(
+            "flex flex-nowrap items-center",
+            getDateRowJustifyClass(firstRowCount),
+            narrowPreview ? "gap-3" : "gap-3 sm:gap-5",
+          )}
         >
           {Array.from({ length: firstRowCount }).map((_, i) => {
             const index = pageOffset + i;
@@ -232,7 +256,11 @@ function DateRowsScroller({
         </div>
         {secondRowCount > 0 ? (
           <div
-            className={`flex flex-nowrap ${getDateRowJustifyClass(secondRowCount)} items-center gap-3 sm:gap-5`}
+            className={cn(
+              "flex flex-nowrap items-center",
+              getDateRowJustifyClass(secondRowCount),
+              narrowPreview ? "gap-3" : "gap-3 sm:gap-5",
+            )}
           >
             {Array.from({ length: secondRowCount }).map((_, i) => {
               const index = pageOffset + itemsPerRow + i;
@@ -259,6 +287,7 @@ export default function DatesSection({
   const { data: session, status } = useSession();
   const { isOnboarding } = useOnboarding();
   const isPreviewMode = useIsPreviewMode();
+  const narrowPreview = usePreviewNarrowLayout();
   // Professional API-only approach - no local cart state needed
   const { mutateAsync: storeEventBooking, isPending } = useStoreEventBooking();
   const selectedDrinks = useDrinkSelectionStore(selectScopedDrinks);
@@ -322,7 +351,45 @@ export default function DatesSection({
   const getDateRowJustifyClass = (itemCount: number) =>
     itemCount > 0 && itemCount < itemsPerRow
       ? "justify-center"
-      : "justify-start sm:justify-center";
+      : cn("justify-start", !narrowPreview && "sm:justify-center");
+
+  const dateCardBodyClass = narrowPreview
+    ? "p-2"
+    : "p-2 sm:p-3";
+  const dateCardDayClass = narrowPreview
+    ? "mb-0.5 text-xs"
+    : "mb-0.5 text-xs sm:mb-1 sm:text-sm";
+  const dateCardNumberClass = narrowPreview
+    ? "py-1 text-3xl font-bold"
+    : "py-1 text-3xl font-bold sm:text-4xl md:text-5xl";
+  const dateCardMonthClass = narrowPreview
+    ? "text-xs"
+    : "text-xs sm:text-sm";
+  const sectionClass = cn(
+    "relative w-full overflow-hidden rounded-3xl text-white transition-all duration-200",
+    "bg-gradient-to-br from-[color:color-mix(in_srgb,var(--color-primary)_30%,#0a0014)] via-[color:color-mix(in_srgb,var(--color-primary)_15%,#0a0014)] to-[#0a0014]",
+    narrowPreview ? "py-12" : "py-12 sm:py-16",
+  );
+  const headingClass = cn(
+    "mb-0 !block !w-full !font-black",
+    narrowPreview
+      ? "!text-3xl"
+      : "!text-3xl sm:!text-4xl md:!text-5xl",
+  );
+  const headerWrapClass = cn(
+    "relative z-10 mb-6 flex w-full flex-col items-center gap-3 px-4 text-center",
+    !narrowPreview && "sm:mb-8 sm:gap-4",
+  );
+  const cardsWrapClass = cn(
+    "relative z-10 mx-auto w-full max-w-5xl px-2",
+    !narrowPreview && "sm:px-8 md:px-12",
+  );
+  const loginCtaClass = cn(
+    "mt-1 shrink-0 rounded-md border border-white/25 bg-[#1a1a24] !text-white shadow-sm hover:bg-[#26273a]",
+    narrowPreview
+      ? "px-6 py-1.5 text-xs"
+      : "px-6 py-1.5 text-xs sm:px-8 sm:py-2 sm:text-sm",
+  );
 
   // Setup client-side detection and window measurements
   useEffect(() => {
@@ -578,19 +645,19 @@ export default function DatesSection({
 
     return (
       <div
-        className={getDateCardContainerClass(visual)}
+        className={getDateCardContainerClass(visual, narrowPreview)}
         key={cardKey}
         onClick={() => handleDateCardClick(dateItem, visual)}
         aria-busy={visual.isSelecting}
       >
-        <div className="p-2 sm:p-3">
-          <p className="text-xs sm:text-sm mb-0.5 sm:mb-1">{dateInfo.day}</p>
-          <p className="text-3xl sm:text-4xl md:text-5xl font-bold py-1">
-            {dateInfo.date}
-          </p>
-          <p className="text-xs sm:text-sm">{dateInfo.month}</p>
+        <div className={dateCardBodyClass}>
+          <p className={dateCardDayClass}>{dateInfo.day}</p>
+          <p className={dateCardNumberClass}>{dateInfo.date}</p>
+          <p className={dateCardMonthClass}>{dateInfo.month}</p>
         </div>
-        <div className={getDateCardFooterClass(visual, inCartStyle)}>
+        <div
+          className={getDateCardFooterClass(visual, inCartStyle, narrowPreview)}
+        >
           <DateCardFooterContent
             visual={visual}
             dateInfo={dateInfo}
@@ -618,7 +685,7 @@ export default function DatesSection({
 
     return (
       <motion.div
-        className={getDateCardContainerClass(visual)}
+        className={getDateCardContainerClass(visual, narrowPreview)}
         key={cardKey}
         initial={{ opacity: 1, y: 0 }}
         animate={{
@@ -652,14 +719,14 @@ export default function DatesSection({
         onClick={() => handleDateCardClick(dateItem, visual)}
         aria-busy={visual.isSelecting}
       >
-        <div className="p-2 sm:p-3">
-          <p className="text-xs sm:text-sm mb-0.5 sm:mb-1">{dateInfo.day}</p>
-          <p className="text-3xl sm:text-4xl md:text-5xl font-bold py-1">
-            {dateInfo.date}
-          </p>
-          <p className="text-xs sm:text-sm">{dateInfo.month}</p>
+        <div className={dateCardBodyClass}>
+          <p className={dateCardDayClass}>{dateInfo.day}</p>
+          <p className={dateCardNumberClass}>{dateInfo.date}</p>
+          <p className={dateCardMonthClass}>{dateInfo.month}</p>
         </div>
-        <div className={getDateCardFooterClass(visual, "primary")}>
+        <div
+          className={getDateCardFooterClass(visual, "primary", narrowPreview)}
+        >
           <DateCardFooterContent
             visual={visual}
             dateInfo={dateInfo}
@@ -670,18 +737,31 @@ export default function DatesSection({
     );
   };
 
-  // If no dates, show a default preview with dummy data
-  const displayDates = dates?.length
-    ? dates
-    : Array(10)
-        .fill({})
-        .map((_, i) => ({
-          event_date: new Date(new Date().setDate(new Date().getDate() + i))
-            .toISOString()
-            .split("T")[0],
-          price: 65,
-          sold_out: false,
-        }));
+  // Live + preview: no fake placeholder dates. While editing dates with none yet, show a light empty cue.
+  if (!dates?.length) {
+    if (!isPreviewMode) return null;
+    return (
+      <section className={cn(sectionClass, "px-4 py-10")}>
+        <div className={headerWrapClass}>
+          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[color:var(--color-primary)]">
+            {sectionLabel}
+          </p>
+          <SiteHeading
+            level={2}
+            title={heading}
+            variant="onDark"
+            align="center"
+            className={headingClass}
+          />
+          <p className="text-sm text-white/70">
+            Add dates in the form to preview them here.
+          </p>
+        </div>
+      </section>
+    );
+  }
+
+  const displayDates = dates;
 
   const firstRowCount = Math.min(itemsPerRow, displayDates.length);
   const secondRowCount = Math.min(
@@ -723,19 +803,23 @@ export default function DatesSection({
   // Simple non-animated fallback for SSR that matches the client layout
   if (!isClient) {
     return (
-      <section className="w-full py-12 sm:py-16 text-white rounded-3xl overflow-hidden relative bg-gradient-to-br from-[color:color-mix(in_srgb,var(--color-primary)_30%,#0a0014)] via-[color:color-mix(in_srgb,var(--color-primary)_15%,#0a0014)] to-[#0a0014] transition-all duration-200">
-        <div className="w-full text-center relative z-10 mb-6 sm:mb-8 px-4">
-          <p className="mb-3 text-xs font-semibold uppercase tracking-[0.2em] text-[color:var(--color-primary)]">
+      <section className={sectionClass}>
+        <div className={headerWrapClass}>
+          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[color:var(--color-primary)]">
             {sectionLabel}
           </p>
-          <h2 className="text-3xl sm:text-4xl md:text-5xl font-black mb-4">
-            {heading}
-          </h2>
+          <SiteHeading
+            level={2}
+            title={heading}
+            variant="onDark"
+            align="center"
+            className={headingClass}
+          />
           {showAlreadyBookedLoginCta && (
             <Button
               type="button"
               variant="outline"
-              className="bg-[#1a1a24] hover:bg-[#26273a] !text-white py-1 sm:py-1.5 px-6 sm:px-8 rounded-md text-xs sm:text-sm border border-white/25 shadow-sm"
+              className={loginCtaClass}
               onClick={() => {
                 if (!isPreviewMode) router.push("/auth/login");
               }}
@@ -745,18 +829,30 @@ export default function DatesSection({
           )}
         </div>
 
-        <div className="w-full max-w-5xl mx-auto relative z-10 px-2 sm:px-8 md:px-12">
+        <div className={cardsWrapClass}>
           {/* Left arrow - Only show if pagination is needed and not on first page */}
           {needsPagination && (
-            <div className="absolute left-0 sm:left-2 top-1/2 transform -translate-y-1/2 z-20">
+            <div
+              className={cn(
+                "absolute top-1/2 z-20 -translate-y-1/2 transform left-0",
+                !narrowPreview && "sm:left-2",
+              )}
+            >
               <div
-                className={`bg-[#21223a] rounded-full p-1 sm:p-2 shadow-[0_0_10px_rgba(33,34,58,0.7)] ${
+                className={cn(
+                  "rounded-full bg-[#21223a] shadow-[0_0_10px_rgba(33,34,58,0.7)]",
+                  narrowPreview ? "p-1" : "p-1 sm:p-2",
                   canGoLeft
                     ? "cursor-pointer hover:bg-[#2a2b4a]"
-                    : "opacity-30 cursor-not-allowed"
-                }`}
+                    : "cursor-not-allowed opacity-30",
+                )}
               >
-                <CircleChevronLeft className="h-7 w-7 sm:h-10 sm:w-10 text-[#8f96c3]" />
+                <CircleChevronLeft
+                  className={cn(
+                    "text-[#8f96c3]",
+                    narrowPreview ? "h-7 w-7" : "h-7 w-7 sm:h-10 sm:w-10",
+                  )}
+                />
               </div>
             </div>
           )}
@@ -768,6 +864,7 @@ export default function DatesSection({
             firstRowCount={firstRowCount}
             secondRowCount={secondRowCount}
             pageOffset={0}
+            narrowPreview={narrowPreview}
             getDateRowJustifyClass={getDateRowJustifyClass}
             renderCard={(dateItem, cardKey) =>
               renderStaticDateCard(dateItem, cardKey, "green")
@@ -776,15 +873,27 @@ export default function DatesSection({
 
           {/* Right arrow - Only show if pagination is needed */}
           {needsPagination && (
-            <div className="absolute right-0 sm:right-2 top-1/2 transform -translate-y-1/2 z-20">
+            <div
+              className={cn(
+                "absolute top-1/2 z-20 -translate-y-1/2 transform right-0",
+                !narrowPreview && "sm:right-2",
+              )}
+            >
               <div
-                className={`bg-[#21223a] rounded-full p-1 sm:p-2 shadow-[0_0_10px_rgba(33,34,58,0.7)] ${
+                className={cn(
+                  "rounded-full bg-[#21223a] shadow-[0_0_10px_rgba(33,34,58,0.7)]",
+                  narrowPreview ? "p-1" : "p-1 sm:p-2",
                   canGoRight
                     ? "cursor-pointer hover:bg-[#2a2b4a]"
-                    : "opacity-30 cursor-not-allowed"
-                }`}
+                    : "cursor-not-allowed opacity-30",
+                )}
               >
-                <CircleChevronRight className="h-7 w-7 sm:h-10 sm:w-10 text-[#8f96c3]" />
+                <CircleChevronRight
+                  className={cn(
+                    "text-[#8f96c3]",
+                    narrowPreview ? "h-7 w-7" : "h-7 w-7 sm:h-10 sm:w-10",
+                  )}
+                />
               </div>
             </div>
           )}
@@ -796,7 +905,7 @@ export default function DatesSection({
   // Full animated version for client-side
   return (
     <motion.section
-      className="w-full py-12 sm:py-16 text-white rounded-3xl overflow-hidden relative bg-gradient-to-br from-[color:color-mix(in_srgb,var(--color-primary)_30%,#0a0014)] via-[color:color-mix(in_srgb,var(--color-primary)_15%,#0a0014)] to-[#0a0014] transition-all duration-200"
+      className={sectionClass}
       initial={{ opacity: 1 }}
       animate={{ opacity: 1 }}
       transition={{ duration: 0.2 }}
@@ -824,18 +933,22 @@ export default function DatesSection({
         <AnimatePresence>{isVisible && particles}</AnimatePresence>
       </div>
 
-      <div className="w-full text-center relative z-10 mb-6 sm:mb-8 px-4">
-        <p className="mb-3 text-xs font-semibold uppercase tracking-[0.2em] text-[color:var(--color-primary)]">
+      <div className={headerWrapClass}>
+        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[color:var(--color-primary)]">
           {sectionLabel}
         </p>
-        <h2 className="text-3xl sm:text-4xl md:text-5xl font-black mb-4">
-          {heading}
-        </h2>
+        <SiteHeading
+          level={2}
+          title={heading}
+          variant="onDark"
+          align="center"
+          className={headingClass}
+        />
         {showAlreadyBookedLoginCta && (
           <Button
             type="button"
             variant="outline"
-            className="bg-[#1a1a24] hover:bg-[#26273a] !text-white py-1 sm:py-1.5 px-6 sm:px-8 rounded-md text-xs sm:text-sm border border-white/25 shadow-sm"
+            className={loginCtaClass}
             onClick={() => {
               if (!isPreviewMode) router.push("/auth/login");
             }}
@@ -845,44 +958,55 @@ export default function DatesSection({
         )}
       </div>
 
-      <div className="w-full max-w-5xl mx-auto relative z-10 px-2 sm:px-8 md:px-12">
-        {/* Left arrow - Only show if pagination is needed and can go left */}
+      <div className={cardsWrapClass}>
         {needsPagination && (
           <div
-            className="absolute left-0 sm:left-2 top-1/2 transform -translate-y-1/2 z-20"
+            className={cn(
+              "absolute top-1/2 z-20 -translate-y-1/2 transform left-0",
+              !narrowPreview && "sm:left-2",
+            )}
             onClick={() =>
               canGoLeft && setCurrentPage((prev) => Math.max(0, prev - 1))
             }
           >
             <div
-              className={`bg-[#21223a] rounded-full p-1 sm:p-2 shadow-[0_0_10px_rgba(33,34,58,0.7)] ${
+              className={cn(
+                "rounded-full bg-[#21223a] shadow-[0_0_10px_rgba(33,34,58,0.7)]",
+                narrowPreview ? "p-1" : "p-1 sm:p-2",
                 canGoLeft
                   ? "cursor-pointer hover:bg-[#2a2b4a]"
-                  : "opacity-30 cursor-not-allowed"
-              }`}
+                  : "cursor-not-allowed opacity-30",
+              )}
             >
-              <CircleChevronLeft className="h-7 w-7 sm:h-10 sm:w-10 text-[#8f96c3]" />
+              <CircleChevronLeft
+                className={cn(
+                  "text-[#8f96c3]",
+                  narrowPreview ? "h-7 w-7" : "h-7 w-7 sm:h-10 sm:w-10",
+                )}
+              />
             </div>
           </div>
         )}
 
-        {/* Date cards — single horizontal scroller (both rows) on mobile */}
         <DateRowsScroller
           displayDates={displayDates}
           itemsPerRow={itemsPerRow}
           firstRowCount={firstRowCount}
           secondRowCount={secondRowCount}
           pageOffset={currentPage * itemsPerRow}
+          narrowPreview={narrowPreview}
           getDateRowJustifyClass={getDateRowJustifyClass}
           renderCard={(dateItem, cardKey, animationIndex) =>
             renderAnimatedDateCard(dateItem, cardKey, animationIndex)
           }
         />
 
-        {/* Right arrow - Only show if pagination is needed and can go right */}
         {needsPagination && (
           <div
-            className="absolute right-0 sm:right-2 top-1/2 transform -translate-y-1/2 z-20"
+            className={cn(
+              "absolute top-1/2 z-20 -translate-y-1/2 transform right-0",
+              !narrowPreview && "sm:right-2",
+            )}
             onClick={() => {
               if (canGoRight) {
                 setCurrentPage((prev) => Math.min(maxPages, prev + 1));
@@ -890,19 +1014,24 @@ export default function DatesSection({
             }}
           >
             <div
-              className={`bg-[#21223a] rounded-full p-1 sm:p-2 shadow-[0_0_10px_rgba(33,34,58,0.7)] ${
+              className={cn(
+                "rounded-full bg-[#21223a] shadow-[0_0_10px_rgba(33,34,58,0.7)]",
+                narrowPreview ? "p-1" : "p-1 sm:p-2",
                 canGoRight
                   ? "cursor-pointer hover:bg-[#2a2b4a]"
-                  : "opacity-30 cursor-not-allowed"
-              }`}
+                  : "cursor-not-allowed opacity-30",
+              )}
             >
-              <CircleChevronRight className="h-7 w-7 sm:h-10 sm:w-10 text-[#8f96c3]" />
+              <CircleChevronRight
+                className={cn(
+                  "text-[#8f96c3]",
+                  narrowPreview ? "h-7 w-7" : "h-7 w-7 sm:h-10 sm:w-10",
+                )}
+              />
             </div>
           </div>
         )}
       </div>
-
-      {/* Professional API-only approach - no conflict modal needed */}
     </motion.section>
   );
 }

@@ -11,6 +11,7 @@ import { Plus } from "lucide-react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { getRoomFloatingAccent } from "@/lib/room-accent-palette";
+import { usePreviewNarrowLayout } from "@/hooks/use-preview-narrow-layout";
 
 export interface FloatingRoomBarItem {
   key: string;
@@ -28,7 +29,7 @@ export interface FloatingRoomBarProps {
   stickyTop?: string;
   /** Leading label inside the pill (default "Room"). */
   label?: string;
-  /** Visual density. "lg" = larger, more premium click targets (~48px tall). */
+  /** Visual density. Default `sm` matches live phone chrome. */
   size?: "sm" | "lg";
   className?: string;
   barClassName?: string;
@@ -40,25 +41,25 @@ export interface FloatingRoomBarProps {
 
 const SIZE_STYLES = {
   sm: {
-    bar: "gap-2 px-3 py-2 sm:gap-2.5 sm:px-4 sm:py-2.5",
-    label: "text-[10px] sm:text-[11px]",
-    group: "gap-0.5",
-    button: "gap-1.5 px-2.5 py-1.5 text-xs sm:px-3.5 sm:py-2 sm:text-sm",
+    bar: "gap-2 px-3 py-2",
+    label: "text-[10px] tracking-[0.18em]",
+    group: "gap-1",
+    button: "gap-1.5 px-2.5 py-1.5 text-xs leading-snug",
     dot: "h-2 w-2",
   },
   lg: {
-    bar: "gap-3 px-4 py-2.5 sm:gap-4 sm:px-5 sm:py-3",
-    label: "text-[11px] sm:text-xs",
-    group: "gap-1 sm:gap-1.5",
-    button:
-      "min-h-[44px] gap-2 px-4 py-2.5 text-sm sm:min-h-[48px] sm:px-5 sm:py-3 sm:text-[15px]",
-    dot: "h-2.5 w-2.5",
+    bar: "gap-2.5 px-3.5 py-2.5",
+    label: "text-[11px] tracking-[0.18em]",
+    group: "gap-1.5",
+    button: "gap-1.5 px-3 py-2 text-sm leading-snug",
+    dot: "h-2 w-2",
   },
 } as const;
 
 /**
  * Unified Lovable-style floating room bar:
- * white pill, “ROOM” label, colored dots, active room as dark filled pill.
+ * compact white pill, “CHOOSE ROOM” label, colored dots, active room filled.
+ * Always horizontal (matches live mobile) — never stacks into tall full-width chips.
  */
 export function FloatingRoomBar({
   rooms,
@@ -76,7 +77,8 @@ export function FloatingRoomBar({
   addRoomHref,
   addRoomLabel = "Add room",
 }: FloatingRoomBarProps) {
-  const sizeStyles = SIZE_STYLES[size];
+  const narrowPreview = usePreviewNarrowLayout();
+  const sizeStyles = SIZE_STYLES[narrowPreview ? "sm" : size];
 
   const resolvedActiveIndex = Math.min(
     Math.max(activeIndex, 0),
@@ -84,8 +86,6 @@ export function FloatingRoomBar({
   );
 
   const scrollRef = useRef<HTMLDivElement>(null);
-  // Edge fades signal that the room list is horizontally scrollable, so a
-  // partially-visible room no longer looks "cut off" on narrow screens.
   const [edgeFade, setEdgeFade] = useState({ left: false, right: false });
 
   const syncEdgeFade = useCallback(() => {
@@ -110,7 +110,6 @@ export function FloatingRoomBar({
     };
   }, [syncEdgeFade, rooms.length]);
 
-  // Keep the selected room in view when it changes (without scrolling the page).
   useEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
@@ -138,7 +137,8 @@ export function FloatingRoomBar({
   return (
     <div
       className={cn(
-        "z-[45] flex w-full justify-center px-3 py-2 sm:px-4",
+        "z-[45] flex w-full justify-center",
+        narrowPreview ? "px-2.5 py-1.5" : "px-2.5 py-1.5 sm:px-4 sm:py-2",
         layout === "sticky" && "sticky",
         layout === "inline" && "relative",
         "animate-in fade-in slide-in-from-top-2 duration-300 ease-out",
@@ -148,16 +148,14 @@ export function FloatingRoomBar({
     >
       <div
         className={cn(
-          // Mobile: stack label above pills so 2 rooms fit without clipping.
-          // sm+: keep the compact inline pill layout.
-          "flex w-full max-w-[calc(100vw-1.5rem)] flex-col items-stretch rounded-2xl border border-gray-200/90 bg-white shadow-[0_8px_32px_rgba(15,23,42,0.1)] sm:inline-flex sm:w-auto sm:flex-row sm:items-center sm:rounded-full",
+          "inline-flex max-w-full items-center rounded-full border border-gray-200/90 bg-white shadow-[0_4px_16px_rgba(15,23,42,0.08)]",
           sizeStyles.bar,
           barClassName,
         )}
       >
         <span
           className={cn(
-            "shrink-0 pl-0.5 font-semibold uppercase tracking-[0.22em] text-gray-400",
+            "shrink-0 pl-0.5 font-semibold uppercase text-gray-400",
             sizeStyles.label,
           )}
         >
@@ -167,9 +165,11 @@ export function FloatingRoomBar({
         <div
           ref={scrollRef}
           className={cn(
-            "flex min-w-0 items-center overflow-x-auto scroll-smooth [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
-            // With 2 rooms, share width evenly on mobile instead of truncating.
-            rooms.length <= 2 && "w-full sm:w-auto",
+            "flex min-w-0 items-center overflow-x-auto scroll-smooth",
+            narrowPreview
+              ? "max-w-[min(100%,20rem)]"
+              : "max-w-[min(100%,20rem)] sm:max-w-[min(100%,28rem)]",
+            "[-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
             sizeStyles.group,
           )}
           style={{
@@ -180,7 +180,6 @@ export function FloatingRoomBar({
           {rooms.map((room, index) => {
             const accent = getRoomFloatingAccent(index);
             const isActive = index === resolvedActiveIndex;
-            const fitTwoOnMobile = rooms.length <= 2;
 
             return (
               <button
@@ -191,10 +190,7 @@ export function FloatingRoomBar({
                 aria-pressed={isActive}
                 data-active={isActive}
                 className={cn(
-                  "flex items-center rounded-full font-semibold transition-all",
-                  fitTwoOnMobile
-                    ? "min-w-0 flex-1 justify-center sm:flex-none sm:shrink-0 sm:justify-start"
-                    : "shrink-0",
+                  "flex shrink-0 items-center rounded-full font-medium transition-all",
                   sizeStyles.button,
                   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--checkout-brand-accent,#3b82f6)] focus-visible:ring-offset-2",
                   isActive
@@ -214,9 +210,7 @@ export function FloatingRoomBar({
                 <span
                   className={cn(
                     "truncate",
-                    fitTwoOnMobile
-                      ? "max-w-full sm:max-w-[9rem]"
-                      : "max-w-[7.5rem] sm:max-w-[9rem]",
+                    narrowPreview ? "max-w-[6.5rem]" : "max-w-[6.5rem] sm:max-w-[8rem]",
                   )}
                 >
                   {room.label}
@@ -229,9 +223,9 @@ export function FloatingRoomBar({
         {addRoomHref ? (
           <Link
             href={addRoomHref}
-            className="flex shrink-0 items-center gap-1 rounded-full border border-dashed border-gray-300 px-2.5 py-1.5 text-[11px] font-semibold text-gray-500 transition-colors hover:border-gray-400 hover:bg-gray-50 hover:text-gray-700 sm:px-3 sm:text-xs"
+            className="flex shrink-0 items-center gap-1 rounded-full border border-dashed border-gray-300 px-2 py-1 text-[11px] font-semibold text-gray-500 transition-colors hover:border-gray-400 hover:bg-gray-50 hover:text-gray-700"
           >
-            <Plus className="h-3.5 w-3.5" />
+            <Plus className="h-3 w-3" />
             <span className="hidden min-[400px]:inline">{addRoomLabel}</span>
           </Link>
         ) : null}

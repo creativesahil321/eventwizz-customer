@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import {
   Notification,
   NotificationFilters,
@@ -30,6 +30,8 @@ export const useNotificationSystem = () => {
   const {
     data: notificationsResponse,
     isLoading: isLoadingNotifications,
+    isFetching: isFetchingNotifications,
+    isPending: isPendingNotifications,
     refetch: refetchNotifications,
   } = useNotifications(filters);
 
@@ -42,23 +44,32 @@ export const useNotificationSystem = () => {
   const { mutate: markAllAsRead, isPending: isMarkingAllAsRead } =
     useMarkAllAsRead();
 
-  // Derived state
-  const notifications = Array.isArray(notificationsResponse?.data)
-    ? notificationsResponse.data
-    : [];
+  // Derived state — API returns { data: { data: [], meta } } with returnFullResponse
+  const pagePayload = notificationsResponse?.data;
+  const notifications = Array.isArray(pagePayload)
+    ? pagePayload
+    : Array.isArray(pagePayload?.data)
+      ? pagePayload.data
+      : [];
 
-  const meta = notificationsResponse?.data?.meta;
-  const isLoading = isLoadingNotifications;
+  const meta = Array.isArray(pagePayload) ? undefined : pagePayload?.meta;
+  // Initial load only — never treat search/filter refetches as a full-page load
+  const isInitialLoading =
+    (isPendingNotifications || isLoadingNotifications) &&
+    !notificationsResponse;
+  const isListFetching = isFetchingNotifications && !isInitialLoading;
   const isPending = isMarkingAsRead || isMarkingAsUnread || isMarkingAllAsRead;
 
-  // Actions
-  const handleFilterChange = (newFilters: Partial<NotificationFilters>) => {
-    setFilters((prev) => ({ ...prev, ...newFilters, page: 1 }));
-  };
+  const handleFilterChange = useCallback(
+    (newFilters: Partial<NotificationFilters>) => {
+      setFilters((prev) => ({ ...prev, ...newFilters, page: 1 }));
+    },
+    [],
+  );
 
-  const handlePageChange = (page: number) => {
+  const handlePageChange = useCallback((page: number) => {
     setFilters((prev) => ({ ...prev, page }));
-  };
+  }, []);
 
   const handleViewDetails = (notification: Notification) => {
     setSelectedNotification(notification);
@@ -97,19 +108,17 @@ export const useNotificationSystem = () => {
   };
 
   return {
-    // State
     filters,
     notifications,
     meta,
     stats,
     selectedNotification,
     isDetailsOpen,
-    isLoading,
+    isLoading: isInitialLoading,
+    isListFetching,
     isPending,
     isMarkingAllAsRead,
     userRole,
-
-    // Actions
     handleFilterChange,
     handlePageChange,
     handleViewDetails,

@@ -24,6 +24,9 @@ import {
 import { VENDOR_FOOTER_PAGE_LINKS } from "@/lib/vendor-cms-content";
 import { useThemeQuery } from "@/hooks/use-theme-query";
 import { useDomain } from "@/providers/domain-provider/domain-provider";
+import { useIsPreviewMode } from "@/contexts/preview-context";
+import { usePreviewNarrowLayout } from "@/hooks/use-preview-narrow-layout";
+import { cn } from "@/lib/utils";
 
 interface FooterSectionProps {
   copyright?: string | null;
@@ -32,6 +35,13 @@ interface FooterSectionProps {
   locationSlug?: string | null;
   /** Optional fields from location/event API (merged over theme) */
   contactOverride?: VenueContactOverride | null;
+  /**
+   * When provided, replaces theme social links (e.g. onboarding draft — often empty).
+   * Pass `{}` / all-empty to hide icons in preview.
+   */
+  socialLinksOverride?: Partial<
+    Record<"facebook" | "twitter" | "instagram" | "linkedin" | "youtube", string>
+  > | null;
 }
 
 function SocialRow({
@@ -112,6 +122,11 @@ function ContactColumn({
 }
 
 function FooterPageLinks({ centered }: { centered?: boolean }) {
+  // Info pages (/policies, /contact) have no site-preview surface — hide the
+  // links so vendors aren't taken out of the preview review flow.
+  const isPreviewMode = useIsPreviewMode();
+  if (isPreviewMode) return null;
+
   return (
     <nav
       aria-label="Footer pages"
@@ -196,11 +211,13 @@ export default function FooterSection({
   logo,
   locationSlug,
   contactOverride,
+  socialLinksOverride,
 }: FooterSectionProps = {}) {
   const { theme: serverTheme } = useContext(ServerContext);
   const { domain } = useDomain();
   const { data: queryTheme } = useThemeQuery(domain, serverTheme);
   const vendorTheme = (queryTheme ?? serverTheme) as ThemeSchema;
+  const narrowPreview = usePreviewNarrowLayout();
 
   const logoToUse = logo || vendorTheme?.logo;
   const logoPath =
@@ -221,12 +238,17 @@ export default function FooterSection({
     youtube: Youtube,
   } as const;
 
-  const socialLinks = Object.entries(vendorTheme?.socialLinks || {})
-    .filter(([, url]) => url && url.trim() !== "")
+  const socialSource =
+    socialLinksOverride !== undefined && socialLinksOverride !== null
+      ? socialLinksOverride
+      : vendorTheme?.socialLinks || {};
+
+  const socialLinks = Object.entries(socialSource)
+    .filter(([, url]) => typeof url === "string" && url.trim() !== "")
     .map(([platform, url]) => {
       const IconComponent = socialIcons[platform as keyof typeof socialIcons];
       if (!IconComponent) return null;
-      return { icon: IconComponent, href: url, id: platform };
+      return { icon: IconComponent, href: url as string, id: platform };
     })
     .filter(
       (link): link is { icon: typeof Facebook; href: string; id: string } =>
@@ -278,13 +300,23 @@ export default function FooterSection({
 
             {hasSingleContact ? (
               <>
-                {/* Mobile: compact icon + value rows (no giant stacked labels) */}
-                <div className="mt-4 w-full max-w-md sm:hidden">
+                {/* Mobile / narrow preview: compact icon + value rows */}
+                <div
+                  className={cn(
+                    "mt-4 w-full max-w-md",
+                    !narrowPreview && "sm:hidden",
+                  )}
+                >
                   <ContactLines contact={singleContact} align="center" />
                 </div>
 
-                {/* sm+: three-column contact */}
-                <div className="mt-6 hidden w-full max-w-3xl grid-cols-3 gap-5 sm:grid md:mt-8 md:gap-6">
+                {/* Desktop preview + live sm+: three-column contact */}
+                <div
+                  className={cn(
+                    "mt-6 w-full max-w-3xl grid-cols-3 gap-5 md:gap-6",
+                    narrowPreview ? "hidden" : "hidden sm:grid md:mt-8",
+                  )}
+                >
                   {singleContact.phone ? (
                     <ContactColumn
                       label="Phone"
@@ -324,43 +356,42 @@ export default function FooterSection({
         </div>
       ) : (
         <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 sm:py-8 md:py-10">
-          <div className="grid grid-cols-1 gap-5 md:grid-cols-12 md:gap-8">
-            <div className="flex flex-col items-center text-center md:col-span-4 md:items-start md:text-left">
-              <Link href="/" className="inline-flex max-w-full">
-                <img
-                  src={addCacheBusting(logoPath)}
-                  className="h-8 w-auto max-w-[min(100%,10rem)] object-contain sm:h-9"
-                  alt={vendorTheme?.name || "EventWizz"}
-                />
-              </Link>
-              {socialLinks.length > 0 ? (
-                <div className="mt-3 flex justify-center md:mt-4 md:justify-start">
-                  <SocialRow links={socialLinks} />
-                </div>
-              ) : null}
-            </div>
-
-            <div className="md:col-span-8">
-              <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 sm:gap-6">
-                {contactBlocks.map((block) => (
-                  <div
-                    key={block.id}
-                    className="min-w-0 text-center sm:text-left"
-                  >
-                    <h6 className="mb-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--color-on-footer)]/45 sm:text-[11px]">
-                      {block.label}
-                    </h6>
-                    <div className="flex justify-center sm:justify-start">
-                      <ContactLines contact={block.contact} />
-                    </div>
-                  </div>
-                ))}
+          <div className="flex flex-col items-center text-center">
+            <Link href="/" className="inline-flex max-w-full">
+              <img
+                src={addCacheBusting(logoPath)}
+                className="h-8 w-auto max-w-[min(100%,10rem)] object-contain sm:h-9"
+                alt={vendorTheme?.name || "EventWizz"}
+              />
+            </Link>
+            {socialLinks.length > 0 ? (
+              <div className="mt-3 sm:mt-4">
+                <SocialRow links={socialLinks} align="center" />
               </div>
-            </div>
+            ) : null}
           </div>
 
-          <div className="mt-5 flex justify-center md:mt-6 md:justify-start">
-            <FooterPageLinks />
+          <div
+            className={cn(
+              "mx-auto mt-6 grid w-full max-w-3xl grid-cols-1 gap-4",
+              !narrowPreview && "sm:mt-8 sm:grid-cols-2 sm:gap-5",
+            )}
+          >
+            {contactBlocks.map((block) => (
+              <div
+                key={block.id}
+                className="min-w-0 rounded-xl border border-[color:color-mix(in_srgb,var(--color-on-footer)_12%,transparent)] px-4 py-4"
+              >
+                <h6 className="mb-3 text-center text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--color-on-footer)]/70">
+                  {block.label}
+                </h6>
+                <ContactLines contact={block.contact} align="center" />
+              </div>
+            ))}
+          </div>
+
+          <div className="mt-5 flex justify-center sm:mt-6">
+            <FooterPageLinks centered />
           </div>
         </div>
       )}
@@ -368,9 +399,7 @@ export default function FooterSection({
       <div className="border-t border-[color:color-mix(in_srgb,var(--color-on-footer)_10%,transparent)]">
         <div className="mx-auto max-w-7xl px-4 pb-[calc(4.25rem+env(safe-area-inset-bottom,0px))] pt-3 sm:px-6 sm:pb-5 sm:pt-4">
           <div
-            className={`break-words text-[11px] leading-relaxed text-[var(--color-on-footer)]/55 sm:text-xs [&_a]:underline [&_em]:italic [&_p]:mb-1.5 [&_p:last-child]:mb-0 [&_strong]:font-semibold ${
-              isSingleContactFooter ? "text-center" : "text-center md:text-left"
-            }`}
+            className="break-words text-center text-[11px] leading-relaxed text-[var(--color-on-footer)]/55 sm:text-xs [&_a]:underline [&_em]:italic [&_p]:mb-1.5 [&_p:last-child]:mb-0 [&_strong]:font-semibold"
             dangerouslySetInnerHTML={{ __html: copyrightText }}
           />
         </div>

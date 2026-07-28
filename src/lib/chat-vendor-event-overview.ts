@@ -4,6 +4,7 @@
  */
 
 import { formatMoneyLocale, parseFormattedMoney } from "@/lib/currency-format";
+import { getTenantCurrencySymbol } from "@/lib/tenant-currency";
 import { eventsService } from "@/services/vendor/events/events.service";
 import type {
   EventItem,
@@ -116,12 +117,13 @@ export function isVendorEventOverviewIntent(text: string): boolean {
 }
 
 function money(value: unknown): string {
+  const symbol = getTenantCurrencySymbol();
   if (typeof value === "number" && Number.isFinite(value)) {
-    return formatMoneyLocale(value, "£");
+    return formatMoneyLocale(value, symbol);
   }
-  const parsed = parseFormattedMoney(String(value ?? ""), "£");
+  const parsed = parseFormattedMoney(String(value ?? ""), symbol);
   const amount = Number.isFinite(parsed) ? parsed : 0;
-  return formatMoneyLocale(amount, "£");
+  return formatMoneyLocale(amount, symbol);
 }
 
 function plural(count: number, one: string, many: string): string {

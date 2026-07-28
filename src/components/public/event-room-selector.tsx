@@ -36,7 +36,7 @@ export function EventRoomSelector({
       layout="sticky"
       stickyTop={PUBLIC_EVENT_HEADER_OFFSET}
       label="Choose Room"
-      size="lg"
+      size="sm"
       className={cn("mx-auto max-w-7xl sm:px-6", className)}
     />
   );

@@ -39,31 +39,42 @@ import { WholeStepGuidedShell } from "../../whole-step-guided-shell";
 import { GuidedWholeStepBottomActions } from "../../guided-section-chips";
 import { slugify } from "@/lib/utils";
 
-/** Public-link preview: never show raw venue names (spaces). Match subdomain rules: a-z, 0-9, hyphens, max 63. */
+/** Public-link / input: subdomain label only (a-z, 0-9, hyphens, max 63). */
+function normalizeSubdomainLabel(
+  selected: string | undefined | null,
+  suffix = "eventwizz.com",
+): string {
+  const stripHostSuffix = (s: string) => {
+    let out = s.trim().toLowerCase();
+    const suffixes = [
+      suffix.trim().toLowerCase(),
+      "eventwizz.com",
+      "eventwizz.vercel.app",
+      "com",
+    ].filter(Boolean);
+    for (const suf of suffixes) {
+      if (out.endsWith(`.${suf}`)) {
+        out = out.slice(0, -(suf.length + 1));
+      }
+    }
+    return out;
+  };
+
+  const cleaned = stripHostSuffix(selected ?? "")
+    .replace(/[^a-z0-9-]/g, "")
+    .replace(/-+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 63);
+  return cleaned;
+}
+
 function subdomainPublicPreviewLabel(
   selected: string | undefined | null,
   venueName: string,
+  suffix = "eventwizz.com",
 ): string {
-  const stripHostSuffix = (s: string) =>
-    s
-      .replace(/\.eventwizz\.vercel\.app$/i, "")
-      .replace(/\.eventwizz\.com$/i, "")
-      .replace(/\.com$/i, "");
-
-  const normalizeLabel = (s: string) => {
-    const cleaned = stripHostSuffix(s.trim())
-      .toLowerCase()
-      .replace(/[^a-z0-9-]/g, "")
-      .replace(/-+/g, "-")
-      .replace(/^-+|-+$/g, "")
-      .slice(0, 63);
-    return cleaned || "yoursubdomain";
-  };
-
-  const trimmedSelected = (selected ?? "").trim();
-  if (trimmedSelected) {
-    return normalizeLabel(trimmedSelected);
-  }
+  const fromSelected = normalizeSubdomainLabel(selected, suffix);
+  if (fromSelected) return fromSelected;
 
   const fromVenue = slugify(venueName.trim()).slice(0, 63);
   return fromVenue || "yoursubdomain";
@@ -96,10 +107,32 @@ export default function StepTen() {
     control: globalForm.control,
     name: "stepTen.isApproved",
   });
+  const persistedStepTenDomain = useWatch({
+    control: globalForm.control,
+    name: "stepTen.domain",
+  });
+  const persistedDomainSuffix = useWatch({
+    control: globalForm.control,
+    name: "stepTen.domain_suffix",
+  });
+  const domainSuffix =
+    (typeof persistedDomainSuffix === "string" &&
+      persistedDomainSuffix.trim()) ||
+    "eventwizz.com";
+
   const { update } = useSession();
   const queryClient = useQueryClient();
   const updateSessionWithLocation = useUpdateSessionWithLocation();
   const [loading, setLoading] = useState(false);
+
+  /**
+   * Last domain confirmed via the steps API (`stepTen.domain` when `isApproved`).
+   * Editing away from this value unchecks confirmation; reverting restores it.
+   */
+  const savedDomainRef = useRef<string>("");
+  /** Whether the API last approved the domain in `savedDomainRef`. */
+  const savedDomainApprovedRef = useRef(false);
+  const subdomainInputSeededRef = useRef(false);
 
   // Domain suggestions
   const {
@@ -127,11 +160,6 @@ export default function StepTen() {
     // Don't truncate error messages - let them display fully
     return error;
   };
-
-  const persistedStepTenDomain = useWatch({
-    control: globalForm.control,
-    name: "stepTen.domain",
-  });
 
   // Reactive so subdomain can seed after persistence GET fills step one.
   const venueName =
@@ -161,6 +189,8 @@ export default function StepTen() {
       city: globalForm.getValues().stepTen?.city || "",
       contact_number: globalForm.getValues().stepTen?.contact_number || "",
       domain: globalForm.getValues().stepTen?.domain || "",
+      domain_suffix:
+        globalForm.getValues().stepTen?.domain_suffix || "eventwizz.com",
       confirm_domain: globalForm.getValues().stepTen?.confirm_domain || false,
     },
     mode: "onChange",
@@ -173,33 +203,72 @@ export default function StepTen() {
   }, [stepOneHasMulti, form]);
 
   /**
-   * Visible subdomain input is driven by `selectedDomain`, while “Public link” preview can show
-   * slugified venue — keep them aligned from persistence and default preview.
+   * Sync confirmation checkbox with the currently typed domain vs last saved domain.
+   * - Current === savedDomain and was approved → restore checked
+   * - Current !== savedDomain → uncheck (must confirm again)
    */
-  const subdomainInputSeededRef = useRef(false);
+  const syncConfirmForDomain = (nextDomain: string) => {
+    const saved = savedDomainRef.current;
+    if (
+      saved.length > 0 &&
+      nextDomain === saved &&
+      savedDomainApprovedRef.current
+    ) {
+      form.setValue("confirm_domain", true, { shouldValidate: true });
+      return;
+    }
+    form.setValue("confirm_domain", false, { shouldValidate: true });
+  };
+
+  const applyDomainChange = (raw: string) => {
+    const value = normalizeSubdomainLabel(raw, domainSuffix);
+    setSelectedDomain(value);
+    form.setValue("domain", value, { shouldValidate: true });
+    syncConfirmForDomain(value);
+  };
+
+  /**
+   * Prefill from steps API `stepTen.domain` / `isApproved`, else seed from venue name.
+   * Domain stays editable while onboarding (`isOnboarded === false`).
+   */
   useEffect(() => {
     if (!persistedProgressHydrated) return;
 
-    const fromGlobal = (persistedStepTenDomain ?? "").trim();
+    const fromGlobal = normalizeSubdomainLabel(
+      persistedStepTenDomain,
+      domainSuffix,
+    );
+    const approved = stepTenPersistedApproved === true;
+
     if (fromGlobal) {
-      const slug = subdomainPublicPreviewLabel(fromGlobal, "");
-      setSelectedDomain(slug);
-      form.setValue("domain", slug);
+      savedDomainRef.current = fromGlobal;
+      savedDomainApprovedRef.current = approved;
+      setSelectedDomain(fromGlobal);
+      form.setValue("domain", fromGlobal);
+      form.setValue("domain_suffix", domainSuffix);
+      form.setValue("confirm_domain", approved, { shouldValidate: true });
+      form.setValue("isApproved", approved);
       subdomainInputSeededRef.current = true;
       return;
     }
 
     if (subdomainInputSeededRef.current) return;
 
-    const fallback = subdomainPublicPreviewLabel("", venueName);
+    savedDomainRef.current = "";
+    savedDomainApprovedRef.current = false;
+    const fallback = subdomainPublicPreviewLabel("", venueName, domainSuffix);
     if (fallback && fallback !== "yoursubdomain") {
       setSelectedDomain(fallback);
       form.setValue("domain", fallback);
+      form.setValue("domain_suffix", domainSuffix);
+      form.setValue("confirm_domain", false, { shouldValidate: true });
       subdomainInputSeededRef.current = true;
     }
   }, [
     persistedProgressHydrated,
     persistedStepTenDomain,
+    stepTenPersistedApproved,
+    domainSuffix,
     venueName,
     form,
     setSelectedDomain,
@@ -212,7 +281,23 @@ export default function StepTen() {
   const onSubmit = async (values: StepTenType) => {
     setLoading(true);
     try {
-      globalForm.setValue("stepTen", values);
+      const domain = normalizeSubdomainLabel(values.domain, domainSuffix);
+      if (!domain) {
+        form.setError("domain", {
+          message: "Please select a domain for your website",
+        });
+        setLoading(false);
+        return;
+      }
+
+      const nextValues: StepTenType = {
+        ...values,
+        domain,
+        domain_suffix: domainSuffix,
+        confirm_domain: true,
+        isApproved: true,
+      };
+      globalForm.setValue("stepTen", nextValues);
 
       type StepTenPayload = {
         step: 10;
@@ -231,8 +316,8 @@ export default function StepTen() {
         step: 10,
         event_id: values.event_id,
         submit_type: values.submit_type,
-        domain: values.domain,
-        confirm_domain: values.confirm_domain,
+        domain,
+        confirm_domain: true,
         isApproved: true,
       };
 
@@ -252,7 +337,19 @@ export default function StepTen() {
       );
       if (!response?.status) throw new Error("Failed to save domain settings");
 
-      globalForm.setValue("stepTen", { ...values, isApproved: true });
+      // Keep checkbox restored for this domain if the vendor navigates back.
+      savedDomainRef.current = domain;
+      savedDomainApprovedRef.current = true;
+      setSelectedDomain(domain);
+      form.setValue("domain", domain);
+      form.setValue("confirm_domain", true);
+      form.setValue("isApproved", true);
+      globalForm.setValue("stepTen", {
+        ...nextValues,
+        domain,
+        isApproved: true,
+        confirm_domain: true,
+      });
 
       if (values.submit_type === "duplicate") {
         const syncedLocations = await syncVendorLocationsCache(queryClient);
@@ -362,8 +459,9 @@ export default function StepTen() {
                                 {subdomainPublicPreviewLabel(
                                   selectedDomain,
                                   venueName,
+                                  domainSuffix,
                                 )}
-                                .{env.NEXT_PUBLIC_WHITE_LABEL_URL}
+                                .{domainSuffix}
                               </strong>
                             </p>
 
@@ -372,7 +470,7 @@ export default function StepTen() {
                                 <label className="text-sm font-medium text-slate-300">
                                   Subdomain
                                 </label>
-                                <div className="relative">
+                                <div className="flex overflow-hidden rounded-md border border-white/20 bg-white/5 focus-within:ring-1 focus-within:ring-[var(--color-primary,#38bdf8)]">
                                   <Input
                                     placeholder="Enter subdomain name"
                                     value={selectedDomain || ""}
@@ -380,8 +478,7 @@ export default function StepTen() {
                                       const value = e.target.value
                                         .toLowerCase()
                                         .replace(/[^a-z0-9-]/g, "");
-                                      setSelectedDomain(value);
-                                      form.setValue("domain", value);
+                                      applyDomainChange(value);
 
                                       // Generate suggestions based on typing
                                       if (value && value.length >= 3) {
@@ -392,30 +489,29 @@ export default function StepTen() {
                                         );
                                       }
                                     }}
-                                    className="h-9 border-white/20 bg-white/5 pr-20 text-sm"
+                                    className="h-9 flex-1 border-0 bg-transparent pr-8 text-sm shadow-none focus-visible:ring-0"
                                     maxLength={63}
                                   />
-                                  <div className="absolute right-3 top-1/2 flex -translate-y-1/2 transform items-center text-sm text-muted-foreground">
-                                    .eventwizz.com
-                                  </div>
-                                  {selectedDomain && (
+                                  {selectedDomain ? (
                                     <button
                                       type="button"
                                       onClick={() => {
-                                        setSelectedDomain("");
-                                        form.setValue("domain", "");
+                                        applyDomainChange("");
                                       }}
-                                      className="absolute right-16 top-1/2 transform -translate-y-1/2 text-slate-500 hover:text-slate-300"
+                                      className="shrink-0 px-2 text-slate-500 hover:text-slate-300"
                                       title="Clear domain"
                                     >
                                       ✕
                                     </button>
-                                  )}
-                                  {isGeneratingSuggestions && (
-                                    <div className="absolute right-20 top-1/2 transform -translate-y-1/2">
+                                  ) : null}
+                                  {isGeneratingSuggestions ? (
+                                    <div className="flex shrink-0 items-center pr-2">
                                       <Loader2 className="h-4 w-4 animate-spin text-blue-600" />
                                     </div>
-                                  )}
+                                  ) : null}
+                                  <div className="flex shrink-0 items-center border-l border-white/15 bg-white/[0.03] px-3 text-sm text-muted-foreground">
+                                    .{domainSuffix}
+                                  </div>
                                 </div>
                               </div>
 
@@ -451,8 +547,7 @@ export default function StepTen() {
                                               key={index}
                                               type="button"
                                               onClick={() => {
-                                                setSelectedDomain(alt);
-                                                form.setValue("domain", alt);
+                                                applyDomainChange(alt);
                                               }}
                                               className="rounded-full border border-white/15 bg-white/[0.06] px-3 py-1.5 text-sm text-foreground transition-all duration-200 hover:border-white/25 hover:bg-white/[0.1]"
                                             >
@@ -474,21 +569,26 @@ export default function StepTen() {
                                         key={index}
                                         type="button"
                                         onClick={() => {
-                                          setSelectedDomain(suggestion.domain);
-                                          form.setValue(
-                                            "domain",
-                                            suggestion.domain,
+                                          applyDomainChange(
+                                            normalizeSubdomainLabel(
+                                              suggestion.domain,
+                                              domainSuffix,
+                                            ),
                                           );
                                         }}
                                         className={`rounded-full border px-3 py-1.5 text-sm transition-all duration-200 hover:shadow-sm ${
-                                          selectedDomain === suggestion.domain
+                                          selectedDomain ===
+                                          normalizeSubdomainLabel(
+                                            suggestion.domain,
+                                            domainSuffix,
+                                          )
                                             ? "border-[var(--color-primary,#3b82f6)] bg-[var(--color-primary,#3b82f6)]/15 text-foreground shadow-sm"
                                             : "border-white/15 bg-white/[0.06] text-foreground hover:border-white/25 hover:bg-white/[0.1]"
                                         }`}
                                       >
-                                        {suggestion.domain.replace(
-                                          /\.com$|\.eventwizz\.com$/g,
-                                          "",
+                                        {normalizeSubdomainLabel(
+                                          suggestion.domain,
+                                          domainSuffix,
                                         )}
                                       </button>
                                     ))}

@@ -174,11 +174,15 @@ export function resolveFooterContactBlocks(options: {
     return blocks;
   }
 
-  if (hasResolvedContact(main)) {
+  // Single-location / main page: apply the override (e.g. onboarding draft contact)
+  // over the saved theme so the preview reflects what the vendor is entering.
+  const mainContact = mergeContact(resolveFromOverride(override), main);
+
+  if (hasResolvedContact(mainContact)) {
     blocks.push({
       id: "head-office",
       label: "Head office",
-      contact: main,
+      contact: mainContact,
     });
   }
 

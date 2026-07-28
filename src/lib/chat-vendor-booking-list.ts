@@ -3,16 +3,21 @@
  * Uses GET /vendor/bookings + GET /vendor/bookings/{id} for phone/email.
  */
 
-import { formatMoneyLocale, parseFormattedMoney } from "@/lib/currency-format";
+import {
+  formatMoneyLocale,
+  parseFormattedMoney,
+} from "@/lib/currency-format";
+import { getTenantCurrencySymbol } from "@/lib/tenant-currency";
 import {
   vendorBookingsService,
   type VendorBookingItem,
 } from "@/services/vendor/bookings/bookings.service";
 
 function money(value: unknown): string {
-  const parsed = parseFormattedMoney(String(value ?? ""), "£");
+  const symbol = getTenantCurrencySymbol();
+  const parsed = parseFormattedMoney(String(value ?? ""), symbol);
   const amount = Number.isFinite(parsed) ? parsed : 0;
-  return formatMoneyLocale(amount, "£");
+  return formatMoneyLocale(amount, symbol);
 }
 
 function pendingValue(b: VendorBookingItem): number {

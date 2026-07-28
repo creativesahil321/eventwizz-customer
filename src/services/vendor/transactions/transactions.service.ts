@@ -45,7 +45,10 @@ export interface VendorTransactionItem {
   full_name: string;
   email: string;
   card_brand: string | null;
-  cardLast4: string | null;
+  card_last4?: string | null;
+  cardLast4?: string | null;
+  /** e.g. stripe | paypal | bank_transfer */
+  payment_method?: string | null;
   status: string; // "success", "Pending", "failed", etc.
   amount: string; // Format: "3675.00"
   platform_fee: string; // Format: "201.25"

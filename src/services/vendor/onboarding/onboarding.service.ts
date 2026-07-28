@@ -1407,7 +1407,7 @@ export const onboardingService = {
     formData.append("step", data.step.toString());
     formData.append("event_id", data.event_id.toString());
     formData.append("submit_type", data.submit_type);
-    formData.append("domain", data.domain);
+    formData.append("domain", data.domain.trim().toLowerCase());
     formData.append("confirm_domain", data.confirm_domain ? "true" : "false");
 
     // Handle city and address fields

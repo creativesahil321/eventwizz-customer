@@ -134,6 +134,7 @@ function AccountRow({
   makingDefault,
   onDisconnect,
   disconnecting,
+  canRemove = true,
 }: {
   icon: React.ReactNode;
   title: string;
@@ -144,6 +145,8 @@ function AccountRow({
   makingDefault?: boolean;
   onDisconnect: () => void;
   disconnecting?: boolean;
+  /** False when this is the last linked account (must keep at least one). */
+  canRemove?: boolean;
 }) {
   return (
     <div
@@ -197,19 +200,21 @@ function AccountRow({
             Set as default
           </Button>
         ) : null}
-        <button
-          type="button"
-          onClick={onDisconnect}
-          disabled={disconnecting || makingDefault}
-          className="inline-flex shrink-0 items-center gap-1.5 text-sm text-slate-500 transition-colors hover:text-slate-900 disabled:opacity-50"
-        >
-          {disconnecting ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
-          ) : (
-            <X className="h-4 w-4" />
-          )}
-          Remove
-        </button>
+        {canRemove ? (
+          <button
+            type="button"
+            onClick={onDisconnect}
+            disabled={disconnecting || makingDefault}
+            className="inline-flex shrink-0 items-center gap-1.5 text-sm text-slate-500 transition-colors hover:text-slate-900 disabled:opacity-50"
+          >
+            {disconnecting ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <X className="h-4 w-4" />
+            )}
+            Remove
+          </button>
+        ) : null}
       </div>
     </div>
   );
@@ -537,6 +542,7 @@ function GatewayBlock({
             makingDefault={enablingAccountId === account.id}
             onDisconnect={() => onDisconnect(account.id)}
             disconnecting={disconnectingAccountId === account.id}
+            canRemove={totalAccounts > 1}
           />
           {extraPerAccount?.(account)}
         </div>

@@ -4,6 +4,8 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { SiteHeading } from "@/components/public/site-heading";
+import { usePreviewNarrowLayout } from "@/hooks/use-preview-narrow-layout";
+import { cn } from "@/lib/utils";
 
 export default function SubscribeSection() {
   const [formData, setFormData] = useState({
@@ -11,6 +13,7 @@ export default function SubscribeSection() {
     email: "",
     phone: "",
   });
+  const narrowPreview = usePreviewNarrowLayout();
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData({
@@ -55,7 +58,10 @@ export default function SubscribeSection() {
 
         <form
           onSubmit={handleSubmit}
-          className="mx-auto flex max-w-4xl flex-col items-stretch justify-center gap-3 rounded-2xl border border-[color:color-mix(in_srgb,var(--color-text)_8%,transparent)] bg-[color:color-mix(in_srgb,var(--color-text)_3%,var(--color-surface))] p-5 shadow-sm md:flex-row md:flex-wrap md:items-center md:p-6"
+          className={cn(
+            "mx-auto flex max-w-4xl flex-col items-stretch justify-center gap-3 rounded-2xl border border-[color:color-mix(in_srgb,var(--color-text)_8%,transparent)] bg-[color:color-mix(in_srgb,var(--color-text)_3%,var(--color-surface))] p-5 shadow-sm",
+            !narrowPreview && "md:flex-row md:flex-wrap md:items-center md:p-6",
+          )}
         >
           <Input
             type="text"
@@ -64,7 +70,11 @@ export default function SubscribeSection() {
             value={formData.name}
             onChange={handleChange}
             required
-            className={`${fieldClass} w-full md:min-w-[160px] md:flex-1`}
+            className={cn(
+              fieldClass,
+              "w-full",
+              !narrowPreview && "md:min-w-[160px] md:flex-1",
+            )}
           />
 
           <Input
@@ -74,7 +84,11 @@ export default function SubscribeSection() {
             value={formData.email}
             onChange={handleChange}
             required
-            className={`${fieldClass} w-full md:min-w-[200px] md:flex-1`}
+            className={cn(
+              fieldClass,
+              "w-full",
+              !narrowPreview && "md:min-w-[200px] md:flex-1",
+            )}
           />
 
           <Input
@@ -83,7 +97,11 @@ export default function SubscribeSection() {
             placeholder="Mobile Number"
             value={formData.phone}
             onChange={handleChange}
-            className={`${fieldClass} w-full md:min-w-[160px] md:flex-1`}
+            className={cn(
+              fieldClass,
+              "w-full",
+              !narrowPreview && "md:min-w-[160px] md:flex-1",
+            )}
           />
 
           <Button type="submit" variant="event-primary">

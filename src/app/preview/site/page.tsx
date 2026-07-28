@@ -22,6 +22,8 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { PreviewProvider } from "@/contexts/preview-context";
 import { PreviewThemeCustomizer } from "@/components/preview/preview-theme-customizer";
+import { PreviewDeviceToolbar } from "@/components/preview/preview-device-toolbar";
+import { PreviewDeviceFrame } from "@/components/preview/preview-device-frame";
 import { themeKeys } from "@/hooks/use-theme-query";
 import { useToast } from "@/components/ui/use-toast";
 import { resolveHasMultipleLocations } from "@/app/(protected)/_shared/sites-essentials/_lib/use-has-multiple-locations";
@@ -689,29 +691,50 @@ export default function SitePreviewPage() {
           : undefined
       }
     >
-      <div className="relative min-h-screen w-full min-w-0 pb-[5.5rem] sm:pb-24">
-        {hasMultipleLocations && effectiveReviewStep === "main" ? (
-          <MainLandingSitePreview
-            formValues={mainLandingPreviewData ?? resolvedGlobalData}
-            onLocationSelect={handlePreviewLocationFromGrid}
-          />
-        ) : isLoadingLocationPreview ||
-          (effectiveReviewStep === "location" &&
-            locationList.length === 0 &&
-            isLoadingVenueLocations) ? (
-          <div className="flex min-h-[60vh] flex-col items-center justify-center gap-3 bg-[var(--color-background)] text-[var(--color-text)]">
-            <Loader2 className="h-8 w-8 animate-spin text-[var(--color-primary)]" />
-            <p className="text-sm text-[var(--color-text-dimmed)]">
-              Loading {currentLocation?.city ?? "location"} preview…
-            </p>
+      <div className="relative flex min-h-screen w-full min-w-0 flex-col bg-slate-900 pb-[5.5rem] sm:pb-24">
+        <div className="pointer-events-none fixed inset-x-0 top-0 z-[60] flex items-start justify-between gap-3 px-4 pt-4 sm:px-6">
+          <Button
+            variant="event-primary"
+            onClick={handleGoBack}
+            size="sm"
+            className="pointer-events-auto shadow-md ring-1 ring-black/10"
+          >
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            Back to Editor
+          </Button>
+          <div className="pointer-events-auto">
+            <PreviewDeviceToolbar />
           </div>
-        ) : locationPreviewFormValues || effectiveReviewStep === "location" ? (
-          <SitePreview
-            formValues={locationPreviewFormValues ?? resolvedGlobalData}
-          />
-        ) : (
-          <SitePreview formValues={resolvedGlobalData} />
-        )}
+          <div className="hidden w-[8.5rem] sm:block" aria-hidden />
+        </div>
+
+        <PreviewDeviceFrame
+          stageClassName="min-h-screen items-stretch bg-slate-900 px-2 pb-8 pt-16 sm:px-4"
+          frameClassName="min-h-[calc(100vh-4rem)]"
+        >
+          {hasMultipleLocations && effectiveReviewStep === "main" ? (
+            <MainLandingSitePreview
+              formValues={mainLandingPreviewData ?? resolvedGlobalData}
+              onLocationSelect={handlePreviewLocationFromGrid}
+            />
+          ) : isLoadingLocationPreview ||
+            (effectiveReviewStep === "location" &&
+              locationList.length === 0 &&
+              isLoadingVenueLocations) ? (
+            <div className="flex min-h-[60vh] flex-col items-center justify-center gap-3 bg-[var(--color-background)] text-[var(--color-text)]">
+              <Loader2 className="h-8 w-8 animate-spin text-[var(--color-primary)]" />
+              <p className="text-sm text-[var(--color-text-dimmed)]">
+                Loading {currentLocation?.city ?? "location"} preview…
+              </p>
+            </div>
+          ) : locationPreviewFormValues || effectiveReviewStep === "location" ? (
+            <SitePreview
+              formValues={locationPreviewFormValues ?? resolvedGlobalData}
+            />
+          ) : (
+            <SitePreview formValues={resolvedGlobalData} />
+          )}
+        </PreviewDeviceFrame>
 
         {previewValuesForCustomizer ? (
           <PreviewThemeCustomizer
@@ -727,18 +750,6 @@ export default function SitePreviewPage() {
             }
           />
         ) : null}
-
-        <div className="fixed top-4 left-4 z-[60] isolate">
-          <Button
-            variant="event-primary"
-            onClick={handleGoBack}
-            size="sm"
-            className="shadow-md ring-1 ring-black/10"
-          >
-            <ArrowLeft className="mr-2 h-4 w-4" />
-            Back to Editor
-          </Button>
-        </div>
 
         <SitePreviewReviewChrome
           hasMultipleLocations={hasMultipleLocations}

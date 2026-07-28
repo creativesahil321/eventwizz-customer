@@ -8,6 +8,7 @@ import { useCurrencyFormat } from "@/hooks/use-currency-format";
 import { SiteHeading } from "@/components/public/site-heading";
 import type { HeadingEmphasis } from "@/lib/heading-emphasis";
 import type { EventRoomChooserItem } from "@/lib/event-room-chooser-item";
+import { usePreviewNarrowLayout } from "@/hooks/use-preview-narrow-layout";
 
 type EventRoomChooserProps = {
   rooms: EventRoomChooserItem[];
@@ -36,6 +37,7 @@ export function EventRoomChooser({
   className,
 }: EventRoomChooserProps) {
   const { formatCompact } = useCurrencyFormat();
+  const narrowPreview = usePreviewNarrowLayout();
 
   if (rooms.length < 2) return null;
 
@@ -73,8 +75,9 @@ export function EventRoomChooser({
 
         <div
           className={cn(
-            "grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5",
-            rooms.length >= 3 && "lg:grid-cols-3",
+            "grid grid-cols-1 gap-4",
+            !narrowPreview && "sm:grid-cols-2 sm:gap-5",
+            !narrowPreview && rooms.length >= 3 && "lg:grid-cols-3",
           )}
         >
           {rooms.map((room) => {

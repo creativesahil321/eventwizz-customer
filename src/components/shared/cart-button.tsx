@@ -70,7 +70,11 @@ export default function CartButton({
                   </Badge>
                 )}
               </span>
-              {size !== "icon" && <span className="inline">Cart</span>}
+              {size !== "icon" && (
+                <span className={fullWidth ? undefined : "hidden xl:inline"}>
+                  Cart
+                </span>
+              )}
               {cartSummary.hasItems && showBadge && fullWidth ? (
                 <Badge
                   variant="destructive"

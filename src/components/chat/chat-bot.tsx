@@ -44,6 +44,12 @@ import {
   fetchVendorEventOverviewChatReply,
 } from "@/lib/chat-vendor-event-overview";
 import {
+  isLiveEventBookingIntent,
+  matchLiveEvents,
+  buildLiveEventsDirectReply,
+} from "@/lib/chat-live-events";
+import type { LiveEvent } from "@/types/theme.types";
+import {
   isVendorBookingListIntent,
   fetchVendorBookingListChatReply,
 } from "@/lib/chat-vendor-booking-list";
@@ -455,6 +461,10 @@ export function ChatBot() {
     );
   }, [theme?.favicon, theme?.logo]);
   const siteName = theme?.name?.trim() || appConfig.name;
+  const liveEvents = useMemo(
+    (): LiveEvent[] => theme?.live_events ?? [],
+    [theme?.live_events],
+  );
 
   const [messages, setMessages] = useState<Message[]>([
     {
@@ -874,6 +884,34 @@ Is there anything else I can help you with?`,
       return;
     }
 
+    // Public venue site: answer event booking asks from theme live_events (direct links)
+    if (
+      isVendorStorefront &&
+      !isLoggedInVendor &&
+      isLiveEventBookingIntent(userText) &&
+      liveEvents.length > 0
+    ) {
+      const matches = matchLiveEvents(userText, liveEvents);
+      const direct = buildLiveEventsDirectReply({
+        userText,
+        matches,
+        allLiveEvents: liveEvents,
+        siteName,
+        userName,
+      });
+      if (direct) {
+        setMessages((prev) => [
+          ...prev,
+          {
+            role: "assistant",
+            content: direct.content,
+            supportCta: direct.supportCta,
+          },
+        ]);
+        return;
+      }
+    }
+
     // Guests (or non-support): AI chat + navigation / contact CTAs
     setIsLoading(true);
     const wantsSupport = isSupportIntent(userText);
@@ -1175,6 +1213,7 @@ Is there anything else I can help you with?`,
             contactEmail,
             contactAddress,
             vendorLiveStats: isLoggedInVendor ? slimStats : null,
+            liveEvents: isVendorStorefront ? liveEvents : null,
           },
         }),
       });
@@ -1220,6 +1259,12 @@ Is there anything else I can help you with?`,
       : supportFlow.step === "description"
         ? "Describe your issue…"
         : "Type a message…";
+
+  // Onboarding is a full-screen editor + preview — the floating launcher
+  // (site logo avatar) overlaps the right-hand preview panel.
+  if (pathname?.startsWith("/on-boarding")) {
+    return null;
+  }
 
   return (
     <>

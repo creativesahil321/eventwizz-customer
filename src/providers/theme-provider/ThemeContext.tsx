@@ -164,6 +164,23 @@ const mapSchemaToSettings = (
     domain: schema.domain || "",
     website_role: schema.website_role || "",
     currency_symbol: resolveCurrencySymbol(schema.currency_symbol),
+    live_events: Array.isArray(schema.live_events)
+      ? schema.live_events
+          .filter(
+            (e) =>
+              e &&
+              typeof e.title === "string" &&
+              typeof e.slug === "string" &&
+              typeof e.location_slug === "string",
+          )
+          .map((e) => ({
+            title: e.title.trim(),
+            slug: e.slug.trim(),
+            location_slug: e.location_slug.trim(),
+            location_city: (e.location_city || e.location_slug).trim(),
+          }))
+      : [],
+    locations: Array.isArray(schema.locations) ? schema.locations : [],
   };
 };
 

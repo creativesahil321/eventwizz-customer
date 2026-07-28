@@ -75,7 +75,7 @@ export default function AuthLayout({
   }
 
   return (
-    <div className="min-h-screen flex flex-col overflow-x-hidden font-sans bg-[var(--color-background)]">
+    <div className="min-h-screen flex flex-col overflow-x-hidden font-body bg-[var(--color-background)]">
       <header className="w-full h-16 bg-[var(--color-header)] text-[var(--color-on-header)]">
         <div className="max-w-[1400px] h-full mx-auto px-4 sm:px-6 flex items-center justify-between">
           <Link href="/" className="flex items-center space-x-2 shrink-0">

@@ -31,7 +31,6 @@ interface NotificationListProps {
   onPageChange: (page: number) => void;
   isLoading?: boolean;
   isMutating?: boolean;
-  searchQuery?: string;
 }
 
 export function NotificationListComponent({
@@ -42,32 +41,12 @@ export function NotificationListComponent({
   onMarkAsUnread,
   onPageChange,
   isLoading,
-  searchQuery = "",
 }: NotificationListProps) {
   const [updatingId, setUpdatingId] = useState<number | null>(null);
 
-  const filteredNotifications = useMemo(() => {
-    const query = searchQuery.trim().toLowerCase();
-    if (!query) return notifications;
-
-    return notifications.filter((notification) => {
-      const haystack = [
-        notification.title,
-        notification.notice,
-        notification.category,
-        notification.action_label,
-      ]
-        .filter(Boolean)
-        .join(" ")
-        .toLowerCase();
-
-      return haystack.includes(query);
-    });
-  }, [notifications, searchQuery]);
-
   const groupedNotifications = useMemo(
-    () => groupNotificationsByDate(filteredNotifications),
-    [filteredNotifications],
+    () => groupNotificationsByDate(notifications),
+    [notifications],
   );
 
   if (isLoading) {
@@ -84,16 +63,6 @@ export function NotificationListComponent({
         icon={<Inbox className="h-10 w-10 text-muted-foreground" />}
         title="No notifications"
         description="You don't have any notifications at the moment."
-      />
-    );
-  }
-
-  if (filteredNotifications.length === 0) {
-    return (
-      <EmptyPlaceholder
-        icon={<Inbox className="h-10 w-10 text-muted-foreground" />}
-        title="No matching notifications"
-        description="Try a different search or filter."
       />
     );
   }

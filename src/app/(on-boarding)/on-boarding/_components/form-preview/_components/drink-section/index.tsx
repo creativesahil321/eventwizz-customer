@@ -5,9 +5,12 @@ import { useDrinkSelectionStore } from "@/store/drink-selection.store";
 import { useHydration } from "@/hooks/useHydration";
 import { useCurrencyFormat } from "@/hooks/use-currency-format";
 import { Button } from "@/components/ui/button";
+import { usePreviewNarrowLayout } from "@/hooks/use-preview-narrow-layout";
+import { SiteHeading } from "@/components/public/site-heading";
+import { cn } from "@/lib/utils";
 
 type DrinkPackage = {
-  id?: number; // Optional for backward compatibility, but should always be present from API
+  id?: number;
   title: string;
   description: string;
   price: number;
@@ -18,7 +21,7 @@ type DrinkSectionProps = {
   title: string;
   description: string;
   packages: DrinkPackage[];
-  eventSlug?: string; // Optional for backward compatibility
+  eventSlug?: string;
   /** Multi-room events: isolate drink selections per room. */
   roomId?: number;
   /** Fallback scope when room id is not assigned yet (onboarding preview). */
@@ -38,7 +41,8 @@ export default function DrinkSection({
 }: DrinkSectionProps) {
   const { format: formatMoney } = useCurrencyFormat();
   const [showMore] = useState(defaultExpanded);
-  const isHydrated = useHydration(); // Professional hydration handling
+  const isHydrated = useHydration();
+  const narrowPreview = usePreviewNarrowLayout();
   const { addDrink, updateDrinkQuantity, getDrinkQuantity, getTotalDrinks } =
     useDrinkSelectionStore();
 
@@ -66,8 +70,6 @@ export default function DrinkSection({
   }
 
   const handleAdd = (drink: DrinkPackage) => {
-    // Ensure id exists - if not, generate a temporary one based on title hash
-    // This handles backward compatibility for packages without id
     const drinkId =
       drink.id ||
       drink.title
@@ -94,30 +96,52 @@ export default function DrinkSection({
   };
 
   return (
-    <section className="bg-[var(--color-background)] text-[var(--color-text)] py-16 px-4 w-full overflow-hidden">
-      <section className="w-full text-center max-w-5xl mx-auto">
-        <h2 className="text-2xl font-black tracking-tight text-[var(--color-text)] md:text-3xl px-2 break-words">
-          {title || "Other Packages"}
-        </h2>
-        <p
-          className="py-4 sm:py-5 text-sm sm:text-base px-2 break-words whitespace-normal overflow-hidden max-w-full text-[var(--color-text-dimmed)]"
-          style={{
-            wordBreak: "break-word",
-            overflowWrap: "break-word",
-            hyphens: "auto",
-          }}
-        >
-          {description || "*Prices are subject to change"}
-        </p>
+    <section className="w-full overflow-hidden bg-[var(--color-background)] px-4 py-16 text-[var(--color-text)]">
+      <section className="mx-auto w-full max-w-5xl text-center">
+        <div className="space-y-3 px-2">
+          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[color:var(--color-primary)]">
+            Drinks
+          </p>
+          <SiteHeading
+            level={2}
+            title={title || "Other Packages"}
+            variant="onSurface"
+            align="center"
+            className="!text-3xl !font-black tracking-tight md:!text-4xl"
+          />
+          <p
+            className={cn(
+              "mx-auto max-w-full overflow-hidden whitespace-normal break-words text-sm text-[var(--color-text-dimmed)]",
+              !narrowPreview && "sm:text-base",
+            )}
+            style={{
+              wordBreak: "break-word",
+              overflowWrap: "break-word",
+              hyphens: "auto",
+            }}
+          >
+            {description || "*Prices are subject to change"}
+          </p>
+        </div>
         {isHydrated && getTotalDrinks() > 0 && (
-          <div className="mt-3 inline-flex items-center gap-2 bg-[var(--color-surface)] text-[var(--color-text)] px-3 py-1 rounded-full text-xs sm:text-sm font-medium border border-[var(--color-text)]/15">
+          <div
+            className={cn(
+              "mt-3 inline-flex items-center gap-2 rounded-full border border-[var(--color-text)]/15 bg-[var(--color-surface)] px-3 py-1 text-xs font-medium text-[var(--color-text)]",
+              !narrowPreview && "sm:text-sm",
+            )}
+          >
             <span>🍹</span>
             <span>
               {getTotalDrinks()} item{getTotalDrinks() > 1 ? "s" : ""} selected
             </span>
           </div>
         )}
-        <section className="flex w-full flex-col space-y-4 sm:space-y-6 mt-4 sm:mt-6 overflow-hidden text-left">
+        <section
+          className={cn(
+            "mt-4 flex w-full flex-col space-y-4 text-left",
+            !narrowPreview && "sm:mt-6 sm:space-y-6",
+          )}
+        >
           {showMore &&
             filteredPackages?.length > 0 &&
             filteredPackages.map((singlePackage, idx) => {
@@ -126,16 +150,30 @@ export default function DrinkSection({
                 : 0;
               return (
                 <section
-                  className="text-[var(--color-text)] bg-[var(--color-surface)] flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4 p-4 sm:p-6 rounded-lg border border-[var(--color-surface)]/10 w-full text-left"
                   key={idx}
+                  className={cn(
+                    "w-full min-w-0 rounded-lg border border-[var(--color-surface)]/10 bg-[var(--color-surface)] p-4 text-left text-[var(--color-text)]",
+                    // Mobile / Tablet framed preview: stacked card (no viewport `sm:` leak).
+                    // Desktop live + desktop preview: details | price row.
+                    narrowPreview
+                      ? "flex flex-col items-start justify-between gap-3"
+                      : "flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-center sm:gap-4 sm:p-6",
+                  )}
                 >
-                  {/* Details — explicit text-left counters inherited text-center from parent hero */}
-                  <article className="flex flex-col items-start w-full sm:min-w-0 sm:max-w-none flex-1 text-left">
-                    <h3 className="text-base sm:text-lg md:text-xl font-semibold mb-1 sm:mb-2 break-words w-full text-left">
+                  <article className="flex w-full min-w-0 flex-1 flex-col items-start text-left">
+                    <h3
+                      className={cn(
+                        "mb-1 w-full break-words text-left text-base font-semibold",
+                        !narrowPreview && "sm:mb-2 sm:text-lg md:text-xl",
+                      )}
+                    >
                       {singlePackage.title}
                     </h3>
                     <div
-                      className="text-xs sm:text-sm md:text-base text-[var(--color-text-dimmed)] text-left leading-relaxed break-words whitespace-normal overflow-hidden prose prose-sm max-w-full w-full prose-p:my-1 prose-headings:text-left"
+                      className={cn(
+                        "prose prose-sm max-w-full w-full min-w-0 overflow-hidden text-left text-xs leading-relaxed break-words text-[var(--color-text-dimmed)] prose-p:my-1 prose-headings:text-left",
+                        !narrowPreview && "sm:text-sm md:text-base",
+                      )}
                       style={{
                         wordBreak: "break-word",
                         overflowWrap: "break-word",
@@ -147,12 +185,26 @@ export default function DrinkSection({
                     />
                   </article>
 
-                  {/* Divider */}
-                  <div className="hidden sm:block flex-1 border-t border-dashed border-[var(--color-text)]/20 mx-4" />
+                  {!narrowPreview ? (
+                    <div className="mx-4 hidden flex-1 border-t border-dashed border-[var(--color-text)]/20 sm:block" />
+                  ) : null}
 
-                  {/* Price + Actions */}
-                  <article className="flex flex-col sm:flex-row items-center gap-3 sm:gap-4 w-full sm:w-auto mt-2 sm:mt-0">
-                    <p className="flex items-center space-x-1 text-lg sm:text-xl md:text-2xl font-semibold whitespace-nowrap">
+                  <article
+                    className={cn(
+                      "flex w-full shrink-0 flex-col gap-3",
+                      // Mobile (live + framed preview): left-align price with copy, full-width CTA.
+                      // Desktop: price + controls sit in a right-hand row.
+                      narrowPreview
+                        ? "mt-2 items-stretch"
+                        : "mt-2 items-stretch sm:mt-0 sm:w-auto sm:items-end sm:flex-row sm:gap-4",
+                    )}
+                  >
+                    <p
+                      className={cn(
+                        "flex items-center justify-start space-x-1 text-left text-lg font-semibold whitespace-nowrap",
+                        !narrowPreview && "sm:text-xl md:text-2xl",
+                      )}
+                    >
                       <span>{formatMoney(singlePackage.price)}</span>
                     </p>
 
@@ -161,26 +213,50 @@ export default function DrinkSection({
                         variant="event-primary"
                         size="sm"
                         onClick={() => handleAdd(singlePackage)}
-                        className="w-full sm:w-auto text-sm sm:text-base px-4 sm:px-6 py-2"
+                        className={cn(
+                          "w-full px-4 py-2 text-sm",
+                          !narrowPreview && "sm:w-auto sm:px-6 sm:text-base",
+                        )}
                       >
                         Add to Cart
                       </Button>
                     ) : (
-                      <div className="flex items-center justify-center border border-[var(--color-text)]/20 rounded-lg overflow-hidden w-full sm:w-auto">
+                      <div
+                        className={cn(
+                          "flex w-full items-center justify-between overflow-hidden rounded-lg border border-[var(--color-text)]/20",
+                          !narrowPreview && "sm:w-auto sm:justify-center",
+                        )}
+                      >
                         <button
-                          className="px-4 sm:px-3 py-2 sm:py-1 hover:bg-[var(--color-background)]/80 text-lg sm:text-base font-semibold min-w-[44px] sm:min-w-0 touch-manipulation"
+                          className={cn(
+                            "min-w-[44px] px-4 py-2 text-lg font-semibold touch-manipulation hover:bg-[var(--color-background)]/80",
+                            !narrowPreview &&
+                              "sm:min-w-0 sm:px-3 sm:py-1 sm:text-base",
+                          )}
                           onClick={() => handleDecrease(singlePackage)}
                           aria-label="Decrease quantity"
+                          type="button"
                         >
                           −
                         </button>
-                        <span className="px-4 sm:px-4 py-2 sm:py-1 bg-[var(--color-background)]/50 text-base sm:text-sm font-medium min-w-[44px] sm:min-w-0 text-center">
+                        <span
+                          className={cn(
+                            "min-w-[44px] bg-[var(--color-background)]/50 px-4 py-2 text-center text-base font-medium",
+                            !narrowPreview &&
+                              "sm:min-w-0 sm:px-4 sm:py-1 sm:text-sm",
+                          )}
+                        >
                           {quantity}
                         </span>
                         <button
-                          className="px-4 sm:px-3 py-2 sm:py-1 hover:bg-[var(--color-background)]/80 text-lg sm:text-base font-semibold min-w-[44px] sm:min-w-0 touch-manipulation"
+                          className={cn(
+                            "min-w-[44px] px-4 py-2 text-lg font-semibold touch-manipulation hover:bg-[var(--color-background)]/80",
+                            !narrowPreview &&
+                              "sm:min-w-0 sm:px-3 sm:py-1 sm:text-base",
+                          )}
                           onClick={() => handleIncrease(singlePackage)}
                           aria-label="Increase quantity"
+                          type="button"
                         >
                           +
                         </button>

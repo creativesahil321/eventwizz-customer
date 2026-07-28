@@ -405,13 +405,16 @@ export const API_ENDPOINTS = {
       STATISTICS: "/admin/transactions/internal-transfer-requests/statistics",
     },
     TRANSACTIONS: {
-      ALL: "/admin/transaction-history",
+      ALL: "/admin/transactions",
       INTERNAL_TRANSFER: "/admin/transactions/internal-transfer-requests",
       INTERNAL_TRANSFER_MANAGEMENT: "/admin/internal-transfer",
 
-      HISTORY: "/admin/transaction-history",
+      HISTORY: "/admin/transactions",
       STATISTICS: "/admin/transaction-history/static",
-      EXPORT: "/admin/transaction-history/export",
+      EXPORT: "/admin/transactions/export",
+
+      RECEIPT: "/admin/transactions/{payment_id}/receipt",
+      EXPORT_TRANSACTIONS: "/admin/transactions/export",
     },
     DEPOSITS: {
       AUTO_METHOD: {

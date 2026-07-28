@@ -1,19 +1,7 @@
 import type { Row } from "@tanstack/react-table";
+import type { AdminTransactionItem } from "@/services/admin/transactions";
 
-export type Transaction = {
-  payment_id: number;
-  booking_number: string;
-  transaction_id: string;
-  booking_date: string;
-  event_date: string;
-  full_name: string;
-  email: string;
-  card_brand: string;
-  cardLast4: string;
-  status: string;
-  amount: string;
-  platform_fee: string;
-};
+export type Transaction = AdminTransactionItem;
 
 export type SearchParams = {
   page?: string;

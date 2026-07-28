@@ -16,6 +16,7 @@ import { GalleryComponentProps } from "../event-types";
 import { addCacheBusting } from "@/lib/image-utils";
 import { SiteHeading } from "@/components/public/site-heading";
 import { GalleryLightbox } from "@/components/public/gallery-lightbox";
+import { usePreviewNarrowLayout } from "@/hooks/use-preview-narrow-layout";
 
 // Default fallback images
 const defaultEventImages = [
@@ -33,6 +34,7 @@ export default function RecentEventsGlimpse({
   const vendorTheme = theme as ThemeSchema;
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState(0);
+  const narrowPreview = usePreviewNarrowLayout();
 
   const galleryTitle =
     propGalleryTitle ||
@@ -122,7 +124,12 @@ export default function RecentEventsGlimpse({
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-5xl mx-auto">
+            <div
+              className={cn(
+                "mx-auto grid max-w-5xl grid-cols-1 gap-8",
+                !narrowPreview && "md:grid-cols-3",
+              )}
+            >
               {[...Array(3)].map((_, i) => (
                 <div key={i} className="group relative">
                   <div className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl h-80 border border-gray-200 shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 overflow-hidden">
@@ -194,7 +201,10 @@ export default function RecentEventsGlimpse({
                 {images.map((src, index) => (
                   <CarouselItem
                     key={index}
-                    className="pl-4 md:basis-1/2 lg:basis-1/3"
+                    className={cn(
+                      "basis-full pl-4",
+                      !narrowPreview && "md:basis-1/2 lg:basis-1/3",
+                    )}
                   >
                     <button
                       type="button"

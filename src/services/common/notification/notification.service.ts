@@ -28,8 +28,19 @@ export const notificationService = {
       role
     );
 
+    const params: Record<string, string | number> = {
+      page: filters.page ?? 1,
+      limit: filters.limit ?? 10,
+    };
+    if (filters.filter?.trim()) {
+      params.filter = filters.filter.trim();
+    }
+    if (filters.search?.trim()) {
+      params.search = filters.search.trim();
+    }
+
     return api.get<NotificationResponse>(endpoints.ALL, {
-      params: filters,
+      params,
       returnFullResponse: true,
     });
   },
@@ -64,6 +75,7 @@ export const notificationService = {
 
   /**
    * Mark all notifications as read
+   * POST /{role}/notifications/mark-as-read-all  body: {}
    */
   markAllAsRead: async (): Promise<boolean> => {
     const role = getCurrentUserRole();
@@ -72,6 +84,6 @@ export const notificationService = {
       role
     );
 
-    return api.get<boolean>(endpoints.MARK_AS_READ_ALL);
+    return api.post<boolean>(endpoints.MARK_AS_READ_ALL, {});
   },
 };

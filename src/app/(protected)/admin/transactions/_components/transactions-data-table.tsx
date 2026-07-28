@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useMemo, useState, useEffect } from "react";
+import React, { useCallback, useMemo, useState, useEffect } from "react";
 import {
   useReactTable,
   getCoreRowModel,
@@ -21,81 +21,74 @@ import {
 import { DataTablePagination } from "@/components/data-table/data-table-pagination";
 import type { SearchParams, Transaction } from "../_lib/types";
 import { getTransactionColumns } from "./columns";
-import { DUMMY_TRANSACTIONS, getDummyEarnings } from "../_lib/dummy-data";
 import { cn } from "@/lib/utils";
 import { useCurrencyFormat } from "@/hooks/use-currency-format";
+import {
+  useAdminTransactions,
+  useDownloadAdminReceipt,
+} from "@/services/admin/transactions";
+import { AdminTransactionsTableSkeleton } from "./skeleton-loader";
 
 type AdminTransactionsDataTableProps = {
   search: SearchParams;
   onEarningsUpdate?: (earnings: string) => void;
 };
 
-function parseBookingDate(dateStr: string): Date {
-  const [datePart] = dateStr.split(" ");
-  const [day, month, year] = datePart.split("-");
-  return new Date(Number(year), Number(month) - 1, Number(day));
-}
-
 export function AdminTransactionsDataTable({
   search,
   onEarningsUpdate,
 }: AdminTransactionsDataTableProps) {
   const { formatLocale: formatMoneyLocale } = useCurrencyFormat();
-  const [rowAction, setRowAction] = useState<{
-    row: { original: Transaction };
-    type: "download";
-  } | null>(null);
   const [sorting, setSorting] = useState<SortingState>([]);
   const [pagination, setPagination] = useState<PaginationState>({
     pageIndex: 0,
-    pageSize: 30,
+    pageSize: Number(search.per_page) || 30,
   });
 
-  const columns = useMemo(
-    () => getTransactionColumns({ setRowAction, formatMoneyLocale }),
-    [formatMoneyLocale],
+  const downloadReceiptMutation = useDownloadAdminReceipt();
+
+  const handleDownloadReceipt = useCallback(
+    (paymentId: number) => {
+      downloadReceiptMutation.mutate(paymentId);
+    },
+    [downloadReceiptMutation],
   );
 
-  const filteredData = useMemo(() => {
-    let data = [...DUMMY_TRANSACTIONS];
+  const downloadingPaymentId =
+    downloadReceiptMutation.isPending &&
+    downloadReceiptMutation.variables != null
+      ? Number(downloadReceiptMutation.variables)
+      : null;
 
-    const q = (search.search ?? "").toString().toLowerCase().trim();
-    if (q) {
-      data = data.filter(
-        (t) =>
-          t.booking_number.toLowerCase().includes(q) ||
-          t.transaction_id.toLowerCase().includes(q)
-      );
-    }
+  const columns = useMemo(
+    () =>
+      getTransactionColumns({
+        onDownloadReceipt: handleDownloadReceipt,
+        downloadingPaymentId,
+        formatMoneyLocale,
+      }),
+    [downloadingPaymentId, formatMoneyLocale, handleDownloadReceipt],
+  );
 
-    const status = (search.status ?? "").toString();
-    if (status && status !== "all") {
-      data = data.filter((t) => t.status.toLowerCase() === status.toLowerCase());
-    }
-
-    const fromDate = search.from_date?.toString();
-    const toDate = search.to_date?.toString();
-    if (fromDate || toDate) {
-      data = data.filter((t) => {
-        const d = parseBookingDate(t.booking_date).getTime();
-        if (fromDate && d < new Date(fromDate).setHours(0, 0, 0, 0))
-          return false;
-        if (toDate && d > new Date(toDate).setHours(23, 59, 59, 999))
-          return false;
-        return true;
-      });
-    }
-
-    return data;
-  }, [search.search, search.status, search.from_date, search.to_date]);
+  const { data, isLoading, isError, isFetching } = useAdminTransactions({
+    search: search.search,
+    status: search.status,
+    from_date: search.from_date,
+    to_date: search.to_date,
+    page: Number(search.page) || pagination.pageIndex + 1,
+    per_page: Number(search.per_page) || pagination.pageSize,
+  });
 
   useEffect(() => {
-    const earnings = getDummyEarnings(filteredData);
-    onEarningsUpdate?.(earnings);
-  }, [filteredData, onEarningsUpdate]);
+    if (data?.earnings != null && onEarningsUpdate) {
+      onEarningsUpdate(data.earnings);
+    }
+  }, [data, onEarningsUpdate]);
+
+  const transactions: Transaction[] = data?.data ?? [];
 
   const table = useReactTable({
-    data: filteredData,
+    data: transactions,
     columns,
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
@@ -105,14 +98,22 @@ export function AdminTransactionsDataTable({
     state: { sorting, pagination },
   });
 
-  useEffect(() => {
-    if (rowAction?.type === "download") {
-      setRowAction(null);
-      // Dummy: could trigger file download or toast "Receipt downloaded"
-    }
-  }, [rowAction]);
+  if (isLoading) {
+    return <AdminTransactionsTableSkeleton rowCount={9} />;
+  }
 
-  if (filteredData.length === 0) {
+  if (isError) {
+    return (
+      <div className="bg-white rounded-lg border border-[var(--color-border)] shadow-sm p-8">
+        <div className="text-center text-destructive min-h-[280px] flex flex-col items-center justify-center">
+          <p className="text-lg font-medium">Failed to load transactions</p>
+          <p className="text-sm mt-2">Please try again later</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (transactions.length === 0) {
     return (
       <div className="bg-white rounded-lg border border-[var(--color-border)] shadow-sm p-8">
         <div className="text-center text-muted-foreground min-h-[280px] flex flex-col items-center justify-center">
@@ -126,7 +127,12 @@ export function AdminTransactionsDataTable({
   }
 
   return (
-    <div className="flex w-full max-w-full min-w-0 flex-col gap-2.5">
+    <div
+      className={cn(
+        "flex w-full max-w-full min-w-0 flex-col gap-2.5",
+        isFetching && "opacity-70 transition-opacity",
+      )}
+    >
       <section className="overflow-x-auto overflow-y-visible bg-white rounded-lg border border-[var(--color-border)] shadow-sm">
         <Table className="min-w-[900px]">
           <TableHeader>
@@ -141,7 +147,7 @@ export function AdminTransactionsDataTable({
                       ? null
                       : flexRender(
                           header.column.columnDef.header,
-                          header.getContext()
+                          header.getContext(),
                         )}
                   </TableHead>
                 ))}
@@ -161,7 +167,7 @@ export function AdminTransactionsDataTable({
                   >
                     {flexRender(
                       cell.column.columnDef.cell,
-                      cell.getContext()
+                      cell.getContext(),
                     )}
                   </TableCell>
                 ))}

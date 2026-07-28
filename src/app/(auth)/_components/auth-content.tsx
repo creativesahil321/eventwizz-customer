@@ -28,7 +28,7 @@ export function AuthContent() {
   if (isRegister && isCustomer) {
     return (
       <div className="space-y-8">
-        <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight text-[var(--color-text)] leading-tight">
+        <h2 className="font-heading text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight text-[var(--color-text)] leading-tight">
           Discover Amazing Events Near You!
         </h2>
 
@@ -71,7 +71,7 @@ export function AuthContent() {
   if (isRegister && isVendor) {
     return (
       <div className="space-y-8">
-        <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight leading-tight">
+        <h2 className="font-heading text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight leading-tight">
           Start Growing Your Event Business Today!
         </h2>
 
@@ -116,7 +116,7 @@ export function AuthContent() {
   if (isLogin) {
     return (
       <div className="space-y-8">
-        <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight text-[var(--color-text)] leading-tight">
+        <h2 className="font-heading text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight text-[var(--color-text)] leading-tight">
           Welcome Back to {siteName}
         </h2>
 
@@ -157,7 +157,7 @@ export function AuthContent() {
   /* ---------------- DEFAULT ---------------- */
   return (
     <div className="space-y-8">
-      <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight text-[var(--color-text)] leading-tight">
+      <h2 className="font-heading text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight text-[var(--color-text)] leading-tight">
         Welcome to {siteName}
       </h2>
 

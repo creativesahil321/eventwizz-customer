@@ -35,8 +35,8 @@ export function PreviewRoomFloatingSelector({
       layout="sticky"
       stickyTop={ONBOARDING_PREVIEW_HEADER_OFFSET}
       label="Choose Room"
-      size="lg"
-      className={cn("mx-auto max-w-7xl sm:px-6", className)}
+      size="sm"
+      className={cn("mx-auto w-full max-w-full", className)}
     />
   );
 }

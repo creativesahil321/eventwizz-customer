@@ -21,8 +21,16 @@ export interface Notification {
 }
 
 export interface NotificationFilters {
-  category?: string;
-  status?: "read" | "unread" | string;
+  /** API feed filter: unread | bookings | payments | customers | system */
+  filter?:
+    | "unread"
+    | "bookings"
+    | "payments"
+    | "customers"
+    | "system"
+    | string;
+  /** Server-side search query */
+  search?: string;
   page?: number;
   limit?: number;
 }

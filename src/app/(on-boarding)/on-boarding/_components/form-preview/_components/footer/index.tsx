@@ -1,3 +1,5 @@
+"use client";
+
 import {
   Facebook,
   Instagram,
@@ -11,6 +13,8 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { addCacheBusting } from "@/lib/image-utils";
+import { usePreviewNarrowLayout } from "@/hooks/use-preview-narrow-layout";
+import { cn } from "@/lib/utils";
 
 // Social media icon mapping
 const socialIcons = {
@@ -40,6 +44,7 @@ export default function FooterSection({
     youtube?: string;
   };
 }) {
+  const narrowPreview = usePreviewNarrowLayout();
   const contact_info = [
     {
       icon: <Phone size={16} />,
@@ -122,7 +127,12 @@ export default function FooterSection({
               ))}
             </div>
           </div>
-          <div className="w-full grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 py-5">
+          <div
+            className={cn(
+              "grid w-full grid-cols-1 gap-6 py-5",
+              !narrowPreview && "sm:grid-cols-2 md:grid-cols-3",
+            )}
+          >
             {contact_info.map((info, index) => (
               <div
                 className="w-full flex flex-row justify-start sm:justify-center gap-3"

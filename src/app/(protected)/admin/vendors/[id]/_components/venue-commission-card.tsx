@@ -100,7 +100,7 @@ function flatFieldMessage(
 
 export function VenueCommissionCard({ venue }: VenueCommissionCardProps) {
   const queryClient = useQueryClient();
-  const { format } = useCurrencyFormat();
+  const { format, symbol } = useCurrencyFormat();
   const formatFlatRange = `${format(FLAT_MIN)}–${format(FLAT_MAX)}`;
   const c = venue.commissionSettings;
   const groupLabelId = `venue-commission-options-${venue.id}`;
@@ -387,7 +387,7 @@ export function VenueCommissionCard({ venue }: VenueCommissionCardProps) {
                     htmlFor={`venue-commission-flat-${venue.id}`}
                     className="text-sm font-medium text-foreground"
                   >
-                    Flat amount
+                    Flat amount ({symbol})
                   </Label>
                   <Input
                     id={`venue-commission-flat-${venue.id}`}

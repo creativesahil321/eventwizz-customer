@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Search, Download, Loader2, RotateCcw } from "lucide-react";
 import { Input } from "@/components/ui/input";
@@ -13,30 +13,23 @@ import {
 } from "@/components/ui/select";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
 import { DateRange } from "react-day-picker";
-import { format } from "date-fns";
+import { format, startOfYear, endOfDay } from "date-fns";
 import { useDebounce } from "@/hooks/data-table/use-debounce";
 import { AdminTransactionsDataTable } from "./transactions-data-table";
-import { AdminTransactionsTableSkeleton } from "./skeleton-loader";
-import {
-  getDummyEarnings,
-  getFilteredDummyTransactions,
-  DUMMY_TRANSACTIONS,
-} from "../_lib/dummy-data";
 import type { SearchParams } from "../_lib/types";
-import type { Transaction } from "../_lib/types";
 import { useCurrencyFormat } from "@/hooks/use-currency-format";
+import { useExportAdminTransactions } from "@/services/admin/transactions";
+import { toast } from "sonner";
 
 export default function Transactions() {
   const { formatLocale } = useCurrencyFormat();
   const [globalFilterValue, setGlobalFilterValue] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
-  const [earnings, setEarnings] = useState(() =>
-    getDummyEarnings(DUMMY_TRANSACTIONS)
-  );
-  const [isLoading, setIsLoading] = useState(true);
+  const [earnings, setEarnings] = useState("0");
 
   const debouncedSearch = useDebounce(globalFilterValue, 500);
+  const exportMutation = useExportAdminTransactions();
 
   const fromDate = dateRange?.from
     ? format(dateRange.from, "yyyy-MM-dd")
@@ -71,52 +64,22 @@ export default function Transactions() {
   };
 
   const handleCSVExport = () => {
-    const filtered = getFilteredDummyTransactions({
-      search: debouncedSearch,
-      status: statusFilter === "all" ? "" : statusFilter,
-      from_date: fromDate,
-      to_date: toDate,
-    });
-    const headers = [
-      "Booking Number",
-      "Txn ID",
-      "Booking Date",
-      "Event Date",
-      "Full Name",
-      "Email",
-      "Payment Method",
-      "Status",
-      "Amount",
-      "Platform Fee",
-    ];
-    const rows = filtered.map((t) =>
-      [
-        t.booking_number,
-        t.transaction_id,
-        t.booking_date,
-        t.event_date,
-        t.full_name,
-        t.email,
-        `${t.card_brand} **${t.cardLast4}`,
-        t.status,
-        t.amount,
-        t.platform_fee,
-      ].join(",")
-    );
-    const csv = [headers.join(","), ...rows].join("\n");
-    const blob = new Blob([csv], { type: "text/csv" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `admin-transaction-history-${format(new Date(), "yyyy-MM-dd")}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
-  };
+    // Always send a date range to the API (same pattern as vendor transactions).
+    const from = fromDate ?? format(startOfYear(new Date()), "yyyy-MM-dd");
+    const to = toDate ?? format(endOfDay(new Date()), "yyyy-MM-dd");
 
-  useEffect(() => {
-    const t = setTimeout(() => setIsLoading(false), 400);
-    return () => clearTimeout(t);
-  }, []);
+    if (!from || !to) {
+      toast.error("Please select a date range to export");
+      return;
+    }
+
+    exportMutation.mutate({
+      from_date: from,
+      to_date: to,
+      search: debouncedSearch || undefined,
+      status: statusFilter === "all" ? undefined : statusFilter,
+    });
+  };
 
   return (
     <div className="flex flex-col gap-4 min-w-0 max-w-full">
@@ -132,7 +95,7 @@ export default function Transactions() {
                   Earnings:
                 </span>
                 <span className="text-lg font-bold text-green-600">
-                  {formatLocale(parseFloat(earnings))}
+                  {formatLocale(parseFloat(earnings) || 0)}
                 </span>
               </div>
             </div>
@@ -181,24 +144,26 @@ export default function Transactions() {
               <Button
                 variant="event-primary"
                 onClick={handleCSVExport}
+                disabled={exportMutation.isPending}
+                aria-busy={exportMutation.isPending}
                 className="gap-2 shrink-0"
               >
-                <Download className="h-4 w-4" />
-                Export CSV
+                {exportMutation.isPending ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Download className="h-4 w-4" />
+                )}
+                {exportMutation.isPending ? "Exporting…" : "Export CSV"}
               </Button>
             </div>
           </div>
         </div>
       </div>
 
-      {isLoading ? (
-        <AdminTransactionsTableSkeleton rowCount={9} />
-      ) : (
-        <AdminTransactionsDataTable
-          search={searchParams}
-          onEarningsUpdate={handleEarningsUpdate}
-        />
-      )}
+      <AdminTransactionsDataTable
+        search={searchParams}
+        onEarningsUpdate={handleEarningsUpdate}
+      />
     </div>
   );
 }

@@ -111,6 +111,13 @@ export function patchOnboardingPayloadFromApi(
     };
   }
 
+  // Step 10: subdomain label + confirmation restore from `isApproved`.
+  if (dataAny.stepTen && typeof dataAny.stepTen === "object") {
+    dataAny.stepTen = normalizeStepTenFromApi(
+      dataAny.stepTen as Record<string, unknown>,
+    );
+  }
+
   // Hydrate the multi-space block from the API response if present. The backend may emit it
   // either as a top-level `multi_space` block, a flat `multi_space_enabled` + `rooms` pair, or
   // already-normalized as `multiSpace`. We accept all three so single-room responses keep the
@@ -155,6 +162,70 @@ export function patchOnboardingPayloadFromApi(
   }
 
   return dataAny;
+}
+
+/** Subdomain label only: strip known host suffixes and normalize slug chars. */
+function normalizeSubdomainLabelFromApi(
+  raw: unknown,
+  suffix?: string,
+): string {
+  if (typeof raw !== "string") return "";
+  let label = raw.trim().toLowerCase();
+  const suffixes = [
+    suffix?.trim().toLowerCase(),
+    "eventwizz.com",
+    "eventwizz.vercel.app",
+    "com",
+  ].filter((s): s is string => Boolean(s));
+
+  for (const suf of suffixes) {
+    if (label.endsWith(`.${suf}`)) {
+      label = label.slice(0, -(suf.length + 1));
+    }
+  }
+
+  return label
+    .replace(/[^a-z0-9-]/g, "")
+    .replace(/-+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 63);
+}
+
+/**
+ * Maps persisted step 10 into the client form shape:
+ * - `domain` → subdomain label only
+ * - `domain_suffix` kept for UI (fallback eventwizz.com)
+ * - `confirm_domain` restored from `isApproved` (vendor confirmation of saved domain)
+ * - API `submit_type: "publish"` → client `"submit"`
+ */
+function normalizeStepTenFromApi(
+  stepTen: Record<string, unknown>,
+): Record<string, unknown> {
+  const suffix =
+    typeof stepTen.domain_suffix === "string" &&
+    stepTen.domain_suffix.trim().length > 0
+      ? stepTen.domain_suffix.trim().toLowerCase()
+      : "eventwizz.com";
+
+  const domain = normalizeSubdomainLabelFromApi(stepTen.domain, suffix);
+  const isApproved = stepTen.isApproved === true;
+
+  const rawSubmit = stepTen.submit_type;
+  const submit_type =
+    rawSubmit === "duplicate"
+      ? "duplicate"
+      : "submit"; /* publish / submit / unknown → submit */
+
+  return {
+    ...defaultValues.stepTen,
+    ...stepTen,
+    domain,
+    domain_suffix: suffix,
+    isApproved,
+    // Same saved domain on return → checkbox stays checked via isApproved
+    confirm_domain: isApproved && domain.length > 0,
+    submit_type,
+  };
 }
 
 /** Internal: pulls `multi_space` / `rooms` out of the API payload and normalizes the shape. */

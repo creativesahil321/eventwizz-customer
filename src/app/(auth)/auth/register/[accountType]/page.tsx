@@ -29,7 +29,7 @@ export default function RegisterPage() {
   return (
     <>
       <div className="flex flex-col space-y-2 text-center mb-8">
-        <h1 className="text-2xl font-semibold tracking-tight text-black">
+        <h1 className="font-heading text-2xl font-semibold tracking-tight text-black">
           {accountType === "vendor"
             ? "Create your vendor account"
             : "Create your account"}

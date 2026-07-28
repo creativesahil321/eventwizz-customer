@@ -1,6 +1,12 @@
 "use client";
 
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 
 import type { DownloadItem } from "@/app/(on-boarding)/on-boarding/_components/form-preview/_components/brochure-section";
 import AboutEventSec from "@/app/(on-boarding)/on-boarding/_components/form-preview/_components/About-event-sec";
@@ -150,9 +156,7 @@ export function EventPreview({
         !!container && container.scrollHeight > container.clientHeight + 1;
 
       if (!chooser) {
-        const scrollTop = useContainer
-          ? container!.scrollTop
-          : window.scrollY;
+        const scrollTop = useContainer ? container!.scrollTop : window.scrollY;
         const height = useContainer
           ? container!.clientHeight
           : window.innerHeight;
@@ -272,10 +276,20 @@ export function EventPreview({
     () =>
       [
         ...(activeBrochure?.brochure_pdf
-          ? [{ title: "Event brochure", download_link: [activeBrochure.brochure_pdf] }]
+          ? [
+              {
+                title: "Event brochure",
+                download_link: [activeBrochure.brochure_pdf],
+              },
+            ]
           : []),
         ...(activeBrochure?.brochure_pdf_2
-          ? [{ title: "Event Flayer", download_link: [activeBrochure.brochure_pdf_2] }]
+          ? [
+              {
+                title: "Event Flayer",
+                download_link: [activeBrochure.brochure_pdf_2],
+              },
+            ]
           : []),
       ] as DownloadItem[],
     [activeBrochure?.brochure_pdf, activeBrochure?.brochure_pdf_2],
@@ -305,9 +319,7 @@ export function EventPreview({
       : null;
 
   const datesForSection = useMemo(() => {
-    const dates = slices.roomMode
-      ? slices.dates
-      : data.stepThree?.dates;
+    const dates = slices.roomMode ? slices.dates : data.stepThree?.dates;
     return (
       dates?.map((date) => {
         const ticketPrices = (date.tickets ?? [])
@@ -356,9 +368,7 @@ export function EventPreview({
   const bannerVideo = s1?.event_banner_video || null;
 
   const galleryImages = useMemo(() => {
-    const gallery = slices.roomMode
-      ? activePackage?.gallery
-      : s2?.gallery;
+    const gallery = slices.roomMode ? activePackage?.gallery : s2?.gallery;
     return mapGalleryForPreview(gallery);
   }, [slices.roomMode, activePackage?.gallery, s2?.gallery]);
 
@@ -386,7 +396,11 @@ export function EventPreview({
     <CartConflictProvider>
       <div
         ref={previewContainerRef}
-        className={`event-detail-page ${
+        className={`event-detail-page @container/preview relative min-w-0 ${
+          embedInShell
+            ? "h-full max-h-full overflow-y-auto scroll-smooth no-scrollbar [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+            : ""
+        } ${
           themeColors.background?.includes("linear-gradient")
             ? "bg-none"
             : "bg-[color:var(--color-background)]"

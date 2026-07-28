@@ -12,7 +12,10 @@ import {
 import { useDomain } from "@/providers/domain-provider/domain-provider";
 import type { LocationData } from "@/types/theme.types";
 import { cn } from "@/lib/utils";
-import { usePreviewLocationNavigation } from "@/contexts/preview-context";
+import {
+  useIsPreviewMode,
+  usePreviewLocationNavigation,
+} from "@/contexts/preview-context";
 import { Check } from "lucide-react";
 
 const dropdownContentClass =
@@ -79,12 +82,7 @@ export function VendorPublicLocationMobileMenuEntries({
 
   if (effectivelyDisabled) {
     return (
-      <div
-        className={cn(
-          mobileNavRowClass,
-          "cursor-not-allowed opacity-60",
-        )}
-      >
+      <div className={cn(mobileNavRowClass, "cursor-not-allowed opacity-60")}>
         <span className={mobileNavIconWrap} aria-hidden>
           <MapPin />
         </span>
@@ -202,6 +200,7 @@ export function VendorPublicLocationBookNow({
   menuContentClassName,
 }: VendorPublicLocationBookNowProps) {
   const { settings, isLoading } = useDomain();
+  const isPreviewMode = useIsPreviewMode();
   const {
     previewLocations,
     activePreviewLocationSlug,
@@ -229,8 +228,16 @@ export function VendorPublicLocationBookNow({
     return null;
   }
 
+  const locationsLabelClass = isPreviewMode
+    ? "hidden @xl/preview:inline"
+    : "hidden xl:inline";
+
   const bookNowPillClass = cn(
-    "!rounded-full h-9 gap-1 border-0 px-4 font-semibold backdrop-blur-sm",
+    "!rounded-full h-9 gap-1 border-0 font-semibold backdrop-blur-sm",
+    // Icon-first until preview frame / viewport is wide (see CommonHeader).
+    isPreviewMode
+      ? "inline-flex w-9 shrink-0 items-center justify-center !px-0 @xl/preview:w-auto @xl/preview:!px-4"
+      : "inline-flex w-9 shrink-0 items-center justify-center !px-0 xl:w-auto xl:!px-4",
     pillGlassOnHero &&
       "shadow-[0_10px_30px_-18px_rgba(0,0,0,0.55)] ring-1 ring-white/25",
     triggerClassName,
@@ -307,10 +314,7 @@ export function VendorPublicLocationBookNow({
     if (variant === "icon") {
       return (
         <div
-          className={cn(
-            iconTriggerClassName,
-            "cursor-not-allowed opacity-60",
-          )}
+          className={cn(iconTriggerClassName, "cursor-not-allowed opacity-60")}
           aria-hidden
         >
           <MapPin className="h-5 w-5" />
@@ -324,10 +328,12 @@ export function VendorPublicLocationBookNow({
           "inline-flex cursor-not-allowed items-center justify-center gap-1 opacity-60",
           "bg-[var(--color-primary)] text-[var(--color-primary-foreground)]",
         )}
+        aria-label="Locations"
         aria-hidden
       >
-        <span>Locations</span>
-        <ChevronDown size={14} />
+        <MapPin className="h-4 w-4 shrink-0" />
+        <span className={locationsLabelClass}>Locations</span>
+        <ChevronDown size={14} className={locationsLabelClass} />
       </div>
     );
   }
@@ -350,8 +356,9 @@ export function VendorPublicLocationBookNow({
             className={bookNowPillClass}
             aria-label="Locations"
           >
-            <span>Locations</span>
-            <ChevronDown size={14} />
+            <MapPin className="h-4 w-4 shrink-0" />
+            <span className={locationsLabelClass}>Locations</span>
+            <ChevronDown size={14} className={locationsLabelClass} />
           </Button>
         )}
       </DropdownMenuTrigger>

@@ -1,5 +1,22 @@
 import type { Table } from "@tanstack/react-table";
 
+/**
+ * Triggers a browser download for a Blob (e.g. server-generated CSV/PDF).
+ * Centralizes the object-URL lifecycle so callers don't duplicate the
+ * create-link/click/revoke dance.
+ */
+export function downloadBlob(blob: Blob, filename: string): void {
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.setAttribute("download", filename);
+  link.style.visibility = "hidden";
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+}
+
 export function exportTableToCSV<TData>(
   /**
    * The table to export.

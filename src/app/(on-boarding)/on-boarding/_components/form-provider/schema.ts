@@ -1086,7 +1086,17 @@ export const stepTenSchema = z.object({
   city: z.string().optional(),
   address: z.string().optional(),
   contact_number: z.string().optional(),
+  /** Subdomain label only (no host suffix). */
   domain: z.string().min(1, "Please select a domain for your website"),
+  /**
+   * Fixed host suffix shown beside the subdomain input (from API `domain_suffix`).
+   * Display-only; not required on save.
+   */
+  domain_suffix: z.string().optional(),
+  /**
+   * Client confirmation checkbox. Restored from `isApproved` when the current
+   * domain matches the last saved domain from the steps API.
+   */
   confirm_domain: z.boolean().refine((val) => val === true, {
     message: "Please confirm your domain selection to continue",
   }),

@@ -12,6 +12,9 @@ import {
 } from "lucide-react";
 import { useRef, useEffect, useState, useMemo, type CSSProperties } from "react";
 import { addCacheBusting } from "@/lib/image-utils";
+import { usePreviewNarrowLayout } from "@/hooks/use-preview-narrow-layout";
+import { SiteHeading } from "@/components/public/site-heading";
+import { cn } from "@/lib/utils";
 
 type EventScheduler = {
   id?: string;
@@ -29,13 +32,6 @@ type EventSchedulerProps = {
 type ScheduleStatus = "completed" | "current" | "upcoming";
 
 const CARD_MIN_WIDTH = 210;
-
-const DEFAULT_SCHEDULES: EventScheduler[] = [
-  { time: "18:00", title: "Doors Open" },
-  { time: "19:00", title: "Live Music" },
-  { time: "20:00", title: "Dancing" },
-  { time: "22:00", title: "Event Ends" },
-];
 
 function formatTime(time: string): string {
   if (!time || time === "TBD") return "TBD";
@@ -274,7 +270,7 @@ const timelineStyles = `
 }
 
 @media (min-width: 640px) {
-  .tl-section {
+  .tl-section:not(.tl-section--preview-narrow) {
     padding: 2.5rem 1.5rem;
   }
 }
@@ -357,7 +353,7 @@ const timelineStyles = `
 }
 
 @media (min-width: 640px) {
-  .tl-header {
+  .tl-section:not(.tl-section--preview-narrow) .tl-header {
     margin-bottom: 1.5rem;
   }
 }
@@ -377,18 +373,7 @@ const timelineStyles = `
 }
 
 .tl-header__title {
-  font-size: 1.375rem;
-  font-weight: 800;
-  letter-spacing: -0.02em;
-  line-height: 1.2;
-  color: var(--tl-text);
   margin: 0 0 0.375rem;
-}
-
-@media (min-width: 768px) {
-  .tl-header__title {
-    font-size: 1.5rem;
-  }
 }
 
 .tl-header__subtitle {
@@ -400,7 +385,7 @@ const timelineStyles = `
 }
 
 @media (min-width: 768px) {
-  .tl-header__subtitle {
+  .tl-section:not(.tl-section--preview-narrow) .tl-header__subtitle {
     font-size: 0.9375rem;
   }
 }
@@ -423,7 +408,7 @@ const timelineStyles = `
 }
 
 @media (min-width: 640px) {
-  .tl-container {
+  .tl-section:not(.tl-section--preview-narrow) .tl-container {
     padding: 1.125rem 1rem;
   }
 }
@@ -434,7 +419,7 @@ const timelineStyles = `
 }
 
 @media (min-width: 640px) {
-  .tl-container--has-arrows {
+  .tl-section:not(.tl-section--preview-narrow) .tl-container--has-arrows {
     padding-left: 3.25rem;
     padding-right: 3.25rem;
   }
@@ -482,8 +467,8 @@ const timelineStyles = `
 }
 
 @media (min-width: 640px) {
-  .tl-arrow--left { left: 0.75rem; }
-  .tl-arrow--right { right: 0.75rem; }
+  .tl-section:not(.tl-section--preview-narrow) .tl-arrow--left { left: 0.75rem; }
+  .tl-section:not(.tl-section--preview-narrow) .tl-arrow--right { right: 0.75rem; }
 }
 
 .tl-arrow--disabled {
@@ -535,7 +520,7 @@ const timelineStyles = `
 }
 
 @media (min-width: 640px) {
-  .tl-items {
+  .tl-section:not(.tl-section--preview-narrow) .tl-items {
     gap: 0.5rem;
   }
 }
@@ -723,7 +708,7 @@ const timelineStyles = `
 }
 
 @media (min-width: 640px) {
-  .tl-card {
+  .tl-section:not(.tl-section--preview-narrow) .tl-card {
     min-height: 118px;
     padding: 1rem;
   }
@@ -874,7 +859,7 @@ const timelineStyles = `
 }
 
 @media (min-width: 640px) {
-  .tl-card__time {
+  .tl-section:not(.tl-section--preview-narrow) .tl-card__time {
     font-size: 0.75rem;
   }
 }
@@ -896,7 +881,7 @@ const timelineStyles = `
 }
 
 @media (min-width: 640px) {
-  .tl-card__title {
+  .tl-section:not(.tl-section--preview-narrow) .tl-card__title {
     font-size: 0.875rem;
   }
 }
@@ -918,6 +903,7 @@ export default function Timeline({
   eventSchedularCopy,
   eventSchedularBackgroundImage,
 }: EventSchedulerProps) {
+  const narrowPreview = usePreviewNarrowLayout();
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [startX, setStartX] = useState(0);
@@ -931,15 +917,13 @@ export default function Timeline({
       ? eventSchedular
       : [];
 
-    const filterSchedules = safeEventSchedular
+    return safeEventSchedular
       .map((item) => ({
         ...item,
         title: item.title.trim(),
         time: item.time.trim(),
       }))
       .filter((item) => item.title || item.time);
-
-    return filterSchedules.length > 0 ? filterSchedules : DEFAULT_SCHEDULES;
   }, [eventSchedular]);
 
   const { currentIndex, useLiveProgress } = useMemo(
@@ -1063,12 +1047,19 @@ export default function Timeline({
   const subtitle =
     eventSchedularCopy?.trim() ||
     "Experience every moment of the evening";
+  const scheduleTitle = eventSchedularTitle?.trim() || "What to Expect";
+  const hasScheduleRows = displaySchedules.length > 0;
 
   return (
     <>
       <style dangerouslySetInnerHTML={{ __html: timelineStyles }} />
 
-      <section className="tl-section">
+      <section
+        className={cn(
+          "tl-section",
+          narrowPreview && "tl-section--preview-narrow",
+        )}
+      >
         {/* Background */}
         {eventSchedularBackgroundImage?.trim() ? (
           <div className="tl-section__bg-image" aria-hidden>
@@ -1087,15 +1078,25 @@ export default function Timeline({
 
         <div style={{ position: "relative", zIndex: 10, maxWidth: "72rem", margin: "0 auto" }}>
           {/* Header */}
-          <header className="tl-header">
-            <span className="tl-header__label">Evening Schedule</span>
-            <h2 className="tl-header__title">
-              {eventSchedularTitle || "What to Expect"}
-            </h2>
+          <header className="tl-header space-y-3">
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[color:var(--color-primary)]">
+              Schedule
+            </p>
+            <SiteHeading
+              level={2}
+              title={scheduleTitle}
+              variant="onSurface"
+              align="center"
+              className="!mx-auto !block !text-3xl !font-black tracking-tight md:!text-4xl"
+            />
             <p className="tl-header__subtitle">{subtitle}</p>
           </header>
 
-          {/* Timeline container */}
+          {!hasScheduleRows ? (
+            <p className="mx-auto max-w-md text-center text-sm text-[var(--color-text-dimmed)]">
+              Add schedule items in the form to preview them here.
+            </p>
+          ) : (
           <div
             className={`tl-container ${showArrows ? "tl-container--has-arrows" : ""}`}
           >
@@ -1235,6 +1236,7 @@ export default function Timeline({
               </div>
             </div>
           </div>
+          )}
         </div>
       </section>
     </>

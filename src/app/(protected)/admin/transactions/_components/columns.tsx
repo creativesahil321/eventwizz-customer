@@ -1,10 +1,11 @@
 import type { ColumnDef } from "@tanstack/react-table";
 import { DataTableColumnHeader } from "@/components/data-table/data-table-column-header";
 import { Button } from "@/components/ui/button";
-import { Download } from "lucide-react";
-import type { DataTableRowAction, Transaction } from "../_lib/types";
+import { Download, Loader2 } from "lucide-react";
+import type { Transaction } from "../_lib/types";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { parseFormattedMoney } from "@/lib/currency-format";
+import { formatTransactionPaymentMethod } from "@/lib/transaction-payment-method";
 
 function ledgerAmount(value: string): number {
   const parsed = parseFormattedMoney(String(value ?? ""));
@@ -14,14 +15,14 @@ function ledgerAmount(value: string): number {
 }
 
 interface GetTransactionColumnsProps {
-  setRowAction: React.Dispatch<
-    React.SetStateAction<DataTableRowAction<Transaction> | null>
-  >;
+  onDownloadReceipt: (paymentId: number) => void;
+  downloadingPaymentId: number | null;
   formatMoneyLocale: (amount: number) => string;
 }
 
 export function getTransactionColumns({
-  setRowAction,
+  onDownloadReceipt,
+  downloadingPaymentId,
   formatMoneyLocale,
 }: GetTransactionColumnsProps): ColumnDef<Transaction>[] {
   return [
@@ -139,7 +140,9 @@ export function getTransactionColumns({
       enableSorting: false,
     },
     {
-      accessorKey: "card_brand",
+      id: "payment_method",
+      accessorFn: (row) =>
+        row.payment_method ?? row.card_brand ?? row.card_last4 ?? row.cardLast4 ?? "",
       header: ({ column }) => (
         <DataTableColumnHeader
           className="text-foreground"
@@ -147,11 +150,15 @@ export function getTransactionColumns({
           title="Payment Method"
         />
       ),
-      cell: ({ row }) => (
-        <span className="text-sm font-medium capitalize">
-          {row.original.card_brand} ••{row.original.cardLast4}
-        </span>
-      ),
+      cell: ({ row }) => {
+        const label = formatTransactionPaymentMethod(row.original);
+        if (!label) {
+          return <span className="text-sm text-muted-foreground">—</span>;
+        }
+        return (
+          <span className="text-sm font-medium capitalize">{label}</span>
+        );
+      },
       enableSorting: false,
     },
     {
@@ -217,17 +224,31 @@ export function getTransactionColumns({
     {
       id: "receipt",
       header: "Receipt",
-      cell: ({ row }) => (
-        <Button
-          onClick={() => setRowAction({ row, type: "download" })}
-          variant="ghost"
-          size="sm"
-          className="h-8 w-8 p-0 hover:bg-gray-100"
-          title="Download Receipt"
-        >
-          <Download className="h-4 w-4 text-gray-600" />
-        </Button>
-      ),
+      cell: ({ row }) => {
+        const paymentId = row.original.payment_id;
+        const isDownloading = downloadingPaymentId === paymentId;
+
+        return (
+          <Button
+            onClick={() => onDownloadReceipt(paymentId)}
+            variant="ghost"
+            size="sm"
+            className="h-8 w-8 p-0 hover:bg-gray-100"
+            title="Download Receipt"
+            disabled={isDownloading}
+            aria-busy={isDownloading}
+            aria-label={
+              isDownloading ? "Downloading receipt" : "Download receipt"
+            }
+          >
+            {isDownloading ? (
+              <Loader2 className="h-4 w-4 animate-spin text-primary" />
+            ) : (
+              <Download className="h-4 w-4 text-gray-600" />
+            )}
+          </Button>
+        );
+      },
       enableSorting: false,
     },
   ];
