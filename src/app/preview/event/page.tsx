@@ -29,8 +29,6 @@ import { eventsService } from "@/services/vendor/events/events.service";
 import { stepEightSchema } from "@/app/(protected)/vendor/events/_components/tab-event-form/schema";
 import { useSitePreviewStore } from "@/store/site-preview.store";
 import { PreviewProvider } from "@/contexts/preview-context";
-import { PreviewDeviceToolbar } from "@/components/preview/preview-device-toolbar";
-import { PreviewDeviceFrame } from "@/components/preview/preview-device-frame";
 import { useSiteEssentialsQuery } from "@/app/(protected)/_shared/sites-essentials/_lib/queries";
 import { SiteEssentialsFormValues } from "@/app/(protected)/_shared/sites-essentials/_lib/schema";
 import { useToast } from "@/components/ui/use-toast";
@@ -308,8 +306,12 @@ function EventPreviewPageContent() {
 
   return (
     <PreviewProvider isPreviewMode={true}>
-      <div className="relative flex min-h-screen flex-col bg-slate-900">
-        <div className="pointer-events-none fixed inset-x-0 top-0 z-[60] flex flex-wrap items-start justify-between gap-3 px-4 pt-4 sm:px-6">
+      {/*
+        Viewport-height shell (no device frame). Theme FX use absolute inset:0 inside
+        the scroll container — without a fixed height they stretch over the full page.
+      */}
+      <div className="relative flex h-[100dvh] max-h-[100dvh] flex-col overflow-hidden bg-[var(--color-background)]">
+        <div className="pointer-events-none absolute inset-x-0 top-0 z-[60] flex flex-wrap items-start justify-between gap-3 px-4 pt-4 sm:px-6">
           <Button
             variant="event-primary"
             onClick={handleGoBack}
@@ -319,9 +321,6 @@ function EventPreviewPageContent() {
             <ArrowLeft className="mr-2 h-4 w-4" />
             Back to Editor
           </Button>
-          <div className="pointer-events-auto">
-            <PreviewDeviceToolbar />
-          </div>
           <div className="pointer-events-auto flex shrink-0 items-center justify-end">
             <Button
               type="button"
@@ -337,17 +336,13 @@ function EventPreviewPageContent() {
           </div>
         </div>
 
-        <PreviewDeviceFrame
-          stageClassName="min-h-screen items-stretch bg-slate-900 px-2 pb-6 pt-16 sm:px-4"
-          frameClassName="flex h-[calc(100vh-4.5rem)] max-h-[calc(100vh-4.5rem)] flex-col"
-          scrollable={false}
-        >
+        <div className="flex min-h-0 flex-1 flex-col pt-14">
           <EventPreview
             data={eventData.data as EventDetailData}
             siteEssentials={siteEssentials}
             embedInShell
           />
-        </PreviewDeviceFrame>
+        </div>
 
         <AlertDialog
           open={publishDialogOpen}

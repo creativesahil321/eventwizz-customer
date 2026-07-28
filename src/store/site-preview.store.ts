@@ -24,8 +24,8 @@ interface SitePreviewState {
   /**
    * True only while `previewData` was set during the CURRENT browser session
    * (the editor → preview → editor round-trip). Reset to false on every
-   * rehydration so a persisted snapshot from a past session/reload is treated
-   * as stale and never overrides fresh server data in the editor.
+   * rehydration so a persisted snapshot from a past reload is treated as
+   * stale and never overrides fresh server data in the editor.
    */
   previewFresh: boolean;
   /**
@@ -103,6 +103,54 @@ const serializePreviewData = (
   }
 
   return serialized;
+};
+
+const PREVIEW_STORAGE_KEY = "site-preview-storage";
+
+/**
+ * Preview is an editor ↔ preview round-trip within the current tab session.
+ * sessionStorage avoids multi-day localStorage snapshots overriding Sites
+ * Essentials after API updates. Drop any legacy localStorage copy on boot.
+ */
+const createPreviewStorage = () => {
+  if (typeof window !== "undefined") {
+    try {
+      localStorage.removeItem(PREVIEW_STORAGE_KEY);
+    } catch {
+      // ignore quota / privacy mode
+    }
+  }
+
+  return {
+    getItem: (name: string) => {
+      if (typeof window === "undefined") return null;
+      return sessionStorage.getItem(name);
+    },
+    setItem: (name: string, value: string) => {
+      if (typeof window === "undefined") return;
+      try {
+        const parsed = JSON.parse(value) as {
+          state?: { previewData?: unknown };
+        };
+        if (!parsed?.state?.previewData) {
+          sessionStorage.removeItem(name);
+          return;
+        }
+        sessionStorage.setItem(name, value);
+      } catch {
+        sessionStorage.removeItem(name);
+      }
+    },
+    removeItem: (name: string) => {
+      if (typeof window === "undefined") return;
+      sessionStorage.removeItem(name);
+      try {
+        localStorage.removeItem(name);
+      } catch {
+        // ignore
+      }
+    },
+  };
 };
 
 export const useSitePreviewStore = create<SitePreviewState>()(
@@ -224,60 +272,27 @@ export const useSitePreviewStore = create<SitePreviewState>()(
         }),
     })),
     {
-      name: "site-preview-storage",
-      version: 2,
+      name: PREVIEW_STORAGE_KEY,
+      version: 3,
       // Only keep the key while a real vendor preview snapshot exists.
-      // Empty/cleared state (and admin) must not leave a shell in localStorage.
-      storage: createJSONStorage(() => ({
-        getItem: (name) => {
-          if (typeof window === "undefined") return null;
-          return localStorage.getItem(name);
-        },
-        setItem: (name, value) => {
-          if (typeof window === "undefined") return;
-          try {
-            const parsed = JSON.parse(value) as {
-              state?: { previewData?: unknown };
-            };
-            if (!parsed?.state?.previewData) {
-              localStorage.removeItem(name);
-              return;
-            }
-            localStorage.setItem(name, value);
-          } catch {
-            localStorage.removeItem(name);
-          }
-        },
-        removeItem: (name) => {
-          if (typeof window === "undefined") return;
-          localStorage.removeItem(name);
-        },
-      })),
+      // Empty/cleared state (and admin) must not leave a shell in storage.
+      storage: createJSONStorage(createPreviewStorage),
       migrate: (persisted, version) => {
-        const p = persisted as Partial<SitePreviewState> | undefined;
-        if (version < 2) {
-          return {
-            ...p,
-            previewLocations: [],
-            approvedLocationSlugs: [],
-            currentLocationIndex: 0,
-            reviewStep: "main" as SitePreviewReviewStep,
-            previewScope: "main" as SitePreviewScope,
-            mainPageApproved: false,
-            previewVendorKey: null,
-          };
+        // v3: session-only preview — discard any legacy long-lived snapshot.
+        if (version < 3) {
+          return {};
         }
-        return p ?? {};
+        return (persisted as Partial<SitePreviewState> | undefined) ?? {};
       },
       merge: (persisted, current) => {
         const p = persisted as Partial<SitePreviewState> | undefined;
         return {
           ...current,
           ...p,
-          // Persisted preview snapshots are always stale on load — only the
-          // in-session round-trip may mark them fresh again.
+          // Persisted snapshots are never an editor overlay after reload —
+          // only an in-memory Preview → Edit round-trip may mark them fresh.
+          // Keep `previewData` so /preview/site can still render after refresh.
           previewFresh: false,
-          // Don't force Approve & save after a full page reload.
           previewRequiresSave: false,
           previewLocations: Array.isArray(p?.previewLocations)
             ? p.previewLocations
@@ -292,6 +307,16 @@ export const useSitePreviewStore = create<SitePreviewState>()(
           previewVendorKey:
             typeof p?.previewVendorKey === "string" ? p.previewVendorKey : null,
         };
+      },
+      onRehydrateStorage: () => () => {
+        // One-time cleanup of the legacy localStorage key after moving to
+        // sessionStorage (createPreviewStorage also removes it on boot).
+        if (typeof window === "undefined") return;
+        try {
+          localStorage.removeItem(PREVIEW_STORAGE_KEY);
+        } catch {
+          // ignore
+        }
       },
     },
   ),

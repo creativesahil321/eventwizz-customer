@@ -2,7 +2,6 @@ import { getServerSession } from "next-auth";
 import { redirect } from "next/navigation";
 import { authOptions } from "@/lib/auth/authOptions";
 import "@/assets/css/tailwind.css";
-import "./onboarding-preview.css";
 import { ServerContextProvider } from "@/lib/server-context";
 import { getRequestHost, getSubdomainFromDomain } from "@/lib/server-theme";
 import { ThemeSchema } from "@/types/theme.types";

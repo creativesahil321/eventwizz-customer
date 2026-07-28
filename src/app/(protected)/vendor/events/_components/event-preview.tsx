@@ -16,7 +16,6 @@ import PackageSec from "@/app/(on-boarding)/on-boarding/_components/form-preview
 import Timeline from "@/app/(on-boarding)/on-boarding/_components/form-preview/_components/Time-line";
 import CommonHeader from "@/components/shared/common-header";
 import FooterSection from "@/app/(public)/vendor/_components/EventListPage/footer";
-import { themeDetectionFromVendorEventData } from "@/lib/theme-detection-source";
 import { EventDetailData } from "@/services/vendor/events/type";
 import {
   LazyBrochureSection,
@@ -32,7 +31,6 @@ import {
   relativeLuminance,
 } from "@/lib/color-contrast";
 import { CartConflictProvider } from "@/app/(public)/vendor/checkout/_components/cart-conflict-provider";
-import { ThemeAnimationManager } from "@/components/theme-animations/theme-animation-manager";
 import { useCurrencyFormat } from "@/hooks/use-currency-format";
 import { EventHeroBand } from "@/components/public/event-hero-band";
 import { EventRoomChooser } from "@/components/public/event-room-chooser";
@@ -415,12 +413,6 @@ export function EventPreview({
             : { ...previewStyles, fontFamily: "var(--font-body)" }
         }
       >
-        {/* Theme FX: vendor payload is step-based — map stepOne copy for keyword detection like the live page */}
-        <ThemeAnimationManager
-          themeDetectionSource={themeDetectionFromVendorEventData(data)}
-          enabled={true}
-          intensity="medium"
-        />
         <SiteEssentialsGoogleFontsLoader
           linkId="site-essentials-google-fonts-event-preview"
           headingStack={headingFont}

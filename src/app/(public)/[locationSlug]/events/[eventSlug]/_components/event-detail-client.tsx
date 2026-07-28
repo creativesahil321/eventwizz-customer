@@ -30,7 +30,6 @@ import {
   LazyFaqSection,
   LazyMenuSection,
 } from "@/components/public/event-detail-lazy-sections";
-import { ThemeAnimationManager } from "@/components/theme-animations/theme-animation-manager";
 import { CartConflictProvider } from "@/app/(public)/vendor/checkout/_components/cart-conflict-provider";
 import { useCurrencyFormat } from "@/hooks/use-currency-format";
 import { ServerContext } from "@/lib/server-context";
@@ -219,12 +218,6 @@ export default function EventDetailClient({
   return (
     <CartConflictProvider>
       <div className="event-detail-page">
-        <ThemeAnimationManager
-          eventData={eventData}
-          enabled={true}
-          intensity="medium"
-        />
-
         <CommonHeader
           variant="default"
           headerDownloads={pdfDownloadLinks}

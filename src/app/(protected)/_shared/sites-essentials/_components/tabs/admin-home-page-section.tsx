@@ -32,6 +32,11 @@ import { Button } from "@/components/ui/button";
 import { FileUploader } from "@/components/ui/file-uploader";
 import { TiptapEditor } from "@/components/ui/tiptap-editor";
 import {
+  ADMIN_HOME_CARD_CROP,
+  ADMIN_HOME_HERO_CROP,
+  ADMIN_SHOWCASE_POSTER_CROP,
+} from "@/lib/event-image-crop-presets";
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -288,13 +293,8 @@ function HeroImageField({ readOnly }: { readOnly?: boolean }) {
               "image/webp": [],
             }}
             enableCropping
-            aspectRatio={16 / 9}
-            cropConfig={{
-              maxSizeKB: 700,
-              quality: 0.9,
-              maxWidth: 1920,
-              maxHeight: 1080,
-            }}
+            aspectRatio={undefined}
+            cropConfig={ADMIN_HOME_HERO_CROP}
           />
         )}
       </FormControl>
@@ -367,13 +367,8 @@ function ShowcaseImageField({ readOnly }: { readOnly?: boolean }) {
               "image/webp": [],
             }}
             enableCropping
-            aspectRatio={3 / 2}
-            cropConfig={{
-              maxSizeKB: 600,
-              quality: 0.9,
-              maxWidth: 1280,
-              maxHeight: 853,
-            }}
+            aspectRatio={ADMIN_SHOWCASE_POSTER_CROP.aspectRatio}
+            cropConfig={ADMIN_SHOWCASE_POSTER_CROP}
           />
         )}
       </FormControl>
@@ -690,13 +685,8 @@ function AudienceCardImage({
               "image/webp": [],
             }}
             enableCropping
-            aspectRatio={16 / 9}
-            cropConfig={{
-              maxSizeKB: 500,
-              quality: 0.9,
-              maxWidth: 1280,
-              maxHeight: 720,
-            }}
+            aspectRatio={undefined}
+            cropConfig={ADMIN_HOME_CARD_CROP}
           />
         )}
       </FormControl>

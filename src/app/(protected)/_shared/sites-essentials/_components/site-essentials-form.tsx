@@ -71,6 +71,7 @@ function SiteEssentialsFormInner() {
     setPreviewData,
     previewData,
     previewFresh,
+    previewRequiresSave,
     clearPreviewData,
     startPreviewReview,
     previewScope,
@@ -126,15 +127,19 @@ function SiteEssentialsFormInner() {
     if (!isAdminSite) return;
     clearPreviewData();
     if (typeof window !== "undefined") {
-      localStorage.removeItem("site-preview-storage");
+      sessionStorage.removeItem("site-preview-storage");
+      try {
+        localStorage.removeItem("site-preview-storage");
+      } catch {
+        // ignore
+      }
     }
   }, [isAdminSite, clearPreviewData]);
 
-  // Restore the preview snapshot into the form ONLY when it was set during the
-  // current session (the editor → preview → editor round-trip). A persisted
-  // snapshot left over from a previous session/reload is stale and must never
-  // override fresh server data — we discard it so the `values` sync (in the
-  // form hook, with `keepDirtyValues`) repopulates the form from the API.
+  // Restore the preview snapshot into the form ONLY for an unsaved
+  // editor → preview → editor round-trip in this tab session.
+  // View-only previews and any rehydrated snapshot must never override
+  // fresh server data (that was the "old logo / Alfriston copyright" bug).
   //
   // Baseline server hydration is owned by react-hook-form's `values` option
   // (see `useSiteEssentials`); this effect is only the preview-restore overlay.
@@ -144,9 +149,15 @@ function SiteEssentialsFormInner() {
     if (!previewData) return;
 
     if (!previewFresh) {
-      // Stale localStorage snapshot from a prior session — drop it so the
-      // server `values` sync becomes the source of truth again.
+      // Stale snapshot from a prior reload — drop it so the server
+      // `values` sync becomes the source of truth again.
       clearPreviewData();
+      return;
+    }
+
+    // View-only Preview (no unsaved editor changes): keep the snapshot for
+    // `/preview/site`, but do not overlay it onto the Sites Essentials form.
+    if (!previewRequiresSave) {
       return;
     }
 
@@ -179,6 +190,7 @@ function SiteEssentialsFormInner() {
     form,
     previewData,
     previewFresh,
+    previewRequiresSave,
     siteEssentials,
     clearPreviewData,
     isAdminSite,
@@ -331,12 +343,12 @@ function SiteEssentialsFormInner() {
 
       const result = await onSubmit(payload);
       if (result) {
-        // Update the preview store with saved form values so theme colors are
-        // available for the (vendor-only) preview experience. The admin site has
-        // no preview, so we skip this to avoid persisting unused preview state.
+        // Drop any preview snapshot after a successful save. Keeping it with
+        // `previewFresh: true` made Sites Essentials re-apply a stale overlay
+        // (old logo / copyright) on top of the fresh API response. Preview
+        // rebuilds from the current form when the user clicks Preview again.
         if (!isAdminSite) {
-          const completeFormValues = form.getValues();
-          setPreviewData(completeFormValues);
+          clearPreviewData();
         }
 
         // Mark the form pristine so the server `values` re-sync (with

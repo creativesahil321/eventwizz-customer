@@ -5,8 +5,9 @@ import { useIsPreviewMode } from "@/contexts/preview-context";
 import { usePreviewDeviceStore } from "@/store/preview-device.store";
 
 /**
- * True when a Desktop/Tablet/Mobile device frame is active (onboarding / `/preview/*`).
- * Vendor dashboard embeds are always full-width desktop — ignore persisted device.
+ * True when a Desktop/Tablet/Mobile device frame is active.
+ * Only onboarding (+ `/preview/onboarding`) uses device frames — Sites Essentials
+ * `/preview/site` and other embeds stay full-width desktop.
  */
 export function usePreviewNarrowLayout(): boolean {
   const isPreview = useIsPreviewMode();
@@ -14,6 +15,6 @@ export function usePreviewNarrowLayout(): boolean {
   const pathname = usePathname();
   const deviceFramesEnabled =
     Boolean(pathname?.includes("/on-boarding")) ||
-    Boolean(pathname?.includes("/preview/"));
+    Boolean(pathname?.includes("/preview/onboarding"));
   return isPreview && deviceFramesEnabled && device !== "desktop";
 }

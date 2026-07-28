@@ -23,6 +23,7 @@ import {
   truncateToMaxWordsForInput,
 } from "@/lib/word-count";
 import { useSiteEssentialsUpdateGate } from "../../_lib/site-essentials-update-context";
+import { SITE_HERO_BACKGROUND_CROP } from "@/lib/event-image-crop-presets";
 
 interface MainLandingPageSectionProps {
   serverMainLandingCoverImage?: string;
@@ -234,13 +235,8 @@ export function MainLandingPageSection({
                       "image/webp": [],
                     }}
                     enableCropping
-                    aspectRatio={16 / 9}
-                    cropConfig={{
-                      maxSizeKB: 500,
-                      quality: 0.9,
-                      maxWidth: 1920,
-                      maxHeight: 1080,
-                    }}
+                    aspectRatio={undefined}
+                    cropConfig={SITE_HERO_BACKGROUND_CROP}
                   />
                 )}
               </FormControl>

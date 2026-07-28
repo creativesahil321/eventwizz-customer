@@ -28,6 +28,7 @@ import { VideoFormatInfo } from "@/components/shared/video-format-info";
 import { addCacheBusting } from "@/lib/image-utils";
 import { LocationIndicator } from "@/components/location-indicator";
 import { MapPin } from "lucide-react";
+import { SITE_HERO_BACKGROUND_CROP } from "@/lib/event-image-crop-presets";
 import {
   BANNER_HEADING_MAX_WORDS,
   countWords,
@@ -859,13 +860,8 @@ export function BrandingTab({
                               "image/webp": [],
                             }}
                             enableCropping={true}
-                            aspectRatio={16 / 9}
-                            cropConfig={{
-                              maxSizeKB: 500,
-                              quality: 0.9,
-                              maxWidth: 1920,
-                              maxHeight: 1080,
-                            }}
+                            aspectRatio={undefined}
+                            cropConfig={SITE_HERO_BACKGROUND_CROP}
                           />
                         )}
                       </FormControl>

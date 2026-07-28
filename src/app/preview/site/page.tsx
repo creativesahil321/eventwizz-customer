@@ -22,8 +22,6 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { PreviewProvider } from "@/contexts/preview-context";
 import { PreviewThemeCustomizer } from "@/components/preview/preview-theme-customizer";
-import { PreviewDeviceToolbar } from "@/components/preview/preview-device-toolbar";
-import { PreviewDeviceFrame } from "@/components/preview/preview-device-frame";
 import { themeKeys } from "@/hooks/use-theme-query";
 import { useToast } from "@/components/ui/use-toast";
 import { resolveHasMultipleLocations } from "@/app/(protected)/_shared/sites-essentials/_lib/use-has-multiple-locations";
@@ -691,8 +689,9 @@ export default function SitePreviewPage() {
           : undefined
       }
     >
-      <div className="relative flex min-h-screen w-full min-w-0 flex-col bg-slate-900 pb-[5.5rem] sm:pb-24">
-        <div className="pointer-events-none fixed inset-x-0 top-0 z-[60] flex items-start justify-between gap-3 px-4 pt-4 sm:px-6">
+      <div className="relative flex min-h-screen w-full min-w-0 flex-col bg-[var(--color-background)] pb-[5.5rem] sm:pb-24">
+        {/* Overlay only — do not pad the site down (that made the preview feel smaller than live). */}
+        <div className="pointer-events-none fixed inset-x-0 top-0 z-[60] flex items-start px-4 pt-4 sm:px-6">
           <Button
             variant="event-primary"
             onClick={handleGoBack}
@@ -702,16 +701,9 @@ export default function SitePreviewPage() {
             <ArrowLeft className="mr-2 h-4 w-4" />
             Back to Editor
           </Button>
-          <div className="pointer-events-auto">
-            <PreviewDeviceToolbar />
-          </div>
-          <div className="hidden w-[8.5rem] sm:block" aria-hidden />
         </div>
 
-        <PreviewDeviceFrame
-          stageClassName="min-h-screen items-stretch bg-slate-900 px-2 pb-8 pt-16 sm:px-4"
-          frameClassName="min-h-[calc(100vh-4rem)]"
-        >
+        <div className="min-h-screen w-full min-w-0">
           {hasMultipleLocations && effectiveReviewStep === "main" ? (
             <MainLandingSitePreview
               formValues={mainLandingPreviewData ?? resolvedGlobalData}
@@ -734,7 +726,7 @@ export default function SitePreviewPage() {
           ) : (
             <SitePreview formValues={resolvedGlobalData} />
           )}
-        </PreviewDeviceFrame>
+        </div>
 
         {previewValuesForCustomizer ? (
           <PreviewThemeCustomizer

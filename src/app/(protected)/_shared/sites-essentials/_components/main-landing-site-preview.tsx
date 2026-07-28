@@ -25,7 +25,6 @@ import { SiteEssentialsFormValues } from "../_lib/schema";
 import { siteEssentialsToPreviewRootStyle } from "../_lib/preview-root-style";
 import { SiteEssentialsGoogleFontsLoader } from "@/components/shared/site-essentials-google-fonts-loader";
 import type { LocationData } from "@/types/theme.types";
-import { usePreviewDeviceStore } from "@/store/preview-device.store";
 
 interface MainLandingSitePreviewProps {
   formValues: SiteEssentialsFormValues;
@@ -51,23 +50,20 @@ export function MainLandingSitePreview({
   onLocationSelect,
 }: Readonly<MainLandingSitePreviewProps>) {
   const previewStyles = siteEssentialsToPreviewRootStyle(formValues);
-  const previewDevice = usePreviewDeviceStore((s) => s.device);
   const [viewMode, setViewMode] = useState<"map" | "grid">("grid");
   const [isMobile, setIsMobile] = useState(false);
 
   useEffect(() => {
+    // Match live site: viewport only (ignore onboarding device-frame store).
     const checkMobile = () => {
-      const fromDevice =
-        previewDevice === "mobile" || previewDevice === "tablet";
-      const fromViewport = window.innerWidth < 768;
-      const mobile = fromDevice || (previewDevice === "desktop" && fromViewport);
+      const mobile = window.innerWidth < 768;
       setIsMobile(mobile);
       if (mobile) setViewMode("grid");
     };
     checkMobile();
     window.addEventListener("resize", checkMobile);
     return () => window.removeEventListener("resize", checkMobile);
-  }, [previewDevice]);
+  }, []);
 
   const heroImageSrc =
     getPreviewUrl(formValues.main_landing_cover_image) ||

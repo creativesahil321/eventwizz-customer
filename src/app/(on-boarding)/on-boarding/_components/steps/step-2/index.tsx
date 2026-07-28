@@ -38,6 +38,7 @@ import {
   GuidedSectionCoreActions,
 } from "../../guided-sticky-approval-bar";
 import { guidedSectionSurfaceClass } from "../../guided-section-surface";
+import { SITE_HERO_BACKGROUND_CROP } from "@/lib/event-image-crop-presets";
 import { GuidedSectionTitleBar } from "../../guided-section-title-bar";
 import { useLogoUploadProcessor } from "@/hooks/use-logo-upload-processor";
 import { Loader2 } from "lucide-react";
@@ -570,13 +571,8 @@ export default function StepTwo() {
                                 }
                                 className="border-dashed"
                                 enableCropping={true}
-                                aspectRatio={16 / 9}
-                                cropConfig={{
-                                  maxSizeKB: 500,
-                                  quality: 0.9,
-                                  maxWidth: 1920,
-                                  maxHeight: 1080,
-                                }}
+                                aspectRatio={undefined}
+                                cropConfig={SITE_HERO_BACKGROUND_CROP}
                               />
                             )}
                           </div>
