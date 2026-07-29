@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { useFormContext, useWatch } from "react-hook-form";
 import { SiteEssentialsFormValues } from "../../_lib/hooks";
 import {
@@ -77,6 +78,20 @@ const BRANDING_SCOPE_TO_PREVIEW: Record<BrandingScopeTab, SitePreviewScope> = {
   "info-pages": "main",
 };
 
+const BRANDING_SCOPE_VALUES: BrandingScopeTab[] = [
+  "site-identity",
+  "main-home",
+  "location-page",
+  "info-pages",
+];
+
+function isBrandingScopeTab(value: string | null): value is BrandingScopeTab {
+  return (
+    value !== null &&
+    (BRANDING_SCOPE_VALUES as readonly string[]).includes(value)
+  );
+}
+
 export function BrandingTab({
   hasMultipleLocations,
   serverCoverImage,
@@ -85,9 +100,17 @@ export function BrandingTab({
 }: BrandingTabProps) {
   const { readOnly } = useSiteEssentialsUpdateGate();
   const { setPreviewScope } = useSitePreviewStore();
-  const [brandingScope, setBrandingScope] = useState<BrandingScopeTab>(() =>
-    hasMultipleLocations ? "main-home" : "site-identity",
-  );
+  const searchParams = useSearchParams();
+  const scopeFromUrl = searchParams.get("scope");
+  const [brandingScope, setBrandingScope] = useState<BrandingScopeTab>(() => {
+    if (isBrandingScopeTab(scopeFromUrl)) {
+      if (!hasMultipleLocations && scopeFromUrl === "main-home") {
+        return "location-page";
+      }
+      return scopeFromUrl;
+    }
+    return hasMultipleLocations ? "main-home" : "site-identity";
+  });
   const form = useFormContext<SiteEssentialsFormValues>();
   // The admin/main marketing site edits a fixed set of home sections (no
   // per-location vendor fields), so we swap in a dedicated editor.
@@ -110,6 +133,16 @@ export function BrandingTab({
       setPreviewScope(previewScopeForTab(scope));
     }
   };
+
+  // Deep-link from onboarding Edit (`?tab=branding&scope=main-home|location-page`)
+  useEffect(() => {
+    if (!isBrandingScopeTab(scopeFromUrl)) return;
+    if (!hasMultipleLocations && scopeFromUrl === "main-home") {
+      setBrandingScope("location-page");
+      return;
+    }
+    setBrandingScope(scopeFromUrl);
+  }, [scopeFromUrl, hasMultipleLocations]);
 
   useEffect(() => {
     if (!hasMultipleLocations && brandingScope === "main-home") {

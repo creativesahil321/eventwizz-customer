@@ -18,7 +18,7 @@ export default function TrueLayerReturnPage() {
   const redirectAfterDelay = useCallback(
     (delay: number) => {
       setTimeout(() => {
-        router.push("/on-boarding?step=11");
+        router.push("/on-boarding?step=10");
       }, delay);
     },
     [router]

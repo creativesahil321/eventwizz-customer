@@ -87,6 +87,9 @@ export function resolveVenueContact(source: VenueContactSource): ResolvedVenueCo
  * 1) explicit override (location/event API fields)
  * 2) matching `theme.locations[]` by slug (per-location contact)
  * 3) main `theme.contactDetails` (vendor-level fallback)
+ *
+ * When an override is present, do not fill gaps from theme head-office —
+ * platform hosts (e.g. `/preview/site`) often carry admin dummy contact.
  */
 export function resolvePublicPageContact(options: {
   theme?: VenueContactSource;
@@ -106,7 +109,11 @@ export function resolvePublicPageContact(options: {
   const fromLocation = resolveFromLocation(matchedLocation);
   const fromOverride = resolveFromOverride(override);
 
-  return mergeContact(fromOverride, mergeContact(fromLocation, main));
+  if (hasResolvedContact(fromOverride)) {
+    return mergeContact(fromOverride, fromLocation);
+  }
+
+  return mergeContact(fromLocation, main);
 }
 
 export function hasResolvedContact(contact: ResolvedVenueContact): boolean {
@@ -154,6 +161,7 @@ export function resolveFooterContactBlocks(options: {
       override,
     });
     const venueLabel = matchedLocation?.city?.trim() || "This venue";
+    const overrideContact = resolveFromOverride(override);
 
     if (hasResolvedContact(venueContact)) {
       blocks.push({
@@ -163,7 +171,14 @@ export function resolveFooterContactBlocks(options: {
       });
     }
 
-    if (hasResolvedContact(main) && !contactsAreEqual(main, venueContact)) {
+    // When site-essentials preview supplies a location override (e.g. `/preview/site`
+    // on the platform host), skip theme head-office — that theme is often admin
+    // dummy contact, not the vendor HQ.
+    if (
+      !hasResolvedContact(overrideContact) &&
+      hasResolvedContact(main) &&
+      !contactsAreEqual(main, venueContact)
+    ) {
       blocks.push({
         id: "head-office",
         label: "Head office",
@@ -174,9 +189,14 @@ export function resolveFooterContactBlocks(options: {
     return blocks;
   }
 
-  // Single-location / main page: apply the override (e.g. onboarding draft contact)
-  // over the saved theme so the preview reflects what the vendor is entering.
-  const mainContact = mergeContact(resolveFromOverride(override), main);
+  // Single-location / main page: apply the override (e.g. onboarding draft contact
+  // or site-essentials company fields) over the saved theme so the preview
+  // reflects what the vendor is entering — without filling gaps from platform
+  // admin dummy contact when an override is present.
+  const fromOverride = resolveFromOverride(override);
+  const mainContact = hasResolvedContact(fromOverride)
+    ? fromOverride
+    : main;
 
   if (hasResolvedContact(mainContact)) {
     blocks.push({

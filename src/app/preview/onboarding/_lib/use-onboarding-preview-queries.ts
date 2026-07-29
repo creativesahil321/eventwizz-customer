@@ -6,6 +6,7 @@ import type { SiteEssentials } from "@/services/common/site-essentials/type";
 
 export type OnboardingPreviewEventData = SiteEssentials & {
   event?: {
+    event_id?: number;
     is_rooms?: boolean;
     logo?: string | null;
     favicon?: string | null;

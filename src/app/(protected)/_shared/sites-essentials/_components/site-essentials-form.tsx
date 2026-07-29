@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useEffect, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { FormProvider } from "react-hook-form";
 import {
   Loader2,
@@ -46,11 +46,31 @@ import { toMutableSiteEssentialsFormValues } from "../_lib/to-mutable-form-value
 import { hydratePreviewMediaForSave } from "../_lib/hydrate-preview-media-for-save";
 import { ImportWebsiteModal } from "./import-website-modal";
 
+const SITE_ESSENTIALS_TABS = [
+  "presets",
+  "branding",
+  "colors",
+  "typography",
+  "social-media",
+  "seo",
+] as const;
+
+type SiteEssentialsTab = (typeof SITE_ESSENTIALS_TABS)[number];
+
+function isSiteEssentialsTab(value: string | null): value is SiteEssentialsTab {
+  return (
+    value !== null &&
+    (SITE_ESSENTIALS_TABS as readonly string[]).includes(value)
+  );
+}
+
 export function SiteEssentialsForm() {
   return (
-    <SiteEssentialsUpdateProvider>
-      <SiteEssentialsFormInner />
-    </SiteEssentialsUpdateProvider>
+    <Suspense fallback={null}>
+      <SiteEssentialsUpdateProvider>
+        <SiteEssentialsFormInner />
+      </SiteEssentialsUpdateProvider>
+    </Suspense>
   );
 }
 
@@ -101,6 +121,8 @@ function SiteEssentialsFormInner() {
   );
   const [showErrorSummary, setShowErrorSummary] = useState(false);
   const [activeTab, setActiveTab] = useState("presets");
+  const searchParams = useSearchParams();
+  const tabFromUrl = searchParams.get("tab");
 
   // The Colors tab lets users fine-tune every theme token, which can easily break
   // the palette. Keep it out of the normal tab bar and only reveal it when the URL
@@ -112,6 +134,16 @@ function SiteEssentialsFormInner() {
     const params = new URLSearchParams(window.location.search);
     if (params.get("advanced") === "colors") setColorsUnlocked(true);
   }, []);
+
+  // Honour `?tab=` from deep links (e.g. onboarding Edit → Branding).
+  useEffect(() => {
+    if (!isSiteEssentialsTab(tabFromUrl)) return;
+    if (tabFromUrl === "colors" && !colorsUnlocked) {
+      setActiveTab("presets");
+      return;
+    }
+    setActiveTab(tabFromUrl);
+  }, [tabFromUrl, colorsUnlocked]);
 
   // Never leave the user stranded on a hidden tab (e.g. the flag is removed after
   // navigation): fall back to Presets if Colors becomes unreachable.

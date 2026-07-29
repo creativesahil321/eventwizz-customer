@@ -19,8 +19,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { env } from "@/env";
-import GoogleLocationSearch from "@/app/(on-boarding)/on-boarding/_components/steps/step-10/google-location-search";
-import { fetchLocationDetails } from "@/app/(on-boarding)/on-boarding/_components/steps/step-10/_lib/actions";
+import GoogleLocationSearch from "@/app/(on-boarding)/on-boarding/_components/steps/step-11/google-location-search";
+import { fetchLocationDetails } from "@/app/(on-boarding)/on-boarding/_components/steps/step-11/_lib/actions";
 import {
   useCurrentLocationId,
   useVendorLocationsList,

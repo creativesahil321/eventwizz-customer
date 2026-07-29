@@ -34,7 +34,7 @@ export default function StripeReturnPage() {
         if (window.opener) {
           window.close();
         } else {
-          router.push("/on-boarding?step=11");
+          router.push("/on-boarding?step=10");
         }
       }, delay);
     },

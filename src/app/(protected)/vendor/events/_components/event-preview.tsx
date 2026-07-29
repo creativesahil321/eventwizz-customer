@@ -24,6 +24,7 @@ import {
   LazyMenuSection,
 } from "@/components/public/event-detail-lazy-sections";
 import { SiteEssentialsFormValues } from "@/app/(protected)/_shared/sites-essentials/_lib/schema";
+import { buildSiteEssentialsContactTheme } from "@/app/(protected)/_shared/sites-essentials/_lib/preview-contact";
 import { SiteEssentialsGoogleFontsLoader } from "@/components/shared/site-essentials-google-fonts-loader";
 import {
   getAnchorColor,
@@ -53,6 +54,11 @@ const HEADER_OFFSET_PX = 72;
 interface EventPreviewProps {
   data: EventDetailData;
   siteEssentials?: SiteEssentialsFormValues | null;
+  /**
+   * Location slug for footer (venue + head office), same as live
+   * `FooterSection locationSlug={…}` on the public event page.
+   */
+  locationSlug?: string | null;
   /**
    * True when preview sits inside admin review or vendor form tabs (no floating "Back to Editor").
    * Disables the header left inset and adds horizontal padding so the bar aligns like the live site.
@@ -98,6 +104,7 @@ function mapGalleryForPreview(
 export function EventPreview({
   data,
   siteEssentials,
+  locationSlug,
   embedInShell = false,
 }: EventPreviewProps) {
   const { format: formatMoney } = useCurrencyFormat();
@@ -189,6 +196,14 @@ export function EventPreview({
 
   const contactNumber =
     data.contact_number || data.stepEight?.contact_number || "";
+
+  /** Same source as live event page: theme locations + contactDetails via site essentials. */
+  const footerLocationSlug =
+    locationSlug?.trim() || siteEssentials?.slug?.trim() || null;
+  const footerContactTheme = useMemo(
+    () => buildSiteEssentialsContactTheme(siteEssentials),
+    [siteEssentials],
+  );
 
   const themeColors = siteEssentials?.colors || {
     primary: "#0F172A",
@@ -573,7 +588,13 @@ export function EventPreview({
 
         {showFaqs && <LazyFaqSection faqs={faqs} />}
 
-        <FooterSection logo={siteEssentials?.logo || data.logo || undefined} />
+        <FooterSection
+          copyright={siteEssentials?.copyright}
+          logo={siteEssentials?.logo || data.logo || undefined}
+          locationSlug={footerLocationSlug}
+          contactTheme={footerContactTheme}
+          socialLinksOverride={siteEssentials?.socialLinks}
+        />
       </div>
     </CartConflictProvider>
   );

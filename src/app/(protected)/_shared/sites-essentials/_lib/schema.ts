@@ -51,6 +51,9 @@ const siteEssentialsLocationSchema = z.object({
   city: z.string(),
   slug: z.string(),
   cover_image: z.string().nullable().optional(),
+  address: z.string().nullable().optional(),
+  email: z.string().nullable().optional(),
+  phone_number: z.string().nullable().optional(),
   total_events: z.number().optional(),
   latest_upcoming_event: z
     .object({
@@ -300,6 +303,19 @@ export const siteEssentialsFormSchema = z.object({
   company_registered_office: z.string().nullable().optional(),
   company_phone: z.string().nullable().optional(),
   company_email: z.string().nullable().optional(),
+  /** Vendor-level contact from theme / site-essentials GET (live public shape) */
+  contactDetails: z
+    .object({
+      email: z.string().optional(),
+      phone: z.string().optional(),
+      phoneNumber: z.string().optional(),
+      address: z.string().optional(),
+      alternativeEmail: z.string().optional(),
+      alternativePhone: z.string().optional(),
+      alternativePhoneNumber: z.string().optional(),
+      alternativeAddress: z.string().optional(),
+    })
+    .optional(),
   event_title_1: z
     .string()
     .max(40, "Event title must not exceed 40 characters")

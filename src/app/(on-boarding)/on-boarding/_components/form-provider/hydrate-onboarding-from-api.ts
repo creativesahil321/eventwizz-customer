@@ -111,10 +111,10 @@ export function patchOnboardingPayloadFromApi(
     };
   }
 
-  // Step 10: subdomain label + confirmation restore from `isApproved`.
-  if (dataAny.stepTen && typeof dataAny.stepTen === "object") {
-    dataAny.stepTen = normalizeStepTenFromApi(
-      dataAny.stepTen as Record<string, unknown>,
+  // Step 11: subdomain label + confirmation restore from `isApproved`.
+  if (dataAny.stepEleven && typeof dataAny.stepEleven === "object") {
+    dataAny.stepEleven = normalizeStepElevenFromApi(
+      dataAny.stepEleven as Record<string, unknown>,
     );
   }
 
@@ -192,33 +192,33 @@ function normalizeSubdomainLabelFromApi(
 }
 
 /**
- * Maps persisted step 10 into the client form shape:
+ * Maps persisted step 11 into the client form shape:
  * - `domain` → subdomain label only
  * - `domain_suffix` kept for UI (fallback eventwizz.com)
  * - `confirm_domain` restored from `isApproved` (vendor confirmation of saved domain)
  * - API `submit_type: "publish"` → client `"submit"`
  */
-function normalizeStepTenFromApi(
-  stepTen: Record<string, unknown>,
+function normalizeStepElevenFromApi(
+  stepEleven: Record<string, unknown>,
 ): Record<string, unknown> {
   const suffix =
-    typeof stepTen.domain_suffix === "string" &&
-    stepTen.domain_suffix.trim().length > 0
-      ? stepTen.domain_suffix.trim().toLowerCase()
+    typeof stepEleven.domain_suffix === "string" &&
+    stepEleven.domain_suffix.trim().length > 0
+      ? stepEleven.domain_suffix.trim().toLowerCase()
       : "eventwizz.com";
 
-  const domain = normalizeSubdomainLabelFromApi(stepTen.domain, suffix);
-  const isApproved = stepTen.isApproved === true;
+  const domain = normalizeSubdomainLabelFromApi(stepEleven.domain, suffix);
+  const isApproved = stepEleven.isApproved === true;
 
-  const rawSubmit = stepTen.submit_type;
+  const rawSubmit = stepEleven.submit_type;
   const submit_type =
     rawSubmit === "duplicate"
       ? "duplicate"
       : "submit"; /* publish / submit / unknown → submit */
 
   return {
-    ...defaultValues.stepTen,
-    ...stepTen,
+    ...defaultValues.stepEleven,
+    ...stepEleven,
     domain,
     domain_suffix: suffix,
     isApproved,

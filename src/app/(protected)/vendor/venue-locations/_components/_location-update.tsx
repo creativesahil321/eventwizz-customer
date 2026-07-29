@@ -26,8 +26,8 @@ import { useUpdateLocation } from "../_lib/queries";
 import { Location } from "../_lib/types";
 import { slugify } from "@/lib/utils";
 import { env } from "@/env";
-import GoogleLocationSearch from "@/app/(on-boarding)/on-boarding/_components/steps/step-10/google-location-search";
-import { fetchLocationDetails } from "@/app/(on-boarding)/on-boarding/_components/steps/step-10/_lib/actions";
+import GoogleLocationSearch from "@/app/(on-boarding)/on-boarding/_components/steps/step-11/google-location-search";
+import { fetchLocationDetails } from "@/app/(on-boarding)/on-boarding/_components/steps/step-11/_lib/actions";
 import { toast } from "sonner";
 
 interface UpdateLocationDialogProps {

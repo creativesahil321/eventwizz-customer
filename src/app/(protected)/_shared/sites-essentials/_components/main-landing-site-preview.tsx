@@ -24,6 +24,7 @@ import { shouldUseNextImageOptimization } from "@/lib/image-utils";
 import { SiteEssentialsFormValues } from "../_lib/schema";
 import { siteEssentialsToPreviewRootStyle } from "../_lib/preview-root-style";
 import { SiteEssentialsGoogleFontsLoader } from "@/components/shared/site-essentials-google-fonts-loader";
+import { resolveSiteEssentialsPreviewContact } from "../_lib/preview-contact";
 import type { LocationData } from "@/types/theme.types";
 
 interface MainLandingSitePreviewProps {
@@ -255,6 +256,8 @@ export function MainLandingSitePreview({
       <FooterSection
         copyright={formValues.copyright}
         logo={getPreviewUrl(formValues.logo) || null}
+        contactOverride={resolveSiteEssentialsPreviewContact(formValues)}
+        socialLinksOverride={formValues.socialLinks}
       />
     </div>
   );

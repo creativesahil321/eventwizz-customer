@@ -77,7 +77,7 @@ export default function PayPalReturnPage() {
             window.close();
           } else {
             // This is the main window, redirect to onboarding payment step
-            router.push("/on-boarding?step=11");
+            router.push("/on-boarding?step=10");
           }
         }, 2000);
       } catch (error) {
@@ -93,7 +93,7 @@ export default function PayPalReturnPage() {
           if (window.opener) {
             window.close();
           } else {
-            router.push("/on-boarding?step=11");
+            router.push("/on-boarding?step=10");
           }
         }, 3000);
       }

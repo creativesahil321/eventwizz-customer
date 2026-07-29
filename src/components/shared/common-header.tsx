@@ -41,7 +41,10 @@ import {
   useIsPreviewModeFromProvider,
   useIsPreviewMode,
 } from "@/contexts/preview-context";
-import { usePreviewNarrowLayout } from "@/hooks/use-preview-narrow-layout";
+import {
+  usePreviewDeviceFramesEnabled,
+  usePreviewNarrowLayout,
+} from "@/hooks/use-preview-narrow-layout";
 import type { HeaderDownloadLink } from "@/lib/event-header-downloads";
 import { resolvePublicPageContact } from "@/lib/resolve-venue-contact";
 import {
@@ -234,17 +237,16 @@ export default function CommonHeader({
   const { theme } = useContext(ServerContext);
   const isPreviewFromProvider = useIsPreviewModeFromProvider();
   const isPreviewPath = useIsPreviewMode();
+  const deviceFramesEnabled = usePreviewDeviceFramesEnabled();
   /**
-   * Site/event/onboarding preview — render guest-facing chrome.
-   * Hide portal-only items (Dashboard / Continue Onboarding / Cart), but still
-   * show Log In / Register so the preview matches how public visitors see the site
-   * (vendors are authenticated while editing, which would otherwise strip those).
+   * Guest-facing chrome only inside framed onboarding previews.
+   * Full-page `/preview/site` and `/preview/event` mirror live auth (Dashboard
+   * when the vendor is signed in) so review matches the live site.
    */
   const isPreviewChrome =
-    variant === "preview" ||
     variant === "onboarding" ||
-    isPreviewFromProvider ||
-    isPreviewPath;
+    (deviceFramesEnabled &&
+      (variant === "preview" || isPreviewFromProvider || isPreviewPath));
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
   const { data: session, status } = useSession();
@@ -546,20 +548,18 @@ export default function CommonHeader({
   const usesEmbeddedScrollPanel = Boolean(scrollContainerRef);
   const usesStickyHeader = variant === "preview" || usesEmbeddedScrollPanel;
   /**
-   * Framed preview (onboarding / site / event): follow `@container/preview` on the
-   * device frame — never the editor viewport, and never a self-sized header
-   * container (that can grow with pill content and keep “desktop” labels at
-   * tablet widths → overlap).
+   * Only use `@container/preview` when a device frame (or embedded scroll panel)
+   * actually provides that container. Full-page `/preview/site` has no frame —
+   * container queries never match and the header stuck on hamburger / tiny logo.
    *
    * Tablet/Mobile device mode: force hamburger chrome via the preview store.
-   * Live pages: normal viewport breakpoints.
+   * Live + full-width preview: normal viewport breakpoints.
    */
   const isPreviewNarrow = usePreviewNarrowLayout();
   const usePreviewContainerQueries =
-    variant === "preview" ||
-    usesEmbeddedScrollPanel ||
-    isPreviewFromProvider ||
-    isPreviewPath;
+    deviceFramesEnabled ||
+    (usesEmbeddedScrollPanel &&
+      (variant === "preview" || variant === "onboarding"));
 
   const desktopHeaderVisibility = isPreviewNarrow
     ? "hidden"
@@ -715,26 +715,10 @@ export default function CommonHeader({
           <div className={desktopActionsRowClass}>
             {/* Cart (signed-in) or public location switcher (guest) */}
             {useNonInteractiveChrome ? (
-              <>
-                <VendorPublicLocationBookNow
-                  disabled
-                  pillGlassOnHero={pillGlassOnHero}
-                />
-                {isAuthenticated && !isPreviewChrome ? (
-                  <div
-                    className={cn(
-                      "flex items-center gap-1",
-                      topBarPillDisabledClass,
-                      styles.textColor,
-                      desktopIconActionClass,
-                    )}
-                    aria-label="Cart"
-                  >
-                    <ShoppingCart size={16} className="shrink-0" />
-                    <span className={desktopActionLabelClass}>Cart</span>
-                  </div>
-                ) : null}
-              </>
+              <VendorPublicLocationBookNow
+                disabled
+                pillGlassOnHero={pillGlassOnHero}
+              />
             ) : commerceSlotLoading ? (
               <div
                 className={cn(

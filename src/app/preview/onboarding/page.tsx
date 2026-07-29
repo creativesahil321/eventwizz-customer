@@ -109,12 +109,15 @@ function OnboardingPreviewContent() {
   /* ── Derive event slug from location API response ── */
   const [activeEventSlug, setActiveEventSlug] = useState<string | undefined>();
 
-  /* ── API: Location Page — only fetch when user reaches location tab ── */
+  /* ── API: Location Page — fetch when location OR event tab is opened
+   * (event slug is resolved from location payload, so Event Page needs this too) */
   const [hasVisitedLocationTab, setHasVisitedLocationTab] = useState(false);
+  const [hasVisitedEventTab, setHasVisitedEventTab] = useState(false);
   const { data: locationData, isLoading: isLoadingLocation } =
     useOnboardingPreviewLocationQuery(
       activeLocationSlug,
-      hasVisitedLocationTab && Boolean(activeLocationSlug?.trim()),
+      (hasVisitedLocationTab || hasVisitedEventTab) &&
+        Boolean(activeLocationSlug?.trim()),
     );
 
   const eventSlugFromLocation = useMemo(() => {
@@ -125,12 +128,24 @@ function OnboardingPreviewContent() {
   }, [locationData, activeEventSlug]);
 
   /* ── API: Event Page — only fetch when user navigates to event tab ── */
-  const [hasVisitedEventTab, setHasVisitedEventTab] = useState(false);
   const { data: eventApiData, isLoading: isLoadingEvent } =
     useOnboardingPreviewEventQuery(
       eventSlugFromLocation,
       hasVisitedEventTab && Boolean(eventSlugFromLocation?.trim()),
     );
+
+  const isEventPreviewLoading =
+    hasVisitedEventTab &&
+    !eventApiData &&
+    (isLoadingEvent ||
+      // Still resolving event slug from location (direct Event tab click)
+      (!eventSlugFromLocation &&
+        Boolean(activeLocationSlug?.trim()) &&
+        isLoadingLocation) ||
+      (!eventSlugFromLocation &&
+        Boolean(activeLocationSlug?.trim()) &&
+        !locationData &&
+        (hasVisitedLocationTab || hasVisitedEventTab)));
 
   /* ── Transform event API data into EventDetailData ── */
   const eventDetailData = useMemo<EventDetailData | null>(() => {
@@ -143,6 +158,27 @@ function OnboardingPreviewContent() {
   const locationPreviewData = locationData as
     | SiteEssentialsFormValues
     | undefined;
+
+  /**
+   * Location + event footers need the live theme shape:
+   * `locations[]` (venue card) + `contactDetails` (head office).
+   * Prefer main landing for those; keep location-scoped fields when present.
+   */
+  const locationSiteEssentials = useMemo(():
+    | SiteEssentialsFormValues
+    | undefined => {
+    if (!locationPreviewData && !mainPreviewData) return undefined;
+    const base = locationPreviewData ?? mainPreviewData!;
+    return {
+      ...base,
+      contactDetails:
+        mainPreviewData?.contactDetails ?? base.contactDetails,
+      locations: mainPreviewData?.locations ?? base.locations,
+      slug: activeLocationSlug ?? base.slug,
+    };
+  }, [locationPreviewData, mainPreviewData, activeLocationSlug]);
+
+  const eventSiteEssentials = locationSiteEssentials;
 
   /* ── Location label ── */
   const locationLabel = useMemo(() => {
@@ -204,7 +240,11 @@ function OnboardingPreviewContent() {
 
   const handleTabChange = useCallback((tab: PreviewTab) => {
     if (tab === "location") setHasVisitedLocationTab(true);
-    if (tab === "event") setHasVisitedEventTab(true);
+    if (tab === "event") {
+      // Event slug comes from the location payload — fetch location if needed.
+      setHasVisitedLocationTab(true);
+      setHasVisitedEventTab(true);
+    }
     setActiveTab(tab);
     window.scrollTo({ top: 0, behavior: "smooth" });
   }, []);
@@ -266,7 +306,10 @@ function OnboardingPreviewContent() {
     const nextTab = reviewSteps[stepIndex + 1];
     if (nextTab) {
       if (nextTab === "location") setHasVisitedLocationTab(true);
-      if (nextTab === "event") setHasVisitedEventTab(true);
+      if (nextTab === "event") {
+        setHasVisitedLocationTab(true);
+        setHasVisitedEventTab(true);
+      }
       setActiveTab(nextTab);
       window.scrollTo({ top: 0, behavior: "smooth" });
     }
@@ -281,14 +324,37 @@ function OnboardingPreviewContent() {
   ]);
 
   const handleEdit = useCallback(() => {
+    // Open the Branding editor for the page being reviewed — not Presets.
     if (activeTab === "main-landing") {
-      router.push("/vendor/sites-essentials");
-    } else if (activeTab === "location") {
-      router.push("/vendor/sites-essentials");
-    } else if (activeTab === "event") {
+      router.push(
+        hasMultipleLocations
+          ? "/vendor/sites-essentials?tab=branding&scope=main-home"
+          : "/vendor/sites-essentials?tab=branding&scope=location-page",
+      );
+      return;
+    }
+
+    if (activeTab === "location") {
+      router.push(
+        "/vendor/sites-essentials?tab=branding&scope=location-page",
+      );
+      return;
+    }
+
+    if (activeTab === "event") {
+      const eventId = eventApiData?.event?.event_id;
+      if (typeof eventId === "number" && Number.isFinite(eventId) && eventId > 0) {
+        router.push(`/vendor/events/${eventId}`);
+        return;
+      }
       router.push("/vendor/events");
     }
-  }, [activeTab, router]);
+  }, [
+    activeTab,
+    eventApiData?.event?.event_id,
+    hasMultipleLocations,
+    router,
+  ]);
 
   const previewLocationOptions = useMemo(() => {
     if (!hasMultipleLocations || !mainData?.locations?.length) return undefined;
@@ -344,8 +410,8 @@ function OnboardingPreviewContent() {
       }
     >
       <div className="flex min-h-screen flex-col bg-slate-900 pb-28 sm:pb-32">
-        <div className="fixed inset-x-0 top-4 z-[60] flex justify-center px-4">
-          <PreviewDeviceToolbar />
+        <div className="pointer-events-none fixed inset-x-0 top-4 z-[60] flex justify-center px-4">
+          <PreviewDeviceToolbar className="pointer-events-auto" />
         </div>
         <PreviewDeviceFrame
           stageClassName="min-h-screen items-stretch bg-slate-900 px-2 pb-8 pt-16 sm:px-4"
@@ -366,10 +432,8 @@ function OnboardingPreviewContent() {
                 <div className="flex items-center justify-center min-h-[60vh]">
                   <Loader2 className="h-8 w-8 text-gray-300 animate-spin" />
                 </div>
-              ) : locationPreviewData ? (
-                <SitePreview formValues={locationPreviewData} />
-              ) : mainPreviewData ? (
-                <SitePreview formValues={mainPreviewData} />
+              ) : locationSiteEssentials ? (
+                <SitePreview formValues={locationSiteEssentials} />
               ) : null}
             </>
           )}
@@ -377,18 +441,15 @@ function OnboardingPreviewContent() {
           {/* Event Page */}
           {activeTab === "event" && (
             <>
-              {isLoadingEvent && !eventDetailData ? (
+              {isEventPreviewLoading ? (
                 <div className="flex items-center justify-center min-h-[60vh]">
                   <Loader2 className="h-8 w-8 text-gray-300 animate-spin" />
                 </div>
               ) : eventDetailData ? (
                 <EventPreview
                   data={eventDetailData}
-                  siteEssentials={
-                    (locationPreviewData ?? mainPreviewData) as
-                      | SiteEssentialsFormValues
-                      | undefined
-                  }
+                  locationSlug={activeLocationSlug}
+                  siteEssentials={eventSiteEssentials}
                 />
               ) : (
                 <div className="flex flex-col items-center justify-center min-h-[60vh] p-8">

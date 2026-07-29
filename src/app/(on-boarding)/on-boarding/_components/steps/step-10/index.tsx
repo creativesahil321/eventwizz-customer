@@ -1,99 +1,30 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { CardContent, CardHeader, OnboardingCard } from "@/components/ui/card";
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from "@/components/ui/form";
+import { Form } from "@/components/ui/form";
 import { useFormContext } from "../../form-provider";
-import { stepTenSchema, StepTenType } from "../../form-provider/schema";
-import { onboardingService } from "@/services/vendor/onboarding/onboarding.service";
-import { useSession } from "next-auth/react";
-import { useQueryClient } from "@tanstack/react-query";
-import { syncVendorLocationsCache } from "@/app/(protected)/vendor/venue-locations/_lib/queries";
-import { useUpdateSessionWithLocation } from "@/services/common/auth/auth-session";
-import { OnboardingTitle, RadioButtonLabel } from "@/components/ui/typography";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Input } from "@/components/ui/input";
-import GoogleLocationSearch from "./google-location-search";
-import { fetchLocationDetails } from "./_lib/actions";
-import { env } from "@/env";
-import { useDomainSuggestions } from "./_lib/hooks/useDomainSuggestions";
-import { Loader2, Globe, Mail, MapPin } from "lucide-react";
+  isGatewayStatusActive,
+  stepTenSchema,
+  StepTenType,
+} from "../../form-provider/schema";
+import { toast } from "sonner";
+import { onboardingService } from "@/services/vendor/onboarding/onboarding.service";
+import { vendorPaymentGatewayService } from "@/services/vendor/payment-gateway/payment-gateway.service";
+import { OnboardingTitle } from "@/components/ui/typography";
+import { Resolver, type FieldErrors } from "react-hook-form";
+import { useSession } from "next-auth/react";
 import { useEventId } from "../../../_lib/hooks/useEventId";
 import { WholeStepGuidedShell } from "../../whole-step-guided-shell";
 import { GuidedWholeStepBottomActions } from "../../guided-section-chips";
-import { slugify } from "@/lib/utils";
-
-/** Public-link / input: subdomain label only (a-z, 0-9, hyphens, max 63). */
-function normalizeSubdomainLabel(
-  selected: string | undefined | null,
-  suffix = "eventwizz.com",
-): string {
-  const stripHostSuffix = (s: string) => {
-    let out = s.trim().toLowerCase();
-    const suffixes = [
-      suffix.trim().toLowerCase(),
-      "eventwizz.com",
-      "eventwizz.vercel.app",
-      "com",
-    ].filter(Boolean);
-    for (const suf of suffixes) {
-      if (out.endsWith(`.${suf}`)) {
-        out = out.slice(0, -(suf.length + 1));
-      }
-    }
-    return out;
-  };
-
-  const cleaned = stripHostSuffix(selected ?? "")
-    .replace(/[^a-z0-9-]/g, "")
-    .replace(/-+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .slice(0, 63);
-  return cleaned;
-}
-
-function subdomainPublicPreviewLabel(
-  selected: string | undefined | null,
-  venueName: string,
-  suffix = "eventwizz.com",
-): string {
-  const fromSelected = normalizeSubdomainLabel(selected, suffix);
-  if (fromSelected) return fromSelected;
-
-  const fromVenue = slugify(venueName.trim()).slice(0, 63);
-  return fromVenue || "yoursubdomain";
-}
-
-// Days options for reminder emails
-const days = Array.from({ length: 31 }, (_, i) => i + 1);
-
-const extraOptions = [
-  { value: 60, label: "2 months before" },
-  { value: 90, label: "3 months before" },
-  { value: 120, label: "4 months before" },
-  { value: 180, label: "6 months before" },
-];
-
-const publishCardClass =
-  "rounded-xl border border-white/[0.08] bg-white/[0.02] p-4 sm:p-5 space-y-3";
-const publishStepBadgeClass =
-  "flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/[0.06] text-sm font-semibold tabular-nums text-slate-100";
+import { guidedOnboardingSkipButtonClass } from "../../guided-sticky-approval-bar";
+import { Button } from "@/components/ui/button";
+import { PaymentSetupLayout, type CardProvider } from "./payment-setup-layout";
+import type { PaymentGatewayCredentials } from "@/services/vendor/payment-gateway/types";
+import { resolveConnectedAccountId } from "@/services/vendor/payment-gateway/types";
 
 export default function StepTen() {
   const {
@@ -107,267 +38,389 @@ export default function StepTen() {
     control: globalForm.control,
     name: "stepTen.isApproved",
   });
-  const persistedStepTenDomain = useWatch({
-    control: globalForm.control,
-    name: "stepTen.domain",
-  });
-  const persistedDomainSuffix = useWatch({
-    control: globalForm.control,
-    name: "stepTen.domain_suffix",
-  });
-  const domainSuffix =
-    (typeof persistedDomainSuffix === "string" &&
-      persistedDomainSuffix.trim()) ||
-    "eventwizz.com";
-
-  const { update } = useSession();
-  const queryClient = useQueryClient();
-  const updateSessionWithLocation = useUpdateSessionWithLocation();
   const [loading, setLoading] = useState(false);
-
-  /**
-   * Last domain confirmed via the steps API (`stepTen.domain` when `isApproved`).
-   * Editing away from this value unchecks confirmation; reverting restores it.
-   */
-  const savedDomainRef = useRef<string>("");
-  /** Whether the API last approved the domain in `savedDomainRef`. */
-  const savedDomainApprovedRef = useRef(false);
-  const subdomainInputSeededRef = useRef(false);
-
-  // Domain suggestions
-  const {
-    suggestions,
-    isLoading: isGeneratingSuggestions,
-    error: suggestionsError,
-    generateSuggestions,
-    selectedDomain,
-    setSelectedDomain,
-  } = useDomainSuggestions();
-
-  // Function to get a user-friendly error message
-  const getErrorMessage = (error: string) => {
-    if (
-      error.includes("explicit") ||
-      error.includes("cannotprovide") ||
-      error.includes("content") ||
-      error.includes("inappropriate")
-    ) {
-      return "This subdomain name may not be appropriate for a professional event venue. Please try a different name.";
-    }
-    if (error.includes("model") || error.includes("API")) {
-      return "Unable to generate suggestions at the moment. Please try again.";
-    }
-    // Don't truncate error messages - let them display fully
-    return error;
-  };
-
-  // Reactive so subdomain can seed after persistence GET fills step one.
-  const venueName =
-    useWatch({
-      control: globalForm.control,
-      name: "stepOne.name",
-    }) || "";
-  const venueType = "event venue"; // Could be enhanced to get from form data
-  const venueLocation = globalForm.getValues("stepOne.city") || "";
-  /** Set from step 1 save and from persistence GET (root `has_multiple_locations` merged into stepOne in FormProvider). */
-  const stepOneHasMulti = globalForm.watch("stepOne.has_multiple_locations");
-  /** Hide duplicate flow for single-location (`false`). Show when multi (`true`) or legacy payloads without the flag (`undefined`). */
-  const showDuplicateEventOptions = stepOneHasMulti !== false;
-
+  const [disconnecting, setDisconnecting] = useState<
+    CardProvider | "truelayer" | null
+  >(null);
+  const [truelayerWebhookUrl, setTruelayerWebhookUrl] = useState<string | null>(
+    null,
+  );
+  const [truelayerWebhookHint, setTruelayerWebhookHint] = useState<
+    string | null
+  >(null);
+  const [truelayerPublicKey, setTruelayerPublicKey] = useState<string | null>(
+    null,
+  );
+  const { update: updateSession } = useSession();
   const eventId = useEventId(globalForm, "stepTen");
 
   const form = useForm<StepTenType>({
-    resolver: zodResolver(stepTenSchema),
+    resolver: zodResolver(stepTenSchema) as Resolver<StepTenType>,
     defaultValues: {
       step: 10,
-      isApproved: false,
       event_id: eventId,
-      reminder_email_before_days:
-        globalForm.getValues().stepTen?.reminder_email_before_days || 10,
-      submit_type: "submit",
-      address: globalForm.getValues().stepTen?.address || "",
-      city: globalForm.getValues().stepTen?.city || "",
-      contact_number: globalForm.getValues().stepTen?.contact_number || "",
-      domain: globalForm.getValues().stepTen?.domain || "",
-      domain_suffix:
-        globalForm.getValues().stepTen?.domain_suffix || "eventwizz.com",
-      confirm_domain: globalForm.getValues().stepTen?.confirm_domain || false,
+      isApproved: false,
+      is_skipped: false,
     },
     mode: "onChange",
   });
 
+  const getInitialPaymentGateways = useCallback(() => {
+    const stepTenData = globalForm.getValues("stepTen");
+    const paymentGateways = (stepTenData as Record<string, unknown>)
+      ?.payment_gateways;
+
+    if (paymentGateways && typeof paymentGateways === "object") {
+      return paymentGateways as StepTenType["payment_gateways"];
+    }
+
+    return {
+      stripe: { status: undefined, account_id: "" },
+      paypal: { status: undefined, account_id: "" },
+      truelayer: {
+        status: undefined,
+        account_id: "",
+        bank: {
+          bank_name: undefined,
+          account_masked: undefined,
+        },
+      },
+      worldpay: { status: undefined, account_id: "" },
+      klarna: { status: undefined, account_id: "" },
+    };
+  }, [globalForm]);
+
+  const deriveAcceptPaymentMethod = useCallback(
+    (
+      gateways: StepTenType["payment_gateways"] | undefined,
+    ): StepTenType["accept_payment_method"] => {
+      const hasBankTransferActive = isGatewayStatusActive(
+        gateways?.truelayer?.status,
+      );
+      const hasPaymentGatewayActive =
+        isGatewayStatusActive(gateways?.stripe?.status) ||
+        isGatewayStatusActive(gateways?.paypal?.status);
+
+      if (hasBankTransferActive && hasPaymentGatewayActive) return "both";
+      if (hasBankTransferActive) return "bank_transfer";
+      return "payment_gateway";
+    },
+    [],
+  );
+
   useEffect(() => {
-    if (stepOneHasMulti === false) {
-      form.setValue("submit_type", "submit");
-    }
-  }, [stepOneHasMulti, form]);
-
-  /**
-   * Sync confirmation checkbox with the currently typed domain vs last saved domain.
-   * - Current === savedDomain and was approved → restore checked
-   * - Current !== savedDomain → uncheck (must confirm again)
-   */
-  const syncConfirmForDomain = (nextDomain: string) => {
-    const saved = savedDomainRef.current;
-    if (
-      saved.length > 0 &&
-      nextDomain === saved &&
-      savedDomainApprovedRef.current
-    ) {
-      form.setValue("confirm_domain", true, { shouldValidate: true });
-      return;
-    }
-    form.setValue("confirm_domain", false, { shouldValidate: true });
-  };
-
-  const applyDomainChange = (raw: string) => {
-    const value = normalizeSubdomainLabel(raw, domainSuffix);
-    setSelectedDomain(value);
-    form.setValue("domain", value, { shouldValidate: true });
-    syncConfirmForDomain(value);
-  };
-
-  /**
-   * Prefill from steps API `stepTen.domain` / `isApproved`, else seed from venue name.
-   * Domain stays editable while onboarding (`isOnboarded === false`).
-   */
-  useEffect(() => {
-    if (!persistedProgressHydrated) return;
-
-    const fromGlobal = normalizeSubdomainLabel(
-      persistedStepTenDomain,
-      domainSuffix,
-    );
-    const approved = stepTenPersistedApproved === true;
-
-    if (fromGlobal) {
-      savedDomainRef.current = fromGlobal;
-      savedDomainApprovedRef.current = approved;
-      setSelectedDomain(fromGlobal);
-      form.setValue("domain", fromGlobal);
-      form.setValue("domain_suffix", domainSuffix);
-      form.setValue("confirm_domain", approved, { shouldValidate: true });
-      form.setValue("isApproved", approved);
-      subdomainInputSeededRef.current = true;
-      return;
+    if (eventId > 0) {
+      form.setValue("event_id", eventId);
     }
 
-    if (subdomainInputSeededRef.current) return;
+    const stepTenData = globalForm.getValues("stepTen");
+    const paymentGateways = (stepTenData as Record<string, unknown>)
+      ?.payment_gateways;
 
-    savedDomainRef.current = "";
-    savedDomainApprovedRef.current = false;
-    const fallback = subdomainPublicPreviewLabel("", venueName, domainSuffix);
-    if (fallback && fallback !== "yoursubdomain") {
-      setSelectedDomain(fallback);
-      form.setValue("domain", fallback);
-      form.setValue("domain_suffix", domainSuffix);
-      form.setValue("confirm_domain", false, { shouldValidate: true });
-      subdomainInputSeededRef.current = true;
+    if (paymentGateways && typeof paymentGateways === "object") {
+      const mappedGateways = getInitialPaymentGateways();
+      form.setValue("payment_gateways", mappedGateways);
+      form.setValue(
+        "accept_payment_method",
+        deriveAcceptPaymentMethod(mappedGateways),
+        { shouldValidate: true, shouldDirty: false },
+      );
     }
   }, [
-    persistedProgressHydrated,
-    persistedStepTenDomain,
-    stepTenPersistedApproved,
-    domainSuffix,
-    venueName,
+    eventId,
     form,
-    setSelectedDomain,
+    globalForm,
+    getInitialPaymentGateways,
+    deriveAcceptPaymentMethod,
   ]);
 
-  // Watch reminder email configuration state
-  const showReminderDays =
-    form.watch("reminder_email_before_days") !== undefined;
+  const paymentGateways = form.watch("payment_gateways");
+  const stripeStatus = form.watch("payment_gateways.stripe.status");
+  const paypalStatus = form.watch("payment_gateways.paypal.status");
+  const truelayerStatus = form.watch("payment_gateways.truelayer.status");
 
-  const onSubmit = async (values: StepTenType) => {
+  useEffect(() => {
+    const gateways = form.getValues("payment_gateways");
+    form.setValue(
+      "accept_payment_method",
+      deriveAcceptPaymentMethod(gateways),
+      {
+        shouldValidate: true,
+        shouldDirty: false,
+      },
+    );
+  }, [
+    stripeStatus,
+    paypalStatus,
+    truelayerStatus,
+    form,
+    deriveAcceptPaymentMethod,
+  ]);
+
+  const stripeConnected = isGatewayStatusActive(
+    paymentGateways?.stripe?.status,
+  );
+  const paypalConnected = isGatewayStatusActive(
+    paymentGateways?.paypal?.status,
+  );
+  const truelayerConnected = isGatewayStatusActive(
+    paymentGateways?.truelayer?.status,
+  );
+  const hasConnectedGateway =
+    stripeConnected || paypalConnected || truelayerConnected;
+
+  const syncGlobalGateways = useCallback(() => {
+    globalForm.setValue(
+      "stepTen.payment_gateways",
+      form.getValues("payment_gateways"),
+    );
+  }, [form, globalForm]);
+
+  const handleDisconnect = async (gateway: CardProvider | "truelayer") => {
+    setDisconnecting(gateway);
+    try {
+      await vendorPaymentGatewayService.disconnectPaymentGateway(gateway);
+
+      if (gateway === "stripe") {
+        form.setValue("payment_gateways.stripe", {
+          status: undefined,
+          account_id: "",
+        });
+      } else if (gateway === "paypal") {
+        form.setValue("payment_gateways.paypal", {
+          status: undefined,
+          account_id: "",
+        });
+      } else {
+        form.setValue("payment_gateways.truelayer", {
+          status: undefined,
+          account_id: "",
+          bank: undefined,
+        });
+        setTruelayerWebhookUrl(null);
+        setTruelayerWebhookHint(null);
+        setTruelayerPublicKey(null);
+      }
+      syncGlobalGateways();
+    } catch (error) {
+      console.error(`Disconnect ${gateway} error:`, error);
+      if (gateway === "stripe") {
+        form.setValue("payment_gateways.stripe", {
+          status: undefined,
+          account_id: "",
+        });
+      } else if (gateway === "paypal") {
+        form.setValue("payment_gateways.paypal", {
+          status: undefined,
+          account_id: "",
+        });
+      } else {
+        form.setValue("payment_gateways.truelayer", {
+          status: undefined,
+          account_id: "",
+          bank: undefined,
+        });
+        setTruelayerWebhookUrl(null);
+        setTruelayerWebhookHint(null);
+        setTruelayerPublicKey(null);
+      }
+      syncGlobalGateways();
+    } finally {
+      setDisconnecting(null);
+    }
+  };
+
+  const handleTrueLayerConnect = async (
+    credentials: PaymentGatewayCredentials,
+  ) => {
+    const loadingToast = toast.loading("Verifying TrueLayer credentials...");
+    try {
+      setLoading(true);
+
+      const response = await onboardingService.connectPaymentGateway(
+        "truelayer",
+        credentials,
+      );
+
+      toast.dismiss(loadingToast);
+      if (!response.status) return;
+
+      const account = response.data?.account;
+      const status = account?.account_status || "active";
+      const accountId = resolveConnectedAccountId(account);
+
+      form.setValue("payment_gateways.truelayer", {
+        status,
+        account_id: accountId,
+      });
+      syncGlobalGateways();
+      setTruelayerWebhookUrl(response.data?.webhook_url || null);
+      setTruelayerWebhookHint(response.data?.webhook_setup_hint || null);
+      setTruelayerPublicKey(response.data?.public_key || null);
+      void updateSession({ has_payment_provider: true });
+    } catch (error) {
+      toast.dismiss(loadingToast);
+      console.error("TrueLayer connection error:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleStripeConnect = async (
+    credentials: PaymentGatewayCredentials,
+  ) => {
+    const loadingToast = toast.loading("Verifying Stripe credentials...");
+    try {
+      setLoading(true);
+
+      const response = await onboardingService.connectPaymentGateway(
+        "stripe",
+        credentials,
+      );
+
+      toast.dismiss(loadingToast);
+      if (!response.status) return;
+
+      const account = response.data?.account;
+      const status = account?.account_status || "active";
+      const accountId = resolveConnectedAccountId(account);
+
+      form.setValue("payment_gateways.stripe", {
+        status,
+        account_id: accountId,
+      });
+      syncGlobalGateways();
+      void updateSession({ has_payment_provider: true });
+    } catch (error) {
+      toast.dismiss(loadingToast);
+      console.error("Stripe connection error:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handlePayPalConnect = async (
+    credentials: PaymentGatewayCredentials,
+  ) => {
+    const loadingToast = toast.loading("Verifying PayPal credentials...");
+    try {
+      setLoading(true);
+
+      const response = await onboardingService.connectPaymentGateway(
+        "paypal",
+        credentials,
+      );
+
+      toast.dismiss(loadingToast);
+      if (!response.status) return;
+
+      const account = response.data?.account;
+      const status = account?.account_status || "active";
+      const accountId = resolveConnectedAccountId(account);
+
+      form.setValue("payment_gateways.paypal", {
+        status,
+        account_id: accountId,
+      });
+      syncGlobalGateways();
+      void updateSession({ has_payment_provider: true });
+    } catch (error) {
+      toast.dismiss(loadingToast);
+      console.error("PayPal connection error:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSkip = async () => {
     setLoading(true);
     try {
-      const domain = normalizeSubdomainLabel(values.domain, domainSuffix);
-      if (!domain) {
-        form.setError("domain", {
-          message: "Please select a domain for your website",
-        });
-        setLoading(false);
-        return;
-      }
-
-      const nextValues: StepTenType = {
-        ...values,
-        domain,
-        domain_suffix: domainSuffix,
-        confirm_domain: true,
+      form.setValue("is_skipped", true);
+      const skippedData: StepTenType = {
+        ...form.getValues(),
+        is_skipped: true,
         isApproved: true,
+        event_id: form.getValues().event_id || (eventId as number),
       };
-      globalForm.setValue("stepTen", nextValues);
+      globalForm.setValue("stepTen", skippedData);
 
-      type StepTenPayload = {
-        step: 10;
-        event_id: number;
-        submit_type: "duplicate" | "submit";
-        address?: string;
-        city?: string;
-        contact_number?: string;
-        reminder_email_before_days?: number;
-        domain: string;
-        confirm_domain: boolean;
-        isApproved?: boolean;
-      };
+      const response = await onboardingService.storeStepTenData(skippedData);
 
-      const payload: StepTenPayload = {
-        step: 10,
-        event_id: values.event_id,
-        submit_type: values.submit_type,
-        domain,
-        confirm_domain: true,
-        isApproved: true,
-      };
-
-      if (values.submit_type === "duplicate") {
-        payload.address = values.address;
-        payload.city = values.city;
-        payload.contact_number = values.contact_number;
+      if (response && response.status) {
+        globalForm.setValue("stepTen", skippedData);
+        toast.info(
+          "Payment setup skipped. You can complete this anytime from Payment settings.",
+          { duration: 5000 },
+        );
+        setActiveStep(11);
+        Promise.all([updateSession({ on_boarding_step: 10 }), save()]).catch(
+          (error) => {
+            console.error("Background save error:", error);
+          },
+        );
       }
+    } catch (error) {
+      console.error("Error skipping payment setup:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
-      if (showReminderDays) {
-        payload.reminder_email_before_days =
-          values.reminder_email_before_days || 10;
-      }
-
-      const response = await onboardingService.storeStepTenData(
-        payload as StepTenType,
+  const onSubmitInvalid = useCallback((errors: FieldErrors<StepTenType>) => {
+    if (errors.payment_gateways) {
+      toast.error(
+        "Connect at least one payment method (bank, Stripe, or PayPal) to continue, or skip payment and continue.",
+        { duration: 6500 },
       );
-      if (!response?.status) throw new Error("Failed to save domain settings");
+    } else if (errors.accept_payment_method) {
+      toast.error(
+        errors.accept_payment_method.message?.toString() ||
+          "Choose how guests can pay (bank transfer, card, or both).",
+        { duration: 6500 },
+      );
+    } else {
+      toast.error("Please fix the highlighted fields to continue.");
+    }
+  }, []);
 
-      // Keep checkbox restored for this domain if the vendor navigates back.
-      savedDomainRef.current = domain;
-      savedDomainApprovedRef.current = true;
-      setSelectedDomain(domain);
-      form.setValue("domain", domain);
-      form.setValue("confirm_domain", true);
-      form.setValue("isApproved", true);
-      globalForm.setValue("stepTen", {
-        ...nextValues,
-        domain,
+  const onSubmit = async (data: StepTenType) => {
+    setLoading(true);
+    try {
+      data.accept_payment_method = deriveAcceptPaymentMethod(
+        data.payment_gateways,
+      );
+      data.is_skipped = false;
+      data.isApproved = true;
+      globalForm.setValue("stepTen", data);
+
+      data.event_id = data?.event_id as number;
+
+      const hasAnyActiveGateway =
+        isGatewayStatusActive(data.payment_gateways?.stripe?.status) ||
+        isGatewayStatusActive(data.payment_gateways?.paypal?.status) ||
+        isGatewayStatusActive(data.payment_gateways?.truelayer?.status) ||
+        isGatewayStatusActive(data.payment_gateways?.worldpay?.status) ||
+        isGatewayStatusActive(data.payment_gateways?.klarna?.status);
+
+      const response = await onboardingService.storeStepTenData({
+        ...data,
         isApproved: true,
-        confirm_domain: true,
       });
 
-      if (values.submit_type === "duplicate") {
-        const syncedLocations = await syncVendorLocationsCache(queryClient);
-        if (syncedLocations?.default_venue_location?.id) {
-          await updateSessionWithLocation({
-            vendor_location_id: syncedLocations.default_venue_location.id,
-          });
-        }
-        void queryClient.invalidateQueries({ queryKey: ["locations"] });
-      }
+      if (response && response.status) {
+        globalForm.setValue("stepTen", { ...data, isApproved: true });
 
-      // Instant transition to payment (final step)
-      setActiveStep(11);
-      Promise.all([update({ on_boarding_step: 10 }), save()]).catch(
-        (error) => {
+        setActiveStep(11);
+        Promise.all([
+          updateSession({
+            on_boarding_step: 10,
+            ...(hasAnyActiveGateway ? { has_payment_provider: true } : {}),
+          }),
+          save(),
+        ]).catch((error) => {
           console.error("Background save error:", error);
-        },
-      );
+        });
+      }
     } catch (error) {
       console.error("Error during Step Ten submission:", error);
     } finally {
@@ -380,584 +433,107 @@ export default function StepTen() {
       <div className="relative mx-auto mb-16 w-full max-w-3xl">
         <OnboardingCard className="mx-auto w-full shadow-sm">
           <CardHeader className="space-y-1.5 pb-2 pt-4 text-center sm:text-left">
-            <OnboardingTitle>Set your booking website</OnboardingTitle>
+            <OnboardingTitle>
+              How would you like to accept payments?
+            </OnboardingTitle>
             <p className="mx-auto max-w-xl text-sm leading-relaxed text-slate-400 sm:mx-0">
-              Choose your booking web address and optionally turn on balance
-              reminders. Payments come next — everything stays editable later.
+              Connect card payments with Stripe or PayPal, and optionally bank
+              transfers with TrueLayer. You can change this later in Payment
+              settings.
             </p>
           </CardHeader>
 
           <CardContent className="px-6 pb-6 pt-0">
             <Form {...form}>
               <form onSubmit={(e) => e.preventDefault()} className="space-y-4">
-                {/* Hidden fields */}
                 <input type="hidden" {...form.register("step")} />
+                <input type="hidden" {...form.register("event_id")} />
                 <input
                   type="hidden"
-                  {...form.register("event_id", {
-                    valueAsNumber: true,
-                  })}
+                  {...form.register("accept_payment_method")}
                 />
+                <input type="hidden" {...form.register("is_skipped")} />
 
                 <WholeStepGuidedShell
                   form={form}
-                  sectionId="step-ten-domain"
-                  chipLabel="Domain"
-                  chipDescription="Subdomain, reminders, then continue to payment."
+                  sectionId="step-ten-payments"
+                  chipLabel="Payment methods"
+                  chipDescription="Card and bank transfer providers. You can skip this step."
+                  lenientApproval
                   persistenceHydrated={persistedProgressHydrated}
                   persistedStepApproved={stepTenPersistedApproved === true}
                   renderFooter={({ guided }) => (
-                    <div className="w-full space-y-4">
-                      <GuidedWholeStepBottomActions
-                        guided={guided}
-                        loading={loading}
-                        labelWhenReady={
-                          form.watch("submit_type") === "duplicate"
-                            ? "Duplicate & continue"
-                            : "Save & continue"
-                        }
-                        continueDisabled={
-                          loading ||
-                          !selectedDomain ||
-                          !form.watch("confirm_domain")
-                        }
-                        onContinue={() => void form.handleSubmit(onSubmit)()}
-                        primaryButtonClassName="h-12 px-10"
-                      />
-                      {!selectedDomain && (
-                        <p className="text-center text-sm text-muted-foreground">
-                          Please select a subdomain to continue
-                        </p>
-                      )}
-                      {selectedDomain && !form.watch("confirm_domain") && (
-                        <p className="text-center text-sm text-muted-foreground">
-                          Please confirm your selection
-                        </p>
-                      )}
-                    </div>
+                    <GuidedWholeStepBottomActions
+                      guided={guided}
+                      loading={loading}
+                      labelWhenReady="Continue to domain"
+                      alwaysShowReadyLabel
+                      continueDisabled={!hasConnectedGateway}
+                      onContinue={() =>
+                        void form.handleSubmit(onSubmit, onSubmitInvalid)()
+                      }
+                      statusSlot={
+                        !hasConnectedGateway ? (
+                          <span className="mx-auto max-w-xl px-2 text-center text-xs text-slate-400">
+                            Link at least one payment account to take bookings,
+                            or skip payment and continue to domain.
+                          </span>
+                        ) : (
+                          <span className="mx-auto max-w-xl px-2 text-center text-xs text-emerald-400/90">
+                            You&apos;re ready to continue to domain.
+                          </span>
+                        )
+                      }
+                      extraActions={
+                        <Button
+                          variant="event-outline"
+                          type="button"
+                          onClick={() => void handleSkip()}
+                          className={guidedOnboardingSkipButtonClass}
+                          disabled={loading}
+                        >
+                          Skip payment and continue
+                        </Button>
+                      }
+                    />
                   )}
                 >
                   {() => (
-                    <div className="w-full space-y-4">
-                      {/* 1 — Website address (required) */}
-                      <div className={publishCardClass}>
-                        <div className="flex gap-3">
-                          <span className={publishStepBadgeClass}>1</span>
-                          <div className="min-w-0 flex-1 space-y-3">
-                            <div className="flex flex-wrap items-center gap-2">
-                              <Globe
-                                className="h-5 w-5 shrink-0 text-sky-400/90"
-                                aria-hidden
-                              />
-                              <h3 className="text-base font-semibold tracking-tight text-white">
-                                Your booking website address
-                              </h3>
-                            </div>
-                            <p className="text-sm leading-relaxed text-slate-400">
-                              Public link:{" "}
-                              <strong className="font-medium text-slate-200 break-all">
-                                {subdomainPublicPreviewLabel(
-                                  selectedDomain,
-                                  venueName,
-                                  domainSuffix,
-                                )}
-                                .{domainSuffix}
-                              </strong>
-                            </p>
-
-                            <div className="space-y-3">
-                              <div className="space-y-2">
-                                <label className="text-sm font-medium text-slate-300">
-                                  Subdomain
-                                </label>
-                                <div className="flex overflow-hidden rounded-md border border-white/20 bg-white/5 focus-within:ring-1 focus-within:ring-[var(--color-primary,#38bdf8)]">
-                                  <Input
-                                    placeholder="Enter subdomain name"
-                                    value={selectedDomain || ""}
-                                    onChange={(e) => {
-                                      const value = e.target.value
-                                        .toLowerCase()
-                                        .replace(/[^a-z0-9-]/g, "");
-                                      applyDomainChange(value);
-
-                                      // Generate suggestions based on typing
-                                      if (value && value.length >= 3) {
-                                        generateSuggestions(
-                                          value, // Use the typed value
-                                          venueType,
-                                          venueLocation,
-                                        );
-                                      }
-                                    }}
-                                    className="h-9 flex-1 border-0 bg-transparent pr-8 text-sm shadow-none focus-visible:ring-0"
-                                    maxLength={63}
-                                  />
-                                  {selectedDomain ? (
-                                    <button
-                                      type="button"
-                                      onClick={() => {
-                                        applyDomainChange("");
-                                      }}
-                                      className="shrink-0 px-2 text-slate-500 hover:text-slate-300"
-                                      title="Clear domain"
-                                    >
-                                      ✕
-                                    </button>
-                                  ) : null}
-                                  {isGeneratingSuggestions ? (
-                                    <div className="flex shrink-0 items-center pr-2">
-                                      <Loader2 className="h-4 w-4 animate-spin text-blue-600" />
-                                    </div>
-                                  ) : null}
-                                  <div className="flex shrink-0 items-center border-l border-white/15 bg-white/[0.03] px-3 text-sm text-muted-foreground">
-                                    .{domainSuffix}
-                                  </div>
-                                </div>
-                              </div>
-
-                              {suggestionsError && (
-                                <div className="flex items-start gap-2 mt-2 w-full">
-                                  <div className="w-4 h-4 rounded-full bg-red-500 flex items-center justify-center flex-shrink-0 mt-0.5">
-                                    <span className="text-white text-xs font-bold">
-                                      !
-                                    </span>
-                                  </div>
-                                  <div className="flex-1 min-w-0 w-full">
-                                    <p className="text-sm text-red-600 leading-relaxed break-words overflow-wrap-anywhere">
-                                      {getErrorMessage(suggestionsError)}
-                                    </p>
-                                    {(suggestionsError.includes("explicit") ||
-                                      suggestionsError.includes(
-                                        "cannotprovide",
-                                      ) ||
-                                      suggestionsError.includes("content")) && (
-                                      <div className="mt-2">
-                                        <p className="mb-2 text-xs text-muted-foreground">
-                                          Try these alternatives:
-                                        </p>
-                                        <div className="flex flex-wrap gap-2">
-                                          {[
-                                            "venue",
-                                            "events",
-                                            "booking",
-                                            "venue123",
-                                            "myvenue",
-                                          ].map((alt, index) => (
-                                            <button
-                                              key={index}
-                                              type="button"
-                                              onClick={() => {
-                                                applyDomainChange(alt);
-                                              }}
-                                              className="rounded-full border border-white/15 bg-white/[0.06] px-3 py-1.5 text-sm text-foreground transition-all duration-200 hover:border-white/25 hover:bg-white/[0.1]"
-                                            >
-                                              {alt}
-                                            </button>
-                                          ))}
-                                        </div>
-                                      </div>
-                                    )}
-                                  </div>
-                                </div>
-                              )}
-
-                              {suggestions.length > 0 && (
-                                <div className="space-y-2">
-                                  <div className="flex flex-wrap gap-2">
-                                    {suggestions.map((suggestion, index) => (
-                                      <button
-                                        key={index}
-                                        type="button"
-                                        onClick={() => {
-                                          applyDomainChange(
-                                            normalizeSubdomainLabel(
-                                              suggestion.domain,
-                                              domainSuffix,
-                                            ),
-                                          );
-                                        }}
-                                        className={`rounded-full border px-3 py-1.5 text-sm transition-all duration-200 hover:shadow-sm ${
-                                          selectedDomain ===
-                                          normalizeSubdomainLabel(
-                                            suggestion.domain,
-                                            domainSuffix,
-                                          )
-                                            ? "border-[var(--color-primary,#3b82f6)] bg-[var(--color-primary,#3b82f6)]/15 text-foreground shadow-sm"
-                                            : "border-white/15 bg-white/[0.06] text-foreground hover:border-white/25 hover:bg-white/[0.1]"
-                                        }`}
-                                      >
-                                        {normalizeSubdomainLabel(
-                                          suggestion.domain,
-                                          domainSuffix,
-                                        )}
-                                      </button>
-                                    ))}
-                                  </div>
-                                </div>
-                              )}
-
-                              {/* Show message when no suggestions available but user is typing */}
-                              {isGeneratingSuggestions &&
-                                (selectedDomain || "").length >= 3 && (
-                                  <div className="mt-2 flex items-center gap-2 text-xs text-[var(--color-primary,#38bdf8)]">
-                                    <Loader2 className="h-3 w-3 animate-spin" />
-                                    Finding suggestions...
-                                  </div>
-                                )}
-
-                              <FormField
-                                control={form.control}
-                                name="domain"
-                                render={({ field }) => (
-                                  <FormItem className="hidden">
-                                    <FormControl>
-                                      <Input {...field} />
-                                    </FormControl>
-                                    <FormMessage />
-                                  </FormItem>
-                                )}
-                              />
-
-                              <FormField
-                                control={form.control}
-                                name="confirm_domain"
-                                render={({ field }) => (
-                                  <FormItem>
-                                    <div className="flex items-start gap-3">
-                                      <FormControl>
-                                        <input
-                                          type="checkbox"
-                                          checked={field.value || false}
-                                          onChange={(e) => {
-                                            field.onChange(e.target.checked);
-                                          }}
-                                          className="mt-1 h-4 w-4 rounded border-white/30 text-[var(--color-primary,#38bdf8)] focus:ring-[var(--color-primary)]"
-                                          disabled={!selectedDomain}
-                                        />
-                                      </FormControl>
-                                      <div className="flex-1">
-                                        <FormLabel className="text-sm font-medium cursor-pointer">
-                                          I confirm this domain
-                                        </FormLabel>
-                                      </div>
-                                    </div>
-                                    <FormMessage />
-                                  </FormItem>
-                                )}
-                              />
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* 2 — Reminder emails (optional) */}
-                      <div className={publishCardClass}>
-                        <div className="flex gap-3">
-                          <span className={publishStepBadgeClass}>2</span>
-                          <div className="min-w-0 flex-1 space-y-3">
-                            <div className="flex flex-wrap items-center gap-2">
-                              <Mail
-                                className="h-5 w-5 shrink-0 text-amber-400/90"
-                                aria-hidden
-                              />
-                              <h3 className="text-base font-semibold tracking-tight text-white">
-                                Balance reminder emails
-                              </h3>
-                              <span className="rounded-full border border-white/10 bg-white/[0.04] px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-slate-400">
-                                Optional
-                              </span>
-                            </div>
-                            <p className="text-sm leading-relaxed text-slate-400">
-                              Send a reminder before the event so guests can pay
-                              any remaining balance. You can change this later.
-                            </p>
-                            <FormField
-                              control={form.control}
-                              name="reminder_email_before_days"
-                              render={({ field }) => (
-                                <FormItem className="relative">
-                                  <p className="text-sm font-medium text-slate-300">
-                                    Send reminders?
-                                  </p>
-                                  <FormControl>
-                                    <RadioGroup
-                                      onValueChange={(value) => {
-                                        if (value === "yes") {
-                                          field.onChange(10);
-                                        } else {
-                                          field.onChange(undefined);
-                                        }
-                                      }}
-                                      defaultValue={
-                                        field.value !== undefined ? "yes" : "no"
-                                      }
-                                      className="flex items-center space-x-4 mt-4"
-                                    >
-                                      <FormItem className="flex items-center space-x-3 space-y-0">
-                                        <FormControl>
-                                          <RadioGroupItem
-                                            value="yes"
-                                            className="text-[#47aab8] border-[#47aab8] focus:ring-[#47aab8] data-[state=checked]:bg-[var(--color-secondary,#009ead)] data-[state=checked]:text-white"
-                                          />
-                                        </FormControl>
-                                        <RadioButtonLabel>
-                                          Yes, set up reminders
-                                        </RadioButtonLabel>
-                                      </FormItem>
-                                      <FormItem className="flex items-center space-x-3 space-y-0">
-                                        <FormControl>
-                                          <RadioGroupItem
-                                            value="no"
-                                            className="text-[#47aab8] border-[#47aab8] focus:ring-[#47aab8] data-[state=checked]:bg-[var(--color-secondary,#009ead)] data-[state=checked]:text-white"
-                                          />
-                                        </FormControl>
-                                        <RadioButtonLabel>
-                                          Not now
-                                        </RadioButtonLabel>
-                                      </FormItem>
-                                    </RadioGroup>
-                                  </FormControl>
-                                  <FormMessage />
-                                </FormItem>
-                              )}
-                            />
-
-                            {showReminderDays && (
-                              <FormField
-                                control={form.control}
-                                name="reminder_email_before_days"
-                                render={({ field }) => {
-                                  // Convert the value to string for the Select component
-                                  const defaultValue =
-                                    field.value !== undefined
-                                      ? field.value.toString()
-                                      : "10";
-
-                                  return (
-                                    <FormItem className="relative">
-                                      <p className="text-sm font-medium text-slate-300">
-                                        How many days before the event?
-                                      </p>
-                                      <Select
-                                        onValueChange={(value) => {
-                                          const numValue = parseInt(value, 10);
-                                          field.onChange(numValue);
-                                        }}
-                                        value={defaultValue}
-                                      >
-                                        <FormControl>
-                                          <SelectTrigger className="w-full h-10 bg-white/5 border-white/10 mt-4">
-                                            <SelectValue placeholder="Days" />
-                                          </SelectTrigger>
-                                        </FormControl>
-
-                                        <SelectContent className="w-full">
-                                          {[
-                                            ...days,
-                                            ...extraOptions.map((o) => o.value),
-                                          ].map((day) => {
-                                            const extra = extraOptions.find(
-                                              (o) => o.value === day,
-                                            );
-                                            return (
-                                              <SelectItem
-                                                key={day}
-                                                value={day.toString()}
-                                              >
-                                                {extra
-                                                  ? extra.label
-                                                  : `${day} ${
-                                                      day === 1 ? "Day" : "Days"
-                                                    }`}
-                                              </SelectItem>
-                                            );
-                                          })}
-                                        </SelectContent>
-                                      </Select>
-                                      <FormMessage />
-                                    </FormItem>
-                                  );
-                                }}
-                              />
-                            )}
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* 3 — Copy event to another venue (multi-location only) */}
-                      {showDuplicateEventOptions && (
-                        <div className={publishCardClass}>
-                          <div className="flex gap-3">
-                            <span className={publishStepBadgeClass}>3</span>
-                            <div className="min-w-0 flex-1 space-y-3">
-                              <div className="flex flex-wrap items-center gap-2">
-                                <MapPin
-                                  className="h-5 w-5 shrink-0 text-violet-400/90"
-                                  aria-hidden
-                                />
-                                <h3 className="text-base font-semibold tracking-tight text-white">
-                                  Another venue?
-                                </h3>
-                              </div>
-                              <p className="text-sm leading-relaxed text-slate-400">
-                                Only if you run more than one location:
-                                duplicate this event and attach it to a
-                                different address. You can edit everything in
-                                the dashboard.
-                              </p>
-                              <FormField
-                                control={form.control}
-                                name="submit_type"
-                                render={({ field }) => (
-                                  <FormItem className="relative">
-                                    <p className="text-sm font-medium text-slate-300">
-                                      Duplicate this event for another location?{" "}
-                                      <span className="text-red-400">*</span>
-                                    </p>
-                                    <FormControl>
-                                      <RadioGroup
-                                        onValueChange={(value) => {
-                                          field.onChange(value);
-                                          // Force re-render by setting state directly
-                                          form.setValue(
-                                            "submit_type",
-                                            value as "duplicate" | "submit",
-                                          );
-                                        }}
-                                        defaultValue={field.value || "submit"}
-                                        className="flex items-center space-x-4 mt-4"
-                                      >
-                                        <FormItem className="flex items-center space-x-3 space-y-0">
-                                          <FormControl>
-                                            <RadioGroupItem
-                                              value="duplicate"
-                                              className="text-[#47aab8] border-[#47aab8] focus:ring-[#47aab8] data-[state=checked]:bg-[var(--color-secondary,#009ead)] data-[state=checked]:text-white"
-                                            />
-                                          </FormControl>
-                                          <RadioButtonLabel>
-                                            Yes, duplicate
-                                          </RadioButtonLabel>
-                                        </FormItem>
-                                        <FormItem className="flex items-center space-x-3 space-y-0">
-                                          <FormControl>
-                                            <RadioGroupItem
-                                              value="submit"
-                                              className="text-[#47aab8] border-[#47aab8] focus:ring-[#47aab8] data-[state=checked]:bg-[var(--color-secondary,#009ead)] data-[state=checked]:text-white"
-                                            />
-                                          </FormControl>
-                                          <RadioButtonLabel>
-                                            No, only this event
-                                          </RadioButtonLabel>
-                                        </FormItem>
-                                      </RadioGroup>
-                                    </FormControl>
-                                    <FormMessage />
-                                  </FormItem>
-                                )}
-                              />
-
-                              {form.watch("submit_type") === "duplicate" && (
-                                <div className="space-y-4 border-t border-white/10 pt-6">
-                                  <p className="text-sm font-medium text-slate-200">
-                                    Other venue address &amp; contact
-                                  </p>
-                                  <FormField
-                                    control={form.control}
-                                    name="address"
-                                    render={({ field }) => (
-                                      <FormItem>
-                                        <FormLabel className="text-sm font-medium text-slate-300">
-                                          Address{" "}
-                                          <span className="text-red-400">
-                                            *
-                                          </span>
-                                        </FormLabel>
-                                        <FormControl>
-                                          <GoogleLocationSearch
-                                            apiKey={
-                                              env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY
-                                            }
-                                            value={field.value || ""}
-                                            onChange={(value) =>
-                                              field.onChange(value)
-                                            }
-                                            onSelect={(placeId) =>
-                                              fetchLocationDetails(
-                                                form,
-                                                placeId,
-                                              )
-                                            }
-                                            placeholder="Search for a location..."
-                                            variant="dark"
-                                          />
-                                        </FormControl>
-                                        <FormMessage />
-                                      </FormItem>
-                                    )}
-                                  />
-
-                                  <FormField
-                                    control={form.control}
-                                    name="city"
-                                    render={({ field }) => (
-                                      <FormItem>
-                                        <FormLabel className="text-sm font-medium text-slate-300">
-                                          City{" "}
-                                          <span className="text-red-400">
-                                            *
-                                          </span>
-                                        </FormLabel>
-                                        <FormControl>
-                                          <Input
-                                            {...field}
-                                            placeholder="City"
-                                            className="h-10 border-white/10 bg-white/5"
-                                          />
-                                        </FormControl>
-                                        <FormMessage />
-                                      </FormItem>
-                                    )}
-                                  />
-
-                                  <FormField
-                                    control={form.control}
-                                    name="contact_number"
-                                    render={({ field }) => (
-                                      <FormItem>
-                                        <FormLabel className="text-sm font-medium text-slate-300">
-                                          Contact number{" "}
-                                          <span className="text-red-400">
-                                            *
-                                          </span>
-                                        </FormLabel>
-                                        <FormControl>
-                                          <Input
-                                            {...field}
-                                            type="tel"
-                                            inputMode="numeric"
-                                            placeholder="Phone number"
-                                            className="h-10 border-white/10 bg-white/5"
-                                            onChange={(e) => {
-                                              const value =
-                                                e.target.value.replace(
-                                                  /[^0-9+\-() ]/g,
-                                                  "",
-                                                );
-                                              field.onChange(value);
-                                            }}
-                                          />
-                                        </FormControl>
-                                        <FormMessage />
-                                      </FormItem>
-                                    )}
-                                  />
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      )}
-                    </div>
+                    <PaymentSetupLayout
+                      stripeConnected={stripeConnected}
+                      paypalConnected={paypalConnected}
+                      truelayerConnected={truelayerConnected}
+                      stripeAccountId={paymentGateways?.stripe?.account_id}
+                      paypalAccountId={paymentGateways?.paypal?.account_id}
+                      truelayerAccountId={
+                        paymentGateways?.truelayer?.account_id
+                      }
+                      truelayerWebhookUrl={truelayerWebhookUrl}
+                      truelayerWebhookHint={truelayerWebhookHint}
+                      truelayerPublicKey={truelayerPublicKey}
+                      loading={loading}
+                      disconnecting={disconnecting}
+                      onConnectStripe={(credentials) =>
+                        void handleStripeConnect(credentials)
+                      }
+                      onConnectPayPal={(credentials) =>
+                        void handlePayPalConnect(credentials)
+                      }
+                      onConnectTrueLayer={(credentials) =>
+                        void handleTrueLayerConnect(credentials)
+                      }
+                      onDisconnectStripe={() => void handleDisconnect("stripe")}
+                      onDisconnectPayPal={() => void handleDisconnect("paypal")}
+                      onDisconnectTrueLayer={() =>
+                        void handleDisconnect("truelayer")
+                      }
+                      onSkip={() => void handleSkip()}
+                      onFinish={() =>
+                        void form.handleSubmit(onSubmit, onSubmitInvalid)()
+                      }
+                      finishDisabled={!hasConnectedGateway}
+                      showFooter={false}
+                    />
                   )}
                 </WholeStepGuidedShell>
               </form>

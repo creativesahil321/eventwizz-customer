@@ -45,11 +45,24 @@ export interface SEO {
   keywords: string;
 }
 
+export interface SiteEssentialsContactDetails {
+  email?: string;
+  phone?: string;
+  phoneNumber?: string;
+  address?: string;
+  alternativeEmail?: string;
+  alternativePhone?: string;
+  alternativePhoneNumber?: string;
+  alternativeAddress?: string;
+}
+
 export interface SiteEssentials {
   colors: Colors;
   typography: Typography;
   socialLinks: SocialLinks;
   seo: SEO;
+  /** Vendor-level contact (same shape as public theme `contactDetails`) */
+  contactDetails?: SiteEssentialsContactDetails;
   logo: string;
   favicon: string;
   name: string;

@@ -222,12 +222,12 @@ When a new vendor registers, they go through a **11-step onboarding** to create 
 7. **Other Packages** — **Drinks (optional)**. If no drink packages, you can remove this section. Otherwise: drinks title, description, drink packages with title, price, quantity.
 8. **Brochure info** — **Event location/address** (event address field), brochure PDFs, event flyer/FAQ PDFs, **price start from**, button text, downloads. This is where **event location** and **brochure** are set.
 9. **FAQs** — Frequently asked questions and answers for the event.
-10. **Domain** — Your venue gets a **subdomain** (e.g. yourvenue.eventwizz.com). Step 10 handles domain suggestion/selection, reminder email settings, and confirm domain. After saving, you continue to Payment.
-11. **Payment** — **Payment gateways**: Connect **Stripe** (Stripe Connect), **PayPal**, **TrueLayer** (Pay by Bank), **WorldPay**, or **Klarna**. You need at least one connected to accept payments (or you can skip and set up later). After finishing or skipping, onboarding is complete and you are redirected to the **vendor dashboard**.
+10. **Payment** — **Payment gateways**: Connect **Stripe** (Stripe Connect), **PayPal**, **TrueLayer** (Pay by Bank), **WorldPay**, or **Klarna**. You need at least one connected to accept payments (or you can skip and set up later). After saving or skipping, you continue to Domain.
+11. **Domain** — Your venue gets a **subdomain** (e.g. yourvenue.eventwizz.com). Step 11 handles domain suggestion/selection, reminder email settings, and confirm domain. After finishing, onboarding is complete and you are redirected to the **vendor dashboard**.
 
 ### AI onboarding vs manual
 - Vendors can choose **AI-assisted** or **manual** onboarding at the start.
-- **AI flow**: They enter venue name, type, and a short description (and can use **voice** to describe requirements). AI generates content for steps 2–9 (site, event, packages, dates/tickets/tables, menu, drinks, brochure/location, FAQs). They **review and edit** the generated content, then click **Apply & Create My Site**. The system saves steps 1–9 and takes them to **Step 10 (Domain)**. They then complete **Step 10 (Domain)** and **Step 11 (Payment)** themselves.
+- **AI flow**: They enter venue name, type, and a short description (and can use **voice** to describe requirements). AI generates content for steps 2–9 (site, event, packages, dates/tickets/tables, menu, drinks, brochure/location, FAQs). They **review and edit** the generated content, then click **Apply & Create My Site**. The system saves steps 1–9 and takes them to **Step 10 (Payment)**. They then complete **Step 10 (Payment)** and **Step 11 (Domain)** themselves.
 - **Manual flow**: They fill each step (1–11) themselves. Progress is saved automatically; they can leave and come back.
 - After they finish (AI or manual), they **cannot** return to the mode-selection page to regenerate; they continue from the dashboard.
 
@@ -237,15 +237,15 @@ When a new vendor registers, they go through a **11-step onboarding** to create 
 - **Event location**: Set in **Step 8 (Brochure info)** — event address and map.
 - **Brochure**: Step 8 — brochure PDF, event flyer PDF, FAQ PDF, and any extra downloads.
 - **Deposit system**: Step 5, per date — for tables (or “both”), you can enable deposit: type (amount/percentage), value, and due date. Customers pay deposit at checkout and the rest by the due date.
-- **Domain**: Step 10 — your **subdomain** is chosen/confirmed before payment; you confirm it in Step 10.
-- **Stripe / payment**: Step 11 — connect your **Stripe account** (and/or PayPal, TrueLayer, etc.) to receive payments.
+- **Payment**: Step 10 — connect your **Stripe account** (and/or PayPal, TrueLayer, etc.) to receive payments.
+- **Domain**: Step 11 — your **subdomain** is chosen/confirmed after payment; you confirm it in Step 11.
 
 ## Vendor Registration Process
 - Go to the EventWizz website and click "Become a Vendor" (e.g. top-right).
 - Register with business email and password.
 - You are taken to onboarding: either **AI-assisted** or **manual** (11 steps).
 - Each step is saved automatically; you can continue later. Progress is tracked in your session.
-- After completing Step 11 (Payment), you are redirected to the **vendor dashboard** and your site is live.
+- After completing Step 11 (Domain), you are redirected to the **vendor dashboard** and your site is live.
 
 ## Vendor Welcome & Select Location
 
@@ -473,7 +473,7 @@ EventWizz is a comprehensive multi-tenant event management platform that serves 
 - **Who**: Venue owners and event organizers
 - **Access**: After login, vendors go to **Welcome — Select Location** (/welcome/select-location) to choose which venue to manage, then **Continue to Dashboard** to reach the vendor dashboard. All features are scoped to the selected location.
 - **Key Features** (see “Vendor Dashboard — All Pages & Menus” for full detail):
-  - **11-step onboarding** for new vendors (Venue → Site → Event → Package → Dates → Catering → Other Packages → Brochure info → FAQs → Domain → Payment). See "Vendor Onboarding (Fresh Vendor)" section.
+  - **11-step onboarding** for new vendors (Venue → Site → Event → Package → Dates → Catering → Other Packages → Brochure info → FAQs → Payment → Domain). See "Vendor Onboarding (Fresh Vendor)" section.
   - **Dashboard** (/vendor/dashboard): Summary (Total/Active/Past/Draft events), Bookings vs Commissions toggle, recent bookings table.
   - **Events** (/vendor/events): Event list and **Create Event** (header button); multi-step event form.
   - **Customers** (/vendor/customers), **Bookings** (/vendor/booking-history), **Email Templates** (/vendor/email-templates), **Menu Choice** (/vendor/menu-choices — customer menu choices per booking), **Transactions** (/vendor/transactions — payment history), **Sites Essentials** (/vendor/sites-essentials — branding, colors, typography, SEO), **Event Locations** (/vendor/venue-locations — add/edit venues), **Marketing**, **Newsletter**, **Email Logs**, **System Logs**, **Manage Roles**, **Staff Management**, **Seo Tools**, **Notifications**, **Support**, **Dispute Resolution**, **Payment Settings** (/vendor/payment-settings — connect Stripe/PayPal etc.).
@@ -569,7 +569,7 @@ The system automatically detects event themes and displays corresponding animati
 
 ### Onboarding Process (Summary)
 
-The full **11-step vendor onboarding** is described in the "Vendor Onboarding (Fresh Vendor)" section above. In short: (1) Venue info (2) Site/landing page (3) Event details and schedule (4) Packages and gallery (5) Dates with tickets/tables and per-date deposit options (6) Catering menu, optional (7) Drink packages, optional (8) Brochure info, event location/address, PDFs (9) FAQs (10) Domain — subdomain and reminders (11) Payment — connect Stripe, PayPal, TrueLayer, WorldPay, or Klarna (or skip). After Step 11, the vendor is redirected to the vendor dashboard and the site is live. Vendors can use **AI-assisted** onboarding (AI generates steps 2–9; they review and apply, then do domain and payment) or **manual** (fill all 11 steps themselves).
+The full **11-step vendor onboarding** is described in the "Vendor Onboarding (Fresh Vendor)" section above. In short: (1) Venue info (2) Site/landing page (3) Event details and schedule (4) Packages and gallery (5) Dates with tickets/tables and per-date deposit options (6) Catering menu, optional (7) Drink packages, optional (8) Brochure info, event location/address, PDFs (9) FAQs (10) Payment — connect Stripe, PayPal, TrueLayer, WorldPay, or Klarna (or skip) (11) Domain — subdomain and reminders. After Step 11, the vendor is redirected to the vendor dashboard and the site is live. Vendors can use **AI-assisted** onboarding (AI generates steps 2–9; they review and apply, then do payment and domain) or **manual** (fill all 11 steps themselves).
 
 ### Event Creation Process
 
@@ -629,7 +629,7 @@ The full **11-step vendor onboarding** is described in the "Vendor Onboarding (F
 - **"Is my payment secure?"** - Yes. Secure payment gateways. Never ask for full card numbers or passwords in chat.
 
 #### For Vendors (Fresh / Onboarding)
-- **"How many steps is onboarding?"** - 11 steps: Venue, Site, Event, Package, Dates, Catering, Other Packages, Brochure info, FAQs, Domain, Payment
+- **"How many steps is onboarding?"** - 11 steps: Venue, Site, Event, Package, Dates, Catering, Other Packages, Brochure info, FAQs, Payment, Domain
 - **"What is step 1?"** - Venue: name, contact, address, city, description. This feeds your subdomain
 - **"What is step 2?"** - Site: landing page — logo, cover image, banner heading, about section
 - **"What is step 5?"** - Dates: add event dates; per date set tickets and/or tables, and for tables you can set deposit (type, value, due date)
@@ -637,8 +637,8 @@ The full **11-step vendor onboarding** is described in the "Vendor Onboarding (F
 - **"Where do I add brochure / PDFs?"** - Step 8 (Brochure info)
 - **"Is menu required?"** - No. Step 6 (Catering) is optional; you can remove it if you have no catering
 - **"Is drinks section required?"** - No. Step 7 (Other Packages) is optional; you can remove it if you have no drink packages
-- **"How do I connect Stripe?"** - Step 11 (Payment): use the Stripe Connect button and complete the Stripe flow
-- **"When do I get my domain?"** - Step 10 (Domain): you choose/confirm your subdomain, then continue to Payment; after finishing Step 11 you are redirected to the dashboard
+- **"How do I connect Stripe?"** - Step 10 (Payment): use the Stripe Connect button and complete the Stripe flow
+- **"When do I get my domain?"** - Step 11 (Domain): you choose/confirm your subdomain after payment; after finishing Step 11 you are redirected to the dashboard
 
 #### For Vendors (Welcome & Location)
 - **"Where do I go after login?"** - You go to Welcome — Select Location (/welcome/select-location). Pick a venue and click “Continue to Dashboard” to open the dashboard for that venue.
@@ -892,7 +892,7 @@ export const VENDOR_STOREFRONT_KNOWLEDGE = `
 export const PLATFORM_VENDOR_CUSTOMER_TRAINING = `
 ## Vendor onboarding (11 steps — exact order)
 Before steps: **How would you like to build your site?** — **AI-Powered Setup** (recommended) or **Manual Setup**.
-AI: collects venue info → generates site/event content → vendor finishes **Domain** and **Payment**.
+AI: collects venue info → generates site/event content → vendor finishes **Payment** and **Domain**.
 Manual steps:
 1. **Venue** — business / brand, contact, multi-location Yes/No
 2. **Site** — branding, hero banner, about (public home)
@@ -903,8 +903,8 @@ Manual steps:
 7. **Brochure info** — PDFs, event address/map (event location lives here)
 8. **Other Packages** — drinks / add-ons
 9. **FAQs**
-10. **Domain** — booking subdomain, confirm domain, optional balance reminder emails
-11. **Payment** — connect Stripe / PayPal / TrueLayer (or skip and finish)
+10. **Payment** — connect Stripe / PayPal / TrueLayer (or skip and continue)
+11. **Domain** — booking subdomain, confirm domain, optional balance reminder emails
 
 ## After vendor login
 - First: **Welcome — Select Location** — pick a venue → **Continue to Dashboard**. (Only when they are on that page — check CURRENT PAGE.)
@@ -991,7 +991,7 @@ For CUSTOMERS (event attendees):
 - **NEVER**: tell customers they can add or change **rooms** after booking. That is impossible. Do not invent “Additional Rooms” or “Add room” on the booking page.
 
 For VENDORS (venue owners):
-- **Onboarding**: AI-Powered or Manual. Steps in order: Venue, Site, Event, Timeline & Package, Dates, Catering, Brochure info, Other Packages, FAQs, Domain, Payment. Optional **Multiple event spaces** (rooms).
+- **Onboarding**: AI-Powered or Manual. Steps in order: Venue, Site, Event, Timeline & Package, Dates, Catering, Brochure info, Other Packages, FAQs, Payment, Domain. Optional **Multiple event spaces** (rooms).
 - **After onboarding**: **Welcome — Select Location** only when they are on that page — then **Continue to Dashboard**. Use CURRENT PAGE if provided.
 - Sidebar labels: **Dashboard**, **Events**, **Customers**, **Bookings**, **Table Assignment**, **Email Templates**, **Menu Choice**, **Transactions**, **Sites Essentials**, **Event Locations**, **Marketing**, **Newsletter**, **Email Logs**, **Manage Roles**, **Staff Management**, **Seo Tools**, **Notifications**, **Support**, **Dispute Resolution**, **Payment Settings**. **Create Event** in the header. **Domain Settings** under profile → Settings (not Sites Essentials).
 - **Sites Essentials**: Presets/Branding/Colors/Typography/Social/SEO — public look & copy. Main home page (multi-location hub) vs Location/Home page vs Info pages. Use **Preview** then **Save**.

@@ -135,8 +135,6 @@ export const defaultValues: OnboardingFormData = {
     ],
   },
 
-
-
   stepNine: {
     isApproved: false,
     step: 9,
@@ -151,19 +149,6 @@ export const defaultValues: OnboardingFormData = {
   stepTen: {
     isApproved: false,
     step: 10,
-    event_id: 0,
-    has_multiple_locations: undefined as boolean | undefined,
-    submit_type: "submit" as "duplicate" | "submit",
-    address: "",
-    city: "",
-    reminder_email_before_days: 0,
-    domain: "",
-    domain_suffix: "eventwizz.com",
-    confirm_domain: false,
-  },
-  stepEleven: {
-    isApproved: false,
-    step: 11,
     event_id: 0,
     accept_payment_method: "both",
     payment_gateways: {
@@ -193,6 +178,20 @@ export const defaultValues: OnboardingFormData = {
       },
     },
     is_skipped: false,
+  },
+  stepEleven: {
+    isApproved: false,
+    step: 11,
+    event_id: 0,
+    has_multiple_locations: undefined as boolean | undefined,
+    submit_type: "submit" as "duplicate" | "submit",
+    address: "",
+    city: "",
+    reminder_email_before_days: 0,
+    domain: "",
+    domain_suffix: "eventwizz.com",
+    confirm_domain: false,
+
   },
   isApproved: false
 };

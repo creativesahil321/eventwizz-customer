@@ -12,6 +12,7 @@ import {
   Youtube,
 } from "lucide-react";
 import { useContext, useMemo, type ReactNode } from "react";
+import { usePathname } from "next/navigation";
 import { ServerContext } from "@/lib/server-context";
 import { ThemeSchema } from "@/types/theme.types";
 import { addCacheBusting } from "@/lib/image-utils";
@@ -35,6 +36,12 @@ interface FooterSectionProps {
   locationSlug?: string | null;
   /** Optional fields from location/event API (merged over theme) */
   contactOverride?: VenueContactOverride | null;
+  /**
+   * Prefer this over the host `useThemeQuery` theme for footer contact.
+   * Used on `/preview/*` where the platform host theme has admin/dummy contact —
+   * pass vendor `contactDetails` + `locations` (same as the live vendor site).
+   */
+  contactTheme?: Pick<ThemeSchema, "contactDetails" | "locations"> | null;
   /**
    * When provided, replaces theme social links (e.g. onboarding draft — often empty).
    * Pass `{}` / all-empty to hide icons in preview.
@@ -211,6 +218,7 @@ export default function FooterSection({
   logo,
   locationSlug,
   contactOverride,
+  contactTheme,
   socialLinksOverride,
 }: FooterSectionProps = {}) {
   const { theme: serverTheme } = useContext(ServerContext);
@@ -218,6 +226,13 @@ export default function FooterSection({
   const { data: queryTheme } = useThemeQuery(domain, serverTheme);
   const vendorTheme = (queryTheme ?? serverTheme) as ThemeSchema;
   const narrowPreview = usePreviewNarrowLayout();
+  const pathname = usePathname();
+  const isPreviewMode = useIsPreviewMode();
+  /** Social icons only on live site + Sites Essentials `/preview/site` — not onboarding. */
+  const showSocialLinks =
+    !isPreviewMode || Boolean(pathname?.includes("/preview/site"));
+  /** Live site uses vendor theme; preview passes site-essentials so we never use platform dummy contact. */
+  const themeForContact = contactTheme ?? vendorTheme;
 
   const logoToUse = logo || vendorTheme?.logo;
   const logoPath =
@@ -243,26 +258,28 @@ export default function FooterSection({
       ? socialLinksOverride
       : vendorTheme?.socialLinks || {};
 
-  const socialLinks = Object.entries(socialSource)
-    .filter(([, url]) => typeof url === "string" && url.trim() !== "")
-    .map(([platform, url]) => {
-      const IconComponent = socialIcons[platform as keyof typeof socialIcons];
-      if (!IconComponent) return null;
-      return { icon: IconComponent, href: url as string, id: platform };
-    })
-    .filter(
-      (link): link is { icon: typeof Facebook; href: string; id: string } =>
-        link !== null,
-    );
+  const socialLinks = showSocialLinks
+    ? Object.entries(socialSource)
+        .filter(([, url]) => typeof url === "string" && url.trim() !== "")
+        .map(([platform, url]) => {
+          const IconComponent = socialIcons[platform as keyof typeof socialIcons];
+          if (!IconComponent) return null;
+          return { icon: IconComponent, href: url as string, id: platform };
+        })
+        .filter(
+          (link): link is { icon: typeof Facebook; href: string; id: string } =>
+            link !== null,
+        )
+    : [];
 
   const contactBlocks = useMemo(
     () =>
       resolveFooterContactBlocks({
-        theme: vendorTheme,
+        theme: themeForContact,
         locationSlug,
         override: contactOverride,
       }),
-    [vendorTheme, locationSlug, contactOverride],
+    [themeForContact, locationSlug, contactOverride],
   );
 
   const isSingleContactFooter = contactBlocks.length <= 1;

@@ -36,8 +36,8 @@ const steps = [
   { id: 7, label: "Brochure info", icon: <Info size={16} /> },
   { id: 8, label: "Other Packages", icon: <Wine size={16} /> },
   { id: 9, label: "FAQs", icon: <HelpCircle size={16} /> },
-  { id: 10, label: "Domain", icon: <Globe size={16} /> },
-  { id: 11, label: "Payment", icon: <CreditCard size={16} /> },
+  { id: 10, label: "Payment", icon: <CreditCard size={16} /> },
+  { id: 11, label: "Domain", icon: <Globe size={16} /> },
 ];
 
 const stepTooltips: Record<number, string> = {
@@ -50,8 +50,8 @@ const stepTooltips: Record<number, string> = {
   7: "Brochure and location for collateral.",
   8: "Drinks and add-on packages.",
   9: "Frequently asked questions.",
-  10: "Choose your booking website subdomain and reminders.",
-  11: "Payment provider connections.",
+  10: "Payment provider connections.",
+  11: "Choose your booking website subdomain and reminders.",
 };
 
 export default function Stepper({ activeStep }: { activeStep: number }) {

@@ -1394,12 +1394,57 @@ export const onboardingService = {
   },
 
   /**
-   * Store step 10 onboarding data (Domain settings)
-   * Domain, confirm domain, reminder emails, and optional duplicate location.
+   * Store step 10 onboarding data (Payment Configuration)
+   * Payment gateways are handled separately via connectPaymentGateway()
+   * This step only stores basic step information and skip status
    * @param data Step 10 data to be stored
    * @returns API response with status and message
    */
   storeStepTenData: async (data: StepTenType): Promise<ApiResponse> => {
+    // Create FormData for consistent handling
+    const formData = new FormData();
+
+    // Add required fields
+    formData.append("step", data.step.toString());
+    formData.append("event_id", data.event_id.toString());
+    formData.append("accept_payment_method", data.accept_payment_method);
+    formData.append("is_skipped", data.is_skipped ? "1" : "0");
+
+    appendManualIsApprovedToFormData(formData, data.isApproved);
+
+    const response = await request<ApiResponse>({
+      method: "POST",
+      url: API_ENDPOINTS.VENDOR.ONBOARDING.STEPS,
+      data: formData,
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
+      returnFullResponse: true,
+    });
+
+    // Check if onboarding is already completed
+    const isCompleted = await onboardingService.checkOnboardingCompleted(
+      response
+    );
+    if (isCompleted) {
+      return response;
+    }
+
+    // Notify that data has changed if successful
+    if (response.status) {
+      await onboardingService.notifyDataChanged();
+    }
+
+    return response;
+  },
+
+  /**
+   * Store step 11 onboarding data (Domain / publish)
+   * Domain, confirm domain, reminder emails, and optional duplicate location.
+   * @param data Step 11 data to be stored
+   * @returns API response with status and message
+   */
+  storeStepElevenData: async (data: StepElevenType): Promise<ApiResponse> => {
     // Create FormData for consistent handling
     const formData = new FormData();
 
@@ -1476,85 +1521,6 @@ export const onboardingService = {
     return response;
   },
 
-  /**
-   * Store step 11 onboarding data (Payment Configuration)
-   * Payment gateways are handled separately via connectPaymentGateway()
-   * This step only stores basic step information and skip status
-   * @param data Step 11 data to be stored
-   * @returns API response with status and message
-   */
-  storeStepElevenData: async (data: StepElevenType): Promise<ApiResponse> => {
-    // Create FormData for consistent handling
-    const formData = new FormData();
-
-    // Add required fields
-    formData.append("step", data.step.toString());
-    formData.append("event_id", data.event_id.toString());
-    formData.append("accept_payment_method", data.accept_payment_method);
-    formData.append("is_skipped", data.is_skipped ? "1" : "0");
-
-    appendManualIsApprovedToFormData(formData, data.isApproved);
-
-    const response = await request<ApiResponse>({
-      method: "POST",
-      url: API_ENDPOINTS.VENDOR.ONBOARDING.STEPS,
-      data: formData,
-      headers: {
-        "Content-Type": "multipart/form-data",
-      },
-      returnFullResponse: true,
-    });
-
-    // Check if onboarding is already completed
-    const isCompleted = await onboardingService.checkOnboardingCompleted(
-      response
-    );
-    if (isCompleted) {
-      return response;
-    }
-
-    // Notify that data has changed if successful
-    if (response.status) {
-      await onboardingService.notifyDataChanged();
-    }
-
-    return response;
-  },
-
-  getAllSteps: async (
-    headers: Record<string, string>,
-    isRooms = false,
-  ): Promise<ApiResponse> => {
-    const locationId = headers["X-Venue-Location-Id"];
-    const endpoint = API_ENDPOINTS.VENDOR.ONBOARDING.GET_ALL_STEPS.replace(
-      "{location_id}",
-      locationId,
-    ).replace("{is_rooms}", isRooms ? "true" : "false");
-
-    return request<ApiResponse>({
-      url: endpoint,
-      method: "GET",
-      returnFullResponse: true,
-      headers,
-    });
-  },
-
-  // Function to notify subscribers that data has changed
-  notifyDataChanged: async (): Promise<void> => {
-    // This is a placeholder function that will be used by the React Query integration
-    // The actual implementation will be handled by the useOnboardingData hook
-
-    // Dispatch a custom event that can be listened to by components
-    if (typeof window !== "undefined") {
-      const event = new CustomEvent("onboarding-data-changed");
-      window.dispatchEvent(event);
-    }
-  },
-
-  /**
-   * Connect a payment gateway via POST /vendor/onboarding/payment-gateway-connect.
-   * Stripe / PayPal / TrueLayer: pass API credentials `{ key, secret }`.
-   */
   connectPaymentGateway: async (
     paymentGateway: "truelayer" | "stripe" | "paypal" | "worldpay" | "klarna",
     credentials: { key: string; secret: string },
@@ -1720,6 +1686,16 @@ export const onboardingService = {
             : `Failed to process ${gateway} return`,
         ],
       };
+    }
+  },
+
+  /**
+   * Notify listeners that onboarding data changed (React Query refetch via
+   * `useOnboardingData` listening for `onboarding-data-changed`).
+   */
+  notifyDataChanged: async (): Promise<void> => {
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent("onboarding-data-changed"));
     }
   },
 

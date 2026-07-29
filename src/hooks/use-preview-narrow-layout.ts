@@ -5,16 +5,23 @@ import { useIsPreviewMode } from "@/contexts/preview-context";
 import { usePreviewDeviceStore } from "@/store/preview-device.store";
 
 /**
- * True when a Desktop/Tablet/Mobile device frame is active.
- * Only onboarding (+ `/preview/onboarding`) uses device frames — Sites Essentials
- * `/preview/site` and other embeds stay full-width desktop.
+ * Desktop/Tablet/Mobile device frames — onboarding (+ `/preview/onboarding`) only.
+ * Sites Essentials `/preview/site` and `/preview/event` stay full-width (no frame).
+ */
+export function usePreviewDeviceFramesEnabled(): boolean {
+  const pathname = usePathname();
+  return (
+    Boolean(pathname?.includes("/on-boarding")) ||
+    Boolean(pathname?.includes("/preview/onboarding"))
+  );
+}
+
+/**
+ * True when a Tablet/Mobile device frame is active (hamburger / narrow chrome).
  */
 export function usePreviewNarrowLayout(): boolean {
   const isPreview = useIsPreviewMode();
   const device = usePreviewDeviceStore((s) => s.device);
-  const pathname = usePathname();
-  const deviceFramesEnabled =
-    Boolean(pathname?.includes("/on-boarding")) ||
-    Boolean(pathname?.includes("/preview/onboarding"));
+  const deviceFramesEnabled = usePreviewDeviceFramesEnabled();
   return isPreview && deviceFramesEnabled && device !== "desktop";
 }

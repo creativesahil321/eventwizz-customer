@@ -11,6 +11,10 @@ import { LocationMarketingBody } from "@/components/public/location-marketing-se
 import { siteEssentialsToPreviewRootStyle } from "../_lib/preview-root-style";
 import { SiteEssentialsGoogleFontsLoader } from "@/components/shared/site-essentials-google-fonts-loader";
 import { pickPreviewEventsFromSiteEssentials } from "../_lib/site-essentials-preview-events";
+import {
+  buildSiteEssentialsContactTheme,
+  resolveSiteEssentialsPreviewContact,
+} from "../_lib/preview-contact";
 // ServerContext removed - already provided at layout level
 
 interface SitePreviewProps {
@@ -49,6 +53,16 @@ export function SitePreview({ formValues }: Readonly<SitePreviewProps>) {
   const { latestEvents, upcomingEvents, galleryImages, locationSlug } =
     pickPreviewEventsFromSiteEssentials(formValues);
 
+  const contactOverride = resolveSiteEssentialsPreviewContact(
+    formValues,
+    locationSlug,
+  );
+  const contactTheme = buildSiteEssentialsContactTheme(formValues);
+  const headerPhone =
+    contactOverride?.phone?.trim() ||
+    formValues.company_phone?.trim() ||
+    undefined;
+
   return (
     <div
       style={previewStyles}
@@ -63,8 +77,9 @@ export function SitePreview({ formValues }: Readonly<SitePreviewProps>) {
       {/* ServerContext already provided at layout level - no need to wrap again */}
       <CommonHeader
         logo={getPreviewUrl(formValues.logo) || null}
-        contact_number={""}
+        contact_number={headerPhone}
         variant="preview"
+        locationSlug={locationSlug || undefined}
       />
       <HeroBanner
         locationName={formValues.name}
@@ -100,6 +115,9 @@ export function SitePreview({ formValues }: Readonly<SitePreviewProps>) {
       <FooterSection
         copyright={formValues.copyright}
         logo={getPreviewUrl(formValues.logo) || null}
+        locationSlug={locationSlug || undefined}
+        contactTheme={contactTheme}
+        socialLinksOverride={formValues.socialLinks}
       />
     </div>
   );

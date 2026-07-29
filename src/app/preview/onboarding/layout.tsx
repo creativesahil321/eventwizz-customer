@@ -28,7 +28,7 @@ export default async function OnboardingPreviewLayout({
   }
 
   // Note: We do NOT guard on session.user.isOnboarded here because
-  // by the time step 11 (Payment) redirects to /preview/onboarding, the session
+  // by the time step 11 (Domain) redirects to /preview/onboarding, the session
   // already has isOnboarded=true. The onboarding layout itself prevents
   // going back to onboarding once isOnboarded is set.
 

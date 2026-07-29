@@ -1079,6 +1079,41 @@ export const stepTenSchema = z.object({
   step: z.number(),
   isApproved: z.boolean().optional(),
   event_id: z.number(),
+  accept_payment_method: z.enum(["bank_transfer", "payment_gateway", "both"], {
+    required_error: "Choose how guests can pay.",
+  }),
+  payment_gateways: paymentGatewaysSchema.optional(),
+  is_skipped: z.boolean().default(false),
+})
+  .superRefine((data, ctx) => {
+    // Validate that at least one payment gateway is ACTIVE if not skipped
+    if (!data.is_skipped) {
+      const hasAnyGatewayActive =
+        isGatewayStatusActive(data.payment_gateways?.stripe?.status) ||
+        isGatewayStatusActive(data.payment_gateways?.paypal?.status) ||
+        isGatewayStatusActive(data.payment_gateways?.truelayer?.status) ||
+        isGatewayStatusActive(data.payment_gateways?.worldpay?.status) ||
+        isGatewayStatusActive(data.payment_gateways?.klarna?.status);
+
+      if (!hasAnyGatewayActive) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message:
+            "Connect at least one payment method (bank, Stripe, or PayPal) to continue, or skip payment and continue.",
+          path: ["payment_gateways"],
+        });
+      }
+    }
+  });
+
+
+export type StepTenType = z.infer<typeof stepTenSchema>;
+
+//#===step-11===#
+export const stepElevenSchema = z.object({
+  step: z.number(),
+  isApproved: z.boolean().optional(),
+  event_id: z.number(),
   /** Persisted from API; also merged into `stepOne` for step 1 gate / brand mode. */
   has_multiple_locations: z.boolean().optional(),
   reminder_email_before_days: z.number().optional(),
@@ -1100,80 +1135,43 @@ export const stepTenSchema = z.object({
   confirm_domain: z.boolean().refine((val) => val === true, {
     message: "Please confirm your domain selection to continue",
   }),
-})
-  .superRefine((data, ctx) => {
-    if (data.submit_type === "duplicate") {
-      if (!data.city || data.city.trim() === "") {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          message: "City is required when duplicating an event",
-          path: ["city"],
-        });
-      }
+}).superRefine((data, ctx) => {
+  if (data.submit_type === "duplicate") {
+    if (!data.city || data.city.trim() === "") {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "City is required when duplicating an event",
+        path: ["city"],
+      });
+    }
 
-      if (!data.address || data.address.trim() === "") {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          message: "Address is required when duplicating an event",
-          path: ["address"],
-        });
-      }
+    if (!data.address || data.address.trim() === "") {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Address is required when duplicating an event",
+        path: ["address"],
+      });
+    }
 
-      if (!data.contact_number || data.contact_number.trim() === "") {
+    if (!data.contact_number || data.contact_number.trim() === "") {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Contact number is required when duplicating an event",
+        path: ["contact_number"],
+      });
+    } else {
+      // Validate that contact number contains only valid phone characters
+      const phoneRegex = /^[0-9+\-() ]+$/;
+      if (!phoneRegex.test(data.contact_number)) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
-          message: "Contact number is required when duplicating an event",
+          message: "Contact number can only contain numbers and phone formatting characters (+, -, spaces, parentheses)",
           path: ["contact_number"],
         });
-      } else {
-        // Validate that contact number contains only valid phone characters
-        const phoneRegex = /^[0-9+\-() ]+$/;
-        if (!phoneRegex.test(data.contact_number)) {
-          ctx.addIssue({
-            code: z.ZodIssueCode.custom,
-            message: "Contact number can only contain numbers and phone formatting characters (+, -, spaces, parentheses)",
-            path: ["contact_number"],
-          });
-        }
       }
     }
-  });
-
-
-export type StepTenType = z.infer<typeof stepTenSchema>;
-
-//#===step-11===#
-export const stepElevenSchema = z
-  .object({
-    step: z.number(),
-    isApproved: z.boolean().optional(),
-    event_id: z.number(),
-    accept_payment_method: z.enum(["bank_transfer", "payment_gateway", "both"], {
-      required_error: "Choose how guests can pay.",
-    }),
-    payment_gateways: paymentGatewaysSchema.optional(),
-    is_skipped: z.boolean().default(false),
-  })
-  .superRefine((data, ctx) => {
-    // Validate that at least one payment gateway is ACTIVE if not skipped
-    if (!data.is_skipped) {
-      const hasAnyGatewayActive =
-        isGatewayStatusActive(data.payment_gateways?.stripe?.status) ||
-        isGatewayStatusActive(data.payment_gateways?.paypal?.status) ||
-        isGatewayStatusActive(data.payment_gateways?.truelayer?.status) ||
-        isGatewayStatusActive(data.payment_gateways?.worldpay?.status) ||
-        isGatewayStatusActive(data.payment_gateways?.klarna?.status);
-
-      if (!hasAnyGatewayActive) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          message:
-            "Connect at least one payment method (bank, Stripe, or PayPal) to complete onboarding, or skip payment and finish.",
-          path: ["payment_gateways"],
-        });
-      }
-    }
-  });
+  }
+});
 
 
 
