@@ -41,7 +41,6 @@ export async function getServerOnboardingData(): Promise<ApiResponse | null> {
       ? roomResponse
       : await fetchByRoomMode(false);
 
-    // If successful, process and return the data
     if (response.status) {
       if (!response.data) {
         return {
@@ -52,7 +51,6 @@ export async function getServerOnboardingData(): Promise<ApiResponse | null> {
       }
       const data = response.data as unknown as OnboardingFormData;
 
-      // Ensure the data property exists and has proper structure for the form
       return {
         status: true,
         message: response.message || "Success",
@@ -63,7 +61,6 @@ export async function getServerOnboardingData(): Promise<ApiResponse | null> {
     return null;
   } catch (err: unknown) {
     console.log("Error fetching onboarding data:", err);
-    // Return null on error
     return null;
   }
 }

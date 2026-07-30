@@ -610,35 +610,88 @@ export const vendorBookingsService = {
     });
     formData.append("date", date);
 
-    // Use axios directly for blob download
-    const response = await axios.post<Blob>(
-      `${env.NEXT_PUBLIC_API_URL}${API_ENDPOINTS.VENDOR.BOOKING_HISTORY.MULTIPLE_ACTIONS.BULK_EXPORT}`,
-      formData,
-      {
-        responseType: "blob",
-        headers,
-      }
-    );
+    try {
+      // Use axios directly for blob download (bypasses apiClient toast interceptors)
+      const response = await axios.post<Blob>(
+        `${env.NEXT_PUBLIC_API_URL}${API_ENDPOINTS.VENDOR.BOOKING_HISTORY.MULTIPLE_ACTIONS.BULK_EXPORT}`,
+        formData,
+        {
+          responseType: "blob",
+          headers,
+        }
+      );
 
-    // Get filename from Content-Disposition header or use default
-    const contentDisposition = response.headers?.["content-disposition"];
-    let filename = `bookings-export-${date}.csv`;
-    if (contentDisposition) {
-      const filenameMatch = contentDisposition.match(/filename="?(.+)"?/i);
-      if (filenameMatch) {
-        filename = filenameMatch[1];
+      // API may return JSON error body with HTTP 200 while responseType is blob
+      await throwIfBlobIsApiError(
+        response.data,
+        response.headers?.["content-type"]
+      );
+
+      // Get filename from Content-Disposition header or use default
+      const contentDisposition = response.headers?.["content-disposition"];
+      let filename = `bookings-export-${date}.csv`;
+      if (contentDisposition) {
+        const filenameMatch = contentDisposition.match(/filename="?(.+)"?/i);
+        if (filenameMatch) {
+          filename = filenameMatch[1];
+        }
       }
+
+      // Create blob URL and trigger download
+      const blob = new Blob([response.data], { type: "text/csv" });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+    } catch (error: unknown) {
+      // Non-2xx responses also arrive as blobs; surface the API message
+      if (axios.isAxiosError(error) && error.response?.data instanceof Blob) {
+        await throwIfBlobIsApiError(
+          error.response.data,
+          error.response.headers?.["content-type"],
+          true
+        );
+      }
+      throw error;
     }
-
-    // Create blob URL and trigger download
-    const blob = new Blob([response.data], { type: "text/csv" });
-    const url = window.URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = filename;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    window.URL.revokeObjectURL(url);
   },
 };
+
+/**
+ * When responseType is "blob", JSON error payloads skip the apiClient interceptor.
+ * Parse and throw so callers can toast the API message.
+ */
+async function throwIfBlobIsApiError(
+  data: Blob,
+  contentType?: string,
+  forceParse = false
+): Promise<void> {
+  const type = (contentType || data.type || "").toLowerCase();
+  const looksLikeJson =
+    forceParse ||
+    type.includes("application/json") ||
+    type.includes("text/json");
+
+  if (!looksLikeJson) return;
+
+  let json: { status?: boolean; message?: string } | null = null;
+  try {
+    json = JSON.parse(await data.text()) as {
+      status?: boolean;
+      message?: string;
+    };
+  } catch {
+    if (forceParse) {
+      throw new Error("Failed to export bookings");
+    }
+    return;
+  }
+
+  if (json?.status === false || forceParse) {
+    throw new Error(json?.message || "Something went wrong");
+  }
+}

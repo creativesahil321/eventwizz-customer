@@ -14,6 +14,11 @@ const ONBOARDING_SHELL_THEME: ThemeSchema = {
   name: "EventWizz",
 };
 
+/**
+ * Single route gate for `/on-boarding`.
+ * Completed vendors are redirected here; JWT sync happens via the API interceptor
+ * (`recoverFromOnboardingAlreadyCompleted`) when the backend reports completion.
+ */
 export default async function OnboardingLayout({
   children,
 }: {
@@ -25,14 +30,12 @@ export default async function OnboardingLayout({
     redirect("/auth/login");
   }
 
-  // Only vendors should access onboarding
   if (session.user.account_type !== "vendor") {
     redirect(`/${session.user.account_type}/dashboard`);
   }
 
-  // If vendor is already onboarded, skip to dashboard
   if (session.user.isOnboarded) {
-    redirect("/vendor/dashboard");
+    redirect("/welcome/select-location");
   }
 
   const host = await getRequestHost();

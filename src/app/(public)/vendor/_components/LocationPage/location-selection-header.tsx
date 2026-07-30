@@ -254,7 +254,7 @@ export default function LocationSelectionHeader({
                       src={addCacheBusting(logo)}
                       width={200}
                       height={116}
-                      className="max-h-8 w-auto max-w-[min(100%,7.5rem)] object-contain md:max-h-12"
+                      className="max-h-10 w-auto max-w-[min(100%,11rem)] object-contain"
                       alt={name || "EventWizz"}
                     />
                   </div>
@@ -276,7 +276,7 @@ export default function LocationSelectionHeader({
                       src={addCacheBusting(logo)}
                       width={200}
                       height={116}
-                      className="max-h-8 w-auto max-w-[min(100%,7.5rem)] object-contain md:max-h-12"
+                      className="max-h-10 w-auto max-w-[min(100%,11rem)] object-contain"
                       alt={name || "EventWizz"}
                     />
                   </div>

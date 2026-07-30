@@ -15,6 +15,10 @@ import {
   getCorrectRedirectUrl,
   validateDomainAccess,
 } from "@/lib/utils/api-endpoints";
+import {
+  isOnboardingAlreadyCompletedMessage,
+  recoverFromOnboardingAlreadyCompleted,
+} from "@/lib/onboarding-completion";
 // Browser environment check
 const isBrowser = typeof window !== "undefined";
 
@@ -397,6 +401,12 @@ apiClient.interceptors.response.use(
         return Promise.reject(response.data);
       }
 
+      // Backend says onboarding is done but JWT may still be stale.
+      if (isOnboardingAlreadyCompletedMessage(message)) {
+        void recoverFromOnboardingAlreadyCompleted();
+        return response;
+      }
+
       const suppressErrorToast = (
         response.config as RequestOptions | undefined
       )?.suppressErrorToast;
@@ -437,6 +447,15 @@ apiClient.interceptors.response.use(
         string,
         unknown
       >;
+
+      // Non-2xx responses can still carry the "already completed" signal
+      if (
+        typeof message === "string" &&
+        isOnboardingAlreadyCompletedMessage(message)
+      ) {
+        void recoverFromOnboardingAlreadyCompleted();
+        return Promise.reject(error);
+      }
 
       // Check for security violation indicators in error response
       const isSecurityViolation =

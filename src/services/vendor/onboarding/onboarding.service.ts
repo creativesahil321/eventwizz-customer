@@ -237,30 +237,6 @@ export const onboardingService = {
     return parseCheckEventNameResponse(response);
   },
 
-  /**
-   * Check if response indicates onboarding is already completed
-   * If so, update session and redirect to welcome page
-   */
-  checkOnboardingCompleted: async (response: ApiResponse): Promise<boolean> => {
-    if (
-      !response.status &&
-      response.message === "OnBoarding is already completed."
-    ) {
-      // Update session to mark as onboarded
-      await authService.updateSession({
-        isOnboarded: true,
-      });
-
-      // Redirect to welcome page
-      if (typeof window !== "undefined") {
-        window.location.href = "/welcome/select-location?onboarded=true";
-      }
-
-      return true;
-    }
-    return false;
-  },
-
   getCurrentStep: async (): Promise<number> => {
     try {
       const stepFromSession = await authService.getCurrentOnboardingStep();
@@ -337,14 +313,6 @@ export const onboardingService = {
         returnFullResponse: true,
       }
     );
-
-    // Check if onboarding is already completed
-    const isCompleted = await onboardingService.checkOnboardingCompleted(
-      response
-    );
-    if (isCompleted) {
-      return response;
-    }
 
     // If successful, get vendor_location_id from response and save it
     if (response.status && response.data) {
@@ -430,14 +398,6 @@ export const onboardingService = {
       },
       returnFullResponse: true,
     });
-
-    // Check if onboarding is already completed
-    const isCompleted = await onboardingService.checkOnboardingCompleted(
-      response
-    );
-    if (isCompleted) {
-      return response;
-    }
 
     // Notify that data has changed if successful
     if (response.status) {
@@ -607,14 +567,6 @@ export const onboardingService = {
       },
       returnFullResponse: true,
     });
-
-    // Check if onboarding is already completed
-    const isCompleted = await onboardingService.checkOnboardingCompleted(
-      response
-    );
-    if (isCompleted) {
-      return response;
-    }
 
     // Notify that data has changed if successful
     if (response.status) {
@@ -818,14 +770,6 @@ export const onboardingService = {
       }
     );
 
-    // Check if onboarding is already completed
-    const isCompleted = await onboardingService.checkOnboardingCompleted(
-      response
-    );
-    if (isCompleted) {
-      return response;
-    }
-
     // Session update will be handled by the component
 
     // Notify that data has changed if successful
@@ -934,14 +878,6 @@ export const onboardingService = {
         },
       }
     );
-
-    // Check if onboarding is already completed
-    const isCompleted = await onboardingService.checkOnboardingCompleted(
-      response
-    );
-    if (isCompleted) {
-      return response;
-    }
 
     // Notify that data has changed if successful
     if (response.status) {
@@ -1104,14 +1040,6 @@ export const onboardingService = {
       }
     );
 
-    // Check if onboarding is already completed
-    const isCompleted = await onboardingService.checkOnboardingCompleted(
-      response
-    );
-    if (isCompleted) {
-      return response;
-    }
-
     // Notify that data has changed if successful
     if (response.status) {
       await onboardingService.notifyDataChanged();
@@ -1258,14 +1186,6 @@ export const onboardingService = {
       }
     );
 
-    // Check if onboarding is already completed
-    const isCompleted = await onboardingService.checkOnboardingCompleted(
-      response
-    );
-    if (isCompleted) {
-      return response;
-    }
-
     // Notify that data has changed if successful
     if (response.status) {
       await onboardingService.notifyDataChanged();
@@ -1314,13 +1234,6 @@ export const onboardingService = {
         returnFullResponse: true,
       },
     );
-
-    const isCompleted = await onboardingService.checkOnboardingCompleted(
-      response,
-    );
-    if (isCompleted) {
-      return response;
-    }
 
     if (response.status) {
       await onboardingService.notifyDataChanged();
@@ -1377,14 +1290,6 @@ export const onboardingService = {
       returnFullResponse: true,
     });
 
-    // Check if onboarding is already completed
-    const isCompleted = await onboardingService.checkOnboardingCompleted(
-      response
-    );
-    if (isCompleted) {
-      return response;
-    }
-
     // Notify that data has changed if successful
     if (response.status) {
       await onboardingService.notifyDataChanged();
@@ -1421,14 +1326,6 @@ export const onboardingService = {
       },
       returnFullResponse: true,
     });
-
-    // Check if onboarding is already completed
-    const isCompleted = await onboardingService.checkOnboardingCompleted(
-      response
-    );
-    if (isCompleted) {
-      return response;
-    }
 
     // Notify that data has changed if successful
     if (response.status) {
@@ -1504,14 +1401,6 @@ export const onboardingService = {
       },
       returnFullResponse: true,
     });
-
-    // Check if onboarding is already completed
-    const isCompleted = await onboardingService.checkOnboardingCompleted(
-      response
-    );
-    if (isCompleted) {
-      return response;
-    }
 
     // Notify that data has changed if successful
     if (response.status) {

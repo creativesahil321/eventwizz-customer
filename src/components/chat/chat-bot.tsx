@@ -172,9 +172,52 @@ function isValidPhone(value: string): boolean {
   return digits.length >= 7 && digits.length <= 15;
 }
 
-function buildSubject(issueSummary: string, description: string): string {
-  const seed = (issueSummary || description).replace(/\s+/g, " ").trim();
-  if (!seed) return "Support enquiry from chat";
+/** True when text is only a support/help trigger, not a real issue title. */
+function isGenericSupportSeed(text: string): boolean {
+  const t = text.replace(/\s+/g, " ").trim();
+  if (!t) return true;
+  if (t.length > 80) return false;
+  if (!isSupportIntent(t)) return false;
+
+  // Strip common support phrasing — if almost nothing remains, it's not a subject
+  const stripped = t
+    .replace(SUPPORT_INTENT_RE, " ")
+    .replace(
+      /\b(i|i'?m|want|wanna|to|with|the|a|an|please|help|me|you|our|team|connect|contact|speak|talk|get|in|touch|raise|open|start|need|like|would|can|could|hi|hello|hey)\b/gi,
+      " ",
+    )
+    .replace(/[^a-z0-9\s]/gi, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  return stripped.length < 4;
+}
+
+/**
+ * Prefer the customer's issue description for the ticket subject.
+ * Ignore generic triggers like "support" / "I want to connect with support".
+ */
+function buildSubject(
+  issueSummary: string,
+  description: string,
+  categoryLabel?: string,
+): string {
+  const desc = description.replace(/\s+/g, " ").trim();
+  const summary = issueSummary.replace(/\s+/g, " ").trim();
+
+  let seed = "";
+  if (desc && !isGenericSupportSeed(desc)) {
+    seed = desc;
+  } else if (summary && !isGenericSupportSeed(summary)) {
+    seed = summary;
+  } else if (categoryLabel?.trim()) {
+    seed = categoryLabel.trim();
+  } else {
+    seed = "Support enquiry from chat";
+  }
+
+  // Capitalise first letter for a cleaner inbox title
+  seed = seed.charAt(0).toUpperCase() + seed.slice(1);
   return seed.length > 80 ? `${seed.slice(0, 77)}…` : seed;
 }
 
@@ -475,6 +518,8 @@ export function ChatBot() {
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
+  /** Session-only hide; remounts on refresh so the launcher returns. */
+  const [isDismissed, setIsDismissed] = useState(false);
   const [isMinimized, setIsMinimized] = useState(false);
   const [supportFlow, setSupportFlow] =
     useState<SupportFlowState>(INITIAL_FLOW);
@@ -581,7 +626,11 @@ export function ChatBot() {
 
     try {
       const response = await createTicket.mutateAsync({
-        subject: buildSubject(flow.issueSummary, flow.description),
+        subject: buildSubject(
+          flow.issueSummary,
+          flow.description,
+          flow.category ? CATEGORY_LABELS[flow.category] : undefined,
+        ),
         category: flow.category,
         contact_number: flow.phone.trim(),
         priority: "medium",
@@ -1266,6 +1315,11 @@ Is there anything else I can help you with?`,
     return null;
   }
 
+  // User dismissed the launcher for this page load only (comes back on refresh).
+  if (isDismissed) {
+    return null;
+  }
+
   return (
     <>
       {shouldLoadVendorChatStats && (
@@ -1276,14 +1330,8 @@ Is there anything else I can help you with?`,
       )}
       <AnimatePresence>
         {!isOpen && (
-          <motion.button
-            type="button"
+          <motion.div
             key="chat-launcher"
-            onClick={() => {
-              setHasOpenedChat(true);
-              setIsOpen(true);
-            }}
-            aria-label="Open chat"
             initial={motionSafe ? { opacity: 0, scale: 0.7, y: 16 } : false}
             animate={
               motionSafe
@@ -1296,63 +1344,76 @@ Is there anything else I can help you with?`,
             }
             exit={motionSafe ? { opacity: 0, scale: 0.85, y: 12 } : undefined}
             transition={{ type: "spring", stiffness: 420, damping: 24 }}
-            whileHover={motionSafe ? { scale: 1.06 } : undefined}
-            whileTap={motionSafe ? { scale: 0.96 } : undefined}
-            className={cn(
-              "fixed bottom-20 right-4 z-50 sm:bottom-8 sm:right-6",
-              "h-14 w-14 rounded-full p-0",
-              "shadow-[0_8px_28px_rgba(15,23,42,0.18)]",
-              "ring-2 ring-white/90",
-              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] focus-visible:ring-offset-2",
-            )}
+            className="fixed bottom-20 right-4 z-50 sm:bottom-8 sm:right-6"
           >
-            {/* Attention rings — draw the eye to the support bot */}
-            {motionSafe && (
-              <>
-                <span
-                  aria-hidden
-                  data-chat-bot-motion
-                  className="pointer-events-none absolute inset-0 rounded-full bg-[var(--color-primary)]/30"
-                  style={{
-                    animation:
-                      "chat-bot-ping 2.4s cubic-bezier(0,0,0.2,1) infinite",
-                  }}
+            <motion.button
+              type="button"
+              onClick={() => {
+                setHasOpenedChat(true);
+                setIsOpen(true);
+              }}
+              aria-label="Open chat"
+              whileHover={motionSafe ? { scale: 1.06 } : undefined}
+              whileTap={motionSafe ? { scale: 0.96 } : undefined}
+              className={cn(
+                "relative h-14 w-14 rounded-full p-0",
+                "shadow-[0_8px_28px_rgba(15,23,42,0.18)]",
+                "ring-2 ring-white/90",
+                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] focus-visible:ring-offset-2",
+              )}
+            >
+              {/* Attention rings — draw the eye to the support bot */}
+              {motionSafe && (
+                <>
+                  <span
+                    aria-hidden
+                    data-chat-bot-motion
+                    className="pointer-events-none absolute inset-0 rounded-full bg-[var(--color-primary)]/30"
+                    style={{
+                      animation:
+                        "chat-bot-ping 2.4s cubic-bezier(0,0,0.2,1) infinite",
+                    }}
+                  />
+                  <span
+                    aria-hidden
+                    data-chat-bot-motion
+                    className="pointer-events-none absolute -inset-1 rounded-full border-2 border-[var(--color-primary)]/40"
+                    style={{
+                      animation:
+                        "chat-bot-pulse 2.4s cubic-bezier(0.4,0,0.6,1) infinite",
+                    }}
+                  />
+                </>
+              )}
+              <span className="relative z-10 block h-full w-full">
+                <ChatAvatar
+                  src={avatarSrc}
+                  alt={siteName}
+                  size="lg"
+                  className="h-full w-full ring-0"
                 />
-                <span
-                  aria-hidden
-                  data-chat-bot-motion
-                  className="pointer-events-none absolute -inset-1 rounded-full border-2 border-[var(--color-primary)]/40"
-                  style={{
-                    animation:
-                      "chat-bot-pulse 2.4s cubic-bezier(0.4,0,0.6,1) infinite",
-                  }}
-                />
-              </>
-            )}
-            <span className="relative z-10 block h-full w-full">
-              <ChatAvatar
-                src={avatarSrc}
-                alt={siteName}
-                size="lg"
-                className="h-full w-full ring-0"
-              />
-            </span>
-            {/* Soft unread-style badge to catch attention */}
-            <motion.span
-              aria-hidden
-              className="absolute -right-0.5 -top-0.5 z-20 h-3.5 w-3.5 rounded-full bg-[var(--color-primary)] ring-2 ring-white"
-              animate={
-                motionSafe
-                  ? { scale: [1, 1.25, 1], opacity: [1, 0.85, 1] }
-                  : undefined
-              }
-              transition={
-                motionSafe
-                  ? { duration: 1.8, repeat: Infinity, ease: "easeInOut" }
-                  : undefined
-              }
-            />
-          </motion.button>
+              </span>
+            </motion.button>
+            <button
+              type="button"
+              aria-label="Hide chat"
+              title="Hide chat"
+              onClick={(e) => {
+                e.stopPropagation();
+                setIsDismissed(true);
+              }}
+              className={cn(
+                "absolute -right-1.5 -top-1.5 z-30",
+                "flex h-5 w-5 items-center justify-center rounded-full",
+                "bg-slate-800 text-white shadow-sm",
+                "ring-2 ring-white",
+                "hover:bg-slate-950",
+                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] focus-visible:ring-offset-1",
+              )}
+            >
+              <X className="h-3 w-3" strokeWidth={2.5} />
+            </button>
+          </motion.div>
         )}
       </AnimatePresence>
 

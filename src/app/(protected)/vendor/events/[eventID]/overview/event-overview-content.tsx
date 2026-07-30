@@ -31,6 +31,7 @@ import EventOverviewFilters from "./_components/event-overview-filters";
 import { BookingItemSkeleton } from "./_components/booking-item-skeleton";
 import { useCurrencyFormat } from "@/hooks/use-currency-format";
 import { parseFormattedMoney } from "@/lib/currency-format";
+import { EventDiscountsCard } from "@/app/(protected)/vendor/discounts/_components/event-discounts-card";
 
 interface EventOverviewClientProps {
   eventId: string;
@@ -382,6 +383,12 @@ export default function EventOverviewClient({
           </CardContent>
         </Card>
       </div>
+
+      <EventDiscountsCard
+        eventId={eventId}
+        eventName={eventData.name}
+        variant="full"
+      />
 
       {/* Search and Filters */}
       <Card>

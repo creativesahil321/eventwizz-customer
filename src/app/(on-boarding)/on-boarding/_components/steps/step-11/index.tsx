@@ -369,7 +369,9 @@ export default function StepEleven() {
       ]).catch((error) => {
         console.error("Background save error:", error);
       });
-      router.push("/preview/onboarding");
+      // replace (not push) so the browser Back button cannot return to the
+      // onboarding form once it is complete.
+      router.replace("/preview/onboarding");
     } catch (error) {
       console.error("Error during Step Eleven submission:", error);
     } finally {

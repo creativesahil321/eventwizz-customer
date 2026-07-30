@@ -12,6 +12,7 @@ import { useSession } from "next-auth/react";
 import { useCallback, useEffect, useState } from "react";
 import { useLocationStore } from "@/store/location.store";
 import { VenueLocation } from "@/types/api.types";
+import { recoverFromOnboardingAlreadyCompleted } from "@/lib/onboarding-completion";
 
 // Define query key for onboarding data
 export const onboardingKeys = {
@@ -183,29 +184,24 @@ export function useOnboardingData() {
         vendor_location_id?: number;
       };
 
-      // Extract location data from persistence API
       const venueLocations = persistenceData.venue_locations || [];
       const defaultVenueLocation = persistenceData.default_venue_location;
       const isOnboarded = persistenceData.isOnboarded || false;
       const vendorLocationId = persistenceData.vendor_location_id;
 
-      // Check if user just completed onboarding
-      const currentIsOnboarded = session?.user?.isOnboarded;
-      if (isOnboarded && !currentIsOnboarded) {
-        // Update session before redirecting
-        await updateSession({
-          isOnboarded: true,
-          vendor_location_id: String(
-            vendorLocationId ||
-              venueLocations[0]?.id ||
-              defaultVenueLocation?.id
-          ),
+      // Persistence says complete but JWT is stale → single shared exit path
+      if (isOnboarded && !session?.user?.isOnboarded) {
+        const locationIdForSession = String(
+          vendorLocationId ||
+            venueLocations[0]?.id ||
+            defaultVenueLocation?.id ||
+            "",
+        );
+        void recoverFromOnboardingAlreadyCompleted({
+          session: locationIdForSession
+            ? { vendor_location_id: locationIdForSession }
+            : undefined,
         });
-
-        // Redirect to welcome page after session update
-        setTimeout(() => {
-          window.location.href = "/preview/onboarding";
-        }, 500);
         return;
       }
 

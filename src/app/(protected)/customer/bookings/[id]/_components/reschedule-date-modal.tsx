@@ -188,13 +188,23 @@ export function RescheduleDateModal({
     ? Number.parseFloat(String(currentDateData.price))
     : currentDate.price;
 
+  const paidAmountValue = (() => {
+    if (currentDateData?.paid_amount == null) return undefined;
+    const parsed = Number.parseFloat(String(currentDateData.paid_amount));
+    return Number.isFinite(parsed) ? parsed : undefined;
+  })();
+
   const selectedRequiresUpgrade =
     selectedDate != null &&
-    selectedRequiresPayment(selectedDate, currentPriceValue);
+    selectedRequiresPayment(selectedDate, currentPriceValue, paidAmountValue);
 
   const selectedAdditionalPayment =
     selectedDate != null
-      ? getAdditionalPaymentRequired(selectedDate, currentPriceValue)
+      ? getAdditionalPaymentRequired(
+          selectedDate,
+          currentPriceValue,
+          paidAmountValue,
+        )
       : 0;
 
   const handleClose = () => {
@@ -555,10 +565,12 @@ export function RescheduleDateModal({
                       const dateRequiresPayment = selectedRequiresPayment(
                         date,
                         currentPriceValue,
+                        paidAmountValue,
                       );
                       const extraPayment = getAdditionalPaymentRequired(
                         date,
                         currentPriceValue,
+                        paidAmountValue,
                       );
 
                       return (

@@ -404,6 +404,9 @@ export default function CartManager({}: CartManagerProps) {
     try {
       setIsProcessing(true);
       clearAllCarts();
+      // Drop reserved-payment UI + sessionStorage so the timer/"Payment required"
+      // card cannot outlive an explicitly cleared cart.
+      useCheckoutPaymentUiStore.getState().clearPaymentSession();
       setExpandedDates(new Set());
       setShowClearConfirm(false);
       await clearAllCartMutation.mutateAsync();

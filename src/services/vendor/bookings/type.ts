@@ -42,9 +42,17 @@ export interface VendorMissingTableDetail {
  */
 export interface VendorAvailableRescheduleDate {
   id: number;
-  dateKey: string;
+  /** Preferred id for `new_booking_date_id` on store */
+  event_date_id?: number;
+  dateKey?: string;
+  date_key?: string;
   date: string;
+  date_label?: string;
   price: number;
+  /** Server-computed upgrade amount — prefer over client price math */
+  additional_payment_required?: number;
+  unpaid_amount?: number;
+  requires_payment?: boolean;
   people: number;
   tables: number;
   drinks: number;
@@ -70,13 +78,19 @@ export interface VendorNeedsTablesRescheduleDate {
  * Current date details for vendor reschedule
  */
 export interface VendorRescheduleCurrentDate {
-  dateKey: string;
+  dateKey?: string;
+  date_key?: string;
   date: string;
-  price: string;
+  date_label?: string;
+  price: string | number;
+  /** Amount already paid toward the current booking date */
+  paid_amount?: number | string;
   people: number;
   tables: number;
   tickets: number;
   drinks: number;
+  room_id?: number;
+  room_name?: string;
 }
 
 /**
@@ -98,6 +112,12 @@ export interface VendorRescheduleDataResponse {
   data: {
     current: VendorRescheduleCurrentDate;
     availableDates: VendorAvailableDates;
+    available_dates?: VendorAvailableDates;
+    payment_gateways?: VendorReschedulePaymentGateway[];
+    is_room_system?: boolean;
+    is_room_scoped?: boolean;
+    room_id?: number;
+    room_name?: string;
   };
   errors: string[];
 }

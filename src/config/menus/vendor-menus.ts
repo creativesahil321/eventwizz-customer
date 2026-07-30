@@ -113,6 +113,16 @@ export const vendorMenus: MenuItemProps[] = [
   },
   {
     id: 12,
+    title: "Discounts",
+    icon: "discounts",
+    href: createVendorUrl("/vendor/discounts"),
+    url: createVendorUrl("/vendor/discounts"),
+    type: "title",
+    // TODO: replace with read-discount when backend permission exists
+    menu: [],
+  },
+  {
+    id: 13,
     title: "Newsletter",
     icon: "newsletter",
     href: createVendorUrl("/vendor/newsletter"),
@@ -122,7 +132,7 @@ export const vendorMenus: MenuItemProps[] = [
     menu: [],
   },
   {
-    id: 13,
+    id: 14,
     title: "Email Logs",
     icon: "emailLogs",
     href: createVendorUrl("/vendor/email-logs"),
@@ -133,7 +143,7 @@ export const vendorMenus: MenuItemProps[] = [
   },
 
   {
-    id: 14,
+    id: 15,
     title: "Manage Roles",
     icon: "manageRoles",
     href: createVendorUrl("/vendor/manage-roles"),
@@ -143,7 +153,7 @@ export const vendorMenus: MenuItemProps[] = [
     menu: [],
   },
   {
-    id: 15,
+    id: 16,
     title: "Staff Management",
     icon: "staffManagement",
     href: createVendorUrl("/vendor/staff-management"),
@@ -153,7 +163,7 @@ export const vendorMenus: MenuItemProps[] = [
     menu: [],
   },
   {
-    id: 16,
+    id: 17,
     title: "Seo Tools",
     icon: "seoTools",
     href: createVendorUrl("/vendor/seo-tools"),
@@ -163,7 +173,7 @@ export const vendorMenus: MenuItemProps[] = [
     menu: [],
   },
   {
-    id: 17,
+    id: 18,
     title: "Notifications",
     icon: "notifications",
     href: createVendorUrl("/vendor/notifications"),
@@ -173,7 +183,7 @@ export const vendorMenus: MenuItemProps[] = [
     menu: [],
   },
   {
-    id: 18,
+    id: 19,
     title: "Support",
     icon: "support",
     href: createVendorUrl("/vendor/support"),
@@ -182,7 +192,7 @@ export const vendorMenus: MenuItemProps[] = [
     menu: [],
   },
   {
-    id: 19,
+    id: 20,
     title: "Dispute Resolution",
     icon: "disputeResolution",
     href: createVendorUrl("/vendor/dispute-resolution"),
@@ -192,7 +202,7 @@ export const vendorMenus: MenuItemProps[] = [
     menu: [],
   },
   {
-    id: 20,
+    id: 21,
     title: "Payment Settings",
     icon: "settings",
     href: createVendorUrl("/vendor/payment-settings"),
