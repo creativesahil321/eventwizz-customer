@@ -29,6 +29,7 @@ export const ADMIN_FOOTER_NAV_LINKS = [
   { href: "/", label: "Home" },
   { href: "/about", label: "About Us" },
   { href: "/how-it-works", label: "How It Works" },
+  { href: "/blog", label: "Blog" },
   { href: "/contact", label: "Contact Us" },
   { href: "/policies", label: "Terms & Privacy" },
 ] as const;

@@ -229,13 +229,16 @@ export default function PaymentGatewaySelector({
 
       {/* Compact selected display when collapsed */}
       {selectedGatewayConfig && !isExpanded && filteredGateways.length > 1 && (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-        >
+        <motion.div initial={false} animate={{ opacity: 1 }}>
           <button
-            onClick={() => setIsExpanded(true)}
-            className={`w-full text-left ${selectedGatewayConfig.bgSelected} rounded-xl p-3 hover:opacity-90 transition-all`}
+            type="button"
+            disabled={disabled}
+            onClick={() => {
+              if (!disabled) setIsExpanded(true);
+            }}
+            className={`w-full text-left ${selectedGatewayConfig.bgSelected} rounded-xl p-3 hover:opacity-90 transition-all ${
+              disabled ? "opacity-50 cursor-not-allowed" : ""
+            }`}
           >
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">

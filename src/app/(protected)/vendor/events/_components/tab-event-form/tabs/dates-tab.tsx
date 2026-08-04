@@ -25,9 +25,11 @@ import {
 } from "@/lib/event-form-limits";
 import {
   cleanVendorStepThreeDatesForForm,
+  cloneDateRowForDuplicate,
   findStepThreeDatesForRoom,
   hasMeaningfulVendorDates,
   normalizeVendorStepThreeRooms,
+  shouldUseCancelDateAction,
   syncStepThreeRoomsFromStepTwo,
 } from "@/app/(protected)/vendor/events/_lib/vendor-step-three-rooms";
 import { eventKeys as vendorEventDetailKeys } from "../../../_lib/hooks/useEventData";
@@ -1257,48 +1259,27 @@ export default function DatesTab() {
                       Cancelled
                     </span>
                   )}
-                  {watch(`dates.${dateIndex}.cancellation_request_pending`) && (
-                    <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-amber-100 text-amber-800 border border-amber-200 shrink-0">
-                      Pending admin
-                    </span>
-                  )}
                 </span>
               </button>
             </div>
             <div className="flex items-center gap-2 w-full sm:w-auto shrink-0">
               {(() => {
-                const cancellationPending = watch(
-                  `dates.${dateIndex}.cancellation_request_pending`,
-                );
-                const useCancelAction =
-                  watch(`dates.${dateIndex}.use_cancel_date_action`) === true;
-                const hasFinancial =
-                  watch(`dates.${dateIndex}.has_financial_bookings`) === true;
-                const hasBookings =
-                  watch(`dates.${dateIndex}.has_bookings`) === true;
-                const showCancelDateFlow =
-                  useCancelAction || hasFinancial || hasBookings;
+                const dateRow = watch(`dates.${dateIndex}`);
+                const isCancelled = dateRow?.cancelled === true;
 
-                if (cancellationPending) {
-                  return null;
-                }
-
-                if (showCancelDateFlow) {
+                if (shouldUseCancelDateAction(dateRow)) {
                   return (
                     <Button
                       type="button"
                       variant="outline"
                       disabled={readOnly}
                       className={
-                        watch(`dates.${dateIndex}.cancelled`)
+                        isCancelled
                           ? "border-gray-400 text-gray-500 hover:bg-gray-50 w-full sm:w-auto"
                           : "border-red-500 text-red-600 hover:bg-red-50 w-full sm:w-auto"
                       }
                       size="sm"
                       onClick={() => {
-                        const isCancelled = watch(
-                          `dates.${dateIndex}.cancelled`,
-                        );
                         if (!isCancelled) {
                           requestCancelDate(dateIndex);
                           return;
@@ -1309,11 +1290,7 @@ export default function DatesTab() {
                       }}
                     >
                       <XCircle className="h-4 w-4 mr-2" />
-                      <span>
-                        {watch(`dates.${dateIndex}.cancelled`)
-                          ? "Undo Cancel"
-                          : "Cancel Date"}
-                      </span>
+                      <span>{isCancelled ? "Undo Cancel" : "Cancel Date"}</span>
                     </Button>
                   );
                 }
@@ -1680,13 +1657,9 @@ export default function DatesTab() {
                   disabled={readOnly}
                   className="text-blue-600 border-blue-600 hover:bg-blue-50 w-full sm:w-auto"
                   onClick={() => {
-                    const currentDate = watch(`dates.${dateIndex}`);
-                    const duplicable = { ...currentDate };
-                    delete (duplicable as { id?: number }).id;
-                    append({
-                      ...duplicable,
-                      event_date: "",
-                    });
+                    append(
+                      cloneDateRowForDuplicate(watch(`dates.${dateIndex}`)),
+                    );
                     toast.success(
                       "Date duplicated! Please set a new event date.",
                     );

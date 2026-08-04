@@ -1,4 +1,5 @@
 import { defaultValues } from "./defaultValues";
+import { normalizeStepTenFromApi } from "./normalize-step-ten-gateways";
 import {
   coerceHasMultipleLocationsFromApi,
   MAX_ROOMS,
@@ -109,6 +110,17 @@ export function patchOnboardingPayloadFromApi(
         ? stepThree.event_schedular
         : [],
     };
+  }
+
+  // Step 10: API nests gateways under online/offline with key/secret — flatten for UI.
+  if (dataAny.stepTen && typeof dataAny.stepTen === "object") {
+    const normalizedStepTen = normalizeStepTenFromApi(dataAny.stepTen);
+    if (normalizedStepTen) {
+      dataAny.stepTen = {
+        ...defaultValues.stepTen,
+        ...normalizedStepTen,
+      };
+    }
   }
 
   // Step 11: subdomain label + confirmation restore from `isApproved`.

@@ -1,24 +1,46 @@
-import type { Discount } from "../_lib/types";
+import type { Discount, FlatDiscountMode } from "../_lib/types";
 import {
   DISCOUNT_CATEGORY_LABELS,
   FLAT_MODE_LABELS,
 } from "../_lib/types";
+import { normalizeFlatMode } from "../_lib/build-store-payload";
 
 export function formatDiscountValue(discount: Discount): string {
-  if (discount.value_type === "percentage") {
-    return `${discount.discount_value}% off`;
+  if (discount.value_label?.trim()) return discount.value_label;
+
+  if (discount.discount_type === "percentage") {
+    return `${discount.amount}% off`;
   }
-  const amount = `£${discount.discount_value}`;
-  if (discount.flat_mode === "flat_per_person") {
+  const amount = `£${discount.amount}`;
+  const mode = normalizeFlatMode(discount.flat_mode);
+  if (mode === "per_person") {
     return `${amount} / person (min ${discount.min_people ?? 0})`;
   }
   return `${amount} off total`;
 }
 
 export function formatDiscountScope(discount: Discount): string {
-  const base = `${discount.location_name} · ${discount.event_name}`;
-  if (discount.category === "date_wise" && discount.room_name) {
-    return `${base} · ${discount.room_name}`;
+  if (discount.summary?.trim()) {
+    const location = discount.location?.name;
+    const event = discount.event?.name;
+    if (location && event) {
+      const base = `${location} · ${event}`;
+      if (discount.category === "date_wise" && discount.room?.name) {
+        return `${base} · ${discount.room.name}`;
+      }
+      if (discount.category === "coupon_code" && discount.coupon_code) {
+        return `${base} · Code: ${discount.coupon_code}`;
+      }
+      return base;
+    }
+    return discount.summary;
+  }
+
+  const location = discount.location?.name ?? "—";
+  const event = discount.event?.name ?? "—";
+  const base = `${location} · ${event}`;
+  if (discount.category === "date_wise" && discount.room?.name) {
+    return `${base} · ${discount.room.name}`;
   }
   if (discount.category === "coupon_code" && discount.coupon_code) {
     return `${base} · Code: ${discount.coupon_code}`;
@@ -33,8 +55,9 @@ export function formatDiscountCategoryLabel(discount: Discount): string {
 export function formatFlatModeLabel(
   mode: Discount["flat_mode"]
 ): string | null {
-  if (!mode) return null;
-  return FLAT_MODE_LABELS[mode];
+  const normalized = normalizeFlatMode(mode);
+  if (!normalized) return null;
+  return FLAT_MODE_LABELS[normalized as FlatDiscountMode];
 }
 
 export function getDiscountDisplayName(discount: Discount): string {

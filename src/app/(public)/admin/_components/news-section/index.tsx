@@ -1,9 +1,7 @@
-import Image from "next/image";
-import Link from "next/link";
-import { ArrowRight } from "lucide-react";
 import type { AdminHomeContent } from "@/lib/admin-cms-content";
 import { SiteHeading } from "@/components/public/site-heading";
-import { formatBlogDate, getPublishedBlogPosts } from "@/lib/blogs";
+import { getPublishedBlogPosts } from "@/lib/blogs";
+import { BlogPostCard } from "@/app/(public)/blog/_components/blog-post-card";
 
 export default function NewsSection({
   content,
@@ -33,42 +31,7 @@ export default function NewsSection({
 
         <div className="grid grid-cols-1 gap-5 sm:gap-6 md:grid-cols-2 md:gap-8 lg:grid-cols-3">
           {articles.map((article) => (
-            <Link
-              key={article.id}
-              href={`/blog/${article.slug}`}
-              className="group cursor-pointer overflow-hidden rounded-2xl bg-[color:var(--color-surface)] shadow-sm transition-all duration-300 hover:shadow-xl"
-            >
-              <article>
-                <div className="relative h-44 overflow-hidden sm:h-52">
-                  <Image
-                    src={article.cover_image}
-                    alt={article.title}
-                    fill
-                    className="object-cover transition-transform duration-500 group-hover:scale-105"
-                    sizes="(max-width: 768px) 100vw, 33vw"
-                  />
-                </div>
-
-                <div className="p-5 sm:p-6">
-                  <p className="mb-2 text-xs font-medium text-[color:var(--color-text)]">
-                    {formatBlogDate(article.published_at)}
-                  </p>
-                  <h3
-                    className="mb-2 line-clamp-2 font-bold leading-snug text-[color:var(--color-text)] transition-colors group-hover:text-[color:var(--color-primary)]"
-                    style={{ fontFamily: "var(--font-heading)" }}
-                  >
-                    {article.title}
-                  </h3>
-                  <p className="mb-4 line-clamp-3 text-sm leading-relaxed text-[color:var(--color-text)]">
-                    {article.excerpt}
-                  </p>
-                  <div className="flex items-center gap-1.5 text-sm font-semibold text-[color:var(--color-primary)] transition-all group-hover:gap-2.5">
-                    <span>Read Article</span>
-                    <ArrowRight className="h-4 w-4" />
-                  </div>
-                </div>
-              </article>
-            </Link>
+            <BlogPostCard key={article.id} post={article} />
           ))}
         </div>
       </div>

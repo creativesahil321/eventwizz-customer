@@ -39,7 +39,7 @@ const Logo: React.FC<LogoProps> = ({ collapsed }) => {
         ) : (
           <Link href="/">
             <img
-              className="h-8 w-auto object-contain drop-shadow-[2px_4px_6px_black]"
+              className="h-8 w-auto object-contain"
               src={addCacheBusting(logoPath)}
               alt={theme?.name || "EventWizz"}
             />

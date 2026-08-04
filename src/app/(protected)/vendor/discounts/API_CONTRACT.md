@@ -1,60 +1,108 @@
 /**
- * # Discount Management — API contract for backend
+ * # Discount Management — API contract
  *
- * Frontend: `/vendor/discounts` (+ entry points on Edit Event & Event Overview)
+ * ## List (wired)
  *
- * ## UX entry points
- * - Sidebar → Discounts (full hub)
- * - Edit Event header → compact “Promotions for this event”
- * - Event Overview → full discounts panel
- * - Deep links: `/vendor/discounts?eventId=` and `/vendor/discounts/create?eventId=`
+ * `GET /api/v1/vendor/discounts?category=&status=&search=&page=&per_page=&vendor_event_id=`
  *
- * ## Endpoints
+ * ## Locations + events for create dropdowns (wired)
  *
- * | Method | Path | Purpose |
- * |--------|------|---------|
- * | GET | `/api/vendor/discounts` | List + filters (`category`, `status`, `event_id`, `search`, `page`) |
- * | POST | `/api/vendor/discounts` | Create (body = `DiscountFormPayload`) |
- * | GET | `/api/vendor/discounts/{id}` | Show one |
- * | PUT/PATCH | `/api/vendor/discounts/{id}` | Update |
- * | PATCH | `/api/vendor/discounts/{id}/status` | `{ status: "active" \| "inactive" }` |
- * | DELETE | `/api/vendor/discounts/{id}` | Soft/hard delete |
+ * `GET /api/v1/vendor/discounts/locations-with-events`
  *
- * ## Create / update body (`DiscountFormPayload`)
+ * Returns locations with nested `events` → `rooms` → `dates` — used for Location,
+ * Event, Room, and Applicable dates selects on create/edit.
  *
  * ```json
  * {
- *   "name": "Summer Festival 15% Off",
- *   "category": "event_specific | date_wise | coupon_code",
- *   "location_id": 1,
- *   "event_id": 101,
- *   "room_id": 11,
- *   "applicable_dates": ["2026-08-15", "2026-08-16"],
- *   "coupon_code": "SUMMER20",
- *   "value_type": "percentage | flat",
- *   "discount_value": 15,
- *   "flat_mode": "flat_on_total | flat_per_person | null",
- *   "min_people": 8,
- *   "valid_from": "2026-08-01",
- *   "expires_at": "2026-08-31",
- *   "status": "active | inactive"
+ *   "status": true,
+ *   "message": "Success",
+ *   "data": [
+ *     {
+ *       "id": 3,
+ *       "city": "kangra",
+ *       "events": [
+ *         {
+ *           "id": 12,
+ *           "name": "Jazz Evening",
+ *           "rooms": [
+ *             {
+ *               "id": 5,
+ *               "name": "Lounge A",
+ *               "dates": [
+ *                 { "id": 101, "date": "2026-07-31" },
+ *                 { "id": 102, "date": "2026-08-08" }
+ *               ]
+ *             }
+ *           ]
+ *         }
+ *       ]
+ *     }
+ *   ],
+ *   "errors": []
  * }
  * ```
  *
- * ## Category rules
+ * ## Create (wired)
  *
- * - **event_specific** — whole event; `room_id` / `applicable_dates` / `coupon_code` null
- * - **date_wise** — require `room_id` + `applicable_dates[]`
- * - **coupon_code** — require `coupon_code` (unique per vendor, case-insensitive); reusable until expiry
+ * `POST /api/v1/vendor/discounts/store`
  *
- * ## Value rules
+ * ### 1) Event specific
+ * ```json
+ * {
+ *   "category": "event_specific",
+ *   "vendor_location_ids": [3, 7],
+ *   "vendor_event_ids": [12, 21],
+ *   "discount_type": "percentage",
+ *   "amount": 15,
+ *   "name": "Summer Festival 15% Off",
+ *   "valid_from": "2026-06-01",
+ *   "expires_at": "2026-08-31",
+ *   "status": "active"
+ * }
+ * ```
  *
- * - **percentage** — `discount_value` 1–100; `flat_mode` / `min_people` null
- * - **flat** — require `flat_mode`
- *   - `flat_on_total` — amount off order total
- *   - `flat_per_person` — require `min_people`; amount × headcount when min met
- * - Payable must never go below 0
+ * ### 2) Date wise
+ * ```json
+ * {
+ *   "category": "date_wise",
+ *   "vendor_location_ids": [3],
+ *   "vendor_event_ids": [12],
+ *   "room_ids": [5, 6],
+ *   "applicable_date_ids": [101, 102],
+ *   "discount_type": "flat",
+ *   "flat_mode": "per_person",
+ *   "amount": 10,
+ *   "min_people": 8,
+ *   "name": "Weekday Lounge Deal",
+ *   "valid_from": null,
+ *   "expires_at": "2026-09-30",
+ *   "status": "active"
+ * }
+ * ```
+ * Flat on total uses `"flat_mode": "on_total"` (no `min_people`).
  *
- * ## Types source of truth (frontend)
- * `src/app/(protected)/vendor/discounts/_lib/types.ts`
+ * ### 3) Coupon code
+ * ```json
+ * {
+ *   "category": "coupon_code",
+ *   "vendor_location_ids": [3],
+ *   "vendor_event_ids": [12],
+ *   "coupon_code": "SUMMER20",
+ *   "customer_audience": "selected",
+ *   "customer_ids": [101, 102, 103],
+ *   "discount_type": "percentage",
+ *   "amount": 20,
+ *   "name": "SUMMER20",
+ *   "valid_from": "2026-06-01",
+ *   "expires_at": "2026-08-31",
+ *   "status": "active"
+ * }
+ * ```
+ * All active customers: `"customer_audience": "all_active"` (omit `customer_ids`).
+ * If status is `active` on a coupon, emails are queued on submit.
+ *
+ * ## Assumed (not confirmed)
+ * GET/PUT/PATCH status/DELETE by id
+ *
+ * Types: `_lib/types.ts` · Mapper: `_lib/build-store-payload.ts` · Service: `discounts.service.ts`
  */

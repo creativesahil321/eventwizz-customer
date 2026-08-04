@@ -30,7 +30,7 @@ export default function AuthLayout({
     theme?.logo?.startsWith("https")
       ? theme.logo
       : "/assets/images/logos/eventwizz-logo.png";
-  // When login page has security_violation, clear any stale session so user must re-login (no redirect to welcome)
+
   useEffect(() => {
     if (!isSecurityViolation || status !== "authenticated") return;
     setIsSigningOutSecurity(true);
@@ -39,7 +39,6 @@ export default function AuthLayout({
     });
   }, [isSecurityViolation, status]);
 
-  // Redirect authenticated users away from auth pages (skip when security_violation — we sign out above)
   useEffect(() => {
     if (
       status === "authenticated" &&
@@ -62,10 +61,12 @@ export default function AuthLayout({
     }
   }, [session, status, router, isSecurityViolation, isSigningOutSecurity]);
 
-  // Show fullscreen loader when session is loading/authenticated or redirecting.
-  // Including "loading" prevents a brief flash of the login form on page load
-  // before the session resolves (e.g. browser back button, hard navigation).
-  if (status === "loading" || status === "authenticated" || isRedirecting || isSigningOutSecurity) {
+  if (
+    status === "loading" ||
+    status === "authenticated" ||
+    isRedirecting ||
+    isSigningOutSecurity
+  ) {
     return (
       <AuthSkeleton
         accountType={session?.user?.account_type}
@@ -74,37 +75,43 @@ export default function AuthLayout({
     );
   }
 
+  const logo = (
+    <Link href="/" className="inline-flex items-center shrink-0">
+      <img
+        className="h-8 w-auto object-contain"
+        alt="EventWizz"
+        src={addCacheBusting(logoPath)}
+      />
+    </Link>
+  );
+
   return (
-    <div className="min-h-screen flex flex-col overflow-x-hidden font-body bg-[var(--color-background)]">
-      <header className="w-full h-16 bg-[var(--color-header)] text-[var(--color-on-header)]">
-        <div className="max-w-[1400px] h-full mx-auto px-4 sm:px-6 flex items-center justify-between">
-          <Link href="/" className="flex items-center space-x-2 shrink-0">
-            <img
-              className="h-8 w-auto object-contain"
-              alt="EventWizz"
-              src={addCacheBusting(logoPath)}
-            />
-          </Link>
+    <div className="min-h-screen flex flex-col md:flex-row overflow-x-hidden font-body bg-[var(--color-background)]">
+      {/* Left — brand panel (desktop) */}
+      <aside
+        className="hidden md:flex md:w-[34%] lg:w-[32%] flex-col border-r border-[var(--color-text)]/8 bg-[color-mix(in_srgb,var(--color-primary)_7%,var(--color-background))]"
+      >
+        <div className="px-8 lg:px-12 pt-8 pb-4">{logo}</div>
+        <div className="flex flex-1 flex-col justify-center px-8 lg:px-12 pb-12">
+          <AuthContent />
         </div>
-      </header>
+      </aside>
 
-      {/* Two-column layout */}
-      <main className="flex-grow flex flex-row w-full relative">
-        {/* Left column - Pink background with branding */}
-        <div className="hidden md:flex md:w-[30%] bg-[var(--color-background)] flex-col">
-          <div className="flex flex-col justify-center h-full p-8 lg:pl-24 lg:pr-12">
-            <AuthContent />
+      {/* Right — form */}
+      <div className="flex flex-1 flex-col bg-[color-mix(in_srgb,var(--color-text)_4%,var(--color-surface))]">
+        {/* Mobile logo bar — matches page, no separate header color */}
+        <header className="md:hidden flex h-14 items-center px-4 border-b border-[var(--color-text)]/8 bg-[var(--color-background)]">
+          {logo}
+        </header>
+
+        <div className="flex flex-1 items-center justify-center px-4 py-10 sm:px-8 sm:py-16">
+          <div className="w-full max-w-[440px]">
+            <div className="rounded-xl border border-[var(--color-text)]/6 bg-[var(--color-surface)] p-6 sm:p-8 shadow-[0_8px_30px_rgb(0,0,0,0.04)]">
+              {children}
+            </div>
           </div>
         </div>
-
-        {/* Right column - Light background with form content */}
-        <div className="w-full md:w-[70%] bg-[#F2F0EF] flex items-center justify-center">
-          <div className="w-full max-w-[600px] px-12 py-20">
-            {/* Form content card */}
-            <div className="bg-white rounded-lg shadow-lg p-6">{children}</div>
-          </div>
-        </div>
-      </main>
+      </div>
     </div>
   );
 }

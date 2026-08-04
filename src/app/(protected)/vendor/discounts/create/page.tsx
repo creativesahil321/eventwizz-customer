@@ -21,11 +21,12 @@ export default async function CreateDiscountPage({ searchParams }: PageProps) {
     ? Number(params.locationId)
     : DUMMY_EVENTS.find((e) => e.id === eventId)?.location_id ?? 0;
 
-  const initialValues: DiscountFormValues = {
+  const initialValues: Partial<DiscountFormValues> = {
     ...defaultDiscountFormValues,
-    event_id: Number.isFinite(eventId) && eventId > 0 ? eventId : 0,
-    location_id:
-      Number.isFinite(locationId) && locationId > 0 ? locationId : 0,
+    event_ids:
+      Number.isFinite(eventId) && eventId > 0 ? [eventId] : [],
+    location_ids:
+      Number.isFinite(locationId) && locationId > 0 ? [locationId] : [],
     name: params.eventName
       ? `${params.eventName} promo`
       : defaultDiscountFormValues.name,

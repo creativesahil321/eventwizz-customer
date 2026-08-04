@@ -19,7 +19,6 @@ import { onboardingService } from "@/services/vendor/onboarding/onboarding.servi
 import { useSession } from "next-auth/react";
 import { OnboardingFormSkeleton } from "@/components/ui/onboarding-skeleton";
 import { ApiResponse } from "@/services/vendor/onboarding/type";
-import { useOnboardingData } from "../../_lib/hooks/useOnboardingData";
 import type { ThemeSchema } from "@/types/theme.types";
 import {
   extractOnboardingPreviewTheme,
@@ -103,9 +102,6 @@ export function FormProvider({
 }) {
   // Get session data and update function
   const { data: session, update: updateSession } = useSession();
-
-  // Get the invalidateCache function from useOnboardingData
-  const { invalidateCache } = useOnboardingData();
 
   // Get initial step after component mount
   const [activeStep, setActiveStep] = useState<number>(1); // Default to 1
@@ -315,17 +311,16 @@ export function FormProvider({
         return;
       }
 
-      // Global `save()` is a no-op persistence placeholder; step components call APIs directly.
+      // Persistence refresh is owned by store methods via
+      // `onboardingService.notifyDataChanged()` — do not invalidate here
+      // (that stacked with the event listener and caused multiple GETs).
       await Promise.resolve();
-
-      // Refresh data after saving
-      invalidateCache();
     } catch (error) {
       console.error("Error saving:", error);
     } finally {
       setIsLoading(false);
     }
-  }, [activeStep, form, isLoading, invalidateCache]);
+  }, [activeStep, form, isLoading]);
 
   const next = useCallback(async () => {
     if (isLoading) return;

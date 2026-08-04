@@ -21,12 +21,13 @@ export interface Notification {
 }
 
 export interface NotificationFilters {
-  /** API feed filter: unread | bookings | payments | customers | system */
+  /** API feed filter: unread | bookings | payments | customers | vendors | system */
   filter?:
     | "unread"
     | "bookings"
     | "payments"
     | "customers"
+    | "vendors"
     | "system"
     | string;
   /** Server-side search query */

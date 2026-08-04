@@ -1,20 +1,28 @@
 "use client";
 
 import Link from "next/link";
-import { Percent, Plus, ArrowRight, Tag, CalendarDays, Ticket } from "lucide-react";
+import {
+  Percent,
+  Plus,
+  ArrowRight,
+  Tag,
+  CalendarDays,
+  Ticket,
+  Loader2,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { DUMMY_DISCOUNTS } from "../_lib/dummy-data";
-import type { Discount } from "../_lib/types";
+import type { DiscountCategory } from "../_lib/types";
 import { DISCOUNT_CATEGORY_LABELS } from "../_lib/types";
+import { useDiscounts } from "../_lib/queries";
 import { DiscountStatusBadge } from "./discount-status-badge";
 import { formatDiscountValue, getDiscountDisplayName } from "./format";
 import { cn } from "@/lib/utils";
 
-const CATEGORY_ICON = {
+const CATEGORY_ICON: Record<DiscountCategory, typeof Tag> = {
   event_specific: Tag,
   date_wise: CalendarDays,
   coupon_code: Ticket,
-} as const;
+};
 
 interface EventDiscountsCardProps {
   eventId: string | number;
@@ -24,19 +32,24 @@ interface EventDiscountsCardProps {
   className?: string;
 }
 
-function getEventDiscounts(eventId: string | number): Discount[] {
-  const id = Number(eventId);
-  if (!Number.isFinite(id) || id <= 0) return [];
-  return DUMMY_DISCOUNTS.filter((d) => d.event_id === id);
-}
-
 export function EventDiscountsCard({
   eventId,
   eventName,
   variant = "full",
   className,
 }: EventDiscountsCardProps) {
-  const discounts = getEventDiscounts(eventId);
+  const id = Number(eventId);
+  const enabled = Number.isFinite(id) && id > 0;
+
+  const { data, isLoading } = useDiscounts({
+    category: "all",
+    status: "all",
+    vendor_event_id: enabled ? id : undefined,
+    per_page: 10,
+    page: 1,
+  });
+
+  const discounts = enabled ? (data?.data ?? []) : [];
   const active = discounts.filter((d) => d.status === "active");
   const manageHref = `/vendor/discounts?eventId=${eventId}${
     eventName ? `&eventName=${encodeURIComponent(eventName)}` : ""
@@ -62,9 +75,16 @@ export function EventDiscountsCard({
               Promotions for this event
             </p>
             <p className="text-xs text-muted-foreground">
-              {active.length > 0
-                ? `${active.length} active discount${active.length > 1 ? "s" : ""}`
-                : "No active discounts yet — add an event, date, or coupon offer."}
+              {isLoading ? (
+                <span className="inline-flex items-center gap-1">
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                  Checking discounts…
+                </span>
+              ) : active.length > 0 ? (
+                `${active.length} active discount${active.length > 1 ? "s" : ""}`
+              ) : (
+                "No active discounts yet — add an event, date, or coupon offer."
+              )}
             </p>
           </div>
         </div>
@@ -124,7 +144,12 @@ export function EventDiscountsCard({
         </div>
       </div>
 
-      {discounts.length === 0 ? (
+      {isLoading ? (
+        <div className="mt-4 flex items-center justify-center gap-2 py-8 text-sm text-muted-foreground">
+          <Loader2 className="h-4 w-4 animate-spin" />
+          Loading…
+        </div>
+      ) : discounts.length === 0 ? (
         <div className="mt-4 rounded-lg border border-dashed border-[#D6ECEF] bg-[#F7FCFC] px-4 py-6 text-center">
           <p className="text-sm font-medium text-[#0F172A]">
             No discounts for this event yet

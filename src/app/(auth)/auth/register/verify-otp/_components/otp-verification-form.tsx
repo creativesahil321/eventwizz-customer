@@ -34,6 +34,12 @@ export function OTPVerificationForm() {
   }, [timer]);
 
   useEffect(() => {
+    // OTP already verified — keep user on create-password (blocks Back)
+    if (getCookie("otp_verified")) {
+      router.replace("/auth/register/create-password");
+      return;
+    }
+
     // Try to get email from cookies first, fallback to localStorage
     const emailFromCookie = getCookie("verification_email") as string;
     const emailFromStorage = localStorage.getItem("verification_email");
@@ -133,9 +139,8 @@ export function OTPVerificationForm() {
         // Set cookie to indicate OTP verification success
         setCookie("otp_verified", "true", { maxAge: 60 * 15, path: "/" });
 
-        // Navigate to create password page
-        const nextPath = "/auth/register/create-password";
-        router.push(nextPath);
+        // Replace so Back cannot return to the OTP page
+        router.replace("/auth/register/create-password");
       }
     } catch (error) {
       // Error handling is done by the interceptor

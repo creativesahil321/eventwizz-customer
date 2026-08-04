@@ -1,6 +1,11 @@
 "use client";
 
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import {
+  useQuery,
+  useMutation,
+  useQueryClient,
+  type QueryClient,
+} from "@tanstack/react-query";
 import { request } from "@/services/core/api-client";
 import { API_ENDPOINTS } from "@/services/core/endpoints";
 import {
@@ -22,6 +27,50 @@ export const onboardingKeys = {
 };
 
 const ONBOARDING_IS_ROOMS_STORAGE_KEY = "onboarding_is_rooms";
+const ONBOARDING_DATA_CHANGED = "onboarding-data-changed";
+
+/** Prevents duplicate NextAuth csrf/session when sync effect re-runs with a stale session snapshot. */
+let lastSessionSyncKey: string | null = null;
+
+/**
+ * One listener for the whole app — avoids N refetches when N components
+ * call `useOnboardingData` (e.g. client + form provider).
+ * `invalidateQueries` alone refetches active observers; do not also call `refetch()`.
+ */
+let onboardingDataChangedSubscribers = 0;
+let onboardingDataChangedHandler: (() => void) | null = null;
+
+function attachOnboardingDataChangedListener(qc: QueryClient) {
+  onboardingDataChangedSubscribers++;
+  if (onboardingDataChangedSubscribers !== 1) return;
+
+  // Coalesce rapid notify + any leftover invalidate into one refetch.
+  let invalidateTimer: ReturnType<typeof setTimeout> | null = null;
+  onboardingDataChangedHandler = () => {
+    if (invalidateTimer) clearTimeout(invalidateTimer);
+    invalidateTimer = setTimeout(() => {
+      invalidateTimer = null;
+      void qc.invalidateQueries({ queryKey: onboardingKeys.all });
+    }, 50);
+  };
+  window.addEventListener(ONBOARDING_DATA_CHANGED, onboardingDataChangedHandler);
+}
+
+function detachOnboardingDataChangedListener() {
+  onboardingDataChangedSubscribers = Math.max(
+    0,
+    onboardingDataChangedSubscribers - 1,
+  );
+  if (onboardingDataChangedSubscribers !== 0 || !onboardingDataChangedHandler) {
+    return;
+  }
+
+  window.removeEventListener(
+    ONBOARDING_DATA_CHANGED,
+    onboardingDataChangedHandler,
+  );
+  onboardingDataChangedHandler = null;
+}
 
 function readIsRoomsFlag(): boolean | undefined {
   if (typeof window === "undefined") return undefined;
@@ -163,7 +212,16 @@ export function useOnboardingData() {
 
     const payload = onboardingData.data as unknown as Record<string, unknown>;
     const persistedIsRooms = coerceIsRoomsFlag(payload.is_rooms);
-    if (typeof persistedIsRooms === "boolean" && persistedIsRooms !== isRoomsFlag) {
+    if (
+      typeof persistedIsRooms === "boolean" &&
+      persistedIsRooms !== isRoomsFlag
+    ) {
+      // Reuse current payload under the corrected key — avoids a second GET
+      // when flipping from "unknown" → true/false after the first response.
+      queryClient.setQueryData(
+        onboardingKeys.data(persistedIsRooms),
+        onboardingData,
+      );
       setIsRoomsFlag(persistedIsRooms);
       if (typeof window !== "undefined") {
         sessionStorage.setItem(
@@ -171,9 +229,6 @@ export function useOnboardingData() {
           persistedIsRooms ? "true" : "false",
         );
       }
-      // If API says room mode differs from current query mode,
-      // force a refetch with the corrected mode immediately.
-      void refetch();
     }
 
     const syncData = async () => {
@@ -189,7 +244,9 @@ export function useOnboardingData() {
       const isOnboarded = persistenceData.isOnboarded || false;
       const vendorLocationId = persistenceData.vendor_location_id;
 
-      // Persistence says complete but JWT is stale → single shared exit path
+      // Persistence says complete but JWT is stale.
+      // While still on /on-boarding (normal step-11 finish), go to preview —
+      // NOT welcome. Welcome was racing step-11's router.replace("/preview/onboarding").
       if (isOnboarded && !session?.user?.isOnboarded) {
         const locationIdForSession = String(
           vendorLocationId ||
@@ -197,7 +254,14 @@ export function useOnboardingData() {
             defaultVenueLocation?.id ||
             "",
         );
+        const stillOnOnboarding =
+          typeof window !== "undefined" &&
+          window.location.pathname.startsWith("/on-boarding");
+
         void recoverFromOnboardingAlreadyCompleted({
+          redirectTo: stillOnOnboarding
+            ? "/preview/onboarding"
+            : undefined,
           session: locationIdForSession
             ? { vendor_location_id: locationIdForSession }
             : undefined,
@@ -223,19 +287,28 @@ export function useOnboardingData() {
 
         setSelectedLocation(defaultLocation);
 
-        // Update session if location or onboarding status changed
-        const currentLocationId = session?.user?.vendor_location_id;
-        const currentIsOnboardedStatus = session?.user?.isOnboarded;
+        // Update session only when values actually change.
+        // Important: `undefined !== false` used to fire updateSession on every refetch
+        // (duplicate csrf + session after each step save).
+        const currentLocationId = String(
+          session?.user?.vendor_location_id ?? "",
+        );
+        const currentIsOnboarded = Boolean(session?.user?.isOnboarded);
+        const nextIsOnboarded = Boolean(isOnboarded);
         const newLocationId = String(vendorLocationId || defaultLocation.id);
 
         if (
           currentLocationId !== newLocationId ||
-          currentIsOnboardedStatus !== isOnboarded
+          currentIsOnboarded !== nextIsOnboarded
         ) {
-          updateSession({
-            isOnboarded,
-            vendor_location_id: newLocationId,
-          });
+          // Avoid overlapping NextAuth updates with the step's own updateSession.
+          if (!lastSessionSyncKey || lastSessionSyncKey !== `${newLocationId}:${nextIsOnboarded}`) {
+            lastSessionSyncKey = `${newLocationId}:${nextIsOnboarded}`;
+            void updateSession({
+              isOnboarded: nextIsOnboarded,
+              vendor_location_id: newLocationId,
+            });
+          }
         }
       } else if (defaultVenueLocation) {
         // If only default location is available
@@ -248,21 +321,26 @@ export function useOnboardingData() {
         setLocations([normalizedDefaultLocation]);
         setSelectedLocation(normalizedDefaultLocation);
 
-        // Update session if location or onboarding status changed
-        const currentLocationId = session?.user?.vendor_location_id;
-        const currentIsOnboardedStatus = session?.user?.isOnboarded;
+        const currentLocationId = String(
+          session?.user?.vendor_location_id ?? "",
+        );
+        const currentIsOnboarded = Boolean(session?.user?.isOnboarded);
+        const nextIsOnboarded = Boolean(isOnboarded);
         const newLocationId = String(
-          vendorLocationId || normalizedDefaultLocation.id
+          vendorLocationId || normalizedDefaultLocation.id,
         );
 
         if (
           currentLocationId !== newLocationId ||
-          currentIsOnboardedStatus !== isOnboarded
+          currentIsOnboarded !== nextIsOnboarded
         ) {
-          updateSession({
-            isOnboarded,
-            vendor_location_id: newLocationId,
-          });
+          if (!lastSessionSyncKey || lastSessionSyncKey !== `${newLocationId}:${nextIsOnboarded}`) {
+            lastSessionSyncKey = `${newLocationId}:${nextIsOnboarded}`;
+            void updateSession({
+              isOnboarded: nextIsOnboarded,
+              vendor_location_id: newLocationId,
+            });
+          }
         }
       }
     };
@@ -275,31 +353,37 @@ export function useOnboardingData() {
   // Mutation for invalidating the cache after form submissions
   const invalidateCache = useMutation({
     mutationFn: async () => {
+      // invalidateQueries already refetches active observers — no extra refetch()
       await queryClient.invalidateQueries({
-        queryKey: onboardingKeys.data(isRoomsFlag ?? "unknown"),
+        queryKey: onboardingKeys.all,
       });
-      return await refetch();
     },
   });
 
-  // Listen for the custom event from onboardingService.notifyDataChanged
+  // Single shared listener (same pattern as useEventData)
+  useEffect(() => {
+    attachOnboardingDataChangedListener(queryClient);
+    return () => detachOnboardingDataChangedListener();
+  }, [queryClient]);
+
+  // Keep is_rooms flag in sync when another tab/window updates storage
+  useEffect(() => {
+    window.addEventListener("storage", syncIsRoomsFlagFromStorage);
+    return () => {
+      window.removeEventListener("storage", syncIsRoomsFlagFromStorage);
+    };
+  }, [syncIsRoomsFlagFromStorage]);
+
+  // Also sync rooms flag when notify fires (listener only invalidates queries)
   useEffect(() => {
     const handleDataChanged = () => {
       syncIsRoomsFlagFromStorage();
-      void queryClient.invalidateQueries({ queryKey: onboardingKeys.all });
-      if (isValidLocationId) {
-        void refetch();
-      }
     };
-
-    window.addEventListener("onboarding-data-changed", handleDataChanged);
-    window.addEventListener("storage", syncIsRoomsFlagFromStorage);
-
+    window.addEventListener(ONBOARDING_DATA_CHANGED, handleDataChanged);
     return () => {
-      window.removeEventListener("onboarding-data-changed", handleDataChanged);
-      window.removeEventListener("storage", syncIsRoomsFlagFromStorage);
+      window.removeEventListener(ONBOARDING_DATA_CHANGED, handleDataChanged);
     };
-  }, [queryClient, refetch, syncIsRoomsFlagFromStorage, isValidLocationId]);
+  }, [syncIsRoomsFlagFromStorage]);
 
   return {
     onboardingData,

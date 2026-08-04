@@ -29,7 +29,7 @@ export function AuthAlternateLink({ variant }: AuthAlternateLinkProps) {
 
   if (variant === "register") {
     return (
-      <p className="text-center text-sm text-black/70 pt-4">
+      <p className="text-center text-sm text-black/70 pt-3">
         Have an account?{" "}
         <Link href="/auth/login" className={linkClassName}>
           Sign in
@@ -39,7 +39,7 @@ export function AuthAlternateLink({ variant }: AuthAlternateLinkProps) {
   }
 
   return (
-    <p className="text-center text-sm text-black/70 pt-4">
+    <p className="text-center text-sm text-black/70 pt-3">
       Don&apos;t have an account?{" "}
       <Link href={getRegistrationPath(website_role)} className={linkClassName}>
         Sign up

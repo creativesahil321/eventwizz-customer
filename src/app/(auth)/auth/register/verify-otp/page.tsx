@@ -11,6 +11,12 @@ export default function VerifyOTPPage() {
   const [isAuthorized, setIsAuthorized] = useState(false);
 
   useEffect(() => {
+    // Already verified — skip OTP page (Back button / direct URL)
+    if (getCookie("otp_verified")) {
+      router.replace("/auth/register/create-password");
+      return;
+    }
+
     // Check if we have an email to verify from cookies first, then localStorage
     const emailFromCookie = getCookie("verification_email");
     const emailFromStorage = localStorage.getItem("verification_email");

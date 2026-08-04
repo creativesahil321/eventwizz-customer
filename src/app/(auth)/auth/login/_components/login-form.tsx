@@ -28,6 +28,7 @@ import { OAuthSkeleton } from "@/components/auth/OAuthSkeleton";
 import { OAuthButtons } from "@/components/auth/OAuthButtons";
 import { handleUrlErrorParams } from "@/lib/auth/url-utils";
 import { AuthAlternateLink } from "@/app/(auth)/_components/auth-alternate-link";
+import { AuthLegalNotice } from "@/app/(auth)/_components/auth-legal-notice";
 
 export default function LoginForm() {
   const [loading, setLoading] = React.useState(false);
@@ -242,9 +243,9 @@ export default function LoginForm() {
                 <div className="absolute inset-0 flex items-center">
                   <span className="w-full border-t border-[var(--color-border,#e5e7eb)]" />
                 </div>
-                <div className="relative flex justify-center text-xs uppercase">
-                  <span className="bg-white px-4 text-black">
-                    Or continue with
+                <div className="relative flex justify-center text-xs uppercase tracking-wide">
+                  <span className="bg-[var(--color-surface,#fff)] px-4 text-[var(--color-text-dimmed,#6b7280)]">
+                    Or with email
                   </span>
                 </div>
               </div>
@@ -330,6 +331,7 @@ export default function LoginForm() {
                 : "Sign in"}
             </Button>
 
+            <AuthLegalNotice variant="login" />
             <AuthAlternateLink variant="login" />
           </div>
         </form>

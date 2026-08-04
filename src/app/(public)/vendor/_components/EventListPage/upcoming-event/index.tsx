@@ -29,6 +29,7 @@ import {
 import {
   eventCarouselNavButtonClass,
   eventListingManyScrollItemClass,
+  mobileEventRowPeekScrollItemClass,
 } from "../event-carousel-classes";
 import { EventListingHorizontalScroll } from "../event-listing-horizontal-scroll";
 import { SingleEventShowcase } from "../single-event-showcase";
@@ -210,7 +211,7 @@ export default function UpcomingEvents({
     );
   }
 
-  // 3–4 events: static grid — no slider chrome
+  // 3–4 events: horizontal peek on mobile; grid from md up
   if (events.length > 2 && events.length <= 4) {
     return (
       <section
@@ -230,26 +231,57 @@ export default function UpcomingEvents({
             />
           </div>
 
-          <div
-            className={cn(
-              "grid grid-cols-1 gap-5",
-              !narrowPreview && "sm:grid-cols-2",
-              !narrowPreview && events.length === 3 && "lg:grid-cols-3",
-              !narrowPreview && events.length === 4 && "lg:grid-cols-4",
-            )}
-          >
-            {events.map((event, index) => (
-              <LocationEventCard
-                key={event.slug || index}
-                event={event}
-                locationSlug={locationSlug || ""}
-                locationLabel={locationLabel}
-                isPending={pendingEventSlug === event.slug}
-                onNavigateStart={() => setPendingEventSlug(event.slug)}
-                imageFallback={eventImages[index % eventImages.length]}
-              />
-            ))}
+          <div className={cn("relative w-full", !narrowPreview && "md:hidden")}>
+            <EventListingHorizontalScroll
+              watchKey={scrollWatchKey}
+              leftButtonClassName={eventCarouselNavButtonClass(
+                "absolute left-0 top-1/2 -translate-y-1/2",
+              )}
+              rightButtonClassName={eventCarouselNavButtonClass(
+                "absolute right-0 top-1/2 -translate-y-1/2",
+              )}
+            >
+              {events.map((event, index) => (
+                <div
+                  key={event.slug || index}
+                  className={mobileEventRowPeekScrollItemClass}
+                >
+                  <div className="h-full w-full pb-1 pt-0.5">
+                    <LocationEventCard
+                      event={event}
+                      locationSlug={locationSlug || ""}
+                      locationLabel={locationLabel}
+                      isPending={pendingEventSlug === event.slug}
+                      onNavigateStart={() => setPendingEventSlug(event.slug)}
+                      imageFallback={eventImages[index % eventImages.length]}
+                    />
+                  </div>
+                </div>
+              ))}
+            </EventListingHorizontalScroll>
           </div>
+
+          {!narrowPreview ? (
+            <div
+              className={cn(
+                "hidden gap-5 md:grid",
+                events.length === 3 && "md:grid-cols-2 lg:grid-cols-3",
+                events.length === 4 && "md:grid-cols-2 lg:grid-cols-4",
+              )}
+            >
+              {events.map((event, index) => (
+                <LocationEventCard
+                  key={event.slug || index}
+                  event={event}
+                  locationSlug={locationSlug || ""}
+                  locationLabel={locationLabel}
+                  isPending={pendingEventSlug === event.slug}
+                  onNavigateStart={() => setPendingEventSlug(event.slug)}
+                  imageFallback={eventImages[index % eventImages.length]}
+                />
+              ))}
+            </div>
+          ) : null}
         </div>
       </section>
     );

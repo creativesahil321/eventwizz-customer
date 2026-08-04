@@ -16,16 +16,15 @@ export function eventCarouselNavButtonClass(extra?: string) {
 }
 
 /**
- * Mobile strip for 2–4 events: one main card plus a sliver of the next slide.
- * (Legacy Embla `CarouselItem` basis — prefer `mobileEventRowPeekScrollItemClass` for native scroll.)
+ * Legacy Embla `CarouselItem` basis — prefer `mobileEventRowPeekScrollItemClass`.
  */
 export const mobileEventRowPeekItemClass =
   "basis-[min(85%,19.5rem)] sm:basis-[min(85%,20.5rem)]";
 
 /**
- * Native horizontal scroll item widths.
- * Mobile uses `--event-scroll-slot` from EventListingHorizontalScroll (measured
- * track width) so one full card fits — never `vw`, which ignored arrow padding.
+ * Mobile peek strip for 2–4 events: one main card + sliver of the next.
+ * Uses `--event-scroll-slot` from EventListingHorizontalScroll (measured track
+ * width) so one full card fits — never `vw`, which ignored arrow padding.
  */
 export const mobileEventRowPeekScrollItemClass =
   "shrink-0 snap-center w-[min(19.5rem,calc(var(--event-scroll-slot,100%)-0.75rem))] sm:w-[min(20.5rem,calc(var(--event-scroll-slot,100%)-1rem))]";

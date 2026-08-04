@@ -134,6 +134,15 @@ export const API_ENDPOINTS = {
       DELETE: "/vendor/newsletters/delete/{id}",
       UNSUBSCRIBE: "/vendor/newsletters/unsubscribe/{email}",
     },
+    DISCOUNTS: {
+      GET_ALL: "/vendor/discounts",
+      GET_BY_ID: "/vendor/discounts/{id}",
+      LOCATIONS_WITH_EVENTS: "/vendor/discounts/locations-with-events",
+      CREATE: "/vendor/discounts/store",
+      UPDATE: "/vendor/discounts/update/{id}",
+      UPDATE_STATUS: "/vendor/discounts/{id}/status",
+      DELETE: "/vendor/discounts/delete/{id}",
+    },
     SITES_ESSENTIALS: {
       GET: "/vendor/site-essentials",
       UPDATE: "/vendor/site-essentials/update",
@@ -281,7 +290,7 @@ export const API_ENDPOINTS = {
       DELETE_CART_DATA_ROOM:
         "/customer/event/delete/{room_id}/{date}", // Room events: delete one date for a specific room
       CHECKOUT: "/customer/event/checkout", // Create booking + payment credentials
-      CHECKOUT_RESUME: "/customer/event/checkout/resume", // Resume unpaid Stripe payment
+      CHECKOUT_RESUME: "/customer/event/checkout/resume", // Resume unpaid booking; optional payment_gateway to switch
       CHECKOUT_BOOKING: "/customer/event/checkout/{bookingId}",
     },
 

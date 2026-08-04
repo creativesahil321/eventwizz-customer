@@ -11,6 +11,7 @@ import {
   stepTenSchema,
   StepTenType,
 } from "../../form-provider/schema";
+import { normalizeStepTenPaymentGatewaysFromApi } from "../../form-provider/normalize-step-ten-gateways";
 import { toast } from "sonner";
 import { onboardingService } from "@/services/vendor/onboarding/onboarding.service";
 import { vendorPaymentGatewayService } from "@/services/vendor/payment-gateway/payment-gateway.service";
@@ -37,6 +38,10 @@ export default function StepTen() {
   const stepTenPersistedApproved = useWatch({
     control: globalForm.control,
     name: "stepTen.isApproved",
+  });
+  const persistedStepTen = useWatch({
+    control: globalForm.control,
+    name: "stepTen",
   });
   const [loading, setLoading] = useState(false);
   const [disconnecting, setDisconnecting] = useState<
@@ -65,31 +70,6 @@ export default function StepTen() {
     mode: "onChange",
   });
 
-  const getInitialPaymentGateways = useCallback(() => {
-    const stepTenData = globalForm.getValues("stepTen");
-    const paymentGateways = (stepTenData as Record<string, unknown>)
-      ?.payment_gateways;
-
-    if (paymentGateways && typeof paymentGateways === "object") {
-      return paymentGateways as StepTenType["payment_gateways"];
-    }
-
-    return {
-      stripe: { status: undefined, account_id: "" },
-      paypal: { status: undefined, account_id: "" },
-      truelayer: {
-        status: undefined,
-        account_id: "",
-        bank: {
-          bank_name: undefined,
-          account_masked: undefined,
-        },
-      },
-      worldpay: { status: undefined, account_id: "" },
-      klarna: { status: undefined, account_id: "" },
-    };
-  }, [globalForm]);
-
   const deriveAcceptPaymentMethod = useCallback(
     (
       gateways: StepTenType["payment_gateways"] | undefined,
@@ -108,31 +88,40 @@ export default function StepTen() {
     [],
   );
 
+  // Keep local step form in sync with persistence (nested online/offline → flat UI).
   useEffect(() => {
     if (eventId > 0) {
       form.setValue("event_id", eventId);
     }
 
-    const stepTenData = globalForm.getValues("stepTen");
-    const paymentGateways = (stepTenData as Record<string, unknown>)
-      ?.payment_gateways;
+    if (!persistedStepTen || typeof persistedStepTen !== "object") return;
 
-    if (paymentGateways && typeof paymentGateways === "object") {
-      const mappedGateways = getInitialPaymentGateways();
-      form.setValue("payment_gateways", mappedGateways);
-      form.setValue(
-        "accept_payment_method",
-        deriveAcceptPaymentMethod(mappedGateways),
-        { shouldValidate: true, shouldDirty: false },
-      );
-    }
-  }, [
-    eventId,
-    form,
-    globalForm,
-    getInitialPaymentGateways,
-    deriveAcceptPaymentMethod,
-  ]);
+    const mappedGateways = normalizeStepTenPaymentGatewaysFromApi(
+      (persistedStepTen as Record<string, unknown>).payment_gateways,
+    ) as StepTenType["payment_gateways"];
+
+    form.setValue("payment_gateways", mappedGateways);
+    form.setValue(
+      "isApproved",
+      (persistedStepTen as { isApproved?: boolean }).isApproved === true,
+    );
+    form.setValue(
+      "is_skipped",
+      (persistedStepTen as { is_skipped?: boolean }).is_skipped === true,
+    );
+    form.setValue(
+      "accept_payment_method",
+      deriveAcceptPaymentMethod(mappedGateways),
+      { shouldValidate: true, shouldDirty: false },
+    );
+
+    const truelayer = mappedGateways?.truelayer as
+      | { webhook_url?: string; public_key?: string }
+      | undefined;
+    // Prefer persistence values when present; keep in-session connect values otherwise.
+    setTruelayerWebhookUrl((prev) => truelayer?.webhook_url || prev);
+    setTruelayerPublicKey((prev) => truelayer?.public_key || prev);
+  }, [eventId, form, persistedStepTen, deriveAcceptPaymentMethod]);
 
   const paymentGateways = form.watch("payment_gateways");
   const stripeStatus = form.watch("payment_gateways.stripe.status");
@@ -352,7 +341,8 @@ export default function StepTen() {
           "Payment setup skipped. You can complete this anytime from Payment settings.",
           { duration: 5000 },
         );
-        setActiveStep(11);
+        // Navigate to step 11 in UI, but persist completed step as 10.
+        void setActiveStep(11, { skipSessionSync: true });
         Promise.all([updateSession({ on_boarding_step: 10 }), save()]).catch(
           (error) => {
             console.error("Background save error:", error);
@@ -410,7 +400,8 @@ export default function StepTen() {
       if (response && response.status) {
         globalForm.setValue("stepTen", { ...data, isApproved: true });
 
-        setActiveStep(11);
+        // Navigate to step 11 in UI, but persist completed step as 10.
+        void setActiveStep(11, { skipSessionSync: true });
         Promise.all([
           updateSession({
             on_boarding_step: 10,

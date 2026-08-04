@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import AdminHeader from "@/app/(public)/admin/_components/header";
 import AdminFooter from "@/app/(public)/admin/_components/footer";
 import { appConfig } from "@/config/app";
+import { assertAdminPublicSite } from "@/lib/assert-admin-public-site";
 import {
   getBlogPostBySlug,
   getBlogPostSlugs,
@@ -47,6 +48,8 @@ export async function generateMetadata({
 }
 
 export default async function BlogArticlePage({ params }: BlogArticlePageProps) {
+  await assertAdminPublicSite();
+
   const { slug } = await params;
   const post = getBlogPostBySlug(slug);
 

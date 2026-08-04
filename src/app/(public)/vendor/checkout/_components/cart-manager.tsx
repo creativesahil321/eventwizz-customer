@@ -383,6 +383,9 @@ export default function CartManager({}: CartManagerProps) {
       newSet.delete(dateKey);
       return newSet;
     });
+    // Drop reserved-payment UI immediately (same as Clear all) so the
+    // timer / "Payment required" card cannot outlive a deleted date.
+    useCheckoutPaymentUiStore.getState().clearPaymentSession();
 
     try {
       const { roomId, date: eventDate } = parseRoomDateKey(dateKey);

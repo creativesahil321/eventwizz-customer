@@ -100,6 +100,8 @@ export interface CheckoutStripeDetails {
 
 export interface CheckoutResumeRequest {
   booking_number: string;
+  /** When set, resume/switch payment on this gateway for the unpaid booking. */
+  payment_gateway?: number;
 }
 
 export interface StripePaymentSuccessRequest {

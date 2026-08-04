@@ -92,7 +92,9 @@ export const useStoreEventBooking = () => {
 
 /**
  * Hook for deleting cart data for a specific date
- * 🔄 SYNC FIX: Ensures all three sources are synchronized
+ * 🔄 SYNC FIX: Ensures all three sources are synchronized.
+ * Also clears the checkout payment session — same as clear-all — so the
+ * "Payment required" / Stripe modal cannot outlive a user-removed date.
  */
 export const useDeleteCartDate = () => {
   const queryClient = useQueryClient();
@@ -119,6 +121,12 @@ export const useDeleteCartDate = () => {
         removeDate(currentEventSlug, params.storeDateKey);
         console.log("✅ Zustand localStorage cleared");
       }
+
+      // 4️⃣ Clear pending Stripe payment session (sessionStorage)
+      // Without this, deleting the last date leaves an empty cart with
+      // "Payment required" / reserved booking UI still visible.
+      useCheckoutPaymentUiStore.getState().clearPaymentSession();
+      console.log("✅ Checkout payment session cleared");
 
       console.log("🎉 Cart date deleted and all sources synchronized");
     },

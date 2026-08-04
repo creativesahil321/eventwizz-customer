@@ -163,10 +163,6 @@ export default function AdminFooter() {
                 ))}
               </ul>
             </nav>
-            <p className="mt-4 text-xs leading-relaxed text-[var(--color-on-footer)]/55">
-              Privacy, terms, cookies, refunds, and vendor policies are available
-              on the Terms &amp; Privacy page.
-            </p>
           </div>
         </div>
 

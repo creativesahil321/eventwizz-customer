@@ -14,6 +14,9 @@ import {
   CalendarDays,
   Ticket,
   X,
+  Loader2,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -36,9 +39,13 @@ import {
   pageCardClassName,
 } from "@/app/(protected)/_components/page-header-card";
 import { cn } from "@/lib/utils";
-import { DUMMY_DISCOUNTS } from "../_lib/dummy-data";
-import type { Discount, DiscountCategory, DiscountStatus } from "../_lib/types";
+import { useDebounce } from "@/hooks/data-table/use-debounce";
+import type { DiscountCategory, DiscountStatus } from "../_lib/types";
 import { DISCOUNT_CATEGORY_LABELS } from "../_lib/types";
+import {
+  useDiscounts,
+  useUpdateDiscountStatus,
+} from "../_lib/queries";
 import { DiscountStatusBadge } from "./discount-status-badge";
 import {
   formatDiscountScope,
@@ -64,58 +71,47 @@ const CATEGORY_META: Record<
   },
 };
 
+const PER_PAGE = 10;
+
 export function DiscountsList() {
   const searchParams = useSearchParams();
   const eventIdParam = searchParams.get("eventId");
   const eventNameParam = searchParams.get("eventName");
 
-  const [items, setItems] = useState<Discount[]>(DUMMY_DISCOUNTS);
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState<DiscountCategory | "all">("all");
   const [status, setStatus] = useState<DiscountStatus | "all">("all");
+  const [page, setPage] = useState(1);
   const [scopedToEvent, setScopedToEvent] = useState(Boolean(eventIdParam));
 
+  const debouncedSearch = useDebounce(search, 400);
   const eventIdNum = eventIdParam ? Number(eventIdParam) : null;
 
-  const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    return items.filter((d) => {
-      if (
-        scopedToEvent &&
-        eventIdNum &&
-        Number.isFinite(eventIdNum) &&
-        d.event_id !== eventIdNum
-      ) {
-        return false;
-      }
-      if (category !== "all" && d.category !== category) return false;
-      if (status !== "all" && d.status !== status) return false;
-      if (!q) return true;
-      const haystack = [
-        d.name,
-        d.coupon_code,
-        d.event_name,
-        d.location_name,
-        d.room_name,
-      ]
-        .filter(Boolean)
-        .join(" ")
-        .toLowerCase();
-      return haystack.includes(q);
-    });
-  }, [items, search, category, status, scopedToEvent, eventIdNum]);
+  const queryParams = useMemo(
+    () => ({
+      category,
+      status,
+      search: debouncedSearch.trim() || undefined,
+      page,
+      per_page: PER_PAGE,
+      ...(scopedToEvent &&
+      eventIdNum &&
+      Number.isFinite(eventIdNum) &&
+      eventIdNum > 0
+        ? { vendor_event_id: eventIdNum }
+        : {}),
+    }),
+    [category, status, debouncedSearch, page, scopedToEvent, eventIdNum]
+  );
 
-  const stats = useMemo(() => {
-    const pool =
-      scopedToEvent && eventIdNum
-        ? items.filter((d) => d.event_id === eventIdNum)
-        : items;
-    return {
-      active: pool.filter((d) => d.status === "active").length,
-      coupons: pool.filter((d) => d.category === "coupon_code").length,
-      total: pool.length,
-    };
-  }, [items, scopedToEvent, eventIdNum]);
+  const { data, isLoading, isFetching, isError, error, refetch } =
+    useDiscounts(queryParams);
+  const updateStatus = useUpdateDiscountStatus();
+
+  const items = data?.data ?? [];
+  const meta = data?.meta;
+  const lastPage = meta?.last_page ?? 1;
+  const total = meta?.total ?? 0;
 
   const createHref = eventIdParam
     ? `/vendor/discounts/create?eventId=${eventIdParam}${
@@ -125,21 +121,36 @@ export function DiscountsList() {
       }`
     : "/vendor/discounts/create";
 
-  const toggleStatus = (id: number) => {
-    setItems((prev) =>
-      prev.map((d) => {
-        if (d.id !== id || d.status === "expired") return d;
-        const nextStatus = d.status === "active" ? "inactive" : "active";
-        toast.success(
-          nextStatus === "active" ? "Discount activated" : "Discount deactivated"
-        );
-        return {
-          ...d,
-          status: nextStatus,
-          updated_at: new Date().toISOString(),
-        };
-      })
-    );
+  const handleCategoryChange = (next: DiscountCategory | "all") => {
+    setCategory(next);
+    setPage(1);
+  };
+
+  const handleStatusChange = (next: DiscountStatus | "all") => {
+    setStatus(next);
+    setPage(1);
+  };
+
+  const handleSearchChange = (value: string) => {
+    setSearch(value);
+    setPage(1);
+  };
+
+  const toggleStatus = async (id: number, current: DiscountStatus) => {
+    if (current === "expired") return;
+    const nextStatus = current === "active" ? "inactive" : "active";
+    try {
+      await updateStatus.mutateAsync({ id, status: nextStatus });
+      toast.success(
+        nextStatus === "active" ? "Discount activated" : "Discount deactivated"
+      );
+    } catch (err) {
+      toast.error(
+        err instanceof Error
+          ? err.message
+          : "Could not update status. Check status API endpoint."
+      );
+    }
   };
 
   return (
@@ -174,7 +185,10 @@ export function DiscountsList() {
               type="button"
               variant="ghost"
               size="sm"
-              onClick={() => setScopedToEvent(false)}
+              onClick={() => {
+                setScopedToEvent(false);
+                setPage(1);
+              }}
             >
               <X className="mr-1 h-3.5 w-3.5" />
               Show all discounts
@@ -183,28 +197,10 @@ export function DiscountsList() {
         </div>
       ) : null}
 
-      {/* Stats */}
-      <div className="grid gap-3 sm:grid-cols-3">
-        {[
-          { label: "Active", value: stats.active },
-          { label: "Coupon codes", value: stats.coupons },
-          { label: "Total", value: stats.total },
-        ].map((s) => (
-          <div
-            key={s.label}
-            className={pageCardClassName("!p-4 flex items-center justify-between")}
-          >
-            <span className="text-sm text-muted-foreground">{s.label}</span>
-            <span className="text-2xl font-bold text-[#0F172A]">{s.value}</span>
-          </div>
-        ))}
-      </div>
-
-      {/* Category chips */}
       <div className="flex flex-wrap gap-2">
         <button
           type="button"
-          onClick={() => setCategory("all")}
+          onClick={() => handleCategoryChange("all")}
           className={cn(
             "rounded-full border px-3 py-1.5 text-sm transition-colors",
             category === "all"
@@ -220,7 +216,7 @@ export function DiscountsList() {
             <button
               key={key}
               type="button"
-              onClick={() => setCategory(key)}
+              onClick={() => handleCategoryChange(key)}
               className={cn(
                 "inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm transition-colors",
                 category === key
@@ -241,14 +237,16 @@ export function DiscountsList() {
             <Search className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              onChange={(e) => handleSearchChange(e.target.value)}
               placeholder="Search name, code, event…"
               className="pl-9"
             />
           </div>
           <Select
             value={status}
-            onValueChange={(v) => setStatus(v as DiscountStatus | "all")}
+            onValueChange={(v) =>
+              handleStatusChange(v as DiscountStatus | "all")
+            }
           >
             <SelectTrigger className="w-full lg:w-[160px]">
               <SelectValue placeholder="Status" />
@@ -262,7 +260,27 @@ export function DiscountsList() {
           </Select>
         </div>
 
-        {filtered.length === 0 ? (
+        {isLoading ? (
+          <div className="flex items-center justify-center gap-2 py-16 text-sm text-muted-foreground">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            Loading discounts…
+          </div>
+        ) : isError ? (
+          <div className="rounded-lg border border-dashed border-destructive/30 px-4 py-12 text-center">
+            <p className="font-medium text-[#0F172A]">Could not load discounts</p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {error instanceof Error ? error.message : "Please try again."}
+            </p>
+            <Button
+              type="button"
+              variant="outline"
+              className="mt-4"
+              onClick={() => refetch()}
+            >
+              Retry
+            </Button>
+          </div>
+        ) : items.length === 0 ? (
           <div className="rounded-lg border border-dashed px-4 py-12 text-center">
             <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-muted">
               <Percent className="h-5 w-5 text-muted-foreground" />
@@ -279,74 +297,127 @@ export function DiscountsList() {
             </Button>
           </div>
         ) : (
-          <ul className="space-y-3">
-            {filtered.map((discount) => {
-              const Icon = CATEGORY_META[discount.category].icon;
-              return (
-                <li
-                  key={discount.id}
-                  className="group flex flex-col gap-3 rounded-xl border bg-white p-4 transition-shadow hover:shadow-sm sm:flex-row sm:items-center sm:justify-between"
-                >
-                  <div className="flex min-w-0 items-start gap-3">
-                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#EAF7F8] text-[#0B6A75]">
-                      <Icon className="h-4 w-4" />
-                    </div>
-                    <div className="min-w-0 space-y-1">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <p className="truncate font-semibold text-[#0F172A]">
-                          {getDiscountDisplayName(discount)}
-                        </p>
-                        <DiscountStatusBadge status={discount.status} />
+          <>
+            <ul
+              className={cn(
+                "space-y-3",
+                isFetching && !isLoading && "opacity-70"
+              )}
+            >
+              {items.map((discount) => {
+                const Icon = CATEGORY_META[discount.category].icon;
+                return (
+                  <li
+                    key={discount.id}
+                    className="group flex flex-col gap-3 rounded-xl border bg-white p-4 transition-shadow hover:shadow-sm sm:flex-row sm:items-center sm:justify-between"
+                  >
+                    <div className="flex min-w-0 items-start gap-3">
+                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#EAF7F8] text-[#0B6A75]">
+                        <Icon className="h-4 w-4" />
                       </div>
-                      <p className="text-sm font-medium text-[var(--color-primary)]">
-                        {formatDiscountValue(discount)}
-                      </p>
-                      <p className="truncate text-xs text-muted-foreground">
-                        {DISCOUNT_CATEGORY_LABELS[discount.category]}
-                        {" · "}
-                        {formatDiscountScope(discount)}
-                        {" · Expires "}
-                        {discount.expires_at}
-                      </p>
+                      <div className="min-w-0 space-y-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <p className="truncate font-semibold text-[#0F172A]">
+                            {getDiscountDisplayName(discount)}
+                          </p>
+                          <DiscountStatusBadge status={discount.status} />
+                        </div>
+                        <p className="text-sm font-medium text-[var(--color-primary)]">
+                          {formatDiscountValue(discount)}
+                        </p>
+                        <p className="truncate text-xs text-muted-foreground">
+                          {discount.summary || (
+                            <>
+                              {DISCOUNT_CATEGORY_LABELS[discount.category]}
+                              {" · "}
+                              {formatDiscountScope(discount)}
+                              {" · Expires "}
+                              {discount.expires_at}
+                            </>
+                          )}
+                        </p>
+                      </div>
                     </div>
-                  </div>
 
-                  <div className="flex shrink-0 items-center gap-2 self-end sm:self-center">
-                    <Button asChild variant="outline" size="sm">
-                      <Link href={`/vendor/discounts/${discount.id}/edit`}>
-                        <Pencil className="mr-1.5 h-3.5 w-3.5" />
-                        Edit
-                      </Link>
-                    </Button>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-8 w-8">
-                          <MoreHorizontal className="h-4 w-4" />
-                          <span className="sr-only">More</span>
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        {discount.status !== "expired" ? (
-                          <DropdownMenuItem
-                            onClick={() => toggleStatus(discount.id)}
+                    <div className="flex shrink-0 items-center gap-2 self-end sm:self-center">
+                      <Button asChild variant="outline" size="sm">
+                        <Link href={`/vendor/discounts/${discount.id}/edit`}>
+                          <Pencil className="mr-1.5 h-3.5 w-3.5" />
+                          Edit
+                        </Link>
+                      </Button>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8"
                           >
-                            <Power className="mr-2 h-4 w-4" />
-                            {discount.status === "active"
-                              ? "Deactivate"
-                              : "Activate"}
-                          </DropdownMenuItem>
-                        ) : (
-                          <DropdownMenuItem disabled>
-                            Expired — cannot activate
-                          </DropdownMenuItem>
-                        )}
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
+                            <MoreHorizontal className="h-4 w-4" />
+                            <span className="sr-only">More</span>
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          {discount.status !== "expired" ? (
+                            <DropdownMenuItem
+                              disabled={updateStatus.isPending}
+                              onClick={() =>
+                                toggleStatus(discount.id, discount.status)
+                              }
+                            >
+                              <Power className="mr-2 h-4 w-4" />
+                              {discount.status === "active"
+                                ? "Deactivate"
+                                : "Activate"}
+                            </DropdownMenuItem>
+                          ) : (
+                            <DropdownMenuItem disabled>
+                              Expired — cannot activate
+                            </DropdownMenuItem>
+                          )}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+
+            {lastPage > 1 ? (
+              <div className="flex items-center justify-between gap-3 border-t pt-3">
+                <p className="text-xs text-muted-foreground">
+                  Page {meta?.current_page ?? page} of {lastPage}
+                  {total ? ` · ${total} total` : ""}
+                </p>
+                <div className="flex gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={page <= 1 || isFetching}
+                    onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  >
+                    <ChevronLeft className="mr-1 h-4 w-4" />
+                    Prev
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={page >= lastPage || isFetching}
+                    onClick={() => setPage((p) => p + 1)}
+                  >
+                    Next
+                    <ChevronRight className="ml-1 h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <p className="text-xs text-muted-foreground">
+                {total} discount{total === 1 ? "" : "s"}
+              </p>
+            )}
+          </>
         )}
       </div>
     </div>

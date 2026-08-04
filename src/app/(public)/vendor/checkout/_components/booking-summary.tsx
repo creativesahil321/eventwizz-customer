@@ -179,6 +179,14 @@ export default function BookingSummary({}: BookingSummaryProps) {
     }
   }, [stripePaymentSession?.bookingNumber]);
 
+  // Date delete / Clear all clears the payment session — close the Stripe modal
+  // so it cannot stay open over an empty cart.
+  useEffect(() => {
+    if (!stripePaymentSession) {
+      setIsStripePaymentOpen(false);
+    }
+  }, [stripePaymentSession]);
+
   const sessionSecondsLeft = usePaymentSessionCountdown(
     stripePaymentSession?.expiresAt,
     expireSession,
@@ -192,7 +200,9 @@ export default function BookingSummary({}: BookingSummaryProps) {
     let cancelled = false;
     void (async () => {
       try {
-        const response = await resumeCheckoutMutation.mutateAsync(bookingNumber);
+        const response = await resumeCheckoutMutation.mutateAsync({
+          booking_number: bookingNumber,
+        });
         if (cancelled || !response.status || !response.data) return;
         const paymentAction = resolveCheckoutPaymentAction(response.data);
         if (paymentAction?.type !== "stripe" || !paymentAction.session.expiresAt) {
@@ -239,6 +249,11 @@ export default function BookingSummary({}: BookingSummaryProps) {
     // Imperative read — avoids adding stripePaymentSession to deps (infinite loop)
     const store = useCheckoutPaymentUiStore.getState();
     if (store.stripePaymentSession) return;
+
+    // Don't restore onto an empty cart (e.g. user deleted the last date). The
+    // backend may still attach pending_payment briefly; showing "Payment required"
+    // over "Your cart is empty" is the bug we're fixing.
+    if (getApiCartDateKeys(currentEventApiData).length === 0) return;
 
     const pending = currentEventApiData.pending_payment as
       | import("@/lib/types/cart.types").ApiPendingPayment
@@ -353,6 +368,80 @@ export default function BookingSummary({}: BookingSummaryProps) {
   const { hasUnsavedEdits, hasValidationErrors, validationErrorMessage } =
     checkoutReadiness;
 
+  const resumePendingPayment = useCallback(
+    async (paymentGatewayId?: string | null) => {
+      if (!stripePaymentSession?.bookingNumber) return;
+
+      const gatewayId = paymentGatewayId
+        ? Number(paymentGatewayId)
+        : undefined;
+      if (
+        paymentGatewayId != null &&
+        paymentGatewayId !== "" &&
+        (!Number.isFinite(gatewayId) || (gatewayId ?? 0) <= 0)
+      ) {
+        toast.error("Select a payment method", {
+          description: "Choose Stripe or PayPal to continue.",
+        });
+        return;
+      }
+
+      try {
+        setIsProcessing(true);
+        toast.info("Loading payment...", { id: "resume-payment" });
+        const response = await resumeCheckoutMutation.mutateAsync({
+          booking_number: stripePaymentSession.bookingNumber,
+          ...(gatewayId && gatewayId > 0
+            ? { payment_gateway: gatewayId }
+            : {}),
+        });
+        toast.dismiss("resume-payment");
+
+        if (!response.status || !response.data) {
+          throw new Error(response.message || "Could not resume payment");
+        }
+
+        const paymentAction = resolveCheckoutPaymentAction(response.data);
+        if (!paymentAction) {
+          throw new Error(
+            "Payment could not be started. Please try again or contact support.",
+          );
+        }
+
+        if (paymentAction.type === "stripe") {
+          useCheckoutPaymentUiStore.getState().setAwaitingStripePayment(true);
+          stripePaymentCompletedRef.current = false;
+          void getStripePromise(paymentAction.session.publishableKey);
+          setStripePaymentSession(
+            mergeStripePaymentSession(
+              stripePaymentSession,
+              paymentAction.session,
+            ),
+          );
+          setIsStripePaymentOpen(true);
+          return;
+        }
+
+        // Redirect gateway (PayPal, etc.) — leave Stripe modal/session behind.
+        useCheckoutPaymentUiStore.getState().setAwaitingStripePayment(false);
+        setIsStripePaymentOpen(false);
+        window.location.href = paymentAction.url;
+      } catch (error) {
+        toast.dismiss("resume-payment");
+        if (error instanceof Error) {
+          handleCheckoutError(error);
+        } else {
+          toast.error("Could not resume payment", {
+            description: "Please try again or contact support.",
+          });
+        }
+      } finally {
+        setIsProcessing(false);
+      }
+    },
+    [resumeCheckoutMutation, stripePaymentSession, setStripePaymentSession],
+  );
+
   // Checkout handler
   const handleProceedToPayment = async () => {
     if (
@@ -372,7 +461,9 @@ export default function BookingSummary({}: BookingSummaryProps) {
         useCheckoutPaymentUiStore.getState().setAwaitingStripePayment(false);
         // fall through to fresh checkout below
       } else {
-        void resumeStripePayment();
+        // Same booking hold — resume on the currently selected gateway
+        // (allows Stripe → PayPal after closing the card modal unpaid).
+        void resumePendingPayment(selectedGateway ?? undefined);
         return;
       }
     }
@@ -591,60 +682,21 @@ export default function BookingSummary({}: BookingSummaryProps) {
     void invalidateCustomerBookingsList(queryClient);
   }, [queryClient]);
 
-  const resumeStripePayment = useCallback(async () => {
-    if (!stripePaymentSession?.bookingNumber) return;
-
-    try {
-      setIsProcessing(true);
-      toast.info("Loading payment...", { id: "resume-payment" });
-      const response = await resumeCheckoutMutation.mutateAsync(
-        stripePaymentSession.bookingNumber,
-      );
-      toast.dismiss("resume-payment");
-
-      if (!response.status || !response.data) {
-        throw new Error(response.message || "Could not resume payment");
-      }
-
-      const paymentAction = resolveCheckoutPaymentAction(response.data);
-      if (paymentAction?.type !== "stripe") {
-        throw new Error("Stripe payment could not be resumed.");
-      }
-
-      useCheckoutPaymentUiStore.getState().setAwaitingStripePayment(true);
-      stripePaymentCompletedRef.current = false;
-      void getStripePromise(paymentAction.session.publishableKey);
-      setStripePaymentSession(
-        mergeStripePaymentSession(stripePaymentSession, paymentAction.session),
-      );
-      setIsStripePaymentOpen(true);
-    } catch (error) {
-      toast.dismiss("resume-payment");
-      if (error instanceof Error) {
-        handleCheckoutError(error);
-      } else {
-        toast.error("Could not resume payment", {
-          description: "Please try again or contact support.",
-        });
-      }
-    } finally {
-      setIsProcessing(false);
-    }
-  }, [resumeCheckoutMutation, stripePaymentSession]);
-
   const stripePaymentModal = (
     <CheckoutStripePaymentModal
       open={isStripePaymentOpen}
       onOpenChange={(open) => {
         setIsStripePaymentOpen(open);
-        if (
-          !open &&
-          stripePaymentSession &&
-          !stripePaymentCompletedRef.current
-        ) {
-          toast.message("Payment not completed", {
-            description: `Booking ${stripePaymentSession.bookingNumber} is reserved. Tap "Complete payment" to continue.`,
-          });
+        if (!open && !stripePaymentCompletedRef.current) {
+          // Read imperatively — session may already be cleared by date delete /
+          // Clear all; don't toast "Payment not completed" in that case.
+          const session =
+            useCheckoutPaymentUiStore.getState().stripePaymentSession;
+          if (session) {
+            toast.message("Payment not completed", {
+              description: `Booking ${session.bookingNumber} is reserved. Tap "Complete payment" to continue.`,
+            });
+          }
         }
       }}
       session={stripePaymentSession}
@@ -904,7 +956,7 @@ export default function BookingSummary({}: BookingSummaryProps) {
           </p>
           <Button
             type="button"
-            onClick={resumeStripePayment}
+            onClick={() => void resumePendingPayment(selectedGateway)}
             className={cn(
               "mt-4 h-11 w-full rounded-xl text-sm font-bold",
               checkoutPayButtonClass(false),
@@ -981,8 +1033,10 @@ export default function BookingSummary({}: BookingSummaryProps) {
 
   // ──────────────────────────────────────────────
   // RENDER: ORDER SUMMARY CARD
+  // Must be a render fn (not an inner component) so timer ticks
+  // re-render without remounting PaymentGatewaySelector every second.
   // ──────────────────────────────────────────────
-  const OrderSummaryContent = () => (
+  const renderOrderSummaryContent = () => (
     <div className="space-y-4">
       {renderExpiredPaymentBanner("card")}
       {renderPendingPaymentBanner("card")}
@@ -1085,7 +1139,11 @@ export default function BookingSummary({}: BookingSummaryProps) {
               }
               selectedGateway={selectedGateway}
               onGatewaySelect={setSelectedGateway}
-              disabled={false}
+              disabled={
+                isProcessing ||
+                processCheckoutMutation.isPending ||
+                resumeCheckoutMutation.isPending
+              }
               showError={ctaState.showGatewayError}
             />
             <Separator className="bg-gray-100" />
@@ -1163,7 +1221,7 @@ export default function BookingSummary({}: BookingSummaryProps) {
               </div>
             </div>
             <div className="px-5 py-4">
-              <OrderSummaryContent />
+              {renderOrderSummaryContent()}
             </div>
           </div>
 
@@ -1205,7 +1263,7 @@ export default function BookingSummary({}: BookingSummaryProps) {
                   <h2 className="mb-4 text-base font-semibold text-[color:var(--checkout-brand-primary)]">
                     Order Summary
                   </h2>
-                  <OrderSummaryContent />
+                  {renderOrderSummaryContent()}
                 </div>
               </motion.div>
             )}

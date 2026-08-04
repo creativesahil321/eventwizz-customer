@@ -3,7 +3,7 @@ import AdminHeader from "@/app/(public)/admin/_components/header";
 import AdminFooter from "@/app/(public)/admin/_components/footer";
 import AboutContent from "./_components/about-content";
 import { appConfig } from "@/config/app";
-import { getRequestHost } from "@/lib/server-theme";
+import { assertAdminPublicSite } from "@/lib/assert-admin-public-site";
 import { fetchInfoPagesHtml } from "@/lib/server-info-pages";
 
 export const metadata: Metadata = {
@@ -28,7 +28,7 @@ export const metadata: Metadata = {
 };
 
 export default async function AboutPage() {
-  const host = await getRequestHost();
+  const host = await assertAdminPublicSite();
   const content = await fetchInfoPagesHtml("admin", ["about_page_content"], host);
 
   return (

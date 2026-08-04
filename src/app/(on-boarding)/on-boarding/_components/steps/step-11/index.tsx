@@ -362,16 +362,18 @@ export default function StepEleven() {
         void queryClient.invalidateQueries({ queryKey: ["locations"] });
       }
 
-      // Final step — mark onboarded then open preview.
-      await Promise.all([
-        update({ on_boarding_step: 11, isOnboarded: true }),
-        save(),
-      ]).catch((error) => {
+      // Final step — mark onboarded, then open preview immediately.
+      // Do this BEFORE save()/invalidate so a persistence refetch cannot race
+      // `recoverFromOnboardingAlreadyCompleted` to /welcome.
+      try {
+        await update({ on_boarding_step: 11, isOnboarded: true });
+      } catch (error) {
+        console.error("Failed to mark onboarded in session:", error);
+      }
+      router.replace("/preview/onboarding");
+      void save().catch((error) => {
         console.error("Background save error:", error);
       });
-      // replace (not push) so the browser Back button cannot return to the
-      // onboarding form once it is complete.
-      router.replace("/preview/onboarding");
     } catch (error) {
       console.error("Error during Step Eleven submission:", error);
     } finally {

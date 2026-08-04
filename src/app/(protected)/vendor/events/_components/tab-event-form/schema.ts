@@ -377,8 +377,11 @@ const baseDateSchema = z.object({
   event_date: z.string().min(1, "Date is required"),
   booking_type: z.enum(["tickets", "tables", "both"]),
   has_bookings: optionalBooleanFromApi,
-  /** From GET show — prefer over has_bookings for cancel vs remove */
+  /** From GET show — "cancel" | "remove"; prefer with use_cancel_date_action */
+  date_action: z.enum(["cancel", "remove"]).optional(),
+  /** From GET show — true when vendor must cancel (not hard-delete) the date */
   use_cancel_date_action: optionalBooleanFromApi,
+  /** Legacy — ignore for cancel vs remove gating */
   cancellation_request_pending: optionalBooleanFromApi,
   has_financial_bookings: optionalBooleanFromApi,
   cancelled: optionalBooleanFromApi,

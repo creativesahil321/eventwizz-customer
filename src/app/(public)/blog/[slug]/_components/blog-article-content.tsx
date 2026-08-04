@@ -35,7 +35,7 @@ export default function BlogArticleContent({ post }: BlogArticleContentProps) {
     <article className="bg-[color:var(--color-background)] pb-16 pt-4 sm:pb-24 sm:pt-6 md:pt-10">
       <div className="mx-auto w-full max-w-[1180px] px-4 sm:px-5 md:px-8">
         <Link
-          href="/#latest-news"
+          href="/blog"
           className="mb-6 inline-flex items-center gap-2 text-xs font-medium uppercase tracking-[0.14em] text-[color:var(--color-text-dimmed)] transition-colors hover:text-[color:var(--color-primary)] sm:mb-10 md:mb-14"
         >
           <ArrowLeft className="h-3.5 w-3.5" />

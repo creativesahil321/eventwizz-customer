@@ -18,7 +18,7 @@ export const NOTIFICATION_STATUSES = [
 
 /**
  * Feed chips map 1:1 to the API `filter` query param
- * (e.g. `?filter=bookings`, `?filter=customers`).
+ * (e.g. `?filter=bookings`, `?filter=customers`, `?filter=vendors`).
  */
 export type NotificationFeedFilter = {
   id: string;
@@ -29,6 +29,7 @@ export type NotificationFeedFilter = {
     | "bookings"
     | "payments"
     | "customers"
+    | "vendors"
     | "system";
 };
 
@@ -61,6 +62,12 @@ const FEED_FILTER_CUSTOMERS: NotificationFeedFilter = {
   filter: "customers",
 };
 
+const FEED_FILTER_VENDORS: NotificationFeedFilter = {
+  id: "vendors",
+  label: "Vendors",
+  filter: "vendors",
+};
+
 const FEED_FILTER_SYSTEM: NotificationFeedFilter = {
   id: "system",
   label: "System",
@@ -69,7 +76,9 @@ const FEED_FILTER_SYSTEM: NotificationFeedFilter = {
 
 /**
  * Role-aware feed chips.
- * "Customers" is only for vendor/admin — never on customer dashboards.
+ * - Admin: Vendors (not Customers)
+ * - Vendor: Customers
+ * - Customer: neither
  */
 export function getNotificationFeedFilters(
   role: UserRole | string | null | undefined,
@@ -86,7 +95,18 @@ export function getNotificationFeedFilters(
     ];
   }
 
-  // vendor + admin (and fallback)
+  if (normalizedRole === "admin") {
+    return [
+      FEED_FILTER_ALL,
+      FEED_FILTER_UNREAD,
+      FEED_FILTER_BOOKINGS,
+      FEED_FILTER_PAYMENTS,
+      FEED_FILTER_VENDORS,
+      FEED_FILTER_SYSTEM,
+    ];
+  }
+
+  // vendor (and fallback)
   return [
     FEED_FILTER_ALL,
     FEED_FILTER_UNREAD,
