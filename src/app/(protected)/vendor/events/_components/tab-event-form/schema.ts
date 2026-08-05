@@ -22,6 +22,7 @@ import {
   BANNER_HEADING_MAX_WORDS,
   countWords,
 } from "@/lib/word-count";
+import { isVendorDateCancelled } from "@/app/(protected)/vendor/events/_lib/vendor-date-cancelled";
 
 // Validation functions for event scheduler
 // Removed future time validation - only keeping sequence validation
@@ -311,6 +312,9 @@ export type StepTwoType = z.infer<typeof stepTwoSchema>;
 
 //=== Step 3 ===//
 const validateDepositDueDate = (data: unknown) => {
+  if (isVendorDateCancelled(data as { cancelled?: boolean })) {
+    return true;
+  }
   const { booking_type, payment_type, deposit_due_date } = data as {
     booking_type: string;
     payment_type: string;
@@ -377,8 +381,16 @@ const baseDateSchema = z.object({
   event_date: z.string().min(1, "Date is required"),
   booking_type: z.enum(["tickets", "tables", "both"]),
   has_bookings: optionalBooleanFromApi,
-  /** From GET show — "cancel" | "remove"; prefer with use_cancel_date_action */
-  date_action: z.enum(["cancel", "remove"]).optional(),
+  /** 1 = active, 2 = cancelled, 0 = inactive */
+  status: optionalCoercedFiniteNumber,
+  is_cancelled: optionalBooleanFromApi,
+  is_readonly: optionalBooleanFromApi,
+  can_edit: optionalBooleanFromApi,
+  /**
+   * From GET show — "cancel" | "remove" for actionable dates;
+   * "cancelled" when the date is already cancelled (read-only).
+   */
+  date_action: z.enum(["cancel", "remove", "cancelled"]).optional(),
   /** From GET show — true when vendor must cancel (not hard-delete) the date */
   use_cancel_date_action: optionalBooleanFromApi,
   /** Legacy — ignore for cancel vs remove gating */
@@ -386,6 +398,7 @@ const baseDateSchema = z.object({
   has_financial_bookings: optionalBooleanFromApi,
   cancelled: optionalBooleanFromApi,
   cancel_reason: z.string().optional(),
+  cancelled_at: z.string().nullable().optional(),
   payment_type: z.enum(["deposit", "full"]).optional(),
   is_deposit_enabled: optionalBooleanFromApi,
   deposit_type: z.preprocess(
@@ -504,6 +517,8 @@ const dateSchema = baseDateSchema
   })
   .refine(validateDepositDueDate, depositDueDateMessage)
   .superRefine((data, ctx) => {
+    if (isVendorDateCancelled(data)) return;
+
     // Only validate deposit fields for tables/both when deposit is selected
     if (!["tables", "both"].includes(data.booking_type)) {
       return;
@@ -618,6 +633,7 @@ const dateSchema = baseDateSchema
   })
   .refine(
     (data) => {
+      if (isVendorDateCancelled(data)) return true;
       // Require payment_type for tables/both booking types
       if (data.booking_type === "tables" || data.booking_type === "both") {
         return (
@@ -634,6 +650,7 @@ const dateSchema = baseDateSchema
   )
   .refine(
     (data) => {
+      if (isVendorDateCancelled(data)) return true;
       if (["tickets", "both"].includes(data.booking_type)) {
         return Array.isArray(data.tickets) && data.tickets.length > 0;
       }
@@ -643,6 +660,7 @@ const dateSchema = baseDateSchema
   )
   .refine(
     (data) => {
+      if (isVendorDateCancelled(data)) return true;
       if (["tables", "both"].includes(data.booking_type)) {
         return Array.isArray(data.tables) && data.tables.length > 0;
       }
@@ -682,6 +700,7 @@ export const stepThreeSchema = z
       today.setHours(0, 0, 0, 0);
       const todayTime = today.getTime();
       for (let i = 0; i < dates.length; i++) {
+        if (isVendorDateCancelled(dates[i])) continue;
         const d = dates[i].event_date;
         if (d && /^\d{4}-\d{2}-\d{2}$/.test(d)) {
           const eventTime = new Date(d + "T00:00:00").getTime();

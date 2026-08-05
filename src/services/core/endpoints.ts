@@ -137,7 +137,8 @@ export const API_ENDPOINTS = {
     DISCOUNTS: {
       GET_ALL: "/vendor/discounts",
       GET_BY_ID: "/vendor/discounts/{id}",
-      LOCATIONS_WITH_EVENTS: "/vendor/discounts/locations-with-events",
+      /** Current header location: events → dates → rooms */
+      EVENTS_WITH_DATES: "/vendor/discounts/events-with-dates",
       CREATE: "/vendor/discounts/store",
       UPDATE: "/vendor/discounts/update/{id}",
       UPDATE_STATUS: "/vendor/discounts/{id}/status",

@@ -22,6 +22,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { PreviewProvider } from "@/contexts/preview-context";
 import { PreviewThemeCustomizer } from "@/components/preview/preview-theme-customizer";
+import { RestoreDefaultThemeControl } from "@/app/(protected)/_shared/sites-essentials/_components/restore-default-theme-control";
 import { themeKeys } from "@/hooks/use-theme-query";
 import { useToast } from "@/components/ui/use-toast";
 import { resolveHasMultipleLocations } from "@/app/(protected)/_shared/sites-essentials/_lib/use-has-multiple-locations";
@@ -739,6 +740,21 @@ export default function SitePreviewPage() {
               previewRequiresSave
                 ? "Adjust colors or fonts. Approve each location page, then save."
                 : "Adjust colors or fonts. Editing will enable Approve & save."
+            }
+            footerSlot={
+              <RestoreDefaultThemeControl
+                presetCacheUserKey={
+                  session?.user?.email?.trim() ||
+                  (session?.user as { id?: string })?.id ||
+                  "anonymous"
+                }
+                getValues={() =>
+                  previewValuesForCustomizer ?? resolvedGlobalData
+                }
+                onApplied={(next) => {
+                  handlePreviewValuesChange(next);
+                }}
+              />
             }
           />
         ) : null}

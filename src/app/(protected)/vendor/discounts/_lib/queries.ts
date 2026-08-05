@@ -18,8 +18,8 @@ export const discountKeys = {
     [...discountKeys.lists(), filters] as const,
   details: () => [...discountKeys.all, "detail"] as const,
   detail: (id: number | string) => [...discountKeys.details(), id] as const,
-  locationsWithEvents: () =>
-    [...discountKeys.all, "locations-with-events"] as const,
+  eventsWithDates: (locationId?: number) =>
+    [...discountKeys.all, "events-with-dates", locationId ?? 0] as const,
 };
 
 export function useDiscounts(params: DiscountsQueryParams) {
@@ -41,11 +41,12 @@ export function useDiscount(id: number | string, enabled = true) {
   });
 }
 
-/** Locations + nested events for create/edit scope dropdowns */
-export function useDiscountLocationsWithEvents() {
+/** Events + dates/rooms for the current header location */
+export function useDiscountEventsWithDates(locationId?: number) {
   return useQuery({
-    queryKey: discountKeys.locationsWithEvents(),
-    queryFn: () => discountsService.getLocationsWithEvents(),
+    queryKey: discountKeys.eventsWithDates(locationId),
+    queryFn: () => discountsService.getEventsWithDates(),
+    enabled: !locationId || locationId > 0,
     staleTime: 1000 * 60 * 5,
     refetchOnWindowFocus: false,
   });

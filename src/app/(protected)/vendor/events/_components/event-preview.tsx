@@ -284,7 +284,7 @@ export function EventPreview({
   const activeDrinks = slices.roomMode ? slices.drinks : data.stepFive;
   const activeBrochure = slices.roomMode ? slices.brochure : data.stepSix;
 
-  /** Same rows as `BrochureSection` so header (single link vs menu) stays in sync with the page. */
+  /** Same rows as the header downloads control (brochure / flyer PDFs). */
   const eventBrochureDownloads = useMemo(
     () =>
       [
@@ -577,7 +577,6 @@ export function EventPreview({
             latitude: data.lat ?? s8?.latitude ?? null,
             longitude: data.long ?? s8?.longitude ?? null,
           }}
-          downloads={eventBrochureDownloads}
           price={{
             title: "PRICES FROM",
             description: brochurePriceDescription,

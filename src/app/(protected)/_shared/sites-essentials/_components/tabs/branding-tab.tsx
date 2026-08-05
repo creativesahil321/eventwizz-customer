@@ -55,6 +55,8 @@ import {
   useSitePreviewStore,
   type SitePreviewScope,
 } from "@/store/site-preview.store";
+import { isUnsavedPreviewMedia } from "../../_lib/merge-preview-with-api";
+import { syncSitePreviewFormIfNeeded } from "../../_lib/sync-preview-form";
 
 interface BrandingTabProps {
   /** When false, location page is the public home — hide main home tab & fields */
@@ -181,32 +183,73 @@ export function BrandingTab({
   const [bannerType, setBannerType] = useState<"image" | "video">("image");
   const [isValidatingVideo, setIsValidatingVideo] = useState(false);
 
-  // Sync banner state from SERVER props first (runs as soon as location data refetches – no form timing issues)
-  useEffect(() => {
-    const hasImage = Boolean(serverCoverImage && serverCoverImage.length > 0);
-    const hasVideo = Boolean(serverCoverVideo && serverCoverVideo.length > 0);
-    setLandingPageImageFiles([]);
-    setLandingPageVideoFiles([]);
-    if (hasImage) {
-      setLandingPageImageUrl(serverCoverImage!);
-    } else {
-      setLandingPageImageUrl("");
-    }
-    if (hasVideo) {
-      setLandingPageVideoUrl(serverCoverVideo!);
-    } else {
-      setLandingPageVideoUrl("");
-    }
-    setBannerType(hasVideo ? "video" : "image");
-  }, [serverCoverImage, serverCoverVideo]);
-
   // Watch form for logo/favicon and for when user uploads new file (form then has File; we don’t overwrite with server in that case)
   const watchedLogo = form.watch("logo");
   const watchedFavicon = form.watch("favicon");
   const watchedCoverImage = form.watch("cover_image");
   const watchedCoverVideo = form.watch("cover_video");
 
-  // Sync logo/favicon from form; for cover_image/cover_video only sync when user has selected a File (so we show their upload), otherwise server props drive banner
+  // Banner priority: unsaved File/blob → explicit null (Remove) → server props.
+  // `null` must stick so Remove is not undone by a later server sync.
+  useEffect(() => {
+    if (
+      isUnsavedPreviewMedia(watchedCoverImage) ||
+      watchedCoverImage instanceof File
+    ) {
+      return;
+    }
+    if (
+      isUnsavedPreviewMedia(watchedCoverVideo) ||
+      watchedCoverVideo instanceof File
+    ) {
+      return;
+    }
+
+    // Explicit clears from Remove — do not resurrect API media
+    if (watchedCoverImage === null && watchedCoverVideo === null) {
+      setLandingPageImageFiles([]);
+      setLandingPageVideoFiles([]);
+      setLandingPageImageUrl("");
+      setLandingPageVideoUrl("");
+      setBannerType("image");
+      return;
+    }
+
+    const allowServerImage = watchedCoverImage !== null;
+    const allowServerVideo = watchedCoverVideo !== null;
+    const hasImage =
+      allowServerImage &&
+      Boolean(serverCoverImage && serverCoverImage.length > 0);
+    const hasVideo =
+      allowServerVideo &&
+      Boolean(serverCoverVideo && serverCoverVideo.length > 0);
+
+    if (allowServerImage) {
+      setLandingPageImageFiles([]);
+      setLandingPageImageUrl(hasImage ? serverCoverImage! : "");
+    } else {
+      setLandingPageImageFiles([]);
+      setLandingPageImageUrl("");
+    }
+
+    if (allowServerVideo) {
+      setLandingPageVideoFiles([]);
+      setLandingPageVideoUrl(hasVideo ? serverCoverVideo! : "");
+    } else {
+      setLandingPageVideoFiles([]);
+      setLandingPageVideoUrl("");
+    }
+
+    setBannerType(hasVideo ? "video" : "image");
+  }, [
+    serverCoverImage,
+    serverCoverVideo,
+    watchedCoverImage,
+    watchedCoverVideo,
+  ]);
+
+  // Sync logo/favicon from form; for cover_image/cover_video sync File uploads,
+  // unsaved Preview blob/data URLs, and explicit null clears.
   useEffect(() => {
     if (watchedLogo instanceof File) {
       setLogoFiles([ensureFilePreview(watchedLogo)]);
@@ -228,13 +271,21 @@ export function BrandingTab({
       setFaviconFiles([]);
       setFaviconUrl("");
     }
-    // Only sync banner from form when value is a File (user just picked a file); otherwise server props are source of truth
     if (watchedCoverImage instanceof File) {
       setLandingPageImageFiles([watchedCoverImage]);
       setLandingPageImageUrl("");
       setLandingPageVideoFiles([]);
       setLandingPageVideoUrl("");
       setBannerType("image");
+    } else if (isUnsavedPreviewMedia(watchedCoverImage)) {
+      setLandingPageImageFiles([]);
+      setLandingPageImageUrl(String(watchedCoverImage).trim());
+      setLandingPageVideoFiles([]);
+      setLandingPageVideoUrl("");
+      setBannerType("image");
+    } else if (watchedCoverImage === null) {
+      setLandingPageImageFiles([]);
+      setLandingPageImageUrl("");
     }
     if (watchedCoverVideo instanceof File) {
       setLandingPageVideoFiles([watchedCoverVideo]);
@@ -242,6 +293,15 @@ export function BrandingTab({
       setLandingPageImageFiles([]);
       setLandingPageImageUrl("");
       setBannerType("video");
+    } else if (isUnsavedPreviewMedia(watchedCoverVideo)) {
+      setLandingPageVideoFiles([]);
+      setLandingPageVideoUrl(String(watchedCoverVideo).trim());
+      setLandingPageImageFiles([]);
+      setLandingPageImageUrl("");
+      setBannerType("video");
+    } else if (watchedCoverVideo === null) {
+      setLandingPageVideoFiles([]);
+      setLandingPageVideoUrl("");
     }
   }, [watchedLogo, watchedFavicon, watchedCoverImage, watchedCoverVideo]);
 
@@ -302,8 +362,14 @@ export function BrandingTab({
     setBannerType("image");
 
     const coverFile = files.length > 0 ? files[0] : null;
-    form.setValue("cover_image", coverFile);
-    form.setValue("cover_video", null); // Clear video
+    form.setValue("cover_image", coverFile, {
+      shouldDirty: true,
+      shouldTouch: true,
+    });
+    form.setValue("cover_video", null, {
+      shouldDirty: true,
+      shouldTouch: true,
+    });
 
     const slug = form.getValues("slug")?.trim();
     const locations = form.getValues("locations");
@@ -323,6 +389,7 @@ export function BrandingTab({
         { shouldDirty: true },
       );
     }
+    syncSitePreviewFormIfNeeded(form.getValues());
   };
 
   const handleLandingPageVideoChange = async (files: File[]) => {
@@ -374,8 +441,15 @@ export function BrandingTab({
       setLandingPageImageUrl(""); // Clear image URL
       setBannerType("video");
 
-      form.setValue("cover_video", file);
-      form.setValue("cover_image", null); // Clear image
+      form.setValue("cover_video", file, {
+        shouldDirty: true,
+        shouldTouch: true,
+      });
+      form.setValue("cover_image", null, {
+        shouldDirty: true,
+        shouldTouch: true,
+      });
+      syncSitePreviewFormIfNeeded(form.getValues());
     } catch (error) {
       console.error("Error validating video:", error);
       const toast = (await import("sonner")).toast;
@@ -404,14 +478,22 @@ export function BrandingTab({
   const handleRemoveLandingPageImage = () => {
     setLandingPageImageFiles([]);
     setLandingPageImageUrl("");
-    form.setValue("cover_image", null);
+    form.setValue("cover_image", null, {
+      shouldDirty: true,
+      shouldTouch: true,
+    });
+    syncSitePreviewFormIfNeeded(form.getValues());
   };
 
   const handleRemoveLandingPageVideo = () => {
     setLandingPageVideoFiles([]);
     setLandingPageVideoUrl("");
-    form.setValue("cover_video", null);
+    form.setValue("cover_video", null, {
+      shouldDirty: true,
+      shouldTouch: true,
+    });
     setBannerType("image");
+    syncSitePreviewFormIfNeeded(form.getValues());
   };
 
   // Cleanup object URLs to prevent memory leaks

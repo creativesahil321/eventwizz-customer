@@ -380,10 +380,6 @@ export default function EventDetailClient({
               latitude: slices.lat,
               longitude: slices.long,
             }}
-            downloads={pdfDownloadLinks.map((d) => ({
-              title: d.title,
-              download_link: [d.href],
-            }))}
             price={{
               title: "PRICES FROM",
               description: `${formatPriceUnit(

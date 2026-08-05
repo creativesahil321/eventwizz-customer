@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { useForm } from "react-hook-form";
@@ -34,12 +35,13 @@ import { useDebounce } from "@/hooks/data-table/use-debounce";
 import {
   defaultDiscountFormValues,
   discountFormSchema,
+  todayIsoDate,
   type DiscountFormValues,
 } from "../../_lib/schema";
-import type { Discount, DiscountLocationWithEvents } from "../../_lib/types";
+import type { Discount, DiscountEventWithDates } from "../../_lib/types";
 import {
   CUSTOMER_AUDIENCE_LABELS,
-  DISCOUNT_CATEGORY_LABELS,
+  DISCOUNT_CREATE_CATEGORIES,
   DISCOUNT_VALUE_TYPE_LABELS,
   FLAT_MODE_LABELS,
 } from "../../_lib/types";
@@ -49,16 +51,13 @@ import {
 } from "../../_lib/build-store-payload";
 import {
   useCreateDiscount,
-  useDiscountLocationsWithEvents,
+  useDiscountEventsWithDates,
 } from "../../_lib/queries";
-import { DiscountScopeMultiSelect } from "../discount-scope-multi-select";
-import { ApplicableDatesPicker } from "../applicable-dates-picker";
-import { parseRoomKey, toRoomKey } from "../../_lib/room-key";
 
-const EMPTY_LOCATIONS: DiscountLocationWithEvents[] = [];
+const EMPTY_EVENTS: DiscountEventWithDates[] = [];
 
 const STEPS = [
-  { id: 1, title: "Category" },
+  { id: 1, title: "Type" },
   { id: 2, title: "Scope" },
   { id: 3, title: "Value" },
   { id: 4, title: "Expiry" },
@@ -131,16 +130,12 @@ function discountToFormValues(discount: Discount): DiscountFormValues {
     discount.customer_audience === "selected" ? "selected" : "all_active";
   return {
     name: discount.name ?? "",
-    category: discount.category,
-    location_ids: discount.vendor_location_id
-      ? [discount.vendor_location_id]
-      : [],
-    event_ids: discount.vendor_event_id ? [discount.vendor_event_id] : [],
-    room_keys:
-      discount.room_id && discount.vendor_event_id
-        ? [toRoomKey(discount.vendor_event_id, discount.room_id)]
-        : [],
-    applicable_date_ids: [],
+    category:
+      discount.category === "coupon_code" ? "coupon_code" : "discount",
+    location_id: discount.vendor_location_id ?? 0,
+    event_id: discount.vendor_event_id ?? 0,
+    room_id: discount.room_id ?? 0,
+    date_id: discount.date_id ?? 0,
     coupon_code: discount.coupon_code ?? "",
     customer_audience: audience,
     customer_ids: discount.customers?.map((c) => c.id) ?? [],
@@ -189,6 +184,9 @@ export function DiscountFormWizard({
   const { data: session } = useSession();
   const [step, setStep] = useState(1);
   const [customerSearch, setCustomerSearch] = useState("");
+  const [selectedCustomersMeta, setSelectedCustomersMeta] = useState<
+    Record<number, { id: number; name: string; email: string }>
+  >({});
   const debouncedCustomerSearch = useDebounce(customerSearch, 500);
   const createDiscount = useCreateDiscount();
 
@@ -204,9 +202,9 @@ export function DiscountFormWizard({
     return fromStore > 0 ? fromStore : fromSession > 0 ? fromSession : 0;
   }, [selectedLocation?.id, session?.user?.vendor_location_id]);
 
-  const { data: locationsData, isLoading: locationsLoading } =
-    useDiscountLocationsWithEvents();
-  const locationsWithEvents = locationsData ?? EMPTY_LOCATIONS;
+  const { data: eventsData, isLoading: eventsLoading } =
+    useDiscountEventsWithDates(currentVendorLocationId);
+  const eventsWithDates = eventsData ?? EMPTY_EVENTS;
 
   const form = useForm<DiscountFormValues>({
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -216,37 +214,40 @@ export function DiscountFormWizard({
       : {
           ...defaultDiscountFormValues,
           ...initialValues,
-          location_ids:
-            Array.isArray(initialValues?.location_ids) &&
-            initialValues.location_ids.length > 0
-              ? initialValues.location_ids
+          location_id:
+            initialValues?.location_id && initialValues.location_id > 0
+              ? initialValues.location_id
               : currentVendorLocationId > 0
-                ? [currentVendorLocationId]
-                : [],
-          event_ids: Array.isArray(initialValues?.event_ids)
-            ? initialValues.event_ids
-            : [],
-          room_keys: Array.isArray(initialValues?.room_keys)
-            ? initialValues.room_keys
-            : [],
+                ? currentVendorLocationId
+                : 0,
+          event_id:
+            initialValues?.event_id && initialValues.event_id > 0
+              ? initialValues.event_id
+              : 0,
         },
     mode: "onChange",
   });
 
   const values = form.watch();
-  const selectedLocationIds = Array.isArray(values.location_ids)
-    ? values.location_ids
-    : [];
-  const selectedEventIds = Array.isArray(values.event_ids)
-    ? values.event_ids
-    : [];
-  const selectedRoomKeys = Array.isArray(values.room_keys)
-    ? values.room_keys
-    : [];
-  const selectedRoomKeySet = useMemo(
-    () => new Set(selectedRoomKeys),
-    [selectedRoomKeys]
-  );
+  const selectedLocationId = Number(values.location_id) || 0;
+  const selectedEventId = Number(values.event_id) || 0;
+  const selectedRoomId = Number(values.room_id) || 0;
+  const selectedDateId = Number(values.date_id) || 0;
+  const isDiscountCategory = values.category === "discount";
+
+  // Header location drives the discount (same as create event)
+  useEffect(() => {
+    if (mode === "edit") return;
+    if (currentVendorLocationId <= 0) return;
+    const current = form.getValues("location_id");
+    if (current === currentVendorLocationId) return;
+    form.setValue("location_id", currentVendorLocationId, {
+      shouldValidate: true,
+    });
+    form.setValue("event_id", 0, { shouldValidate: true });
+    form.setValue("room_id", 0);
+    form.setValue("date_id", 0);
+  }, [currentVendorLocationId, mode, form]);
 
   // Same search API as Customers page
   const {
@@ -269,166 +270,67 @@ export function DiscountFormWizard({
     } as any
   );
 
-  const locationOptions = useMemo(
-    () =>
-      locationsWithEvents.map((loc) => ({
-        id: loc.id,
-        name: loc.city || `Location #${loc.id}`,
-        hint:
-          (loc.events?.length ?? 0) > 0
-            ? `${loc.events.length} event${loc.events.length === 1 ? "" : "s"}`
-            : "No events",
-      })),
-    [locationsWithEvents]
+  const headerLocationName =
+    selectedLocation?.city ||
+    selectedLocation?.name ||
+    (selectedLocationId > 0 ? `Location #${selectedLocationId}` : null);
+
+  const selectedEvent = useMemo(
+    () => eventsWithDates.find((e) => e.id === selectedEventId) ?? null,
+    [eventsWithDates, selectedEventId]
   );
 
   const eventOptions = useMemo(() => {
-    const byId = new Map<
-      number,
-      { id: number; name: string; group?: string; hint?: string }
-    >();
-    for (const loc of locationsWithEvents) {
-      if (!selectedLocationIds.includes(loc.id)) continue;
-      const locName = loc.city || `Location #${loc.id}`;
-      for (const e of loc.events ?? []) {
-        byId.set(e.id, {
-          id: e.id,
-          name: e.name,
-          group: locName,
-          hint: `${e.rooms?.length ?? 0} room${
-            (e.rooms?.length ?? 0) === 1 ? "" : "s"
-          }`,
-        });
-      }
-    }
-    for (const evId of selectedEventIds) {
-      if (!byId.has(evId)) {
-        const label =
+    const list = eventsWithDates.map((e) => ({
+      id: e.id,
+      name: e.name,
+    }));
+    if (
+      selectedEventId > 0 &&
+      !list.some((e) => e.id === selectedEventId)
+    ) {
+      list.push({
+        id: selectedEventId,
+        name:
           initialDiscount?.event?.name ||
           (initialValues?.name
             ? String(initialValues.name).replace(/ promo$/, "")
             : null) ||
-          `Event #${evId}`;
-        byId.set(evId, { id: evId, name: label, group: "Other" });
-      }
+          `Event #${selectedEventId}`,
+      });
     }
-    return Array.from(byId.values());
+    return list;
   }, [
-    locationsWithEvents,
-    selectedLocationIds,
-    selectedEventIds,
+    eventsWithDates,
+    selectedEventId,
     initialValues?.name,
     initialDiscount?.event?.name,
   ]);
 
+  /** Event dates — uses API `date_id` */
+  const dateOptions = useMemo(() => {
+    if (!selectedEvent) return [] as { id: number; date: string }[];
+    return (selectedEvent.dates ?? [])
+      .filter((d) => d?.date_id != null && d?.date)
+      .map((d) => ({ id: d.date_id, date: d.date }))
+      .sort((a, b) => a.date.localeCompare(b.date));
+  }, [selectedEvent]);
+
+  /** Rooms for the single selected date */
   const roomOptions = useMemo(() => {
-    const list: {
-      id: string;
-      name: string;
-      group?: string;
-      hint?: string;
-    }[] = [];
-    for (const loc of locationsWithEvents) {
-      if (!selectedLocationIds.includes(loc.id)) continue;
-      const locName = loc.city || `Location #${loc.id}`;
-      for (const e of loc.events ?? []) {
-        if (!selectedEventIds.includes(e.id)) continue;
-        for (const r of e.rooms ?? []) {
-          list.push({
-            id: toRoomKey(e.id, r.id),
-            name: r.name,
-            group: `${locName} · ${e.name}`,
-            hint: `${r.dates?.length ?? 0} date${
-              (r.dates?.length ?? 0) === 1 ? "" : "s"
-            }`,
-          });
-        }
-      }
+    if (!selectedEvent || selectedDateId <= 0) {
+      return [] as { id: number; name: string }[];
     }
-    return list;
-  }, [locationsWithEvents, selectedLocationIds, selectedEventIds]);
-
-  /** Selected events that have no rooms — still show in Room picker for clarity */
-  const roomEmptyGroups = useMemo(() => {
-    const groups: { label: string; message: string }[] = [];
-    for (const loc of locationsWithEvents) {
-      if (!selectedLocationIds.includes(loc.id)) continue;
-      const locName = loc.city || `Location #${loc.id}`;
-      for (const e of loc.events ?? []) {
-        if (!selectedEventIds.includes(e.id)) continue;
-        if ((e.rooms?.length ?? 0) > 0) continue;
-        groups.push({
-          label: `${locName} · ${e.name}`,
-          message: "No rooms for this event",
-        });
-      }
-    }
-    return groups;
-  }, [locationsWithEvents, selectedLocationIds, selectedEventIds]);
-
-  /** Dates only for selected event+room pairs (not every event sharing a room id) */
-  const availableDateGroups = useMemo(() => {
-    const groups: {
-      key: string;
-      locationName: string;
-      eventName: string;
-      eventId: number;
-      roomId: number;
-      roomName: string;
-      dates: { id: number; date: string }[];
-    }[] = [];
-
-    for (const loc of locationsWithEvents) {
-      if (!selectedLocationIds.includes(loc.id)) continue;
-      const locationName = loc.city || `Location #${loc.id}`;
-      for (const e of loc.events ?? []) {
-        if (!selectedEventIds.includes(e.id)) continue;
-        for (const r of e.rooms ?? []) {
-          const key = toRoomKey(e.id, r.id);
-          if (!selectedRoomKeySet.has(key)) continue;
-          groups.push({
-            key,
-            locationName,
-            eventName: e.name,
-            eventId: e.id,
-            roomId: r.id,
-            roomName: r.name,
-            dates: (r.dates ?? [])
-              .filter((d) => d?.id != null && d?.date)
-              .map((d) => ({ id: d.id, date: d.date }))
-              .sort((a, b) => a.date.localeCompare(b.date)),
-          });
-        }
-      }
-    }
-
-    return groups.sort((a, b) =>
-      `${a.locationName}${a.eventName}${a.roomName}`.localeCompare(
-        `${b.locationName}${b.eventName}${b.roomName}`
-      )
+    const day = (selectedEvent.dates ?? []).find(
+      (d) => d.date_id === selectedDateId
     );
-  }, [
-    locationsWithEvents,
-    selectedLocationIds,
-    selectedEventIds,
-    selectedRoomKeySet,
-  ]);
+    return (day?.rooms ?? [])
+      .filter((r) => r?.id != null)
+      .map((r) => ({ id: r.id, name: r.name }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [selectedEvent, selectedDateId]);
 
-  const dateIdsForRoomKeys = (keys: string[]) => {
-    const keySet = new Set(keys);
-    const ids: number[] = [];
-    for (const loc of locationsWithEvents) {
-      for (const e of loc.events ?? []) {
-        for (const r of e.rooms ?? []) {
-          if (!keySet.has(toRoomKey(e.id, r.id))) continue;
-          for (const d of r.dates ?? []) {
-            if (d?.id != null) ids.push(d.id);
-          }
-        }
-      }
-    }
-    return ids;
-  };
+  const selectedDateNeedsRoom = roomOptions.length > 0;
 
   const customers = Array.isArray(customersResponse?.data)
     ? customersResponse.data
@@ -437,80 +339,109 @@ export function DiscountFormWizard({
   const selectedCustomerIds = Array.isArray(values.customer_ids)
     ? values.customer_ids
     : [];
-  const selectedApplicableDateIds = Array.isArray(values.applicable_date_ids)
-    ? values.applicable_date_ids
-    : [];
 
-  const selectedDateLabels = useMemo(() => {
-    const byId = new Map<number, string>();
-    for (const group of availableDateGroups) {
-      for (const d of group.dates) byId.set(d.id, d.date);
-    }
-    return selectedApplicableDateIds
-      .map((id) => byId.get(id))
-      .filter((d): d is string => Boolean(d));
-  }, [availableDateGroups, selectedApplicableDateIds]);
+  const customerDisplayName = (c: {
+    first_name?: string | null;
+    last_name?: string | null;
+    email?: string | null;
+  }) =>
+    `${c.first_name ?? ""} ${c.last_name ?? ""}`.trim() || c.email || "Customer";
 
-  const locationName =
-    selectedLocationIds.length === 0
-      ? "—"
-      : selectedLocationIds
-          .map(
-            (id) =>
-              locationOptions.find((l) => l.id === id)?.name ?? `Location #${id}`
-          )
-          .join(", ");
-  const eventName =
-    selectedEventIds.length === 0
-      ? "—"
-      : selectedEventIds
-          .map(
-            (id) =>
-              eventOptions.find((e) => e.id === id)?.name ?? `Event #${id}`
-          )
-          .join(", ");
-  const roomName =
-    selectedRoomKeys.length === 0
-      ? "—"
-      : selectedRoomKeys
-          .map((key) => {
-            const opt = roomOptions.find((r) => String(r.id) === String(key));
-            if (!opt) return key;
-            return opt.group ? `${opt.name} (${opt.group})` : opt.name;
-          })
-          .join(", ");
-
-  const pruneEventsForLocations = (locationIds: number[]) => {
-    const allowed = new Set<number>();
-    for (const loc of locationsWithEvents) {
-      if (!locationIds.includes(loc.id)) continue;
-      for (const e of loc.events ?? []) allowed.add(e.id);
-    }
-    return selectedEventIds.filter((id) => allowed.has(id));
-  };
-
-  const pruneRoomsForEvents = (eventIds: number[]) => {
-    const allowedEvents = new Set(eventIds);
-    return selectedRoomKeys.filter((key) => {
-      const parsed = parseRoomKey(key);
-      return parsed ? allowedEvents.has(parsed.eventId) : false;
+  // Keep names for selected customers even after search results change
+  useEffect(() => {
+    if (!customers.length || selectedCustomerIds.length === 0) return;
+    setSelectedCustomersMeta((prev) => {
+      let changed = false;
+      const next = { ...prev };
+      for (const c of customers) {
+        if (!selectedCustomerIds.includes(c.id)) continue;
+        const name = customerDisplayName(c);
+        const existing = next[c.id];
+        if (
+          !existing ||
+          existing.name !== name ||
+          existing.email !== (c.email ?? "")
+        ) {
+          next[c.id] = { id: c.id, name, email: c.email ?? "" };
+          changed = true;
+        }
+      }
+      return changed ? next : prev;
     });
-  };
+  }, [customers, selectedCustomerIds]);
 
-  const pruneDatesForRoomKeys = (roomKeys: string[]) => {
-    const allowed = new Set(dateIdsForRoomKeys(roomKeys));
-    return selectedApplicableDateIds.filter((id) => allowed.has(id));
+  const selectedCustomersForReview = useMemo(
+    () =>
+      selectedCustomerIds.map((id) => {
+        const meta = selectedCustomersMeta[id];
+        return meta ?? { id, name: `Customer #${id}`, email: "" };
+      }),
+    [selectedCustomerIds, selectedCustomersMeta]
+  );
+
+  const locationName = headerLocationName || "—";
+  const eventName =
+    selectedEventId > 0
+      ? eventOptions.find((e) => e.id === selectedEventId)?.name ??
+        `Event #${selectedEventId}`
+      : "—";
+
+  function formatDateLabel(iso: string) {
+    try {
+      return new Date(`${iso}T12:00:00`).toLocaleDateString("en-GB", {
+        day: "numeric",
+        month: "short",
+        year: "numeric",
+      });
+    } catch {
+      return iso;
+    }
+  }
+
+  const roomName =
+    selectedRoomId > 0
+      ? roomOptions.find((r) => r.id === selectedRoomId)?.name ??
+        `Room #${selectedRoomId}`
+      : "—";
+  const selectedDateLabel =
+    selectedDateId > 0
+      ? (() => {
+          const d = dateOptions.find((x) => x.id === selectedDateId);
+          return d ? formatDateLabel(d.date) : `Date #${selectedDateId}`;
+        })()
+      : "—";
+
+  const selectDate = (dateId: number) => {
+    form.setValue("date_id", dateId, { shouldValidate: true });
+    form.clearErrors("date_id");
+    form.setValue("room_id", 0, { shouldValidate: true });
+    form.clearErrors("room_id");
   };
 
   const validateStep = async (current: number) => {
     if (current === 1) return form.trigger(["category"]);
     if (current === 2) {
       const fields: (keyof DiscountFormValues)[] = [
-        "location_ids",
-        "event_ids",
+        "location_id",
+        "event_id",
       ];
-      if (values.category === "date_wise") {
-        fields.push("room_keys", "applicable_date_ids");
+      if (isDiscountCategory) {
+        if (dateOptions.length > 0 && selectedDateId <= 0) {
+          form.setError("date_id", {
+            type: "manual",
+            message: "Please select a date",
+          });
+          return false;
+        }
+        fields.push("date_id");
+        if (selectedDateNeedsRoom && selectedRoomId <= 0) {
+          form.setError("room_id", {
+            type: "manual",
+            message: "Please select a room",
+          });
+          return false;
+        }
+        if (selectedDateNeedsRoom) fields.push("room_id");
       }
       if (values.category === "coupon_code") {
         fields.push("coupon_code", "customer_audience", "customer_ids");
@@ -554,18 +485,22 @@ export function DiscountFormWizard({
         data.category === "coupon_code" &&
         data.status === "active" &&
         res?.data?.emails_sent_at
-          ? " Coupon emails were queued."
+          ? " Coupon emails have been queued."
           : data.category === "coupon_code" && data.status === "active"
             ? " Coupon emails will be queued."
             : "";
-      toast.success((res?.message || "Discount created") + emailsNote);
+      toast.success((res?.message || "Discount saved successfully.") + emailsNote);
       router.push("/vendor/discounts");
     } catch (error) {
       toast.error(getErrorMessage(error));
     }
   };
 
-  const toggleCustomer = (id: number, checked: boolean) => {
+  const toggleCustomer = (
+    id: number,
+    checked: boolean,
+    meta?: { name: string; email: string }
+  ) => {
     const current = Array.isArray(form.getValues("customer_ids"))
       ? form.getValues("customer_ids")
       : [];
@@ -574,6 +509,16 @@ export function DiscountFormWizard({
       checked ? [...current, id] : current.filter((x) => x !== id),
       { shouldValidate: true, shouldDirty: true }
     );
+    setSelectedCustomersMeta((prev) => {
+      if (!checked) {
+        if (!(id in prev)) return prev;
+        const next = { ...prev };
+        delete next[id];
+        return next;
+      }
+      if (!meta) return prev;
+      return { ...prev, [id]: { id, name: meta.name, email: meta.email } };
+    });
   };
 
   const isSubmitting = createDiscount.isPending;
@@ -620,36 +565,32 @@ export function DiscountFormWizard({
               name="category"
               render={({ field }) => (
                 <FormItem className="space-y-4">
-                  <FormLabel className="text-base">Discount category</FormLabel>
+                  <FormLabel className="text-base">What would you like to create?</FormLabel>
                   <FormDescription>
-                    Choose how this discount targets bookings — selection
-                    continues to the next step.
+                    Select Discount or Coupon Code to continue. This applies to
+                    the location currently selected in the header.
                   </FormDescription>
                   <ChoiceCards
-                    value={field.value}
+                    value={
+                      field.value === "coupon_code"
+                        ? "coupon_code"
+                        : "discount"
+                    }
                     onChange={(key) => {
                       field.onChange(key);
-                      form.setValue("room_keys", []);
-                      form.setValue("applicable_date_ids", []);
                       form.setValue("coupon_code", "");
                       form.setValue("customer_audience", "all_active");
                       form.setValue("customer_ids", []);
+                      setSelectedCustomersMeta({});
+                      form.setValue("room_id", 0);
+                      form.setValue("date_id", 0);
                       setStep(2);
                     }}
-                    className="md:grid-cols-3"
-                    options={(
-                      Object.keys(
-                        DISCOUNT_CATEGORY_LABELS
-                      ) as (keyof typeof DISCOUNT_CATEGORY_LABELS)[]
-                    ).map((key) => ({
-                      value: key,
-                      label: DISCOUNT_CATEGORY_LABELS[key],
-                      description:
-                        key === "event_specific"
-                          ? "Applies to the whole selected event."
-                          : key === "date_wise"
-                            ? "Applies to a room/hall on selected dates."
-                            : "Customer enters a code at checkout. Active coupons email the audience.",
+                    className="sm:grid-cols-2"
+                    options={DISCOUNT_CREATE_CATEGORIES.map((opt) => ({
+                      value: opt.value,
+                      label: opt.label,
+                      description: opt.description,
                     }))}
                   />
                   <FormMessage />
@@ -660,165 +601,175 @@ export function DiscountFormWizard({
 
           {step === 2 ? (
             <div className="min-w-0 space-y-4">
-              <div className="grid min-w-0 gap-4 md:grid-cols-2">
-                <FormField
-                  control={form.control}
-                  name="location_ids"
-                  render={({ field }) => (
-                    <FormItem className="min-w-0">
-                      <FormLabel>Location</FormLabel>
-                      <DiscountScopeMultiSelect
-                        options={locationOptions}
-                        value={field.value ?? []}
-                        onChange={(ids) => {
-                          const locationIds = ids.map(Number);
-                          field.onChange(locationIds);
-                          const nextEvents = pruneEventsForLocations(locationIds);
-                          const nextRooms = pruneRoomsForEvents(nextEvents);
-                          form.setValue("event_ids", nextEvents, {
-                            shouldValidate: true,
-                          });
-                          form.setValue("room_keys", nextRooms, {
-                            shouldValidate: true,
-                          });
-                          form.setValue(
-                            "applicable_date_ids",
-                            pruneDatesForRoomKeys(nextRooms),
-                            { shouldValidate: true }
-                          );
-                        }}
-                        disabled={locationsLoading}
-                        loading={locationsLoading}
-                        placeholder="Select locations"
-                        searchPlaceholder="Search locations…"
-                        emptyLabel="No locations with events."
-                        unitLabel="locations selected"
-                      />
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+              {selectedLocationId <= 0 ? (
+                <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+                  Please select a location in the header first. Discounts and
+                  coupons apply to that location only.
+                </p>
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  Location:{" "}
+                  <span className="font-medium text-foreground">
+                    {headerLocationName}
+                  </span>{" "}
+                  (from header)
+                </p>
+              )}
 
+              {selectedLocationId > 0 &&
+              !eventsLoading &&
+              eventOptions.length === 0 ? (
+                <div className="max-w-xl rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+                  <p className="font-medium">
+                    No published events for{" "}
+                    {headerLocationName || "this location"}
+                  </p>
+                  <p className="mt-1 text-amber-900/90">
+                    Please create and publish an event for this location, then
+                    return here to add a discount or coupon.
+                  </p>
+                  <Button asChild variant="outline" size="sm" className="mt-3">
+                    <Link href="/vendor/events/create">Create an event</Link>
+                  </Button>
+                </div>
+              ) : (
                 <FormField
                   control={form.control}
-                  name="event_ids"
+                  name="event_id"
                   render={({ field }) => (
-                    <FormItem className="min-w-0">
+                    <FormItem className="min-w-0 max-w-xl">
                       <FormLabel>Event</FormLabel>
-                      <DiscountScopeMultiSelect
-                        options={eventOptions}
-                        value={field.value ?? []}
-                        onChange={(ids) => {
-                          const eventIds = ids.map(Number);
-                          field.onChange(eventIds);
-                          const nextRooms = pruneRoomsForEvents(eventIds);
-                          form.setValue("room_keys", nextRooms, {
-                            shouldValidate: true,
-                          });
-                          form.setValue(
-                            "applicable_date_ids",
-                            pruneDatesForRoomKeys(nextRooms),
-                            { shouldValidate: true }
-                          );
+                      <Select
+                        value={
+                          field.value > 0 ? String(field.value) : undefined
+                        }
+                        onValueChange={(v) => {
+                          const eventId = Number(v);
+                          field.onChange(eventId);
+                          form.setValue("room_id", 0);
+                          form.setValue("date_id", 0);
+                          form.clearErrors("room_id");
+                          form.clearErrors("date_id");
                         }}
                         disabled={
-                          selectedLocationIds.length === 0 || locationsLoading
+                          selectedLocationId <= 0 || eventsLoading
                         }
-                        loading={locationsLoading}
-                        placeholder={
-                          selectedLocationIds.length === 0
-                            ? "Select location first"
-                            : eventOptions.length === 0
-                              ? "No events at selected locations"
-                              : "Select events"
-                        }
-                        searchPlaceholder="Search events…"
-                        emptyLabel="No events found."
-                        unitLabel="events selected"
-                      />
+                      >
+                        <FormControl>
+                          <SelectTrigger className="h-11 w-full sm:h-10">
+                            <SelectValue
+                              placeholder={
+                                selectedLocationId <= 0
+                                  ? "Select a location in the header first"
+                                  : eventsLoading
+                                    ? "Loading events…"
+                                    : "Select an event"
+                              }
+                            />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {eventOptions.map((ev) => (
+                            <SelectItem key={ev.id} value={String(ev.id)}>
+                              {ev.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
-              </div>
+              )}
 
-              {values.category === "date_wise" ? (
-                <div className="min-w-0 space-y-4">
-                  <FormField
-                    control={form.control}
-                    name="room_keys"
-                    render={({ field }) => (
-                      <FormItem className="min-w-0">
-                        <FormLabel>Room / Hall</FormLabel>
-                        <FormDescription>
-                          Grouped by event — same room name can appear under more
-                          than one event.
-                        </FormDescription>
-                        <DiscountScopeMultiSelect
-                          options={roomOptions}
-                          emptyGroups={roomEmptyGroups}
-                          value={field.value ?? []}
-                          onChange={(keys) => {
-                            const nextKeys = keys.map(String);
-                            const prev = new Set(field.value ?? []);
-                            field.onChange(nextKeys);
+              {isDiscountCategory && selectedEventId > 0 ? (
+                <div className="min-w-0 max-w-xl space-y-4">
+                  {dateOptions.length > 0 ? (
+                    <FormField
+                      control={form.control}
+                      name="date_id"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Date</FormLabel>
+                          <FormDescription>
+                            Choose one event date for this discount.
+                          </FormDescription>
+                          <Select
+                            value={
+                              field.value > 0
+                                ? String(field.value)
+                                : undefined
+                            }
+                            onValueChange={(v) => selectDate(Number(v))}
+                          >
+                            <FormControl>
+                              <SelectTrigger className="h-11 w-full sm:h-10">
+                                <SelectValue placeholder="Select a date" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {dateOptions.map((d) => (
+                                <SelectItem key={d.id} value={String(d.id)}>
+                                  {formatDateLabel(d.date)}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  ) : (
+                    <p className="text-sm text-muted-foreground">
+                      This event has no dates yet.
+                    </p>
+                  )}
 
-                            // Keep dates for still-selected rooms; auto-select
-                            // all dates for newly added rooms.
-                            const kept = pruneDatesForRoomKeys(nextKeys);
-                            const added = nextKeys.filter((k) => !prev.has(k));
-                            const auto = dateIdsForRoomKeys(added);
-                            form.setValue(
-                              "applicable_date_ids",
-                              [...new Set([...kept, ...auto])],
-                              { shouldValidate: true }
-                            );
-                          }}
-                          disabled={
-                            selectedEventIds.length === 0 || locationsLoading
-                          }
-                          loading={locationsLoading}
-                          placeholder={
-                            selectedEventIds.length === 0
-                              ? "Select event first"
-                              : roomOptions.length === 0 &&
-                                  roomEmptyGroups.length === 0
-                                ? "No rooms for selected events"
-                                : "Select rooms"
-                          }
-                          searchPlaceholder="Search rooms…"
-                          emptyLabel="No rooms found."
-                          unitLabel="rooms selected"
-                        />
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={form.control}
-                    name="applicable_date_ids"
-                    render={({ field }) => (
-                      <FormItem className="min-w-0">
-                        <FormLabel>Applicable dates</FormLabel>
-                        <FormDescription>
-                          Open a city, then an event, then adjust room dates.
-                        </FormDescription>
-                        {selectedRoomKeys.length === 0 ? (
-                          <p className="text-sm text-muted-foreground">
-                            Select a room first to see available dates.
-                          </p>
-                        ) : (
-                          <ApplicableDatesPicker
-                            groups={availableDateGroups}
-                            selectedIds={field.value ?? []}
-                            onChange={(ids) => field.onChange(ids)}
-                          />
-                        )}
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+                  {/* Room only when the chosen date has rooms in the API */}
+                  {selectedDateId > 0 && selectedDateNeedsRoom ? (
+                    <FormField
+                      control={form.control}
+                      name="room_id"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Room</FormLabel>
+                          <FormDescription>
+                            Rooms available on this date.
+                          </FormDescription>
+                          <Select
+                            value={
+                              field.value > 0
+                                ? String(field.value)
+                                : undefined
+                            }
+                            onValueChange={(v) => {
+                              form.setValue("room_id", Number(v), {
+                                shouldValidate: true,
+                              });
+                              form.clearErrors("room_id");
+                            }}
+                          >
+                            <FormControl>
+                              <SelectTrigger className="h-11 w-full sm:h-10">
+                                <SelectValue placeholder="Select a room" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {roomOptions.map((room) => (
+                                <SelectItem
+                                  key={room.id}
+                                  value={String(room.id)}
+                                >
+                                  {room.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  ) : null}
                 </div>
               ) : null}
 
@@ -831,18 +782,20 @@ export function DiscountFormWizard({
                       <FormItem className="min-w-0">
                         <FormLabel>Coupon code</FormLabel>
                         <FormDescription>
-                          Unique per vendor, case-insensitive.
+                          Must be unique for your venue. Letters and numbers
+                          only; not case-sensitive.
                         </FormDescription>
                         <FormControl>
                           <Input
                             {...field}
                             value={field.value ?? ""}
                             placeholder="e.g. SUMMER20"
+                            maxLength={40}
                             autoCapitalize="characters"
                             autoCorrect="off"
                             spellCheck={false}
                             inputMode="text"
-                            className="w-full max-w-sm font-mono uppercase"
+                            className="w-full max-w-full font-mono uppercase sm:max-w-sm"
                             onChange={(e) =>
                               field.onChange(e.target.value.toUpperCase())
                             }
@@ -858,13 +811,14 @@ export function DiscountFormWizard({
                     name="customer_audience"
                     render={({ field }) => (
                       <FormItem className="min-w-0 space-y-3">
-                        <FormLabel>Customer audience</FormLabel>
+                        <FormLabel>Who should receive this coupon?</FormLabel>
                         <ChoiceCards
                           value={field.value}
                           onChange={(v) => {
                             field.onChange(v);
                             if (v === "all_active") {
                               form.setValue("customer_ids", []);
+                              setSelectedCustomersMeta({});
                             }
                             setCustomerSearch("");
                           }}
@@ -878,8 +832,8 @@ export function DiscountFormWizard({
                             label: CUSTOMER_AUDIENCE_LABELS[key],
                             description:
                               key === "all_active"
-                                ? "Email every active customer when this coupon is activated."
-                                : "Choose who should receive the coupon email.",
+                                ? "Email all active customers when this coupon is activated."
+                                : "Choose specific customers to email.",
                           }))}
                         />
                         <FormMessage />
@@ -893,7 +847,7 @@ export function DiscountFormWizard({
                       name="customer_ids"
                       render={() => (
                         <FormItem className="min-w-0">
-                          <FormLabel>Select customers</FormLabel>
+                          <FormLabel>Customers</FormLabel>
                           <div className="relative min-w-0">
                             <Search className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                             <Input
@@ -935,15 +889,16 @@ export function DiscountFormWizard({
                                 const checked = selectedCustomerIds.includes(
                                   c.id
                                 );
-                                const label =
-                                  `${c.first_name ?? ""} ${c.last_name ?? ""}`.trim() ||
-                                  c.email;
+                                const label = customerDisplayName(c);
                                 return (
                                   <div
                                     key={c.id}
                                     className="flex min-h-11 min-w-0 cursor-pointer touch-manipulation items-center gap-3 rounded-md px-2 py-2 hover:bg-muted/60 active:bg-muted/80"
                                     onClick={() =>
-                                      toggleCustomer(c.id, !checked)
+                                      toggleCustomer(c.id, !checked, {
+                                        name: label,
+                                        email: c.email ?? "",
+                                      })
                                     }
                                     onKeyDown={(e) => {
                                       if (
@@ -951,7 +906,10 @@ export function DiscountFormWizard({
                                         e.key === " "
                                       ) {
                                         e.preventDefault();
-                                        toggleCustomer(c.id, !checked);
+                                        toggleCustomer(c.id, !checked, {
+                                          name: label,
+                                          email: c.email ?? "",
+                                        });
                                       }
                                     }}
                                     role="checkbox"
@@ -962,7 +920,10 @@ export function DiscountFormWizard({
                                       checked={checked}
                                       className="shrink-0"
                                       onCheckedChange={(v) =>
-                                        toggleCustomer(c.id, v === true)
+                                        toggleCustomer(c.id, v === true, {
+                                          name: label,
+                                          email: c.email ?? "",
+                                        })
                                       }
                                       onClick={(e) => e.stopPropagation()}
                                     />
@@ -996,7 +957,7 @@ export function DiscountFormWizard({
                 name="value_type"
                 render={({ field }) => (
                   <FormItem className="space-y-3">
-                    <FormLabel>Discount type</FormLabel>
+                    <FormLabel>Value type</FormLabel>
                     <ChoiceCards
                       value={field.value}
                       onChange={(v) => {
@@ -1005,7 +966,7 @@ export function DiscountFormWizard({
                           form.setValue("flat_mode", null);
                           form.setValue("min_people", null);
                         } else if (!form.getValues("flat_mode")) {
-                          form.setValue("flat_mode", "on_total");
+                          form.setValue("flat_mode", "total");
                         }
                       }}
                       className="sm:grid-cols-2"
@@ -1029,9 +990,9 @@ export function DiscountFormWizard({
                   name="flat_mode"
                   render={({ field }) => (
                     <FormItem className="space-y-3">
-                      <FormLabel>Flat mode</FormLabel>
+                      <FormLabel>How should the fixed amount apply?</FormLabel>
                       <ChoiceCards
-                        value={field.value ?? "on_total"}
+                        value={field.value ?? "total"}
                         onChange={field.onChange}
                         className="sm:grid-cols-2"
                         options={(
@@ -1042,9 +1003,9 @@ export function DiscountFormWizard({
                           value: key,
                           label: FLAT_MODE_LABELS[key],
                           description:
-                            key === "on_total"
-                              ? "Fixed amount off the total order."
-                              : "Fixed amount off per person; requires minimum headcount.",
+                            key === "total"
+                              ? "A fixed amount off the booking total."
+                              : "A fixed amount off per person. A minimum party size is required.",
                         }))}
                       />
                       <FormMessage />
@@ -1053,7 +1014,7 @@ export function DiscountFormWizard({
                 />
               ) : null}
 
-              <div className="grid gap-4 md:grid-cols-2">
+              <div className="grid gap-4 sm:grid-cols-2">
                 <FormField
                   control={form.control}
                   name="discount_value"
@@ -1067,7 +1028,10 @@ export function DiscountFormWizard({
                       <FormControl>
                         <Input
                           type="number"
-                          min={0}
+                          min={0.01}
+                          max={
+                            values.value_type === "percentage" ? 100 : 100000
+                          }
                           step="0.01"
                           {...field}
                           value={field.value || ""}
@@ -1085,11 +1049,12 @@ export function DiscountFormWizard({
                     name="min_people"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Minimum people</FormLabel>
+                        <FormLabel>Minimum party size</FormLabel>
                         <FormControl>
                           <Input
                             type="number"
                             min={1}
+                            max={500}
                             {...field}
                             value={field.value ?? ""}
                           />
@@ -1104,20 +1069,22 @@ export function DiscountFormWizard({
           ) : null}
 
           {step === 4 ? (
-            <div className="grid gap-4 md:grid-cols-2">
+            <div className="grid gap-4 sm:grid-cols-2">
               <FormField
                 control={form.control}
                 name="name"
                 render={({ field }) => (
-                  <FormItem className="md:col-span-2">
+                  <FormItem className="sm:col-span-2">
                     <FormLabel>Display name (optional)</FormLabel>
                     <FormControl>
                       <Input
                         {...field}
                         value={field.value ?? ""}
+                        maxLength={120}
                         placeholder="e.g. Summer Festival 15% Off"
                       />
                     </FormControl>
+                    <FormMessage />
                   </FormItem>
                 )}
               />
@@ -1127,13 +1094,23 @@ export function DiscountFormWizard({
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Valid from (optional)</FormLabel>
+                    <FormDescription>
+                      Leave blank to start as soon as it is activated.
+                    </FormDescription>
                     <FormControl>
                       <Input
                         type="date"
                         {...field}
                         value={field.value ?? ""}
+                        max={values.expires_at || undefined}
+                        onChange={(e) => {
+                          field.onChange(e.target.value);
+                          // Re-check expiry relationship when start date changes
+                          void form.trigger(["valid_from", "expires_at"]);
+                        }}
                       />
                     </FormControl>
+                    <FormMessage />
                   </FormItem>
                 )}
               />
@@ -1143,8 +1120,24 @@ export function DiscountFormWizard({
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Expiry date</FormLabel>
+                    <FormDescription>
+                      Must be today or a future date.
+                    </FormDescription>
                     <FormControl>
-                      <Input type="date" {...field} />
+                      <Input
+                        type="date"
+                        {...field}
+                        min={
+                          values.valid_from?.trim() &&
+                          values.valid_from > todayIsoDate()
+                            ? values.valid_from
+                            : todayIsoDate()
+                        }
+                        onChange={(e) => {
+                          field.onChange(e.target.value);
+                          void form.trigger(["expires_at", "valid_from"]);
+                        }}
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -1154,24 +1147,24 @@ export function DiscountFormWizard({
                 control={form.control}
                 name="status"
                 render={({ field }) => (
-                  <FormItem className="md:col-span-2">
-                    <FormLabel>Status on save</FormLabel>
+                  <FormItem className="sm:col-span-2">
+                    <FormLabel>Status when saved</FormLabel>
                     <Select value={field.value} onValueChange={field.onChange}>
                       <FormControl>
-                        <SelectTrigger className="max-w-xs">
+                        <SelectTrigger className="h-11 w-full max-w-full sm:h-10 sm:max-w-xs">
                           <SelectValue />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        <SelectItem value="active">Activate now</SelectItem>
+                        <SelectItem value="active">Activate immediately</SelectItem>
                         <SelectItem value="inactive">Save as inactive</SelectItem>
                       </SelectContent>
                     </Select>
                     {values.category === "coupon_code" &&
                     values.status === "active" ? (
                       <FormDescription>
-                        Activating a coupon queues emails to the selected
-                        audience on submit.
+                        Activating a coupon will queue emails to the chosen
+                        audience when you save.
                       </FormDescription>
                     ) : null}
                     <FormMessage />
@@ -1182,96 +1175,199 @@ export function DiscountFormWizard({
           ) : null}
 
           {step === 5 ? (
-            <div className="space-y-4">
-              <p className="text-sm text-muted-foreground">
-                Review before saving. This is the payload sent to{" "}
-                <code className="rounded bg-muted px-1">
-                  POST /vendor/discounts/store
-                </code>
-                .
-              </p>
-              <dl className="grid gap-3 rounded-lg border bg-muted/30 p-3 text-sm sm:p-4 md:grid-cols-2">
-                <div className="min-w-0">
-                  <dt className="text-muted-foreground">Category</dt>
-                  <dd className="font-medium break-words">
-                    {DISCOUNT_CATEGORY_LABELS[values.category]}
-                  </dd>
-                </div>
-                <div className="min-w-0">
-                  <dt className="text-muted-foreground">Location / Event</dt>
-                  <dd className="font-medium break-words">
-                    {locationName} · {eventName}
-                  </dd>
-                </div>
-                {values.category === "date_wise" ? (
-                  <>
-                    <div className="min-w-0">
-                      <dt className="text-muted-foreground">Room</dt>
-                      <dd className="font-medium break-words">{roomName}</dd>
-                    </div>
-                    <div className="min-w-0">
-                      <dt className="text-muted-foreground">Dates</dt>
-                      <dd className="font-medium break-words">
-                        {(selectedDateLabels.length
-                          ? selectedDateLabels.join(", ")
-                          : "—") || "—"}
-                      </dd>
-                    </div>
-                  </>
-                ) : null}
-                {values.category === "coupon_code" ? (
-                  <>
-                    <div className="min-w-0">
-                      <dt className="text-muted-foreground">Coupon</dt>
-                      <dd className="font-mono font-medium break-all">
-                        {values.coupon_code || "—"}
-                      </dd>
-                    </div>
-                    <div className="min-w-0">
-                      <dt className="text-muted-foreground">Audience</dt>
-                      <dd className="font-medium break-words">
-                        {CUSTOMER_AUDIENCE_LABELS[values.customer_audience]}
-                        {values.customer_audience === "selected"
-                          ? ` (${selectedCustomerIds.length})`
-                          : ""}
-                      </dd>
-                    </div>
-                  </>
-                ) : null}
-                <div className="min-w-0">
-                  <dt className="text-muted-foreground">Value</dt>
-                  <dd className="font-medium break-words">
+            <div className="w-full min-w-0 max-w-2xl space-y-4 sm:space-y-5">
+              <div className="min-w-0">
+                <h3 className="text-base font-semibold tracking-tight sm:text-lg">
+                  Ready to save?
+                </h3>
+                <p className="mt-1 text-sm text-pretty text-muted-foreground">
+                  A quick check before this{" "}
+                  {values.category === "coupon_code" ? "coupon" : "discount"}{" "}
+                  goes live for {locationName}.
+                </p>
+              </div>
+
+              <div className="min-w-0 overflow-hidden rounded-xl border bg-background shadow-sm">
+                <div className="border-b bg-muted/30 px-3 py-4 sm:px-6 sm:py-5">
+                  <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                    {values.category === "coupon_code"
+                      ? "Coupon offer"
+                      : "Discount offer"}
+                  </p>
+                  <p className="mt-1.5 text-2xl font-semibold tracking-tight break-words sm:text-3xl">
                     {values.value_type === "percentage"
-                      ? `${values.discount_value}%`
-                      : `£${values.discount_value}${
+                      ? `${values.discount_value}% off`
+                      : `£${Number(values.discount_value).toFixed(
+                          Number(values.discount_value) % 1 === 0 ? 0 : 2
+                        )}${
                           values.flat_mode === "per_person"
-                            ? ` / person (min ${values.min_people})`
-                            : " off total"
+                            ? " per person"
+                            : " off the total"
                         }`}
-                  </dd>
+                  </p>
+                  {values.category === "coupon_code" &&
+                  values.coupon_code?.trim() ? (
+                    <p className="mt-3 inline-flex max-w-full items-center rounded-md border bg-background px-2.5 py-1 font-mono text-sm font-medium tracking-wide break-all">
+                      {values.coupon_code.trim()}
+                    </p>
+                  ) : null}
+                  {values.name?.trim() ? (
+                    <p className="mt-2 text-sm break-words text-muted-foreground">
+                      {values.name.trim()}
+                    </p>
+                  ) : null}
                 </div>
-                <div className="min-w-0">
-                  <dt className="text-muted-foreground">Expires</dt>
-                  <dd className="font-medium">{values.expires_at || "—"}</dd>
+
+                <div className="min-w-0 space-y-5 px-3 py-4 sm:px-6 sm:py-5">
+                  <section className="min-w-0 space-y-3">
+                    <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                      Applies to
+                    </h4>
+                    <dl className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 sm:gap-3">
+                      <div className="min-w-0 rounded-lg bg-muted/40 px-3 py-2.5">
+                        <dt className="text-xs text-muted-foreground">
+                          Location
+                        </dt>
+                        <dd className="mt-0.5 text-sm font-medium break-words">
+                          {locationName}
+                        </dd>
+                      </div>
+                      <div className="min-w-0 rounded-lg bg-muted/40 px-3 py-2.5">
+                        <dt className="text-xs text-muted-foreground">Event</dt>
+                        <dd className="mt-0.5 text-sm font-medium break-words">
+                          {eventName}
+                        </dd>
+                      </div>
+                      {isDiscountCategory && selectedDateId > 0 ? (
+                        <div className="min-w-0 rounded-lg bg-muted/40 px-3 py-2.5">
+                          <dt className="text-xs text-muted-foreground">Date</dt>
+                          <dd className="mt-0.5 text-sm font-medium">
+                            {selectedDateLabel}
+                          </dd>
+                        </div>
+                      ) : null}
+                      {isDiscountCategory && selectedRoomId > 0 ? (
+                        <div className="min-w-0 rounded-lg bg-muted/40 px-3 py-2.5">
+                          <dt className="text-xs text-muted-foreground">Room</dt>
+                          <dd className="mt-0.5 text-sm font-medium break-words">
+                            {roomName}
+                          </dd>
+                        </div>
+                      ) : null}
+                      {values.value_type === "flat" &&
+                      values.flat_mode === "per_person" &&
+                      values.min_people ? (
+                        <div className="min-w-0 rounded-lg bg-muted/40 px-3 py-2.5">
+                          <dt className="text-xs text-muted-foreground">
+                            Minimum party size
+                          </dt>
+                          <dd className="mt-0.5 text-sm font-medium">
+                            {values.min_people}
+                          </dd>
+                        </div>
+                      ) : null}
+                    </dl>
+                  </section>
+
+                  {values.category === "coupon_code" ? (
+                    <section className="min-w-0 space-y-3">
+                      <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                        Email audience
+                      </h4>
+                      {values.customer_audience === "all_active" ? (
+                        <p className="rounded-lg bg-muted/40 px-3 py-2.5 text-sm font-medium">
+                          All active customers
+                        </p>
+                      ) : (
+                        <div className="min-w-0 overflow-hidden rounded-lg border bg-muted/20">
+                          <div className="border-b px-3 py-2 text-xs text-muted-foreground">
+                            {selectedCustomersForReview.length} customer
+                            {selectedCustomersForReview.length === 1
+                              ? ""
+                              : "s"}{" "}
+                            selected
+                          </div>
+                          <ul className="max-h-[min(12rem,40vh)] divide-y overflow-y-auto overscroll-contain sm:max-h-48">
+                            {selectedCustomersForReview.map((c) => (
+                              <li
+                                key={c.id}
+                                className="flex min-w-0 flex-col gap-0.5 px-3 py-2.5"
+                              >
+                                <span className="truncate text-sm font-medium">
+                                  {c.name}
+                                </span>
+                                {c.email ? (
+                                  <span className="truncate text-xs text-muted-foreground">
+                                    {c.email}
+                                  </span>
+                                ) : null}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                    </section>
+                  ) : null}
+
+                  <section className="min-w-0 space-y-3">
+                    <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                      Schedule
+                    </h4>
+                    <dl className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 sm:gap-3">
+                      {values.valid_from?.trim() ? (
+                        <div className="min-w-0 rounded-lg bg-muted/40 px-3 py-2.5">
+                          <dt className="text-xs text-muted-foreground">
+                            Valid from
+                          </dt>
+                          <dd className="mt-0.5 text-sm font-medium">
+                            {formatDateLabel(values.valid_from)}
+                          </dd>
+                        </div>
+                      ) : null}
+                      <div className="min-w-0 rounded-lg bg-muted/40 px-3 py-2.5">
+                        <dt className="text-xs text-muted-foreground">
+                          Expires
+                        </dt>
+                        <dd className="mt-0.5 text-sm font-medium">
+                          {values.expires_at
+                            ? formatDateLabel(values.expires_at)
+                            : "—"}
+                        </dd>
+                      </div>
+                      <div className="min-w-0 rounded-lg bg-muted/40 px-3 py-2.5 sm:col-span-2">
+                        <dt className="text-xs text-muted-foreground">
+                          When saved
+                        </dt>
+                        <dd className="mt-0.5 text-sm font-medium">
+                          {values.status === "active"
+                            ? "Activate immediately"
+                            : "Save as inactive"}
+                        </dd>
+                      </div>
+                    </dl>
+                  </section>
                 </div>
-                <div className="min-w-0">
-                  <dt className="text-muted-foreground">Status</dt>
-                  <dd className="font-medium capitalize">{values.status}</dd>
-                </div>
-              </dl>
-              <pre className="max-h-48 overflow-auto rounded-md border bg-slate-950 p-3 text-[11px] leading-relaxed break-all text-slate-100 sm:max-h-56 sm:text-xs">
-                {JSON.stringify(buildDiscountStorePayload(values), null, 2)}
-              </pre>
+              </div>
+
+              {values.category === "coupon_code" &&
+              values.status === "active" ? (
+                <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 text-sm text-pretty text-amber-950">
+                  {values.customer_audience === "selected"
+                    ? `Saving as active will email this coupon to ${selectedCustomersForReview.length} selected customer${selectedCustomersForReview.length === 1 ? "" : "s"}.`
+                    : "Saving as active will email this coupon to all active customers."}
+                </p>
+              ) : null}
             </div>
           ) : null}
 
-          <div className="mt-8 flex flex-col-reverse gap-3 border-t pt-4 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+          <div className="sticky bottom-0 z-10 mt-6 border-t bg-background/95 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur-sm sm:static sm:mt-8 sm:bg-transparent sm:pt-4 sm:pb-0 sm:backdrop-blur-none">
+            <div className="flex flex-col-reverse gap-2.5 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:gap-3">
             <Button
               type="button"
               variant="outline"
               onClick={goBack}
               disabled={step === 1 || isSubmitting}
-              className="w-full touch-manipulation sm:w-auto"
+              className="h-11 w-full touch-manipulation sm:h-10 sm:w-auto"
             >
               <ChevronLeft className="mr-1 h-4 w-4" />
               Back
@@ -1280,7 +1376,7 @@ export function DiscountFormWizard({
               <Button
                 type="button"
                 onClick={goNext}
-                className="w-full touch-manipulation sm:w-auto"
+                className="h-11 w-full touch-manipulation sm:h-10 sm:w-auto"
               >
                 Next
                 <ChevronRight className="ml-1 h-4 w-4" />
@@ -1289,7 +1385,7 @@ export function DiscountFormWizard({
               <Button
                 type="submit"
                 disabled={isSubmitting || mode === "edit"}
-                className="w-full touch-manipulation sm:w-auto"
+                className="h-11 w-full touch-manipulation sm:h-10 sm:w-auto"
               >
                 {isSubmitting ? (
                   <>
@@ -1297,12 +1393,15 @@ export function DiscountFormWizard({
                     Saving…
                   </>
                 ) : mode === "create" ? (
-                  "Save Discount"
+                  values.category === "coupon_code"
+                    ? "Save coupon"
+                    : "Save discount"
                 ) : (
                   "Update (API pending)"
                 )}
               </Button>
             )}
+            </div>
           </div>
         </div>
       </form>

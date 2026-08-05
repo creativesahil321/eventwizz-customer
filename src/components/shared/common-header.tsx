@@ -456,6 +456,18 @@ export default function CommonHeader({
     (variant === "default" && isPreviewFromProvider) ||
     (variant === "preview" && isPreviewFromProvider);
 
+  /**
+   * Brand mark must never navigate to `/` during site/event preview — that dumps
+   * the vendor out of `/preview/*` onto the live home. Cover path-based preview
+   * even if PreviewProvider is missing higher in the tree.
+   */
+  const disableLogoHomeLink =
+    useNonInteractiveChrome ||
+    isPreviewPath ||
+    isPreviewFromProvider ||
+    variant === "preview" ||
+    variant === "onboarding";
+
   const sessionPending = status === "loading";
   const commerceSlotLoading = !useNonInteractiveChrome && sessionPending;
   const showHeaderCart =
@@ -666,7 +678,7 @@ export default function CommonHeader({
               ))}
           </div>
           <div className="relative z-0 w-1/3 min-w-0 overflow-hidden px-2 text-center">
-            {useNonInteractiveChrome ? (
+            {disableLogoHomeLink ? (
               <div className="flex h-14 max-w-full items-center justify-center cursor-default">
                 {logoPath ? (
                   <img
@@ -1020,7 +1032,7 @@ export default function CommonHeader({
             <Menu className="h-5 w-5" />
           </button>
           <div className="flex min-w-0 justify-center px-1">
-            {useNonInteractiveChrome ? (
+            {disableLogoHomeLink ? (
               <div className="flex h-9 max-w-full items-center justify-center cursor-default">
                 {logoPath ? (
                   <img

@@ -57,17 +57,21 @@ const CATEGORY_META: Record<
   DiscountCategory,
   { icon: typeof Tag; hint: string }
 > = {
-  event_specific: {
+  discount: {
     icon: Tag,
-    hint: "Whole event",
-  },
-  date_wise: {
-    icon: CalendarDays,
-    hint: "Room + dates",
+    hint: "Event discount",
   },
   coupon_code: {
     icon: Ticket,
     hint: "Checkout code",
+  },
+  event_specific: {
+    icon: Tag,
+    hint: "Event discount",
+  },
+  date_wise: {
+    icon: CalendarDays,
+    hint: "Room and dates",
   },
 };
 
@@ -157,12 +161,12 @@ export function DiscountsList() {
     <div className="flex w-full min-w-0 flex-col gap-4">
       <ProtectedPageHeader
         title="Discounts"
-        description="Create event offers, date deals, and coupon codes. One discount applies per booking — coupons win first."
+        description="Create event discounts and coupon codes for your current location. Only one discount applies per booking; coupon codes take priority."
         actions={
           <Button asChild>
             <Link href={createHref}>
               <Plus className="mr-2 h-4 w-4" />
-              Create Discount
+              Create discount
             </Link>
           </Button>
         }
@@ -210,7 +214,11 @@ export function DiscountsList() {
         >
           All
         </button>
-        {(Object.keys(CATEGORY_META) as DiscountCategory[]).map((key) => {
+        {(
+          Object.keys(CATEGORY_META) as DiscountCategory[]
+        )
+          .filter((key) => key === "discount" || key === "coupon_code")
+          .map((key) => {
           const Icon = CATEGORY_META[key].icon;
           return (
             <button
@@ -252,7 +260,7 @@ export function DiscountsList() {
               <SelectValue placeholder="Status" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All status</SelectItem>
+              <SelectItem value="all">All statuses</SelectItem>
               <SelectItem value="active">Active</SelectItem>
               <SelectItem value="inactive">Inactive</SelectItem>
               <SelectItem value="expired">Expired</SelectItem>
@@ -285,14 +293,14 @@ export function DiscountsList() {
             <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-muted">
               <Percent className="h-5 w-5 text-muted-foreground" />
             </div>
-            <p className="font-medium text-[#0F172A]">No discounts found</p>
+            <p className="font-medium text-[#0F172A]">No discounts yet</p>
             <p className="mt-1 text-sm text-muted-foreground">
-              Try another filter, or create your first promotion.
+              Create your first discount or coupon code for this location.
             </p>
             <Button asChild className="mt-4">
               <Link href={createHref}>
                 <Plus className="mr-2 h-4 w-4" />
-                Create Discount
+                Create discount
               </Link>
             </Button>
           </div>

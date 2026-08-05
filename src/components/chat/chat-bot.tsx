@@ -27,7 +27,6 @@ import { useCreateCustomerSupportTicket } from "@/services/customer/support";
 import type { SupportCategory } from "@/app/(protected)/customer/support/_lib/types";
 import { CATEGORY_LABELS } from "@/app/(protected)/customer/support/_lib/utils";
 import { resolveChatNavLink } from "@/lib/chat-nav-links";
-import { pickReadableForeground } from "@/lib/color-contrast";
 import type {
   VendorChatLiveStats,
   VendorChatDashboardSnapshot,
@@ -225,7 +224,7 @@ function buildSubject(
 function renderMessageContent(content: string, isUser: boolean): ReactNode[] {
   const linkClass = isUser
     ? "underline underline-offset-2 font-medium opacity-95"
-    : "underline underline-offset-2 font-medium text-[var(--color-primary)]";
+    : "underline underline-offset-2 font-medium text-slate-700";
   const boldClass = isUser
     ? "font-bold opacity-100"
     : "font-bold text-slate-950";
@@ -323,7 +322,7 @@ function ChatAvatar({
   return (
     <span
       className={cn(
-        "relative inline-flex shrink-0 items-center justify-center overflow-hidden rounded-full bg-[var(--color-primary)] ring-1 ring-black/5",
+        "relative inline-flex shrink-0 items-center justify-center overflow-hidden rounded-full bg-slate-800 ring-1 ring-black/5",
         sizeClass,
         className,
       )}
@@ -442,10 +441,6 @@ export function ChatBot() {
     domainWebsiteRole ||
     (theme?.website_role as string | undefined) ||
     null;
-  /** User bubbles sit on primary; pick black/white so light themes stay readable. */
-  const userBubbleTextColor = pickReadableForeground(
-    theme?.colors?.primary ?? "#0F172A",
-  );
   const isLoggedInCustomer =
     sessionStatus === "authenticated" &&
     session?.user?.account_type === "customer";
@@ -1359,7 +1354,7 @@ Is there anything else I can help you with?`,
                 "relative h-14 w-14 rounded-full p-0",
                 "shadow-[0_8px_28px_rgba(15,23,42,0.18)]",
                 "ring-2 ring-white/90",
-                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] focus-visible:ring-offset-2",
+                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-2",
               )}
             >
               {/* Attention rings — draw the eye to the support bot */}
@@ -1368,7 +1363,7 @@ Is there anything else I can help you with?`,
                   <span
                     aria-hidden
                     data-chat-bot-motion
-                    className="pointer-events-none absolute inset-0 rounded-full bg-[var(--color-primary)]/30"
+                    className="pointer-events-none absolute inset-0 rounded-full bg-slate-400/30"
                     style={{
                       animation:
                         "chat-bot-ping 2.4s cubic-bezier(0,0,0.2,1) infinite",
@@ -1377,7 +1372,7 @@ Is there anything else I can help you with?`,
                   <span
                     aria-hidden
                     data-chat-bot-motion
-                    className="pointer-events-none absolute -inset-1 rounded-full border-2 border-[var(--color-primary)]/40"
+                    className="pointer-events-none absolute -inset-1 rounded-full border-2 border-slate-400/40"
                     style={{
                       animation:
                         "chat-bot-pulse 2.4s cubic-bezier(0.4,0,0.6,1) infinite",
@@ -1408,7 +1403,7 @@ Is there anything else I can help you with?`,
                 "bg-slate-800 text-white shadow-sm",
                 "ring-2 ring-white",
                 "hover:bg-slate-950",
-                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] focus-visible:ring-offset-1",
+                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-1",
               )}
             >
               <X className="h-3 w-3" strokeWidth={2.5} />
@@ -1435,7 +1430,7 @@ Is there anything else I can help you with?`,
             transition={{ type: "spring", stiffness: 380, damping: 28 }}
             className={cn(
               "fixed bottom-10 right-4 z-50 flex w-[min(100vw-2rem,22rem)] flex-col overflow-hidden sm:right-6 md:w-96",
-              "rounded-2xl border border-black/8 bg-[var(--color-surface,#fff)]",
+              "rounded-2xl border border-slate-200 bg-white",
               "shadow-[0_16px_48px_rgba(15,23,42,0.16)]",
               "origin-bottom-right",
               isMinimized ? "h-14" : "h-[min(530px,70vh)]",
@@ -1444,10 +1439,7 @@ Is there anything else I can help you with?`,
               transition: "height 300ms ease-out",
             }}
           >
-            <div
-              className="flex h-14 shrink-0 items-center justify-between gap-2 px-3.5 text-white"
-              style={{ backgroundColor: "var(--color-primary)" }}
-            >
+            <div className="flex h-14 shrink-0 items-center justify-between gap-2 bg-slate-800 px-3.5 text-white">
               <div className="flex min-w-0 items-center gap-2.5">
                 <motion.div
                   animate={
@@ -1507,7 +1499,7 @@ Is there anything else I can help you with?`,
 
             {!isMinimized && (
               <>
-                <ScrollArea className="min-h-0 flex-1 bg-[var(--color-secondary,#f8fafc)] px-3.5 py-4">
+                <ScrollArea className="min-h-0 flex-1 bg-slate-50 px-3.5 py-4">
                   <div className="space-y-4 pb-1">
                     <AnimatePresence initial={false}>
                       {messages.map((message, index) => {
@@ -1548,15 +1540,9 @@ Is there anything else I can help you with?`,
                                 className={cn(
                                   "min-w-0 px-3.5 py-2.5 text-sm leading-relaxed",
                                   isUser
-                                    ? "rounded-2xl rounded-br-md bg-[var(--color-primary)]"
-                                    : // Always dark text on white — never inherit theme --color-text (invisible on dark themes)
-                                      "rounded-2xl rounded-bl-md border border-black/6 bg-white text-slate-900 shadow-[0_1px_2px_rgba(15,23,42,0.04)]",
+                                    ? "rounded-2xl rounded-br-md bg-slate-800 text-white"
+                                    : "rounded-2xl rounded-bl-md border border-black/6 bg-white text-slate-900 shadow-[0_1px_2px_rgba(15,23,42,0.04)]",
                                 )}
-                                style={
-                                  isUser
-                                    ? { color: userBubbleTextColor }
-                                    : { color: "#0F172A" }
-                                }
                               >
                                 <p
                                   className="whitespace-pre-wrap break-words"
@@ -1605,7 +1591,7 @@ Is there anything else I can help you with?`,
                                           "w-fit max-w-full rounded-full border px-3 py-1.5 text-left text-xs font-semibold transition-colors",
                                           action.id === "cancel_flow"
                                             ? "border-slate-300 bg-white text-slate-700 hover:bg-slate-100"
-                                            : "border-[var(--color-primary)]/40 bg-white text-[var(--color-primary)] hover:bg-[var(--color-primary)] hover:text-white",
+                                            : "border-slate-300 bg-white text-slate-700 hover:bg-slate-800 hover:text-white hover:border-slate-800",
                                           "disabled:pointer-events-none disabled:opacity-50",
                                         )}
                                       >
@@ -1628,7 +1614,7 @@ Is there anything else I can help you with?`,
                                     href={message.supportCta.href}
                                     className={cn(
                                       "inline-flex w-fit items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold",
-                                      "bg-[var(--color-primary)] text-white shadow-sm transition hover:opacity-90",
+                                      "bg-slate-800 text-white shadow-sm transition hover:bg-slate-900",
                                     )}
                                   >
                                     {message.supportCta.label}
@@ -1673,7 +1659,7 @@ Is there anything else I can help you with?`,
                       onKeyDown={handleKeyDown}
                       placeholder={inputPlaceholder}
                       disabled={isLoading || supportFlow.step === "submitting"}
-                      className="h-10 flex-1 rounded-full border-black/10 bg-white px-4 text-sm text-slate-900 shadow-none placeholder:text-slate-400 focus-visible:ring-1 focus-visible:ring-[var(--color-primary)] focus-visible:ring-offset-0"
+                      className="h-10 flex-1 rounded-full border-black/10 bg-white px-4 text-sm text-slate-900 shadow-none placeholder:text-slate-400 focus-visible:ring-1 focus-visible:ring-slate-400 focus-visible:ring-offset-0"
                     />
                     <Button
                       type="button"
@@ -1687,14 +1673,9 @@ Is there anything else I can help you with?`,
                       className={cn(
                         "h-10 w-10 shrink-0 rounded-full transition-transform",
                         input.trim()
-                          ? "bg-[var(--color-primary)] hover:opacity-90 hover:scale-105"
+                          ? "bg-slate-800 text-white hover:bg-slate-900 hover:scale-105"
                           : "bg-black/5 text-black/35",
                       )}
-                      style={
-                        input.trim()
-                          ? { color: userBubbleTextColor }
-                          : undefined
-                      }
                       aria-label="Send message"
                     >
                       {isLoading ? (

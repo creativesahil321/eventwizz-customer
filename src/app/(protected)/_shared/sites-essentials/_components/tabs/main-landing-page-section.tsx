@@ -24,6 +24,8 @@ import {
 } from "@/lib/word-count";
 import { useSiteEssentialsUpdateGate } from "../../_lib/site-essentials-update-context";
 import { SITE_HERO_BACKGROUND_CROP } from "@/lib/event-image-crop-presets";
+import { isUnsavedPreviewMedia } from "../../_lib/merge-preview-with-api";
+import { syncSitePreviewFormIfNeeded } from "../../_lib/sync-preview-form";
 
 interface MainLandingPageSectionProps {
   serverMainLandingCoverImage?: string;
@@ -40,10 +42,16 @@ export function MainLandingPageSection({
 
   const watchedCover = form.watch("main_landing_cover_image");
 
-  // Server refetch only — do not restore when the user cleared the field (form value is null).
+  // Server refetch only — do not restore when the user cleared the field (form value is null)
+  // or when Preview restored an unsaved blob:/data: URL for a new upload.
   useEffect(() => {
     const formCover = form.getValues("main_landing_cover_image");
     if (formCover instanceof File || formCover === null) return;
+    if (isUnsavedPreviewMedia(formCover)) {
+      setCoverImageFiles([]);
+      setCoverImageUrl(String(formCover).trim());
+      return;
+    }
 
     const hasServer = Boolean(serverMainLandingCoverImage?.length);
     setCoverImageFiles([]);
@@ -70,8 +78,9 @@ export function MainLandingPageSection({
       return;
     }
 
+    // Prefer form strings (incl. Preview blob URLs) over the previous API image.
     if (typeof watchedCover === "string" && watchedCover.trim()) {
-      setCoverImageUrl(watchedCover);
+      setCoverImageUrl(watchedCover.trim());
       return;
     }
 
@@ -90,6 +99,7 @@ export function MainLandingPageSection({
       files.length > 0 ? files[0] : null,
       { shouldDirty: true, shouldTouch: true },
     );
+    syncSitePreviewFormIfNeeded(form.getValues());
   };
 
   const handleRemoveCover = () => {
@@ -99,6 +109,7 @@ export function MainLandingPageSection({
       shouldDirty: true,
       shouldTouch: true,
     });
+    syncSitePreviewFormIfNeeded(form.getValues());
   };
 
   return (

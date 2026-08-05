@@ -87,8 +87,8 @@ export default function ResetPasswordForm() {
           <form onSubmit={handleSubmit(onSubmit)}>
             <input type="hidden" {...register("email")} />
             <div className="flex flex-col justify-start space-y-2 mb-4">
-              <Label className="text-left">Email</Label>
-              <div className="border border-gray-400 rounded-sm h-12 px-3 flex items-center bg-muted/30 text-gray-700">
+              <Label className="text-left text-[var(--color-text)]">Email</Label>
+              <div className="border border-[var(--color-border,#9ca3af)] rounded-sm h-12 px-3 flex items-center bg-[color-mix(in_srgb,var(--color-text)_6%,var(--color-surface))] text-[var(--color-text-dimmed)]">
                 {emailValue || "Email not found in reset link"}
               </div>
               {errors.email && (
@@ -99,13 +99,15 @@ export default function ResetPasswordForm() {
             </div>
 
             <div className="flex flex-col justify-start space-y-2 mb-4">
-              <Label className="text-left">Password</Label>
+              <Label className="text-left text-[var(--color-text)]">
+                Password
+              </Label>
               <PasswordInput
                 id="password"
                 placeholder="******"
                 autoComplete="new-password"
                 {...register("password")}
-                className="border border-gray-400 rounded-sm"
+                className="border border-[var(--color-border,#9ca3af)] rounded-sm text-[var(--color-text)]"
               />
               {errors.password && (
                 <Small className="text-red-500 text-left">
@@ -115,14 +117,16 @@ export default function ResetPasswordForm() {
             </div>
 
             <div className="flex flex-col justify-start space-y-2 mb-4">
-              <Label className="text-left">Confirm Password</Label>
+              <Label className="text-left text-[var(--color-text)]">
+                Confirm Password
+              </Label>
               <PasswordInput
                 id="confirm_password"
                 placeholder="******"
                 autoComplete="new-password"
                 ariaPasswordField="confirm password"
                 {...register("confirm_password")}
-                className="border border-gray-400 rounded-sm"
+                className="border border-[var(--color-border,#9ca3af)] rounded-sm text-[var(--color-text)]"
               />
               {errors.confirm_password && (
                 <Small className="text-red-500 text-left">

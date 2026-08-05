@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, forwardRef } from "react";
 import { Input } from "@/components/ui/input";
 
 interface Suggestion {
@@ -25,18 +25,24 @@ interface AddressAutocompleteProps {
   variant?: "default" | "dark";
 }
 
-export default function AddressAutocomplete({
-  value,
-  onChange,
-  onSelect,
-  onFocus,
-  placeholder = "Type to search for a UK address or location...",
-  className = "",
-  autoFocus = false,
-  inputClassName,
-  suggestionsClassName,
-  variant = "default",
-}: AddressAutocompleteProps) {
+const AddressAutocomplete = forwardRef<
+  HTMLInputElement,
+  AddressAutocompleteProps
+>(function AddressAutocomplete(
+  {
+    value,
+    onChange,
+    onSelect,
+    onFocus,
+    placeholder = "Type to search for a UK address or location...",
+    className = "",
+    autoFocus = false,
+    inputClassName,
+    suggestionsClassName,
+    variant = "default",
+  },
+  ref,
+) {
   const isDark = variant === "dark";
   const resolvedInputClassName =
     inputClassName ??
@@ -49,7 +55,9 @@ export default function AddressAutocomplete({
       ? "absolute z-50 w-full mt-1 bg-slate-800 border border-white/10 rounded-lg shadow-xl max-h-60 overflow-y-auto"
       : "absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-y-auto");
   const suggestionItemTextClass = isDark ? "text-slate-200" : "text-gray-800";
-  const clearButtonClass = isDark ? "text-slate-400 hover:text-red-400" : "text-gray-400 hover:text-red-600";
+  const clearButtonClass = isDark
+    ? "text-slate-400 hover:text-red-400"
+    : "text-gray-400 hover:text-red-600";
   const noResultsClass = isDark
     ? "absolute z-50 w-full mt-1 bg-slate-800 border border-white/10 rounded-lg shadow-xl p-4 text-slate-400 text-sm"
     : "absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg p-4 text-gray-500 text-sm";
@@ -60,19 +68,27 @@ export default function AddressAutocomplete({
   const [isSearching, setIsSearching] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [isSelected, setIsSelected] = useState(false);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const localInputRef = useRef<HTMLInputElement>(null);
   const autocompleteService =
     useRef<google.maps.places.AutocompleteService | null>(null);
   const placesService = useRef<google.maps.places.PlacesService | null>(null);
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
   const safetyTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Handle autofocus
+  const setInputRef = (node: HTMLInputElement | null) => {
+    localInputRef.current = node;
+    if (typeof ref === "function") {
+      ref(node);
+    } else if (ref) {
+      ref.current = node;
+    }
+  };
+
+  // Handle autofocus (prop or RHF shouldFocus via ref)
   useEffect(() => {
-    if (autoFocus && inputRef.current) {
-      // Small delay to ensure component is fully mounted
+    if (autoFocus && localInputRef.current) {
       const timer = setTimeout(() => {
-        inputRef.current?.focus();
+        localInputRef.current?.focus();
       }, 100);
       return () => clearTimeout(timer);
     }
@@ -86,11 +102,10 @@ export default function AddressAutocomplete({
           autocompleteService.current =
             new google.maps.places.AutocompleteService();
 
-          // Create a hidden div for PlacesService (required by Google Maps API)
           const hiddenDiv = document.createElement("div");
           document.body.appendChild(hiddenDiv);
           placesService.current = new google.maps.places.PlacesService(
-            hiddenDiv
+            hiddenDiv,
           );
         } catch (error) {
           console.error("Error initializing Google Places services:", error);
@@ -98,16 +113,12 @@ export default function AddressAutocomplete({
       }
     };
 
-    // Try to initialize immediately
     initializeServices();
-
-    // Also try after a short delay in case Google Maps is still loading
     const timeout = setTimeout(initializeServices, 1000);
 
     return () => clearTimeout(timeout);
   }, []);
 
-  // Check if we have a selected value
   useEffect(() => {
     if (value && !searchQuery) {
       setIsSelected(true);
@@ -115,17 +126,15 @@ export default function AddressAutocomplete({
   }, [value, searchQuery]);
 
   const handleInputChange = (inputValue: string) => {
-    if (isSelected) return; // Prevent changes if already selected
+    if (isSelected) return;
 
     setSearchQuery(inputValue);
     onChange(inputValue);
 
-    // Clear previous timeout
     if (timeoutRef.current) {
       clearTimeout(timeoutRef.current);
     }
 
-    // Clear previous safety timeout
     if (safetyTimeoutRef.current) {
       clearTimeout(safetyTimeoutRef.current);
       safetyTimeoutRef.current = null;
@@ -139,23 +148,20 @@ export default function AddressAutocomplete({
 
     setIsSearching(true);
 
-    // Safety timeout to prevent infinite loading (5 seconds)
     safetyTimeoutRef.current = setTimeout(() => {
       setIsSearching(false);
       console.warn("Search timeout - stopping loading state");
     }, 5000);
 
-    // Debounce the search
     timeoutRef.current = setTimeout(() => {
       if (autocompleteService.current && inputValue.trim()) {
         autocompleteService.current.getPlacePredictions(
           {
             input: inputValue,
-            types: ["geocode"], // Use geocode which includes addresses and places
-            componentRestrictions: { country: ["gb"] }, // Restrict to UK only
+            types: ["geocode"],
+            componentRestrictions: { country: ["gb"] },
           },
           (predictions, status) => {
-            // Clear safety timeout
             if (safetyTimeoutRef.current) {
               clearTimeout(safetyTimeoutRef.current);
               safetyTimeoutRef.current = null;
@@ -170,22 +176,20 @@ export default function AddressAutocomplete({
                 predictions.map((prediction) => ({
                   description: prediction.description,
                   place_id: prediction.place_id,
-                }))
+                })),
               );
             } else {
               setSuggestions([]);
               console.warn("Google Places API error:", status);
             }
-          }
+          },
         );
       } else {
-        // Clear safety timeout
         if (safetyTimeoutRef.current) {
           clearTimeout(safetyTimeoutRef.current);
           safetyTimeoutRef.current = null;
         }
 
-        // If services are not ready, stop loading
         setIsSearching(false);
         setSuggestions([]);
         console.warn("Google Places services not initialized");
@@ -200,7 +204,6 @@ export default function AddressAutocomplete({
     setIsSelected(true);
 
     if (onSelect && placesService.current) {
-      // Get detailed place information
       placesService.current.getDetails(
         {
           placeId: suggestion.place_id,
@@ -210,12 +213,12 @@ export default function AddressAutocomplete({
           if (status === google.maps.places.PlacesServiceStatus.OK && place) {
             onSelect(
               suggestion.place_id,
-              place.formatted_address || suggestion.description
+              place.formatted_address || suggestion.description,
             );
           } else {
             onSelect(suggestion.place_id, suggestion.description);
           }
-        }
+        },
       );
     }
   };
@@ -225,26 +228,20 @@ export default function AddressAutocomplete({
     setSearchQuery("");
     setSuggestions([]);
     setIsSelected(false);
-    if (inputRef.current) {
-      inputRef.current.focus();
-    }
+    localInputRef.current?.focus();
   };
 
   const handleFocus = () => {
-    // Call the onFocus prop if provided
-    if (onFocus) {
-      onFocus();
-    }
+    onFocus?.();
 
     if (isSelected) {
-      // If already selected, show suggestions for the current value
       if (value && autocompleteService.current) {
         setIsSearching(true);
         autocompleteService.current.getPlacePredictions(
           {
             input: value,
-            types: ["geocode"], // Use geocode which includes addresses and places
-            componentRestrictions: { country: ["gb"] }, // Restrict to UK only
+            types: ["geocode"],
+            componentRestrictions: { country: ["gb"] },
           },
           (predictions, status) => {
             setIsSearching(false);
@@ -256,16 +253,15 @@ export default function AddressAutocomplete({
                 predictions.map((prediction) => ({
                   description: prediction.description,
                   place_id: prediction.place_id,
-                }))
+                })),
               );
             }
-          }
+          },
         );
       }
     }
   };
 
-  // Cleanup timeouts on unmount
   useEffect(() => {
     return () => {
       if (timeoutRef.current) {
@@ -280,7 +276,7 @@ export default function AddressAutocomplete({
   return (
     <div className={`relative w-full ${className}`}>
       <Input
-        ref={inputRef}
+        ref={setInputRef}
         className={
           resolvedInputClassName ??
           `w-full border p-2 rounded ${isSelected ? "bg-green-50 cursor-not-allowed" : "bg-white"}`
@@ -292,16 +288,15 @@ export default function AddressAutocomplete({
         onFocus={handleFocus}
         placeholder={isSelected ? "" : placeholder}
         readOnly={isSelected}
+        autoFocus={autoFocus}
       />
 
-      {/* Loading spinner */}
       {isSearching && !isSelected && (
         <div className="absolute right-10 top-1/2 transform -translate-y-1/2">
           <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
         </div>
       )}
 
-      {/* Clear button */}
       {isSelected && (
         <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
           <button
@@ -315,7 +310,6 @@ export default function AddressAutocomplete({
         </div>
       )}
 
-      {/* Suggestions dropdown */}
       {suggestions.length > 0 && !isSelected && searchQuery && (
         <div className={resolvedSuggestionsClassName}>
           {suggestions.map((suggestion) => (
@@ -325,7 +319,9 @@ export default function AddressAutocomplete({
               onClick={() => handleSuggestionSelect(suggestion)}
             >
               <div className="flex items-center space-x-2">
-                <span className={isDark ? "text-slate-500" : "text-gray-400"}>📍</span>
+                <span className={isDark ? "text-slate-500" : "text-gray-400"}>
+                  📍
+                </span>
                 <span className={`text-sm ${suggestionItemTextClass}`}>
                   {suggestion.description}
                 </span>
@@ -335,7 +331,6 @@ export default function AddressAutocomplete({
         </div>
       )}
 
-      {/* No results message */}
       {searchQuery &&
         suggestions.length === 0 &&
         !isSearching &&
@@ -352,7 +347,6 @@ export default function AddressAutocomplete({
           </div>
         )}
 
-      {/* Google Places API not available message */}
       {searchQuery &&
         searchQuery.length >= 2 &&
         !isSearching &&
@@ -369,4 +363,8 @@ export default function AddressAutocomplete({
         )}
     </div>
   );
-}
+});
+
+AddressAutocomplete.displayName = "AddressAutocomplete";
+
+export default AddressAutocomplete;

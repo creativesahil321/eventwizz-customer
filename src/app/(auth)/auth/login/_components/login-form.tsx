@@ -251,7 +251,10 @@ export default function LoginForm() {
               </div>
 
               <div className="grid gap-2">
-                <label htmlFor="email" className="text-black font-medium">
+                <label
+                  htmlFor="email"
+                  className="font-medium text-[var(--color-text)]"
+                >
                   Email address
                 </label>
                 <Input
@@ -261,7 +264,7 @@ export default function LoginForm() {
                   autoCapitalize="none"
                   autoComplete="email"
                   autoCorrect="off"
-                  className={`h-11 px-3 border-0 border-b-2 border-[var(--color-primary,#019ead)] focus:border-[var(--color-primary-dark,#018795)] focus:outline-none focus:ring-0 ${
+                  className={`h-11 px-3 border-0 border-b-2 border-[var(--color-primary,#019ead)] text-[var(--color-text)] focus:border-[var(--color-primary-dark,#018795)] focus:outline-none focus:ring-0 ${
                     errors.email ? "border-red-500" : ""
                   }`}
                   {...register("email")}
@@ -275,7 +278,10 @@ export default function LoginForm() {
 
               <div className="grid gap-2">
                 <div className="flex items-center justify-between">
-                  <label htmlFor="password" className="text-black font-medium">
+                  <label
+                    htmlFor="password"
+                    className="font-medium text-[var(--color-text)]"
+                  >
                     Password
                   </label>
 
@@ -292,7 +298,7 @@ export default function LoginForm() {
                   autoCapitalize="none"
                   autoComplete="current-password"
                   autoCorrect="off"
-                  className={`h-11 px-3 border-0 border-b-2 border-[var(--color-primary,#019ead)] focus:border-[var(--color-primary-dark,#018795)] focus:outline-none focus:ring-0 ${
+                  className={`h-11 px-3 border-0 border-b-2 border-[var(--color-primary,#019ead)] text-[var(--color-text)] focus:border-[var(--color-primary-dark,#018795)] focus:outline-none focus:ring-0 ${
                     errors.password ? "border-red-500" : ""
                   }`}
                   {...register("password")}

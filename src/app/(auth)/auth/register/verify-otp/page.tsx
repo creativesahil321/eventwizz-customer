@@ -38,8 +38,10 @@ export default function VerifyOTPPage() {
     <div className="w-full flex items-center justify-center py-12">
       <div className="mx-auto w-full max-w-[420px] px-4 flex flex-col items-center">
         <div className="flex flex-col space-y-2 text-center mb-8 w-full">
-          <H1>Verify your email</H1>
-          <Paragraph>Enter the verification code sent to your email</Paragraph>
+          <H1 className="text-[var(--color-text)]">Verify your email</H1>
+          <Paragraph className="text-[var(--color-text-dimmed)]">
+            Enter the verification code sent to your email
+          </Paragraph>
         </div>
         <div className="w-full">
           <OTPVerificationForm />

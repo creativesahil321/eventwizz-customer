@@ -67,14 +67,16 @@ export default function ForgotPassword({
         <div className="w-full my-5">
           <form onSubmit={handleSubmit(onSubmit)}>
             <div className="flex flex-col justify-start space-y-2 mb-2">
-              <Label className="text-left text-black">{field.label}</Label>
+              <Label className="text-left text-[var(--color-text)]">
+                {field.label}
+              </Label>
               <Input
                 type={field.type}
                 placeholder={field.placeholder}
-                className={`h-10 ${
+                className={`h-10 text-[var(--color-text)] ${
                   errors.email
                     ? "border-red-500"
-                    : "border border-gray-400 rounded-sm"
+                    : "border border-[var(--color-border,#9ca3af)] rounded-sm"
                 }`}
                 id={field.name}
                 {...register(field.name as keyof EmailVerificationFormValues)}

@@ -26,12 +26,20 @@ export function AuthSkeleton({ accountType, isOnboarded }: AuthSkeletonProps = {
       <div className="flex flex-col items-center gap-4 text-center">
         <Loader2
           className="h-10 w-10 animate-spin"
-          style={{ color: isVendorGoingToOnboarding ? "#94a3b8" : "var(--color-primary, #3b82f6)" }}
+          style={{
+            color: isVendorGoingToOnboarding
+              ? "#94a3b8"
+              : "var(--color-primary, #1e293b)",
+          }}
           aria-hidden
         />
         <p
           className="text-sm"
-          style={{ color: isVendorGoingToOnboarding ? "#94a3b8" : "var(--color-text-dimmed, #64748b)" }}
+          style={{
+            color: isVendorGoingToOnboarding
+              ? "#94a3b8"
+              : "var(--color-text-dimmed, #64748b)",
+          }}
         >
           {isVendorGoingToOnboarding
             ? "Taking you to complete your setup…"

@@ -25,11 +25,11 @@ export function AuthAlternateLink({ variant }: AuthAlternateLinkProps) {
   const { website_role } = useDomain();
 
   const linkClassName =
-    "font-medium text-black hover:text-black hover:underline";
+    "font-medium text-[var(--color-text)] hover:text-[var(--color-primary)] hover:underline";
 
   if (variant === "register") {
     return (
-      <p className="text-center text-sm text-black/70 pt-3">
+      <p className="text-center text-sm text-[var(--color-text-dimmed)] pt-3">
         Have an account?{" "}
         <Link href="/auth/login" className={linkClassName}>
           Sign in
@@ -39,7 +39,7 @@ export function AuthAlternateLink({ variant }: AuthAlternateLinkProps) {
   }
 
   return (
-    <p className="text-center text-sm text-black/70 pt-3">
+    <p className="text-center text-sm text-[var(--color-text-dimmed)] pt-3">
       Don&apos;t have an account?{" "}
       <Link href={getRegistrationPath(website_role)} className={linkClassName}>
         Sign up

@@ -19,6 +19,7 @@ interface LocationData {
   longitude?: number | string | null;
 }
 
+/** Kept for callers that still build header download rows from the same shape. */
 export interface DownloadItem {
   icon?: string;
   title: string;
@@ -35,7 +36,6 @@ export interface PriceProps {
 
 type BrochureSectionProps = {
   location: LocationData;
-  downloads?: DownloadItem[];
   price: PriceProps;
   /** When true, the location map mounts and loads immediately (public event pages). */
   showMapImmediately?: boolean;
@@ -45,7 +45,6 @@ type BrochureSectionProps = {
 
 export default function BrochureSection({
   location,
-  downloads = [],
   price,
   showMapImmediately = false,
   omitPricePanel = false,
@@ -84,7 +83,6 @@ export default function BrochureSection({
     return <LucideIcon size={size} />;
   };
 
-  // Create default location and price objects
   const defaultLocation = {
     title: location?.title || "LOCATION",
     description:
@@ -103,37 +101,11 @@ export default function BrochureSection({
     icon: price?.icon || "Tag",
   };
 
-  // Filter out downloads with invalid links
-  const validDownloads = downloads.filter((item) => {
-    if (!item.download_link || item.download_link.length === 0) return false;
-    const title = (item.title || "").toLowerCase();
-    if (title.includes("faq") || title.includes("frequently asked")) {
-      return false;
-    }
-    return true;
-  });
-  const showDownloads = validDownloads.length > 0;
-
   const gridClass = cn(
     "grid grid-cols-1 gap-4",
-    // Mobile / framed Mobile-Tablet: stack like live phone (map → cards).
-    // Desktop preview + live desktop: multi-column grid.
-    !narrowPreview &&
-      (omitPricePanel
-        ? showDownloads
-          ? "sm:grid-cols-2"
-          : ""
-        : showDownloads
-          ? "sm:grid-cols-2 md:grid-cols-3"
-          : "sm:grid-cols-2"),
-  );
-
-  const pricePanelClass = cn(
-    "flex w-full flex-col items-center justify-center rounded-md bg-[var(--color-primary)] px-2 py-5 text-[var(--color-primary-foreground)]",
-    !narrowPreview &&
-      showDownloads &&
-      !omitPricePanel &&
-      "sm:col-span-2 md:col-span-1",
+    // Mobile / framed Mobile-Tablet: stack like live phone (map → price).
+    // Desktop preview + live desktop: side-by-side when price is shown.
+    !narrowPreview && !omitPricePanel && "sm:grid-cols-2",
   );
 
   return (
@@ -162,52 +134,8 @@ export default function BrochureSection({
             />
           </section>
 
-          {showDownloads ? (
-            <section className="flex w-full flex-col items-center justify-center rounded-md bg-[var(--color-primary)] px-2 py-5 text-[var(--color-primary-foreground)]">
-              {renderIcon("Download", 24)}
-              <h2
-                className={cn(
-                  "py-2 text-base font-bold uppercase text-[var(--color-primary-foreground)]",
-                  !narrowPreview && "sm:py-3 sm:text-lg",
-                )}
-              >
-                DOWNLOADS
-              </h2>
-              {validDownloads.map((item, idx) => (
-                <div key={idx} className="mb-1 flex items-center gap-1">
-                  {renderIcon("FileText", 16)}
-                  <a
-                    href={sanitizeHref(item.download_link[0]) ?? "#"}
-                    className={cn(
-                      "break-all text-xs text-[var(--color-primary-foreground)] underline",
-                      !narrowPreview && "sm:text-sm",
-                    )}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    onClick={(e) => {
-                      // For File objects, we need to handle download differently
-                      if (item.download_link[0].startsWith("blob:")) {
-                        e.preventDefault();
-                        const link = document.createElement("a");
-                        link.href = item.download_link[0];
-                        link.download = item.title + ".pdf";
-                        document.body.appendChild(link);
-                        link.click();
-                        document.body.removeChild(link);
-                      } else if (!sanitizeHref(item.download_link[0])) {
-                        e.preventDefault();
-                      }
-                    }}
-                  >
-                    {item.title}
-                  </a>
-                </div>
-              ))}
-            </section>
-          ) : null}
-
           {!omitPricePanel ? (
-            <section className={pricePanelClass}>
+            <section className="flex w-full flex-col items-center justify-center rounded-md bg-[var(--color-primary)] px-2 py-5 text-[var(--color-primary-foreground)]">
               {renderIcon(defaultPrice.icon, 24)}
               <h2
                 className={cn(

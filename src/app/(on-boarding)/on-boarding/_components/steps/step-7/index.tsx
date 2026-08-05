@@ -884,6 +884,7 @@ export default function StepSeven() {
                                 </FormLabel>
                                 <FormControl>
                                   <AddressAutocomplete
+                                    ref={field.ref}
                                     value={field.value}
                                     onChange={(address) => {
                                       field.onChange(address);

@@ -19,9 +19,10 @@ import { formatDiscountValue, getDiscountDisplayName } from "./format";
 import { cn } from "@/lib/utils";
 
 const CATEGORY_ICON: Record<DiscountCategory, typeof Tag> = {
+  discount: Tag,
+  coupon_code: Ticket,
   event_specific: Tag,
   date_wise: CalendarDays,
-  coupon_code: Ticket,
 };
 
 interface EventDiscountsCardProps {
@@ -83,7 +84,7 @@ export function EventDiscountsCard({
               ) : active.length > 0 ? (
                 `${active.length} active discount${active.length > 1 ? "s" : ""}`
               ) : (
-                "No active discounts yet — add an event, date, or coupon offer."
+                "No active discounts yet. Add a discount or coupon for this event."
               )}
             </p>
           </div>
@@ -120,14 +121,14 @@ export function EventDiscountsCard({
           </div>
           <div>
             <h2 className="text-base font-semibold text-[#0F172A]">
-              Discounts & coupons
+              Discounts and coupons
             </h2>
             <p className="mt-0.5 text-sm text-muted-foreground">
-              Manage promotions for{" "}
+              Manage offers for{" "}
               <span className="font-medium text-foreground">
                 {eventName || "this event"}
               </span>
-              . Full control lives in Discounts; this is a quick view.
+              . Use Discounts for full control; this is a quick view.
             </p>
           </div>
         </div>
@@ -155,7 +156,7 @@ export function EventDiscountsCard({
             No discounts for this event yet
           </p>
           <p className="mt-1 text-xs text-muted-foreground">
-            Create an event-wide offer, date-wise deal, or shareable coupon code.
+            Create an event discount or a shareable coupon code.
           </p>
           <Button asChild size="sm" className="mt-3">
             <Link href={createHref}>

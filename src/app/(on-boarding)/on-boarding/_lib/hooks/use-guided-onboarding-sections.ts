@@ -34,6 +34,21 @@ function scrollToFirstError(): void {
 
     if (target) {
       target.scrollIntoView({ behavior: "smooth", block: "center" });
+      const focusable =
+        target.matches(
+          'input, textarea, select, [contenteditable="true"], button',
+        )
+          ? target
+          : target.querySelector<HTMLElement>(
+              'input:not([type="hidden"]):not([type="file"]):not([disabled]), textarea:not([disabled]), select:not([disabled]), [contenteditable="true"]',
+            );
+      if (focusable) {
+        try {
+          focusable.focus({ preventScroll: true });
+        } catch {
+          focusable.focus();
+        }
+      }
     }
   });
 }
@@ -124,8 +139,9 @@ export function useGuidedOnboardingSections<T extends FieldValues>({
     root.scrollIntoView({ block: "nearest", behavior: "smooth" });
 
     const focusFirstField = () => {
+      // Skip hidden + file inputs (uploaders) so focus lands on real form fields.
       const focusable = root.querySelector<HTMLElement>(
-        'input:not([type="hidden"]):not([disabled]), textarea:not([disabled]), select:not([disabled]), [contenteditable="true"]',
+        'input:not([type="hidden"]):not([type="file"]):not([disabled]), textarea:not([disabled]), select:not([disabled]), [contenteditable="true"]',
       );
       if (focusable) {
         try {

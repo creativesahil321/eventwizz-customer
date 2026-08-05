@@ -225,7 +225,7 @@ export default function FormPreview() {
     };
   }, [activePreviewBrochure, currencySymbol]);
 
-  // Brochure downloads — same data drives section + `CommonHeader` (single pill vs dropdown).
+  // Brochure downloads — drives `CommonHeader` only (section DOWNLOADS tile removed).
   const downloadsArray = useMemo(() => {
     const downloads: Array<{
       title: string;
@@ -1188,7 +1188,7 @@ export default function FormPreview() {
           )}
         </div>
 
-        {/* Location / downloads / prices — after drinks, same as live */}
+        {/* Location / prices — downloads live in the header only */}
         <div
           ref={moreInfoRef}
           className={`transition-all duration-300 ${getHighlightClass(
@@ -1198,7 +1198,6 @@ export default function FormPreview() {
         >
           <BrochureSection
             location={activePreviewBrochureLocation}
-            downloads={downloadsArray}
             price={activePreviewBrochurePrice}
           />
         </div>

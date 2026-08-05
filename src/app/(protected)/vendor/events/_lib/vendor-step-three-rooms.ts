@@ -1,4 +1,8 @@
 import type { StepThreeType } from "@/app/(protected)/vendor/events/_components/tab-event-form/schema";
+import {
+  isVendorDateCancelled,
+  isVendorDateReadonlyCancelled,
+} from "@/app/(protected)/vendor/events/_lib/vendor-date-cancelled";
 
 export type VendorStepThreeRoomEntry = {
   room_id: number;
@@ -9,11 +13,20 @@ type DateRow = StepThreeType["dates"][number];
 
 export type VendorDateAction = NonNullable<DateRow["date_action"]>;
 
+export {
+  isVendorDateCancelled,
+  isVendorDateReadonlyCancelled,
+} from "@/app/(protected)/vendor/events/_lib/vendor-date-cancelled";
+
 const hasNonEmpty = (value: unknown): boolean =>
   String(value ?? "").trim().length > 0;
 
 function parseDateAction(value: unknown): VendorDateAction | undefined {
-  return value === "cancel" || value === "remove" ? value : undefined;
+  return value === "cancel" ||
+    value === "remove" ||
+    value === "cancelled"
+    ? value
+    : undefined;
 }
 
 /** True when the date must be cancelled (kept in payload), not hard-removed. */
@@ -21,6 +34,8 @@ export function shouldUseCancelDateAction(
   date: Pick<DateRow, "date_action" | "use_cancel_date_action"> | undefined,
 ): boolean {
   if (!date) return false;
+  // Already cancelled on the server — never offer Cancel / Undo again.
+  if (isVendorDateReadonlyCancelled(date)) return false;
   return date.date_action === "cancel" || date.use_cancel_date_action === true;
 }
 
@@ -38,6 +53,11 @@ export function cloneDateRowForDuplicate(date: DateRow): DateRow {
     cancellation_request_pending: _pending,
     cancelled: _cancelled,
     cancel_reason: _reason,
+    status: _status,
+    is_cancelled: _isCancelled,
+    is_readonly: _isReadonly,
+    can_edit: _canEdit,
+    cancelled_at: _cancelledAt,
     ...rest
   } = date;
 
@@ -129,6 +149,27 @@ export function normalizeVendorStepThreeDateRow(
       : String(raw.deposit_due_date);
 
   const dateId = parseOptionalFiniteNumber(raw.id);
+  const status = parseOptionalFiniteNumber(raw.status);
+  const dateAction = parseDateAction(raw.date_action);
+  const isCancelledFlag = normalizeApiBoolean(raw.is_cancelled);
+  const cancelledFlag = normalizeApiBoolean(raw.cancelled);
+  const isReadonlyFlag = normalizeApiBoolean(raw.is_readonly);
+  const canEditFlag = normalizeApiBoolean(raw.can_edit);
+
+  const cancelled =
+    cancelledFlag === true ||
+    isCancelledFlag === true ||
+    dateAction === "cancelled" ||
+    status === 2;
+
+  const cancelReason = String(
+    raw.cancel_reason ?? raw.cancellation_reason ?? "",
+  ).trim();
+
+  const cancelledAt =
+    raw.cancelled_at === null || raw.cancelled_at === undefined
+      ? undefined
+      : String(raw.cancelled_at);
 
   return {
     ...(dateId !== undefined && dateId > 0 ? { id: dateId } : {}),
@@ -153,16 +194,21 @@ export function normalizeVendorStepThreeDateRow(
         ) as DateRow["tickets"])
       : [],
     has_bookings: normalizeApiBoolean(raw.has_bookings),
-    date_action: parseDateAction(raw.date_action),
-    use_cancel_date_action: normalizeApiBoolean(raw.use_cancel_date_action),
+    ...(status !== undefined && { status }),
+    is_cancelled: isCancelledFlag ?? (cancelled || undefined),
+    is_readonly: isReadonlyFlag ?? (cancelled || undefined),
+    can_edit: canEditFlag ?? (cancelled ? false : undefined),
+    date_action: dateAction,
+    use_cancel_date_action: cancelled
+      ? false
+      : normalizeApiBoolean(raw.use_cancel_date_action),
     cancellation_request_pending: normalizeApiBoolean(
       raw.cancellation_request_pending,
     ),
     has_financial_bookings: normalizeApiBoolean(raw.has_financial_bookings),
-    cancelled: normalizeApiBoolean(raw.cancelled),
-    cancel_reason: String(
-      raw.cancel_reason ?? raw.cancellation_reason ?? "",
-    ).trim(),
+    cancelled: cancelled || undefined,
+    cancel_reason: cancelReason,
+    ...(cancelledAt !== undefined && { cancelled_at: cancelledAt }),
   };
 }
 
@@ -235,14 +281,15 @@ export function formatVendorStepThreeDateForApi(
   date: DateRow,
 ): Record<string, unknown> {
   const bookingType = date.booking_type ?? "tickets";
+  const cancelled = isVendorDateCancelled(date);
   const base: Record<string, unknown> = {
     ...(typeof date.id === "number" &&
       Number.isFinite(date.id) &&
       date.id > 0 && { id: date.id }),
     event_date: date.event_date,
     booking_type: bookingType,
-    ...(date.cancelled === true && { cancelled: true }),
-    ...(date.cancelled === true &&
+    ...(cancelled && { cancelled: true }),
+    ...(cancelled &&
       date.cancel_reason?.trim() && {
         cancel_reason: date.cancel_reason.trim(),
         cancellation_reason: date.cancel_reason.trim(),
@@ -304,6 +351,10 @@ function pickDateActionMeta(date: DateRow): Partial<DateRow> {
   return {
     ...(id !== undefined && { id }),
     ...(date.has_bookings !== undefined && { has_bookings: date.has_bookings }),
+    ...(date.status !== undefined && { status: date.status }),
+    ...(date.is_cancelled !== undefined && { is_cancelled: date.is_cancelled }),
+    ...(date.is_readonly !== undefined && { is_readonly: date.is_readonly }),
+    ...(date.can_edit !== undefined && { can_edit: date.can_edit }),
     ...(dateAction !== undefined && { date_action: dateAction }),
     ...(date.use_cancel_date_action !== undefined && {
       use_cancel_date_action: date.use_cancel_date_action,
@@ -317,6 +368,9 @@ function pickDateActionMeta(date: DateRow): Partial<DateRow> {
     ...(date.cancelled !== undefined && { cancelled: date.cancelled }),
     ...(date.cancel_reason !== undefined && {
       cancel_reason: date.cancel_reason,
+    }),
+    ...(date.cancelled_at !== undefined && {
+      cancelled_at: date.cancelled_at,
     }),
   };
 }

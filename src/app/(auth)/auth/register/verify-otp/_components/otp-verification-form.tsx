@@ -212,10 +212,11 @@ export function OTPVerificationForm() {
               onPaste={handlePaste}
               autoFocus={index === 0}
               className={cn(
-                "w-14 h-14 text-center text-xl border rounded-md focus:ring-2 focus:ring-[var(--color-primary)] focus:outline-none text-black",
+                "w-14 h-14 text-center text-xl border rounded-md focus:ring-2 focus:ring-[var(--color-primary)] focus:outline-none",
+                "bg-[var(--color-surface)] text-[var(--color-text)]",
                 digit
-                  ? "border-[var(--color-primary)] bg-white border-2"
-                  : "border-[var(--color-border)] bg-white border"
+                  ? "border-[var(--color-primary)] border-2"
+                  : "border-[var(--color-border)] border"
               )}
             />
           ))}

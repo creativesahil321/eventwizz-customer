@@ -24,9 +24,12 @@ export function formatDiscountScope(discount: Discount): string {
     const location = discount.location?.name;
     const event = discount.event?.name;
     if (location && event) {
-      const base = `${location} · ${event}`;
-      if (discount.category === "date_wise" && discount.room?.name) {
-        return `${base} · ${discount.room.name}`;
+      let base = `${location} · ${event}`;
+      if (discount.date) {
+        base = `${base} · ${discount.date}`;
+      }
+      if (discount.room?.name) {
+        base = `${base} · ${discount.room.name}`;
       }
       if (discount.category === "coupon_code" && discount.coupon_code) {
         return `${base} · Code: ${discount.coupon_code}`;
@@ -38,9 +41,12 @@ export function formatDiscountScope(discount: Discount): string {
 
   const location = discount.location?.name ?? "—";
   const event = discount.event?.name ?? "—";
-  const base = `${location} · ${event}`;
-  if (discount.category === "date_wise" && discount.room?.name) {
-    return `${base} · ${discount.room.name}`;
+  let base = `${location} · ${event}`;
+  if (discount.date) {
+    base = `${base} · ${discount.date}`;
+  }
+  if (discount.room?.name) {
+    base = `${base} · ${discount.room.name}`;
   }
   if (discount.category === "coupon_code" && discount.coupon_code) {
     return `${base} · Code: ${discount.coupon_code}`;

@@ -1,6 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  type ReactNode,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
   AlignCenter,
   AlignLeft,
@@ -114,6 +121,8 @@ type PreviewThemeCustomizerProps = {
   /** Event preview: write Try theme → Site Essentials (API). Renders “Save theme” in this panel. */
   onSaveTheme?: () => void | Promise<void>;
   isSavingTheme?: boolean;
+  /** Rendered at the bottom of the panel — e.g. the editor injects Restore default theme here. */
+  footerSlot?: ReactNode;
 };
 
 function presetById(
@@ -138,6 +147,7 @@ export function PreviewThemeCustomizer({
   sheetDescription,
   onSaveTheme,
   isSavingTheme = false,
+  footerSlot,
 }: PreviewThemeCustomizerProps) {
   const canPersistSiteEssentials = usePermission("update-site-essential");
   useSiteEssentialsPresetFontsPreload();
@@ -385,7 +395,11 @@ export function PreviewThemeCustomizer({
         <SheetContent
           id="preview-theme-customizer-sheet"
           side="right"
-          className="z-[110] flex h-full max-h-[100dvh] w-full max-w-[380px] flex-col border-l border-slate-200 bg-white p-0 shadow-xl sm:max-w-[380px]"
+          // Sit above the preview review chrome (2-row fixed bar ≈ 9rem) so the
+          // pinned Restore footer is never covered. Inline zIndex beats any
+          // competing utility / stacking-context quirks from the portal.
+          style={{ zIndex: 200 }}
+          className="!inset-y-auto !top-0 !bottom-36 !h-auto !max-h-none z-[200] flex w-full max-w-[380px] flex-col gap-0 overflow-hidden border-l border-slate-200 bg-white p-0 shadow-xl sm:max-w-[380px]"
           onPointerDownOutside={(e) => e.preventDefault()}
         >
           <SheetHeader className="border-b border-slate-100 px-4 pb-4 pt-5 text-left">
@@ -399,9 +413,15 @@ export function PreviewThemeCustomizer({
 
           {onSaveTheme ? (
             <div className="shrink-0 border-b border-slate-100 px-4 py-3">
+              {/*
+                Must not use the default/event-primary variants — those bind to
+                preview CSS vars (--color-primary*). On some themes hover sets
+                white text on a light/white fill and the label vanishes.
+              */}
               <Button
                 type="button"
-                className="w-full border border-slate-200 bg-white font-medium text-slate-900 shadow-sm hover:bg-slate-50"
+                variant="outline"
+                className="w-full border-slate-300 !bg-white !font-medium !text-slate-900 shadow-sm hover:!bg-slate-100 hover:!text-slate-900"
                 disabled={isSavingTheme || !canPersistSiteEssentials}
                 onClick={() => void onSaveTheme()}
               >
@@ -835,6 +855,14 @@ export function PreviewThemeCustomizer({
               </div>
             </div>
           </ScrollArea>
+
+          {/* Pinned outside ScrollArea so Restore stays visible without scrolling
+              past the palette grid, and sits above the preview review chrome. */}
+          {footerSlot ? (
+            <div className="shrink-0 border-t border-slate-100 bg-white px-4 py-3">
+              {footerSlot}
+            </div>
+          ) : null}
         </SheetContent>
       </Sheet>
     </>

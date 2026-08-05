@@ -25,10 +25,10 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
   return (
     <>
       <div className="flex flex-col space-y-2 text-center mb-8">
-        <h1 className="font-heading text-2xl font-semibold tracking-tight text-black">
+        <h1 className="font-heading text-2xl font-semibold tracking-tight text-[var(--color-text)]">
           Sign in
         </h1>
-        <p className="text-sm text-black">
+        <p className="text-sm text-[var(--color-text-dimmed)]">
           Enter your credentials to access your account
         </p>
       </div>

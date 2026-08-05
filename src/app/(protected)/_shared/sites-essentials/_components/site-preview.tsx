@@ -83,8 +83,18 @@ export function SitePreview({ formValues }: Readonly<SitePreviewProps>) {
       />
       <HeroBanner
         locationName={formValues.name}
-        coverImage={getPreviewUrl(formValues.cover_image) || null}
-        coverVideo={getPreviewUrl(formValues.cover_video) || null}
+        // Pass `null` for explicit Remove so HeroBanner does not fall back to
+        // the live theme cover video/image during Preview.
+        coverImage={
+          formValues.cover_image === null
+            ? null
+            : getPreviewUrl(formValues.cover_image) ?? undefined
+        }
+        coverVideo={
+          formValues.cover_video === null
+            ? null
+            : getPreviewUrl(formValues.cover_video) ?? undefined
+        }
         bannerHeading={formValues.banner_heading}
         bannerSubHeading={formValues.banner_sub_heading}
         bannerHeadingAccent={formValues.banner_heading_accent}

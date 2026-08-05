@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { Loader2, Palette } from "lucide-react";
-import type { UseFormReturn } from "react-hook-form";
 import { Button } from "@/components/ui/button";
 import {
   AlertDialog,
@@ -17,7 +16,7 @@ import {
 import { useToast } from "@/components/ui/use-toast";
 import { useResetSiteEssentialsThemeMutation } from "../_lib/queries";
 import {
-  applySiteEssentialsDefaultTheme,
+  mergeSiteEssentialsDefaultTheme,
   SITE_ESSENTIALS_DEFAULT_PRESET_ID,
 } from "../_lib/default-site-theme";
 import { writeLastAppliedSiteThemePresetId } from "../_lib/site-theme-preset-local-cache";
@@ -25,15 +24,20 @@ import { toMutableSiteEssentialsFormValues } from "../_lib/to-mutable-form-value
 import type { SiteEssentialsFormValues } from "../_lib/schema";
 
 type RestoreDefaultThemeControlProps = {
-  form: UseFormReturn<SiteEssentialsFormValues>;
+  /** Stable per-account key for the "last applied preset" highlight. */
   presetCacheUserKey: string;
   readOnly?: boolean;
+  /** Current site values (preview store / form snapshot). */
+  getValues: () => SiteEssentialsFormValues;
+  /** Apply restored values into the host (preview store or form). */
+  onApplied: (next: SiteEssentialsFormValues) => void;
 };
 
 export function RestoreDefaultThemeControl({
-  form,
   presetCacheUserKey,
   readOnly = false,
+  getValues,
+  onApplied,
 }: RestoreDefaultThemeControlProps) {
   const { toast } = useToast();
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -45,14 +49,7 @@ export function RestoreDefaultThemeControl({
   const handleConfirm = async () => {
     try {
       const updated = await resetThemeToDefault();
-      form.reset(toMutableSiteEssentialsFormValues(updated), {
-        keepErrors: false,
-        keepDirty: false,
-        keepIsSubmitted: false,
-        keepTouched: false,
-        keepIsValid: false,
-        keepSubmitCount: false,
-      });
+      onApplied(toMutableSiteEssentialsFormValues(updated));
       writeLastAppliedSiteThemePresetId(
         presetCacheUserKey,
         SITE_ESSENTIALS_DEFAULT_PRESET_ID,
@@ -64,7 +61,7 @@ export function RestoreDefaultThemeControl({
           "Colors and fonts were reset to EventWizz defaults. Your logo, copy, and images are unchanged.",
       });
     } catch {
-      applySiteEssentialsDefaultTheme(form.setValue, form.getValues);
+      onApplied(mergeSiteEssentialsDefaultTheme(getValues()));
       writeLastAppliedSiteThemePresetId(
         presetCacheUserKey,
         SITE_ESSENTIALS_DEFAULT_PRESET_ID,
@@ -73,30 +70,22 @@ export function RestoreDefaultThemeControl({
       toast({
         title: "Default theme applied locally",
         description:
-          "The reset API is not available yet — changes are in the form only. Click Save after the backend ships POST …/reset-theme-default.",
+          "The reset API is not available yet — changes are in the preview only. Save from this page after the backend ships POST …/reset-theme-default.",
       });
     }
   };
 
   return (
     <>
-      <div className="flex flex-col gap-2 rounded-lg border border-dashed border-border bg-muted/30 p-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="space-y-1">
-          <p className="text-sm font-medium text-foreground">
-            Restore EventWizz default theme
-          </p>
-          <p className="text-xs text-muted-foreground">
-            Resets colors, fonts, and heading style to the platform default.
-            Logo, copy, images, and SEO stay unchanged.
-          </p>
-        </div>
+      {/* Compact sidebar footer — one button + one-line hint (no tall dashed card). */}
+      <div className="space-y-2">
         <Button
           type="button"
           variant="outline"
           size="sm"
           onClick={() => setDialogOpen(true)}
           disabled={readOnly || isResetting}
-          className="shrink-0 border-slate-300 bg-white text-slate-900 hover:bg-slate-50"
+          className="w-full border-slate-300 bg-white text-slate-900 hover:bg-slate-50"
         >
           {isResetting ? (
             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -105,10 +94,13 @@ export function RestoreDefaultThemeControl({
           )}
           {isResetting ? "Restoring…" : "Restore default theme"}
         </Button>
+        <p className="text-[10px] leading-snug text-slate-500">
+          Resets colors & fonts only — logo, copy, and images stay unchanged.
+        </p>
       </div>
 
       <AlertDialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <AlertDialogContent className="text-foreground">
+        <AlertDialogContent className="z-[220] text-foreground">
           <AlertDialogHeader>
             <AlertDialogTitle>Restore default theme?</AlertDialogTitle>
             <AlertDialogDescription asChild>
@@ -127,8 +119,8 @@ export function RestoreDefaultThemeControl({
                   changed.
                 </p>
                 <p className="font-medium text-amber-700">
-                  This saves immediately on the server. Your live site will use
-                  the default theme after the reset completes.
+                  This saves immediately on the server when the reset API is
+                  available. Otherwise it updates this preview until you Save.
                 </p>
               </div>
             </AlertDialogDescription>

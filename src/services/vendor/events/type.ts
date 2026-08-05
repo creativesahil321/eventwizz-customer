@@ -118,13 +118,23 @@ export interface EventDetailStepThree {
     event_date: string;
     booking_type: "tickets" | "tables" | "both";
     has_bookings?: boolean;
-    /** Backend: "cancel" keeps the date (cancelled: true); "remove" allows omitting it */
-    date_action?: "cancel" | "remove";
+    /** 1 = active, 2 = cancelled, 0 = inactive */
+    status?: number;
+    is_cancelled?: boolean;
+    is_readonly?: boolean;
+    can_edit?: boolean;
+    /**
+     * Backend: "cancel" keeps the date (cancelled: true); "remove" allows omitting it;
+     * "cancelled" means already cancelled (read-only).
+     */
+    date_action?: "cancel" | "remove" | "cancelled";
     use_cancel_date_action?: boolean;
     /** Legacy — do not use for cancel/remove UI gating */
     cancellation_request_pending?: boolean;
     has_financial_bookings?: boolean;
     cancelled?: boolean;
+    cancellation_reason?: string | null;
+    cancelled_at?: string | null;
     total_table_types?: number;
     tables?: Array<{
       id: number;

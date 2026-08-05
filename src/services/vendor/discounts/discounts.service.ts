@@ -3,8 +3,8 @@ import { API_ENDPOINTS } from "@/services/core/endpoints";
 import type {
   Discount,
   DiscountFormPayload,
-  DiscountLocationsWithEventsResponse,
-  DiscountLocationWithEvents,
+  DiscountEventsWithDatesResponse,
+  DiscountEventWithDates,
   DiscountStoreResponse,
   DiscountsListResponse,
   DiscountsPaginatedData,
@@ -20,7 +20,6 @@ function getDiscountEndpoints(): DiscountEndpoints {
 function normalizeListPayload(
   response: DiscountsListResponse | DiscountsPaginatedData | Discount[]
 ): DiscountsPaginatedData {
-  // Full envelope: { status, data: { data, links, meta } }
   if (
     response &&
     typeof response === "object" &&
@@ -34,7 +33,6 @@ function normalizeListPayload(
     return response.data as DiscountsPaginatedData;
   }
 
-  // Already paginated: { data, links, meta }
   if (
     response &&
     typeof response === "object" &&
@@ -56,7 +54,6 @@ function normalizeListPayload(
     };
   }
 
-  // Flat array
   if (Array.isArray(response)) {
     return {
       data: response,
@@ -88,7 +85,6 @@ function normalizeListPayload(
 
 /**
  * Vendor Discounts Service
- * GET /api/v1/vendor/discounts
  */
 export const discountsService = {
   getDiscounts: async (
@@ -124,14 +120,14 @@ export const discountsService = {
   },
 
   /**
-   * Locations that have events — for discount create dropdowns
+   * Events (with dates/rooms) for the current header location.
    * GET /vendor/discounts/locations-with-events
    */
-  getLocationsWithEvents: async (): Promise<DiscountLocationWithEvents[]> => {
+  getEventsWithDates: async (): Promise<DiscountEventWithDates[]> => {
     const endpoints = getDiscountEndpoints();
     const response = await api.get<
-      DiscountLocationsWithEventsResponse | DiscountLocationWithEvents[]
-    >(endpoints.LOCATIONS_WITH_EVENTS, {
+      DiscountEventsWithDatesResponse | DiscountEventWithDates[]
+    >(endpoints.EVENTS_WITH_DATES, {
       returnFullResponse: true,
     });
 

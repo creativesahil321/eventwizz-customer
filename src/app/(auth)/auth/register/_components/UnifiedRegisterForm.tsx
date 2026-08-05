@@ -148,7 +148,10 @@ export function UnifiedRegisterForm({ accountType }: UnifiedRegisterFormProps) {
             </div>
 
             <div className="grid gap-2">
-              <Label htmlFor="email" className="text-black font-medium">
+              <Label
+                htmlFor="email"
+                className="font-medium text-[var(--color-text)]"
+              >
                 {accountType === "vendor"
                   ? "Business Email address"
                   : "Email address"}
@@ -164,7 +167,7 @@ export function UnifiedRegisterForm({ accountType }: UnifiedRegisterFormProps) {
                 autoCapitalize="none"
                 autoComplete="email"
                 autoCorrect="off"
-                className={`h-11 px-3 border-0 border-b-2 border-[var(--color-primary,#019ead)] focus:border-[var(--color-primary-dark,#018795)] focus:outline-none focus:ring-0 ${
+                className={`h-11 px-3 border-0 border-b-2 border-[var(--color-primary,#019ead)] text-[var(--color-text)] focus:border-[var(--color-primary-dark,#018795)] focus:outline-none focus:ring-0 ${
                   errors.email ? "border-red-500" : ""
                 }`}
                 {...register("email")}

@@ -55,6 +55,18 @@ interface SitePreviewState {
     vendorKey?: string,
     options?: StartPreviewReviewOptions,
   ) => void;
+  /**
+   * After the editor has applied an in-session preview snapshot once, clear
+   * `previewFresh` so a full reload is treated as stale. `previewData` is kept
+   * while `previewRequiresSave` so remounts (incl. React Strict Mode) can
+   * re-apply the snapshot; call `syncPreviewData` when the user edits media.
+   */
+  consumePreviewFresh: () => void;
+  /**
+   * Keep the in-session preview snapshot aligned with editor media edits
+   * (upload / remove) so a remount restore does not resurrect a stale image.
+   */
+  syncPreviewData: (data: SiteEssentialsFormValues) => void;
   clearPreviewData: () => void;
 }
 
@@ -255,6 +267,20 @@ export const useSitePreviewStore = create<SitePreviewState>()(
             if (safeCopy.main_landing_cover_image instanceof File)
               safeCopy.main_landing_cover_image = null;
             state.previewData = safeCopy;
+          }
+        }),
+      consumePreviewFresh: () =>
+        set((state) => {
+          state.previewFresh = false;
+        }),
+      syncPreviewData: (data: SiteEssentialsFormValues) =>
+        set((state) => {
+          if (!state.previewRequiresSave || !state.previewData) return;
+          if (data.website_role === "admin") return;
+          try {
+            state.previewData = serializePreviewData(data);
+          } catch (error) {
+            console.error("Error syncing preview data:", error);
           }
         }),
       clearPreviewData: () =>

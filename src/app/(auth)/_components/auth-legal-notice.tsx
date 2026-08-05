@@ -11,10 +11,10 @@ export function AuthLegalNotice({ variant }: AuthLegalNoticeProps) {
       : "By creating an account, you agree to our";
 
   const linkClassName =
-    "underline underline-offset-2 hover:text-black transition-colors";
+    "underline underline-offset-2 text-[var(--color-text)] hover:text-[var(--color-primary)] transition-colors";
 
   return (
-    <p className="text-center text-xs text-black/50 leading-relaxed pt-1">
+    <p className="text-center text-xs text-[var(--color-text-dimmed)] leading-relaxed pt-1">
       {preface}{" "}
       <Link href="/terms" className={linkClassName}>
         Terms

@@ -2,15 +2,17 @@
  * Vendor Discounts — types aligned with GET/POST /api/v1/vendor/discounts
  */
 
+/** Create/list API categories. Legacy values may still appear in older rows. */
 export type DiscountCategory =
+  | "discount"
+  | "coupon_code"
   | "event_specific"
-  | "date_wise"
-  | "coupon_code";
+  | "date_wise";
 
 export type DiscountType = "percentage" | "flat";
 
-/** Store API: `per_person` | `on_total` */
-export type FlatDiscountMode = "on_total" | "per_person";
+/** Store API: `per_person` | `total` */
+export type FlatDiscountMode = "total" | "per_person";
 
 export type DiscountStatus = "active" | "inactive" | "expired";
 
@@ -44,11 +46,12 @@ export interface Discount {
   summary: string;
   vendor_location_id: number;
   vendor_event_id: number;
+  date_id: number | null;
+  date: string | null;
   room_id: number | null;
   location: DiscountRelation | null;
   event: DiscountRelation | null;
   room: DiscountRelation | null;
-  applicable_dates?: string[];
   customers?: DiscountCustomer[];
   valid_from: string | null;
   expires_at: string;
@@ -103,22 +106,24 @@ export interface DiscountsListResponse {
   errors: unknown[];
 }
 
+/**
+ * POST /vendor/discounts/store
+ * Location comes from header `x-venue-location-id` (not body).
+ */
 export interface DiscountFormPayload {
-  category: DiscountCategory;
-  vendor_location_ids: number[];
-  vendor_event_ids: number[];
+  category: "discount" | "coupon_code";
+  vendor_event_id: number;
   discount_type: DiscountType;
   amount: number;
   name?: string | null;
   valid_from?: string | null;
   expires_at: string;
   status: "active" | "inactive";
-  room_ids?: number[];
-  /** Preferred: unique ids from locations-with-events room.dates[].id */
-  applicable_date_ids?: number[];
-  /** Legacy / display: YYYY-MM-DD strings derived from selected date ids */
-  applicable_dates?: string[];
+  /** Required for category `discount` */
+  date_id?: number;
+  room_id?: number;
   coupon_code?: string | null;
+  /** API: `total` | `per_person` */
   flat_mode?: FlatDiscountMode | null;
   min_people?: number | null;
   customer_audience?: CustomerAudience;
@@ -132,68 +137,71 @@ export interface DiscountStoreResponse {
   errors: unknown[];
 }
 
-export interface DiscountLocationOption {
+/**
+ * GET /vendor/discounts/locations-with-events
+ * Events for the current header location.
+ *
+ * Shape: event → dates (`date_id`) → optional rooms.
+ */
+export interface DiscountEventDateRoom {
   id: number;
   name: string;
 }
 
-export interface DiscountEventOption {
-  id: number;
-  location_id: number;
-  name: string;
-}
-
-export interface DiscountRoomOption {
-  id: number;
-  event_id: number;
-  name: string;
-}
-
-/** GET /vendor/discounts/locations-with-events */
-export interface DiscountLocationDateItem {
-  id: number;
+export interface DiscountEventDateItem {
   date: string;
+  date_id: number;
+  rooms?: DiscountEventDateRoom[];
 }
 
-export interface DiscountLocationRoomItem {
+export interface DiscountEventWithDates {
   id: number;
   name: string;
-  dates?: DiscountLocationDateItem[];
+  dates: DiscountEventDateItem[];
 }
 
-export interface DiscountLocationEventItem {
-  id: number;
-  name: string;
-  rooms?: DiscountLocationRoomItem[];
-}
-
-export interface DiscountLocationWithEvents {
-  id: number;
-  city: string;
-  events: DiscountLocationEventItem[];
-}
-
-export interface DiscountLocationsWithEventsResponse {
+export interface DiscountEventsWithDatesResponse {
   status: boolean;
   message: string;
-  data: DiscountLocationWithEvents[];
+  data: DiscountEventWithDates[];
   errors: unknown[];
 }
 
 export const DISCOUNT_CATEGORY_LABELS: Record<DiscountCategory, string> = {
-  event_specific: "Event Specific",
-  date_wise: "Date Wise",
+  discount: "Discount",
   coupon_code: "Coupon Code",
+  event_specific: "Discount",
+  date_wise: "Discount",
 };
+
+/** Categories shown on create wizard (location comes from header) */
+export const DISCOUNT_CREATE_CATEGORIES: {
+  value: Extract<DiscountCategory, "discount" | "coupon_code">;
+  label: string;
+  description: string;
+}[] = [
+  {
+    value: "discount",
+    label: "Discount",
+    description:
+      "Applies to a chosen event date (and room, if any) at the location selected in the header.",
+  },
+  {
+    value: "coupon_code",
+    label: "Coupon Code",
+    description:
+      "Guests enter a code at checkout. When active, it can be emailed to your customers.",
+  },
+];
 
 export const DISCOUNT_VALUE_TYPE_LABELS: Record<DiscountType, string> = {
   percentage: "Percentage",
-  flat: "Flat",
+  flat: "Fixed amount",
 };
 
 export const FLAT_MODE_LABELS: Record<FlatDiscountMode, string> = {
-  on_total: "Flat on total",
-  per_person: "Flat per person",
+  total: "Off the total",
+  per_person: "Per person",
 };
 
 export const DISCOUNT_STATUS_LABELS: Record<DiscountStatus, string> = {

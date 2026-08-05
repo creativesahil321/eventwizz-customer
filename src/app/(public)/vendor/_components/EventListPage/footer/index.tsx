@@ -301,13 +301,23 @@ export default function FooterSection({
       {isSingleContactFooter ? (
         <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 sm:py-8 md:py-10">
           <div className="flex flex-col items-center text-center">
-            <Link href="/" className="inline-flex max-w-full">
-              <img
-                src={addCacheBusting(logoPath)}
-                className="h-8 w-auto max-w-[min(100%,10rem)] object-contain sm:h-9"
-                alt={vendorTheme?.name || "EventWizz"}
-              />
-            </Link>
+            {isPreviewMode ? (
+              <div className="inline-flex max-w-full cursor-default">
+                <img
+                  src={addCacheBusting(logoPath)}
+                  className="h-8 w-auto max-w-[min(100%,10rem)] object-contain sm:h-9"
+                  alt={vendorTheme?.name || "EventWizz"}
+                />
+              </div>
+            ) : (
+              <Link href="/" className="inline-flex max-w-full">
+                <img
+                  src={addCacheBusting(logoPath)}
+                  className="h-8 w-auto max-w-[min(100%,10rem)] object-contain sm:h-9"
+                  alt={vendorTheme?.name || "EventWizz"}
+                />
+              </Link>
+            )}
 
             {socialLinks.length > 0 ? (
               <div className="mt-3 sm:mt-4">
@@ -374,13 +384,23 @@ export default function FooterSection({
       ) : (
         <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 sm:py-8 md:py-10">
           <div className="flex flex-col items-center text-center">
-            <Link href="/" className="inline-flex max-w-full">
-              <img
-                src={addCacheBusting(logoPath)}
-                className="h-8 w-auto max-w-[min(100%,10rem)] object-contain sm:h-9"
-                alt={vendorTheme?.name || "EventWizz"}
-              />
-            </Link>
+            {isPreviewMode ? (
+              <div className="inline-flex max-w-full cursor-default">
+                <img
+                  src={addCacheBusting(logoPath)}
+                  className="h-8 w-auto max-w-[min(100%,10rem)] object-contain sm:h-9"
+                  alt={vendorTheme?.name || "EventWizz"}
+                />
+              </div>
+            ) : (
+              <Link href="/" className="inline-flex max-w-full">
+                <img
+                  src={addCacheBusting(logoPath)}
+                  className="h-8 w-auto max-w-[min(100%,10rem)] object-contain sm:h-9"
+                  alt={vendorTheme?.name || "EventWizz"}
+                />
+              </Link>
+            )}
             {socialLinks.length > 0 ? (
               <div className="mt-3 sm:mt-4">
                 <SocialRow links={socialLinks} align="center" />

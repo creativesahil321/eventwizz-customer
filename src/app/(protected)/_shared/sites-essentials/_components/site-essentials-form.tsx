@@ -37,7 +37,6 @@ import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { useSitePreviewStore } from "@/store/site-preview.store";
 import { SocialMediaTab } from "./tabs/social-media-tab";
-import { ThemePresetsTab } from "./tabs/theme-presets-tab";
 import {
   SiteEssentialsUpdateProvider,
   useSiteEssentialsUpdateGate,
@@ -47,7 +46,6 @@ import { hydratePreviewMediaForSave } from "../_lib/hydrate-preview-media-for-sa
 import { ImportWebsiteModal } from "./import-website-modal";
 
 const SITE_ESSENTIALS_TABS = [
-  "presets",
   "branding",
   "colors",
   "typography",
@@ -89,10 +87,8 @@ function SiteEssentialsFormInner() {
   const { toast } = useToast();
   const {
     setPreviewData,
-    previewData,
-    previewFresh,
-    previewRequiresSave,
     clearPreviewData,
+    consumePreviewFresh,
     startPreviewReview,
     previewScope,
   } = useSitePreviewStore();
@@ -120,7 +116,7 @@ function SiteEssentialsFormInner() {
     {},
   );
   const [showErrorSummary, setShowErrorSummary] = useState(false);
-  const [activeTab, setActiveTab] = useState("presets");
+  const [activeTab, setActiveTab] = useState("branding");
   const searchParams = useSearchParams();
   const tabFromUrl = searchParams.get("tab");
 
@@ -139,17 +135,17 @@ function SiteEssentialsFormInner() {
   useEffect(() => {
     if (!isSiteEssentialsTab(tabFromUrl)) return;
     if (tabFromUrl === "colors" && !colorsUnlocked) {
-      setActiveTab("presets");
+      setActiveTab("branding");
       return;
     }
     setActiveTab(tabFromUrl);
   }, [tabFromUrl, colorsUnlocked]);
 
   // Never leave the user stranded on a hidden tab (e.g. the flag is removed after
-  // navigation): fall back to Presets if Colors becomes unreachable.
+  // navigation): fall back to Branding if Colors becomes unreachable.
   useEffect(() => {
     if (!colorsUnlocked && activeTab === "colors") {
-      setActiveTab("presets");
+      setActiveTab("branding");
     }
   }, [colorsUnlocked, activeTab]);
 
@@ -168,36 +164,45 @@ function SiteEssentialsFormInner() {
     }
   }, [isAdminSite, clearPreviewData]);
 
-  // Restore the preview snapshot into the form ONLY for an unsaved
-  // editor → preview → editor round-trip in this tab session.
-  // View-only previews and any rehydrated snapshot must never override
-  // fresh server data (that was the "old logo / Alfriston copyright" bug).
+  // Restore the preview snapshot into the form ONLY when this editor instance
+  // mounts after an unsaved editor → preview → editor round-trip.
+  //
+  // Critical: do NOT re-run on `previewData` / `previewFresh` updates while still
+  // mounted (Preview click). That used to consume `previewFresh` before
+  // navigation, so the remounted editor never restored and showed the old API image.
+  //
+  // While `previewRequiresSave` is true we keep `previewData` and re-apply it on
+  // every mount (React Strict Mode remounts included). Media edits must call
+  // `syncSitePreviewFormIfNeeded` so Remove/replace is not undone on remount.
   //
   // Baseline server hydration is owned by react-hook-form's `values` option
   // (see `useSiteEssentials`); this effect is only the preview-restore overlay.
   // Vendor sites only — admin has no preview flow.
   useEffect(() => {
     if (isAdminSite) return;
-    if (!previewData) return;
 
-    if (!previewFresh) {
-      // Stale snapshot from a prior reload — drop it so the server
-      // `values` sync becomes the source of truth again.
+    const {
+      previewData: snapshot,
+      previewFresh: fresh,
+      previewRequiresSave: requiresSave,
+    } = useSitePreviewStore.getState();
+
+    if (!snapshot) return;
+
+    // Rehydrated snapshot from a prior reload (both flags false) — drop it.
+    if (!fresh && !requiresSave) {
       clearPreviewData();
       return;
     }
 
-    // View-only Preview (no unsaved editor changes): keep the snapshot for
-    // `/preview/site`, but do not overlay it onto the Sites Essentials form.
-    if (!previewRequiresSave) {
-      return;
-    }
+    // View-only Preview: keep the snapshot for `/preview/site`, do not overlay.
+    if (!requiresSave) return;
 
     try {
       const currentFormValues = form.getValues();
 
-      // Never override freshly uploaded File objects with the snapshot's
-      // object-URL strings (uploads would otherwise silently become blob URLs).
+      // Still on the editor with live File uploads (Preview just clicked) —
+      // leave Files alone; remount after Preview will restore blob URLs.
       const hasFileUploads =
         currentFormValues.logo instanceof File ||
         currentFormValues.favicon instanceof File ||
@@ -205,28 +210,26 @@ function SiteEssentialsFormInner() {
         currentFormValues.cover_video instanceof File ||
         currentFormValues.main_landing_cover_image instanceof File;
 
-      if (!hasFileUploads) {
-        // Coalesce with the fresh server data so any field the snapshot is
-        // missing/empty (e.g. omitted Info Pages content) is filled from the API,
-        // while still honouring in-session preview edits that DO have a value.
-        form.reset(
-          toMutableSiteEssentialsFormValues(
-            mergeSiteEssentialsPreviewWithApi(previewData, siteEssentials),
-          ),
-        );
+      if (hasFileUploads) return;
+
+      // keepDefaultValues: true keeps server defaults so the restored snapshot
+      // stays dirty. A pristine reset would let RHF `values` + keepDirtyValues
+      // re-apply stale API media and wipe Preview blob:/data: URLs.
+      form.reset(
+        toMutableSiteEssentialsFormValues(
+          mergeSiteEssentialsPreviewWithApi(snapshot, siteEssentials),
+        ),
+        { keepDefaultValues: true },
+      );
+      if (fresh) {
+        consumePreviewFresh();
       }
     } catch (error) {
       console.error("Error resetting form with preview data:", error);
     }
-  }, [
-    form,
-    previewData,
-    previewFresh,
-    previewRequiresSave,
-    siteEssentials,
-    clearPreviewData,
-    isAdminSite,
-  ]);
+    // Mount-only on purpose — see comment above.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAdminSite]);
 
   // Combined useEffect for form validation and error tracking
   useEffect(() => {
@@ -500,12 +503,6 @@ function SiteEssentialsFormInner() {
               <div className="w-full overflow-x-auto no-scrollbar">
                 <TabsList className="flex w-max min-w-full bg-muted/60 p-1 h-auto rounded-lg gap-1">
                   <TabsTrigger
-                    value="presets"
-                    className="px-3 sm:px-4 py-1 h-8 text-xs font-medium whitespace-nowrap relative rounded-md data-[state=active]:bg-[var(--color-primary)] data-[state=active]:text-white data-[state=active]:shadow-sm mx-0.5"
-                  >
-                    Presets
-                  </TabsTrigger>
-                  <TabsTrigger
                     value="branding"
                     className="px-3 sm:px-4 py-1 h-8 text-xs font-medium whitespace-nowrap relative rounded-md data-[state=active]:bg-[var(--color-primary)] data-[state=active]:text-white data-[state=active]:shadow-sm mx-0.5"
                   >
@@ -567,19 +564,6 @@ function SiteEssentialsFormInner() {
             </div>
 
             <div className="space-y-6 p-6 pb-6">
-              <TabsContent value="presets" className="mt-0 w-full">
-                <div className="bg-white rounded-lg p-3 sm:p-6">
-                  <ThemePresetsTab
-                    onGoToColors={() => {
-                      setColorsUnlocked(true);
-                      setActiveTab("colors");
-                    }}
-                    onGoToTypography={() => setActiveTab("typography")}
-                    onGoToBranding={() => setActiveTab("branding")}
-                  />
-                </div>
-              </TabsContent>
-
               <TabsContent value="branding" className="mt-0 w-full">
                 {tabsWithErrors.branding && (
                   <Badge variant="destructive" className="mb-3">

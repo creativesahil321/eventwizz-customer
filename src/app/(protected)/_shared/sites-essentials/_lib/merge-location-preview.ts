@@ -56,17 +56,30 @@ function formFieldHasValue(value: unknown): boolean {
   return value != null && value !== "";
 }
 
+/**
+ * Whether the editor snapshot owns this location-scoped field for the preview
+ * slug. `null` is an intentional clear (Remove) and must beat the saved API
+ * value — otherwise Preview resurrects a removed cover video/image.
+ */
 function shouldPreferFormLocationField(
   global: SiteEssentialsFormValues,
   formVal: unknown,
   options?: MergeLocationPreviewOptions,
 ): boolean {
+  const formSlug = global.slug?.trim() ?? "";
+  const previewSlug = options?.previewSlug?.trim() ?? "";
+  const formOwnsPreviewLocation =
+    Boolean(options?.isSingleLocation) ||
+    (Boolean(previewSlug) && Boolean(formSlug) && formSlug === previewSlug);
+
+  // Explicit Remove in the editor (`null`) for the location being previewed.
+  if (formVal === null) {
+    return formOwnsPreviewLocation;
+  }
+
   if (!formFieldHasValue(formVal)) return false;
 
   if (options?.isSingleLocation) return true;
-
-  const formSlug = global.slug?.trim() ?? "";
-  const previewSlug = options?.previewSlug?.trim() ?? "";
 
   if (previewSlug && formSlug) {
     return formSlug === previewSlug;
@@ -110,10 +123,15 @@ export function mergeGlobalWithLocationSiteEssentials(
     const formVal = global[key as keyof SiteEssentialsFormValues];
     if (shouldPreferFormLocationField(global, formVal, options)) continue;
 
+    // The editor snapshot does not own this field (we're previewing a different
+    // location), so this location's API response is the source of truth. Adopt
+    // its value even when explicitly empty ("" / null) so a previous location's
+    // inherited media/text — e.g. another location's cover video — is cleared
+    // instead of leaking across the switch. Keys the API omits entirely
+    // (`undefined`) still fall back to the inherited global value.
     const apiVal = perLocation[key as keyof SiteEssentials];
-    if (apiVal !== undefined && apiVal !== null && apiVal !== "") {
-      (apiFill as Record<string, unknown>)[key] = apiVal;
-    }
+    if (apiVal === undefined) continue;
+    (apiFill as Record<string, unknown>)[key] = apiVal ?? "";
   }
 
   const previewSlug =
