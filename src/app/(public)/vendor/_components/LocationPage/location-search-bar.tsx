@@ -242,8 +242,7 @@ export function LocationSearchBar({
           Popular:
         </span>
         {POPULAR_SEARCH_TAGS.map((tag) => {
-          const active =
-            value.query.trim().toLowerCase() === tag.toLowerCase();
+          const active = value.query.trim().toLowerCase() === tag.toLowerCase();
           return (
             <button
               key={tag}
