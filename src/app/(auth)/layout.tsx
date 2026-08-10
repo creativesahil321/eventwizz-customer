@@ -8,6 +8,7 @@ import { AuthContent } from "./_components/auth-content";
 import { ServerContext } from "@/lib/server-context";
 import { AuthSkeleton } from "./_components/auth-skeleton";
 import { addCacheBusting } from "@/lib/image-utils";
+import { resolvePostLoginRedirect } from "@/lib/auth/safe-callback-url";
 
 export default function AuthLayout({
   children,
@@ -23,6 +24,7 @@ export default function AuthLayout({
 
   const isSecurityViolation =
     searchParams.get("error") === "security_violation";
+  const callbackUrl = searchParams.get("callbackUrl");
   const logoPath =
     theme?.logo?.startsWith("/") ||
     theme?.logo?.startsWith("data:") ||
@@ -51,15 +53,22 @@ export default function AuthLayout({
       const account_type = session.user.account_type;
       const isOnboarded = session.user.isOnboarded;
 
-      if (account_type === "vendor" && !isOnboarded) {
-        router.push("/on-boarding");
-      } else if (account_type === "vendor") {
-        router.replace("/welcome/select-location");
-      } else {
-        router.replace(`/${account_type}/dashboard`);
-      }
+      router.replace(
+        resolvePostLoginRedirect({
+          accountType: account_type || "customer",
+          isVendorOnboarded: Boolean(isOnboarded),
+          callbackUrl,
+        }),
+      );
     }
-  }, [session, status, router, isSecurityViolation, isSigningOutSecurity]);
+  }, [
+    session,
+    status,
+    router,
+    isSecurityViolation,
+    isSigningOutSecurity,
+    callbackUrl,
+  ]);
 
   if (
     status === "loading" ||

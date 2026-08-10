@@ -38,7 +38,10 @@ import {
   GuidedSectionCoreActions,
 } from "../../guided-sticky-approval-bar";
 import { guidedSectionSurfaceClass } from "../../guided-section-surface";
-import { SITE_HERO_BACKGROUND_CROP } from "@/lib/event-image-crop-presets";
+import {
+  SITE_HERO_BACKGROUND_CROP,
+  SITE_HERO_UPLOAD_HINT,
+} from "@/lib/event-image-crop-presets";
 import { GuidedSectionTitleBar } from "../../guided-section-title-bar";
 import { useLogoUploadProcessor } from "@/hooks/use-logo-upload-processor";
 import { Loader2 } from "lucide-react";
@@ -532,6 +535,9 @@ export default function StepTwo() {
                         <OnboardingFieldGroupTitle>
                           Landing page image
                         </OnboardingFieldGroupTitle>
+                        <p className="text-xs text-muted-foreground mb-2">
+                          {SITE_HERO_UPLOAD_HINT}
+                        </p>
                         <FormControl>
                           <div
                             className="flex flex-col justify-center items-center h-full space-y-2 bg-white/5 p-4 rounded-lg border border-white/10"
@@ -571,7 +577,7 @@ export default function StepTwo() {
                                 }
                                 className="border-dashed"
                                 enableCropping={true}
-                                aspectRatio={undefined}
+                                aspectRatio={SITE_HERO_BACKGROUND_CROP.aspectRatio}
                                 cropConfig={SITE_HERO_BACKGROUND_CROP}
                               />
                             )}

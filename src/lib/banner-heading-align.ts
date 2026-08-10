@@ -49,7 +49,7 @@ export function vendorHomeTrustRowClass(align: BannerHeadingAlign): string {
     /* Narrow: single column so pills don’t wrap 2+1; sm+: row + wrap */
     "flex w-full flex-col gap-3 sm:flex-row sm:flex-wrap md:gap-4",
     align === "center" &&
-      "mx-auto max-w-md items-stretch sm:max-w-none sm:items-center sm:justify-center",
+    "mx-auto max-w-md items-stretch sm:max-w-none sm:items-center sm:justify-center",
     align === "left" && "items-stretch sm:items-center sm:justify-start",
     align === "right" && "items-stretch sm:items-center sm:justify-end",
   );
@@ -64,8 +64,42 @@ export function vendorHomeTrustRowClass(align: BannerHeadingAlign): string {
 export const heroBandHeightClass =
   "h-[min(68dvh,720px)] min-h-[380px] max-h-[760px]";
 
+/**
+ * Slightly shorter than the location hero — room for search without eating the fold.
+ */
+export const heroBandHeightCompactClass =
+  "h-[min(62dvh,660px)] min-h-[340px] max-h-[700px]";
+
 export const heroBandMediaOverlayClass =
   "bg-gradient-to-b from-black/60 via-black/30 to-black/85";
+
+/**
+ * Soft hero dissolve: keep the image solid through the search, then ease
+ * into the page background (lighter than before so the bar isn’t washed out).
+ */
+export const heroBandMediaMaskClass =
+  "[mask-image:linear-gradient(to_bottom,black_0%,black_72%,rgba(0,0,0,0.88)_90%,transparent_100%)] [-webkit-mask-image:linear-gradient(to_bottom,black_0%,black_72%,rgba(0,0,0,0.88)_90%,transparent_100%)]";
+
+/** Theme-aware fog that blends the hero into `--color-background`. */
+export const heroBandBottomFadeClass =
+  "pointer-events-none absolute inset-x-0 bottom-0 z-[1] h-[22%] bg-gradient-to-t from-[var(--color-background)] from-[12%] via-[color:color-mix(in_srgb,var(--color-background)_40%,transparent)] via-[55%] to-transparent";
+
+/** Soft vignette for centered hero copy (edges darker, center clearer). */
+export const heroBandVignetteClass =
+  "pointer-events-none absolute inset-0 z-[1] bg-[radial-gradient(ellipse_78%_70%_at_50%_36%,transparent_0%,rgba(0,0,0,0.18)_60%,rgba(0,0,0,0.5)_100%)]";
+
+/**
+ * Mild pull into the empty fade only — never large enough to cover the CTA.
+ * Use with extra hero bottom padding when the toggle is visible.
+ */
+export const heroBandViewToggleOffsetClass = "relative z-20 -mt-4 xl:-mt-6";
+
+/**
+ * Multi-location hero — auto-height on small screens so stacked search
+ * doesn’t clip; fixed band from sm+ for a stable banner.
+ */
+export const heroBandHeightCompactMobileClass =
+  "min-h-[360px] h-auto max-h-none sm:h-[min(60dvh,600px)] sm:min-h-[360px] sm:max-h-[640px] xl:h-[min(62dvh,660px)] xl:min-h-[380px] xl:max-h-[700px]";
 
 /* ---- Vertical placement (hero band) ---- */
 

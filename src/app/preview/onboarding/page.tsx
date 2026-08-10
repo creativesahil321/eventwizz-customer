@@ -364,6 +364,8 @@ function OnboardingPreviewContent() {
         id: loc.id,
         slug: loc.slug.trim(),
         city: loc.city?.trim() || loc.slug,
+        total_events:
+          typeof loc.total_events === "number" ? loc.total_events : undefined,
       }));
   }, [hasMultipleLocations, mainData?.locations]);
 

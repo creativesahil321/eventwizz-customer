@@ -4,7 +4,7 @@ import { useMemo, useState, useEffect, useCallback } from "react";
 import { useSession } from "next-auth/react";
 import { Shell } from "@/components/shell";
 import { PermissionRoute } from "@/components/permission";
-import { LocationIndicator } from "@/components/location-indicator";
+import { LocationScopedTitle } from "@/components/location-indicator";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -433,7 +433,7 @@ export default function TableAssignmentPage() {
               <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center flex-wrap gap-4">
                 <div className="flex flex-col gap-3 min-w-0">
                   <h1 className="text-2xl title-header font-bold text-black flex items-center gap-2">
-                  Table Assignment
+                  <LocationScopedTitle title="Table Assignment" />
                   {assignmentsFetching && assignmentsData ? (
                     <Loader2
                       className="h-5 w-5 shrink-0 animate-spin text-primary"
@@ -441,10 +441,9 @@ export default function TableAssignmentPage() {
                     />
                   ) : null}
                 </h1>
-                  <LocationIndicator variant="card" />
                   <p className="text-muted-foreground">
-                    Assign final table numbers—choose event, room, and date,
-                    then edit the grid below.
+                    Assign table numbers for this venue — choose event, room and
+                    date, then edit the grid below.
                   </p>
                 </div>
 

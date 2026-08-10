@@ -1,4 +1,11 @@
-import type { CropperConfig } from "@/components/ui/image-cropper/types";
+import {
+  ASPECT_RATIOS,
+  type CropperConfig,
+} from "@/components/ui/image-cropper/types";
+
+/** Shared vendor-facing hint for site / location hero uploads. */
+export const SITE_HERO_UPLOAD_HINT =
+  "Landscape 16:9 (1920×1080 recommended). Crop to the banner frame and keep faces or logos centered.";
 
 /** Package hero image — aligned with onboarding step 4 for speed + quality balance. */
 export const EVENT_PACKAGE_IMAGE_CROP: CropperConfig & { aspectRatio: number } =
@@ -36,25 +43,29 @@ export const PROFILE_AVATAR_CROP: CropperConfig & { aspectRatio: number } = {
 };
 
 /**
- * Site / location hero & cover backgrounds (object-cover on the site).
- * Free crop so the full upload can be kept; users can still pick 16:9 in the dialog.
+ * Site / location hero & cover backgrounds.
+ * Locked to 16:9 so the crop matches the live banner band (`object-cover`).
  */
-export const SITE_HERO_BACKGROUND_CROP: CropperConfig = {
+export const SITE_HERO_BACKGROUND_CROP: CropperConfig & {
+  aspectRatio: number;
+} = {
+  aspectRatio: ASPECT_RATIOS.landscape,
   maxSizeKB: 500,
   quality: 0.9,
   maxWidth: 1920,
-  maxHeight: 1920,
+  maxHeight: 1080,
 };
 
-/** @deprecated Use SITE_HERO_BACKGROUND_CROP — free crop for full-bleed covers. */
+/** @deprecated Use SITE_HERO_BACKGROUND_CROP. */
 export const SITE_LANDING_BANNER_CROP = SITE_HERO_BACKGROUND_CROP;
 
-/** Admin CMS home hero background. */
-export const ADMIN_HOME_HERO_CROP: CropperConfig = {
+/** Admin CMS home hero background — same 16:9 band as vendor heroes. */
+export const ADMIN_HOME_HERO_CROP: CropperConfig & { aspectRatio: number } = {
+  aspectRatio: ASPECT_RATIOS.landscape,
   maxSizeKB: 700,
   quality: 0.9,
   maxWidth: 1920,
-  maxHeight: 1920,
+  maxHeight: 1080,
 };
 
 /** Admin CMS card / showcase images — free so full image is allowed. */

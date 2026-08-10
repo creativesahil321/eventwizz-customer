@@ -63,6 +63,8 @@ interface DateAccordionProps {
   embedded?: boolean;
   /** Accent index for room-colored calendar icon. */
   roomAccentIndex?: number;
+  /** Shown inline under the date for single-room checkout (no room tab bar). */
+  roomName?: string;
   /** Event-level drink section label from cart API. */
   drinkTitle?: string;
   /** Server cart event payload for price validation on save. */
@@ -106,6 +108,7 @@ export default function DateAccordion({
   roomId,
   embedded = false,
   roomAccentIndex = 0,
+  roomName,
   drinkTitle = "Drinks",
   serverEventData = null,
 }: DateAccordionProps) {
@@ -401,7 +404,11 @@ export default function DateAccordion({
     metaParts.push(`${tableQty} table${tableQty !== 1 ? "s" : ""}`);
   if (guestQty > 0)
     metaParts.push(`${guestQty} guest${guestQty !== 1 ? "s" : ""}`);
-  const metaLine = metaParts.join(" · ");
+  const itemsMeta = metaParts.join(" · ");
+  const trimmedRoomName = roomName?.trim() || "";
+  const fallbackItemsMeta =
+    itemsMeta || selectionSummary || "No items selected yet";
+  const metaLine = itemsMeta;
 
   const hasTicketsSection = dateData.tickets.length > 0;
   const hasTablesSection = dateData.tables.length > 0;
@@ -462,7 +469,19 @@ export default function DateAccordion({
               <span className="sm:hidden">{formatDateMobile(date)}</span>
             </h3>
             <p className="mt-0.5 truncate text-[11px] font-medium leading-relaxed text-[color:var(--checkout-muted-foreground)] sm:text-xs">
-              {metaLine || selectionSummary || "No items selected yet"}
+              {trimmedRoomName ? (
+                <>
+                  <span className="font-semibold text-[color:var(--checkout-brand-accent)]">
+                    {trimmedRoomName}
+                  </span>
+                  <span className="text-[color:var(--checkout-muted-foreground)]">
+                    {" · "}
+                    {fallbackItemsMeta}
+                  </span>
+                </>
+              ) : (
+                metaLine || selectionSummary || "No items selected yet"
+              )}
             </p>
             {hasValidationError && (
               <span className="mt-1.5 inline-flex w-fit items-center rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-[10px] font-semibold leading-none text-amber-700 sm:hidden">

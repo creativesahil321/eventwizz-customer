@@ -65,6 +65,7 @@ export function SitePreview({ formValues }: Readonly<SitePreviewProps>) {
 
   return (
     <div
+      data-preview-theme-root=""
       style={previewStyles}
       className="w-full min-w-0 text-[color:var(--color-text)] font-body"
     >

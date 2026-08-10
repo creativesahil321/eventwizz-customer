@@ -245,19 +245,66 @@ export function normalizeVendorStepThreeRooms(
   return [];
 }
 
-/** Align persisted step-three rooms with the active step-two room list. */
+/**
+ * Align persisted step-three rooms with the active step-two room list.
+ *
+ * Prefer exact `room_id` matches. When ids diverge (common after duplicating an
+ * event to another location that has different venue room ids), fall back to
+ * room order / first unused dated entry so API dates are not wiped from the UI.
+ */
 export function syncStepThreeRoomsFromStepTwo(
   stepTwoRooms: Array<{ room_id?: number; name?: string }>,
   existing: VendorStepThreeRoomEntry[],
 ): VendorStepThreeRoomEntry[] {
+  const usedExistingIndexes = new Set<number>();
+
   return stepTwoRooms
     .filter((room) => Number(room.room_id) > 0)
-    .map((room) => {
+    .map((room, index) => {
       const roomId = Number(room.room_id);
-      const found = existing.find((entry) => entry.room_id === roomId);
+
+      const byIdIndex = existing.findIndex(
+        (entry, i) =>
+          entry.room_id === roomId && !usedExistingIndexes.has(i),
+      );
+      if (byIdIndex >= 0) {
+        usedExistingIndexes.add(byIdIndex);
+        return {
+          room_id: roomId,
+          dates: existing[byIdIndex]?.dates?.length
+            ? existing[byIdIndex].dates
+            : [],
+        };
+      }
+
+      // Same ordinal after a location duplicate — room ids differ, order matches.
+      if (
+        index < existing.length &&
+        !usedExistingIndexes.has(index) &&
+        existing[index]?.dates?.length
+      ) {
+        usedExistingIndexes.add(index);
+        return {
+          room_id: roomId,
+          dates: existing[index].dates,
+        };
+      }
+
+      const fallbackIndex = existing.findIndex(
+        (entry, i) =>
+          !usedExistingIndexes.has(i) && Boolean(entry.dates?.length),
+      );
+      if (fallbackIndex >= 0) {
+        usedExistingIndexes.add(fallbackIndex);
+        return {
+          room_id: roomId,
+          dates: existing[fallbackIndex].dates,
+        };
+      }
+
       return {
         room_id: roomId,
-        dates: found?.dates?.length ? found.dates : [],
+        dates: [],
       };
     });
 }

@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { PasswordInput } from "@/components/ui/password-input";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import React from "react";
 import { useForm } from "react-hook-form";
 import { LoginFormInputs, loginSchema } from "./schema";
@@ -27,6 +27,7 @@ import { OAuthErrorBoundary } from "@/components/auth/OAuthErrorBoundary";
 import { OAuthSkeleton } from "@/components/auth/OAuthSkeleton";
 import { OAuthButtons } from "@/components/auth/OAuthButtons";
 import { handleUrlErrorParams } from "@/lib/auth/url-utils";
+import { resolvePostLoginRedirect } from "@/lib/auth/safe-callback-url";
 import { AuthAlternateLink } from "@/app/(auth)/_components/auth-alternate-link";
 import { AuthLegalNotice } from "@/app/(auth)/_components/auth-legal-notice";
 
@@ -34,7 +35,9 @@ export default function LoginForm() {
   const [loading, setLoading] = React.useState(false);
   const [redirecting, setRedirecting] = React.useState(false);
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { website_role, parentDomain } = useDomain();
+  const callbackUrl = searchParams.get("callbackUrl");
 
   // Handle error from URL parameters (for OAuth errors)
   React.useEffect(() => {
@@ -183,19 +186,15 @@ export default function LoginForm() {
           throw new Error(result.error);
         }
 
-        // Redirect after successful authentication using SPA navigation
-        // (router.push avoids a full page reload that causes flash of login page)
+        // Prefer safe callbackUrl for customers (e.g. return to checkout after booking)
         try {
-          if (account_type === "vendor") {
-            if (isVendorOnboarded) {
-              router.push("/welcome/select-location");
-            } else {
-              router.push("/on-boarding");
-            }
-          } else {
-            // For non-vendor users, redirect to their dashboard
-            router.push(`/${account_type}/dashboard`);
-          }
+          router.push(
+            resolvePostLoginRedirect({
+              accountType: account_type,
+              isVendorOnboarded,
+              callbackUrl,
+            }),
+          );
         } catch (error) {
           console.error("Error redirecting:", error);
           setRedirecting(false);

@@ -10,6 +10,8 @@ import {
 export type PublicEventRoomRef = {
   room_id: number;
   name: string;
+  /** True when the room has no bookable dates — shown but not selectable. */
+  disabled?: boolean;
 };
 
 /** @deprecated Prefer `EventRoomChooserItem` — kept as an alias for public callers. */
@@ -43,30 +45,41 @@ export type PublicEventActiveSlices = {
   long: string | number | null;
 };
 
+/** Empty `{}` room shells from the API still count as rooms when `is_rooms` is on. */
+type PublicRoomPayload = Partial<EventDetailRoom>;
+
+function roomHasBookableDates(payload: PublicRoomPayload): boolean {
+  return Array.isArray(payload.dates) && payload.dates.length > 0;
+}
+
+function resolveRoomId(payload: PublicRoomPayload, index: number): number {
+  const id = Number(payload.room_id);
+  return Number.isFinite(id) && id > 0 ? id : -(index + 1);
+}
+
 function listRoomEntries(
   event: EventDetail,
-): Array<{ name: string; payload: EventDetailRoom }> {
+): Array<{ name: string; payload: PublicRoomPayload }> {
   const rooms = event.rooms;
   if (!rooms || typeof rooms !== "object") return [];
 
   return Object.entries(rooms)
     .map(([name, payload]) => ({
       name: name.trim(),
-      payload,
+      payload:
+        payload && typeof payload === "object"
+          ? (payload as PublicRoomPayload)
+          : {},
     }))
-    .filter(
-      (entry) =>
-        entry.payload &&
-        typeof entry.payload === "object" &&
-        Number(entry.payload.room_id) > 0,
-    );
+    .filter((entry) => entry.name.length > 0);
 }
 
 /** Active rooms from the public event detail API (`rooms` keyed by name). */
 export function listPublicEventRooms(event: EventDetail): PublicEventRoomRef[] {
   return listRoomEntries(event).map((entry, index) => ({
-    room_id: Number(entry.payload.room_id),
+    room_id: resolveRoomId(entry.payload, index),
     name: entry.name || `Room ${index + 1}`,
+    disabled: !roomHasBookableDates(entry.payload),
   }));
 }
 
@@ -74,6 +87,7 @@ export function listPublicEventRooms(event: EventDetail): PublicEventRoomRef[] {
  * Per-room card summaries for the public "Choose Your Room" section.
  * Derives a thumbnail and a "from" price from each room payload — no fabricated
  * metadata; fields fall back to `null` when the API does not provide them.
+ * Rooms with an empty payload (or no dates) are included as `disabled`.
  */
 export function listPublicEventRoomSummaries(
   event: EventDetail,
@@ -86,6 +100,7 @@ export function listPublicEventRoomSummaries(
 
   return listRoomEntries(event).map((entry, index) => {
     const { payload, name } = entry;
+    const disabled = !roomHasBookableDates(payload);
 
     const galleryImage =
       payload.event_galley?.find((item) => item.url?.trim())?.url ?? null;
@@ -109,7 +124,7 @@ export function listPublicEventRoomSummaries(
           );
 
     return {
-      room_id: Number(payload.room_id),
+      room_id: resolveRoomId(payload, index),
       name: name || `Room ${index + 1}`,
       index,
       thumbnail: packageImage || galleryImage || bannerFallback,
@@ -118,8 +133,16 @@ export function listPublicEventRoomSummaries(
       ),
       packageCount: payload.packages?.length ?? 0,
       highlights,
+      disabled,
     };
   });
+}
+
+/** First room that still has dates; falls back to 0 when none are bookable. */
+export function firstBookablePublicRoomIndex(event: EventDetail): number {
+  const rooms = listPublicEventRooms(event);
+  const idx = rooms.findIndex((room) => !room.disabled);
+  return idx >= 0 ? idx : 0;
 }
 
 export function isPublicEventRoomMode(event: EventDetail): boolean {
@@ -132,7 +155,7 @@ export function isPublicEventRoomMode(event: EventDetail): boolean {
 function roomPayloadAtIndex(
   event: EventDetail,
   roomIndex: number,
-): EventDetailRoom | null {
+): PublicRoomPayload | null {
   const entries = listRoomEntries(event);
   if (entries.length === 0) return null;
   const safeIndex = Math.min(
@@ -179,7 +202,7 @@ function flatSlicesFromEvent(event: EventDetail): PublicEventActiveSlices {
 function roomSlicesFromPayload(
   event: EventDetail,
   room: PublicEventRoomRef,
-  payload: EventDetailRoom,
+  payload: PublicRoomPayload,
 ): PublicEventActiveSlices {
   return {
     roomMode: true,
@@ -187,7 +210,8 @@ function roomSlicesFromPayload(
     activeRoom: room,
     event_schedular_title: payload.event_schedular_title ?? "",
     event_schedular: payload.event_schedular ?? [],
-    event_schedular_background_image: payload.event_schedular_background_image,
+    event_schedular_background_image:
+      payload.event_schedular_background_image ?? null,
     package_title: payload.package_title ?? "",
     package_description: String(payload.package_description ?? "").trim(),
     package_image: payload.package_image ?? "",
@@ -198,12 +222,12 @@ function roomSlicesFromPayload(
     menu_title: payload.menu_title ?? "",
     menu_description: payload.menu_description ?? "",
     menus: payload.menus ?? [],
-    menu_background_image: payload.menu_background_image,
+    menu_background_image: payload.menu_background_image ?? null,
     drink_title: payload.drink_title ?? "",
     drink_description: payload.drink_description ?? "",
     packages: payload.packages ?? [],
-    brochure_pdf: payload.brochure_pdf,
-    brochure_pdf_2: payload.brochure_pdf_2,
+    brochure_pdf: payload.brochure_pdf ?? null,
+    brochure_pdf_2: payload.brochure_pdf_2 ?? null,
     event_address: payload.event_address ?? event.event_address ?? null,
     lat: payload.lat ?? event.lat ?? null,
     long: payload.long ?? event.long ?? null,
@@ -220,10 +244,15 @@ export function resolvePublicEventActiveSlices(
   }
 
   const rooms = listPublicEventRooms(event);
-  const safeIndex = Math.min(
+  const requestedIndex = Math.min(
     Math.max(roomIndex, 0),
     Math.max(rooms.length - 1, 0),
   );
+  // Never activate a date-less room — snap to the first bookable one.
+  const safeIndex =
+    rooms[requestedIndex]?.disabled
+      ? firstBookablePublicRoomIndex(event)
+      : requestedIndex;
   const activeRoom = rooms[safeIndex] ?? null;
   const payload = roomPayloadAtIndex(event, safeIndex);
 

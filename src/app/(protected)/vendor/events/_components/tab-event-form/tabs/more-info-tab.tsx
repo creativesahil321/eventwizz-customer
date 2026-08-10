@@ -353,7 +353,7 @@ export default function MoreInfoTab() {
             submission.event_address.trim().length === 0)
         ) {
           toast.error("Event address is required", {
-            description: "Please provide an exact event location address.",
+            description: "Please enter the exact event address.",
             duration: 5000,
           });
           setActiveField("event_address");
@@ -582,7 +582,7 @@ export default function MoreInfoTab() {
         (data) => handleSubmit(data, { applyToAllRooms: false }),
         () => {
           toast.error(
-            "Please complete the required address field for this room.",
+            "Please complete the required address for this room.",
           );
         },
       )();
@@ -609,7 +609,7 @@ export default function MoreInfoTab() {
           {/* Document Uploads Section */}
           <div className="space-y-4">
             <h2 className="text-xl font-bold title-header">
-              Add More Information
+              Add more information
             </h2>
             <p className="text-sm text-gray-500 mt-1 mb-4">
               Upload important documents for your event
@@ -699,7 +699,7 @@ export default function MoreInfoTab() {
                 render={() => (
                   <FormItem>
                     <FormLabel className="text-sm font-medium">
-                      Event Flyer (PDF only) (Optional)
+                      Event flyer (PDF only, optional)
                     </FormLabel>
                     <FormControl>
                       {brochurePdfUrl2 ? (
@@ -765,7 +765,7 @@ export default function MoreInfoTab() {
                     </FormControl>
                     <FormMessage />
                     <p className="text-xs text-gray-500 mt-1">
-                      Upload your event Flyer (PDF only)
+                      Upload your event flyer (PDF only)
                     </p>
                   </FormItem>
                 )}
@@ -787,7 +787,7 @@ export default function MoreInfoTab() {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel className="text-sm font-medium">
-                      Event Address (exact location){" "}
+                      Event address (exact location){" "}
                       <span className="text-red-500">*</span>
                     </FormLabel>
                     <FormControl>
@@ -834,7 +834,7 @@ export default function MoreInfoTab() {
                       />
                     </FormControl>
                     <p className="text-xs text-blue-600 mt-1 font-medium">
-                      ⓘ Search for UK addresses or use the map below to set
+                      Search for a UK address, or use the map below to set the
                       exact location
                     </p>
                     <FormMessage />

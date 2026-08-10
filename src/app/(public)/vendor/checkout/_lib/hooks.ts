@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { useAuthStore } from "@/store/auth.store";
+import { saveAuthCallbackUrl } from "@/lib/auth/safe-callback-url";
 
 type CheckoutAuthStatus = "loading" | "authenticated" | "unauthenticated";
 
@@ -36,6 +37,7 @@ export function useCheckoutAuth() {
 
     if (!isAuthenticated) {
       const currentUrl = window.location.href;
+      saveAuthCallbackUrl("/vendor/checkout");
       router.push(`/auth/login?callbackUrl=${encodeURIComponent(currentUrl)}`);
       return;
     }

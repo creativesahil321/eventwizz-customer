@@ -29,13 +29,17 @@ import { VideoFormatInfo } from "@/components/shared/video-format-info";
 import { addCacheBusting } from "@/lib/image-utils";
 import { LocationIndicator } from "@/components/location-indicator";
 import { MapPin } from "lucide-react";
-import { SITE_HERO_BACKGROUND_CROP } from "@/lib/event-image-crop-presets";
+import {
+  SITE_HERO_BACKGROUND_CROP,
+  SITE_HERO_UPLOAD_HINT,
+} from "@/lib/event-image-crop-presets";
 import {
   BANNER_HEADING_MAX_WORDS,
   countWords,
   truncateToMaxWordsForInput,
 } from "@/lib/word-count";
 import { useSiteEssentialsUpdateGate } from "../../_lib/site-essentials-update-context";
+import { useSiteEssentialsQuery } from "../../_lib/queries";
 import { useLogoUploadProcessor } from "@/hooks/use-logo-upload-processor";
 import { Loader2, Sparkles } from "lucide-react";
 import { defaultThemeConstants } from "@/services/common/theme/constants/theme";
@@ -103,6 +107,9 @@ export function BrandingTab({
   const { readOnly } = useSiteEssentialsUpdateGate();
   const { setPreviewScope } = useSitePreviewStore();
   const searchParams = useSearchParams();
+  // Backend often overwrites logo/favicon at the same storage path. Without a
+  // version, addCacheBusting is a no-op and the browser keeps the old image.
+  const { dataUpdatedAt: siteMediaVersion } = useSiteEssentialsQuery();
   const scopeFromUrl = searchParams.get("scope");
   const [brandingScope, setBrandingScope] = useState<BrandingScopeTab>(() => {
     if (isBrandingScopeTab(scopeFromUrl)) {
@@ -508,10 +515,10 @@ export function BrandingTab({
   }, [landingPageVideoFiles]);
 
   return (
-    <div className="space-y-6">
+    <div className="min-w-0 space-y-4 sm:space-y-6">
       <Alert className="border-slate-200 bg-slate-50 text-slate-800">
         <Info className="h-4 w-4" />
-        <AlertDescription className="text-sm">
+        <AlertDescription className="text-sm leading-relaxed">
           {isAdmin ? (
             <>
               Edit your marketing site here. <strong>Site identity</strong>{" "}
@@ -537,42 +544,44 @@ export function BrandingTab({
         </AlertDescription>
       </Alert>
 
-      <Tabs value={brandingScope} onValueChange={handleBrandingScopeChange}>
-        <TabsList
-          className={`grid h-auto w-full gap-1 bg-muted/60 p-1 ${
-            hasMultipleLocations ? "grid-cols-4" : "grid-cols-3"
-          }`}
-        >
-          <TabsTrigger
-            value="site-identity"
-            className="text-xs sm:text-sm data-[state=active]:bg-[var(--color-primary)] data-[state=active]:text-white"
-          >
-            Site identity
-          </TabsTrigger>
-          {hasMultipleLocations ? (
+      <Tabs
+        value={brandingScope}
+        onValueChange={handleBrandingScopeChange}
+        className="min-w-0"
+      >
+        <div className="w-full min-w-0 overflow-x-auto no-scrollbar">
+          <TabsList className="inline-flex h-auto w-max min-w-full gap-1 rounded-lg bg-muted/60 p-1">
             <TabsTrigger
-              value="main-home"
-              className="text-xs sm:text-sm data-[state=active]:bg-[var(--color-primary)] data-[state=active]:text-white"
+              value="site-identity"
+              className="flex-none shrink-0 whitespace-nowrap px-3 text-xs data-[state=active]:bg-[var(--color-primary)] data-[state=active]:text-white sm:px-4 sm:text-sm"
             >
-              Main home page
+              Site identity
             </TabsTrigger>
-          ) : null}
-          <TabsTrigger
-            value="location-page"
-            className="text-xs sm:text-sm data-[state=active]:bg-[var(--color-primary)] data-[state=active]:text-white"
-          >
-            {hasMultipleLocations ? "Location page" : "Home page"}
-          </TabsTrigger>
-          <TabsTrigger
-            value="info-pages"
-            className="text-xs sm:text-sm data-[state=active]:bg-[var(--color-primary)] data-[state=active]:text-white"
-          >
-            Info pages
-          </TabsTrigger>
-        </TabsList>
+            {hasMultipleLocations ? (
+              <TabsTrigger
+                value="main-home"
+                className="flex-none shrink-0 whitespace-nowrap px-3 text-xs data-[state=active]:bg-[var(--color-primary)] data-[state=active]:text-white sm:px-4 sm:text-sm"
+              >
+                Main home page
+              </TabsTrigger>
+            ) : null}
+            <TabsTrigger
+              value="location-page"
+              className="flex-none shrink-0 whitespace-nowrap px-3 text-xs data-[state=active]:bg-[var(--color-primary)] data-[state=active]:text-white sm:px-4 sm:text-sm"
+            >
+              {hasMultipleLocations ? "Location page" : "Home page"}
+            </TabsTrigger>
+            <TabsTrigger
+              value="info-pages"
+              className="flex-none shrink-0 whitespace-nowrap px-3 text-xs data-[state=active]:bg-[var(--color-primary)] data-[state=active]:text-white sm:px-4 sm:text-sm"
+            >
+              Info pages
+            </TabsTrigger>
+          </TabsList>
+        </div>
 
-        <TabsContent value="site-identity" className="mt-6 space-y-6">
-      <div className="rounded-lg border-2 border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900 p-6 space-y-6">
+        <TabsContent value="site-identity" className="mt-4 min-w-0 space-y-4 sm:mt-6 sm:space-y-6">
+      <div className="min-w-0 space-y-4 rounded-lg border-2 border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-900 sm:space-y-6 sm:p-6">
         <div className="space-y-2">
           <SectionTitle
             title="Logo & site identity"
@@ -582,7 +591,7 @@ export function BrandingTab({
 
         <Separator className="my-4" />
 
-        <div className="grid gap-6 md:grid-cols-2">
+        <div className="grid gap-4 md:grid-cols-2 md:gap-6">
           <FormField
             control={form.control}
             name="name"
@@ -633,7 +642,7 @@ export function BrandingTab({
           />
         </div>
 
-        <div className="grid gap-6 md:grid-cols-2">
+        <div className="grid gap-4 md:grid-cols-2 md:gap-6">
           <FormField
             control={form.control}
             name="logo"
@@ -659,10 +668,11 @@ export function BrandingTab({
                         style={{ backgroundColor: headerBackgroundColor }}
                       >
                         <img
+                          key={`logo-${siteMediaVersion}`}
                           src={
                             isLocalLogoUrl(logoUrl)
                               ? logoUrl
-                              : addCacheBusting(logoUrl)
+                              : addCacheBusting(logoUrl, siteMediaVersion)
                           }
                           alt="Logo preview"
                           className="max-h-40 w-full object-contain"
@@ -756,7 +766,8 @@ export function BrandingTab({
                   {faviconUrl ? (
                     <div className="space-y-2">
                       <img
-                        src={addCacheBusting(faviconUrl)}
+                        key={`favicon-${siteMediaVersion}`}
+                        src={addCacheBusting(faviconUrl, siteMediaVersion)}
                         alt="Favicon preview"
                         className="max-h-16 object-contain mx-auto"
                       />
@@ -795,41 +806,46 @@ export function BrandingTab({
         </TabsContent>
 
         {hasMultipleLocations ? (
-          <TabsContent value="main-home" className="mt-6">
+          <TabsContent value="main-home" className="mt-4 min-w-0 sm:mt-6">
             <MainLandingPageSection
               serverMainLandingCoverImage={serverMainLandingCoverImage}
             />
           </TabsContent>
         ) : null}
 
-        <TabsContent value="location-page" className="mt-6">
+        <TabsContent value="location-page" className="mt-4 min-w-0 sm:mt-6">
           {isAdmin ? (
             <AdminHomePageSection />
           ) : (
-      <div className="space-y-6">
+      <div className="min-w-0 space-y-4 sm:space-y-6">
         {/* Location context banner */}
-        <div className="flex flex-wrap items-center gap-3 rounded-xl border border-blue-200 bg-blue-50 px-5 py-4 dark:border-blue-800 dark:bg-blue-950/40">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-blue-500 text-white">
-            <MapPin className="h-5 w-5" />
-          </div>
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-wider text-blue-700 dark:text-blue-300">
-              {hasMultipleLocations
-                ? "For this location only"
-                : "Your public home page"}
-            </p>
-            <p className="text-sm font-bold text-blue-900 dark:text-blue-100">
-              {hasMultipleLocations
-                ? "All fields below apply only to this location"
-                : "Hero, banner, and sections visitors see on your site home"}
-            </p>
+        <div className="flex flex-col gap-3 rounded-xl border border-blue-200 bg-blue-50 p-3 dark:border-blue-800 dark:bg-blue-950/40 sm:flex-row sm:flex-wrap sm:items-center sm:gap-3 sm:p-4">
+          <div className="flex min-w-0 items-start gap-3 sm:items-center">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-blue-500 text-white sm:h-10 sm:w-10">
+              <MapPin className="h-4 w-4 sm:h-5 sm:w-5" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-xs font-semibold uppercase tracking-wider text-blue-700 dark:text-blue-300">
+                {hasMultipleLocations
+                  ? "For this location only"
+                  : "Your public home page"}
+              </p>
+              <p className="text-sm font-bold leading-snug text-blue-900 dark:text-blue-100">
+                {hasMultipleLocations
+                  ? "All fields below apply only to this location"
+                  : "Hero, banner, and sections visitors see on your site home"}
+              </p>
+            </div>
           </div>
           {hasMultipleLocations ? (
-            <div className="ml-auto flex items-center gap-2 rounded-lg border border-blue-200 bg-white px-3 py-2 shadow-sm dark:border-blue-700 dark:bg-slate-800">
-              <span className="text-xs font-medium text-muted-foreground">
+            <div className="flex w-full min-w-0 items-center gap-2 rounded-lg border border-blue-200 bg-white px-2.5 py-2 shadow-sm dark:border-blue-700 dark:bg-slate-800 sm:ml-auto sm:w-auto sm:max-w-full sm:px-3">
+              <span className="shrink-0 text-xs font-medium text-muted-foreground">
                 Editing:
               </span>
-              <LocationIndicator variant="light" />
+              <LocationIndicator
+                variant="light"
+                className="min-w-0 max-w-full truncate"
+              />
             </div>
           ) : null}
         </div>
@@ -846,7 +862,7 @@ export function BrandingTab({
               : "Heading and subheading on your site home. Text position is set from Try theme on the Presets tab or preview — not here."
           }
         >
-          <div className="grid gap-6 md:grid-cols-2">
+          <div className="grid gap-4 md:grid-cols-2 md:gap-6">
             <FormField
               control={form.control}
               name="banner_heading"
@@ -940,16 +956,18 @@ export function BrandingTab({
                     <FormItem>
                       <FormLabel>Banner Image</FormLabel>
                       <FormDescription>
-                        Upload a static image for this location’s hero banner
-                        (recommended size: 1200 x 600px)
+                        Location page hero banner. {SITE_HERO_UPLOAD_HINT}
                       </FormDescription>
                       <FormControl>
                         {landingPageImageUrl ? (
                           <div className="space-y-2">
                             <img
-                              src={addCacheBusting(landingPageImageUrl)}
+                              src={addCacheBusting(
+                                landingPageImageUrl,
+                                siteMediaVersion,
+                              )}
                               alt="Landing page image preview"
-                              className="max-h-40 object-contain mx-auto"
+                              className="mx-auto aspect-video max-h-40 w-full object-cover"
                             />
                             <button
                               type="button"
@@ -975,7 +993,7 @@ export function BrandingTab({
                               "image/webp": [],
                             }}
                             enableCropping={true}
-                            aspectRatio={undefined}
+                            aspectRatio={SITE_HERO_BACKGROUND_CROP.aspectRatio}
                             cropConfig={SITE_HERO_BACKGROUND_CROP}
                           />
                         )}
@@ -1149,7 +1167,7 @@ export function BrandingTab({
           title="Event sections"
           description="Section titles on this location’s page"
         >
-          <div className="grid gap-6 md:grid-cols-2">
+          <div className="grid gap-4 md:grid-cols-2 md:gap-6">
             <FormField
               control={form.control}
               name="event_title_1"
@@ -1265,7 +1283,7 @@ export function BrandingTab({
           )}
         </TabsContent>
 
-        <TabsContent value="info-pages" className="mt-6">
+        <TabsContent value="info-pages" className="mt-4 min-w-0 sm:mt-6">
           <InfoPagesTab />
         </TabsContent>
       </Tabs>

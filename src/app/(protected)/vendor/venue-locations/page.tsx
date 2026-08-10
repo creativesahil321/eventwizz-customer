@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input";
 import { useDebounce } from "@/hooks/data-table/use-debounce";
 import { useQueryState, parseAsInteger } from "nuqs";
 import { PermissionRoute } from "@/components/permission";
+import { AllLocationsBadge } from "@/components/location-indicator";
 
 // Dynamic import of the location create dialog
 const CreateLocationDialog = dynamic(
@@ -66,12 +67,16 @@ export default function VenueLocationsPage() {
           <div className="bg-white rounded-lg border border-[var(--color-border)] shadow-md p-4 sm:p-6 mb-4 min-w-0 max-w-full overflow-hidden">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center flex-wrap gap-4 min-w-0">
               <div className="min-w-0">
-                <h1 className="text-2xl title-header font-bold">
-                  Event Locations
-                </h1>
+                <div className="flex flex-wrap items-center gap-2">
+                  <h1 className="text-2xl title-header font-bold">
+                    Event Locations
+                  </h1>
+                  <AllLocationsBadge />
+                </div>
                 <p className="text-muted-foreground mt-2">
-                  Manage different locations for your event. Each location
-                  represents a physical address where your venue operates.
+                  All venues on your account. Each location is a physical
+                  address where you run events — this list is not filtered by
+                  the header selector.
                 </p>
               </div>
               <div className="flex w-full flex-col gap-3 sm:flex-row sm:items-center sm:shrink-0 min-w-0">

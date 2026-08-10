@@ -35,6 +35,7 @@ import {
   ADMIN_HOME_CARD_CROP,
   ADMIN_HOME_HERO_CROP,
   ADMIN_SHOWCASE_POSTER_CROP,
+  SITE_HERO_UPLOAD_HINT,
 } from "@/lib/event-image-crop-presets";
 import {
   Select,
@@ -242,8 +243,8 @@ function HeroImageField({ readOnly }: { readOnly?: boolean }) {
     <FormItem>
       <FormLabel>Hero background image</FormLabel>
       <FormDescription>
-        Large background behind the hero heading (recommended 1920 x 1080px, max
-        2MB). Falls back to the default image when empty.
+        Large background behind the hero heading. {SITE_HERO_UPLOAD_HINT} Falls
+        back to the default image when empty.
       </FormDescription>
       <FormControl>
         {localPreview ? (
@@ -293,7 +294,7 @@ function HeroImageField({ readOnly }: { readOnly?: boolean }) {
               "image/webp": [],
             }}
             enableCropping
-            aspectRatio={undefined}
+            aspectRatio={ADMIN_HOME_HERO_CROP.aspectRatio}
             cropConfig={ADMIN_HOME_HERO_CROP}
           />
         )}
@@ -1066,16 +1067,16 @@ export function AdminHomePageSection() {
   const d = ADMIN_HOME_DEFAULTS;
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center gap-3 rounded-xl border border-blue-200 bg-blue-50 px-5 py-4 dark:border-blue-800 dark:bg-blue-950/40">
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-blue-500 text-white">
-          <MapPin className="h-5 w-5" />
+    <div className="min-w-0 space-y-4 sm:space-y-6">
+      <div className="flex items-start gap-3 rounded-xl border border-blue-200 bg-blue-50 p-3 dark:border-blue-800 dark:bg-blue-950/40 sm:items-center sm:p-4">
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-blue-500 text-white sm:h-10 sm:w-10">
+          <MapPin className="h-4 w-4 sm:h-5 sm:w-5" />
         </div>
-        <div>
+        <div className="min-w-0 flex-1">
           <p className="text-xs font-semibold uppercase tracking-wider text-blue-700 dark:text-blue-300">
             Your public home page
           </p>
-          <p className="text-sm font-bold text-blue-900 dark:text-blue-100">
+          <p className="text-sm font-bold leading-snug text-blue-900 dark:text-blue-100">
             Edit each section of your marketing home. Empty fields fall back to
             the default text.
           </p>

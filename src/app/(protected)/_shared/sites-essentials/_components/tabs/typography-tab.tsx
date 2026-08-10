@@ -84,7 +84,7 @@ export function TypographyTab() {
   }, [bodyStack]);
 
   return (
-    <div className="space-y-6">
+    <div className="min-w-0 space-y-4 sm:space-y-6">
       <SiteEssentialsGoogleFontsLoader
         linkId="site-essentials-google-fonts-typography-tab"
         headingStack={headingFont}
@@ -95,7 +95,7 @@ export function TypographyTab() {
         title="Typography"
         description="Configure your site's fonts and typography settings"
       />
-      <Separator className="my-4" />
+      <Separator className="my-3 sm:my-4" />
 
       <div className="grid gap-4 sm:grid-cols-2">
         <div

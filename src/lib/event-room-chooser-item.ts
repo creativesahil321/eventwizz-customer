@@ -12,6 +12,11 @@ export type EventRoomChooserItem = {
   packageCount: number;
   /** Short feature highlights (inclusions or package names). */
   highlights: string[];
+  /**
+   * True when the room has no bookable dates (empty payload or empty `dates`).
+   * Shown in the chooser but not selectable.
+   */
+  disabled?: boolean;
 };
 
 /** First few non-empty titles, trimmed and de-duplicated. */

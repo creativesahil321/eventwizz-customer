@@ -18,6 +18,7 @@ import {
 import { onboardingService } from "@/services/vendor/onboarding/onboarding.service";
 import { roomService } from "@/services/vendor/onboarding/room.service";
 import { eventsService } from "@/services/vendor/events/events.service";
+import { withSuppressedSuccessToasts } from "@/services/core/api-client";
 import { ensureEventMenuCategoriesForRoom } from "@/lib/event-menu-categories";
 import {
   AI_ONBOARDING_MAX_ROOMS,
@@ -82,7 +83,16 @@ export interface ApplyAIOnboardingParams {
  * Persists AI-generated onboarding content through the same step APIs as manual flow.
  * Used after generation (auto-apply) or from review if reintroduced.
  */
-export async function applyAIGeneratedOnboardingContent({
+export async function applyAIGeneratedOnboardingContent(
+  params: ApplyAIOnboardingParams,
+): Promise<void> {
+  // Progress checklist is the UX; hide per-step API success toasts.
+  return withSuppressedSuccessToasts(() =>
+    applyAIGeneratedOnboardingContentInner(params),
+  );
+}
+
+async function applyAIGeneratedOnboardingContentInner({
   content,
   venueInput,
   removedSections = new Set<string>(),

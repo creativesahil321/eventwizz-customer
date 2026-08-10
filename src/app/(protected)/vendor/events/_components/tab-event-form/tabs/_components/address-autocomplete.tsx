@@ -417,8 +417,8 @@ export default function AddressAutocomplete({
             >
               <span>⚠️</span>
               <span className={isDark ? "" : "text-sm"}>
-                Address search is unavailable. Check your connection or try again
-                shortly.
+                Address search is unavailable. Please check your connection or
+                try again shortly.
               </span>
             </div>
           </div>

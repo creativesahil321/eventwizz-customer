@@ -16,7 +16,7 @@ export function SectionCard({
   children: React.ReactNode;
 }) {
   return (
-    <div className="rounded-lg border-2 border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900 p-6 space-y-5">
+    <div className="min-w-0 space-y-4 rounded-lg border-2 border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-900 sm:space-y-5 sm:p-6">
       <SectionTitle title={title} description={description} />
       <Separator className="my-1" />
       {children}

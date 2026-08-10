@@ -149,6 +149,13 @@ export function DuplicateLocationFields({
     fetchLocationDetails(form, placeId);
   };
 
+  const handleNewAddressClear = () => {
+    form.setValue("vendor_location_id", undefined, { shouldValidate: true });
+    form.setValue("address", "", { shouldValidate: true });
+    form.setValue("city", "", { shouldValidate: true });
+    form.setValue("contact_number", "", { shouldValidate: true });
+  };
+
   return (
     <div className="space-y-6">
       {hasExistingLocations && (
@@ -158,7 +165,7 @@ export function DuplicateLocationFields({
           render={({ field }) => (
             <FormItem>
               <FormLabel className="text-sm font-medium">
-                Where should this duplicate go?
+                Where should the duplicated event go?
               </FormLabel>
               <FormControl>
                 <RadioGroup
@@ -166,7 +173,7 @@ export function DuplicateLocationFields({
                     handleTargetTypeChange(value as "existing" | "new")
                   }
                   value={field.value || "existing"}
-                  className="flex flex-col space-y-1"
+                  className="flex flex-col gap-2"
                 >
                   <FormItem className="flex items-center space-x-3 space-y-0">
                     <FormControl>
@@ -249,9 +256,13 @@ export function DuplicateLocationFields({
                       form.setValue("vendor_location_id", undefined, {
                         shouldValidate: true,
                       });
+                      // City only comes from a Google place selection —
+                      // clear it while the user is still typing.
+                      form.setValue("city", "", { shouldValidate: true });
                       field.onChange(value);
                     }}
                     onSelect={handleNewLocationSelect}
+                    onClear={handleNewAddressClear}
                     placeholder="Search for a location..."
                     disabled={readOnly}
                   />
@@ -273,10 +284,12 @@ export function DuplicateLocationFields({
                   <FormControl>
                     <Input
                       {...field}
-                      placeholder="Enter city name"
-                      className="h-11 bg-[#F9FAFB] border-[#E5E7EB]"
-                      onFocus={() => onFieldFocus?.("city")}
+                      placeholder="Select an address above to auto-fill"
+                      autoComplete="off"
+                      readOnly
                       disabled={readOnly}
+                      className="h-11 bg-muted border-[#E5E7EB] cursor-not-allowed"
+                      onFocus={() => onFieldFocus?.("city")}
                     />
                   </FormControl>
                   <FormMessage />
@@ -290,7 +303,7 @@ export function DuplicateLocationFields({
               render={({ field }) => (
                 <FormItem>
                   <FormLabel className="text-sm font-medium">
-                    Contact Number <span className="text-red-500">*</span>
+                    Contact number <span className="text-red-500">*</span>
                   </FormLabel>
                   <FormControl>
                     <Input

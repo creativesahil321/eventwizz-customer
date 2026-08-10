@@ -141,6 +141,11 @@ export function CropDialog({
 
   const handleAspectChange = useCallback(
     (next: number | undefined) => {
+      // Re-clicking the already-active mode used to clear croppedAreaPixels and
+      // leave Save disabled — react-easy-crop only re-fires onCropComplete after
+      // a remount or user drag.
+      if (next === activeAspect) return;
+
       setActiveAspect(next);
       setCropState((prev) => ({
         ...prev,
@@ -149,7 +154,7 @@ export function CropDialog({
         croppedAreaPixels: null,
       }));
     },
-    [mergedConfig.initialZoom]
+    [activeAspect, mergedConfig.initialZoom]
   );
 
   const finishWithResult = useCallback(
@@ -234,8 +239,9 @@ export function CropDialog({
             Crop & Optimize Image
           </DialogTitle>
           <DialogDescription className="text-black">
-            Adjust the crop area, zoom, and rotation — or use the full image.
-            The image will be automatically optimized for web use.
+            {recommendedAspect
+              ? `Frame your image to ${getAspectRatioLabel(recommendedAspect)} so it matches the live banner. Zoom and reposition as needed — the image is optimized automatically.`
+              : "Adjust the crop area, zoom, and rotation — or use the full image. The image will be automatically optimized for web use."}
           </DialogDescription>
         </DialogHeader>
 
@@ -249,6 +255,9 @@ export function CropDialog({
           ) : null}
           {imageSrc && !previewLoading ? (
             <Cropper
+              // Remount when aspect/rotation changes so onCropComplete fires
+              // with the new frame (otherwise Save can stay disabled).
+              key={`crop-${activeAspect ?? "free"}-${cropState.rotation}`}
               image={imageSrc}
               crop={cropState.crop}
               zoom={cropState.zoom}

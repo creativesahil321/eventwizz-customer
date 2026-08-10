@@ -30,11 +30,40 @@ export interface DiscountCustomer {
   status: string;
 }
 
+/** One date row inside a multi-date Discount (API + form). */
+export interface DiscountDateEntry {
+  id?: number;
+  date_id: number;
+  /** Event calendar date `YYYY-MM-DD` (for labels + expiry validation). */
+  date?: string | null;
+  room_id?: number | null;
+  room?: DiscountRelation | null;
+  discount_type: DiscountType;
+  flat_mode?: FlatDiscountMode | string | null;
+  amount: number;
+  min_people?: number | null;
+  valid_from?: string | null;
+  expires_at: string;
+  value_label?: string | null;
+  /** When false, hide this date’s badge on the public event page. */
+  show_on_banner?: boolean | null;
+  /** When false, this date’s offer is saved but not live at checkout. */
+  is_live?: boolean | null;
+  /** Alternate API field — prefer `is_live` when both exist. */
+  status?: DiscountStatus | string | null;
+}
+
 export interface Discount {
   id: number;
   category: DiscountCategory;
   name: string | null;
   coupon_code: string | null;
+  /** When false, hide from the public event page (coupon strip / discount badges). */
+  show_on_banner?: boolean | null;
+  /** Small eyebrow on the coupon strip (e.g. "Limited time offer"). */
+  banner_heading?: string | null;
+  /** Main promo line on the event page coupon strip. */
+  dynamic_text?: string | null;
   discount_type: DiscountType;
   flat_mode: FlatDiscountMode | string | null;
   amount: number;
@@ -46,12 +75,15 @@ export interface Discount {
   summary: string;
   vendor_location_id: number;
   vendor_event_id: number;
+  /** Legacy single-date fields — prefer `dates[]` when present. */
   date_id: number | null;
   date: string | null;
   room_id: number | null;
   location: DiscountRelation | null;
   event: DiscountRelation | null;
   room: DiscountRelation | null;
+  /** Multi-date Discount rows (guide model). */
+  dates?: DiscountDateEntry[] | null;
   customers?: DiscountCustomer[];
   valid_from: string | null;
   expires_at: string;
@@ -106,6 +138,22 @@ export interface DiscountsListResponse {
   errors: unknown[];
 }
 
+/** One date row in POST /vendor/discounts/store for category `discount`. */
+export interface DiscountDatePayload {
+  date_id: number;
+  room_id?: number | null;
+  discount_type: DiscountType;
+  amount: number;
+  flat_mode?: FlatDiscountMode | null;
+  min_people?: number | null;
+  valid_from?: string | null;
+  expires_at: string;
+  /** Show offer badge on the public event date picker for this date. */
+  show_on_banner?: boolean;
+  /** Live for checkout immediately when true; paused when false. */
+  is_live?: boolean;
+}
+
 /**
  * POST /vendor/discounts/store
  * Location comes from header `x-venue-location-id` (not body).
@@ -113,16 +161,24 @@ export interface DiscountsListResponse {
 export interface DiscountFormPayload {
   category: "discount" | "coupon_code";
   vendor_event_id: number;
-  discount_type: DiscountType;
-  amount: number;
   name?: string | null;
-  valid_from?: string | null;
-  expires_at: string;
   status: "active" | "inactive";
-  /** Required for category `discount` */
+  /** Multi-date Discount rows */
+  dates?: DiscountDatePayload[];
+  /** Coupon (and legacy single-date) value fields */
+  discount_type?: DiscountType;
+  amount?: number;
+  valid_from?: string | null;
+  expires_at?: string;
   date_id?: number;
   room_id?: number;
   coupon_code?: string | null;
+  /** Promote on the public event page (coupon strip or discount display). */
+  show_on_banner?: boolean;
+  /** Small eyebrow on the coupon strip. */
+  banner_heading?: string | null;
+  /** Main promo line on the event page coupon strip. */
+  dynamic_text?: string | null;
   /** API: `total` | `per_person` */
   flat_mode?: FlatDiscountMode | null;
   min_people?: number | null;
@@ -184,13 +240,13 @@ export const DISCOUNT_CREATE_CATEGORIES: {
     value: "discount",
     label: "Discount",
     description:
-      "Applies to a chosen event date (and room, if any) at the location selected in the header.",
+      "Automatic off on selected event dates — each date/room can have its own amount and expiry.",
   },
   {
     value: "coupon_code",
     label: "Coupon Code",
     description:
-      "Guests enter a code at checkout. When active, it can be emailed to your customers.",
+      "A typed checkout code for one event. Email it, or show it on the event page banner.",
   },
 ];
 
@@ -199,18 +255,33 @@ export const DISCOUNT_VALUE_TYPE_LABELS: Record<DiscountType, string> = {
   flat: "Fixed amount",
 };
 
+/** Offer type choices matching the guide (flat splits into total vs per person). */
+export const DISCOUNT_OFFER_KIND_LABELS = {
+  percentage: "Percentage",
+  flat_total: "Flat off total",
+  flat_per_person: "Flat per person",
+} as const;
+
+export type DiscountOfferKind = keyof typeof DISCOUNT_OFFER_KIND_LABELS;
+
 export const FLAT_MODE_LABELS: Record<FlatDiscountMode, string> = {
   total: "Off the total",
   per_person: "Per person",
 };
 
 export const DISCOUNT_STATUS_LABELS: Record<DiscountStatus, string> = {
-  active: "Active",
-  inactive: "Inactive",
+  active: "Live",
+  inactive: "Paused",
   expired: "Expired",
 };
 
 export const CUSTOMER_AUDIENCE_LABELS: Record<CustomerAudience, string> = {
-  all_active: "All active customers",
+  all_active: "Everyone",
   selected: "Selected customers",
+};
+
+export const CUSTOMER_AUDIENCE_DESCRIPTIONS: Record<CustomerAudience, string> = {
+  all_active:
+    "Anyone can use this code — registered customers and guest checkouts.",
+  selected: "Only the customers you pick can use this code.",
 };

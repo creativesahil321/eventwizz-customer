@@ -163,7 +163,7 @@ function VenueLocationsDataTable({
     enableClientSideSorting: true,
     initialState: {
       sorting: [{ id: "created_at", desc: true }],
-      columnPinning: { right: ["actions"] },
+      // Don't pin Actions — sticky right pin floats over address text on mobile.
     },
     getRowId,
     shallow: false,

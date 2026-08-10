@@ -157,10 +157,16 @@ export const discountsService = {
     return response as DiscountStoreResponse;
   },
 
-  updateDiscount: (id: number | string, data: Partial<DiscountFormPayload>) => {
+  updateDiscount: async (
+    id: number | string,
+    data: DiscountFormPayload
+  ): Promise<DiscountStoreResponse> => {
     const endpoints = getDiscountEndpoints();
     const url = endpoints.UPDATE.replace("{id}", String(id));
-    return api.put(url, data, { returnFullResponse: true });
+    const response = await api.post<DiscountStoreResponse>(url, data, {
+      returnFullResponse: true,
+    });
+    return response as DiscountStoreResponse;
   },
 
   updateDiscountStatus: (

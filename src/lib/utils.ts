@@ -18,6 +18,40 @@ export function toSentenceCase(str: string) {
     .trim();
 }
 
+const TITLE_CASE_ACRONYMS = new Set([
+  "seo",
+  "uk",
+  "uri",
+  "url",
+  "id",
+  "api",
+  "vat",
+  "pdf",
+  "csv",
+]);
+
+/**
+ * Title-case for place names, roles, and other UI labels.
+ * `kangra` → `Kangra`, `stock brook` → `Stock Brook`, `seo` → `SEO`.
+ */
+export function toTitleCase(value: string): string {
+  if (!value?.trim()) return "";
+  return value
+    .trim()
+    .split(/([\s/_-]+)/)
+    .map((token) => {
+      if (/^[\s/_-]+$/.test(token)) {
+        return token.replace(/_/g, " ");
+      }
+      const lower = token.toLowerCase();
+      if (TITLE_CASE_ACRONYMS.has(lower)) return lower.toUpperCase();
+      return lower.charAt(0).toUpperCase() + lower.slice(1);
+    })
+    .join("")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 /**
  * Converts a string into a URL-friendly slug
  * @param str - The string to convert to a slug

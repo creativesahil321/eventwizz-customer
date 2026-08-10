@@ -186,9 +186,11 @@ export function PreviewThemeCustomizer({
 
   const applyColorGridOption = useCallback(
     (opt: TryThemeColorGridOption) => {
-      onValuesChange(
-        mergeColorPaletteIntoValues(valuesRef.current, opt.colors),
-      );
+      const cur = valuesRef.current;
+      if (siteEssentialsColorsMatch(cur.colors, opt.colors)) {
+        return;
+      }
+      onValuesChange(mergeColorPaletteIntoValues(cur, opt.colors));
       const k = tryThemeColorGridOptionStorageKey(opt);
       setLastColorKey(k);
       try {
@@ -203,7 +205,15 @@ export function PreviewThemeCustomizer({
   const applyFonts = useCallback(
     (id: SiteThemePresetId) => {
       const preset = presetById(id);
-      onValuesChange(mergePresetFontsIntoValues(valuesRef.current, preset));
+      const cur = valuesRef.current;
+      const next = mergePresetFontsIntoValues(cur, preset);
+      if (
+        siteEssentialsFontPairKey(cur.typography) ===
+        siteEssentialsFontPairKey(next.typography)
+      ) {
+        return;
+      }
+      onValuesChange(next);
     },
     [onValuesChange],
   );
@@ -234,8 +244,12 @@ export function PreviewThemeCustomizer({
 
   const applyHeroAlign = useCallback(
     (align: BannerHeadingAlign) => {
+      const cur = valuesRef.current;
+      if (normalizeBannerHeadingAlign(cur.banner_heading_align) === align) {
+        return;
+      }
       onValuesChange({
-        ...valuesRef.current,
+        ...cur,
         banner_heading_align: align,
       });
     },
@@ -244,8 +258,12 @@ export function PreviewThemeCustomizer({
 
   const applyHeroValign = useCallback(
     (valign: BannerHeadingValign) => {
+      const cur = valuesRef.current;
+      if (normalizeBannerHeadingValign(cur.banner_heading_valign) === valign) {
+        return;
+      }
       onValuesChange({
-        ...valuesRef.current,
+        ...cur,
         banner_heading_valign: valign,
       });
     },
@@ -255,6 +273,11 @@ export function PreviewThemeCustomizer({
   const applyHeadingEmphasisStyle = useCallback(
     (emphasis: HeadingEmphasis) => {
       const cur = valuesRef.current;
+      if (
+        normalizeHeadingEmphasis(cur.typography?.headingEmphasis) === emphasis
+      ) {
+        return;
+      }
       onValuesChange({
         ...cur,
         typography: {
@@ -371,23 +394,31 @@ export function PreviewThemeCustomizer({
         aria-expanded={open}
         aria-controls="preview-theme-customizer-sheet"
         className={cn(
-          "group fixed right-0 top-1/2 z-[70] flex -translate-y-1/2 flex-row-reverse items-center gap-2.5",
-          "rounded-l-xl border border-r-0 border-slate-200 bg-white py-2.5 pl-4 pr-2.5",
+          "group fixed right-0 top-1/2 z-[70] flex -translate-y-1/2 items-center gap-0",
+          "rounded-l-xl border border-r-0 border-slate-200 bg-white py-2.5 pl-3 pr-2.5",
           "text-sm font-semibold text-slate-800 shadow-md",
-          "translate-x-[calc(100%-2.875rem)] transition-[transform,box-shadow,background-color] duration-300 ease-out",
-          "hover:translate-x-0 hover:bg-slate-50 hover:shadow-lg",
-          "focus-visible:translate-x-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-2",
-          "motion-reduce:translate-x-0",
+          // Collapsed: icon-only peek. Expanded on hover/focus: slide in + show label.
+          "translate-x-[calc(100%-2.75rem)] transition-[transform,box-shadow,background-color,padding] duration-300 ease-out",
+          "hover:translate-x-0 hover:bg-slate-50 hover:pl-4 hover:shadow-lg",
+          "focus-visible:translate-x-0 focus-visible:pl-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-2",
+          "motion-reduce:translate-x-0 motion-reduce:pl-4",
           open && "pointer-events-none opacity-0",
         )}
       >
+        <span
+          className={cn(
+            "max-w-0 overflow-hidden whitespace-nowrap text-xs leading-none opacity-0 transition-[max-width,opacity,margin] duration-300 ease-out sm:text-sm",
+            "group-hover:mr-2.5 group-hover:max-w-[6.5rem] group-hover:opacity-100",
+            "group-focus-visible:mr-2.5 group-focus-visible:max-w-[6.5rem] group-focus-visible:opacity-100",
+            "motion-reduce:mr-2.5 motion-reduce:max-w-[6.5rem] motion-reduce:opacity-100",
+          )}
+        >
+          Try theme
+        </span>
         <Palette
           className="h-5 w-5 shrink-0 text-slate-700 transition-transform duration-300 ease-out group-hover:scale-110 motion-reduce:group-hover:scale-100"
           aria-hidden
         />
-        <span className="whitespace-nowrap text-right text-xs leading-none sm:text-sm">
-          Try theme
-        </span>
       </button>
 
       {/* modal={false}: avoid Radix RemoveScroll / body lock so the preview page stays scrollable */}

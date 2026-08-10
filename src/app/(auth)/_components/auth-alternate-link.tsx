@@ -1,7 +1,9 @@
 "use client";
 
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { useDomain } from "@/providers/domain-provider/domain-provider";
+import { getSafeCallbackUrl } from "@/lib/auth/safe-callback-url";
 
 type AuthAlternateLinkProps = {
   variant: "login" | "register";
@@ -21,8 +23,17 @@ function getRegistrationPath(website_role: string | null | undefined) {
   );
 }
 
+function withCallbackUrl(path: string, callbackUrl: string | null): string {
+  const safe = getSafeCallbackUrl(callbackUrl);
+  if (!safe) return path;
+  const separator = path.includes("?") ? "&" : "?";
+  return `${path}${separator}callbackUrl=${encodeURIComponent(safe)}`;
+}
+
 export function AuthAlternateLink({ variant }: AuthAlternateLinkProps) {
   const { website_role } = useDomain();
+  const searchParams = useSearchParams();
+  const callbackUrl = searchParams.get("callbackUrl");
 
   const linkClassName =
     "font-medium text-[var(--color-text)] hover:text-[var(--color-primary)] hover:underline";
@@ -31,7 +42,10 @@ export function AuthAlternateLink({ variant }: AuthAlternateLinkProps) {
     return (
       <p className="text-center text-sm text-[var(--color-text-dimmed)] pt-3">
         Have an account?{" "}
-        <Link href="/auth/login" className={linkClassName}>
+        <Link
+          href={withCallbackUrl("/auth/login", callbackUrl)}
+          className={linkClassName}
+        >
           Sign in
         </Link>
       </p>
@@ -41,7 +55,10 @@ export function AuthAlternateLink({ variant }: AuthAlternateLinkProps) {
   return (
     <p className="text-center text-sm text-[var(--color-text-dimmed)] pt-3">
       Don&apos;t have an account?{" "}
-      <Link href={getRegistrationPath(website_role)} className={linkClassName}>
+      <Link
+        href={withCallbackUrl(getRegistrationPath(website_role), callbackUrl)}
+        className={linkClassName}
+      >
         Sign up
       </Link>
     </p>

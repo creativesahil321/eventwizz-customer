@@ -12,6 +12,7 @@ import {
   useLocationsQuery,
   useCurrentLocationId,
 } from "@/app/(protected)/vendor/venue-locations/_lib/queries";
+import { MAX_VENDOR_LOCATIONS } from "@/app/(protected)/vendor/venue-locations/_lib/validations";
 import { useSwitchLocation } from "@/app/(protected)/vendor/venue-locations/_lib/hooks";
 import { VenueLocation } from "@/types/api.types";
 import { cn } from "@/lib/utils";
@@ -20,6 +21,7 @@ import { PageLoader } from "../ui/page-loader";
 import { InfoCircledIcon } from "@radix-ui/react-icons";
 import { Badge } from "@/components/ui/badge";
 import { XCircle } from "lucide-react";
+import { toast } from "sonner";
 
 interface LocationSelectorModalProps {
   isOpen: boolean;
@@ -42,6 +44,19 @@ export function LocationSelectorModal({
     return locationsData.data || [];
   }, [locationsData]);
 
+  const locationCount = useMemo(() => {
+    if (
+      locationsData &&
+      !Array.isArray(locationsData) &&
+      typeof locationsData.meta?.total === "number"
+    ) {
+      return locationsData.meta.total;
+    }
+    return allLocations.length;
+  }, [locationsData, allLocations.length]);
+
+  const atLocationLimit = locationCount >= MAX_VENDOR_LOCATIONS;
+
   const [selectedLocationId, setSelectedLocationId] = useState<number | null>(
     currentLocationId || null,
   );
@@ -58,6 +73,16 @@ export function LocationSelectorModal({
   // Handler for selecting a location
   const handleLocationSelect = (location: VenueLocation) => {
     setSelectedLocationId(location.id);
+  };
+
+  const handleCreateLocation = () => {
+    if (atLocationLimit) {
+      toast.error(
+        `You can add a maximum of ${MAX_VENDOR_LOCATIONS} locations`,
+      );
+      return;
+    }
+    router.push("/vendor/venue-locations");
   };
 
   // Handler for confirming selection
@@ -106,8 +131,14 @@ export function LocationSelectorModal({
               <InfoCircledIcon className="h-4 w-4 text-gray-500" />
             </div>
             <Button
-              onClick={() => router.push("/vendor/venue-locations/create")}
+              onClick={handleCreateLocation}
+              disabled={atLocationLimit}
               className="h-9 bg-teal-600 hover:bg-teal-700 text-white"
+              title={
+                atLocationLimit
+                  ? `Maximum of ${MAX_VENDOR_LOCATIONS} locations allowed`
+                  : undefined
+              }
             >
               Create New Location
             </Button>
@@ -169,10 +200,14 @@ export function LocationSelectorModal({
                     No locations found. Please create a location first.
                   </p>
                   <Button
-                    onClick={() =>
-                      router.push("/vendor/venue-locations/create")
-                    }
+                    onClick={handleCreateLocation}
+                    disabled={atLocationLimit}
                     className="bg-teal-600 hover:bg-teal-700 text-white"
+                    title={
+                      atLocationLimit
+                        ? `Maximum of ${MAX_VENDOR_LOCATIONS} locations allowed`
+                        : undefined
+                    }
                   >
                     Create New Location
                   </Button>

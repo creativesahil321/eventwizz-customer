@@ -20,6 +20,7 @@ import { AuthUser, UserType, StaffRole } from "@/types/auth.types";
 import { usePermissionStore } from "@/store/permission.store";
 import { Loader2 } from "lucide-react";
 import { RegistrationResponse } from "@/types/api.types";
+import { resolvePostLoginRedirect } from "@/lib/auth/safe-callback-url";
 
 type RegisterFormValues = z.infer<typeof registerSchema>;
 
@@ -32,6 +33,7 @@ export function CompleteRegistrationForm() {
   const [redirecting, setRedirecting] = useState(false);
   const [redirectAccountType, setRedirectAccountType] = useState<"vendor" | "customer" | "admin" | null>(null);
   const email = searchParams?.get("email") || "";
+  const callbackUrl = searchParams?.get("callbackUrl");
 
   const {
     register,
@@ -206,12 +208,13 @@ export function CompleteRegistrationForm() {
           toast.error(result?.error || "Failed to sign in after registration");
           router.push("/auth/login");
         } else {
-          // Redirect based on account type
-          if (accountType === "vendor") {
-            router.push("/on-boarding");
-          } else {
-            router.push(`/${accountType}/dashboard`);
-          }
+          router.push(
+            resolvePostLoginRedirect({
+              accountType,
+              isVendorOnboarded: false,
+              callbackUrl,
+            }),
+          );
         }
       } else {
         // Error is handled by axios interceptor

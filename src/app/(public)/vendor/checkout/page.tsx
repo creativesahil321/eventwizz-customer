@@ -6,6 +6,7 @@ import CheckoutHeader from "./_components/checkout-header";
 import CartManager from "./_components/cart-manager";
 import { CheckoutPageProps } from "./_lib/types";
 import { useCheckoutAuth } from "./_lib/hooks";
+import { useResumePendingBooking } from "./_lib/hooks/use-resume-pending-booking";
 import { LOADING_MESSAGES } from "./_lib/constants";
 import BookingSummary from "./_components/booking-summary";
 import { preconnectStripeJs, preloadStripeModule } from "@/lib/stripe/stripe-loader";
@@ -14,6 +15,7 @@ import "./checkout-theme.css";
 export default function CheckoutPage({}: CheckoutPageProps) {
   const { settings, isLoading: isDomainLoading } = useDomain();
   const { isClient, status, isAuthenticated, isCustomer } = useCheckoutAuth();
+  const { isResuming } = useResumePendingBooking(isCustomer);
 
   useEffect(() => {
     preconnectStripeJs();
@@ -51,7 +53,7 @@ export default function CheckoutPage({}: CheckoutPageProps) {
     </div>
   );
 
-  if (!isClient || isDomainLoading || status === "loading") {
+  if (!isClient || isDomainLoading || status === "loading" || isResuming) {
     return <LoadingScreen message={LOADING_MESSAGES.LOADING_CHECKOUT} />;
   }
 

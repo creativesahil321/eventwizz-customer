@@ -41,10 +41,16 @@ export function EventRoomChooser({
 
   if (rooms.length < 2) return null;
 
-  const safeIndex = Math.min(
+  const clampedIndex = Math.min(
     Math.max(currentRoomIndex, 0),
     Math.max(rooms.length - 1, 0),
   );
+  const safeIndex = rooms[clampedIndex]?.disabled
+    ? Math.max(
+        0,
+        rooms.findIndex((room) => !room.disabled),
+      )
+    : clampedIndex;
 
   return (
     <section
@@ -82,21 +88,33 @@ export function EventRoomChooser({
         >
           {rooms.map((room) => {
             const accent = getRoomFloatingAccent(room.index);
-            const isActive = room.index === safeIndex;
+            const isDisabled = Boolean(room.disabled);
+            const isActive = !isDisabled && room.index === safeIndex;
 
             return (
               <button
                 key={`${room.room_id}-${room.index}`}
                 type="button"
-                onClick={() => onRoomChange(room.index)}
+                onClick={() => {
+                  if (isDisabled) return;
+                  onRoomChange(room.index);
+                }}
+                disabled={isDisabled}
                 aria-pressed={isActive}
-                aria-label={`Select ${room.name}`}
+                aria-disabled={isDisabled}
+                aria-label={
+                  isDisabled
+                    ? `${room.name} unavailable — no dates`
+                    : `Select ${room.name}`
+                }
                 className={cn(
                   "group relative flex flex-col overflow-hidden rounded-2xl border bg-[var(--color-surface)] text-left transition-all duration-300",
                   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--color-primary)] focus-visible:ring-offset-2",
-                  isActive
-                    ? "border-[color:var(--color-primary)] shadow-[0_22px_45px_-20px_color-mix(in_srgb,var(--color-primary)_60%,transparent)] ring-1 ring-[color:var(--color-primary)]"
-                    : "border-[color:color-mix(in_srgb,var(--color-text)_10%,transparent)] shadow-[0_12px_30px_-24px_rgba(0,0,0,0.35)] hover:-translate-y-1 hover:border-[color:color-mix(in_srgb,var(--color-primary)_45%,transparent)] hover:shadow-[0_22px_45px_-24px_rgba(0,0,0,0.4)]",
+                  isDisabled
+                    ? "cursor-not-allowed border-[color:color-mix(in_srgb,var(--color-text)_10%,transparent)] opacity-55 shadow-none"
+                    : isActive
+                      ? "border-[color:var(--color-primary)] shadow-[0_22px_45px_-20px_color-mix(in_srgb,var(--color-primary)_60%,transparent)] ring-1 ring-[color:var(--color-primary)]"
+                      : "border-[color:color-mix(in_srgb,var(--color-text)_10%,transparent)] shadow-[0_12px_30px_-24px_rgba(0,0,0,0.35)] hover:-translate-y-1 hover:border-[color:color-mix(in_srgb,var(--color-primary)_45%,transparent)] hover:shadow-[0_22px_45px_-24px_rgba(0,0,0,0.4)]",
                 )}
               >
                 <div className="relative aspect-[16/10] w-full overflow-hidden bg-[color:color-mix(in_srgb,var(--color-text)_6%,var(--color-surface))]">
@@ -105,7 +123,11 @@ export function EventRoomChooser({
                     <img
                       src={addCacheBusting(room.thumbnail)}
                       alt=""
-                      className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+                      className={cn(
+                        "h-full w-full object-cover transition-transform duration-500",
+                        !isDisabled && "group-hover:scale-105",
+                        isDisabled && "grayscale",
+                      )}
                     />
                   ) : (
                     <div className="flex h-full w-full items-center justify-center">
@@ -118,12 +140,16 @@ export function EventRoomChooser({
                   <span
                     className={cn(
                       "absolute left-3 top-3 h-2.5 w-2.5 rounded-full ring-2 ring-white/70",
-                      accent.dot,
+                      isDisabled ? "bg-gray-400" : accent.dot,
                     )}
                     aria-hidden="true"
                   />
 
-                  {isActive ? (
+                  {isDisabled ? (
+                    <span className="absolute right-3 top-3 inline-flex items-center rounded-full bg-black/65 px-2.5 py-1 text-[11px] font-semibold text-white shadow-sm backdrop-blur-sm">
+                      No dates
+                    </span>
+                  ) : isActive ? (
                     <span className="absolute right-3 top-3 inline-flex items-center gap-1 rounded-full bg-[color:var(--color-primary)] px-2.5 py-1 text-[11px] font-semibold text-[color:var(--color-primary-foreground,white)] shadow-sm">
                       <Check className="h-3 w-3" strokeWidth={3} aria-hidden />
                       Selected
@@ -136,29 +162,35 @@ export function EventRoomChooser({
                     {room.name}
                   </h3>
 
-                  {room.highlights.length > 0 ? (
+                  {isDisabled ? (
+                    <p className="text-xs leading-relaxed text-[var(--color-text-dimmed)] sm:text-sm">
+                      Dates not available for this room yet.
+                    </p>
+                  ) : room.highlights.length > 0 ? (
                     <p className="line-clamp-2 text-xs leading-relaxed text-[var(--color-text-dimmed)] sm:text-sm">
                       {room.highlights.join(" • ")}
                     </p>
                   ) : null}
 
-                  <div className="mt-auto flex flex-wrap items-center gap-x-4 gap-y-1 pt-1 text-xs font-medium text-[var(--color-text-dimmed)] sm:text-sm">
-                    {room.fromPrice != null ? (
-                      <span className="text-[var(--color-text)]">
-                        From{" "}
-                        <span className="font-bold text-[color:var(--color-primary)]">
-                          {formatCompact(room.fromPrice)}
-                        </span>{" "}
-                        pp
-                      </span>
-                    ) : null}
-                    {room.packageCount > 0 ? (
-                      <span>
-                        {room.packageCount}{" "}
-                        {room.packageCount === 1 ? "package" : "packages"}
-                      </span>
-                    ) : null}
-                  </div>
+                  {!isDisabled ? (
+                    <div className="mt-auto flex flex-wrap items-center gap-x-4 gap-y-1 pt-1 text-xs font-medium text-[var(--color-text-dimmed)] sm:text-sm">
+                      {room.fromPrice != null ? (
+                        <span className="text-[var(--color-text)]">
+                          From{" "}
+                          <span className="font-bold text-[color:var(--color-primary)]">
+                            {formatCompact(room.fromPrice)}
+                          </span>{" "}
+                          pp
+                        </span>
+                      ) : null}
+                      {room.packageCount > 0 ? (
+                        <span>
+                          {room.packageCount}{" "}
+                          {room.packageCount === 1 ? "package" : "packages"}
+                        </span>
+                      ) : null}
+                    </div>
+                  ) : null}
                 </div>
               </button>
             );

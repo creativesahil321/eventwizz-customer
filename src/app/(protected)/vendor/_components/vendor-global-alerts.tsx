@@ -67,37 +67,58 @@ export function VendorGlobalAlerts() {
       {showGoCardlessBanner && gc ? (
         <GlobalInfoBanner
           emphasis
-          className="border-b-2 border-amber-400 bg-amber-100 text-amber-950"
+          className="border-b border-amber-300 bg-amber-100 text-amber-950"
           iconClassName="text-amber-700"
         >
           {!gc.connected ? (
-            <>
-              <span className="font-semibold">
-                Connect GoCardless so EventWizz can collect platform fees by
-                Direct Debit.
-              </span>{" "}
-              <Link
-                href="/vendor/payment-settings"
-                className="ml-1 inline-flex items-center rounded-md bg-amber-600 px-2.5 py-1 text-xs font-bold text-white shadow-sm transition hover:bg-amber-700 sm:ml-2 sm:text-sm"
-              >
-                Open Payment Settings
-              </Link>
-            </>
+            <BannerMessageWithCta
+              shortMessage="Connect GoCardless for platform fee Direct Debit."
+              message="Connect GoCardless so EventWizz can collect platform fees by Direct Debit."
+              href="/vendor/payment-settings"
+              shortCta="Settings"
+              cta="Open Payment Settings"
+            />
           ) : (
-            <>
-              <span className="font-semibold">
-                GoCardless is connected, but auto-debit is not allowed yet.
-              </span>{" "}
-              <Link
-                href="/vendor/payment-settings"
-                className="ml-1 inline-flex items-center rounded-md bg-amber-600 px-2.5 py-1 text-xs font-bold text-white shadow-sm transition hover:bg-amber-700 sm:ml-2 sm:text-sm"
-              >
-                Allow auto-debit in Payment Settings
-              </Link>
-            </>
+            <BannerMessageWithCta
+              shortMessage="GoCardless connected — allow auto-debit to continue."
+              message="GoCardless is connected, but auto-debit is not allowed yet."
+              href="/vendor/payment-settings"
+              shortCta="Allow"
+              cta="Allow auto-debit in Payment Settings"
+            />
           )}
         </GlobalInfoBanner>
       ) : null}
+    </div>
+  );
+}
+
+const bannerCtaClassName =
+  "inline-flex shrink-0 items-center justify-center rounded-md bg-amber-600 px-2.5 py-1 text-[11px] font-bold leading-none text-white shadow-sm transition hover:bg-amber-700 sm:px-2.5 sm:py-1 sm:text-xs";
+
+function BannerMessageWithCta({
+  shortMessage,
+  message,
+  href,
+  shortCta,
+  cta,
+}: {
+  shortMessage: string;
+  message: string;
+  href: string;
+  shortCta: string;
+  cta: string;
+}) {
+  return (
+    <div className="flex min-w-0 items-center gap-2 sm:gap-3">
+      <p className="min-w-0 flex-1 text-xs font-semibold leading-snug sm:text-sm">
+        <span className="sm:hidden">{shortMessage}</span>
+        <span className="hidden sm:inline">{message}</span>
+      </p>
+      <Link href={href} className={bannerCtaClassName}>
+        <span className="sm:hidden">{shortCta}</span>
+        <span className="hidden sm:inline">{cta}</span>
+      </Link>
     </div>
   );
 }
@@ -117,26 +138,20 @@ function GlobalInfoBanner({
     <div
       role="status"
       className={cn(
-        "flex w-full items-start gap-2.5 px-4 sm:items-center sm:justify-center sm:px-6",
-        emphasis ? "py-3.5 text-[15px] sm:text-base" : "py-2.5 text-sm",
+        "flex w-full items-center gap-2 px-3 sm:justify-center sm:gap-2.5 sm:px-6",
+        emphasis ? "py-2 text-xs sm:py-2.5 sm:text-sm" : "py-2 text-xs sm:py-2.5 sm:text-sm",
         className,
       )}
     >
       <Info
         className={cn(
-          "mt-0.5 shrink-0 sm:mt-0",
-          emphasis ? "h-5 w-5" : "h-4 w-4",
+          "size-3.5 shrink-0 sm:size-4",
           iconClassName ?? "text-sky-600",
         )}
         aria-hidden
-        strokeWidth={emphasis ? 2.5 : 2}
+        strokeWidth={emphasis ? 2.25 : 2}
       />
-      <div
-        className={cn(
-          "min-w-0 leading-snug sm:text-center",
-          emphasis && "font-medium",
-        )}
-      >
+      <div className="min-w-0 flex-1 sm:flex-none sm:max-w-4xl">
         {children}
       </div>
     </div>

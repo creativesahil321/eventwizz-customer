@@ -93,7 +93,7 @@ export const stepOneSchema = z
     step: z.literal(1),
     vendor_location_id: z.number().optional(),
     event_id: z.number().optional(), // Added event_id to support editing existing events
-    event_category_id: z.number().min(1, "Event Category is required"),
+    event_category_id: z.number().min(1, "Event category is required"),
     event_name: z
       .string()
       .min(1, "Event name is required")
@@ -112,16 +112,16 @@ export const stepOneSchema = z
       ),
     event_banner_sub_heading: z
       .string()
-      .min(1, "Banner sub heading is required")
-      .max(80, "Banner sub heading must not exceed 80 characters"),
+      .min(1, "Banner subheading is required")
+      .max(80, "Banner subheading must not exceed 80 characters"),
     about_event_heading: z
       .string()
       .min(1, "About event heading is required")
       .max(50, "About event heading must not exceed 50 characters"),
     about_event_sub_heading: z
       .string()
-      .min(1, "About event sub heading is required")
-      .max(80, "About event sub heading must not exceed 80 characters"),
+      .min(1, "About event subtitle is required")
+      .max(80, "About event subtitle must not exceed 80 characters"),
     about_event_description: z
       .string()
       .min(1, "About event description is required"),
@@ -234,8 +234,8 @@ export const stepTwoSchema = z
 
     event_schedular_title: z
       .string()
-      .min(1, "Event schedular title is required")
-      .max(40, "Event schedular title must not exceed 40 characters"),
+      .min(1, "Event schedule title is required")
+      .max(40, "Event schedule title must not exceed 40 characters"),
     event_schedule_subtitle: z
       .string()
       .max(160, "Custom copy must not exceed 160 characters"),
@@ -868,25 +868,27 @@ export const stepFourSchema = z
       if (!data.menu_title || data.menu_title.trim() === "")
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
-          message: "Menu title is required when catering option is Yes",
+          message: "Menu title is required when food choices are enabled",
           path: ["menu_title"],
         });
       if (!data.menu_description || data.menu_description.trim() === "")
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
-          message: "Menu description is required when catering option is Yes",
+          message:
+            "Menu description is required when food choices are enabled",
           path: ["menu_description"],
         });
       if (!data.event_menu_category_id || data.event_menu_category_id < 1)
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
-          message: "Menu category is required when catering option is Yes",
+          message: "Menu category is required when food choices are enabled",
           path: ["event_menu_category_id"],
         });
       if (!data.menus || data.menus.length === 0)
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
-          message: "At least one menu is required when catering option is Yes",
+          message:
+            "At least one menu is required when food choices are enabled",
           path: ["menus"],
         });
     }
@@ -1062,14 +1064,14 @@ export const stepSixSchema = z.object({
   rooms: z.array(stepSixRoomEntrySchema).optional(),
   drink_title: z
     .string()
-    .min(1, "The drink title field is required")
+    .min(1, "Package section title is required")
     .max(
       DRINK_SECTION_TITLE_MAX_CHARS,
       `Drink title must not exceed ${DRINK_SECTION_TITLE_MAX_CHARS} characters`,
     ),
   drink_description: z
     .string()
-    .min(1, "The drink description field is required")
+    .min(1, "Package section description is required")
     .max(
       DRINK_SECTION_DESCRIPTION_MAX_CHARS,
       `Drink description must not exceed ${DRINK_SECTION_DESCRIPTION_MAX_CHARS} characters`,

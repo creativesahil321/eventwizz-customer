@@ -58,8 +58,11 @@ export default function CreateEventClientWrapper() {
     );
   }
 
+  // Cancel PageWrapper padding (px-3 pt-4 pb-32 / sm:pt-5 / md:pb-6) so the
+  // dark canvas fills the screen — otherwise mobile shows a large white gap
+  // under the chooser (pb-32 is reserved for floating chat widgets).
   const fullBleedClass =
-    "-m-2 sm:-m-4 md:-m-6 lg:-m-8 min-h-[calc(100vh-4.5rem)] min-h-[calc(100dvh-4.5rem)] bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 overflow-y-auto";
+    "-mx-3 -mt-4 -mb-32 sm:-mt-5 md:-mb-6 min-h-[calc(100dvh-3.5rem)] bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 overflow-y-auto";
 
   if (mode === "ai") {
     return (
@@ -73,7 +76,9 @@ export default function CreateEventClientWrapper() {
   }
 
   return (
-    <div className={`${fullBleedClass} flex items-center justify-center`}>
+    <div
+      className={`${fullBleedClass} flex items-start justify-center sm:items-center`}
+    >
       <ModeSelection onSelect={setMode} />
     </div>
   );
@@ -96,8 +101,8 @@ function ModeSelection({ onSelect }: { onSelect: (mode: CreateMode) => void }) {
           </p>
         </motion.div>
 
-        {/* Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
+        {/* Cards — extra bottom space so FABs don't cover CTAs on mobile */}
+        <div className="mb-8 grid grid-cols-1 gap-3 sm:mb-0 sm:gap-4 md:grid-cols-2">
           {/* AI Card */}
           <motion.button
             initial={{ opacity: 0, y: 20 }}

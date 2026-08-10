@@ -104,7 +104,7 @@ export default function FaqsTab() {
 
     if (hasEmptyFields) {
       toast.error(
-        "Please fill in all existing FAQ fields before adding a new one",
+        "Please complete all existing FAQ fields before adding another",
       );
       return;
     }
@@ -249,7 +249,7 @@ export default function FaqsTab() {
                           <FormControl>
                             <Textarea
                               {...field}
-                              placeholder="e.g. Yes, we have multi-thermostatic heaters throughout all of our marquee venues."
+                              placeholder="e.g. Yes, the venue is heated throughout."
                               className="min-h-[100px] bg-[#F9FAFB] border-[#E5E7EB]"
                               onFocus={() =>
                                 handleFieldFocus(`faqs.${index}.answer`)
@@ -271,7 +271,7 @@ export default function FaqsTab() {
                   disabled={readOnly || faqFields.length >= STEP_NINE_MAX_FAQS}
                   className="bg-[#F9FAFB] hover:bg-gray-100 text-gray-700 border border-[#E5E7EB]"
                 >
-                  <span className="mr-1">+</span> Add Another FAQ
+                  <span className="mr-1">+</span> Add another FAQ
                 </Button>
               </div>
             </div>
@@ -280,10 +280,10 @@ export default function FaqsTab() {
           {/* Pro Tip Section */}
           <div className="p-4 bg-blue-50 rounded-md text-blue-800 text-sm">
             <p>
-              <strong>Pro Tip:</strong> Including FAQs can significantly reduce
-              inquiries and improve customer conversion. Consider adding
-              questions about payment policies, cancellations, dress codes, and
-              any unique aspects of your event.
+              <strong>Tip:</strong> Including FAQs can reduce enquiries and help
+              customers book with confidence. Consider adding questions about
+              payment policies, cancellations, dress codes, and anything unique
+              about your event.
             </p>
           </div>
 

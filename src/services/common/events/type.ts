@@ -162,7 +162,8 @@ export type EventsResponse = BaseApiResponse<EventsResponseData>;
  * Per-room payload on the public event detail API when `is_rooms` is enabled.
  */
 export interface EventDetailRoom {
-  room_id: number;
+  /** May be omitted on empty room shells (`{}`) returned when a named room has no content yet. */
+  room_id?: number;
   event_schedular_title: string;
   event_schedular_background_image: string | null;
   event_schedular: Array<{

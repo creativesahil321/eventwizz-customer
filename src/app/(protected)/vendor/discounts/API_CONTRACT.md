@@ -55,7 +55,8 @@
  * }
  * ```
  *
- * ### Coupon — all active customers
+ * ### Coupon — everyone (customers + guests)
+ * UI label: "Everyone". API value remains `all_active`.
  * ```json
  * {
  *   "category": "coupon_code",
@@ -88,6 +89,14 @@
  *   "status": "active"
  * }
  * ```
+ *
+ * ## Update (wired)
+ *
+ * `POST /api/v1/vendor/discounts/update/{id}`
+ *
+ * Uses the same payload contract as Create. Location comes from the
+ * `x-venue-location-id` header. Send `date_id` and optional `room_id` for a
+ * discount; send coupon audience fields for a coupon.
  *
  * Types: `_lib/types.ts` · Mapper: `_lib/build-store-payload.ts` · Service: `discounts.service.ts`
  */

@@ -330,10 +330,17 @@ function SiteEssentialsFormInner() {
         openOnLocation,
         initialLocationIndex:
           initialLocationIndex >= 0 ? initialLocationIndex : 0,
-        // View-only when the editor has no unsaved changes
+        // View-only when the editor has no unsaved changes.
+        // Use a fresh isDirty read so Preview never opens in save mode by accident
+        // after a pristine load (RHF can briefly report stale dirty during sync).
         requiresSave: Boolean(form.formState.isDirty),
       });
       setPreviewData(completeFormValues);
+
+      // If the form is pristine, ensure we never restore-as-dirty on return
+      if (!form.formState.isDirty) {
+        useSitePreviewStore.getState().setPreviewRequiresSave(false);
+      }
 
       // Add a small delay to show loading state
       setTimeout(() => {
@@ -498,13 +505,13 @@ function SiteEssentialsFormInner() {
           onValueChange={setActiveTab}
           className="w-full gap-0"
         >
-          <Card className="shadow-sm overflow-hidden p-0 gap-0 py-0">
-            <div className="border-b bg-card px-2 sm:px-3 md:px-4 pt-3 pb-3">
-              <div className="w-full overflow-x-auto no-scrollbar">
-                <TabsList className="flex w-max min-w-full bg-muted/60 p-1 h-auto rounded-lg gap-1">
+          <Card className="min-w-0 gap-0 overflow-hidden p-0 py-0 shadow-sm">
+            <div className="border-b bg-card px-2 pb-3 pt-3 sm:px-3 md:px-4">
+              <div className="w-full min-w-0 overflow-x-auto no-scrollbar">
+                <TabsList className="flex h-auto w-max min-w-full gap-1 rounded-lg bg-muted/60 p-1">
                   <TabsTrigger
                     value="branding"
-                    className="px-3 sm:px-4 py-1 h-8 text-xs font-medium whitespace-nowrap relative rounded-md data-[state=active]:bg-[var(--color-primary)] data-[state=active]:text-white data-[state=active]:shadow-sm mx-0.5"
+                    className="relative mx-0.5 h-8 shrink-0 whitespace-nowrap rounded-md px-3 py-1 text-xs font-medium data-[state=active]:bg-[var(--color-primary)] data-[state=active]:text-white data-[state=active]:shadow-sm sm:px-4"
                   >
                     Branding
                     {tabsWithErrors.branding && (
@@ -516,7 +523,7 @@ function SiteEssentialsFormInner() {
                   {colorsUnlocked && (
                     <TabsTrigger
                       value="colors"
-                      className="px-3 sm:px-4 py-1 h-8 text-xs font-medium whitespace-nowrap relative rounded-md data-[state=active]:bg-[var(--color-primary)] data-[state=active]:text-white data-[state=active]:shadow-sm mx-0.5"
+                      className="relative mx-0.5 h-8 shrink-0 whitespace-nowrap rounded-md px-3 py-1 text-xs font-medium data-[state=active]:bg-[var(--color-primary)] data-[state=active]:text-white data-[state=active]:shadow-sm sm:px-4"
                     >
                       Colors
                       {tabsWithErrors.colors && (
@@ -528,7 +535,7 @@ function SiteEssentialsFormInner() {
                   )}
                   <TabsTrigger
                     value="typography"
-                    className="px-3 sm:px-4 py-1 h-8 text-xs font-medium whitespace-nowrap relative rounded-md data-[state=active]:bg-[var(--color-primary)] data-[state=active]:text-white data-[state=active]:shadow-sm mx-0.5"
+                    className="relative mx-0.5 h-8 shrink-0 whitespace-nowrap rounded-md px-3 py-1 text-xs font-medium data-[state=active]:bg-[var(--color-primary)] data-[state=active]:text-white data-[state=active]:shadow-sm sm:px-4"
                   >
                     Typography
                     {tabsWithErrors.typography && (
@@ -539,7 +546,7 @@ function SiteEssentialsFormInner() {
                   </TabsTrigger>
                   <TabsTrigger
                     value="social-media"
-                    className="px-3 sm:px-4 py-1 h-8 text-xs font-medium whitespace-nowrap relative rounded-md data-[state=active]:bg-[var(--color-primary)] data-[state=active]:text-white data-[state=active]:shadow-sm mx-0.5"
+                    className="relative mx-0.5 h-8 shrink-0 whitespace-nowrap rounded-md px-3 py-1 text-xs font-medium data-[state=active]:bg-[var(--color-primary)] data-[state=active]:text-white data-[state=active]:shadow-sm sm:px-4"
                   >
                     Social Media
                     {tabsWithErrors.socialMedia && (
@@ -550,7 +557,7 @@ function SiteEssentialsFormInner() {
                   </TabsTrigger>
                   <TabsTrigger
                     value="seo"
-                    className="px-3 sm:px-4 py-1 h-8 text-xs font-medium whitespace-nowrap relative rounded-md data-[state=active]:bg-[var(--color-primary)] data-[state=active]:text-white data-[state=active]:shadow-sm mx-0.5"
+                    className="relative mx-0.5 h-8 shrink-0 whitespace-nowrap rounded-md px-3 py-1 text-xs font-medium data-[state=active]:bg-[var(--color-primary)] data-[state=active]:text-white data-[state=active]:shadow-sm sm:px-4"
                   >
                     SEO
                     {tabsWithErrors.seo && (
@@ -563,80 +570,70 @@ function SiteEssentialsFormInner() {
               </div>
             </div>
 
-            <div className="space-y-6 p-6 pb-6">
-              <TabsContent value="branding" className="mt-0 w-full">
+            <div className="min-w-0 space-y-4 p-3 pb-4 sm:space-y-6 sm:p-6 sm:pb-6">
+              <TabsContent value="branding" className="mt-0 w-full min-w-0">
                 {tabsWithErrors.branding && (
                   <Badge variant="destructive" className="mb-3">
                     Required fields missing
                   </Badge>
                 )}
-                <div className="bg-white rounded-lg p-3 sm:p-6">
-                  <BrandingTab
-                    hasMultipleLocations={hasMultipleLocations}
-                    serverCoverImage={
-                      typeof siteEssentials?.cover_image === "string"
-                        ? siteEssentials.cover_image
-                        : undefined
-                    }
-                    serverCoverVideo={
-                      typeof siteEssentials?.cover_video === "string"
-                        ? siteEssentials.cover_video
-                        : undefined
-                    }
-                    serverMainLandingCoverImage={
-                      typeof siteEssentials?.main_landing_cover_image ===
-                      "string"
-                        ? siteEssentials.main_landing_cover_image
-                        : undefined
-                    }
-                  />
-                </div>
+                <BrandingTab
+                  hasMultipleLocations={hasMultipleLocations}
+                  serverCoverImage={
+                    typeof siteEssentials?.cover_image === "string"
+                      ? siteEssentials.cover_image
+                      : undefined
+                  }
+                  serverCoverVideo={
+                    typeof siteEssentials?.cover_video === "string"
+                      ? siteEssentials.cover_video
+                      : undefined
+                  }
+                  serverMainLandingCoverImage={
+                    typeof siteEssentials?.main_landing_cover_image ===
+                    "string"
+                      ? siteEssentials.main_landing_cover_image
+                      : undefined
+                  }
+                />
               </TabsContent>
 
               {colorsUnlocked && (
-                <TabsContent value="colors" className="mt-0 w-full">
+                <TabsContent value="colors" className="mt-0 w-full min-w-0">
                   {tabsWithErrors.colors && (
                     <Badge variant="destructive" className="mb-3">
                       Required fields missing
                     </Badge>
                   )}
-                  <div className="bg-white rounded-lg p-3 sm:p-6">
-                    <ColorsTab />
-                  </div>
+                  <ColorsTab />
                 </TabsContent>
               )}
 
-              <TabsContent value="typography" className="mt-0 w-full">
+              <TabsContent value="typography" className="mt-0 w-full min-w-0">
                 {tabsWithErrors.typography && (
                   <Badge variant="destructive" className="mb-3">
                     Required fields missing
                   </Badge>
                 )}
-                <div className="bg-white rounded-lg p-3 sm:p-6">
-                  <TypographyTab />
-                </div>
+                <TypographyTab />
               </TabsContent>
 
-              <TabsContent value="social-media" className="mt-0 w-full">
+              <TabsContent value="social-media" className="mt-0 w-full min-w-0">
                 {tabsWithErrors.socialMedia && (
                   <Badge variant="destructive" className="mb-3">
                     Required fields missing
                   </Badge>
                 )}
-                <div className="bg-white rounded-lg p-3 sm:p-6">
-                  <SocialMediaTab />
-                </div>
+                <SocialMediaTab />
               </TabsContent>
 
-              <TabsContent value="seo" className="mt-0 w-full">
+              <TabsContent value="seo" className="mt-0 w-full min-w-0">
                 {tabsWithErrors.seo && (
                   <Badge variant="destructive" className="mb-3">
                     Required fields missing
                   </Badge>
                 )}
-                <div className="bg-white rounded-lg p-3 sm:p-6">
-                  <SeoTab />
-                </div>
+                <SeoTab />
               </TabsContent>
             </div>
 

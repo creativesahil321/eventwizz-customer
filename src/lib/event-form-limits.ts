@@ -18,9 +18,9 @@ export const PACKAGE_BUTTON_NAME_MAX_CHARS = 18;
 /** One bullet line in package details. */
 export const PACKAGE_DETAIL_LINE_MAX_CHARS = 40;
 
-/** Menu item title label/placeholder (1-based): "Item Title 1", "Item Title 2", … */
+/** Menu item title label/placeholder (1-based): "Item title 1", "Item title 2", … */
 export function menuItemTitleLabel(itemIndex: number): string {
-  return `Item Title ${itemIndex + 1}`;
+  return `Item title ${itemIndex + 1}`;
 }
 
 export function menuItemTitlePlaceholder(itemIndex: number): string {

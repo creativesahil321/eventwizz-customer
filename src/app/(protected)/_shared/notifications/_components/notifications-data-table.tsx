@@ -109,7 +109,8 @@ export function NotificationsDataTable({
     <section className="relative w-full min-w-0 space-y-4 text-black sm:space-y-6">
       <ProtectedPageHeader
         title="Notifications"
-        description="View alerts and account activity"
+        description="Alerts and activity for your account."
+        locationScope="all-locations"
         actions={
           unreadCount > 0 ? (
             <Button

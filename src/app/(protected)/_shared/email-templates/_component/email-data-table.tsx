@@ -171,6 +171,8 @@ export default function EmailTemplatesTable({
     <section className="w-full relative min-w-0">
       <ProtectedPageHeader
         title="Email Templates"
+        description="Manage reusable email templates for your account."
+        locationScope="all-locations"
         className="mb-4 min-w-0"
       />
       <div className="max-w-full overflow-x-auto rounded-lg">

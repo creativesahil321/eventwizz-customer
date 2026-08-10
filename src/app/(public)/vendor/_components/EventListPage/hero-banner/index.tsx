@@ -19,6 +19,8 @@ import {
   type BannerHeadingAlign,
   type BannerHeadingValign,
 } from "@/lib/banner-heading-align";
+import { addCacheBusting } from "@/lib/image-utils";
+import { useTheme } from "@/providers/theme-provider/ThemeContext";
 // Default fallback media
 // const FALLBACK_VIDEO_URL =
 //   "https://www.bestpartiesever.com/wp-content/uploads/2025/03/Website-video-combined-edit-online-video-cutter.com-1.mp4";
@@ -67,6 +69,8 @@ export default function HeroBanner({
 }: HeroBannerProps) {
   const { theme } = useContext(ServerContext) || { theme: null };
   const vendorTheme = theme as ThemeSchema | null;
+  // Same storage path is often reused after save — bust browser cache like logo/favicon.
+  const { mediaVersion } = useTheme();
 
   // Get banner content from theme or use defaults - with API data taking priority
   const bannerHeading =
@@ -118,7 +122,8 @@ export default function HeroBanner({
       !imageExplicitlyCleared);
 
   const finalVideoUrl = apiVideoUrl || themeVideoUrl || FALLBACK_VIDEO_URL;
-  const finalImageUrl = apiImageUrl || themeImageUrl || DEFAULT_IMAGE_URL;
+  const rawImageUrl = apiImageUrl || themeImageUrl || DEFAULT_IMAGE_URL;
+  const finalImageUrl = addCacheBusting(rawImageUrl, mediaVersion);
 
   const textAlign = normalizeBannerHeadingAlign(
     bannerHeadingAlignProp !== undefined && bannerHeadingAlignProp !== null
@@ -171,6 +176,7 @@ export default function HeroBanner({
         <div className="absolute inset-0 overflow-hidden">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
+            key={finalImageUrl}
             src={finalImageUrl}
             alt=""
             className="absolute inset-0 h-full w-full scale-105 object-cover"

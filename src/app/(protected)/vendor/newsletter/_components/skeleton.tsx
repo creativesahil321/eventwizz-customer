@@ -1,41 +1,37 @@
 import { Skeleton } from "@/components/ui/skeleton";
+import { pageCardClassName } from "@/app/(protected)/_components/page-header-card";
 
 export function NewsletterFormSkeleton() {
   return (
-    <section className="w-full bg-background p-6 rounded-md relative">
-      <header className="w-full mb-6">
-        <Skeleton className="h-8 w-40" />
-      </header>
-      <main className="w-full relative">
-        <form className="space-y-8 space-x-8 flex flex-col md:flex-row items-center">
-          <div className="grid gap-2 w-full lg:min-w-64">
-            <Skeleton className="h-4 w-24" />
-            <Skeleton className="h-12 w-full rounded-md" />
+    <div className="flex w-full min-w-0 flex-col gap-4">
+      <div className={pageCardClassName("min-w-0")}>
+        <div className="flex min-w-0 flex-col gap-3">
+          <Skeleton className="h-7 w-40" />
+          <Skeleton className="h-4 w-full max-w-xl" />
+        </div>
+      </div>
+
+      <div className={pageCardClassName("min-w-0")}>
+        <div className="flex flex-col gap-4 md:flex-row md:items-end md:gap-4">
+          <div className="grid w-full gap-2 lg:min-w-64">
+            <Skeleton className="h-4 w-16" />
+            <Skeleton className="h-10 w-full" />
           </div>
-          <div className="grid gap-2 w-full lg:min-w-64">
-            <Skeleton className="h-4 w-28" />
-            <Skeleton className="h-12 w-full rounded-md" />
-          </div>
-          <div className="grid gap-2 w-full lg:min-w-64">
+          <div className="grid w-full gap-2 lg:min-w-64">
             <Skeleton className="h-4 w-20" />
-            <Skeleton className="h-12 w-full rounded-md" />
+            <Skeleton className="h-10 w-full" />
           </div>
-          <div className="grid gap-2 w-full lg:min-w-64">
-            <Skeleton className="h-4 w-40" />
-            <div className="flex space-x-4">
-              <div className="flex items-center space-x-2">
-                <Skeleton className="h-6 w-6 rounded-full" />
-                <Skeleton className="h-4 w-12" />
-              </div>
-              <div className="flex items-center space-x-2">
-                <Skeleton className="h-6 w-6 rounded-full" />
-                <Skeleton className="h-4 w-12" />
-              </div>
-            </div>
+          <div className="grid w-full gap-2 lg:min-w-64">
+            <Skeleton className="h-4 w-14" />
+            <Skeleton className="h-10 w-full" />
           </div>
-          <Skeleton className="h-9 w-24 rounded-lg" />
-        </form>
-      </main>
-    </section>
+          <div className="grid w-full gap-2 lg:min-w-48">
+            <Skeleton className="h-4 w-32" />
+            <Skeleton className="h-10 w-full" />
+          </div>
+          <Skeleton className="h-10 w-24 shrink-0 rounded-md" />
+        </div>
+      </div>
+    </div>
   );
 }

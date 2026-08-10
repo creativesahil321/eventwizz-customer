@@ -19,7 +19,8 @@ import type {
 type EventListFiltersProps = {
   dateRange: DateRange | undefined;
   onDateRangeChange: (range: DateRange | undefined) => void;
-  availableDates: string[];
+  /** YYYY-MM-DD values; `undefined` while filter meta is still loading */
+  availableDates: string[] | undefined;
   categoryFilter: string;
   onCategoryFilterChange: (value: string) => void;
   availableCategories: EventsListCategoryOption[];

@@ -299,7 +299,7 @@ export default function EventNameTab() {
         // Success toast will be shown by axios interceptor when form is saved
       } catch (error) {
         console.error("Error handling banner video:", error);
-        toast.error("Failed to process video", {
+        toast.error("Could not process the video", {
           description:
             "Please ensure the video is in MP4 format with H.264 codec.",
         });
@@ -366,7 +366,7 @@ export default function EventNameTab() {
               "message" in errors.event_banner_image
                 ? String(errors.event_banner_image.message)
                 : "Please upload either a banner image or video for your event.";
-            toast.error("Banner required", {
+            toast.error("Banner image or video required", {
               description: errorMessage,
               duration: 5000,
             });
@@ -654,7 +654,7 @@ export default function EventNameTab() {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel className="text-sm font-medium">
-                      Banner Subheading <span className="text-red-500">*</span>
+                      Banner subheading <span className="text-red-500">*</span>
                     </FormLabel>
                     <FormControl>
                       <Input
@@ -885,7 +885,7 @@ export default function EventNameTab() {
                   render={({ field }) => (
                     <FormItem className="w-full">
                       <FormLabel className="text-sm font-medium">
-                        Event Name <span className="text-red-500">*</span>
+                        Event name <span className="text-red-500">*</span>
                       </FormLabel>
                       <FormControl>
                         <Input
@@ -914,7 +914,7 @@ export default function EventNameTab() {
                   render={({ field }) => (
                     <FormItem className="w-full">
                       <FormLabel className="text-sm font-medium">
-                        Event Category <span className="text-red-500">*</span>
+                        Event category <span className="text-red-500">*</span>
                       </FormLabel>
                       <Select
                         onValueChange={(value) => {
@@ -957,7 +957,7 @@ export default function EventNameTab() {
             <div className="space-y-6">
               <div className="flex items-center gap-3 title-header">
                 <h2 className="text-xl font-bold">
-                  Tell Guests What It&apos;s About
+                  Tell guests what it&apos;s about
                 </h2>
               </div>
 
@@ -973,7 +973,7 @@ export default function EventNameTab() {
                       <FormControl>
                         <Input
                           {...field}
-                          placeholder="Enter about event heading"
+                          placeholder="Enter a short title for the about section"
                           className="h-11 bg-[#F9FAFB] border-[#E5E7EB]"
                           onFocus={() =>
                             handleFieldFocus("about_event_heading")
@@ -999,12 +999,12 @@ export default function EventNameTab() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel className="text-sm font-medium">
-                        Sub Title
+                        Subtitle
                       </FormLabel>
                       <FormControl>
                         <Input
                           {...field}
-                          placeholder="Enter about event sub-heading"
+                          placeholder="Enter a short subtitle for the about section"
                           className="h-11 bg-[#F9FAFB] border-[#E5E7EB]"
                           onFocus={() =>
                             handleFieldFocus("about_event_sub_heading")
@@ -1043,7 +1043,7 @@ export default function EventNameTab() {
                             value,
                           );
                         }}
-                        placeholder="Write a compelling description..."
+                        placeholder="Write a clear description of the event…"
                         className="bg-gray-100 p-2 rounded-md"
                         maxLength={340}
                         maxWords={50}

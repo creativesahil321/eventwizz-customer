@@ -38,6 +38,13 @@ import { addCacheBusting } from "@/lib/image-utils";
 import { useCurrencySymbol } from "@/hooks/use-currency-format";
 import { cn } from "@/lib/utils";
 import { SiteHeading } from "@/components/public/site-heading";
+import {
+  attachDemoDateOffers,
+  type DateCardOffer,
+} from "@/components/public/date-card-offer";
+import { DateCardPriceFooter } from "@/components/public/date-card-price-footer";
+import { savePendingBooking } from "@/lib/booking/pending-booking";
+import { saveAuthCallbackUrl } from "@/lib/auth/safe-callback-url";
 
 // Define proper user interface for session
 interface SessionUser {
@@ -52,6 +59,8 @@ export type DatesSectionType = {
   event_date: string;
   price: number;
   sold_out?: boolean;
+  /** Public date-card offer (API or temporary demo). */
+  offer?: DateCardOffer | null;
 }[];
 
 type DatesSectionProps = {
@@ -176,18 +185,56 @@ function DateCardFooterContent({
   visual,
   dateInfo,
   currencySymbol,
+  listPrice,
+  offer,
+  compact,
 }: {
   visual: DateCardVisualState;
   dateInfo: DateInfo;
   currencySymbol: string;
+  listPrice: number;
+  offer?: DateCardOffer | null;
+  compact?: boolean;
 }) {
-  if (visual.isSoldOut) return <>SOLD OUT</>;
-  if (visual.isSelecting) return <DateCardSelectingIndicator />;
-  if (visual.isInCart) return <>VIEW CART</>;
-  if (dateInfo.isPlaceholder && dateInfo.price === "—") {
-    return <>Set date</>;
+  if (visual.isSoldOut) {
+    return (
+      <DateCardPriceFooter
+        currencySymbol={currencySymbol}
+        listPrice={listPrice}
+        fallbackLabel="SOLD OUT"
+        compact={compact}
+      />
+    );
   }
-  return <>{`${currencySymbol}${dateInfo.price}`}</>;
+  if (visual.isSelecting) return <DateCardSelectingIndicator />;
+  if (visual.isInCart) {
+    return (
+      <DateCardPriceFooter
+        currencySymbol={currencySymbol}
+        listPrice={listPrice}
+        fallbackLabel="VIEW CART"
+        compact={compact}
+      />
+    );
+  }
+  if (dateInfo.isPlaceholder && dateInfo.price === "—") {
+    return (
+      <DateCardPriceFooter
+        currencySymbol={currencySymbol}
+        listPrice={listPrice}
+        fallbackLabel="Set date"
+        compact={compact}
+      />
+    );
+  }
+  return (
+    <DateCardPriceFooter
+      currencySymbol={currencySymbol}
+      listPrice={listPrice}
+      offer={offer}
+      compact={compact}
+    />
+  );
 }
 
 type DateRowsScrollerProps = {
@@ -480,20 +527,29 @@ export default function DatesSection({
       return;
     }
 
-    // Check if user is authenticated first
-    if (status !== "authenticated" || !session?.user) {
-      // User is not logged in, redirect to login with simple callback URL
-      const checkoutUrl = `/vendor/checkout`;
-      router.push(`/auth/login?callbackUrl=${encodeURIComponent(checkoutUrl)}`);
-      return;
-    }
-
     const actualEventSlug = eventSlug || CHECKOUT_CONSTANTS.DEFAULT_EVENT_SLUG;
     const eventDate = dateItem.event_date;
     const actualEventName = eventName || "Festive & Fabulous";
     const actualEventImage =
       eventImage ||
       "http://192.168.1.100:8000/storage/uploads/vendor/events/event_banner_image68bab4bb983bd.jpg";
+
+    // Guest: stash booking intent, then return to checkout after login
+    if (status !== "authenticated" || !session?.user) {
+      savePendingBooking({
+        event_slug: actualEventSlug,
+        event_name: actualEventName,
+        event_image: actualEventImage,
+        event_date: eventDate,
+        ...(roomId != null && roomId > 0 ? { room_id: roomId } : {}),
+      });
+      saveAuthCallbackUrl("/vendor/checkout");
+      clearDateSelection();
+      router.push(
+        `/auth/login?callbackUrl=${encodeURIComponent("/vendor/checkout")}`,
+      );
+      return;
+    }
 
     const eventPayload = {
       event_slug: actualEventSlug,
@@ -577,9 +633,18 @@ export default function DatesSection({
         router.push("/unauthorized");
       }
     } else {
-      // User is not logged in, redirect to login with simple callback URL
-      const checkoutUrl = `/vendor/checkout`;
-      router.push(`/auth/login?callbackUrl=${encodeURIComponent(checkoutUrl)}`);
+      savePendingBooking({
+        event_slug: eventData.event_slug,
+        event_name: eventData.event_name,
+        event_image: eventData.event_image,
+        event_date: eventData.event_date,
+        ...(roomId != null && roomId > 0 ? { room_id: roomId } : {}),
+      });
+      saveAuthCallbackUrl("/vendor/checkout");
+      clearDateSelection();
+      router.push(
+        `/auth/login?callbackUrl=${encodeURIComponent("/vendor/checkout")}`,
+      );
     }
   };
 
@@ -662,6 +727,17 @@ export default function DatesSection({
             visual={visual}
             dateInfo={dateInfo}
             currencySymbol={currencySymbol}
+            listPrice={
+              typeof dateItem.price === "number" && !isNaN(dateItem.price)
+                ? dateItem.price
+                : 0
+            }
+            offer={
+              !visual.isSoldOut && !visual.isInCart && !visual.isSelecting
+                ? dateItem.offer
+                : null
+            }
+            compact={narrowPreview}
           />
         </div>
       </div>
@@ -731,6 +807,17 @@ export default function DatesSection({
             visual={visual}
             dateInfo={dateInfo}
             currencySymbol={currencySymbol}
+            listPrice={
+              typeof dateItem.price === "number" && !isNaN(dateItem.price)
+                ? dateItem.price
+                : 0
+            }
+            offer={
+              !visual.isSoldOut && !visual.isInCart && !visual.isSelecting
+                ? dateItem.offer
+                : null
+            }
+            compact={narrowPreview}
           />
         </div>
       </motion.div>
@@ -761,7 +848,10 @@ export default function DatesSection({
     );
   }
 
-  const displayDates = dates;
+  // Temporary demo badges on the customer site until event API returns offers.
+  const displayDates = isOnboarding
+    ? dates
+    : attachDemoDateOffers(dates);
 
   const firstRowCount = Math.min(itemsPerRow, displayDates.length);
   const secondRowCount = Math.min(

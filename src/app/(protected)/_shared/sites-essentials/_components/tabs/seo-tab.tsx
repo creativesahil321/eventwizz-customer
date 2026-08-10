@@ -21,14 +21,14 @@ export function SeoTab() {
   const form = useFormContext<SiteEssentialsFormValues>();
 
   return (
-    <div className="space-y-4 sm:space-y-6">
+    <div className="min-w-0 space-y-4 sm:space-y-6">
       <SectionTitle
         title="SEO Settings"
         description="Configure your site's search engine optimization settings"
       />
       <Separator className="my-3 sm:my-4" />
 
-      <div className="space-y-4 sm:space-y-6">
+      <div className="min-w-0 space-y-4 sm:space-y-6">
         <FormField
           control={form.control}
           name="seo.title"

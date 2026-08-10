@@ -37,13 +37,17 @@ import {
 import { useSession } from "next-auth/react";
 import { useVendorLocationsList } from "@/app/(protected)/vendor/venue-locations/_lib/queries";
 import { resolveDefaultVenueLocation } from "@/lib/auth/session-location";
+import { useHasMultipleLocations } from "../_lib/use-has-multiple-locations";
 
 interface ImportWebsiteModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
 
-type ToggleKey = Exclude<keyof ImportSelection, "coverUrl">;
+type ToggleKey = Exclude<
+  keyof ImportSelection,
+  "coverUrl" | "mainLandingCoverUrl"
+>;
 
 function proxiedImageUrl(url: string): string {
   return `/api/ai/import-website/image?url=${encodeURIComponent(url)}`;
@@ -55,6 +59,7 @@ export function ImportWebsiteModal({
 }: ImportWebsiteModalProps) {
   const form = useFormContext<SiteEssentialsFormValues>();
   const { data: session } = useSession();
+  const hasMultipleLocations = useHasMultipleLocations();
   const { locations: venueLocations } = useVendorLocationsList();
   const activeVenueSlug = resolveDefaultVenueLocation(
     venueLocations,
@@ -72,6 +77,8 @@ export function ImportWebsiteModal({
     useState<WebsiteImportClientError | null>(null);
   const [applying, setApplying] = useState(false);
   const [selectedCover, setSelectedCover] = useState<string>("");
+  const [selectedMainLandingCover, setSelectedMainLandingCover] =
+    useState<string>("");
   const [selection, setSelection] = useState<Record<ToggleKey, boolean>>({
     content: true,
     seo: true,
@@ -79,6 +86,7 @@ export function ImportWebsiteModal({
     typography: true,
     logo: true,
     cover: true,
+    mainLandingCover: true,
     favicon: true,
   });
   // Colors reuse the dedicated contrast-safe AI theme generator.
@@ -89,6 +97,7 @@ export function ImportWebsiteModal({
     setResult(null);
     setAnalyzeError(null);
     setSelectedCover("");
+    setSelectedMainLandingCover("");
     setSelection({
       content: true,
       seo: true,
@@ -96,6 +105,7 @@ export function ImportWebsiteModal({
       typography: true,
       logo: true,
       cover: true,
+      mainLandingCover: true,
       favicon: true,
     });
     setImportColors(true);
@@ -123,12 +133,18 @@ export function ImportWebsiteModal({
     }
     if (!data) return;
 
+    const defaultCover = data.images.cover ?? data.images.gallery[0] ?? "";
+    const hasCoverImages = Boolean(
+      data.images.cover || data.images.gallery.length,
+    );
     setResult(data);
-    setSelectedCover(data.images.cover ?? data.images.gallery[0] ?? "");
+    setSelectedCover(defaultCover);
+    setSelectedMainLandingCover(defaultCover);
     setSelection((prev) => ({
       ...prev,
       logo: Boolean(data.images.logo),
-      cover: Boolean(data.images.cover || data.images.gallery.length),
+      cover: hasCoverImages,
+      mainLandingCover: hasMultipleLocations && hasCoverImages,
       favicon: Boolean(data.images.favicon),
       typography: Boolean(data.typography.heading || data.typography.body),
       social: Object.values(data.socialLinks).some(Boolean) && prev.social,
@@ -196,7 +212,14 @@ export function ImportWebsiteModal({
         result,
         {
           ...selection,
+          mainLandingCover: hasMultipleLocations
+            ? selection.mainLandingCover
+            : false,
           coverUrl: selection.cover ? selectedCover || undefined : undefined,
+          mainLandingCoverUrl:
+            hasMultipleLocations && selection.mainLandingCover
+              ? selectedMainLandingCover || undefined
+              : undefined,
         },
         {
           locationSlug:
@@ -230,6 +253,12 @@ export function ImportWebsiteModal({
   const hasFonts = Boolean(
     result?.typography.heading || result?.typography.body,
   );
+  const hasCoverImages = Boolean(
+    result?.images.cover || (result?.images.gallery.length ?? 0) > 0,
+  );
+  const showLocationCoverPicker = selection.cover && hasCoverImages;
+  const showMainLandingCoverPicker =
+    hasMultipleLocations && selection.mainLandingCover && hasCoverImages;
 
   const toggleRow = (
     key: ToggleKey,
@@ -420,12 +449,26 @@ export function ImportWebsiteModal({
                 )}
                 {toggleRow(
                   "cover",
-                  "Cover image",
-                  result.images.cover || result.images.gallery.length
-                    ? "Hero/banner image"
+                  hasMultipleLocations
+                    ? "Location page banner"
+                    : "Cover image",
+                  hasCoverImages
+                    ? hasMultipleLocations
+                      ? "Hero on the location you’re editing"
+                      : "Hero/banner image"
                     : "None found",
-                  !(result.images.cover || result.images.gallery.length),
+                  !hasCoverImages,
                 )}
+                {hasMultipleLocations
+                  ? toggleRow(
+                      "mainLandingCover",
+                      "Main home background",
+                      hasCoverImages
+                        ? "Full-width hero before a city is chosen"
+                        : "None found",
+                      !hasCoverImages,
+                    )
+                  : null}
                 {toggleRow(
                   "favicon",
                   "Favicon",
@@ -511,54 +554,32 @@ export function ImportWebsiteModal({
               </div>
             )}
 
-            {/* Cover image chooser */}
-            {selection.cover && result.images.gallery.length > 0 ? (
-              <div className="space-y-2">
-                <p className="text-sm font-semibold">
-                  Choose a cover image{" "}
-                  <span className="font-normal text-muted-foreground">
-                    (tap to select)
-                  </span>
-                </p>
-                <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
-                  {result.images.gallery.map((img) => {
-                    const active = selectedCover === img;
-                    return (
-                      <button
-                        type="button"
-                        key={img}
-                        onClick={() => setSelectedCover(img)}
-                        className={`relative aspect-video overflow-hidden rounded-lg border-2 bg-slate-100 transition ${
-                          active
-                            ? "border-[var(--color-primary)] ring-2 ring-[var(--color-primary)]/30"
-                            : "border-transparent hover:border-slate-300"
-                        }`}
-                      >
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img
-                          src={proxiedImageUrl(img)}
-                          alt="Candidate cover"
-                          className="h-full w-full object-cover"
-                          loading="lazy"
-                          onError={(e) => {
-                            const target = e.currentTarget;
-                            if (target.dataset.fallback === "1") return;
-                            target.dataset.fallback = "1";
-                            // Fall back to direct URL if the proxy fails.
-                            target.src = img;
-                          }}
-                        />
-                        {active && (
-                          <span className="absolute right-1 top-1 flex h-5 w-5 items-center justify-center rounded-full bg-[var(--color-primary)] text-white">
-                            <Check className="h-3 w-3" />
-                          </span>
-                        )}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            ) : selection.cover ? (
+            {/* Separate cover pickers */}
+            {showLocationCoverPicker && result.images.gallery.length > 0 ? (
+              <CoverGalleryPicker
+                title={
+                  hasMultipleLocations
+                    ? "Choose a location page banner"
+                    : "Choose a cover image"
+                }
+                images={result.images.gallery}
+                selected={selectedCover}
+                onSelect={setSelectedCover}
+              />
+            ) : null}
+
+            {showMainLandingCoverPicker && result.images.gallery.length > 0 ? (
+              <CoverGalleryPicker
+                title="Choose a main home background"
+                images={result.images.gallery}
+                selected={selectedMainLandingCover}
+                onSelect={setSelectedMainLandingCover}
+              />
+            ) : null}
+
+            {(selection.cover ||
+              (hasMultipleLocations && selection.mainLandingCover)) &&
+            result.images.gallery.length === 0 ? (
               <Alert className="border-slate-200 bg-slate-50 text-slate-800">
                 <Info className="h-4 w-4" />
                 <AlertDescription className="text-xs">
@@ -623,6 +644,63 @@ export function ImportWebsiteModal({
         )}
       </DialogContent>
     </Dialog>
+  );
+}
+
+function CoverGalleryPicker({
+  title,
+  images,
+  selected,
+  onSelect,
+}: {
+  title: string;
+  images: string[];
+  selected: string;
+  onSelect: (url: string) => void;
+}) {
+  return (
+    <div className="space-y-2">
+      <p className="text-sm font-semibold">
+        {title}{" "}
+        <span className="font-normal text-muted-foreground">(tap to select)</span>
+      </p>
+      <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
+        {images.map((img) => {
+          const active = selected === img;
+          return (
+            <button
+              type="button"
+              key={img}
+              onClick={() => onSelect(img)}
+              className={`relative aspect-video overflow-hidden rounded-lg border-2 bg-slate-100 transition ${
+                active
+                  ? "border-[var(--color-primary)] ring-2 ring-[var(--color-primary)]/30"
+                  : "border-transparent hover:border-slate-300"
+              }`}
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={proxiedImageUrl(img)}
+                alt="Candidate cover"
+                className="h-full w-full object-cover"
+                loading="lazy"
+                onError={(e) => {
+                  const target = e.currentTarget;
+                  if (target.dataset.fallback === "1") return;
+                  target.dataset.fallback = "1";
+                  target.src = img;
+                }}
+              />
+              {active && (
+                <span className="absolute right-1 top-1 flex h-5 w-5 items-center justify-center rounded-full bg-[var(--color-primary)] text-white">
+                  <Check className="h-3 w-3" />
+                </span>
+              )}
+            </button>
+          );
+        })}
+      </div>
+    </div>
   );
 }
 

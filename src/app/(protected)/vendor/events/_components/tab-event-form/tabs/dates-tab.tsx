@@ -751,7 +751,7 @@ export default function DatesTab() {
                               Total Tickets
                               {soldTickets > 0 && (
                                 <span className="text-xs text-gray-500 ml-2">
-                                  (Min: {soldTickets} sold)
+                                  (Minimum: {soldTickets} sold)
                                 </span>
                               )}
                             </FormLabel>
@@ -818,7 +818,7 @@ export default function DatesTab() {
                       render={({ field }) => (
                         <FormItem>
                           <FormLabel className="text-md font-medium">
-                            Price/Person
+                            Price per person
                           </FormLabel>
                           <FormControl>
                             <Input
@@ -969,7 +969,7 @@ export default function DatesTab() {
                     name={`dates.${dateIndex}.tables.${tableIndex}.min_persons`}
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Min People/Table</FormLabel>
+                        <FormLabel>Minimum people per table</FormLabel>
                         <FormControl>
                           <Input
                             type="number"
@@ -1043,7 +1043,7 @@ export default function DatesTab() {
                     name={`dates.${dateIndex}.tables.${tableIndex}.max_persons`}
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Max People/Table</FormLabel>
+                        <FormLabel>Maximum people per table</FormLabel>
                         <FormControl>
                           <Input
                             type="number"
@@ -1117,7 +1117,7 @@ export default function DatesTab() {
                     name={`dates.${dateIndex}.tables.${tableIndex}.price`}
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Price/Person</FormLabel>
+                        <FormLabel>Price per person</FormLabel>
                         <FormControl>
                           <Input
                             type="number"
@@ -1170,7 +1170,7 @@ export default function DatesTab() {
                             Total Tables
                             {soldTables > 0 && (
                               <span className="text-xs text-gray-500 ml-2">
-                                (Min: {soldTables} sold)
+                                (Minimum: {soldTables} sold)
                               </span>
                             )}
                           </FormLabel>
@@ -1321,7 +1321,9 @@ export default function DatesTab() {
                       }}
                     >
                       <XCircle className="h-4 w-4 mr-2" />
-                      <span>{isCancelled ? "Undo Cancel" : "Cancel Date"}</span>
+                      <span>
+                        {isCancelled ? "Undo cancellation" : "Cancel date"}
+                      </span>
                     </Button>
                   );
                 }
@@ -1490,7 +1492,7 @@ export default function DatesTab() {
                                       <RadioGroupItem value="full" />
                                     </FormControl>
                                     <Label className="font-normal cursor-pointer">
-                                      Full Payment
+                                      Full payment
                                     </Label>
                                   </FormItem>
                                   <FormItem className="flex items-center space-x-2 space-y-0">
@@ -1545,7 +1547,7 @@ export default function DatesTab() {
                                         <RadioGroupItem value="amount" />
                                       </FormControl>
                                       <Label className="font-normal cursor-pointer">
-                                        Fixed Amount
+                                        Fixed amount
                                       </Label>
                                     </FormItem>
                                     <FormItem className="flex items-center space-x-2 space-y-0">
@@ -1574,8 +1576,8 @@ export default function DatesTab() {
                                     {watch(
                                       `dates.${dateIndex}.deposit_type`,
                                     ) === "amount"
-                                      ? "Deposit Amount/Person"
-                                      : "Deposit Percentage (%)"}
+                                      ? "Deposit amount per person"
+                                      : "Deposit percentage (%)"}
                                   </FormLabel>
                                   <FormControl>
                                     <Input
@@ -1706,7 +1708,7 @@ export default function DatesTab() {
                         cloneDateRowForDuplicate(watch(`dates.${dateIndex}`)),
                       );
                       toast.success(
-                        "Date duplicated! Please set a new event date.",
+                        "Date duplicated. Please set a new event date.",
                       );
                     }}
                   >
@@ -1754,7 +1756,7 @@ export default function DatesTab() {
         globalForm.getValues().stepOne?.vendor_location_id;
       if (!vendor_location_id || vendor_location_id < 1) {
         toast.error(
-          "Select a venue location in event basics (step 1) before saving dates.",
+          "Select a venue location in the Event name step before saving dates.",
         );
         return;
       }
@@ -2055,7 +2057,7 @@ export default function DatesTab() {
                   setCancelReasonError(null);
                 }
               }}
-              placeholder="Example: Venue maintenance issue, weather advisory, or operational constraint."
+              placeholder="Example: Venue maintenance, weather warning, or operational constraint."
               rows={4}
               disabled={readOnly}
             />

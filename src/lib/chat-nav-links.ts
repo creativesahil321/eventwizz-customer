@@ -34,7 +34,7 @@ const NAV_RULES: NavRule[] = [
   {
     id: "seo-tools",
     pattern: /\b(seo tools)\b/i,
-    vendor: { href: "/vendor/seo-tools", label: "Open Seo Tools" },
+    vendor: { href: "/vendor/seo-tools", label: "Open SEO Tools" },
   },
   {
     id: "sites-essentials",

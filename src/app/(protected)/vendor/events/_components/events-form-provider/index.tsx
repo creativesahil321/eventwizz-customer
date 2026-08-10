@@ -38,6 +38,9 @@ interface EventFormContextType {
   advanceStep: (completedStep?: number) => Promise<void>;
   back: () => Promise<void>;
   isLoading: boolean;
+  /** True while Finalize (step 8) publish/draft save is in flight. */
+  finalizeBusy: boolean;
+  setFinalizeBusy: (busy: boolean) => void;
   /** True after persistence GET was merged into the global form. */
   persistedHydrated: boolean;
   /** When true, user can only view (read-event); Save/Submit and edits are disabled */
@@ -89,6 +92,7 @@ export function FormProvider({
   const [currentStep, setLastCompletedStep] = useState<number>(1); // Track last completed step
   const [activeField, setActiveField] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [finalizeBusy, setFinalizeBusy] = useState(false);
   const [initialDataLoaded, setInitialDataLoaded] = useState(false);
   const [persistedHydrated, setPersistedHydrated] = useState(false);
 
@@ -228,8 +232,6 @@ export function FormProvider({
 
         // Update form state
         form.setValue("currentStep", nextStep);
-      } else if (response.success) {
-        toast.info("Reached final step.");
       }
     } catch (error) {
       console.error("Error in next function:", error);
@@ -250,8 +252,8 @@ export function FormProvider({
   const advanceStep = useCallback(
     async (completedStep?: number) => {
       const stepBase = completedStep ?? activeStep;
+      // Already on the last step (e.g. publish save) — nothing further to unlock.
       if (stepBase >= maxSteps) {
-        toast.info("Reached final step.");
         return;
       }
 
@@ -279,6 +281,8 @@ export function FormProvider({
       advanceStep,
       back,
       isLoading,
+      finalizeBusy,
+      setFinalizeBusy,
       persistedHydrated,
       readOnly,
     }),
@@ -289,6 +293,7 @@ export function FormProvider({
       activeField,
       setActiveField,
       isLoading,
+      finalizeBusy,
       persistedHydrated,
       updateActiveStep,
       save,

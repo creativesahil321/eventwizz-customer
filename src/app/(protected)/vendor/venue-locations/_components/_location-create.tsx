@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useRef, useState } from "react";
+import React, { useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -20,18 +20,29 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { Plus } from "lucide-react";
 import { PermissionGuard } from "@/components/permission/PermissionGuard";
 import { useForm, SubmitHandler, Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { LocationFormValues, locationSchema } from "../_lib/validations";
-import { useCreateLocation } from "../_lib/queries";
+import {
+  LocationFormValues,
+  locationSchema,
+  MAX_VENDOR_LOCATIONS,
+} from "../_lib/validations";
+import { useCreateLocation, useLocationsQuery } from "../_lib/queries";
 import { slugify } from "@/lib/utils";
 import { useSession } from "next-auth/react";
 import GoogleLocationSearch from "@/app/(on-boarding)/on-boarding/_components/steps/step-11/google-location-search";
 import { env } from "@/env";
 import { fetchLocationDetails } from "@/app/(on-boarding)/on-boarding/_components/steps/step-11/_lib/actions";
 import { toast } from "sonner";
+import { useLocationStore } from "@/store/location.store";
 
 export default function CreateLocationDialog() {
   const [open, setOpen] = React.useState(false);
@@ -39,6 +50,23 @@ export default function CreateLocationDialog() {
   const addressPlaceIdRef = useRef<string | null>(null);
   const { mutate: createLocation, isPending } = useCreateLocation();
   const { data: session } = useSession();
+  const { data: locationsData } = useLocationsQuery();
+  const storeLocations = useLocationStore((state) => state.allLocations);
+
+  const locationCount = useMemo(() => {
+    if (locationsData) {
+      if (!Array.isArray(locationsData) && typeof locationsData.meta?.total === "number") {
+        return locationsData.meta.total;
+      }
+      const list = Array.isArray(locationsData)
+        ? locationsData
+        : (locationsData.data ?? []);
+      if (list.length > 0) return list.length;
+    }
+    return storeLocations.length;
+  }, [locationsData, storeLocations.length]);
+
+  const atLimit = locationCount >= MAX_VENDOR_LOCATIONS;
 
   const venueName = session?.user?.name || "Venue";
 
@@ -63,6 +91,12 @@ export default function CreateLocationDialog() {
 
   const handleOpenChange = React.useCallback(
     (next: boolean) => {
+      if (next && atLimit) {
+        toast.error(
+          `You can add a maximum of ${MAX_VENDOR_LOCATIONS} locations`,
+        );
+        return;
+      }
       setOpen(next);
       if (!next) {
         addressPlaceIdRef.current = null;
@@ -76,10 +110,17 @@ export default function CreateLocationDialog() {
         });
       }
     },
-    [form],
+    [form, atLimit],
   );
 
   const onSubmit: SubmitHandler<LocationFormValues> = (data) => {
+    if (atLimit) {
+      toast.error(
+        `You can add a maximum of ${MAX_VENDOR_LOCATIONS} locations`,
+      );
+      return;
+    }
+
     const address = (data.address ?? "").trim();
     if (address && !addressPlaceIdRef.current) {
       toast.error("Please select a location from the suggestions", {
@@ -105,24 +146,52 @@ export default function CreateLocationDialog() {
         form.reset();
         handleOpenChange(false);
       },
+      onError: (error) => {
+        const message =
+          error instanceof Error
+            ? error.message
+            : `You can add a maximum of ${MAX_VENDOR_LOCATIONS} locations`;
+        toast.error(message);
+      },
     });
   };
+
+  const addLocationButton = (
+    <Button
+      variant="event-primary"
+      size="sm"
+      className="gap-1"
+      disabled={atLimit}
+    >
+      <Plus className="h-3.5 w-3.5" />
+      <span>Add Location</span>
+    </Button>
+  );
 
   return (
     <PermissionGuard permissionKey="create-event-location" fallback={null}>
       <Dialog open={open} onOpenChange={handleOpenChange}>
-        <DialogTrigger asChild>
-          <Button variant="event-primary" size="sm" className="gap-1">
-            <Plus className="h-3.5 w-3.5" />
-            <span>Add Location</span>
-          </Button>
-        </DialogTrigger>
+        {atLimit ? (
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span className="inline-flex">{addLocationButton}</span>
+              </TooltipTrigger>
+              <TooltipContent>
+                Maximum of {MAX_VENDOR_LOCATIONS} locations allowed
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        ) : (
+          <DialogTrigger asChild>{addLocationButton}</DialogTrigger>
+        )}
         <DialogContent className="sm:max-w-[425px] text-black">
           <DialogHeader>
             <DialogTitle>Add New Location</DialogTitle>
             <DialogDescription>
               Add a new location for your venue ({venueName}). Fill in the
-              location details below.
+              location details below. You can add up to {MAX_VENDOR_LOCATIONS}{" "}
+              locations ({locationCount}/{MAX_VENDOR_LOCATIONS} used).
             </DialogDescription>
           </DialogHeader>
           <Form {...form}>
@@ -241,7 +310,7 @@ export default function CreateLocationDialog() {
                 <Button
                   variant="event-primary"
                   type="submit"
-                  disabled={isPending || !isAddressValid}
+                  disabled={isPending || !isAddressValid || atLimit}
                 >
                   {isPending ? "Saving..." : "Save Location"}
                 </Button>

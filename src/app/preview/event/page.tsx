@@ -111,13 +111,23 @@ function EventPreviewPageContent() {
   }, [eventId, isRoomsForFetch, refetch]);
 
   useEffect(() => {
-    const onPersistenceChanged = () => {
+    const onPersistenceChanged = (event: Event) => {
+      const changedEventId = (
+        event as CustomEvent<{ eventId?: string } | undefined>
+      ).detail?.eventId;
+      if (
+        changedEventId &&
+        eventId &&
+        String(changedEventId) !== String(eventId)
+      ) {
+        return;
+      }
       void refetch();
     };
     window.addEventListener("event-data-changed", onPersistenceChanged);
     return () =>
       window.removeEventListener("event-data-changed", onPersistenceChanged);
-  }, [refetch]);
+  }, [eventId, refetch]);
 
   const [publishDialogOpen, setPublishDialogOpen] = useState(false);
   const [isPublishing, setIsPublishing] = useState(false);

@@ -104,6 +104,10 @@ export interface ApiEventCartData {
   event_slug: string;
   event_image: string;
   vendor_event_id: number;
+  /** Venue display name from cart GET — shown under event name on checkout. */
+  location_name?: string;
+  event_location?: string;
+  city?: string;
   payment_gateways?: PaymentGatewayData[];
   drink_title?: string;
   drinks: SelectedDrink[];

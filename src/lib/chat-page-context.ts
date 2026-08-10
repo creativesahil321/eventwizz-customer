@@ -43,7 +43,7 @@ const VENDOR_PAGES: Array<{ prefix: string; label: string; hints?: string }> = [
   { prefix: "/vendor/email-logs", label: "Email Logs" },
   { prefix: "/vendor/manage-roles", label: "Manage Roles" },
   { prefix: "/vendor/staff-management", label: "Staff Management" },
-  { prefix: "/vendor/seo-tools", label: "Seo Tools" },
+  { prefix: "/vendor/seo-tools", label: "SEO Tools" },
   { prefix: "/vendor/notifications", label: "Notifications" },
   { prefix: "/vendor/support", label: "Support" },
   { prefix: "/vendor/dispute-resolution", label: "Dispute Resolution" },

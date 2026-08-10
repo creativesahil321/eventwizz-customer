@@ -5,26 +5,35 @@ import {
   useQueryClient,
 } from "@tanstack/react-query";
 import { discountsService } from "@/services/vendor/discounts/discounts.service";
+import { useHeaderLocationId } from "@/hooks/use-header-location-id";
 import type {
   DiscountFormPayload,
   DiscountStoreResponse,
   DiscountsQueryParams,
 } from "./types";
 
+/**
+ * Every discount endpoint is scoped by the `x-venue-location-id` header, so
+ * the header location is part of each key — switching venue then refetches
+ * instead of reusing another venue's cache.
+ */
 export const discountKeys = {
   all: ["vendor-discounts"] as const,
   lists: () => [...discountKeys.all, "list"] as const,
-  list: (filters: DiscountsQueryParams) =>
-    [...discountKeys.lists(), filters] as const,
+  list: (locationId: number, filters: DiscountsQueryParams) =>
+    [...discountKeys.lists(), locationId, filters] as const,
   details: () => [...discountKeys.all, "detail"] as const,
-  detail: (id: number | string) => [...discountKeys.details(), id] as const,
+  detail: (locationId: number, id: number | string) =>
+    [...discountKeys.details(), locationId, id] as const,
   eventsWithDates: (locationId?: number) =>
     [...discountKeys.all, "events-with-dates", locationId ?? 0] as const,
 };
 
 export function useDiscounts(params: DiscountsQueryParams) {
+  const locationId = useHeaderLocationId();
+
   return useQuery({
-    queryKey: discountKeys.list(params),
+    queryKey: discountKeys.list(locationId, params),
     queryFn: () => discountsService.getDiscounts(params),
     placeholderData: keepPreviousData,
     staleTime: 1000 * 60,
@@ -33,8 +42,10 @@ export function useDiscounts(params: DiscountsQueryParams) {
 }
 
 export function useDiscount(id: number | string, enabled = true) {
+  const locationId = useHeaderLocationId();
+
   return useQuery({
-    queryKey: discountKeys.detail(id),
+    queryKey: discountKeys.detail(locationId, id),
     queryFn: () => discountsService.getDiscountById(id),
     enabled: enabled && Boolean(id),
     staleTime: 1000 * 60,
@@ -60,6 +71,24 @@ export function useCreateDiscount() {
       discountsService.createDiscount(payload) as Promise<DiscountStoreResponse>,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: discountKeys.lists() });
+    },
+  });
+}
+
+export function useUpdateDiscount() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({
+      id,
+      payload,
+    }: {
+      id: number;
+      payload: DiscountFormPayload;
+    }) => discountsService.updateDiscount(id, payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: discountKeys.lists() });
+      queryClient.invalidateQueries({ queryKey: discountKeys.details() });
     },
   });
 }

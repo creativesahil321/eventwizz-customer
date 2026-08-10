@@ -18,6 +18,10 @@ import { Input } from "@/components/ui/input";
 import { SquarePen } from "lucide-react";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { subscribe } from "../_lib/actions";
+import {
+  ProtectedPageHeader,
+  pageCardClassName,
+} from "@/app/(protected)/_components/page-header-card";
 
 export default function NewsletterForm() {
   const [loading, setLoading] = useState<boolean>(false);
@@ -44,15 +48,18 @@ export default function NewsletterForm() {
   };
 
   return (
-    <section className="w-full min-w-0 bg-background dark:border p-6 rounded-md relative text-black">
-      <header className="w-full mb-6 min-w-0">
-        <h2 className="text-2xl mb-0 title-header font-bold">Newsletter</h2>
-      </header>
-      <main className="w-full min-w-0 relative">
+    <div className="flex w-full min-w-0 flex-col gap-4 text-black">
+      <ProtectedPageHeader
+        title="Newsletter"
+        locationScope="all-locations"
+        description="Reach customers across every venue on your account. Not limited to the location in the header."
+      />
+
+      <div className={pageCardClassName("min-w-0")}>
         <Form {...form}>
           <form
             onSubmit={form.handleSubmit(onSubmit)}
-            className="space-y-4 md:space-y-0 md:space-x-4 flex flex-col md:flex-row md:items-center min-w-0"
+            className="flex min-w-0 flex-col space-y-4 md:flex-row md:items-end md:space-x-4 md:space-y-0"
           >
             <FormField
               control={form.control}
@@ -147,14 +154,19 @@ export default function NewsletterForm() {
                 </FormItem>
               )}
             />
-            <Button variant="event-primary" type="submit" disabled={loading} className="w-full md:w-auto shrink-0">
-              <span className="w-24 inline-block text-center">
-                {loading ? "Saving..." : "Save"}
+            <Button
+              variant="event-primary"
+              type="submit"
+              disabled={loading}
+              className="w-full shrink-0 md:w-auto"
+            >
+              <span className="inline-block w-24 text-center">
+                {loading ? "Saving…" : "Save"}
               </span>
             </Button>
           </form>
         </Form>
-      </main>
-    </section>
+      </div>
+    </div>
   );
 }

@@ -16,6 +16,10 @@ export const CART_METADATA_KEYS = [
   "event_rooms",
   // Pending payment session — cross-device restore field (must NOT be treated as a date key)
   "pending_payment",
+  // Location meta from cart GET (must NOT be treated as date keys)
+  "location_name",
+  "event_location",
+  "city",
 ] as const;
 
 export const CART_METADATA_KEYS_SET = new Set<string>(CART_METADATA_KEYS);

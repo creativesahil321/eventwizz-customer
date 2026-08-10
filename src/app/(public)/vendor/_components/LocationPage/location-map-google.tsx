@@ -1,10 +1,11 @@
+/// <reference types="google.maps" />
 "use client";
 
 import { useEffect, useRef, useState, useCallback, useMemo } from "react";
 import { VenueLocation } from "@/types/api.types";
 import { LocationData } from "@/types/theme.types";
 import { motion } from "framer-motion";
-import { MapPin } from "lucide-react";
+import { LayoutGrid, Maximize2 } from "lucide-react";
 import { env } from "@/env";
 import { useTheme } from "@/providers/theme-provider/ThemeContext";
 import {
@@ -12,10 +13,14 @@ import {
   pickReadableForeground,
   relativeLuminance,
 } from "@/lib/color-contrast";
+import { Skeleton } from "@/components/ui/skeleton";
+import { cn } from "@/lib/utils";
 
 interface LocationMapProps {
   locations: (VenueLocation | LocationData)[];
   onSelect: (slug: string) => void;
+  /** Optional: switch the parent page into grid view (Arena map sidebar CTA). */
+  onSwitchToGrid?: () => void;
 }
 
 interface LocationMarker {
@@ -52,6 +57,7 @@ const DEFAULT_MAP_TOKENS: MapVisualTokens = {
 export default function GoogleLocationMap({
   locations,
   onSelect,
+  onSwitchToGrid,
 }: LocationMapProps) {
   const { theme } = useTheme();
   const mapRef = useRef<HTMLDivElement>(null);
@@ -77,12 +83,6 @@ export default function GoogleLocationMap({
 
   mapVisualTokensRef.current = mapVisualTokens;
 
-  const headerForeground = pickReadableForeground(mapVisualTokens.primary);
-  const headerMuted =
-    headerForeground === "#F8FAFC"
-      ? "color-mix(in srgb, #f8fafc 72%, transparent)"
-      : "color-mix(in srgb, #0f172a 55%, transparent)";
-
   // Convert all locations to markers - ALL will be geocoded (API doesn't provide lat/lng)
   const locationMarkers: LocationMarker[] = useMemo(() => {
     return locations.map((location) => {
@@ -104,13 +104,18 @@ export default function GoogleLocationMap({
         rawAddress ||
         (name.toLowerCase().includes("uk") ? name : `${name}, UK`);
 
+      const eventCount =
+        "total_events" in location && typeof location.total_events === "number"
+          ? location.total_events
+          : 0;
+
       // All locations need geocoding - use default UK center as placeholder
       return {
         name,
         slug,
         lat: 53.0, // Default UK center - will be replaced by geocoding
         lng: -2.0,
-        eventCount: 0,
+        eventCount,
         needsGeocoding: true, // All locations need geocoding
         address: address,
       };
@@ -346,7 +351,10 @@ export default function GoogleLocationMap({
                 address: location.address || location.name + ", UK",
                 region: "GB", // Restrict to UK
               },
-              (results, status) => {
+              (
+                results: google.maps.GeocoderResult[] | null,
+                status: google.maps.GeocoderStatus,
+              ) => {
                 if (
                   status === "OK" &&
                   results &&
@@ -500,172 +508,143 @@ export default function GoogleLocationMap({
     });
   }, [mapVisualTokens]);
 
+  const requestFullscreen = () => {
+    const el = mapRef.current;
+    if (!el) return;
+    if (el.requestFullscreen) {
+      void el.requestFullscreen();
+    }
+  };
+
   return (
     <div className="relative w-full">
       <motion.div
-        className="rounded-2xl border overflow-hidden shadow-xl ring-1 ring-black/5"
+        className="overflow-hidden rounded-[20px] border border-[color:color-mix(in_srgb,var(--color-text)_10%,transparent)] bg-[var(--color-surface)] shadow-[0_20px_48px_-32px_rgba(0,0,0,0.55)]"
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.6 }}
-        style={{
-          minHeight: "700px",
-          backgroundColor: "var(--color-surface, #ffffff)",
-          borderColor:
-            "color-mix(in srgb, var(--color-primary, #0f172a) 14%, transparent)",
-        }}
+        transition={{ duration: 0.45 }}
       >
-        <div
-          className="py-6 px-6 sm:px-8 text-center border-b"
-          style={{
-            background: `linear-gradient(120deg, ${mapVisualTokens.primary} 0%, ${mapVisualTokens.secondary} 100%)`,
-            borderColor:
-              "color-mix(in srgb, var(--color-primary-foreground, #f8fafc) 12%, transparent)",
-          }}
-        >
-          <h2
-            className="text-2xl sm:text-3xl font-extrabold tracking-tight sm:tracking-wide drop-shadow-sm"
-            style={{
-              color: headerForeground,
-              fontFamily: "var(--font-heading, inherit)",
-            }}
-          >
-            Available Locations
-          </h2>
-          <p
-            className="text-sm mt-2 font-medium max-w-lg mx-auto leading-relaxed"
-            style={{ color: headerMuted }}
-          >
-            Tap a pin to open that location&rsquo;s events. Drag and zoom the
-            map as usual.
-          </p>
-        </div>
-
-        <div className="relative">
-          <div
-            ref={mapRef}
-            className="w-full"
-            style={{
-              height: "600px",
-              backgroundColor: "var(--color-background, #f8fafc)",
-            }}
-            aria-busy={isLoading}
-            aria-label="Vendor locations map"
-          />
-
-          {isLoading && (
+        <div className="grid min-h-[560px] lg:grid-cols-[minmax(0,1.35fr)_minmax(280px,0.85fr)]">
+          <div className="relative h-[360px] border-b border-[color:color-mix(in_srgb,var(--color-text)_8%,transparent)] lg:h-full lg:min-h-[560px] lg:border-b-0 lg:border-r">
             <div
-              className="absolute inset-0 flex items-center justify-center backdrop-blur-[2px]"
-              style={{
-                backgroundColor:
-                  "color-mix(in srgb, var(--color-surface, #ffffff) 88%, transparent)",
-              }}
-            >
-              <div className="flex flex-col items-center gap-4 px-6 text-center">
-                <div
-                  className="flex h-14 w-14 items-center justify-center rounded-2xl shadow-md"
-                  style={{
-                    background: `linear-gradient(135deg, color-mix(in srgb, ${mapVisualTokens.primary} 18%, white), color-mix(in srgb, ${mapVisualTokens.secondary} 12%, white))`,
-                    color: mapVisualTokens.primary,
-                  }}
-                >
-                  <MapPin className="h-7 w-7" strokeWidth={2.25} />
+              ref={mapRef}
+              className="h-full w-full"
+              style={{ backgroundColor: "var(--color-background, #f8fafc)" }}
+              aria-busy={isLoading}
+              aria-label="Vendor locations map"
+            />
+
+            {isLoading && (
+              <div className="absolute inset-0 z-10 flex items-center justify-center bg-[color:color-mix(in_srgb,var(--color-surface)_88%,transparent)] backdrop-blur-[2px]">
+                <div className="flex w-full max-w-xs flex-col items-center gap-3 px-6">
+                  <Skeleton className="h-12 w-12 rounded-2xl" />
+                  <Skeleton className="h-4 w-40" />
+                  <Skeleton className="h-3 w-28" />
                 </div>
-                <div
-                  className="h-10 w-10 rounded-full border-2 border-b-transparent animate-spin"
-                  style={{
-                    borderColor: `color-mix(in srgb, ${mapVisualTokens.primary} 55%, transparent)`,
-                    borderBottomColor: "transparent",
-                  }}
-                />
-                <span
-                  className="text-base font-medium"
-                  style={{ color: "var(--color-text, #0f172a)" }}
-                >
-                  Preparing your map&hellip;
-                </span>
-                <span
-                  className="text-sm max-w-xs"
-                  style={{ color: "var(--color-text-dimmed, #64748b)" }}
-                >
-                  Resolving addresses in the UK
-                </span>
               </div>
-            </div>
-          )}
+            )}
 
-          {error && (
-            <div
-              className="absolute inset-0 flex items-center justify-center p-6"
-              style={{
-                backgroundColor:
-                  "color-mix(in srgb, var(--color-surface, #ffffff) 92%, transparent)",
-              }}
-            >
-              <div
-                className="text-center p-8 rounded-xl shadow-lg max-w-md border"
-                style={{
-                  backgroundColor: "var(--color-surface, #ffffff)",
-                  borderColor:
-                    "color-mix(in srgb, var(--color-primary, #0f172a) 10%, transparent)",
-                }}
-              >
-                <div
-                  className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full text-2xl"
-                  style={{
-                    backgroundColor:
-                      "color-mix(in srgb, #ef4444 12%, var(--color-surface, #fff))",
-                  }}
-                  aria-hidden
-                >
-                  ⚠️
+            {error && (
+              <div className="absolute inset-0 z-10 flex items-center justify-center bg-[color:color-mix(in_srgb,var(--color-surface)_92%,transparent)] p-6">
+                <div className="max-w-md rounded-2xl border border-[color:color-mix(in_srgb,var(--color-text)_10%,transparent)] bg-[var(--color-surface)] p-8 text-center shadow-lg">
+                  <p className="mb-4 text-lg font-semibold text-[var(--color-text)]">
+                    {error}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => window.location.reload()}
+                    className="rounded-xl px-6 py-3 text-sm font-medium text-[var(--color-primary-foreground)] transition-opacity hover:opacity-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--color-primary)]"
+                    style={{ backgroundColor: mapVisualTokens.primary }}
+                  >
+                    Reload page
+                  </button>
                 </div>
-                <p
-                  className="text-lg font-semibold mb-4"
-                  style={{ color: "var(--color-text, #0f172a)" }}
-                >
-                  {error}
-                </p>
+              </div>
+            )}
+
+            {!isLoading && !error ? (
+              <>
+                <div className="pointer-events-none absolute bottom-4 left-4 z-10 rounded-full bg-black/55 px-3 py-1.5 text-xs font-medium text-white backdrop-blur-md">
+                  {locationMarkers.length} location
+                  {locationMarkers.length !== 1 ? "s" : ""} · Interactive
+                  preview
+                </div>
                 <button
                   type="button"
-                  onClick={() => window.location.reload()}
-                  className="rounded-lg px-6 py-3 font-medium text-white transition-opacity hover:opacity-95"
-                  style={{ backgroundColor: mapVisualTokens.primary }}
+                  onClick={requestFullscreen}
+                  className="absolute bottom-4 right-4 z-10 inline-flex h-10 items-center gap-1.5 rounded-full bg-white px-3.5 text-sm font-semibold text-black shadow-md transition-transform duration-200 hover:scale-[1.02] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--color-primary)]"
                 >
-                  Reload page
+                  <Maximize2 className="h-3.5 w-3.5" aria-hidden />
+                  Expand
+                </button>
+              </>
+            ) : null}
+          </div>
+
+          <aside className="flex min-h-0 flex-col bg-[var(--color-surface)]">
+            <div className="border-b border-[color:color-mix(in_srgb,var(--color-text)_8%,transparent)] px-4 py-3.5 sm:px-5">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--color-text-dimmed)]">
+                All locations
+              </p>
+            </div>
+
+            <ul className="min-h-0 flex-1 space-y-1 overflow-y-auto px-2 py-2 sm:px-3">
+              {locationMarkers.map((marker) => {
+                const initial = (marker.name.trim()[0] || "?").toUpperCase();
+                return (
+                  <li key={marker.slug || marker.name}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (marker.slug) onSelect(marker.slug);
+                      }}
+                      className={cn(
+                        "flex w-full items-center gap-3 rounded-xl px-2.5 py-2.5 text-left transition-colors duration-200",
+                        "hover:bg-[color:color-mix(in_srgb,var(--color-primary)_10%,transparent)]",
+                        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--color-primary)]",
+                      )}
+                    >
+                      <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[color:color-mix(in_srgb,var(--color-primary)_22%,var(--color-surface))] text-sm font-semibold text-[var(--color-primary)]">
+                        {initial}
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-sm font-semibold text-[var(--color-text)]">
+                          {marker.name}
+                        </span>
+                        {marker.address ? (
+                          <span className="mt-0.5 block truncate text-xs text-[var(--color-text-dimmed)]">
+                            {marker.address}
+                          </span>
+                        ) : null}
+                      </span>
+                      <span className="inline-flex h-7 min-w-7 shrink-0 items-center justify-center rounded-full bg-[var(--color-primary)] px-2 text-xs font-semibold text-[var(--color-primary-foreground)]">
+                        {marker.eventCount}
+                      </span>
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+
+            {onSwitchToGrid ? (
+              <div className="border-t border-[color:color-mix(in_srgb,var(--color-text)_8%,transparent)] p-3 sm:p-4">
+                <button
+                  type="button"
+                  onClick={onSwitchToGrid}
+                  className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-[var(--color-primary)] text-sm font-semibold text-[var(--color-primary-foreground)] transition-opacity duration-200 hover:opacity-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--color-primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[color:var(--color-surface)]"
+                >
+                  <LayoutGrid className="h-4 w-4" aria-hidden />
+                  Switch to Grid View
                 </button>
               </div>
-            </div>
-          )}
+            ) : null}
+          </aside>
         </div>
-
-        {!isLoading && !error && (
-          <div
-            className="py-4 px-6 sm:px-8 border-t"
-            style={{
-              backgroundColor: "var(--color-background, #f8fafc)",
-              borderColor:
-                "color-mix(in srgb, var(--color-primary, #0f172a) 8%, transparent)",
-            }}
-          >
-            <div
-              className="flex items-center justify-center gap-2 text-sm"
-              style={{ color: "var(--color-text-dimmed, #64748b)" }}
-            >
-              <span
-                className="inline-flex h-2.5 w-2.5 rounded-full animate-pulse"
-                style={{ backgroundColor: mapVisualTokens.primary }}
-              />
-              <span
-                className="font-semibold"
-                style={{ color: "var(--color-text, #0f172a)" }}
-              >
-                {locationMarkers.length} location
-                {locationMarkers.length !== 1 ? "s" : ""} on the map
-              </span>
-            </div>
-          </div>
-        )}
       </motion.div>
+
+      <p className="mt-4 text-center text-sm text-[var(--color-text-dimmed)]">
+        Showing {locationMarkers.length} of {locationMarkers.length} locations
+      </p>
     </div>
   );
 }

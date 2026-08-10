@@ -1,11 +1,11 @@
 "use client";
 
 import { useParams } from "next/navigation";
-import { Loader2 } from "lucide-react";
 import { Shell } from "@/components/shell";
 import { BackButton } from "@/components/ui/back-button";
 import { ProtectedPageHeader } from "@/app/(protected)/_components/page-header-card";
 import { DiscountFormWizard } from "../../_components/discount-form";
+import { DiscountFormSkeleton } from "../../_components/discount-form-skeleton";
 import { useDiscount } from "../../_lib/queries";
 
 export default function EditDiscountPage() {
@@ -17,10 +17,7 @@ export default function EditDiscountPage() {
       <section className="page bg-[var(--color-background,#f3f4f6)]">
         <Shell className="items-start gap-4 pb-4">
           <BackButton href="/vendor/discounts" label="Back to Discounts" />
-          <div className="flex w-full items-center justify-center gap-2 py-20 text-sm text-muted-foreground">
-            <Loader2 className="h-4 w-4 animate-spin" />
-            Loading discount…
-          </div>
+          <DiscountFormSkeleton />
         </Shell>
       </section>
     );
@@ -50,7 +47,7 @@ export default function EditDiscountPage() {
         <BackButton href="/vendor/discounts" label="Back to Discounts" />
         <ProtectedPageHeader
           title="Edit Discount"
-          description="Update discount settings. Save will call the update API when store/update contracts are confirmed."
+          description="Update the offer scope, value, schedule, status, or customer audience."
         />
         <DiscountFormWizard mode="edit" initialDiscount={discount} />
       </Shell>

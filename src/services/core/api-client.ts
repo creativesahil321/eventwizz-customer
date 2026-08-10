@@ -77,6 +77,23 @@ export const setLogoutInProgress = (status: boolean): void => {
 // Function to check if logout is in progress
 export const getLogoutInProgress = (): boolean => isLogoutInProgress;
 
+/**
+ * Nested counter so concurrent AI bulk-apply (or similar) flows can suppress
+ * global success toasts while their own progress UI is the source of truth.
+ */
+let suppressSuccessToastDepth = 0;
+
+export async function withSuppressedSuccessToasts<T>(
+  fn: () => Promise<T>,
+): Promise<T> {
+  suppressSuccessToastDepth += 1;
+  try {
+    return await fn();
+  } finally {
+    suppressSuccessToastDepth = Math.max(0, suppressSuccessToastDepth - 1);
+  }
+}
+
 // Security violation tracking functions
 const recordSecurityViolation = (): number => {
   if (!isBrowser) return 0;
@@ -422,9 +439,9 @@ apiClient.interceptors.response.use(
 
     // Show success toast for data modification operations only
     const method = response.config.method?.toUpperCase();
-    const suppressSuccessToast = (
-      response.config as RequestOptions | undefined
-    )?.suppressSuccessToast;
+    const suppressSuccessToast =
+      suppressSuccessToastDepth > 0 ||
+      (response.config as RequestOptions | undefined)?.suppressSuccessToast;
     if (
       !suppressSuccessToast &&
       response.data.status === true &&

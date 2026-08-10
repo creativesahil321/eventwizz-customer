@@ -10,10 +10,15 @@ export interface ImportSelection {
   /** Heading/body fonts + any required font stylesheet URLs. */
   typography: boolean;
   logo: boolean;
+  /** Location page banner (`cover_image`). */
   cover: boolean;
+  /** Multi-location main home background (`main_landing_cover_image`). */
+  mainLandingCover: boolean;
   favicon: boolean;
-  /** Optional override — a specific gallery image chosen as the cover. */
+  /** Optional override — gallery image for the location page banner. */
   coverUrl?: string;
+  /** Optional override — gallery image for the main home background. */
+  mainLandingCoverUrl?: string;
 }
 
 export interface ApplyImportSummary {
@@ -170,10 +175,10 @@ export async function applyImportedWebsite(
     }
   }
 
-  const coverUrl = selection.coverUrl || images.cover;
-  if (selection.cover && coverUrl) {
+  const locationCoverUrl = selection.coverUrl || images.cover;
+  if (selection.cover && locationCoverUrl) {
     try {
-      const coverFile = await remoteImageToFile(coverUrl, "cover");
+      const coverFile = await remoteImageToFile(locationCoverUrl, "cover");
       if (coverFile) {
         form.setValue("cover_image", coverFile, { shouldDirty: true });
         form.setValue("cover_video", null, { shouldDirty: true });
@@ -200,10 +205,31 @@ export async function applyImportedWebsite(
         }
         appliedFields += 1;
       } else {
-        imageErrors.push("cover image");
+        imageErrors.push("location cover image");
       }
     } catch {
-      imageErrors.push("cover image");
+      imageErrors.push("location cover image");
+    }
+  }
+
+  const mainLandingCoverUrl =
+    selection.mainLandingCoverUrl || selection.coverUrl || images.cover;
+  if (selection.mainLandingCover && mainLandingCoverUrl) {
+    try {
+      const mainCoverFile = await remoteImageToFile(
+        mainLandingCoverUrl,
+        "main-landing-cover",
+      );
+      if (mainCoverFile) {
+        form.setValue("main_landing_cover_image", mainCoverFile, {
+          shouldDirty: true,
+        });
+        appliedFields += 1;
+      } else {
+        imageErrors.push("main home cover image");
+      }
+    } catch {
+      imageErrors.push("main home cover image");
     }
   }
 

@@ -60,6 +60,12 @@ import { addCacheBusting } from "@/lib/image-utils";
 import { useCurrencyFormat } from "@/hooks/use-currency-format";
 import OrderViewBreakdown from "./order-view-breakdown";
 import PerDatePaymentSelection from "./per-date-payment-selection";
+import {
+  CheckoutPromoPanel,
+  DEFAULT_CHECKOUT_PROMO,
+  resolveCheckoutPromoTotals,
+  type CheckoutPromoApplied,
+} from "./checkout-promo-panel";
 import { cn } from "@/lib/utils";
 import { useDrinkSelectionStore } from "@/store/drink-selection.store";
 import {
@@ -84,6 +90,9 @@ export default function BookingSummary({}: BookingSummaryProps) {
   const [isProcessing, setIsProcessing] = useState(false);
   const [showViewBreakdown, setShowViewBreakdown] = useState(false);
   const [showMobileDrawer, setShowMobileDrawer] = useState(false);
+  /** Dummy checkout promo UI — not wired to payment API yet. */
+  const [checkoutPromo, setCheckoutPromo] =
+    useState<CheckoutPromoApplied>(DEFAULT_CHECKOUT_PROMO);
   const [isStripePaymentOpen, setIsStripePaymentOpen] = useState(false);
   const [justExpiredBookingNumber, setJustExpiredBookingNumber] = useState<
     string | null
@@ -919,6 +928,7 @@ export default function BookingSummary({}: BookingSummaryProps) {
   const finalTotal = totalToday;
   const bookingGrandTotal = totalToday + totalLater;
   const hasPayableTotal = bookingGrandTotal > 0;
+  const promoTotals = resolveCheckoutPromoTotals(checkoutPromo);
 
   // Platform fee
   const platformFeeMeta = (
@@ -1068,6 +1078,23 @@ export default function BookingSummary({}: BookingSummaryProps) {
         />
       )}
 
+      {hasPayableTotal ? (
+        <>
+          <Separator className="bg-gray-100" />
+          <CheckoutPromoPanel
+            formatMoney={formatMoney}
+            value={checkoutPromo}
+            onChange={setCheckoutPromo}
+            disabled={
+              isProcessing ||
+              isPending ||
+              processCheckoutMutation.isPending ||
+              resumeCheckoutMutation.isPending
+            }
+          />
+        </>
+      ) : null}
+
       {hasPayableTotal ? <Separator className="bg-gray-100" /> : null}
 
       {/* ── Pricing Summary ── */}
@@ -1084,6 +1111,31 @@ export default function BookingSummary({}: BookingSummaryProps) {
             <span className="text-sm text-gray-400">—</span>
           )}
         </div>
+
+        {hasPayableTotal && promoTotals.autoDiscountAmount > 0 ? (
+          <div className="flex items-center justify-between text-sm text-emerald-700">
+            <span>Discount</span>
+            <span className="font-medium tabular-nums">
+              −{formatMoney(promoTotals.autoDiscountAmount)}
+            </span>
+          </div>
+        ) : null}
+
+        {hasPayableTotal &&
+        checkoutPromo.couponCode &&
+        promoTotals.couponAmount > 0 ? (
+          <div className="flex items-center justify-between text-sm text-emerald-700">
+            <span>
+              Coupon{" "}
+              <span className="font-mono text-xs tracking-wide">
+                {checkoutPromo.couponCode}
+              </span>
+            </span>
+            <span className="font-medium tabular-nums">
+              −{formatMoney(promoTotals.couponAmount)}
+            </span>
+          </div>
+        ) : null}
 
         {hasPayableTotal && platformFee > 0 && (
           <div className="flex justify-between text-xs text-[color:var(--checkout-muted-foreground)]">
@@ -1113,7 +1165,9 @@ export default function BookingSummary({}: BookingSummaryProps) {
           </span>
           {hasPayableTotal ? (
             <span className="text-2xl font-bold tabular-nums text-[color:var(--checkout-foreground)]">
-              {formatMoney(finalTotalWithFee)}
+              {formatMoney(
+                Math.max(0, finalTotalWithFee - promoTotals.totalDiscount),
+              )}
             </span>
           ) : (
             <span className="text-sm text-gray-400">

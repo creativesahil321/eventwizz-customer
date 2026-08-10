@@ -217,7 +217,7 @@ export default function AIEventCreationFlow({
                       onClick={() => openManualEditor()}
                       className="min-h-[44px] px-6 py-2.5 rounded-full text-slate-400 hover:text-white text-sm font-medium transition-colors touch-manipulation"
                     >
-                      Manual Setup
+                      Manual setup
                     </button>
                   </div>
                 </div>
@@ -244,7 +244,7 @@ export default function AIEventCreationFlow({
                 <span className="text-xl sm:text-2xl">!</span>
               </div>
               <h2 className="text-xl sm:text-2xl font-bold text-white mb-2 sm:mb-3">
-                Generation Failed
+                Generation failed
               </h2>
               <p className="text-slate-400 mb-4 sm:mb-6 text-xs sm:text-sm break-words">
                 {error}
@@ -255,7 +255,7 @@ export default function AIEventCreationFlow({
                   className="min-h-[44px] px-6 py-2.5 rounded-full text-white text-sm font-medium transition-colors touch-manipulation"
                   style={{ background: "var(--color-primary, #3b82f6)" }}
                 >
-                  Try Again
+                  Try again
                 </button>
                 <button
                   onClick={() => {
@@ -263,13 +263,13 @@ export default function AIEventCreationFlow({
                   }}
                   className="min-h-[44px] px-6 py-2.5 rounded-full bg-white/5 hover:bg-white/10 text-white text-sm font-medium border border-white/10 transition-colors touch-manipulation"
                 >
-                  Go Back
+                  Go back
                 </button>
                 <button
                   onClick={() => openManualEditor()}
                   className="min-h-[44px] px-6 py-2.5 rounded-full text-slate-400 hover:text-white text-sm font-medium transition-colors touch-manipulation"
                 >
-                  Manual Setup
+                  Manual setup
                 </button>
               </div>
             </div>

@@ -7,6 +7,7 @@ export type PreviewLocationOption = {
   id?: number;
   slug: string;
   city: string;
+  total_events?: number;
 };
 
 interface PreviewContextType {

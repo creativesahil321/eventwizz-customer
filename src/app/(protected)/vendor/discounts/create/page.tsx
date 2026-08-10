@@ -43,8 +43,8 @@ export default async function CreateDiscountPage({ searchParams }: PageProps) {
           title="Create Discount"
           description={
             params.eventName
-              ? `Create a discount or coupon for ${params.eventName}. This uses the location selected in the header.`
-              : "Select a discount or coupon, choose an event for your current location, then set the value and expiry."
+              ? `Discount or coupon for ${params.eventName} · location from header`
+              : "Multi-date Discount or Coupon Code · location from header"
           }
         />
         <DiscountFormWizard mode="create" initialValues={initialValues} />

@@ -217,9 +217,9 @@ function InfoPageSection({
   children: ReactNode;
 }) {
   return (
-    <section className="space-y-6 rounded-xl border border-border bg-card/40 p-5 md:p-6">
+    <section className="min-w-0 space-y-4 rounded-xl border border-border bg-card/40 p-4 sm:space-y-6 sm:p-6">
       <SectionTitle title={title} description={description} />
-      <div className="space-y-8">{children}</div>
+      <div className="space-y-6 sm:space-y-8">{children}</div>
     </section>
   );
 }
@@ -231,7 +231,7 @@ export function InfoPagesTab() {
   const isAdmin = form.watch("website_role") === "admin";
 
   return (
-    <div className="space-y-8">
+    <div className="min-w-0 space-y-6 sm:space-y-8">
       <p className="max-w-3xl text-sm leading-relaxed text-muted-foreground">
         {isAdmin ? (
           <>

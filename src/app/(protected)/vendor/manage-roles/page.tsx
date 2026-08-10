@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { PlusCircle } from "lucide-react";
 import { PermissionGuard } from "@/components/permission/PermissionGuard";
 import { PermissionRoute } from "@/components/permission";
+import { AllLocationsBadge } from "@/components/location-indicator";
 
 export default function Page() {
   return (
@@ -20,9 +21,12 @@ export default function Page() {
           <section className="w-full relative">
             <div className="bg-white rounded-lg border border-[var(--color-border)] shadow-md p-6 mb-6 text-black">
               <div className="flex justify-between items-center flex-wrap gap-4">
-                <h1 className="text-2xl title-header font-bold">
-                  Manage Roles & Permissions
-                </h1>
+                <div className="min-w-0 flex flex-wrap items-center gap-2">
+                  <h1 className="text-2xl title-header font-bold">
+                    Manage Roles & Permissions
+                  </h1>
+                  <AllLocationsBadge />
+                </div>
                 <PermissionGuard permissionKey="create-role-permission">
                   <Link href="./manage-roles/create" className="shrink-0">
                     <Button
@@ -35,9 +39,9 @@ export default function Page() {
                 </PermissionGuard>
               </div>
               <p className="text-muted-foreground mt-2">
-                Manage staff roles and permissions to control access to
-                different parts of your account. Each role can have customized
-                permissions to match your organization&apos;s needs.
+                Manage staff roles and permissions across every venue. Each role
+                can have custom permissions to match your organisation&apos;s
+                needs.
               </p>
             </div>
 

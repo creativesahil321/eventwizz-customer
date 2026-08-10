@@ -5,7 +5,7 @@ import {
   LocationRowAction,
   ToggleLocationStatusMutation,
 } from "../_lib/types";
-import { Settings, ChevronDown, XCircle, Building2 } from "lucide-react";
+import { MoreHorizontal, XCircle, Building2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -14,7 +14,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
-import { formatDate } from "@/lib/utils";
+import { formatDate, toTitleCase } from "@/lib/utils";
 import {
   Tooltip,
   TooltipContent,
@@ -44,7 +44,9 @@ export const getColumns = ({
       />
     ),
     cell: ({ row }) => {
-      const city = row.original.city || "-";
+      const city = row.original.city
+        ? toTitleCase(row.original.city)
+        : "-";
       const isHeadquarters = Boolean(row.original.is_headquarters);
       return (
         <div className="flex min-w-0 max-w-[280px] flex-wrap items-center gap-2">
@@ -216,18 +218,21 @@ export const getColumns = ({
   {
     id: "actions",
     header: "Actions",
-    meta: { className: "pr-4 whitespace-nowrap" },
+    meta: { className: "pr-4 text-right whitespace-nowrap" },
     cell: ({ row }) => {
       return (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="event-primary" size="sm" className="shrink-0">
-              <span className="sr-only">Open menu</span>
-              <Settings className="h-3.5 w-3.5 text-gray-600 shrink-0" />
-              <span className="hidden sm:inline-block text-xs font-medium">
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8 shrink-0 border-slate-200 bg-white px-2.5 text-slate-700 shadow-none hover:bg-slate-50 hover:text-slate-900"
+            >
+              <span className="sr-only">Open actions</span>
+              <span className="hidden text-xs font-medium sm:inline">
                 Actions
               </span>
-              <ChevronDown className="h-3 w-3 ml-0.5 shrink-0 text-[var(--color-secondary)]" />
+              <MoreHorizontal className="h-4 w-4 sm:ml-1" />
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-[180px]">

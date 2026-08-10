@@ -1,6 +1,5 @@
 "use client";
 
-import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { MapPin, ArrowRight, Loader2, Calendar } from "lucide-react";
 import { VenueLocation } from "@/types/api.types";
@@ -20,12 +19,12 @@ interface LocationGridProps {
   onSelect: (slug: string) => void | boolean;
 }
 
-/** Gradient hover tints per card (Tailwind must see full class strings). */
-const HOVER_GRADIENTS = [
-  "from-purple-600 to-pink-600",
-  "from-blue-600 to-purple-600",
-  "from-pink-600 to-orange-500",
-] as const;
+function locationInitials(name: string) {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return "?";
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return `${parts[0][0] ?? ""}${parts[1][0] ?? ""}`.toUpperCase();
+}
 
 export default function LocationGrid({
   locations,
@@ -39,8 +38,8 @@ export default function LocationGrid({
     return (
       <div
         className={cn(
-          "grid grid-cols-1 gap-6",
-          !narrowPreview && "md:grid-cols-3",
+          "mx-auto grid max-w-[920px] grid-cols-1 gap-5",
+          !narrowPreview && "md:grid-cols-3 md:gap-6",
         )}
       >
         {Array(6)
@@ -48,7 +47,7 @@ export default function LocationGrid({
           .map((_, idx) => (
             <div
               key={idx}
-              className="relative aspect-[4/5] overflow-hidden rounded-3xl bg-[var(--color-surface)]"
+              className="relative aspect-[5/6] overflow-hidden rounded-[20px] bg-[var(--color-surface)]"
             >
               <Skeleton className="absolute inset-0 h-full w-full rounded-none" />
             </div>
@@ -60,7 +59,7 @@ export default function LocationGrid({
   if (!locations || locations.length === 0) {
     return (
       <div className="flex w-full justify-center py-16">
-        <div className="w-full max-w-md rounded-2xl border border-[color:color-mix(in_srgb,var(--color-text)_10%,transparent)] bg-[var(--color-surface)] p-12 text-center text-[var(--color-on-surface)] shadow-sm">
+        <div className="w-full max-w-md rounded-[20px] border border-[color:color-mix(in_srgb,var(--color-text)_10%,transparent)] bg-[var(--color-surface)] p-12 text-center text-[var(--color-on-surface)] shadow-sm">
           <MapPin
             size={48}
             className="mx-auto mb-4 opacity-40 text-[color:var(--color-primary)]"
@@ -84,12 +83,11 @@ export default function LocationGrid({
   return (
     <div
       className={cn(
-        "grid gap-6",
-        locations.length === 1 &&
-          "mx-auto max-w-sm grid-cols-1 justify-items-center",
+        "mx-auto grid max-w-[920px] gap-5 md:gap-6",
+        locations.length === 1 && "max-w-sm grid-cols-1 justify-items-center",
         locations.length === 2 &&
           cn(
-            "mx-auto max-w-3xl grid-cols-1",
+            "max-w-3xl grid-cols-1",
             !narrowPreview && "md:grid-cols-2",
           ),
         locations.length >= 3 &&
@@ -116,13 +114,6 @@ export default function LocationGrid({
               ? locationData.total_events
               : 0;
 
-          const upcomingEvent = locationData.latest_upcoming_event
-            ? {
-                name: locationData.latest_upcoming_event.name,
-                date: locationData.latest_upcoming_event.date,
-              }
-            : null;
-
           const coverImage =
             "cover_image" in location && location.cover_image
               ? location.cover_image
@@ -133,7 +124,14 @@ export default function LocationGrid({
               ? locationData.address.trim()
               : "";
 
-          const hoverTint = HOVER_GRADIENTS[idx % HOVER_GRADIENTS.length];
+          const upcomingEvent = locationData.latest_upcoming_event
+            ? {
+                name: locationData.latest_upcoming_event.name,
+                date: locationData.latest_upcoming_event.date,
+              }
+            : null;
+
+          const initials = locationInitials(locationName);
 
           const handleCardClick = () => {
             if (!locationSlug || pendingSlug) return;
@@ -167,7 +165,7 @@ export default function LocationGrid({
                     handleCardClick();
                   }
                 }}
-                className="group relative aspect-[4/5] cursor-pointer overflow-hidden rounded-3xl transition-all duration-500 hover:-translate-y-1 hover:shadow-xl hover:shadow-black/10"
+                className="group relative aspect-[5/6] cursor-pointer overflow-hidden rounded-[20px] border border-[color:color-mix(in_srgb,var(--color-text)_8%,transparent)] shadow-[0_16px_40px_-28px_rgba(0,0,0,0.55)] transition-all duration-300 ease-out hover:-translate-y-1.5 hover:shadow-[0_22px_48px_-24px_rgba(0,0,0,0.55)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--color-primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[color:var(--color-background)] motion-reduce:transition-none motion-reduce:hover:translate-y-0"
                 onClick={handleCardClick}
               >
                 {coverImage && typeof coverImage === "string" ? (
@@ -177,7 +175,7 @@ export default function LocationGrid({
                     fill
                     priority={idx < 2}
                     sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-                    className="object-cover transition-transform duration-700 group-hover:scale-110"
+                    className="object-cover transition-transform duration-500 ease-out group-hover:scale-105 motion-reduce:transition-none motion-reduce:group-hover:scale-100"
                     unoptimized={!shouldUseNextImageOptimization(coverImage)}
                     onError={(e) => {
                       (e.target as HTMLImageElement).style.display = "none";
@@ -185,42 +183,47 @@ export default function LocationGrid({
                   />
                 ) : (
                   <div
-                    className="absolute inset-0 bg-gradient-to-br from-[color:color-mix(in_srgb,var(--color-primary)_35%,var(--color-background))] to-[var(--color-background)]"
+                    className="absolute inset-0 flex items-center justify-center bg-[radial-gradient(ellipse_at_30%_20%,color-mix(in_srgb,var(--color-primary)_42%,transparent),transparent_55%),linear-gradient(160deg,color-mix(in_srgb,var(--color-primary)_28%,var(--color-background)),var(--color-background))]"
                     aria-hidden
-                  />
+                  >
+                    <span className="flex h-20 w-20 items-center justify-center rounded-full bg-[color:color-mix(in_srgb,var(--color-text)_8%,transparent)] text-2xl font-semibold tracking-[0.08em] text-[var(--color-text-dimmed)]">
+                      {initials}
+                    </span>
+                  </div>
                 )}
 
-                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent" />
-
                 <div
-                  className={`pointer-events-none absolute inset-0 bg-gradient-to-br ${hoverTint} opacity-0 transition-opacity duration-500 group-hover:opacity-30`}
+                  className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/35 to-black/10"
                   aria-hidden
                 />
 
-                <div className="absolute bottom-0 left-0 right-0 z-[1] p-6 sm:p-8">
-                  <Badge className="mb-3 border-0 bg-[var(--color-primary)]/80 text-[var(--color-primary-foreground)] backdrop-blur-sm">
+                <div className="absolute left-3 top-3 z-[1] sm:left-4 sm:top-4">
+                  <span className="inline-flex rounded-full bg-[var(--color-primary)] px-2.5 py-1 text-[11px] font-semibold text-[var(--color-primary-foreground)] shadow-sm">
                     {totalEvents} event{totalEvents !== 1 ? "s" : ""}
-                  </Badge>
-                  <SiteHeading
-                    level={3}
-                    title={locationName}
-                    variant="onDark"
-                    className="mb-2 !text-3xl !font-black tracking-tight !text-white sm:!text-4xl"
-                  />
+                  </span>
+                </div>
+
+                <div className="absolute bottom-0 left-0 right-0 z-[1] p-5 sm:p-6">
+                  <h3
+                    className="mb-2 font-heading text-[1.65rem] font-normal leading-tight tracking-tight text-white sm:text-[1.85rem]"
+                    style={{ fontFamily: "var(--font-heading, inherit)" }}
+                  >
+                    {locationName}
+                  </h3>
 
                   {locationAddress ? (
-                    <p className="mb-3 flex items-start gap-1.5 text-sm text-white/75">
+                    <p className="mb-3 flex items-start gap-1.5 text-sm text-white/70">
                       <MapPin
                         className="mt-0.5 h-3.5 w-3.5 shrink-0 opacity-90"
                         aria-hidden
                       />
-                      <span className="line-clamp-2">{locationAddress}</span>
+                      <span className="line-clamp-1">{locationAddress}</span>
                     </p>
                   ) : null}
 
                   {upcomingEvent ? (
                     <div
-                      className="mb-3 grid grid-rows-[1fr] transition-[grid-template-rows] duration-300 ease-out md:grid-rows-[0fr] md:group-hover:grid-rows-[1fr] md:group-focus-within:grid-rows-[1fr]"
+                      className="mb-3 grid grid-rows-[1fr] transition-[grid-template-rows] duration-300 ease-out md:grid-rows-[0fr] md:group-hover:grid-rows-[1fr] md:group-focus-within:grid-rows-[1fr] motion-reduce:md:grid-rows-[1fr]"
                       aria-live="polite"
                     >
                       <div className="min-h-0 overflow-hidden">
@@ -228,7 +231,7 @@ export default function LocationGrid({
                           <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-white/55">
                             Next up
                           </p>
-                          <p className="line-clamp-2 text-base font-semibold leading-snug text-white">
+                          <p className="line-clamp-2 text-sm font-semibold leading-snug text-white sm:text-base">
                             {upcomingEvent.name}
                           </p>
                           <p className="flex items-center gap-1.5 text-sm text-white/75">
@@ -243,21 +246,23 @@ export default function LocationGrid({
                     </div>
                   ) : null}
 
-                  <div className="flex items-center gap-2 text-sm text-white/70 transition-colors group-hover:text-white">
+                  <div className="flex items-center justify-between gap-3 border-t border-white/15 pt-3.5">
                     {isPending ? (
-                      <>
+                      <span className="inline-flex items-center gap-2 text-sm text-white/80">
                         <Loader2
                           className="h-4 w-4 shrink-0 animate-spin"
                           aria-hidden
                         />
-                        <span>Opening…</span>
-                      </>
+                        Opening…
+                      </span>
                     ) : (
-                      <>
-                        <span>Explore events</span>
-                        <ArrowRight className="h-4 w-4 shrink-0 transition-transform group-hover:translate-x-1" />
-                      </>
+                      <span className="text-sm font-medium text-white/80 transition-colors duration-200 group-hover:text-white">
+                        Explore events
+                      </span>
                     )}
+                    <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white text-black transition-transform duration-200 group-hover:translate-x-0.5 motion-reduce:group-hover:translate-x-0">
+                      <ArrowRight className="h-4 w-4" aria-hidden />
+                    </span>
                   </div>
                 </div>
               </div>

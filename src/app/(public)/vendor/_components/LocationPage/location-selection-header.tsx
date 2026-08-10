@@ -6,6 +6,7 @@ import { motion } from "framer-motion";
 import { useState, useEffect, useCallback } from "react";
 import { VendorPublicLocationBookNow } from "@/components/shared/vendor-public-location-book-now";
 import { addCacheBusting } from "@/lib/image-utils";
+import { useTheme } from "@/providers/theme-provider/ThemeContext";
 import { useSession } from "next-auth/react";
 import { logout } from "@/lib/auth/logout";
 import { cn } from "@/lib/utils";
@@ -27,6 +28,8 @@ export default function LocationSelectionHeader({
   const isPreviewMode = useIsPreviewModeFromProvider();
   const deviceFramesEnabled = usePreviewDeviceFramesEnabled();
   const isPreviewNarrow = usePreviewNarrowLayout();
+  const { mediaVersion } = useTheme();
+  const logoSrc = logo ? addCacheBusting(logo, mediaVersion) : "";
   /** Guest CTAs only in framed onboarding — `/preview/site` mirrors live auth. */
   const forceGuestAuthChrome = isPreviewMode && deviceFramesEnabled;
   /**
@@ -49,39 +52,37 @@ export default function LocationSelectionHeader({
     ? "Continue Onboarding"
     : "Dashboard";
 
-  /** Desktop nav: viewport `md` on live; frame container / narrow store in onboarding. */
+  /**
+   * Desktop nav from `lg` so tablet / narrow widths use the hamburger instead of
+   * cramming Locations + auth links into ~700px.
+   */
   const desktopNavVisibility = isPreviewNarrow
     ? "hidden"
     : deviceFramesEnabled
       ? "hidden @lg/preview:flex"
-      : "hidden md:flex";
+      : "hidden lg:flex";
   const hamburgerVisibility = isPreviewNarrow
     ? "inline-flex"
     : deviceFramesEnabled
       ? "@lg/preview:hidden"
-      : "md:hidden";
+      : "lg:hidden";
   const mobileMenuVisibility = isPreviewNarrow
     ? "block"
     : deviceFramesEnabled
       ? "@lg/preview:hidden"
-      : "md:hidden";
+      : "lg:hidden";
 
   const topBarChromeLinkClass = cn(
-    "inline-flex items-center justify-center rounded-full border text-sm font-medium transition-colors whitespace-nowrap backdrop-blur-md px-3 py-1",
-    "border-[color:color-mix(in_srgb,var(--color-primary)_28%,var(--color-on-header)_16%)]",
-    "bg-[color:color-mix(in_srgb,var(--color-header)_72%,transparent)] hover:bg-[color:color-mix(in_srgb,var(--color-header)_82%,transparent)]",
-    "text-[var(--color-on-header)]",
-    "shadow-[0_12px_28px_-18px_rgba(15,23,42,0.22)]",
-    "hover:opacity-95 hover:underline hover:decoration-2 hover:underline-offset-2 hover:decoration-[color:var(--color-primary)]",
+    "inline-flex h-9 items-center justify-center rounded-full px-2.5 text-sm font-medium whitespace-nowrap transition-colors duration-200 sm:px-3.5",
+    "text-[var(--color-on-header)]/90 hover:text-[var(--color-on-header)]",
+    "hover:bg-[color:color-mix(in_srgb,var(--color-on-header)_8%,transparent)]",
+    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--color-primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[color:var(--color-header)]",
   );
   const menuSurfaceChromeLinkClass = cn(
-    "inline-flex items-center justify-center rounded-full border text-sm font-medium text-[var(--color-on-header)] transition-colors whitespace-nowrap px-4 py-2 backdrop-blur-sm",
-    "border-[color:color-mix(in_srgb,var(--color-primary)_28%,var(--color-on-header)_16%)]",
-    "bg-[color:color-mix(in_srgb,var(--color-header)_55%,transparent)] hover:bg-[color:color-mix(in_srgb,var(--color-header)_70%,transparent)]",
-    "hover:opacity-95 hover:underline hover:decoration-2 hover:underline-offset-2 hover:decoration-[color:var(--color-primary)]",
+    "inline-flex min-h-11 items-center justify-center rounded-xl px-4 py-2.5 text-sm font-medium text-[var(--color-on-header)] transition-colors duration-200 whitespace-nowrap",
+    "bg-[color:color-mix(in_srgb,var(--color-on-header)_6%,transparent)] hover:bg-[color:color-mix(in_srgb,var(--color-on-header)_12%,transparent)]",
+    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--color-primary)]",
   );
-  const bookNowMobilePillClass =
-    "!rounded-full h-9 gap-1 border-0 px-4 font-semibold shadow-sm";
 
   const handleClickOutside = useCallback(
     (event: MouseEvent) => {
@@ -107,6 +108,23 @@ export default function LocationSelectionHeader({
   useEffect(() => {
     setMobileMenuOpen(false);
   }, [isPreviewNarrow]);
+
+  const brandMark = logoSrc ? (
+    <div className="flex h-8 items-center sm:h-9 lg:h-10">
+      <img
+        key={logoSrc}
+        src={logoSrc}
+        width={200}
+        height={116}
+        className="max-h-8 w-auto max-w-[min(100%,8.5rem)] object-contain sm:max-h-9 sm:max-w-[min(100%,10rem)] lg:max-h-10 lg:max-w-[min(100%,11rem)]"
+        alt={name || "EventWizz"}
+      />
+    </div>
+  ) : (
+    <span className="max-w-[10rem] truncate text-base font-bold sm:max-w-[14rem] sm:text-lg lg:text-xl">
+      {name || "EventWizz"}
+    </span>
+  );
 
   const authChrome = (
     forceGuest: boolean,
@@ -229,96 +247,62 @@ export default function LocationSelectionHeader({
   return (
     <header
       className={cn(
-        "relative z-50 bg-[color:var(--color-header)] shadow-md text-[var(--color-on-header)]",
+        "relative z-50 h-[60px] border-b border-[color:color-mix(in_srgb,var(--color-on-header)_8%,transparent)] text-[var(--color-on-header)]",
+        "bg-[color:color-mix(in_srgb,var(--color-header)_72%,transparent)] shadow-[0_8px_28px_-20px_rgba(0,0,0,0.45)] backdrop-blur-xl supports-[backdrop-filter]:bg-[color:color-mix(in_srgb,var(--color-header)_58%,transparent)]",
         usesStickyHeader
           ? "sticky top-0 w-full"
           : "fixed top-0 left-0 right-0",
       )}
     >
-      <div className="py-3">
-        <div className="mx-auto flex w-full min-w-0 max-w-7xl items-center justify-between px-4">
-          <motion.div
-            className="flex min-w-0 items-center"
-            initial={{ opacity: 0, x: -20 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.5 }}
-          >
-            {isPreviewMode ? (
-              <div
-                className="inline-flex min-w-0 cursor-default items-center"
-                aria-label={name || "Site logo"}
-              >
-                {logo ? (
-                  <div className="flex h-10 items-center md:h-14">
-                    <img
-                      src={addCacheBusting(logo)}
-                      width={200}
-                      height={116}
-                      className="max-h-10 w-auto max-w-[min(100%,11rem)] object-contain"
-                      alt={name || "EventWizz"}
-                    />
-                  </div>
-                ) : (
-                  <span className="truncate text-lg font-bold md:text-xl">
-                    {name || "EventWizz"}
-                  </span>
-                )}
-              </div>
-            ) : (
-              <Link
-                href="/"
-                className="inline-flex min-w-0 items-center"
-                aria-label="Home"
-              >
-                {logo ? (
-                  <div className="flex h-10 items-center md:h-14">
-                    <img
-                      src={addCacheBusting(logo)}
-                      width={200}
-                      height={116}
-                      className="max-h-10 w-auto max-w-[min(100%,11rem)] object-contain"
-                      alt={name || "EventWizz"}
-                    />
-                  </div>
-                ) : (
-                  <span className="truncate text-lg font-bold md:text-xl">
-                    {name || "EventWizz"}
-                  </span>
-                )}
-              </Link>
-            )}
-          </motion.div>
-
-          <div className="flex shrink-0 items-center gap-2 sm:gap-3 md:gap-4">
+      <div className="mx-auto flex h-full w-full min-w-0 max-w-[1180px] items-center justify-between px-4 sm:px-6">
+        <motion.div
+          className="flex min-w-0 items-center"
+          initial={{ opacity: 0, x: -20 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ duration: 0.5 }}
+        >
+          {isPreviewMode ? (
             <div
-              className={cn(
-                desktopNavVisibility,
-                "items-center gap-3 lg:gap-4",
-              )}
+              className="inline-flex min-w-0 max-w-full cursor-default items-center gap-2.5"
+              aria-label={name || "Site logo"}
             >
-              <div className="flex items-center gap-2">
-                <VendorPublicLocationBookNow
-                  disabled={isPreviewMode}
-                  pillGlassOnHero={false}
-                  onLocationNavigate={() => setMobileMenuOpen(false)}
-                />
-              </div>
-              {authChrome(forceGuestAuthChrome, topBarChromeLinkClass)}
+              {brandMark}
             </div>
-
-            <button
-              type="button"
-              className={cn(
-                hamburgerVisibility,
-                "rounded-full p-2 transition-colors text-[var(--color-on-header)] hover:bg-[var(--color-primary)]/10",
-              )}
-              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              aria-label={mobileMenuOpen ? "Close menu" : "Open menu"}
-              aria-expanded={mobileMenuOpen}
+          ) : (
+            <Link
+              href="/"
+              className="inline-flex min-w-0 max-w-full items-center gap-2.5"
+              aria-label="Home"
             >
-              <Menu size={24} />
-            </button>
+              {brandMark}
+            </Link>
+          )}
+        </motion.div>
+
+        <div className="flex shrink-0 items-center gap-1 sm:gap-2 lg:gap-3">
+          <div
+            className={cn(desktopNavVisibility, "items-center gap-2 xl:gap-3")}
+          >
+            <VendorPublicLocationBookNow
+              disabled={isPreviewMode}
+              pillGlassOnHero={false}
+              onLocationNavigate={() => setMobileMenuOpen(false)}
+            />
+            {authChrome(forceGuestAuthChrome, topBarChromeLinkClass)}
           </div>
+
+          <button
+            type="button"
+            className={cn(
+              hamburgerVisibility,
+              "inline-flex h-11 w-11 items-center justify-center rounded-full transition-colors duration-200 text-[var(--color-on-header)] hover:bg-[color:color-mix(in_srgb,var(--color-on-header)_10%,transparent)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--color-primary)]",
+            )}
+            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            aria-label={mobileMenuOpen ? "Close menu" : "Open menu"}
+            aria-expanded={mobileMenuOpen}
+          >
+            <Menu size={22} />
+          </button>
         </div>
       </div>
 
@@ -326,7 +310,7 @@ export default function LocationSelectionHeader({
         <motion.div
           className={cn(
             mobileMenuVisibility,
-            "absolute top-full left-0 w-full bg-[var(--color-header)]/95 backdrop-blur-sm border-b border-[var(--color-primary)]/30 shadow-lg mobile-dropdown",
+            "absolute top-full left-0 w-full border-b border-[color:color-mix(in_srgb,var(--color-on-header)_10%,transparent)] bg-[color:color-mix(in_srgb,var(--color-header)_92%,transparent)] shadow-lg backdrop-blur-xl mobile-dropdown",
           )}
           initial={{ opacity: 0, height: 0 }}
           animate={{ opacity: 1, height: "auto" }}
@@ -334,14 +318,11 @@ export default function LocationSelectionHeader({
           transition={{ duration: 0.3 }}
         >
           <div className="px-4 py-4">
-            <nav className="mb-4 flex flex-col gap-4">
+            <nav className="mb-2 flex flex-col gap-2">
               <VendorPublicLocationBookNow
                 disabled={isPreviewMode}
                 pillGlassOnHero={false}
-                triggerClassName={cn(
-                  "book-now-btn flex w-full items-center justify-center gap-2 font-medium",
-                  bookNowMobilePillClass,
-                )}
+                triggerClassName="!h-11 !w-full !rounded-xl !px-4 justify-center font-semibold"
                 menuContentClassName="!w-full max-w-none"
                 onLocationNavigate={() => {
                   setMobileMenuOpen(false);

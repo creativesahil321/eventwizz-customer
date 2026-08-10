@@ -390,7 +390,7 @@ export function buildAiEventUserPrompt(params: {
     : "";
 
   const exampleBlock = hasRoomSystem
-    ? `\nEXAMPLE (multi-room): "Room Snow Ball dates 25-27 Aug 2026 with tickets+tables+deposit%; Room Office dates 2,6,8 Sep 2026 with tickets+tables; different menus and drink packages per room; Italian menu; whisky in Snow Ball, soft drinks in Office; packages price 55 USD; 10 FAQs" → map each fact to the correct step and room_name.\n`
+    ? `\nEXAMPLE (multi-room): "Room Snow Ball dates 25-27 Aug 2026 with tickets+tables+deposit%; Room Office dates 2,6,8 Sep 2026 with tickets+tables; different menus and drink packages per room; Italian menu; whisky in Snow Ball, soft drinks in Office; packages price £55; 10 FAQs" → map each fact to the correct step and room_name.\n`
     : "";
 
   return `Generate complete event content for:
@@ -517,7 +517,7 @@ export function resolveRoomBrochureDescription(
 }
 
 export const AI_EVENT_ADDITIONAL_DETAILS_PLACEHOLDER =
-  "Describe tickets, tables, dates per room, menus, drink packages, deposits, pricing, brochures, timeline, VIP rules, copy-from-room instructions, etc. Example: Room A dates 25–27 Aug with tickets+tables and 25% deposit; Room B dates 2, 6, 8 Sep with tickets+tables; Italian menu in both; whisky packages in Room A, soft drinks in Room B; packages from 55 USD; at least 10 FAQs.";
+  "Describe tickets, tables, dates per room, menus, drink packages, deposits, pricing, brochures, timeline, VIP rules or copy-from-room instructions. Example: Room A dates 25–27 Aug with tickets and tables and a 25% deposit; Room B dates 2, 6 and 8 Sep with tickets and tables; Italian menu in both; whisky packages in Room A, soft drinks in Room B; packages from £55; at least 10 FAQs.";
 
 export const AI_EVENT_ADDITIONAL_DETAILS_HINT =
-  "The AI understands natural language: per-room dates, menus, drinks, packages, deposits, bulk copy rules, pricing, FAQs, and more. Be specific about room names, dates, and prices.";
+  "Describe what you need in plain English — dates per room, menus, drinks, packages, deposits, pricing and FAQs. Be specific about room names, dates and prices.";

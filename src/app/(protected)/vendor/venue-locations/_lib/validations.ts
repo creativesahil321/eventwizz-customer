@@ -1,5 +1,8 @@
 import { z } from "zod";
 
+/** Hard cap on venue locations a vendor can create. */
+export const MAX_VENDOR_LOCATIONS = 6;
+
 // Schema for search params
 export const searchParamsCache = z.object({
   page: z.string().optional(),

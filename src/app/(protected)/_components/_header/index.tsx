@@ -150,31 +150,19 @@ const Header: React.FC<HeaderProps> = memo(({ menus }) => {
           </DropdownMenu>
         </div>
 
-        {/* Create Event Button - Show on mobile too with icon only */}
+        {/* Create Event — always labeled so vendors recognise the action */}
         {isVendor && (
           <PermissionGuard permissionKey="create-event">
-            <Link href="/vendor/events/create" className="md:hidden">
+            <Link href="/vendor/events/create" className="shrink-0">
               <Button
                 variant="event-primary"
-                size="icon"
-                aria-label="Create Event"
+                className="flex h-9 items-center gap-1.5 px-2.5 text-xs font-semibold sm:h-10 sm:gap-2 sm:px-4 sm:text-sm"
               >
-                <PlusCircle size={18} />
-              </Button>
-            </Link>
-          </PermissionGuard>
-        )}
-
-        {/* Create Event Button - Full button for tablets and up */}
-        {isVendor && (
-          <PermissionGuard permissionKey="create-event">
-            <Link href="/vendor/events/create" className="hidden md:block">
-              <Button
-                variant="event-primary"
-                className="flex items-center gap-2"
-              >
-                <PlusCircle size={16} />
-                Create Event
+                <PlusCircle size={16} className="shrink-0" />
+                <span className="whitespace-nowrap">
+                  <span className="sm:hidden">Create</span>
+                  <span className="hidden sm:inline">Create Event</span>
+                </span>
               </Button>
             </Link>
           </PermissionGuard>

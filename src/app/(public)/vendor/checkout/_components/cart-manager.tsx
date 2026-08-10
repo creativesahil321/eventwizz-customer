@@ -12,6 +12,7 @@ import {
   MoreHorizontal,
   Package,
   Loader2,
+  Plus,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
@@ -35,7 +36,6 @@ import {
   getAllRoomDateKeys,
   getApiCartDateKeys,
   getEventRoomCatalog,
-  getTotalEventRoomCount,
   hasRoomsAvailableToAdd,
   getRoomDrinkTitle,
   calculateRoomSubtotal,
@@ -120,11 +120,6 @@ export default function CartManager({}: CartManagerProps) {
   const showAddRoom = useMemo(
     () => hasRoomsAvailableToAdd(rooms, eventRoomCatalog),
     [rooms, eventRoomCatalog],
-  );
-
-  const totalEventRooms = useMemo(
-    () => getTotalEventRoomCount(currentEventApiData),
-    [currentEventApiData],
   );
 
   const drinkTitle = useMemo(
@@ -508,9 +503,18 @@ export default function CartManager({}: CartManagerProps) {
     totalGuestsAcrossCart > 0
       ? ` · ${totalGuestsAcrossCart} guest${totalGuestsAcrossCart !== 1 ? "s" : ""}`
       : "";
-  const bookingMetaLine = roomMode && rooms.length > 0
-    ? `${totalEventRooms} ${totalEventRooms === 1 ? "room" : "rooms"} · ${totalDatesAcrossRooms} ${totalDatesAcrossRooms === 1 ? "date" : "dates"}${guestMetaSuffix}`
-    : `${totalCartItems} ${totalCartItems === 1 ? "date" : "dates"}${guestMetaSuffix}`;
+  const isSingleRoomCheckout = roomMode && rooms.length === 1;
+  const isMultiRoomCheckout = roomMode && rooms.length > 1;
+  const bookedRoomCount = rooms.length;
+  const bookingMetaLine =
+    roomMode && bookedRoomCount > 0
+      ? `${bookedRoomCount} ${bookedRoomCount === 1 ? "room" : "rooms"} · ${totalDatesAcrossRooms} ${totalDatesAcrossRooms === 1 ? "date" : "dates"}${guestMetaSuffix}`
+      : `${totalCartItems} ${totalCartItems === 1 ? "date" : "dates"}${guestMetaSuffix}`;
+
+  const locationName =
+    typeof currentEventApiData?.location_name === "string"
+      ? currentEventApiData.location_name.trim()
+      : "";
 
   const bookingHeader = (
     <div className="mb-3 flex flex-col gap-3 sm:mb-4 sm:flex-row sm:items-start sm:justify-between">
@@ -521,6 +525,12 @@ export default function CartManager({}: CartManagerProps) {
         <h1 className="mt-1 text-lg font-extrabold tracking-tight text-[color:var(--checkout-brand-primary)] sm:text-2xl">
           {currentEventApiData?.event_name || "Your Booking"}
         </h1>
+        {locationName ? (
+          <p className="mt-1 flex items-center gap-1.5 text-[11px] font-medium text-[color:var(--checkout-muted-foreground)] sm:text-xs">
+            <MapPin className="h-3.5 w-3.5 shrink-0 text-[color:var(--checkout-brand-accent)]" />
+            <span className="truncate">{locationName}</span>
+          </p>
+        ) : null}
         <p className="mt-1.5 text-[11px] font-medium leading-relaxed text-[color:var(--checkout-muted-foreground)] sm:text-xs">
           {bookingMetaLine}
         </p>
@@ -602,8 +612,11 @@ export default function CartManager({}: CartManagerProps) {
               onRemoveDate={handleRemoveDate}
               isRemoving={removingDateKey === date}
               roomId={roomMode ? (activeRoomId ?? undefined) : undefined}
-              embedded={roomMode}
+              embedded={isMultiRoomCheckout}
               roomAccentIndex={activeRoomIndex}
+              roomName={
+                isSingleRoomCheckout ? activeRoom?.room_name : undefined
+              }
               drinkTitle={drinkTitle}
               serverEventData={currentEventApiData}
             />
@@ -612,7 +625,30 @@ export default function CartManager({}: CartManagerProps) {
       })
     );
 
-  if (roomMode && rooms.length > 0 && activeRoomId != null && activeRoom) {
+  const compactAddRoomLink =
+    showAddRoom && eventDetailsUrl ? (
+      <Link
+        href={eventDetailsUrl}
+        className="inline-flex items-center justify-center gap-1.5 self-start rounded-lg border border-dashed border-[color:var(--checkout-brand-accent)]/35 px-3 py-2 text-xs font-semibold text-[color:var(--checkout-brand-accent)] transition-colors hover:border-[color:var(--checkout-brand-accent)] hover:bg-blue-50/50"
+      >
+        <Plus className="h-3.5 w-3.5" />
+        Add room
+      </Link>
+    ) : null;
+
+  // Single room: merge room name into the date row — no heavy room tab bar.
+  if (isSingleRoomCheckout && activeRoomId != null && activeRoom) {
+    return (
+      <div id="checkout-cart-section" className="space-y-4">
+        {bookingHeader}
+        <div className="space-y-3">{dateSections}</div>
+        {compactAddRoomLink}
+      </div>
+    );
+  }
+
+  // Multi room: keep room tabs so customers can switch between rooms.
+  if (isMultiRoomCheckout && activeRoomId != null && activeRoom) {
     return (
       <div id="checkout-cart-section" className="space-y-4">
         {bookingHeader}

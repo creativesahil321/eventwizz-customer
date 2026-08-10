@@ -137,12 +137,14 @@ export function ColorsTab() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="min-w-0 space-y-4 sm:space-y-6">
       {/* Header with AI Button */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-bold text-gray-900">Color Palette</h2>
-          <p className="text-sm text-gray-500 mt-1">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
+        <div className="min-w-0">
+          <h2 className="text-xl font-bold text-gray-900 sm:text-2xl">
+            Color Palette
+          </h2>
+          <p className="mt-1 text-sm leading-relaxed text-gray-500">
             Fine-tune every token after a preset, or build your palette from
             scratch. AI can regenerate colors without changing your fonts.
           </p>
@@ -153,7 +155,7 @@ export function ColorsTab() {
           size="default"
           disabled={readOnly}
           onClick={() => setShowAIModal(true)}
-          className="flex items-center gap-2 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white shadow-lg"
+          className="flex w-full shrink-0 items-center justify-center gap-2 bg-gradient-to-r from-purple-600 to-blue-600 text-white shadow-lg hover:from-purple-700 hover:to-blue-700 sm:w-auto"
         >
           <Sparkles className="h-4 w-4" />
           Generate with AI

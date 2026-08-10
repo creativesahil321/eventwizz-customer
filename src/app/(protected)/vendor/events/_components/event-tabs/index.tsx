@@ -17,7 +17,8 @@ import {
 } from "../../_lib/queries";
 import EventPagination from "./event-pagination";
 import { Button } from "@/components/ui/button";
-import { Trash2 } from "lucide-react";
+import { PlusCircle, Trash2 } from "lucide-react";
+import Link from "next/link";
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { useSession } from "next-auth/react";
 import { EventItem, EventsQueryParams } from "@/services/vendor/events/type";
@@ -31,7 +32,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { LocationIndicator } from "@/components/location-indicator";
+import { LocationScopedTitle } from "@/components/location-indicator";
 import { PermissionGuard } from "@/components/permission/PermissionGuard";
 import { pageCardClassName } from "@/app/(protected)/_components/page-header-card";
 import { DateRange } from "react-day-picker";
@@ -176,9 +177,14 @@ export default function EventTabs({ search }: EventsProps) {
     cancelled: 0,
   };
 
+  // undefined while the list is loading so the date picker can show a loading
+  // state; [] once loaded with no selectable dates (not "still loading").
   const availableDates = useMemo(
-    () => filterMeta?.available_dates ?? [],
-    [filterMeta?.available_dates],
+    () =>
+      isLoading && !eventsData
+        ? undefined
+        : (filterMeta?.available_dates ?? []),
+    [filterMeta?.available_dates, isLoading, eventsData],
   );
   const availableCategories = useMemo(
     () => filterMeta?.available_categories ?? [],
@@ -380,18 +386,30 @@ export default function EventTabs({ search }: EventsProps) {
           <div className="flex flex-col gap-3 w-full sm:flex-1 min-w-0">
             <div className="flex flex-col sm:flex-row sm:items-center gap-3 flex-wrap">
               <h2 className="text-xl sm:text-2xl title-header text-black font-bold shrink-0">
-                All Events
+                <LocationScopedTitle title="Events" fallback="All Events" />
               </h2>
             </div>
-            <LocationIndicator variant="card" />
           </div>
-          <div className="flex flex-wrap gap-2 w-full sm:w-auto sm:shrink-0 sm:justify-end">
+          <div className="flex w-full flex-wrap gap-2 sm:w-auto sm:shrink-0 sm:justify-end">
+            <PermissionGuard permissionKey="create-event">
+              <Button
+                asChild
+                size="sm"
+                variant="event-primary"
+                className="flex-1 gap-1.5 font-semibold sm:flex-none"
+              >
+                <Link href="/vendor/events/create">
+                  <PlusCircle className="h-4 w-4 shrink-0" />
+                  Create Event
+                </Link>
+              </Button>
+            </PermissionGuard>
             {showDraftBulkUi && !selectionMode && (
               <PermissionGuard permissionKey="update-event">
                 <Button
                   size="sm"
                   onClick={toggleSelectionMode}
-                  variant="event-primary"
+                  variant="event-outline"
                   className="flex-1 sm:flex-none"
                 >
                   <span className="hidden sm:inline">Select Events</span>

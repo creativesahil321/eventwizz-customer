@@ -16,6 +16,8 @@ import { usePreviewNarrowLayout } from "@/hooks/use-preview-narrow-layout";
 export interface FloatingRoomBarItem {
   key: string;
   label: string;
+  /** Shown but not selectable (e.g. room with no dates). */
+  disabled?: boolean;
 }
 
 export interface FloatingRoomBarProps {
@@ -179,30 +181,38 @@ export function FloatingRoomBar({
         >
           {rooms.map((room, index) => {
             const accent = getRoomFloatingAccent(index);
-            const isActive = index === resolvedActiveIndex;
+            const isDisabled = Boolean(room.disabled);
+            const isActive = !isDisabled && index === resolvedActiveIndex;
 
             return (
               <button
                 key={room.key}
                 type="button"
-                onClick={() => onSelect(index)}
-                title={room.label}
+                onClick={() => {
+                  if (isDisabled) return;
+                  onSelect(index);
+                }}
+                disabled={isDisabled}
+                title={isDisabled ? `${room.label} — no dates available` : room.label}
                 aria-pressed={isActive}
+                aria-disabled={isDisabled}
                 data-active={isActive}
                 className={cn(
                   "flex shrink-0 items-center rounded-full font-medium transition-all",
                   sizeStyles.button,
                   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--checkout-brand-accent,#3b82f6)] focus-visible:ring-offset-2",
-                  isActive
-                    ? "bg-[color:var(--checkout-brand-primary,oklch(0.208_0.042_265.755))] text-white shadow-sm"
-                    : "text-gray-600 hover:bg-gray-50 hover:text-gray-900",
+                  isDisabled
+                    ? "cursor-not-allowed text-gray-400 opacity-55"
+                    : isActive
+                      ? "bg-[color:var(--checkout-brand-primary,oklch(0.208_0.042_265.755))] text-white shadow-sm"
+                      : "text-gray-600 hover:bg-gray-50 hover:text-gray-900",
                 )}
               >
                 <span
                   className={cn(
                     "shrink-0 rounded-full",
                     sizeStyles.dot,
-                    accent.dot,
+                    isDisabled ? "bg-gray-300" : accent.dot,
                     isActive && "ring-2 ring-white/30",
                   )}
                   aria-hidden="true"

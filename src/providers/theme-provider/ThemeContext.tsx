@@ -22,6 +22,7 @@ import {
 import { useQueryClient } from "@tanstack/react-query";
 import { resolveCurrencySymbol } from "@/lib/currency-format";
 import { normalizeHeadingEmphasis } from "@/lib/heading-emphasis";
+import { addCacheBusting } from "@/lib/image-utils";
 
 /**
  * Context type definition for theme data and state
@@ -30,6 +31,8 @@ interface ThemeContextType {
   theme: ThemeSettings | null;
   loading: boolean;
   error: string | null;
+  /** Changes when theme query updates — use with addCacheBusting for logo/favicon */
+  mediaVersion?: number;
 }
 
 /**
@@ -39,6 +42,7 @@ const defaultContext: ThemeContextType = {
   theme: null,
   loading: true,
   error: null,
+  mediaVersion: undefined,
 };
 
 const ThemeContext = createContext<ThemeContextType>(defaultContext);
@@ -187,8 +191,13 @@ const mapSchemaToSettings = (
 /**
  * Applies theme CSS variables to document root
  * @param settings - Theme settings to apply
+ * @param mediaVersion - Stable cache key (e.g. query dataUpdatedAt) so overwritten
+ *   logo/favicon files at the same URL are not served from browser cache
  */
-const applyThemeToDOM = (settings: ThemeSchema): void => {
+const applyThemeToDOM = (
+  settings: ThemeSchema,
+  mediaVersion?: number,
+): void => {
   if (!settings) return;
 
   // Generate CSS using the shared utility
@@ -221,8 +230,9 @@ const applyThemeToDOM = (settings: ThemeSchema): void => {
       link.rel = "icon";
       document.head.appendChild(link);
     }
-    if (link.href !== settings.favicon) {
-      link.href = settings.favicon;
+    const faviconHref = addCacheBusting(settings.favicon, mediaVersion);
+    if (link.getAttribute("href") !== faviconHref) {
+      link.href = faviconHref;
     }
   }
 
@@ -252,6 +262,7 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({
   // Use TanStack Query for theme data
   const {
     data: queryThemeData,
+    dataUpdatedAt: themeMediaVersion,
     isLoading: isQueryLoading,
     error: queryError,
   } = useThemeQuery(domain, initialTheme);
@@ -272,8 +283,8 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({
         const themeSettings = mapSchemaToSettings(themeToApply);
         setTheme(themeSettings);
 
-        // Apply theme to DOM
-        applyThemeToDOM(themeToApply);
+        // Apply theme to DOM (version busts favicon when storage path is reused)
+        applyThemeToDOM(themeToApply, themeMediaVersion || undefined);
 
         setLoading(false);
       } catch (err) {
@@ -286,12 +297,18 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({
       setError("Theme settings not available");
       setLoading(false);
     }
-  }, [queryThemeData, initialTheme, isQueryLoading, isDomainLoading]);
+  }, [
+    queryThemeData,
+    themeMediaVersion,
+    initialTheme,
+    isQueryLoading,
+    isDomainLoading,
+  ]);
 
   // Apply initial theme immediately on mount if available
   useEffect(() => {
     if (initialTheme && typeof window !== "undefined") {
-      applyThemeToDOM(initialTheme);
+      applyThemeToDOM(initialTheme, Date.now());
 
       // Pre-populate the query cache with a mutable copy so TanStack Query
       // never mutates a read-only (frozen) server object (avoids "Cannot assign to read only property 'primary'").
@@ -306,6 +323,7 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({
         theme,
         loading: loading && !initialTheme, // Don't show loading if we have initialTheme
         error: queryError ? String(queryError) : error,
+        mediaVersion: themeMediaVersion || undefined,
       }}
     >
       {children}

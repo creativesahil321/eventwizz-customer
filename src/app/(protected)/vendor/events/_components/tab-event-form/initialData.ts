@@ -72,7 +72,7 @@ export const initialData: EventSchemaType = {
         name: "",
         items: [
           {
-            title: "Item Title 1",
+            title: "Item title 1",
             description: "",
           },
         ],

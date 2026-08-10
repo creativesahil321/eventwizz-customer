@@ -21,6 +21,7 @@ import {
   useState,
   useEffect,
   useMemo,
+  type ReactNode,
   type RefObject,
 } from "react";
 import { ServerContext } from "@/lib/server-context";
@@ -34,6 +35,7 @@ import {
 } from "./vendor-public-location-book-now";
 import { useCartVisibility } from "@/app/(public)/vendor/checkout/_lib/hooks/useCartVisibility";
 import { addCacheBusting } from "@/lib/image-utils";
+import { useTheme } from "@/providers/theme-provider/ThemeContext";
 import { cn } from "@/lib/utils";
 import { getAnchorColor, relativeLuminance } from "@/lib/color-contrast";
 import { useMediaPreviewUrl } from "@/hooks/use-media-preview-url";
@@ -218,6 +220,11 @@ interface CommonHeaderProps {
   scrollContainerRef?: RefObject<HTMLElement | null>;
   /** Prefer this location's phone from theme.locations when set */
   locationSlug?: string | null;
+  /**
+   * Optional strip above the nav (e.g. event coupon banner).
+   * Renders inside the same fixed/sticky chrome so it never covers the header.
+   */
+  topBanner?: ReactNode;
 }
 
 export default function CommonHeader({
@@ -233,8 +240,11 @@ export default function CommonHeader({
   compactGuestAuth = false,
   scrollContainerRef,
   locationSlug,
+  topBanner,
 }: CommonHeaderProps) {
   const { theme } = useContext(ServerContext);
+  // Theme refetch after logo save updates this → busts browser cache for same URL path
+  const { mediaVersion: themeMediaVersion } = useTheme();
   const isPreviewFromProvider = useIsPreviewModeFromProvider();
   const isPreviewPath = useIsPreviewMode();
   const deviceFramesEnabled = usePreviewDeviceFramesEnabled();
@@ -408,6 +418,10 @@ export default function CommonHeader({
         if (headerIsLight) {
           return solidHeaderBarStyles(isScrolled);
         }
+        // With a top banner, keep a solid nav bar so chrome stays readable.
+        if (topBanner) {
+          return solidHeaderBarStyles(true);
+        }
         // Dark header: transparent bar over hero until scroll (white nav pills).
         const overDarkHero = !isScrolled;
         return {
@@ -429,7 +443,10 @@ export default function CommonHeader({
   const styles = getVariantStyles();
   /** Glass pills over imagery: dark-header live pages over hero + onboarding homepage with cover. */
   const pillGlassOnHero =
-    (variant === "default" && !isScrolled && !headerIsLight) ||
+    (variant === "default" &&
+      !topBanner &&
+      !isScrolled &&
+      !headerIsLight) ||
     (variant === "onboarding" && hasBackgroundImage);
   const topBarPillClass = cn(
     "rounded-full border px-3 py-1 text-sm transition-colors whitespace-nowrap backdrop-blur-md",
@@ -619,12 +636,20 @@ export default function CommonHeader({
         usesStickyHeader
           ? "sticky top-0 z-50 w-full transition-all duration-300"
           : "fixed top-0 left-0 right-0 z-50 transition-all duration-300",
-        styles.container,
+        // Banner owns its own fill; keep section transparent so strip colour isn't washed.
+        topBanner ? "bg-transparent shadow-none" : styles.container,
         variant !== "default" && styles.textColor,
         headerDarkModeBg,
         className,
       )}
     >
+      {topBanner ? <div className="w-full">{topBanner}</div> : null}
+      <div
+        className={cn(
+          "w-full",
+          topBanner ? styles.container : null,
+        )}
+      >
       <div className="container mx-auto min-w-0 px-2 sm:px-4">
         {/* Desktop Header — mirrors live site; container-aware when embedded */}
         <div
@@ -682,7 +707,10 @@ export default function CommonHeader({
               <div className="flex h-14 max-w-full items-center justify-center cursor-default">
                 {logoPath ? (
                   <img
-                    src={addCacheBusting(logoPath as string)}
+                    src={addCacheBusting(
+                      logoPath as string,
+                      themeMediaVersion,
+                    )}
                     width={200}
                     height={116}
                     className={logoSizeClass}
@@ -706,7 +734,10 @@ export default function CommonHeader({
                 <div className="flex h-14 max-w-full items-center justify-center">
                   {logoPath ? (
                     <img
-                      src={addCacheBusting(logoPath as string)}
+                      src={addCacheBusting(
+                        logoPath as string,
+                        themeMediaVersion,
+                      )}
                       width={200}
                       height={116}
                       className={logoSizeClass}
@@ -1036,7 +1067,10 @@ export default function CommonHeader({
               <div className="flex h-9 max-w-full items-center justify-center cursor-default">
                 {logoPath ? (
                   <img
-                    src={addCacheBusting(logoPath as string)}
+                    src={addCacheBusting(
+                      logoPath as string,
+                      themeMediaVersion,
+                    )}
                     width={200}
                     height={116}
                     className="max-h-7 max-w-[min(100%,9.5rem)] w-auto object-contain"
@@ -1060,7 +1094,10 @@ export default function CommonHeader({
                 <div className="flex h-9 max-w-full items-center justify-center">
                   {logoPath ? (
                     <img
-                      src={addCacheBusting(logoPath as string)}
+                      src={addCacheBusting(
+                        logoPath as string,
+                        themeMediaVersion,
+                      )}
                       width={200}
                       height={116}
                       className="max-h-7 max-w-[min(100%,9.5rem)] w-auto object-contain"
@@ -1441,6 +1478,7 @@ export default function CommonHeader({
             )}
           </nav>
         </div>
+      </div>
       </div>
     </section>
   );

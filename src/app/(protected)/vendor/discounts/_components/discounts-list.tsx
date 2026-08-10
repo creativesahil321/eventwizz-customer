@@ -14,13 +14,12 @@ import {
   CalendarDays,
   Ticket,
   X,
-  Loader2,
   ChevronLeft,
   ChevronRight,
 } from "lucide-react";
-import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { DiscountRowsSkeleton } from "./discounts-list-skeleton";
 import {
   Select,
   SelectContent,
@@ -48,7 +47,7 @@ import {
 } from "../_lib/queries";
 import { DiscountStatusBadge } from "./discount-status-badge";
 import {
-  formatDiscountScope,
+  formatDiscountMetaLine,
   formatDiscountValue,
   getDiscountDisplayName,
 } from "./format";
@@ -140,20 +139,14 @@ export function DiscountsList() {
     setPage(1);
   };
 
+  /** Success and error toasts come from the api-client interceptor. */
   const toggleStatus = async (id: number, current: DiscountStatus) => {
     if (current === "expired") return;
     const nextStatus = current === "active" ? "inactive" : "active";
     try {
       await updateStatus.mutateAsync({ id, status: nextStatus });
-      toast.success(
-        nextStatus === "active" ? "Discount activated" : "Discount deactivated"
-      );
-    } catch (err) {
-      toast.error(
-        err instanceof Error
-          ? err.message
-          : "Could not update status. Check status API endpoint."
-      );
+    } catch {
+      // Mutation state already reflects the failure in the UI
     }
   };
 
@@ -161,7 +154,8 @@ export function DiscountsList() {
     <div className="flex w-full min-w-0 flex-col gap-4">
       <ProtectedPageHeader
         title="Discounts"
-        description="Create event discounts and coupon codes for your current location. Only one discount applies per booking; coupon codes take priority."
+        locationScope="venue"
+        description="Discounts and coupon codes for this venue only. A Discount can cover multiple dates with different offers. Coupon codes are reusable and tied to one event. Switch location in the header to manage another."
         actions={
           <Button asChild>
             <Link href={createHref}>
@@ -269,10 +263,7 @@ export function DiscountsList() {
         </div>
 
         {isLoading ? (
-          <div className="flex items-center justify-center gap-2 py-16 text-sm text-muted-foreground">
-            <Loader2 className="h-4 w-4 animate-spin" />
-            Loading discounts…
-          </div>
+          <DiscountRowsSkeleton />
         ) : isError ? (
           <div className="rounded-lg border border-dashed border-destructive/30 px-4 py-12 text-center">
             <p className="font-medium text-[#0F172A]">Could not load discounts</p>
@@ -334,15 +325,7 @@ export function DiscountsList() {
                           {formatDiscountValue(discount)}
                         </p>
                         <p className="truncate text-xs text-muted-foreground">
-                          {discount.summary || (
-                            <>
-                              {DISCOUNT_CATEGORY_LABELS[discount.category]}
-                              {" · "}
-                              {formatDiscountScope(discount)}
-                              {" · Expires "}
-                              {discount.expires_at}
-                            </>
-                          )}
+                          {formatDiscountMetaLine(discount)}
                         </p>
                       </div>
                     </div>
@@ -375,8 +358,8 @@ export function DiscountsList() {
                             >
                               <Power className="mr-2 h-4 w-4" />
                               {discount.status === "active"
-                                ? "Deactivate"
-                                : "Activate"}
+                                ? "Pause (turn off)"
+                                : "Make live"}
                             </DropdownMenuItem>
                           ) : (
                             <DropdownMenuItem disabled>

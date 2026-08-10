@@ -10,7 +10,7 @@ import { Area } from "react-easy-crop";
  */
 export const ASPECT_RATIOS = {
   square: 1 / 1, // Avatar / logo (1:1)
-  landscape: 16 / 9, // Optional guide for covers (overridable in dialog)
+  landscape: 16 / 9, // Site / location hero & cover backgrounds
   cinematic: 21 / 9, // Ultra-wide event banner (21:9)
   portrait: 3 / 4, // Portrait slots
   free: undefined, // Full image / gallery — user's choice

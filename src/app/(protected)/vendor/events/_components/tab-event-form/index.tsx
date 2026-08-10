@@ -9,12 +9,14 @@ import React, {
   useCallback,
   useRef,
 } from "react";
-import { ArrowLeft, CheckCircle2, Eye } from "lucide-react";
+import { ArrowLeft, CheckCircle2, Eye, Loader2 } from "lucide-react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { FormProvider as RHFFormProvider, useWatch } from "react-hook-form";
+import { cn } from "@/lib/utils";
 import { useEventFormContext } from "../events-form-provider";
 import { toast } from "sonner";
 import {
@@ -93,7 +95,7 @@ const steps = [
   },
   {
     id: 2,
-    label: "Timeline & package",
+    label: "Package",
     icon: <Package size={16} />,
     value: "package",
   },
@@ -101,20 +103,44 @@ const steps = [
   { id: 4, label: "Menu", icon: <Utensils size={16} />, value: "menu" },
   {
     id: 5,
-    label: "Brochure Info",
+    label: "Brochure",
     icon: <Info size={16} />,
     value: "more-info",
   },
-  { id: 6, label: "Other Packages", icon: <Wine size={16} />, value: "drinks" },
+  { id: 6, label: "Other packages", icon: <Wine size={16} />, value: "drinks" },
 
   { id: 7, label: "FAQs", icon: <HelpCircle size={16} />, value: "faqs" },
   {
     id: 8,
-    label: "Publish",
+    label: "Finalise",
     icon: <UploadCloud size={16} />,
     value: "publish",
   },
 ];
+
+function formatEventStatusLabel(status?: string | null): string {
+  if (!status) return "Draft";
+  const normalized = status.toLowerCase();
+  if (normalized === "active") return "Published";
+  if (normalized === "draft") return "Draft";
+  if (normalized === "cancelled") return "Cancelled";
+  if (normalized === "past") return "Past";
+  return status.charAt(0).toUpperCase() + status.slice(1);
+}
+
+function eventStatusBadgeClass(status?: string | null): string {
+  const normalized = (status || "draft").toLowerCase();
+  if (normalized === "active") {
+    return "border-emerald-200 bg-emerald-50 text-emerald-800";
+  }
+  if (normalized === "cancelled") {
+    return "border-red-200 bg-red-50 text-red-700";
+  }
+  if (normalized === "past") {
+    return "border-blue-200 bg-blue-50 text-blue-700";
+  }
+  return "border-slate-200 bg-slate-100 text-slate-700";
+}
 
 type RoomRecord = {
   name: string;
@@ -242,6 +268,7 @@ export default function TabEventForm() {
     currentStep,
     readOnly,
     persistedHydrated,
+    finalizeBusy,
     setActiveStep,
   } = useEventFormContext();
   const { openEventPreview, canPreview } = useEventPreviewNavigation();
@@ -256,6 +283,10 @@ export default function TabEventForm() {
   const stepOneIsRooms = useWatch({
     control: formContext.control,
     name: "stepOne.is_rooms",
+  });
+  const publishSubmitType = useWatch({
+    control: formContext.control,
+    name: "stepEight.submit_type",
   });
   const watchedStepTwoRooms = useWatch({
     control: formContext.control,
@@ -341,6 +372,25 @@ export default function TabEventForm() {
     // API shape may be either { data: event } or { data: { data: event } }.
     return (levelTwo || levelOne || {}) as EventDataLike;
   }, [eventData]);
+
+  const eventStatus = useMemo(() => {
+    const payload = eventData?.data;
+    if (payload && typeof payload === "object" && "status" in payload) {
+      const status = (payload as { status?: unknown }).status;
+      return typeof status === "string" ? status : null;
+    }
+    return null;
+  }, [eventData]);
+
+  const isEventCancelled = (eventStatus || "").toLowerCase() === "cancelled";
+  const isPublishTab = activeTab === "publish";
+  const canFinalizeEvent =
+    Boolean(currentStep && currentStep >= 8) &&
+    !readOnly &&
+    !isEventCancelled &&
+    persistedHydrated;
+  const publishActionLabel =
+    publishSubmitType === "active" ? "Publish event" : "Save as draft";
 
   const resolvedStepTwoRooms = useMemo(
     () =>
@@ -702,40 +752,53 @@ export default function TabEventForm() {
           >
             <Card className="shadow-sm overflow-hidden gap-0 py-0">
               <div className="border-b bg-card px-2 sm:px-3 md:px-4 pt-3 pb-3">
-                <div className="w-full overflow-x-auto scrollbar-thin scrollbar-thumb-gray-400 scrollbar-track-gray-100 hover:scrollbar-thumb-gray-500 md:overflow-x-visible">
-                  <TabsList className="inline-flex md:flex w-max md:w-full bg-muted/60 p-1 h-auto rounded-lg gap-1.5 md:gap-2">
-                    {steps.map((step) => {
-                      // Disable tabs that are beyond the current step
-                      const isDisabled = currentStep
-                        ? step.id > currentStep
-                        : false;
+                <div className="flex items-start gap-2 sm:gap-3">
+                  <div className="min-w-0 flex-1 overflow-x-auto scrollbar-thin scrollbar-thumb-gray-400 scrollbar-track-gray-100 hover:scrollbar-thumb-gray-500 md:overflow-x-visible">
+                    <TabsList className="inline-flex md:flex w-max md:w-full bg-muted/60 p-1 h-auto rounded-lg gap-1.5 md:gap-2">
+                      {steps.map((step) => {
+                        // Disable tabs that are beyond the current step
+                        const isDisabled = currentStep
+                          ? step.id > currentStep
+                          : false;
 
-                      return (
-                        <TabsTrigger
-                          key={step.id}
-                          value={step.value}
-                          disabled={isDisabled}
-                          className={`px-2 sm:px-3 md:px-4 lg:px-5 py-1.5 h-auto text-xs sm:text-sm font-medium whitespace-nowrap rounded-md data-[state=active]:bg-[var(--color-primary)] data-[state=active]:text-white data-[state=active]:shadow-sm flex items-center justify-center gap-1 sm:gap-1.5 flex-shrink-0 md:flex-1 md:min-w-0 transition-all duration-300 ease-in-out ${
-                            isDisabled ? "opacity-50 cursor-not-allowed" : ""
-                          } ${
-                            currentStep && step.id === currentStep
-                              ? "ring-2 ring-blue-500"
-                              : ""
-                          }`}
-                        >
-                          {step.icon}
-                          <span className="whitespace-nowrap truncate">
-                            {step.label}
-                          </span>
-                          {currentStep && step.id === currentStep && (
-                            <span className="ml-1 text-xs bg-blue-100 text-blue-800 px-1 sm:px-1.5 py-0.5 rounded-full hidden sm:inline whitespace-nowrap flex-shrink-0">
-                              Current
+                        return (
+                          <TabsTrigger
+                            key={step.id}
+                            value={step.value}
+                            disabled={isDisabled}
+                            className={`px-2 sm:px-3 md:px-4 lg:px-5 py-1.5 h-auto text-xs sm:text-sm font-medium whitespace-nowrap rounded-md data-[state=active]:bg-[var(--color-primary)] data-[state=active]:text-white data-[state=active]:shadow-sm flex items-center justify-center gap-1 sm:gap-1.5 flex-shrink-0 md:flex-1 md:min-w-0 transition-all duration-300 ease-in-out ${
+                              isDisabled ? "opacity-50 cursor-not-allowed" : ""
+                            } ${
+                              currentStep && step.id === currentStep
+                                ? "ring-2 ring-blue-500"
+                                : ""
+                            }`}
+                          >
+                            {step.icon}
+                            <span className="whitespace-nowrap truncate">
+                              {step.label}
                             </span>
-                          )}
-                        </TabsTrigger>
-                      );
-                    })}
-                  </TabsList>
+                            {currentStep &&
+                              step.id === currentStep &&
+                              step.value !== "publish" && (
+                              <span className="ml-1 text-xs bg-blue-100 text-blue-800 px-1 sm:px-1.5 py-0.5 rounded-full hidden sm:inline whitespace-nowrap flex-shrink-0">
+                                Current
+                              </span>
+                            )}
+                          </TabsTrigger>
+                        );
+                      })}
+                    </TabsList>
+                  </div>
+                  <Badge
+                    variant="outline"
+                    className={cn(
+                      "mt-1 shrink-0 px-2.5 py-0.5 text-xs font-semibold capitalize",
+                      eventStatusBadgeClass(eventStatus),
+                    )}
+                  >
+                    {formatEventStatusLabel(eventStatus)}
+                  </Badge>
                 </div>
               </div>
 
@@ -924,12 +987,12 @@ export default function TabEventForm() {
               </div>
 
               {/* Tab Navigation */}
-                  <div className="flex flex-wrap items-center justify-between gap-3 mt-6">
+                  <div className="flex flex-wrap items-center justify-between gap-3 mt-6 pt-2 border-t border-slate-100">
                 <Button
                   type="button"
                   variant="outline"
                   onClick={navigateToPreviousTab}
-                  disabled={activeTab === "event-name"}
+                  disabled={activeTab === "event-name" || finalizeBusy}
                   className="flex items-center gap-2 text-xs sm:text-sm"
                   size="sm"
                 >
@@ -938,11 +1001,11 @@ export default function TabEventForm() {
                   <span className="sm:hidden">Prev</span>
                 </Button>
 
-                    <div className="flex items-center gap-3">
+                    <div className="flex flex-wrap items-center justify-end gap-3 sm:gap-4">
                       {currentStep ? (
-                  <div className="text-xs sm:text-sm text-muted-foreground flex items-center">
-                    <span className="hidden sm:inline">Step </span>
-                    {currentStep}/8
+                        <div className="inline-flex items-center rounded-md border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs sm:text-sm font-semibold text-slate-700 tabular-nums">
+                          <span className="hidden sm:inline">Step </span>
+                          {Math.min(currentStep, 8)}/8
                         </div>
                       ) : null}
                       <Button
@@ -950,17 +1013,47 @@ export default function TabEventForm() {
                         variant="event-outline"
                         size="sm"
                         className="flex items-center gap-2 text-xs sm:text-sm"
-                        disabled={!canPreview}
+                        disabled={!canPreview || finalizeBusy}
                         onClick={openEventPreview}
                         title={
                           canPreview
                             ? "Preview how this event will look to customers"
-                            : "Save step 1 to enable preview"
+                            : "Save the Event name step to enable preview"
                         }
                       >
                         <Eye size={14} />
                         Preview
                       </Button>
+                      {isPublishTab ? (
+                        <Button
+                          type="submit"
+                          form="vendor-event-publish-form"
+                          variant="event-primary"
+                          size="default"
+                          className="min-w-[10.5rem] text-sm font-semibold shadow-md"
+                          disabled={!canFinalizeEvent || finalizeBusy}
+                          title={
+                            readOnly
+                              ? "View only"
+                              : isEventCancelled
+                                ? "You cannot publish a cancelled event"
+                                : !canFinalizeEvent
+                                  ? "Complete all required sections before you publish"
+                                  : publishActionLabel
+                          }
+                        >
+                          {finalizeBusy ? (
+                            <>
+                              <Loader2 className="size-4 animate-spin" />
+                              {publishSubmitType === "active"
+                                ? "Publishing…"
+                                : "Saving…"}
+                            </>
+                          ) : (
+                            publishActionLabel
+                          )}
+                        </Button>
+                      ) : null}
                     </div>
                   </div>
                 </div>

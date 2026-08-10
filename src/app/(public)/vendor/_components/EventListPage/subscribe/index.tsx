@@ -32,16 +32,15 @@ export default function SubscribeSection() {
   };
 
   const fieldClass =
-    "h-12 border-[color:color-mix(in_srgb,var(--color-text)_14%,transparent)] bg-[var(--color-background)]/90 text-[var(--color-text)] placeholder:text-[var(--color-text-dimmed)]";
+    "h-[42px] rounded-xl border-[color:color-mix(in_srgb,var(--color-text)_14%,transparent)] bg-[var(--color-background)]/90 text-[var(--color-text)] placeholder:text-[var(--color-text-dimmed)] focus-visible:ring-2 focus-visible:ring-[color:var(--color-primary)]";
 
   return (
-    <section className="relative overflow-hidden py-14 md:py-16">
-      <div className="absolute inset-0 bg-[var(--color-surface)]" aria-hidden />
+    <section className="relative overflow-hidden border-t border-[color:color-mix(in_srgb,var(--color-text)_8%,transparent)] bg-[var(--color-background)] py-16 md:py-20">
       <div
-        className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_80%_50%_at_50%_-20%,color-mix(in_srgb,var(--color-primary)_12%,transparent),transparent)]"
+        className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_80%_50%_at_50%_-20%,color-mix(in_srgb,var(--color-primary)_10%,transparent),transparent)]"
         aria-hidden
       />
-      <div className="relative z-10 container mx-auto px-6 text-center">
+      <div className="relative z-10 mx-auto w-full max-w-[1180px] px-4 text-center sm:px-6">
         <p className="mb-3 text-xs font-semibold uppercase tracking-[0.28em] text-[color:var(--color-primary)]">
           Stay updated
         </p>
@@ -52,14 +51,14 @@ export default function SubscribeSection() {
           variant="onSurface"
           className="mb-4 !text-3xl !font-semibold tracking-tight !text-[var(--color-on-surface)] md:!text-4xl"
         />
-        <p className="mx-auto mb-10 max-w-xl text-base text-[var(--color-text-dimmed)] md:text-lg">
+        <p className="mx-auto mb-8 max-w-xl text-base text-[var(--color-text-dimmed)] md:mb-9 md:text-lg">
           Get drops for new dates and venues — one short form, no spam.
         </p>
 
         <form
           onSubmit={handleSubmit}
           className={cn(
-            "mx-auto flex max-w-4xl flex-col items-stretch justify-center gap-3 rounded-2xl border border-[color:color-mix(in_srgb,var(--color-text)_8%,transparent)] bg-[color:color-mix(in_srgb,var(--color-text)_3%,var(--color-surface))] p-5 shadow-sm",
+            "mx-auto flex max-w-4xl flex-col items-stretch justify-center gap-3 rounded-[20px] border border-[color:color-mix(in_srgb,var(--color-text)_10%,transparent)] bg-[var(--color-surface)] p-5 shadow-[0_16px_40px_-28px_rgba(0,0,0,0.28)]",
             !narrowPreview && "md:flex-row md:flex-wrap md:items-center md:p-6",
           )}
         >
@@ -104,10 +103,18 @@ export default function SubscribeSection() {
             )}
           />
 
-          <Button type="submit" variant="event-primary">
+          <Button
+            type="submit"
+            variant="event-primary"
+            className="h-[42px] rounded-xl px-6 font-semibold"
+          >
             Subscribe
           </Button>
         </form>
+
+        <p className="mx-auto mt-4 max-w-md text-center text-xs leading-relaxed text-[var(--color-text-dimmed)] sm:mt-5 sm:text-[13px]">
+          No spam. Only event updates. Unsubscribe anytime.
+        </p>
       </div>
     </section>
   );

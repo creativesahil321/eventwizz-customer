@@ -83,7 +83,7 @@ export const vendorMenus: MenuItemProps[] = [
   },
   {
     id: 9,
-    title: "Sites Essentials",
+    title: "Site Essentials",
     icon: "sitesEssentials",
     href: createVendorUrl("/vendor/sites-essentials"),
     url: createVendorUrl("/vendor/sites-essentials"),
@@ -164,7 +164,7 @@ export const vendorMenus: MenuItemProps[] = [
   },
   {
     id: 17,
-    title: "Seo Tools",
+    title: "SEO Tools",
     icon: "seoTools",
     href: createVendorUrl("/vendor/seo-tools"),
     url: createVendorUrl("/vendor/seo-tools"),

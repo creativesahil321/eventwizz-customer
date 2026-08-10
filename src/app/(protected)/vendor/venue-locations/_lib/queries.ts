@@ -6,7 +6,7 @@ import {
   type QueryClient,
 } from "@tanstack/react-query";
 import { SearchParams } from "./types";
-import { LocationFormValues } from "./validations";
+import { LocationFormValues, MAX_VENDOR_LOCATIONS } from "./validations";
 import { VenueLocation as ApiVenueLocation } from "@/types/api.types";
 import { locationService } from "@/services/vendor/locations/locations.service";
 import { useSitePreviewStore } from "@/store/site-preview.store";
@@ -20,6 +20,32 @@ import { useLocationStore } from "@/store/location.store";
 // Constants
 const LOCATIONS_STALE_TIME = 10 * 60 * 1000; // 10 minutes
 
+export { MAX_VENDOR_LOCATIONS };
+
+/** Resolve current vendor location count from React Query cache and Zustand. */
+export function resolveVendorLocationCount(queryClient: QueryClient): number {
+  let count = useLocationStore.getState().allLocations.length;
+
+  const caches = queryClient.getQueriesData<
+    LocationsQueryData | ApiVenueLocation[]
+  >({ queryKey: ["locations"] });
+
+  for (const [, value] of caches) {
+    if (!value) continue;
+    if (Array.isArray(value)) {
+      count = Math.max(count, value.length);
+      continue;
+    }
+    if (typeof value.meta?.total === "number") {
+      count = Math.max(count, value.meta.total);
+    } else if (Array.isArray(value.data)) {
+      count = Math.max(count, value.data.length);
+    }
+  }
+
+  return count;
+}
+
 /** Query key prefixes to invalidate when default location changes (APIs use location from session/header) */
 export const LOCATION_DEPENDENT_QUERY_KEYS = [
   ["vendor", "dashboard"],
@@ -29,6 +55,8 @@ export const LOCATION_DEPENDENT_QUERY_KEYS = [
   ["vendor", "email-logs"],
   ["site-essentials"],
   ["events"],
+  ["vendor-discounts"],
+  ["vendor", "payment-gateways"],
   // Profile carries site_url, has_payment_provider, notification_stats per location
   ["profile"],
 ] as const;
@@ -220,6 +248,13 @@ export const useCreateLocation = () => {
 
   return useMutation({
     mutationFn: (data: LocationFormValues) => {
+      const locationCount = resolveVendorLocationCount(queryClient);
+      if (locationCount >= MAX_VENDOR_LOCATIONS) {
+        throw new Error(
+          `You can add a maximum of ${MAX_VENDOR_LOCATIONS} locations`,
+        );
+      }
+
       const payload: LocationCreatePayload = {
         name: data.name || "",
         city: data.city || "",

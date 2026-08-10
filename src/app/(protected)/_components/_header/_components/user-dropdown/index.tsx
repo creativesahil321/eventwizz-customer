@@ -19,6 +19,7 @@ import { useExitImpersonation } from "@/hooks/useImpersonation";
 import { logout } from "@/lib/auth/logout";
 import { addCacheBusting } from "@/lib/image-utils";
 import { PermissionGuard } from "@/components/permission/PermissionGuard";
+import { toTitleCase } from "@/lib/utils";
 
 // Helper function to check if a URL is valid
 const isValidUrl = (url: string | null | undefined): boolean => {
@@ -129,7 +130,9 @@ const UserDropdown = memo(() => {
                 <ChevronDown size={16} />
               </div>
               <span className="hidden xl:block text-xs">
-                {user?.active_role || session?.user?.active_role}
+                {toTitleCase(
+                  user?.active_role || session?.user?.active_role || ""
+                )}
               </span>
             </div>
           </Button>

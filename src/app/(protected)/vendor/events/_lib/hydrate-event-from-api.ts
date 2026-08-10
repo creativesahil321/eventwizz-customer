@@ -129,8 +129,7 @@ export function patchEventPayloadFromApi(
       : 0;
   const activeRoomId =
     Number(cappedStepTwoRooms[activeRoomIndex]?.room_id) || 0;
-  const syncedStepThreeRooms = syncStepThreeRoomsFromStepTwo(
-    cappedStepTwoRooms,
+  const stepThreeRoomsForSync =
     stepThreeRoomsFromApi.length > 0
       ? stepThreeRoomsFromApi
       : stepThreeFlatDates.length > 0
@@ -140,8 +139,67 @@ export function patchEventPayloadFromApi(
               dates: stepThreeFlatDates,
             },
           ].filter((entry) => entry.room_id > 0)
-        : [],
+        : [];
+
+  const syncedStepThreeRooms = syncStepThreeRoomsFromStepTwo(
+    cappedStepTwoRooms,
+    stepThreeRoomsForSync,
   );
+
+  const apiHadStepThreeDates =
+    stepThreeRoomsFromApi.some((room) => room.dates.length > 0) ||
+    stepThreeFlatDates.length > 0;
+  const syncedRoomsLostDates =
+    apiHadStepThreeDates &&
+    syncedStepThreeRooms.every((room) => room.dates.length === 0);
+
+  // Last-resort: keep API dates visible even if room remapping failed.
+  const recoveredStepThreeRooms = (() => {
+    if (!syncedRoomsLostDates) return syncedStepThreeRooms;
+
+    if (stepThreeFlatDates.length > 0 && activeRoomId > 0) {
+      return syncedStepThreeRooms.map((room, index) =>
+        index === 0 || room.room_id === activeRoomId
+          ? { ...room, dates: stepThreeFlatDates }
+          : room,
+      );
+    }
+
+    if (stepThreeRoomsFromApi.length > 0) {
+      return syncStepThreeRoomsFromStepTwo(
+        cappedStepTwoRooms,
+        stepThreeRoomsFromApi.map((room, index) => ({
+          ...room,
+          // Force ordinal remapping when ids cannot match stepTwo.
+          room_id: Number(cappedStepTwoRooms[index]?.room_id) || room.room_id,
+        })),
+      );
+    }
+
+    return syncedStepThreeRooms;
+  })();
+
+  const activeRoomDates = findStepThreeDatesForRoom(
+    recoveredStepThreeRooms,
+    activeRoomId,
+  );
+  const firstRoomWithDates = recoveredStepThreeRooms.find(
+    (room) => room.dates.length > 0,
+  )?.dates;
+  const resolvedStepThreeDates =
+    rootIsRooms === 1 && activeRoomId > 0
+      ? activeRoomDates.length > 0
+        ? activeRoomDates
+        : stepThreeFlatDates.length > 0
+          ? stepThreeFlatDates
+          : firstRoomWithDates && firstRoomWithDates.length > 0
+            ? firstRoomWithDates
+            : initialData.stepThree.dates
+      : stepThreeFlatDates.length > 0
+        ? stepThreeFlatDates
+        : firstRoomWithDates && firstRoomWithDates.length > 0
+          ? firstRoomWithDates
+          : initialData.stepThree.dates;
 
   const normalizedStepThree = rawStepThree
     ? {
@@ -151,13 +209,8 @@ export function patchEventPayloadFromApi(
           (eventDataAny as { vendor_location_id?: number }).vendor_location_id ??
           eventDataAny.stepOne?.vendor_location_id,
         is_rooms: parseEventIsRoomsFlag(rawStepThree.is_rooms ?? rootIsRooms),
-        rooms: syncedStepThreeRooms,
-        dates:
-          rootIsRooms === 1 && activeRoomId > 0
-            ? findStepThreeDatesForRoom(syncedStepThreeRooms, activeRoomId)
-            : stepThreeFlatDates.length > 0
-              ? stepThreeFlatDates
-              : initialData.stepThree.dates,
+        rooms: recoveredStepThreeRooms,
+        dates: resolvedStepThreeDates,
       }
     : initialData.stepThree;
 

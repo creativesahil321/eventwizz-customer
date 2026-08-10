@@ -1,16 +1,11 @@
 import { Shell } from "@/components/shell";
 import { Suspense } from "react";
-import { SearchParams } from "@/types";
 import { PageLoader } from "@/components/ui/page-loader";
 import { PermissionRoute } from "@/components/permission";
+import { pageCardClassName } from "@/app/(protected)/_components/page-header-card";
+import { LocationScopedTitle } from "@/components/location-indicator";
 
-interface PageProps {
-  searchParams: Promise<SearchParams>;
-}
-const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
-export default async function Page(props: PageProps) {
-  await delay(4000);
-  const searchParams = await props.searchParams;
+export default function Page() {
   return (
     <PermissionRoute
       permissionKey="read-marketing"
@@ -19,10 +14,16 @@ export default async function Page(props: PageProps) {
       <section className="page">
         <Shell className="gap-2">
           <Suspense fallback={<PageLoader />}>
-            <section className="w-full">
-              <h1>MARKETING</h1>
-              <pre>{JSON.stringify(searchParams, null, 3)}</pre>
-            </section>
+            <div className={pageCardClassName("min-w-0")}>
+              <h1 className="text-xl font-bold text-black title-header sm:text-2xl">
+                <LocationScopedTitle title="Marketing" />
+              </h1>
+              <p className="mt-1 text-sm text-muted-foreground sm:mt-2 sm:text-base">
+                Campaigns and promotions for this venue. This section is being
+                prepared — switch location in the header to work on another
+                venue when available.
+              </p>
+            </div>
           </Suspense>
         </Shell>
       </section>

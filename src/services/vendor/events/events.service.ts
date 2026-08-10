@@ -468,7 +468,7 @@ export const eventsService = {
 
     // Notify that data has changed if successful
     if (response.status) {
-      await eventsService.notifyDataChanged();
+      await eventsService.notifyDataChanged(eventId);
     }
 
     return response;
@@ -711,7 +711,7 @@ export const eventsService = {
 
     // Notify that data has changed if successful
     if (response.status) {
-      await eventsService.notifyDataChanged();
+      await eventsService.notifyDataChanged(data.event_id);
     }
 
     return response;
@@ -789,7 +789,7 @@ export const eventsService = {
       (response.data as { event_deleted?: boolean }).event_deleted === true;
 
     if (response.status && !eventDeleted) {
-      await eventsService.notifyDataChanged();
+      await eventsService.notifyDataChanged(data.event_id);
     }
 
     return response;
@@ -869,7 +869,7 @@ export const eventsService = {
 
     // Notify that data has changed if successful
     if (response.status) {
-      await eventsService.notifyDataChanged();
+      await eventsService.notifyDataChanged(data.event_id);
     }
 
     return response;
@@ -957,7 +957,7 @@ export const eventsService = {
 
     // Notify that data has changed if successful
     if (response.status) {
-      await eventsService.notifyDataChanged();
+      await eventsService.notifyDataChanged(eventIdStr);
     }
 
     return response;
@@ -1006,7 +1006,7 @@ export const eventsService = {
 
     // Notify that data has changed if successful
     if (response.status) {
-      await eventsService.notifyDataChanged();
+      await eventsService.notifyDataChanged(data.event_id);
     }
 
     return response;
@@ -1063,7 +1063,7 @@ export const eventsService = {
 
     // Notify that data has changed if successful
     if (response.status) {
-      await eventsService.notifyDataChanged();
+      await eventsService.notifyDataChanged(data.event_id);
     }
 
     return response;
@@ -1139,18 +1139,29 @@ export const eventsService = {
     });
 
     if (response.status) {
-      await eventsService.notifyDataChanged();
+      await eventsService.notifyDataChanged(data.event_id);
     }
 
     return response;
   },
 
-  notifyDataChanged: async (): Promise<void> => {
-    console.log("Notifying event data changed");
+  /**
+   * Broadcast that persisted event data changed.
+   * Pass `eventId` so listeners invalidate only that event — not every open/cached event
+   * (needed so editing the original after a location-duplicate does not wipe the copy).
+   */
+  notifyDataChanged: async (eventId?: string | number): Promise<void> => {
+    if (typeof window === "undefined") return;
 
-    if (typeof window !== "undefined") {
-      const event = new CustomEvent("event-data-changed");
-      window.dispatchEvent(event);
-    }
+    const normalizedId =
+      eventId != null && String(eventId).trim().length > 0
+        ? String(eventId).trim()
+        : undefined;
+
+    window.dispatchEvent(
+      new CustomEvent("event-data-changed", {
+        detail: normalizedId ? { eventId: normalizedId } : undefined,
+      }),
+    );
   },
 };

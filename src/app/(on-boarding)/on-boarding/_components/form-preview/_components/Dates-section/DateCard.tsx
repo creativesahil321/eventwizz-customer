@@ -3,9 +3,10 @@
 import { motion } from "framer-motion";
 import { getDateInfo } from "@/lib/utils";
 import { DatesSectionType } from ".";
-import { useCurrencyFormat } from "@/hooks/use-currency-format";
+import { useCurrencySymbol } from "@/hooks/use-currency-format";
 import { usePreviewNarrowLayout } from "@/hooks/use-preview-narrow-layout";
 import { cn } from "@/lib/utils";
+import { DateCardPriceFooter } from "@/components/public/date-card-price-footer";
 
 interface DateCardProps {
   dateItem: DatesSectionType[0];
@@ -20,9 +21,10 @@ export const DateCard = ({
   onDateClick,
   isFirstRow = false,
 }: DateCardProps) => {
-  const { formatCompact: formatMoneyCompact } = useCurrencyFormat();
+  const currencySymbol = useCurrencySymbol();
   const narrowPreview = usePreviewNarrowLayout();
   const dateInfo = getDateInfo(dateItem);
+  const listPrice = Number.parseFloat(String(dateInfo.price));
 
   return (
     <motion.div
@@ -67,15 +69,13 @@ export const DateCard = ({
           {dateInfo.month}
         </p>
       </div>
-      <div
-        className={cn(
-          "bg-gradient-to-b from-[var(--color-primary)] to-[#232a61] tracking-wider text-white",
-          narrowPreview
-            ? "py-1 text-xl"
-            : "py-1 text-xl sm:py-1.5 sm:text-2xl",
-        )}
-      >
-        {formatMoneyCompact(Number.parseFloat(String(dateInfo.price)))}
+      <div className="bg-gradient-to-b from-[var(--color-primary)] to-[#232a61] text-white">
+        <DateCardPriceFooter
+          currencySymbol={currencySymbol}
+          listPrice={Number.isFinite(listPrice) ? listPrice : 0}
+          offer={dateItem.offer}
+          compact={narrowPreview}
+        />
       </div>
     </motion.div>
   );

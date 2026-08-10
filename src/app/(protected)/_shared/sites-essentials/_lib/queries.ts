@@ -65,8 +65,11 @@ export const useSiteEssentialsMutation = () => {
         toSiteEssentialsUpdatePayload(data as SiteEssentialsFormValues),
       ),
     onSuccess: (data) => {
-      // Immediately update the cache with the new data
+      // Immediately update the cache with the new data.
+      // dataUpdatedAt changes → logo/favicon previews get a fresh ?v= cache key
+      // (backend often overwrites the same storage path).
       queryClient.setQueryData(siteEssentialsKeys.details(), data);
+      void queryClient.invalidateQueries({ queryKey: themeKeys.all });
     },
   });
 };

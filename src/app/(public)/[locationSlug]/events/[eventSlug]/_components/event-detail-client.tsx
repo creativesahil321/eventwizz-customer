@@ -13,7 +13,20 @@ import {
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { EventHeroBand } from "@/components/public/event-hero-band";
-import { EventRoomSelector } from "@/components/public/event-room-selector";
+import {
+  EventCouponStrip,
+  EVENT_COUPON_STRIP_HEIGHT_PX,
+  PUBLIC_EVENT_HEADER_WITH_COUPON_OFFSET,
+} from "@/components/public/event-coupon-strip";
+import {
+  couponToStripProps,
+  DEMO_EVENT_BANNER_COUPON,
+  type CouponStripSource,
+} from "@/lib/coupon-strip-props";
+import {
+  EventRoomSelector,
+  PUBLIC_EVENT_HEADER_OFFSET,
+} from "@/components/public/event-room-selector";
 import { EventRoomChooser } from "@/components/public/event-room-chooser";
 import { RoomContentTransition } from "@/components/public/room-content-transition";
 
@@ -41,6 +54,7 @@ import { buildEventHeaderDownloadLinks } from "@/lib/event-header-downloads";
 import { EVENT_BOOKING_SECTION_CLASSNAME } from "@/lib/event-booking-section-layout";
 import { slugToShortLabel } from "@/lib/slug-short-label";
 import {
+  firstBookablePublicRoomIndex,
   isPublicEventRoomMode,
   listPublicEventRoomSummaries,
   resolvePublicEventActiveSlices,
@@ -48,7 +62,7 @@ import {
 import { scrollToElementIfNeeded } from "@/lib/scroll-to-element-if-needed";
 
 /** Sticky site header height — keep scroll targets / triggers clear of the header. */
-const HEADER_OFFSET_PX = 72;
+const BASE_HEADER_OFFSET_PX = 72;
 
 interface EventDetailClientProps {
   event: EventDetail;
@@ -68,14 +82,57 @@ export default function EventDetailClient({
 
   const eventData = data?.data || initialEvent;
 
-  const [currentRoomIndex, setCurrentRoomIndex] = useState(0);
+  const [currentRoomIndex, setCurrentRoomIndex] = useState(() =>
+    firstBookablePublicRoomIndex(initialEvent),
+  );
   const [roomSelectorScrollVisible, setRoomSelectorScrollVisible] =
     useState(false);
+  /**
+   * Banner coupon for the strip. Prefer event payload coupons when the API
+   * exposes them (`show_on_banner`); until then use the shared demo source so
+   * props still go through `couponToStripProps`.
+   */
+  const bannerCouponSource = useMemo((): CouponStripSource | null => {
+    const fromEvent = (
+      eventData as EventDetail & {
+        banner_coupon?: CouponStripSource | null;
+        coupons?: CouponStripSource[] | null;
+      }
+    ).banner_coupon;
+    if (fromEvent) return fromEvent;
+
+    const list = (
+      eventData as EventDetail & {
+        coupons?: CouponStripSource[] | null;
+      }
+    ).coupons;
+    const firstBanner = list?.find((c) => c.show_on_banner !== false);
+    if (firstBanner) return firstBanner;
+
+    return DEMO_EVENT_BANNER_COUPON;
+  }, [eventData]);
+
+  const couponStripProps = useMemo(
+    () => couponToStripProps(bannerCouponSource),
+    [bannerCouponSource],
+  );
+
+  const [couponStripDismissed, setCouponStripDismissed] = useState(false);
+  const showCouponStrip = Boolean(couponStripProps) && !couponStripDismissed;
+
+  const headerOffsetPx =
+    BASE_HEADER_OFFSET_PX +
+    (showCouponStrip ? EVENT_COUPON_STRIP_HEIGHT_PX : 0);
+  const roomBarStickyTop = showCouponStrip
+    ? PUBLIC_EVENT_HEADER_WITH_COUPON_OFFSET
+    : PUBLIC_EVENT_HEADER_OFFSET;
 
   const roomPreviewMode = isPublicEventRoomMode(eventData);
 
   useEffect(() => {
-    setCurrentRoomIndex(0);
+    setCurrentRoomIndex(firstBookablePublicRoomIndex(eventData));
+    // Reset only when the event identity / room-mode changes — not on every refetch.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- eventData read intentionally once per slug/mode
   }, [eventSlug, roomPreviewMode]);
 
   const slices = useMemo(
@@ -106,16 +163,21 @@ export default function EventDetailClient({
    * section when it isn't already in a comfortable viewport band.
    * Double-rAF waits for React to paint the new room content before measuring.
    */
-  const handleRoomChange = useCallback((index: number) => {
-    setCurrentRoomIndex(index);
-    requestAnimationFrame(() => {
+  const handleRoomChange = useCallback(
+    (index: number) => {
+      const target = roomSummaries[index];
+      if (target?.disabled) return;
+      setCurrentRoomIndex(index);
       requestAnimationFrame(() => {
-        scrollToElementIfNeeded(bookingRef.current, {
-          headerOffsetPx: HEADER_OFFSET_PX,
+        requestAnimationFrame(() => {
+          scrollToElementIfNeeded(bookingRef.current, {
+            headerOffsetPx,
+          });
         });
       });
-    });
-  }, []);
+    },
+    [roomSummaries, headerOffsetPx],
+  );
 
   useEffect(() => {
     if (!showRoomSelector) {
@@ -133,7 +195,7 @@ export default function EventDetailClient({
         return;
       }
       const { bottom } = chooser.getBoundingClientRect();
-      setRoomSelectorScrollVisible(bottom <= HEADER_OFFSET_PX + 8);
+      setRoomSelectorScrollVisible(bottom <= headerOffsetPx + 8);
     };
 
     handleScroll();
@@ -143,7 +205,7 @@ export default function EventDetailClient({
       window.removeEventListener("scroll", handleScroll);
       window.removeEventListener("resize", handleScroll);
     };
-  }, [showRoomSelector]);
+  }, [showRoomSelector, headerOffsetPx]);
 
   const heroTitle =
     eventData.event_banner_heading?.trim() ||
@@ -223,6 +285,15 @@ export default function EventDetailClient({
           headerDownloads={pdfDownloadLinks}
           hideHeaderPhone
           compactGuestAuth
+          topBanner={
+            showCouponStrip && couponStripProps ? (
+              <EventCouponStrip
+                {...couponStripProps}
+                position="static"
+                onDismiss={() => setCouponStripDismissed(true)}
+              />
+            ) : null
+          }
         />
 
         {showRoomSelector ? (
@@ -231,6 +302,7 @@ export default function EventDetailClient({
             currentRoomIndex={currentRoomIndex}
             onRoomChange={handleRoomChange}
             visible={roomSelectorVisible}
+            stickyTop={roomBarStickyTop}
           />
         ) : null}
 

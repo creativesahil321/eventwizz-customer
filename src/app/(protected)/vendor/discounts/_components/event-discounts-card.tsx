@@ -8,9 +8,9 @@ import {
   Tag,
   CalendarDays,
   Ticket,
-  Loader2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 import type { DiscountCategory } from "../_lib/types";
 import { DISCOUNT_CATEGORY_LABELS } from "../_lib/types";
 import { useDiscounts } from "../_lib/queries";
@@ -77,10 +77,7 @@ export function EventDiscountsCard({
             </p>
             <p className="text-xs text-muted-foreground">
               {isLoading ? (
-                <span className="inline-flex items-center gap-1">
-                  <Loader2 className="h-3 w-3 animate-spin" />
-                  Checking discounts…
-                </span>
+                <Skeleton className="mt-1 inline-block h-3 w-48 max-w-full align-middle" />
               ) : active.length > 0 ? (
                 `${active.length} active discount${active.length > 1 ? "s" : ""}`
               ) : (
@@ -146,10 +143,23 @@ export function EventDiscountsCard({
       </div>
 
       {isLoading ? (
-        <div className="mt-4 flex items-center justify-center gap-2 py-8 text-sm text-muted-foreground">
-          <Loader2 className="h-4 w-4 animate-spin" />
-          Loading…
-        </div>
+        <ul className="mt-4 divide-y rounded-lg border">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <li
+              key={i}
+              className="flex items-center justify-between gap-3 px-3 py-2.5"
+            >
+              <div className="flex min-w-0 items-center gap-2.5">
+                <Skeleton className="h-4 w-4 shrink-0 rounded-sm" />
+                <div className="min-w-0 space-y-1.5">
+                  <Skeleton className="h-3.5 w-40 max-w-full" />
+                  <Skeleton className="h-3 w-24" />
+                </div>
+              </div>
+              <Skeleton className="h-5 w-16 rounded-full" />
+            </li>
+          ))}
+        </ul>
       ) : discounts.length === 0 ? (
         <div className="mt-4 rounded-lg border border-dashed border-[#D6ECEF] bg-[#F7FCFC] px-4 py-6 text-center">
           <p className="text-sm font-medium text-[#0F172A]">

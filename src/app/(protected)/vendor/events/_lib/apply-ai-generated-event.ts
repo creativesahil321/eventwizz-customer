@@ -2,7 +2,7 @@ import type {
   AIEventGeneratedContent,
   AIEventInput,
 } from "@/app/api/ai/generate-event/route";
-import { api } from "@/services/core/api-client";
+import { api, withSuppressedSuccessToasts } from "@/services/core/api-client";
 import type { ApiResponse } from "@/services/core/api-client";
 import { buildVendorEventGetUrl } from "@/services/vendor/events/build-vendor-event-get-url";
 import { eventsService } from "@/services/vendor/events/events.service";
@@ -44,11 +44,11 @@ import {
 import type { AIDate } from "@/app/api/ai/generate-onboarding/route";
 
 export const AI_EVENT_APPLY_STEPS = [
-  { label: "Event details & schedule", icon: "📅" },
+  { label: "Event details and schedule", icon: "📅" },
   { label: "Packages", icon: "📦" },
-  { label: "Dates, tickets & tables", icon: "🎟️" },
-  { label: "Catering & menu", icon: "🍽️" },
-  { label: "Brochure info", icon: "📍" },
+  { label: "Dates, tickets and tables", icon: "🎟️" },
+  { label: "Catering and menu", icon: "🍽️" },
+  { label: "Brochure", icon: "📍" },
   { label: "Other packages", icon: "🥂" },
   { label: "FAQs", icon: "❓" },
 ] as const;
@@ -210,6 +210,20 @@ export async function applyAIGeneratedEventToBackend(params: {
   removedSections?: Set<string>;
   onProgress?: ApplyAIEventProgress;
   /** Fired after step 1 succeeds so UI can open the draft in manual editor if later steps fail. */
+  onEventCreated?: (eventId: number) => void;
+}): Promise<ApplyAIGeneratedEventResult> {
+  // Progress checklist is the UX; hide per-step API success toasts.
+  return withSuppressedSuccessToasts(() =>
+    applyAIGeneratedEventToBackendInner(params),
+  );
+}
+
+async function applyAIGeneratedEventToBackendInner(params: {
+  content: AIEventGeneratedContent;
+  eventInput: AIEventInput;
+  categoryId: number;
+  removedSections?: Set<string>;
+  onProgress?: ApplyAIEventProgress;
   onEventCreated?: (eventId: number) => void;
 }): Promise<ApplyAIGeneratedEventResult> {
   const { content: s, eventInput, categoryId, onProgress } = params;
