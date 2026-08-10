@@ -38,7 +38,7 @@ export default function LocationGrid({
     return (
       <div
         className={cn(
-          "mx-auto grid max-w-[920px] grid-cols-1 gap-5",
+          "mx-auto grid max-w-[920px] grid-cols-1 gap-2.5",
           !narrowPreview && "md:grid-cols-3 md:gap-6",
         )}
       >
@@ -47,7 +47,12 @@ export default function LocationGrid({
           .map((_, idx) => (
             <div
               key={idx}
-              className="relative aspect-[5/6] overflow-hidden rounded-[20px] bg-[var(--color-surface)]"
+              className={cn(
+                "relative overflow-hidden bg-[var(--color-surface)]",
+                narrowPreview
+                  ? "min-h-[5.5rem] rounded-xl"
+                  : "min-h-[5.5rem] rounded-xl md:h-auto md:min-h-0 md:aspect-[5/6] md:rounded-[20px]",
+              )}
             >
               <Skeleton className="absolute inset-0 h-full w-full rounded-none" />
             </div>
@@ -83,7 +88,7 @@ export default function LocationGrid({
   return (
     <div
       className={cn(
-        "mx-auto grid max-w-[920px] gap-5 md:gap-6",
+        "mx-auto grid max-w-[920px] gap-2.5 md:gap-6",
         locations.length === 1 && "max-w-sm grid-cols-1 justify-items-center",
         locations.length === 2 &&
           cn(
@@ -165,103 +170,202 @@ export default function LocationGrid({
                     handleCardClick();
                   }
                 }}
-                className="group relative aspect-[5/6] cursor-pointer overflow-hidden rounded-[20px] border border-[color:color-mix(in_srgb,var(--color-text)_8%,transparent)] shadow-[0_16px_40px_-28px_rgba(0,0,0,0.55)] transition-all duration-300 ease-out hover:-translate-y-1.5 hover:shadow-[0_22px_48px_-24px_rgba(0,0,0,0.55)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--color-primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[color:var(--color-background)] motion-reduce:transition-none motion-reduce:hover:translate-y-0"
+                className={cn(
+                  "group relative cursor-pointer border border-[color:color-mix(in_srgb,var(--color-text)_8%,transparent)] transition-all duration-300 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--color-primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[color:var(--color-background)] motion-reduce:transition-none",
+                  // Compact list — min-height (not fixed) so heading glyphs aren't clipped
+                  narrowPreview
+                    ? "flex min-h-[5.75rem] items-stretch overflow-hidden rounded-xl bg-[var(--color-surface)] shadow-sm"
+                    : "flex min-h-[5.75rem] items-stretch overflow-hidden rounded-xl bg-[var(--color-surface)] shadow-sm md:block md:aspect-[5/6] md:h-auto md:min-h-0 md:rounded-[20px] md:shadow-[0_16px_40px_-28px_rgba(0,0,0,0.55)] md:hover:-translate-y-1.5 md:hover:shadow-[0_22px_48px_-24px_rgba(0,0,0,0.55)] motion-reduce:md:hover:translate-y-0",
+                )}
                 onClick={handleCardClick}
               >
-                {coverImage && typeof coverImage === "string" ? (
-                  <Image
-                    src={coverImage}
-                    alt={locationName}
-                    fill
-                    priority={idx < 2}
-                    sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-                    className="object-cover transition-transform duration-500 ease-out group-hover:scale-105 motion-reduce:transition-none motion-reduce:group-hover:scale-100"
-                    unoptimized={!shouldUseNextImageOptimization(coverImage)}
-                    onError={(e) => {
-                      (e.target as HTMLImageElement).style.display = "none";
-                    }}
-                  />
-                ) : (
-                  <div
-                    className="absolute inset-0 flex items-center justify-center bg-[radial-gradient(ellipse_at_30%_20%,color-mix(in_srgb,var(--color-primary)_42%,transparent),transparent_55%),linear-gradient(160deg,color-mix(in_srgb,var(--color-primary)_28%,var(--color-background)),var(--color-background))]"
-                    aria-hidden
-                  >
-                    <span className="flex h-20 w-20 items-center justify-center rounded-full bg-[color:color-mix(in_srgb,var(--color-text)_8%,transparent)] text-2xl font-semibold tracking-[0.08em] text-[var(--color-text-dimmed)]">
-                      {initials}
-                    </span>
-                  </div>
-                )}
+                <div
+                  className={cn(
+                    "relative w-[5.75rem] shrink-0 self-stretch overflow-hidden",
+                    !narrowPreview && "md:absolute md:inset-0 md:w-full md:self-auto",
+                  )}
+                >
+                  {coverImage && typeof coverImage === "string" ? (
+                    <Image
+                      src={coverImage}
+                      alt={locationName}
+                      fill
+                      priority={idx < 2}
+                      sizes="(max-width: 768px) 96px, (max-width: 1200px) 50vw, 33vw"
+                      className="object-cover transition-transform duration-500 ease-out group-hover:scale-105 motion-reduce:transition-none motion-reduce:group-hover:scale-100"
+                      unoptimized={!shouldUseNextImageOptimization(coverImage)}
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).style.display = "none";
+                      }}
+                    />
+                  ) : (
+                    <div
+                      className="absolute inset-0 flex items-center justify-center bg-[radial-gradient(ellipse_at_30%_20%,color-mix(in_srgb,var(--color-primary)_42%,transparent),transparent_55%),linear-gradient(160deg,color-mix(in_srgb,var(--color-primary)_28%,var(--color-background)),var(--color-background))]"
+                      aria-hidden
+                    >
+                      <span
+                        className={cn(
+                          "flex h-10 w-10 items-center justify-center rounded-full bg-[color:color-mix(in_srgb,var(--color-text)_8%,transparent)] text-sm font-semibold tracking-[0.08em] text-[var(--color-text-dimmed)]",
+                          !narrowPreview && "md:h-20 md:w-20 md:text-2xl",
+                        )}
+                      >
+                        {initials}
+                      </span>
+                    </div>
+                  )}
+                </div>
 
                 <div
-                  className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/35 to-black/10"
+                  className={cn(
+                    "absolute inset-0 bg-gradient-to-t from-black/85 via-black/35 to-black/10",
+                    narrowPreview ? "hidden" : "hidden md:block",
+                  )}
                   aria-hidden
                 />
 
-                <div className="absolute left-3 top-3 z-[1] sm:left-4 sm:top-4">
-                  <span className="inline-flex rounded-full bg-[var(--color-primary)] px-2.5 py-1 text-[11px] font-semibold text-[var(--color-primary-foreground)] shadow-sm">
-                    {totalEvents} event{totalEvents !== 1 ? "s" : ""}
-                  </span>
-                </div>
+                <span
+                  className={cn(
+                    "absolute left-2 top-2 z-[1] inline-flex rounded-full bg-[var(--color-primary)] px-1.5 py-0.5 text-[9px] font-semibold text-[var(--color-primary-foreground)] shadow-sm",
+                    !narrowPreview &&
+                      "md:left-4 md:top-4 md:px-2.5 md:py-1 md:text-[11px]",
+                  )}
+                >
+                  {totalEvents} event{totalEvents !== 1 ? "s" : ""}
+                </span>
 
-                <div className="absolute bottom-0 left-0 right-0 z-[1] p-5 sm:p-6">
+                <div
+                  className={cn(
+                    "relative z-[1] flex min-w-0 flex-1 flex-col justify-center gap-1 px-3 py-2.5",
+                    !narrowPreview &&
+                      "md:absolute md:bottom-0 md:left-0 md:right-0 md:justify-end md:gap-0 md:p-6",
+                  )}
+                >
                   <h3
-                    className="mb-2 font-heading text-[1.65rem] font-normal leading-tight tracking-tight text-white sm:text-[1.85rem]"
-                    style={{ fontFamily: "var(--font-heading, inherit)" }}
+                    className={cn(
+                      // Compact cards: body font + normal leading so ascenders
+                      // aren't clipped by overflow-hidden + tight display fonts.
+                      "truncate text-[15px] font-semibold leading-normal tracking-tight text-[var(--color-text)]",
+                      !narrowPreview &&
+                        "md:mb-2 md:text-[1.85rem] md:font-normal md:leading-[1.2] md:text-white md:[font-family:var(--font-heading,inherit)]",
+                    )}
                   >
                     {locationName}
                   </h3>
 
                   {locationAddress ? (
-                    <p className="mb-3 flex items-start gap-1.5 text-sm text-white/70">
+                    <p
+                      className={cn(
+                        "flex min-w-0 items-center gap-1 text-[11px] text-[var(--color-text-dimmed)]",
+                        !narrowPreview &&
+                          "md:mb-3 md:items-start md:gap-1.5 md:text-sm md:text-white/70",
+                      )}
+                    >
                       <MapPin
-                        className="mt-0.5 h-3.5 w-3.5 shrink-0 opacity-90"
+                        className={cn(
+                          "h-3 w-3 shrink-0 opacity-90",
+                          !narrowPreview && "md:mt-0.5 md:h-3.5 md:w-3.5",
+                        )}
                         aria-hidden
                       />
-                      <span className="line-clamp-1">{locationAddress}</span>
+                      <span className="truncate md:line-clamp-1">
+                        {locationAddress}
+                      </span>
                     </p>
                   ) : null}
 
                   {upcomingEvent ? (
-                    <div
-                      className="mb-3 grid grid-rows-[1fr] transition-[grid-template-rows] duration-300 ease-out md:grid-rows-[0fr] md:group-hover:grid-rows-[1fr] md:group-focus-within:grid-rows-[1fr] motion-reduce:md:grid-rows-[1fr]"
-                      aria-live="polite"
-                    >
-                      <div className="min-h-0 overflow-hidden">
-                        <div className="space-y-1 border-l-2 border-white/25 pl-3">
-                          <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-white/55">
-                            Next up
-                          </p>
-                          <p className="line-clamp-2 text-sm font-semibold leading-snug text-white sm:text-base">
-                            {upcomingEvent.name}
-                          </p>
-                          <p className="flex items-center gap-1.5 text-sm text-white/75">
-                            <Calendar
-                              className="h-3.5 w-3.5 shrink-0 opacity-90"
-                              aria-hidden
-                            />
-                            {upcomingEvent.date}
-                          </p>
+                    <>
+                      <p
+                        className={cn(
+                          "flex min-w-0 items-center gap-1 text-[11px] text-[var(--color-text-dimmed)]",
+                          !narrowPreview && "md:hidden",
+                        )}
+                      >
+                        <Calendar
+                          className="h-3 w-3 shrink-0 opacity-90"
+                          aria-hidden
+                        />
+                        <span className="truncate font-medium text-[var(--color-text)]">
+                          {upcomingEvent.name}
+                        </span>
+                        <span className="shrink-0 opacity-50">·</span>
+                        <span className="shrink-0">{upcomingEvent.date}</span>
+                      </p>
+
+                      {!narrowPreview ? (
+                        <div
+                          className="mb-3 hidden grid-rows-[0fr] transition-[grid-template-rows] duration-300 ease-out md:grid md:group-hover:grid-rows-[1fr] md:group-focus-within:grid-rows-[1fr] motion-reduce:md:grid-rows-[1fr]"
+                          aria-live="polite"
+                        >
+                          <div className="min-h-0 overflow-hidden">
+                            <div className="space-y-1 border-l-2 border-white/25 pl-3">
+                              <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-white/55">
+                                Next up
+                              </p>
+                              <p className="line-clamp-2 text-sm font-semibold leading-snug text-white sm:text-base">
+                                {upcomingEvent.name}
+                              </p>
+                              <p className="flex items-center gap-1.5 text-sm text-white/75">
+                                <Calendar
+                                  className="h-3.5 w-3.5 shrink-0 opacity-90"
+                                  aria-hidden
+                                />
+                                {upcomingEvent.date}
+                              </p>
+                            </div>
+                          </div>
                         </div>
-                      </div>
-                    </div>
+                      ) : null}
+                    </>
                   ) : null}
 
-                  <div className="flex items-center justify-between gap-3 border-t border-white/15 pt-3.5">
+                  <div
+                    className={cn(
+                      "mt-0.5 flex items-center justify-between gap-2",
+                      !narrowPreview &&
+                        "md:mt-0 md:border-t md:border-white/15 md:pt-3.5",
+                    )}
+                  >
                     {isPending ? (
-                      <span className="inline-flex items-center gap-2 text-sm text-white/80">
+                      <span
+                        className={cn(
+                          "inline-flex items-center gap-1.5 text-[11px] text-[var(--color-text-dimmed)]",
+                          !narrowPreview && "md:gap-2 md:text-sm md:text-white/80",
+                        )}
+                      >
                         <Loader2
-                          className="h-4 w-4 shrink-0 animate-spin"
+                          className={cn(
+                            "h-3.5 w-3.5 shrink-0 animate-spin",
+                            !narrowPreview && "md:h-4 md:w-4",
+                          )}
                           aria-hidden
                         />
                         Opening…
                       </span>
                     ) : (
-                      <span className="text-sm font-medium text-white/80 transition-colors duration-200 group-hover:text-white">
+                      <span
+                        className={cn(
+                          "text-[11px] font-medium text-[var(--color-primary)] transition-colors duration-200",
+                          !narrowPreview &&
+                            "md:text-sm md:text-white/80 md:group-hover:text-white",
+                        )}
+                      >
                         Explore events
                       </span>
                     )}
-                    <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white text-black transition-transform duration-200 group-hover:translate-x-0.5 motion-reduce:group-hover:translate-x-0">
-                      <ArrowRight className="h-4 w-4" aria-hidden />
+                    <span
+                      className={cn(
+                        "inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[var(--color-primary)] text-[var(--color-primary-foreground)] transition-transform duration-200 group-hover:translate-x-0.5 motion-reduce:group-hover:translate-x-0",
+                        !narrowPreview && "md:h-8 md:w-8 md:bg-white md:text-black",
+                      )}
+                    >
+                      <ArrowRight
+                        className={cn(
+                          "h-3 w-3",
+                          !narrowPreview && "md:h-4 md:w-4",
+                        )}
+                        aria-hidden
+                      />
                     </span>
                   </div>
                 </div>

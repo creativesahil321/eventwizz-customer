@@ -1,8 +1,9 @@
+import { COUPON_STRIP_DEFAULT_HEADING } from "@/lib/coupon-strip-props";
 import type {
   Discount,
   DiscountDateEntry,
-  DiscountDatePayload,
   DiscountFormPayload,
+  DiscountOfferPayload,
   FlatDiscountMode,
 } from "./types";
 import {
@@ -11,7 +12,6 @@ import {
   type DiscountDateFormEntry,
   type DiscountFormValues,
 } from "./schema";
-import { COUPON_STRIP_DEFAULT_HEADING } from "@/lib/coupon-strip-props";
 
 /** Normalize API / legacy flat_mode into store contract values */
 export function normalizeFlatMode(
@@ -29,15 +29,19 @@ export function normalizeFlatMode(
   return null;
 }
 
-function mapDateEntryToPayload(entry: DiscountDateFormEntry): DiscountDatePayload {
-  const payload: DiscountDatePayload = {
+function toOfferStatus(isLive: boolean | undefined): "active" | "inactive" {
+  return isLive === false ? "inactive" : "active";
+}
+
+function mapDateEntryToOffer(entry: DiscountDateFormEntry): DiscountOfferPayload {
+  const payload: DiscountOfferPayload = {
     date_id: Number(entry.date_id) || 0,
     discount_type: entry.value_type,
     amount: Number(entry.discount_value),
     valid_from: entry.valid_from?.trim() ? entry.valid_from : null,
     expires_at: entry.expires_at,
-    show_on_banner: entry.show_on_banner !== false,
-    is_live: entry.is_live !== false,
+    show_on_event_page: entry.show_on_banner !== false,
+    status: toOfferStatus(entry.is_live),
   };
 
   const roomId = Number(entry.room_id) || 0;
@@ -53,6 +57,19 @@ function mapDateEntryToPayload(entry: DiscountDateFormEntry): DiscountDatePayloa
   return payload;
 }
 
+function offerShowOnEventPage(
+  entry: DiscountDateEntry,
+  fallback = true,
+): boolean {
+  if (typeof entry.show_on_event_page === "boolean") {
+    return entry.show_on_event_page;
+  }
+  if (typeof entry.show_on_banner === "boolean") {
+    return entry.show_on_banner;
+  }
+  return fallback;
+}
+
 function resolveDateIsLive(
   entry: DiscountDateEntry,
   fallbackLive: boolean,
@@ -63,12 +80,17 @@ function resolveDateIsLive(
     if (s === "inactive" || s === "paused" || s === "expired") return false;
     if (s === "active") return true;
   }
+  if (entry.stored_status != null) {
+    const s = String(entry.stored_status).toLowerCase();
+    if (s === "inactive" || s === "paused" || s === "expired") return false;
+    if (s === "active") return true;
+  }
   return fallbackLive;
 }
 
-function apiDateToFormEntry(
+function apiOfferToFormEntry(
   entry: DiscountDateEntry,
-  fallbackShowOnBanner = true,
+  fallbackShowOnEventPage = true,
   fallbackLive = true,
 ): DiscountDateFormEntry {
   const flatMode = normalizeFlatMode(entry.flat_mode);
@@ -83,28 +105,51 @@ function apiDateToFormEntry(
     valid_from: entry.valid_from ?? "",
     original_valid_from: entry.valid_from ?? "",
     expires_at: entry.expires_at ?? "",
-    show_on_banner:
-      entry.show_on_banner != null
-        ? entry.show_on_banner !== false
-        : fallbackShowOnBanner,
+    show_on_banner: offerShowOnEventPage(entry, fallbackShowOnEventPage),
     is_live: resolveDateIsLive(entry, fallbackLive),
   };
 }
 
-/** Map API discount → form values (supports `dates[]` or legacy single date). */
+function discountOfferRows(discount: Discount): DiscountDateEntry[] {
+  if (Array.isArray(discount.offers) && discount.offers.length > 0) {
+    return discount.offers;
+  }
+  if (Array.isArray(discount.dates) && discount.dates.length > 0) {
+    return discount.dates;
+  }
+  return [];
+}
+
+function couponShowOnEventPage(discount: Discount): boolean {
+  if (typeof discount.show_on_event_page === "boolean") {
+    return discount.show_on_event_page;
+  }
+  if (typeof discount.show_on_banner === "boolean") {
+    return discount.show_on_banner;
+  }
+  return true;
+}
+
+function couponBannerSubheading(discount: Discount): string {
+  return discount.banner_subheading ?? discount.dynamic_text ?? "";
+}
+
+/** Map API discount → form values (supports `offers[]`, legacy `dates[]`, or single date). */
 export function discountToFormValues(discount: Discount): DiscountFormValues {
   const audience =
     discount.customer_audience === "selected" ? "selected" : "all_active";
   const isCoupon = discount.category === "coupon_code";
 
-  const legacyShowOnBanner = discount.show_on_banner !== false;
-  const legacyLive = discount.status !== "inactive" && discount.status !== "expired";
+  const legacyLive =
+    discount.status !== "inactive" && discount.status !== "expired";
+  const legacyShowOnEventPage = couponShowOnEventPage(discount);
 
   let dates: DiscountDateFormEntry[] = [];
   if (!isCoupon) {
-    if (Array.isArray(discount.dates) && discount.dates.length > 0) {
-      dates = discount.dates.map((d) =>
-        apiDateToFormEntry(d, legacyShowOnBanner, legacyLive),
+    const offerRows = discountOfferRows(discount);
+    if (offerRows.length > 0) {
+      dates = offerRows.map((d) =>
+        apiOfferToFormEntry(d, legacyShowOnEventPage, legacyLive),
       );
     } else if (discount.date_id) {
       dates = [
@@ -121,12 +166,17 @@ export function discountToFormValues(discount: Discount): DiscountFormValues {
           valid_from: discount.valid_from ?? "",
           original_valid_from: discount.valid_from ?? "",
           expires_at: discount.expires_at ?? "",
-          show_on_banner: legacyShowOnBanner,
+          show_on_banner: legacyShowOnEventPage,
           is_live: legacyLive,
         },
       ];
     }
   }
+
+  const flatMode = normalizeFlatMode(discount.flat_mode);
+  // Coupons only support percentage or flat off total.
+  const couponFlatMode =
+    isCoupon && flatMode === "per_person" ? "total" : flatMode;
 
   return {
     name: discount.name ?? "",
@@ -135,16 +185,16 @@ export function discountToFormValues(discount: Discount): DiscountFormValues {
     event_id: discount.vendor_event_id ?? 0,
     dates,
     coupon_code: discount.coupon_code ?? "",
-    show_on_banner: discount.show_on_banner !== false,
+    show_on_banner: legacyShowOnEventPage,
     banner_heading:
       discount.banner_heading?.trim() || COUPON_STRIP_DEFAULT_HEADING,
-    dynamic_text: discount.dynamic_text ?? "",
+    dynamic_text: couponBannerSubheading(discount),
     customer_audience: audience,
     customer_ids: discount.customers?.map((c) => c.id) ?? [],
     value_type: discount.discount_type === "flat" ? "flat" : "percentage",
     discount_value: Number(discount.amount) || 0,
-    flat_mode: normalizeFlatMode(discount.flat_mode),
-    min_people: discount.min_people,
+    flat_mode: couponFlatMode,
+    min_people: isCoupon ? null : discount.min_people,
     valid_from: discount.valid_from ?? "",
     original_valid_from: discount.valid_from ?? "",
     expires_at: discount.expires_at ?? "",
@@ -153,7 +203,7 @@ export function discountToFormValues(discount: Discount): DiscountFormValues {
 }
 
 /**
- * Map wizard form values → POST /vendor/discounts/store body.
+ * Map wizard form values → POST /vendor/discounts/store|update body.
  * Location is sent via header `x-venue-location-id` (axios interceptor).
  */
 export function buildDiscountStorePayload(
@@ -167,22 +217,19 @@ export function buildDiscountStorePayload(
   const eventId = Number(data.event_id) || 0;
 
   if (!isCoupon) {
-    const dateRows = (data.dates ?? [])
+    const offers = (data.dates ?? [])
       .filter((entry) => !isDiscountDateOfferBlank(entry))
-      .map(mapDateEntryToPayload);
+      .map(mapDateEntryToOffer);
+
     return {
       category: "discount",
       vendor_event_id: eventId,
       name,
-      // Live if any date is immediately live (legacy top-level flag).
-      status: dateRows.some((d) => d.is_live !== false)
-        ? "active"
-        : "inactive",
-      // True if any date shows a public badge (legacy top-level flag).
-      show_on_banner: dateRows.some((d) => d.show_on_banner !== false),
-      dates: dateRows,
+      offers,
     };
   }
+
+  const showOnEventPage = data.show_on_banner !== false;
 
   const payload: DiscountFormPayload = {
     category: "coupon_code",
@@ -191,20 +238,24 @@ export function buildDiscountStorePayload(
     amount: Number(data.discount_value),
     name,
     valid_from: data.valid_from?.trim() ? data.valid_from : null,
-    expires_at: data.expires_at,
+    expires_at: data.expires_at?.trim() ? data.expires_at : null,
     status: data.status,
     coupon_code: data.coupon_code?.trim() ?? "",
-    show_on_banner: data.show_on_banner !== false,
-    banner_heading: data.banner_heading?.trim() || null,
-    dynamic_text: data.dynamic_text?.trim() || null,
     customer_audience: data.customer_audience,
+    show_on_event_page: showOnEventPage,
+    show_on_checkout: true,
+    banner_heading: showOnEventPage
+      ? data.banner_heading?.trim() || null
+      : null,
+    banner_subheading: showOnEventPage
+      ? data.dynamic_text?.trim() || null
+      : null,
   };
 
-  if (data.value_type === "flat" && data.flat_mode) {
-    payload.flat_mode = data.flat_mode;
-    if (data.flat_mode === "per_person") {
-      payload.min_people = Number(data.min_people);
-    }
+  if (data.value_type === "flat") {
+    // Coupons: flat off total only (ignore legacy per_person).
+    payload.flat_mode =
+      data.flat_mode === "per_person" ? "total" : data.flat_mode ?? "total";
   }
 
   if (data.customer_audience === "selected") {

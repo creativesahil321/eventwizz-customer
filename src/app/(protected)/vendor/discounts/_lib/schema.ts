@@ -382,8 +382,10 @@ export const discountFormSchema = z
       {
         value_type: data.value_type,
         discount_value: data.discount_value,
-        flat_mode: data.flat_mode,
-        min_people: data.min_people,
+        // Coupons do not support flat per person.
+        flat_mode:
+          data.flat_mode === "per_person" ? "total" : data.flat_mode,
+        min_people: null,
       },
       ctx,
       [],

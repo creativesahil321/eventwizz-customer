@@ -47,7 +47,6 @@ import {
   CUSTOMER_AUDIENCE_LABELS,
   DISCOUNT_CREATE_CATEGORIES,
   DISCOUNT_OFFER_KIND_LABELS,
-  type DiscountOfferKind,
 } from "../../_lib/types";
 import {
   buildDiscountStorePayload,
@@ -276,6 +275,14 @@ export function DiscountFormWizard({
     form.setValue("event_id", 0, { shouldValidate: true });
     form.setValue("dates", [], { shouldValidate: true });
   }, [currentVendorLocationId, mode, form]);
+
+  // Coupons: no flat-per-person — coerce legacy edits to flat off total.
+  useEffect(() => {
+    if (values.category !== "coupon_code") return;
+    if (values.flat_mode !== "per_person") return;
+    form.setValue("flat_mode", "total", { shouldValidate: true });
+    form.setValue("min_people", null);
+  }, [values.category, values.flat_mode, form]);
 
   const {
     data: customersResponse,
@@ -648,7 +655,8 @@ export function DiscountFormWizard({
         "status",
       ];
       if (values.value_type === "flat") {
-        fields.push("flat_mode", "min_people");
+        // Coupons: percentage or flat off total only (no flat per person).
+        fields.push("flat_mode");
       }
       return form.trigger(fields);
     }
@@ -1413,14 +1421,9 @@ export function DiscountFormWizard({
 
               <FormItem className="space-y-3">
                 <FormLabel>Offer type</FormLabel>
-                <ChoiceCards<DiscountOfferKind>
+                <ChoiceCards<"percentage" | "flat_total">
                   value={
-                    values.value_type === "flat" &&
-                    values.flat_mode === "per_person"
-                      ? "flat_per_person"
-                      : values.value_type === "flat"
-                        ? "flat_total"
-                        : "percentage"
+                    values.value_type === "flat" ? "flat_total" : "percentage"
                   }
                   onChange={(key) => {
                     if (key === "percentage") {
@@ -1429,11 +1432,6 @@ export function DiscountFormWizard({
                       });
                       form.setValue("flat_mode", null);
                       form.setValue("min_people", null);
-                    } else if (key === "flat_per_person") {
-                      form.setValue("value_type", "flat", {
-                        shouldValidate: true,
-                      });
-                      form.setValue("flat_mode", "per_person");
                     } else {
                       form.setValue("value_type", "flat", {
                         shouldValidate: true,
@@ -1442,83 +1440,56 @@ export function DiscountFormWizard({
                       form.setValue("min_people", null);
                     }
                   }}
-                  className="sm:grid-cols-3"
-                  options={(
-                    Object.keys(DISCOUNT_OFFER_KIND_LABELS) as DiscountOfferKind[]
-                  ).map((key) => ({
-                    value: key,
-                    label: DISCOUNT_OFFER_KIND_LABELS[key],
-                  }))}
+                  className="sm:grid-cols-2"
+                  options={[
+                    {
+                      value: "percentage",
+                      label: DISCOUNT_OFFER_KIND_LABELS.percentage,
+                    },
+                    {
+                      value: "flat_total",
+                      label: DISCOUNT_OFFER_KIND_LABELS.flat_total,
+                    },
+                  ]}
                 />
               </FormItem>
 
-              <div className="grid min-w-0 gap-4 sm:grid-cols-2">
-                <FormField
-                  control={form.control}
-                  name="discount_value"
-                  render={({ field }) => (
-                    <FormItem className="min-w-0">
-                      <FormLabel>
-                        {values.value_type === "percentage"
-                          ? "Percentage"
-                          : "Amount (£)"}
-                      </FormLabel>
-                      <FormControl>
-                        <Input
-                          type="number"
-                          inputMode="decimal"
-                          min={0}
-                          max={
-                            values.value_type === "percentage" ? 100 : undefined
-                          }
-                          step={values.value_type === "percentage" ? 1 : 0.01}
-                          value={
-                            field.value != null && Number(field.value) > 0
-                              ? field.value
-                              : ""
-                          }
-                          onChange={(e) => {
-                            const raw = e.target.value;
-                            // 0 = unset; input stays blank while cleared
-                            field.onChange(raw === "" ? 0 : Number(raw));
-                          }}
-                          className="w-full max-w-full sm:max-w-xs"
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                {values.value_type === "flat" &&
-                values.flat_mode === "per_person" ? (
-                  <FormField
-                    control={form.control}
-                    name="min_people"
-                    render={({ field }) => (
-                      <FormItem className="min-w-0">
-                        <FormLabel>Minimum people</FormLabel>
-                        <FormControl>
-                          <Input
-                            type="number"
-                            inputMode="numeric"
-                            min={1}
-                            max={500}
-                            value={field.value ?? ""}
-                            onChange={(e) =>
-                              field.onChange(
-                                e.target.value ? Number(e.target.value) : null,
-                              )
-                            }
-                            className="w-full max-w-full sm:max-w-xs"
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                ) : null}
-              </div>
+              <FormField
+                control={form.control}
+                name="discount_value"
+                render={({ field }) => (
+                  <FormItem className="min-w-0">
+                    <FormLabel>
+                      {values.value_type === "percentage"
+                        ? "Percentage"
+                        : "Amount (£)"}
+                    </FormLabel>
+                    <FormControl>
+                      <Input
+                        type="number"
+                        inputMode="decimal"
+                        min={0}
+                        max={
+                          values.value_type === "percentage" ? 100 : undefined
+                        }
+                        step={values.value_type === "percentage" ? 1 : 0.01}
+                        value={
+                          field.value != null && Number(field.value) > 0
+                            ? field.value
+                            : ""
+                        }
+                        onChange={(e) => {
+                          const raw = e.target.value;
+                          // 0 = unset; input stays blank while cleared
+                          field.onChange(raw === "" ? 0 : Number(raw));
+                        }}
+                        className="w-full max-w-full sm:max-w-xs"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
 
               <div className="grid min-w-0 gap-4 sm:grid-cols-2">
                 <FormField

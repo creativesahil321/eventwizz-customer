@@ -3,6 +3,7 @@
 import { cn } from "@/lib/utils";
 import type { BannerHeadingAlign } from "@/lib/banner-heading-align";
 import { useTheme } from "@/providers/theme-provider/ThemeContext";
+import { usePreviewNarrowLayout } from "@/hooks/use-preview-narrow-layout";
 import {
   normalizeHeadingEmphasis,
   splitBannerHeading,
@@ -46,14 +47,21 @@ const headingBox = "inline-block max-w-full overflow-visible";
 const accentTailScriptPad =
   "inline-block  pl-[0.06em] pr-[0.5em] py-[0.06em]";
 
-/** Soft bloom behind accent tail text */
-function AccentTailTrail({ variant }: { variant: SiteHeadingVariant }) {
+/** Soft bloom behind accent tail text (desktop only — on mobile it reads as ghost/overlapping text). */
+function AccentTailTrail({
+  variant,
+  enabled,
+}: {
+  variant: SiteHeadingVariant;
+  enabled: boolean;
+}) {
   const isDark = variant === "onDark";
+  if (!enabled) return null;
   return (
     <>
       <span
         className={cn(
-          "pointer-events-none absolute left-[48%] top-1/2 z-0 min-h-[2.25rem] w-[min(115%,14rem)] -translate-x-1/2 -translate-y-1/2 scale-x-[1.15] rounded-full blur-[26px] md:min-h-[2.75rem] md:blur-[34px]",
+          "pointer-events-none absolute left-[48%] top-1/2 z-0 hidden min-h-[2.25rem] w-[min(115%,14rem)] -translate-x-1/2 -translate-y-1/2 scale-x-[1.15] rounded-full blur-[26px] md:block md:min-h-[2.75rem] md:blur-[34px]",
           isDark
             ? "h-[0.88em] bg-[color:color-mix(in_srgb,var(--color-primary)_48%,transparent)]"
             : "h-[0.82em] bg-[color:color-mix(in_srgb,var(--color-primary)_32%,transparent)]",
@@ -62,7 +70,7 @@ function AccentTailTrail({ variant }: { variant: SiteHeadingVariant }) {
       />
       <span
         className={cn(
-          "pointer-events-none absolute left-[54%] top-[56%] z-0 h-[0.42em] min-h-[1rem] w-[min(95%,11rem)] -translate-x-1/2 -translate-y-1/2 rounded-full blur-[18px] md:blur-[22px]",
+          "pointer-events-none absolute left-[54%] top-[56%] z-0 hidden h-[0.42em] min-h-[1rem] w-[min(95%,11rem)] -translate-x-1/2 -translate-y-1/2 rounded-full blur-[18px] md:block md:blur-[22px]",
           isDark
             ? "bg-[color:color-mix(in_srgb,var(--color-primary)_28%,transparent)]"
             : "bg-[color:color-mix(in_srgb,var(--color-primary)_18%,transparent)]",
@@ -91,9 +99,12 @@ export function SiteHeading({
   className,
 }: SiteHeadingProps) {
   const { theme } = useTheme();
+  const narrowPreview = usePreviewNarrowLayout();
   const emphasis = normalizeHeadingEmphasis(
     emphasisProp ?? theme?.typography?.headingEmphasis,
   );
+  /** Phone / tablet preview frames keep a desktop viewport — gate decorative accents. */
+  const useCompactAccent = narrowPreview;
 
   const Tag = level === 2 ? "h2" : level === 3 ? "h3" : "h1";
 
@@ -190,12 +201,23 @@ export function SiteHeading({
         <>
           {" "}
           <span className="relative inline-block max-w-full align-baseline">
-            <AccentTailTrail variant={variant} />
+            <AccentTailTrail
+              variant={variant}
+              enabled={!useCompactAccent}
+            />
             <span
               className={cn(
                 "relative z-[1] font-black leading-none align-baseline",
                 accentTailScriptPad,
-                variant === "onDark" ? accentGradient : accentSolidPrimary,
+                // Compact / mobile: solid primary. Desktop: gradient clip.
+                variant === "onDark"
+                  ? useCompactAccent
+                    ? accentSolidPrimary
+                    : cn(
+                        accentSolidPrimary,
+                        "md:bg-gradient-to-r md:from-[color:var(--color-primary)] md:via-[color:var(--color-primary)] md:to-[color:color-mix(in_srgb,var(--color-primary)_82%,white)] md:bg-clip-text md:text-transparent",
+                      )
+                  : accentSolidPrimary,
               )}
               style={{ fontFamily: headingFamily }}
             >

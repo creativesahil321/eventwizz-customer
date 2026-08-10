@@ -79,8 +79,10 @@ export default function LocationSelectionHeader({
     "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--color-primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[color:var(--color-header)]",
   );
   const menuSurfaceChromeLinkClass = cn(
-    "inline-flex min-h-11 items-center justify-center rounded-xl px-4 py-2.5 text-sm font-medium text-[var(--color-on-header)] transition-colors duration-200 whitespace-nowrap",
-    "bg-[color:color-mix(in_srgb,var(--color-on-header)_6%,transparent)] hover:bg-[color:color-mix(in_srgb,var(--color-on-header)_12%,transparent)]",
+    "inline-flex min-h-11 items-center justify-center rounded-xl px-4 py-2.5 text-sm font-medium whitespace-nowrap transition-colors duration-200",
+    // Solid surface so hero/page text cannot show through on mobile.
+    "bg-[var(--color-surface)] text-[var(--color-text)]",
+    "hover:bg-[color:color-mix(in_srgb,var(--color-text)_6%,var(--color-surface))]",
     "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--color-primary)]",
   );
 
@@ -248,7 +250,8 @@ export default function LocationSelectionHeader({
     <header
       className={cn(
         "relative z-50 h-[60px] border-b border-[color:color-mix(in_srgb,var(--color-on-header)_8%,transparent)] text-[var(--color-on-header)]",
-        "bg-[color:color-mix(in_srgb,var(--color-header)_72%,transparent)] shadow-[0_8px_28px_-20px_rgba(0,0,0,0.45)] backdrop-blur-xl supports-[backdrop-filter]:bg-[color:color-mix(in_srgb,var(--color-header)_58%,transparent)]",
+        // Solid header so scrolled content (e.g. Explore events) never shows through.
+        "bg-[var(--color-header)] shadow-[0_8px_28px_-20px_rgba(0,0,0,0.45)]",
         usesStickyHeader
           ? "sticky top-0 w-full"
           : "fixed top-0 left-0 right-0",
@@ -310,7 +313,7 @@ export default function LocationSelectionHeader({
         <motion.div
           className={cn(
             mobileMenuVisibility,
-            "absolute top-full left-0 w-full border-b border-[color:color-mix(in_srgb,var(--color-on-header)_10%,transparent)] bg-[color:color-mix(in_srgb,var(--color-header)_92%,transparent)] shadow-lg backdrop-blur-xl mobile-dropdown",
+            "absolute top-full left-0 w-full border-b border-[color:color-mix(in_srgb,var(--color-on-header)_10%,transparent)] bg-[var(--color-header)] shadow-lg mobile-dropdown",
           )}
           initial={{ opacity: 0, height: 0 }}
           animate={{ opacity: 1, height: "auto" }}

@@ -145,6 +145,21 @@ export function firstBookablePublicRoomIndex(event: EventDetail): number {
   return idx >= 0 ? idx : 0;
 }
 
+/** Resolve a public event room index from a `?roomId=` query value. */
+export function resolvePublicRoomIndexFromId(
+  event: EventDetail,
+  roomIdParam: string | null | undefined,
+): number | null {
+  if (!roomIdParam) return null;
+  const roomId = Number(roomIdParam);
+  if (!Number.isFinite(roomId) || roomId <= 0) return null;
+  const rooms = listPublicEventRooms(event);
+  const index = rooms.findIndex(
+    (room) => room.room_id === roomId && !room.disabled,
+  );
+  return index >= 0 ? index : null;
+}
+
 export function isPublicEventRoomMode(event: EventDetail): boolean {
   return (
     parseEventIsRoomsFlag(event.is_rooms) === 1 &&

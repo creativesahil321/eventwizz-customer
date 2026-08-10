@@ -52,6 +52,9 @@ import { useDrinkSelectionStore } from "@/store/drink-selection.store";
 import { useCartSync } from "../_lib/hooks/useCartSync";
 import { useLocationSlug } from "../_lib/hooks/useLocationSlug";
 import { generateEventBookingUrl } from "../_lib/utils/event-url";
+import { hasRemainingDatesToAdd } from "../_lib/remaining-dates";
+import { useEventDetail } from "@/app/(public)/[locationSlug]/events/[eventSlug]/_lib/hooks";
+import { useDomain } from "@/providers/domain-provider/domain-provider";
 import type { ApiRoomCartData } from "@/lib/types/cart.types";
 
 type CartManagerProps = Record<string, never>;
@@ -101,6 +104,7 @@ export default function CartManager({}: CartManagerProps) {
   }, [apiCartData]);
 
   const locationSlug = useLocationSlug();
+  const { domain } = useDomain();
 
   const roomMode = useMemo(
     () => isRoomBasedCart(currentEventApiData),
@@ -127,10 +131,54 @@ export default function CartManager({}: CartManagerProps) {
     [currentEventApiData, activeRoomId],
   );
 
+  // Public event detail (often cached from the event page) — used to know
+  // which bookable dates still remain for Add Dates visibility.
+  const { data: eventDetailResponse } = useEventDetail(
+    currentEventSlug ?? "",
+    domain ?? "",
+  );
+  const eventDetail = eventDetailResponse?.data ?? null;
+
+  // Add room stays unscoped; Add Dates deep-links the active checkout room.
   const eventDetailsUrl = useMemo(
     () => generateEventBookingUrl(locationSlug, currentEventSlug),
     [locationSlug, currentEventSlug],
   );
+
+  const addDatesUrl = useMemo(
+    () =>
+      generateEventBookingUrl(
+        locationSlug,
+        currentEventSlug,
+        roomMode ? activeRoomId : null,
+      ),
+    [locationSlug, currentEventSlug, roomMode, activeRoomId],
+  );
+
+  const showAddDates = useMemo(() => {
+    if (!addDatesUrl || !currentEventSlug) return false;
+    return hasRemainingDatesToAdd({
+      eventDetail,
+      cartEventData: currentEventApiData,
+      roomId: roomMode ? activeRoomId : null,
+      getLocalDateData: (date) => {
+        const storeKey =
+          roomMode && activeRoomId != null
+            ? buildRoomDateKey(activeRoomId, date)
+            : date;
+        return getDateData(currentEventSlug, storeKey);
+      },
+    });
+  }, [
+    addDatesUrl,
+    currentEventSlug,
+    eventDetail,
+    currentEventApiData,
+    roomMode,
+    activeRoomId,
+    getDateData,
+    editingData,
+  ]);
 
   // Keep active room valid for the current cart event (reset after event replace).
   useEffect(() => {
@@ -537,15 +585,15 @@ export default function CartManager({}: CartManagerProps) {
       </div>
 
       <div className="flex w-full shrink-0 items-center gap-2 sm:w-auto">
-        {eventDetailsUrl && currentEventSlug && (
+        {showAddDates && addDatesUrl ? (
           <Link
-            href={eventDetailsUrl}
+            href={addDatesUrl}
             className="inline-flex min-h-10 flex-1 items-center justify-center gap-1.5 rounded-lg border border-[color:var(--checkout-border)] bg-white px-3 py-2 text-sm font-semibold text-[color:var(--checkout-foreground)] transition-colors hover:bg-[color:var(--checkout-muted)] sm:flex-none sm:px-4"
           >
             <CalendarPlus className="h-4 w-4 shrink-0" />
             <span className="truncate">Add Dates</span>
           </Link>
-        )}
+        ) : null}
 
         {showClearConfirm ? (
           <div className="flex items-center gap-1.5">

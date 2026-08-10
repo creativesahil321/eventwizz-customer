@@ -35,9 +35,9 @@ function matchesQuery(location: LocationData, query: string): boolean {
 
 /**
  * Temporary client-side filter until a search API is wired.
- * City + date always apply. Free-text / Popular tags only narrow the list
- * when they match real location data — otherwise they stay UI-only so
- * category chips like “Corporate Summit” don’t wipe the grid.
+ * City + date always apply. Free-text only narrows the list when it matches
+ * real location data — otherwise it stays UI-only so unmatched queries don’t
+ * wipe the grid.
  */
 export function filterLocations(
   locations: LocationData[],

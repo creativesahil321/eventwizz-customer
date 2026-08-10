@@ -19,17 +19,9 @@ import {
 import { cn } from "@/lib/utils";
 import type { LocationSearchFilters } from "./_lib/filter-locations";
 
-export const POPULAR_SEARCH_TAGS = [
-  "Wedding Fair",
-  "Food Festival",
-  "Live Music",
-  "Corporate Summit",
-] as const;
-
 export type LocationSearchBarProps = {
   cities?: string[];
   id?: string;
-  variant?: "default" | "onDark";
   className?: string;
   value: LocationSearchFilters;
   onChange: (value: LocationSearchFilters) => void;
@@ -42,7 +34,6 @@ export type LocationSearchBarProps = {
 export function LocationSearchBar({
   cities = [],
   id,
-  variant = "default",
   className,
   value,
   onChange,
@@ -80,7 +71,7 @@ export function LocationSearchBar({
           event.preventDefault();
           onSearch();
         }}
-        className="rounded-2xl border border-[color:color-mix(in_srgb,var(--color-text)_10%,transparent)] bg-[var(--color-surface)] p-1 shadow-[0_10px_28px_-22px_rgba(0,0,0,0.45)] sm:rounded-full sm:p-1"
+        className="rounded-2xl border border-[color:color-mix(in_srgb,var(--color-text)_10%,transparent)] bg-[var(--color-surface)] p-1 shadow-[0_10px_32px_-20px_rgba(0,0,0,0.28)] sm:rounded-full sm:p-1"
       >
         <div className="flex flex-col gap-0.5 sm:flex-row sm:items-center sm:gap-0">
           <label className="relative flex min-w-0 flex-1 items-center gap-1.5 rounded-full px-2.5 py-1.5 sm:gap-2 sm:px-3.5 sm:py-2">
@@ -229,41 +220,6 @@ export function LocationSearchBar({
           </button>
         </div>
       </form>
-
-      <div className="mt-2 flex flex-wrap items-center justify-center gap-1 px-1 sm:mt-3 sm:gap-1.5">
-        <span
-          className={cn(
-            "text-[10px] font-medium sm:text-xs",
-            variant === "onDark"
-              ? "text-white/70"
-              : "text-[var(--color-text-dimmed)]",
-          )}
-        >
-          Popular:
-        </span>
-        {POPULAR_SEARCH_TAGS.map((tag) => {
-          const active = value.query.trim().toLowerCase() === tag.toLowerCase();
-          return (
-            <button
-              key={tag}
-              type="button"
-              onClick={() => patch({ query: tag })}
-              className={cn(
-                "rounded-full border px-2 py-0.5 text-[10px] font-medium transition-colors sm:px-2.5 sm:py-1 sm:text-xs",
-                variant === "onDark"
-                  ? active
-                    ? "border-white bg-white/20 text-white"
-                    : "border-white/35 bg-black/25 text-white/90 backdrop-blur-sm hover:border-white/55 hover:bg-black/35"
-                  : active
-                    ? "border-[var(--color-primary)] bg-[color:color-mix(in_srgb,var(--color-primary)_12%,transparent)] text-[var(--color-text)]"
-                    : "border-[color:color-mix(in_srgb,var(--color-text)_14%,transparent)] bg-transparent text-[var(--color-text)] hover:border-[color:color-mix(in_srgb,var(--color-text)_28%,transparent)]",
-              )}
-            >
-              {tag}
-            </button>
-          );
-        })}
-      </div>
     </div>
   );
 }

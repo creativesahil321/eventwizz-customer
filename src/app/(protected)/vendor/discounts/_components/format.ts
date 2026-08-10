@@ -22,12 +22,22 @@ function formatAmountLabel(
   return `£${amount} off total`;
 }
 
+function discountOfferRows(discount: Discount) {
+  if (Array.isArray(discount.offers) && discount.offers.length > 0) {
+    return discount.offers;
+  }
+  if (Array.isArray(discount.dates) && discount.dates.length > 0) {
+    return discount.dates;
+  }
+  return [];
+}
+
 export function formatDiscountValue(discount: Discount): string {
   if (discount.value_label?.trim()) return discount.value_label;
 
-  const dates = Array.isArray(discount.dates) ? discount.dates : [];
-  if (dates.length > 1) {
-    const labels = dates.map((d) =>
+  const offers = discountOfferRows(discount);
+  if (offers.length > 1) {
+    const labels = offers.map((d) =>
       formatAmountLabel(
         d.discount_type,
         d.amount,
@@ -37,13 +47,13 @@ export function formatDiscountValue(discount: Discount): string {
     );
     const unique = Array.from(new Set(labels));
     if (unique.length === 1) return unique[0];
-    return `${dates.length} dates · ${unique.slice(0, 2).join(" / ")}${
+    return `${offers.length} offers · ${unique.slice(0, 2).join(" / ")}${
       unique.length > 2 ? "…" : ""
     }`;
   }
 
-  if (dates.length === 1) {
-    const d = dates[0];
+  if (offers.length === 1) {
+    const d = offers[0];
     return (
       d.value_label?.trim() ||
       formatAmountLabel(d.discount_type, d.amount, d.flat_mode, d.min_people)
@@ -69,15 +79,15 @@ export function formatDiscountScope(discount: Discount): string {
     parts.push(discount.event.name.trim());
   }
 
-  const dates = Array.isArray(discount.dates) ? discount.dates : [];
-  if (dates.length > 1) {
-    parts.push(`${dates.length} dates`);
-    const first = dates[0]?.date;
+  const offers = discountOfferRows(discount);
+  if (offers.length > 1) {
+    parts.push(`${offers.length} dates`);
+    const first = offers[0]?.date;
     if (first) {
       parts.push(`from ${formatGuideDate(first)}`);
     }
-  } else if (dates.length === 1) {
-    const d = dates[0];
+  } else if (offers.length === 1) {
+    const d = offers[0];
     if (d.date) parts.push(formatGuideDate(d.date));
     if (d.room?.name?.trim()) parts.push(d.room.name.trim());
   } else {
@@ -97,9 +107,9 @@ export function formatDiscountScope(discount: Discount): string {
 }
 
 function formatExpiryPart(discount: Discount): string {
-  const dates = Array.isArray(discount.dates) ? discount.dates : [];
-  if (dates.length > 1) {
-    const expiries = dates
+  const offers = discountOfferRows(discount);
+  if (offers.length > 1) {
+    const expiries = offers
       .map((d) => d.expires_at)
       .filter(Boolean)
       .sort();
@@ -107,8 +117,8 @@ function formatExpiryPart(discount: Discount): string {
     const last = expiries[expiries.length - 1];
     return `Expires from ${formatGuideDate(expiries[0])}–${formatGuideDate(last)}`;
   }
-  if (dates.length === 1 && dates[0].expires_at) {
-    return `Expires ${formatGuideDate(dates[0].expires_at)}`;
+  if (offers.length === 1 && offers[0].expires_at) {
+    return `Expires ${formatGuideDate(offers[0].expires_at)}`;
   }
   if (discount.expires_at) {
     return `Expires ${formatGuideDate(discount.expires_at) || discount.expires_at}`;

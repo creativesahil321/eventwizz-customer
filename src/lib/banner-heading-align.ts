@@ -95,11 +95,11 @@ export const heroBandVignetteClass =
 export const heroBandViewToggleOffsetClass = "relative z-20 -mt-4 xl:-mt-6";
 
 /**
- * Multi-location hero — auto-height on small screens so stacked search
- * doesn’t clip; fixed band from sm+ for a stable banner.
+ * Multi-location hero — soft opacity image band + content (search on-page).
+ * Auto-height so stacked search never clips; no fixed dark media band.
  */
 export const heroBandHeightCompactMobileClass =
-  "min-h-[360px] h-auto max-h-none sm:h-[min(60dvh,600px)] sm:min-h-[360px] sm:max-h-[640px] xl:h-[min(62dvh,660px)] xl:min-h-[380px] xl:max-h-[700px]";
+  "min-h-[520px] h-auto max-h-none sm:min-h-[560px]";
 
 /* ---- Vertical placement (hero band) ---- */
 

@@ -11,6 +11,7 @@ import {
   useState,
 } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { EventHeroBand } from "@/components/public/event-hero-band";
 import {
@@ -58,6 +59,7 @@ import {
   isPublicEventRoomMode,
   listPublicEventRoomSummaries,
   resolvePublicEventActiveSlices,
+  resolvePublicRoomIndexFromId,
 } from "@/lib/resolve-public-event-room-slices";
 import { scrollToElementIfNeeded } from "@/lib/scroll-to-element-if-needed";
 
@@ -79,17 +81,20 @@ export default function EventDetailClient({
 }: EventDetailClientProps) {
   const { formatCompact: formatPriceUnit } = useCurrencyFormat();
   const { data } = useEventDetail(eventSlug, host);
+  const searchParams = useSearchParams();
+  const roomIdParam = searchParams.get("roomId");
 
   const eventData = data?.data || initialEvent;
 
-  const [currentRoomIndex, setCurrentRoomIndex] = useState(() =>
-    firstBookablePublicRoomIndex(initialEvent),
-  );
+  const [currentRoomIndex, setCurrentRoomIndex] = useState(() => {
+    const fromQuery = resolvePublicRoomIndexFromId(initialEvent, roomIdParam);
+    return fromQuery ?? firstBookablePublicRoomIndex(initialEvent);
+  });
   const [roomSelectorScrollVisible, setRoomSelectorScrollVisible] =
     useState(false);
   /**
    * Banner coupon for the strip. Prefer event payload coupons when the API
-   * exposes them (`show_on_banner`); until then use the shared demo source so
+   * exposes them (`show_on_event_page`); until then use the shared demo source so
    * props still go through `couponToStripProps`.
    */
   const bannerCouponSource = useMemo((): CouponStripSource | null => {
@@ -106,7 +111,10 @@ export default function EventDetailClient({
         coupons?: CouponStripSource[] | null;
       }
     ).coupons;
-    const firstBanner = list?.find((c) => c.show_on_banner !== false);
+    const firstBanner = list?.find((c) => {
+      if (typeof c.show_on_event_page === "boolean") return c.show_on_event_page;
+      return c.show_on_banner !== false;
+    });
     if (firstBanner) return firstBanner;
 
     return DEMO_EVENT_BANNER_COUPON;
@@ -130,10 +138,11 @@ export default function EventDetailClient({
   const roomPreviewMode = isPublicEventRoomMode(eventData);
 
   useEffect(() => {
-    setCurrentRoomIndex(firstBookablePublicRoomIndex(eventData));
-    // Reset only when the event identity / room-mode changes — not on every refetch.
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- eventData read intentionally once per slug/mode
-  }, [eventSlug, roomPreviewMode]);
+    const fromQuery = resolvePublicRoomIndexFromId(eventData, roomIdParam);
+    setCurrentRoomIndex(fromQuery ?? firstBookablePublicRoomIndex(eventData));
+    // Reset when event identity / room-mode / deep-linked room changes — not every refetch.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- eventData read intentionally once per slug/mode/roomId
+  }, [eventSlug, roomPreviewMode, roomIdParam]);
 
   const slices = useMemo(
     () => resolvePublicEventActiveSlices(eventData, currentRoomIndex),

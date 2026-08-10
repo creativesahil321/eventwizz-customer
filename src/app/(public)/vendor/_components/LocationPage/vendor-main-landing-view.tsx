@@ -7,7 +7,6 @@ import {
   type CSSProperties,
   type ReactNode,
 } from "react";
-import Image from "next/image";
 import { motion } from "framer-motion";
 import { Map, LayoutGrid, MapPin, CalendarDays } from "lucide-react";
 import LocationSelectionHeader from "./location-selection-header";
@@ -27,18 +26,14 @@ import {
   type HeadingEmphasis,
 } from "@/lib/heading-emphasis";
 import {
-  heroBandBottomFadeClass,
   heroBandContentPadClass,
   heroBandHeightCompactMobileClass,
-  heroBandMediaMaskClass,
   heroBandVerticalClass,
-  heroBandVignetteClass,
   heroBandViewToggleOffsetClass,
   heroBannerStackClass,
   vendorHomeSubheroClass,
 } from "@/lib/banner-heading-align";
 import { cn } from "@/lib/utils";
-import { shouldUseNextImageOptimization } from "@/lib/image-utils";
 import type { LocationData } from "@/types/theme.types";
 import type { ThemeSchema } from "@/types/theme.types";
 import type { VenueContactOverride } from "@/lib/resolve-venue-contact";
@@ -130,7 +125,7 @@ export function VendorMainLandingView({
     () => filterLocations(locations, activeFilters),
     [locations, activeFilters],
   );
-  /** Empty state only for city/date — Popular/query stay soft until the API. */
+  /** Empty state only for city/date — free-text stays soft until the API. */
   const showEmptySearchState =
     hasHardSearchFilters(searchFilters) && filteredLocations.length === 0;
 
@@ -183,41 +178,34 @@ export function VendorMainLandingView({
 
       <section
         className={cn(
-          "relative mx-auto flex w-full min-w-0 justify-center overflow-hidden",
+          "relative mx-auto flex w-full min-w-0 justify-center overflow-hidden bg-[var(--color-background)]",
           heroBandHeightCompactMobileClass,
           heroBandVerticalClass(heroValign),
         )}
       >
-        <div className="absolute inset-0" aria-hidden>
-          <div className={cn("absolute inset-0", heroBandMediaMaskClass)}>
-            <Image
-              key={heroImageSrc}
-              src={heroImageSrc}
-              alt=""
-              fill
-              className="scale-[1.03] object-cover"
-              priority
-              sizes="100vw"
-              unoptimized={!shouldUseNextImageOptimization(heroImageSrc)}
-            />
-            <div
-              className="absolute inset-0 bg-gradient-to-b from-black/50 via-black/20 to-transparent"
-              aria-hidden
-            />
-            <div
-              className="absolute inset-0 bg-[color:color-mix(in_srgb,var(--color-primary)_10%,transparent)] mix-blend-soft-light"
-              aria-hidden
-            />
-          </div>
-          <div className={heroBandVignetteClass} aria-hidden />
-          <div className={heroBandBottomFadeClass} aria-hidden />
-        </div>
+        {/*
+          Soft hero image band — no CSS blur:
+          absolute top band · opacity-50 · mask-image: linear-gradient(#000 50%, #00000057 98%)
+        */}
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-x-0 top-0 h-[520px] opacity-50 sm:h-[580px]"
+          style={{
+            backgroundImage: `url(${heroImageSrc})`,
+            backgroundSize: "cover",
+            backgroundPosition: "center center",
+            WebkitMaskImage:
+              "linear-gradient(#000000 50%, #00000057 98%)",
+            maskImage: "linear-gradient(#000000 50%, #00000057 98%)",
+          }}
+        />
+
         <div
           className={cn(
             "relative z-10 mx-auto w-full min-w-0 max-w-[1180px] overflow-visible px-4 sm:px-6",
             heroBandContentPadClass(heroValign),
-            // Room under hero search + Popular chips so the toggle never covers them.
-            hideMapView ? "pb-10 sm:pb-16" : "pb-16 sm:pb-28 xl:pb-32",
+            "pt-24 sm:pt-28 md:pt-32",
+            hideMapView ? "pb-12 sm:pb-16" : "pb-16 sm:pb-20 xl:pb-24",
           )}
         >
           <motion.div
@@ -229,7 +217,7 @@ export function VendorMainLandingView({
               "w-full min-w-0 overflow-visible",
             )}
           >
-            <span className="mb-3 inline-flex max-w-[min(100%,22rem)] items-center gap-2 truncate rounded-full border border-white/20 bg-black/35 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-white/90 backdrop-blur-md sm:mb-4 sm:px-3.5 sm:py-1.5 sm:text-[11px] sm:tracking-[0.16em]">
+            <span className="mb-3 inline-flex max-w-[min(100%,22rem)] items-center gap-2 truncate rounded-full border border-[color:color-mix(in_srgb,var(--color-primary)_22%,transparent)] bg-[color:color-mix(in_srgb,var(--color-primary)_8%,var(--color-surface))] px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--color-primary)] sm:mb-4 sm:px-3.5 sm:py-1.5 sm:text-[11px] sm:tracking-[0.16em]">
               <span
                 className="h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--color-primary)]"
                 aria-hidden
@@ -242,7 +230,7 @@ export function VendorMainLandingView({
               title={heroHeading}
               accentHint={heroAccentHint}
               emphasis={normalizeHeadingEmphasis(headingEmphasis)}
-              variant="onDark"
+              variant="onSurface"
               align={heroAlign}
               className="mb-2.5 w-full min-w-0 max-w-full break-words font-bold !text-[1.65rem] !leading-[1.18] sm:mb-4 sm:!text-4xl sm:!leading-[1.12] md:max-w-5xl md:!text-5xl xl:!text-[3.25rem] xl:!leading-[1.05]"
             />
@@ -250,15 +238,14 @@ export function VendorMainLandingView({
             <p
               className={cn(
                 vendorHomeSubheroClass(heroAlign),
-                "!mb-5 px-1 text-sm sm:!mb-6 sm:text-base md:text-lg",
+                "!mb-8 !text-[var(--color-text-dimmed)] px-1 text-sm sm:!mb-10 sm:text-base md:text-lg",
               )}
             >
               {heroSubheading}
             </p>
 
             <LocationSearchBar
-              variant="onDark"
-              className="w-full max-w-4xl px-0"
+              className="w-full max-w-3xl px-0"
               cities={locations.map((location) => location.city)}
               value={searchFilters}
               onChange={setSearchFilters}
@@ -268,30 +255,30 @@ export function VendorMainLandingView({
         </div>
       </section>
 
-      {!hideMapView && (
+      {!hideMapView ? (
         <section
           className={cn(
-            "flex justify-center bg-transparent px-4 pb-6 pt-0 sm:px-6",
+            "relative z-20 flex justify-center bg-transparent px-4 pb-5 pt-0 sm:px-6",
             heroBandViewToggleOffsetClass,
           )}
         >
-          <motion.div
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.45, delay: 0.08 }}
-            className="rounded-full border border-[color:color-mix(in_srgb,var(--color-text)_12%,transparent)] bg-[var(--color-surface)] p-1 shadow-[0_12px_32px_-18px_rgba(0,0,0,0.45)]"
+          <div
+            className="rounded-full border border-[color:color-mix(in_srgb,var(--color-text)_10%,transparent)] bg-[var(--color-surface)] p-0.5 shadow-[0_8px_24px_-18px_rgba(0,0,0,0.35)]"
+            role="tablist"
+            aria-label="Locations view"
           >
-            <div className="flex" role="tablist" aria-label="Locations view">
+            <div className="flex">
               <button
                 type="button"
                 role="tab"
                 aria-selected={viewMode === "map"}
                 onClick={() => setViewMode("map")}
-                className={`flex items-center gap-2 rounded-full px-5 py-2.5 text-sm font-medium transition-all duration-300 motion-reduce:transition-none ${
+                className={cn(
+                  "flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition-colors",
                   viewMode === "map"
-                    ? "bg-[var(--color-primary)] text-[var(--color-primary-foreground)] shadow-sm"
-                    : "text-[var(--color-text-dimmed)] hover:text-[var(--color-text)]"
-                }`}
+                    ? "bg-[var(--color-primary)] text-[var(--color-primary-foreground)]"
+                    : "text-[var(--color-text-dimmed)] hover:text-[var(--color-text)]",
+                )}
               >
                 <Map className="h-4 w-4" aria-hidden />
                 Map View
@@ -301,25 +288,26 @@ export function VendorMainLandingView({
                 role="tab"
                 aria-selected={viewMode === "grid"}
                 onClick={() => setViewMode("grid")}
-                className={`flex items-center gap-2 rounded-full px-5 py-2.5 text-sm font-medium transition-all duration-300 motion-reduce:transition-none ${
+                className={cn(
+                  "flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition-colors",
                   viewMode === "grid"
-                    ? "bg-[var(--color-primary)] text-[var(--color-primary-foreground)] shadow-sm"
-                    : "text-[var(--color-text-dimmed)] hover:text-[var(--color-text)]"
-                }`}
+                    ? "bg-[var(--color-primary)] text-[var(--color-primary-foreground)]"
+                    : "text-[var(--color-text-dimmed)] hover:text-[var(--color-text)]",
+                )}
               >
                 <LayoutGrid className="h-4 w-4" aria-hidden />
                 Grid View
               </button>
             </div>
-          </motion.div>
+          </div>
         </section>
-      )}
+      ) : null}
 
       <section
         id={exploreCitiesSectionId}
         className={cn(
-          "scroll-mt-20 bg-[var(--color-background)] pb-14 md:pb-20",
-          hideMapView ? "pt-8 sm:pt-10" : "pt-2 md:pt-3",
+          "scroll-mt-20 bg-[var(--color-background)] pb-10 md:pb-20",
+          hideMapView ? "pt-6 sm:pt-8 md:pt-10" : "pt-3 md:pt-4",
         )}
       >
         <motion.div
@@ -328,8 +316,19 @@ export function VendorMainLandingView({
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.45, delay: 0.12 }}
         >
-          <div className="mx-auto mb-6 max-w-2xl text-center md:mb-7">
-            <span className="mb-2.5 block text-[11px] font-bold uppercase tracking-[0.2em] text-[color:var(--color-primary)] sm:text-xs">
+          <div
+            className={cn(
+              "mx-auto mb-3 max-w-2xl text-center md:mb-7",
+              !isPreviewNarrow && "sm:mb-5",
+            )}
+          >
+            <span
+              className={cn(
+                "mb-1 block text-[10px] font-bold uppercase tracking-[0.18em] text-[color:var(--color-primary)]",
+                !isPreviewNarrow &&
+                  "sm:mb-2.5 sm:text-xs sm:tracking-[0.2em]",
+              )}
+            >
               Explore cities
             </span>
             <SiteHeading
@@ -337,37 +336,96 @@ export function VendorMainLandingView({
               align="center"
               title={locationsListTitle}
               variant="onSurface"
-              className="mb-2.5 !text-[1.75rem] !font-black !leading-tight tracking-tight sm:!text-4xl"
+              className={cn(
+                "mb-1 !text-xl !font-black !leading-snug tracking-tight",
+                !isPreviewNarrow &&
+                  "sm:mb-2.5 sm:!text-4xl sm:!leading-tight",
+              )}
             />
-            <p className="mx-auto max-w-xl px-1 text-sm leading-relaxed text-[var(--color-text-dimmed)] sm:text-base">
+            <p
+              className={cn(
+                "mx-auto max-w-xl px-1 text-xs leading-snug text-[var(--color-text-dimmed)]",
+                !isPreviewNarrow && "sm:text-base sm:leading-relaxed",
+              )}
+            >
               {locationsListSubtitle}
             </p>
           </div>
 
           {locations.length > 0 ? (
             <div
-              className="mx-auto mb-7 grid max-w-md grid-cols-2 items-stretch gap-2.5 sm:gap-3 md:mb-8"
+              className={cn(
+                "mx-auto mb-4 flex max-w-md items-center justify-center gap-2 md:mb-8",
+                !isPreviewNarrow &&
+                  "sm:mb-6 sm:grid sm:grid-cols-2 sm:items-stretch sm:gap-3",
+              )}
               aria-label="Location overview"
             >
-              <div className="flex flex-col items-center rounded-[16px] border border-[color:color-mix(in_srgb,var(--color-text)_10%,transparent)] bg-[var(--color-surface)] px-3 py-3.5 shadow-[0_12px_28px_-24px_rgba(0,0,0,0.45)] sm:rounded-[20px] sm:px-6 sm:py-4">
+              {/* Compact pills on phone / phone preview; cards from sm on desktop */}
+              <div
+                className={cn(
+                  "inline-flex items-center gap-1.5 rounded-full border border-[color:color-mix(in_srgb,var(--color-text)_10%,transparent)] bg-[var(--color-surface)] px-3 py-1.5",
+                  !isPreviewNarrow && "sm:hidden",
+                )}
+              >
+                <MapPin
+                  className="h-3 w-3 text-[var(--color-primary)]"
+                  aria-hidden
+                />
+                <span className="text-xs font-semibold tabular-nums text-[var(--color-text)]">
+                  {totalLocations}
+                </span>
+                <span className="text-[10px] font-medium uppercase tracking-wide text-[var(--color-text-dimmed)]">
+                  locations
+                </span>
+              </div>
+              <div
+                className={cn(
+                  "inline-flex items-center gap-1.5 rounded-full border border-[color:color-mix(in_srgb,var(--color-text)_10%,transparent)] bg-[var(--color-surface)] px-3 py-1.5",
+                  !isPreviewNarrow && "sm:hidden",
+                )}
+              >
+                <CalendarDays
+                  className="h-3 w-3 text-[var(--color-primary)]"
+                  aria-hidden
+                />
+                <span className="text-xs font-semibold tabular-nums text-[var(--color-text)]">
+                  {totalEvents}
+                </span>
+                <span className="text-[10px] font-medium uppercase tracking-wide text-[var(--color-text-dimmed)]">
+                  events
+                </span>
+              </div>
+
+              <div
+                className={cn(
+                  "flex-col items-center rounded-[20px] border border-[color:color-mix(in_srgb,var(--color-text)_10%,transparent)] bg-[var(--color-surface)] px-6 py-4 shadow-[0_12px_28px_-24px_rgba(0,0,0,0.45)]",
+                  isPreviewNarrow ? "hidden" : "hidden sm:flex",
+                )}
+              >
                 <div className="mb-1.5 flex items-center gap-1.5 text-[var(--color-primary)]">
                   <MapPin className="h-3.5 w-3.5 shrink-0" aria-hidden />
-                  <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--color-text-dimmed)] sm:text-[11px] sm:tracking-[0.16em]">
+                  <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--color-text-dimmed)]">
                     Locations
                   </span>
                 </div>
-                <p className="text-xl font-bold tabular-nums tracking-tight text-[var(--color-text)] sm:text-[1.75rem]">
+                <p className="text-[1.75rem] font-bold tabular-nums tracking-tight text-[var(--color-text)]">
                   {totalLocations}
                 </p>
               </div>
-              <div className="flex flex-col items-center rounded-[16px] border border-[color:color-mix(in_srgb,var(--color-text)_10%,transparent)] bg-[var(--color-surface)] px-3 py-3.5 shadow-[0_12px_28px_-24px_rgba(0,0,0,0.45)] sm:rounded-[20px] sm:px-6 sm:py-4">
+              <div
+                className={cn(
+                  "flex-col items-center rounded-[20px] border border-[color:color-mix(in_srgb,var(--color-text)_10%,transparent)] bg-[var(--color-surface)] px-6 py-4 shadow-[0_12px_28px_-24px_rgba(0,0,0,0.45)]",
+                  isPreviewNarrow ? "hidden" : "hidden sm:flex",
+                )}
+              >
                 <div className="mb-1.5 flex items-center gap-1.5 text-[var(--color-primary)]">
                   <CalendarDays className="h-3.5 w-3.5 shrink-0" aria-hidden />
-                  <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--color-text-dimmed)] sm:text-[11px] sm:tracking-[0.16em]">
+                  <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--color-text-dimmed)]">
                     Events
                   </span>
                 </div>
-                <p className="text-xl font-bold tabular-nums tracking-tight text-[var(--color-text)] sm:text-[1.75rem]">
+                <p className="text-[1.75rem] font-bold tabular-nums tracking-tight text-[var(--color-text)]">
                   {totalEvents}
                 </p>
               </div>

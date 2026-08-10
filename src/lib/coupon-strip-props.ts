@@ -17,7 +17,9 @@ export type CouponStripSource = {
   coupon_code?: string | null;
   /** Small uppercase eyebrow on the strip (e.g. "Limited time offer"). */
   banner_heading?: string | null;
-  /** Main promo line under the heading. */
+  /** Main promo line under the heading (API: `banner_subheading`). */
+  banner_subheading?: string | null;
+  /** @deprecated Prefer `banner_subheading`. */
   dynamic_text?: string | null;
   discount_type?: "percentage" | "flat" | string | null;
   value_type?: "percentage" | "flat" | string | null;
@@ -25,6 +27,9 @@ export type CouponStripSource = {
   discount_value?: number | null;
   flat_mode?: string | null;
   expires_at?: string | null;
+  /** API: show coupon banner on the event page. */
+  show_on_event_page?: boolean | null;
+  /** @deprecated Prefer `show_on_event_page`. */
   show_on_banner?: boolean | null;
 };
 
@@ -80,13 +85,24 @@ export function couponStripEndsAt(
 
 /**
  * Map coupon form / API fields → `EventCouponStrip` props.
- * Returns `null` when the strip should not show (`show_on_banner` false or no code).
+ * Returns `null` when the strip should not show (`show_on_event_page` /
+ * legacy `show_on_banner` false, or no code).
  */
+function couponStripVisible(source: CouponStripSource): boolean {
+  if (typeof source.show_on_event_page === "boolean") {
+    return source.show_on_event_page;
+  }
+  if (typeof source.show_on_banner === "boolean") {
+    return source.show_on_banner;
+  }
+  return true;
+}
+
 export function couponToStripProps(
   source: CouponStripSource | null | undefined,
 ): CouponStripMappedProps | null {
   if (!source) return null;
-  if (source.show_on_banner === false) return null;
+  if (!couponStripVisible(source)) return null;
 
   const code = source.coupon_code?.trim() ?? "";
   if (!code) return null;
@@ -95,10 +111,11 @@ export function couponToStripProps(
     source.banner_heading?.trim() || COUPON_STRIP_DEFAULT_HEADING
   ).slice(0, COUPON_BANNER_HEADING_MAX);
 
-  const headline = (source.dynamic_text?.trim() ?? "").slice(
-    0,
-    COUPON_BANNER_TEXT_MAX,
-  );
+  const headline = (
+    source.banner_subheading?.trim() ||
+    source.dynamic_text?.trim() ||
+    ""
+  ).slice(0, COUPON_BANNER_TEXT_MAX);
 
   return {
     code,
@@ -125,10 +142,10 @@ function demoCouponExpiresAt(): string {
 export const DEMO_EVENT_BANNER_COUPON: CouponStripSource = {
   coupon_code: "TEA50",
   banner_heading: COUPON_STRIP_DEFAULT_HEADING,
-  dynamic_text: "Claim Your 50% Off Afternoon Tea",
+  banner_subheading: "Claim Your 50% Off Afternoon Tea",
   discount_type: "percentage",
   amount: 50,
   flat_mode: null,
   expires_at: demoCouponExpiresAt(),
-  show_on_banner: true,
+  show_on_event_page: true,
 };

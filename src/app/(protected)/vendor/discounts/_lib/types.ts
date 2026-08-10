@@ -30,7 +30,7 @@ export interface DiscountCustomer {
   status: string;
 }
 
-/** One date row inside a multi-date Discount (API + form). */
+/** One offer row inside a multi-date Discount (`offers[]` from API). */
 export interface DiscountDateEntry {
   id?: number;
   date_id: number;
@@ -45,12 +45,16 @@ export interface DiscountDateEntry {
   valid_from?: string | null;
   expires_at: string;
   value_label?: string | null;
-  /** When false, hide this date’s badge on the public event page. */
+  /** Show badge on public event date picker. */
+  show_on_event_page?: boolean | null;
+  /** @deprecated API uses `show_on_event_page`. */
   show_on_banner?: boolean | null;
-  /** When false, this date’s offer is saved but not live at checkout. */
-  is_live?: boolean | null;
-  /** Alternate API field — prefer `is_live` when both exist. */
+  /** Offer live status (`active` | `inactive`). */
   status?: DiscountStatus | string | null;
+  stored_status?: DiscountStatus | string | null;
+  /** @deprecated Prefer `status === "active"`. */
+  is_live?: boolean | null;
+  sort_order?: number | null;
 }
 
 export interface Discount {
@@ -58,11 +62,17 @@ export interface Discount {
   category: DiscountCategory;
   name: string | null;
   coupon_code: string | null;
-  /** When false, hide from the public event page (coupon strip / discount badges). */
+  /** Coupon banner on the public event page. */
+  show_on_event_page?: boolean | null;
+  /** Coupon usable at checkout. */
+  show_on_checkout?: boolean | null;
+  /** @deprecated API uses `show_on_event_page`. */
   show_on_banner?: boolean | null;
   /** Small eyebrow on the coupon strip (e.g. "Limited time offer"). */
   banner_heading?: string | null;
-  /** Main promo line on the event page coupon strip. */
+  /** Main promo line on the coupon strip. */
+  banner_subheading?: string | null;
+  /** @deprecated API uses `banner_subheading`. */
   dynamic_text?: string | null;
   discount_type: DiscountType;
   flat_mode: FlatDiscountMode | string | null;
@@ -75,18 +85,20 @@ export interface Discount {
   summary: string;
   vendor_location_id: number;
   vendor_event_id: number;
-  /** Legacy single-date fields — prefer `dates[]` when present. */
+  /** Legacy single-date fields — prefer `offers[]` when present. */
   date_id: number | null;
   date: string | null;
   room_id: number | null;
   location: DiscountRelation | null;
   event: DiscountRelation | null;
   room: DiscountRelation | null;
-  /** Multi-date Discount rows (guide model). */
+  /** Multi-date Discount offer rows. */
+  offers?: DiscountDateEntry[] | null;
+  /** @deprecated API uses `offers`. */
   dates?: DiscountDateEntry[] | null;
   customers?: DiscountCustomer[];
   valid_from: string | null;
-  expires_at: string;
+  expires_at: string | null;
   redemption_count: number;
   emails_sent_at: string | null;
   created_at: string;
@@ -138,8 +150,8 @@ export interface DiscountsListResponse {
   errors: unknown[];
 }
 
-/** One date row in POST /vendor/discounts/store for category `discount`. */
-export interface DiscountDatePayload {
+/** One offer in POST /vendor/discounts/store for category `discount`. */
+export interface DiscountOfferPayload {
   date_id: number;
   room_id?: number | null;
   discount_type: DiscountType;
@@ -148,11 +160,14 @@ export interface DiscountDatePayload {
   min_people?: number | null;
   valid_from?: string | null;
   expires_at: string;
-  /** Show offer badge on the public event date picker for this date. */
-  show_on_banner?: boolean;
-  /** Live for checkout immediately when true; paused when false. */
-  is_live?: boolean;
+  /** Show offer badge on the public event date picker. */
+  show_on_event_page: boolean;
+  /** Immediately live at checkout. */
+  status: "active" | "inactive";
 }
+
+/** @deprecated Use `DiscountOfferPayload`. */
+export type DiscountDatePayload = DiscountOfferPayload;
 
 /**
  * POST /vendor/discounts/store
@@ -162,24 +177,22 @@ export interface DiscountFormPayload {
   category: "discount" | "coupon_code";
   vendor_event_id: number;
   name?: string | null;
-  status: "active" | "inactive";
-  /** Multi-date Discount rows */
-  dates?: DiscountDatePayload[];
-  /** Coupon (and legacy single-date) value fields */
+  /** Discount: per-offer rows (replaces whole set on update). */
+  offers?: DiscountOfferPayload[];
+  /** Coupon live toggle (discounts use `offers[].status`). */
+  status?: "active" | "inactive";
   discount_type?: DiscountType;
   amount?: number;
   valid_from?: string | null;
-  expires_at?: string;
-  date_id?: number;
-  room_id?: number;
+  expires_at?: string | null;
   coupon_code?: string | null;
-  /** Promote on the public event page (coupon strip or discount display). */
-  show_on_banner?: boolean;
-  /** Small eyebrow on the coupon strip. */
+  /** Coupon event-page banner. */
+  show_on_event_page?: boolean;
+  /** Coupon usable at checkout. */
+  show_on_checkout?: boolean;
   banner_heading?: string | null;
-  /** Main promo line on the event page coupon strip. */
-  dynamic_text?: string | null;
-  /** API: `total` | `per_person` */
+  banner_subheading?: string | null;
+  /** API: `total` | `per_person` (discounts / coupon flat total). */
   flat_mode?: FlatDiscountMode | null;
   min_people?: number | null;
   customer_audience?: CustomerAudience;

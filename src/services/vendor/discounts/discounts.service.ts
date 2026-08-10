@@ -121,7 +121,7 @@ export const discountsService = {
 
   /**
    * Events (with dates/rooms) for the current header location.
-   * GET /vendor/discounts/locations-with-events
+   * GET /vendor/discounts/events-with-dates
    */
   getEventsWithDates: async (): Promise<DiscountEventWithDates[]> => {
     const endpoints = getDiscountEndpoints();
