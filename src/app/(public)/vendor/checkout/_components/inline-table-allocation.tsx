@@ -72,15 +72,19 @@ export default function InlineTableAllocation({
   const [draftAllocation, setDraftAllocation] =
     useState<number[]>(committedAllocation);
   const [isConfirmed, setIsConfirmed] = useState(false);
+  /** Show Auto Distribute / Reset only after the user edits a table. */
+  const [hasTouchedTables, setHasTouchedTables] = useState(false);
 
   // Sync before paint so Confirm seating never submits stale allocation after
   // group-size / auto-match updates (useEffect was one frame too late).
   useLayoutEffect(() => {
     setDraftAllocation(committedAllocation);
+    setHasTouchedTables(false);
   }, [committedAllocation]);
 
   useEffect(() => {
     setIsConfirmed(false);
+    setHasTouchedTables(false);
   }, [peopleCount, table.id, table.quantity]);
 
   const isDirty = useMemo(
@@ -140,6 +144,7 @@ export default function InlineTableAllocation({
   };
 
   const stepAllocation = (index: number, delta: number) => {
+    setHasTouchedTables(true);
     setDraftAllocation((current) => {
       const value = current[index] ?? minPersons;
       const next = Math.max(minPersons, Math.min(maxPersons, value + delta));
@@ -268,24 +273,26 @@ export default function InlineTableAllocation({
           />
         </div>
 
-        <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
-          <button
-            type="button"
-            onClick={handleAutoDistribute}
-            className="inline-flex h-10 w-full items-center justify-center gap-1.5 rounded-lg bg-[color:var(--checkout-brand-accent)] px-3 text-xs font-semibold text-white transition-colors hover:opacity-90 sm:h-8 sm:w-auto"
-          >
-            <Wand2 className="h-3 w-3" />
-            Auto Distribute
-          </button>
-          <button
-            type="button"
-            onClick={handleReset}
-            className="inline-flex h-10 w-full items-center justify-center gap-1.5 rounded-lg border border-[color:var(--checkout-border)] bg-white px-3 text-xs font-semibold text-[color:var(--checkout-muted-foreground)] transition-colors hover:bg-[color:var(--checkout-muted)]/50 sm:h-8 sm:w-auto"
-          >
-            <RotateCcw className="h-3 w-3" />
-            Reset
-          </button>
-        </div>
+        {hasTouchedTables ? (
+          <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+            <button
+              type="button"
+              onClick={handleAutoDistribute}
+              className="inline-flex h-10 w-full items-center justify-center gap-1.5 rounded-lg bg-[color:var(--checkout-brand-accent)] px-3 text-xs font-semibold text-white transition-colors hover:opacity-90 sm:h-8 sm:w-auto"
+            >
+              <Wand2 className="h-3 w-3" />
+              Auto Distribute
+            </button>
+            <button
+              type="button"
+              onClick={handleReset}
+              className="inline-flex h-10 w-full items-center justify-center gap-1.5 rounded-lg border border-[color:var(--checkout-border)] bg-white px-3 text-xs font-semibold text-[color:var(--checkout-muted-foreground)] transition-colors hover:bg-[color:var(--checkout-muted)]/50 sm:h-8 sm:w-auto"
+            >
+              <RotateCcw className="h-3 w-3" />
+              Reset
+            </button>
+          </div>
+        ) : null}
 
         {showConfirmButton && (
           <>

@@ -149,6 +149,8 @@ export function TableSeatingPanel({
 
   const [draftAllocation, setDraftAllocation] = useState<number[]>([]);
   const [seatingConfirmed, setSeatingConfirmed] = useState(false);
+  /** Show Auto Distribute / Reset only after the user edits a table. */
+  const [hasTouchedTables, setHasTouchedTables] = useState(false);
   const lastAppliedPlanRef = useRef<string>("");
 
   const belowMinimum = effectiveGroupSize > 0 && effectiveGroupSize < minPersons;
@@ -205,11 +207,13 @@ export function TableSeatingPanel({
     if (effectiveGroupSize <= 0 || tableQuantity <= 0) {
       setDraftAllocation([]);
       setSeatingConfirmed(false);
+      setHasTouchedTables(false);
       return;
     }
 
     setDraftAllocation(buildAutoAllocation(effectiveGroupSize, tableQuantity));
     setSeatingConfirmed(false);
+    setHasTouchedTables(false);
   }, [
     buildAutoAllocation,
     effectiveGroupSize,
@@ -311,6 +315,7 @@ export function TableSeatingPanel({
   };
 
   const stepAllocation = (index: number, delta: number) => {
+    setHasTouchedTables(true);
     setDraftAllocation((current) => {
       const value = current[index] ?? minPersons;
       const next = Math.max(minPersons, Math.min(maxPersons, value + delta));
@@ -336,6 +341,7 @@ export function TableSeatingPanel({
       lastAppliedPlanRef.current = "";
       setDraftAllocation([]);
       setSeatingConfirmed(false);
+      setHasTouchedTables(false);
       return;
     }
 
@@ -486,28 +492,30 @@ export function TableSeatingPanel({
                 />
               </div>
 
-              <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
-                <button
-                  type="button"
-                  className="inline-flex h-8 w-full items-center justify-center gap-1.5 rounded-lg border-0 text-xs font-semibold leading-none transition-opacity hover:opacity-90 sm:w-auto sm:px-3"
-                  style={{
-                    backgroundColor: "var(--color-primary)",
-                    color: "var(--color-primary-foreground, #fff)",
-                  }}
-                  onClick={handleAutoDistribute}
-                >
-                  <Wand2 className="h-3 w-3" strokeWidth={2} />
-                  Auto Distribute
-                </button>
-                <button
-                  type="button"
-                  className="inline-flex h-8 w-full items-center justify-center gap-1.5 rounded-lg border border-border bg-card text-xs font-semibold leading-none text-muted-foreground transition-colors hover:bg-[color-mix(in_srgb,var(--muted)_40%,var(--card))] sm:w-auto sm:px-3"
-                  onClick={handleReset}
-                >
-                  <RotateCcw className="h-3 w-3" strokeWidth={2} />
-                  Reset
-                </button>
-              </div>
+              {hasTouchedTables ? (
+                <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+                  <button
+                    type="button"
+                    className="inline-flex h-8 w-full items-center justify-center gap-1.5 rounded-lg border-0 text-xs font-semibold leading-none transition-opacity hover:opacity-90 sm:w-auto sm:px-3"
+                    style={{
+                      backgroundColor: "var(--color-primary)",
+                      color: "var(--color-primary-foreground, #fff)",
+                    }}
+                    onClick={handleAutoDistribute}
+                  >
+                    <Wand2 className="h-3 w-3" strokeWidth={2} />
+                    Auto Distribute
+                  </button>
+                  <button
+                    type="button"
+                    className="inline-flex h-8 w-full items-center justify-center gap-1.5 rounded-lg border border-border bg-card text-xs font-semibold leading-none text-muted-foreground transition-colors hover:bg-[color-mix(in_srgb,var(--muted)_40%,var(--card))] sm:w-auto sm:px-3"
+                    onClick={handleReset}
+                  >
+                    <RotateCcw className="h-3 w-3" strokeWidth={2} />
+                    Reset
+                  </button>
+                </div>
+              ) : null}
 
               {showConfirmButton && (
                 <>
